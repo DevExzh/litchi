@@ -1087,11 +1087,11 @@ fn budget_managed_snapshots_refuse_the_formatting_operations() {
     assert!(matches!(
         edit.format_run(Position::new(0), Position::new(0), |run| run.bold =
             Some(true)),
-        Err(Error::Document(crate::Error::UnsafeEdit { .. }))
+        Err(Error::Document(crate::Error::Refused(_)))
     ));
     assert!(matches!(
         edit.insert_formatted_paragraph(BodyAnchor::End, &NewParagraph::new()),
-        Err(Error::Document(crate::Error::UnsafeEdit { .. }))
+        Err(Error::Document(crate::Error::Refused(_)))
     ));
 }
 

@@ -24,7 +24,7 @@ fn paragraph(position: usize) -> ElementPath {
     ElementPath::new([ElementStep::Paragraph(Position::new(position))])
 }
 
-fn reopened(mut package: Package) -> Package {
+fn reopened(package: Package) -> Package {
     Package::from_bytes(&package.to_bytes().unwrap()).unwrap()
 }
 
@@ -72,7 +72,7 @@ fn styles_are_added_changed_removed_and_inverted() {
         Some(true)
     );
     assert_eq!(
-        bytes(&changed.apply(&change_patch.inverse()).unwrap()),
+        bytes(changed.apply(&change_patch.inverse()).unwrap().package()),
         bytes(&added)
     );
 
@@ -90,9 +90,12 @@ fn styles_are_added_changed_removed_and_inverted() {
     );
 
     // The add replays onto its base and inverts exactly.
-    assert_eq!(bytes(&base.apply(&add_patch).unwrap()), bytes(&added));
     assert_eq!(
-        bytes(&added.apply(&add_patch.inverse()).unwrap()),
+        bytes(base.apply(&add_patch).unwrap().package()),
+        bytes(&added)
+    );
+    assert_eq!(
+        bytes(added.apply(&add_patch.inverse()).unwrap().package()),
         bytes(&base)
     );
 }
@@ -128,7 +131,7 @@ fn numbering_definitions_instances_and_levels_round_trip() {
         Some("3")
     );
     assert_eq!(
-        bytes(&changed.apply(&patch.inverse()).unwrap()),
+        bytes(changed.apply(&patch.inverse()).unwrap().package()),
         bytes(&base)
     );
 
@@ -172,8 +175,11 @@ fn headers_and_footers_are_added_retyped_written_and_removed() {
     )
     .unwrap();
     assert!(main.contains("<w:titlePg/>"), "{main}");
-    assert_eq!(bytes(&added.apply(&patch.inverse()).unwrap()), bytes(&base));
-    assert_eq!(bytes(&base.apply(&patch).unwrap()), bytes(&added));
+    assert_eq!(
+        bytes(added.apply(&patch.inverse()).unwrap().package()),
+        bytes(&base)
+    );
+    assert_eq!(bytes(base.apply(&patch).unwrap().package()), bytes(&added));
 
     let mut edit = again.edit().unwrap();
     edit.set_story_text(&header, "Final").unwrap();
@@ -200,7 +206,7 @@ fn headers_and_footers_are_added_retyped_written_and_removed() {
     );
     assert_eq!(removed_again.header_footer_entries().unwrap().len(), 1);
     assert_eq!(
-        bytes(&removed.apply(&remove_patch.inverse()).unwrap()),
+        bytes(removed.apply(&remove_patch.inverse()).unwrap().package()),
         bytes(&written)
     );
 }
@@ -238,7 +244,10 @@ fn notes_are_added_written_and_removed_with_their_references() {
         "Two"
     );
     assert_eq!(document.text().unwrap().matches("First").count(), 1);
-    assert_eq!(bytes(&added.apply(&patch.inverse()).unwrap()), bytes(&base));
+    assert_eq!(
+        bytes(added.apply(&patch.inverse()).unwrap().package()),
+        bytes(&base)
+    );
 
     let mut edit = again.edit().unwrap();
     edit.set_note_text(NoteKind::Footnote, first, "Uno")

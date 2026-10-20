@@ -1233,10 +1233,12 @@ impl Classify for litchi_docx::Error {
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
-            Self::UnsafeEdit { .. } => Class::of(Code::UnsupportedCapability),
-            Self::Allocation { .. } | Self::RevisionAllocation { .. } | Self::Other(_) => {
-                Class::of(Code::InternalError)
-            },
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Allocation { .. }
+            | Self::RevisionAllocation { .. }
+            | Self::Internal { .. }
+            | Self::Other(_) => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }
@@ -1248,15 +1250,11 @@ impl Classify for litchi_docx::document::Error {
         match self {
             Self::Document(error) => error.classify(),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
-            Self::Refused {
-                reason: litchi_docx::document::Refusal::InvalidPropertyValue,
-                ..
-            } => Class::of(Code::InvalidValue),
-            Self::Refused { .. } | Self::Transfer(_) => Class::of(Code::UnsupportedCapability),
+            Self::Refused { reason, .. } => reason.kind().classify(),
+            Self::Transfer(refusal) => refusal.kind().classify(),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
-            // The patch target no longer holds the bytes the edit captured:
-            // the source changed underneath the handle.
-            Self::PatchConflict => Class::of(Code::IoError),
+            // A patch for another base: the caller supplied it (record 0351).
+            Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
             Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
                 Class::of(Code::InvalidInput)
@@ -1273,7 +1271,7 @@ impl Classify for litchi_docx::metadata::Error {
             Self::Package(error) => error.classify(),
             Self::Signed => Class::of(Code::DocumentProtected),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
-            Self::PatchConflict => Class::of(Code::IoError),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
             // Application and custom properties (record 0342).
             Self::Properties(error) => Class::of(match error {
                 litchi_ooxml_common::properties::Error::Unsupported { .. } => {

@@ -34,6 +34,7 @@ pub struct OpenOptions {
     pub(crate) cache_limits: Option<SourceCacheLimits>,
     pub(crate) source_read_policy: Option<SourceReadPolicy>,
     pub(crate) execution_context: Option<ExecutionContext>,
+    pub(crate) semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     pub(crate) encryption_limits: crate::encryption::Limits,
 }
@@ -67,6 +68,20 @@ impl OpenOptions {
     pub fn execution_context(mut self, context: ExecutionContext) -> Self {
         self.execution_context = Some(context);
         self
+    }
+
+    /// Bound the opened package's semantic reads by `limits` (record 0355);
+    /// the package keeps them for every bounded read and edit.
+    #[must_use]
+    pub fn semantic_limits(mut self, limits: crate::SemanticLimits) -> Self {
+        self.semantic_limits = limits;
+        self
+    }
+
+    /// The configured semantic read budgets.
+    #[must_use]
+    pub const fn semantic_limits_value(&self) -> &crate::SemanticLimits {
+        &self.semantic_limits
     }
 
     pub(crate) fn check_owning(&self) -> crate::Result<()> {

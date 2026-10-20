@@ -1091,7 +1091,7 @@ fn capabilities_match_live_paths_queries_and_views() {
             .document()
             .expect("document")
             .set_watermark(litchi_docx::Watermark::text("DRAFT"));
-        let mut package = builder.build().expect("build");
+        let package = builder.build().expect("build");
         crate::open_bytes(package.to_bytes().expect("bytes"))
             .expect("open the watermarked document")
     };

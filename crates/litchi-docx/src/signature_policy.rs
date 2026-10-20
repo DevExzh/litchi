@@ -7,9 +7,7 @@
 //! [`ensure_unsigned`] before they mutate anything, so a changed publication
 //! from a signed package is refused with
 //! [`OpcError::SignedSourceRequiresExplicitPolicy`] instead of dropping the
-//! signature. The shared core- and custom-properties owners refuse the same
-//! way at a managed save, and [`from_shared`] keeps their refusal typed. The
-//! caller authorizes the removal first with [`crate::Package::unsign`] or
+//! signature. The caller authorizes the removal first with [`crate::Package::unsign`] or
 //! [`litchi_opc::OpcPackage::unsign`]. A call that publishes nothing (removing
 //! something absent, storing an equal value) leaves the package, signature
 //! included, byte for byte as it was.
@@ -34,17 +32,4 @@ pub(crate) fn ensure_unsigned(package: &OpcPackage) -> Result<()> {
 /// disposition first.
 pub(crate) fn is_signed(package: &OpcPackage) -> bool {
     package.is_signed() || package.requires_signature_edit_policy()
-}
-
-/// Map an error of a shared `litchi-ooxml-common` owner (custom and core
-/// properties) to this crate's error, keeping a signature refusal typed as
-/// [`Error::Opc`] with [`OpcError::SignedSourceRequiresExplicitPolicy`]
-/// (unified-ops record 0014a, F1b).
-pub(crate) fn from_shared(error: litchi_ooxml_common::Error) -> Error {
-    match error {
-        litchi_ooxml_common::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy) => {
-            Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
-        },
-        error => Error::Common(error),
-    }
 }

@@ -24,14 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_heading("Litchi altChunk verification", 1)?;
 
     let html = br#"<!doctype html><html><head><meta charset="utf-8"></head><body><h2>Imported HTML</h2><p>Word imported this move-owned payload.</p></body></html>"#;
-    builder
-        .package()
-        .add_alt(Import::data(Data::Html(html.to_vec())), Some(true))?;
+    builder.add_alt(Import::data(Data::Html(html.to_vec())), Some(true))?;
     builder
         .document()?
         .add_paragraph()
         .add_run_with_text("Content after the imported block.");
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     package.save(&path)?;
 
     let reopened = Package::open(&path)?;

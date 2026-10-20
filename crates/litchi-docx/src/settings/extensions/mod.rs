@@ -13,6 +13,6 @@ pub use model::{
     DocumentId, Extension, Extensions, Guid, MAX_EXTENSIONS, MAX_OPAQUE_BYTES, OnOff,
     OpaqueExtension, WORD_2010_NAMESPACE, WORD_2012_NAMESPACE,
 };
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot};
 
 pub(crate) use package::{process_bytes_with_limits, process_part};

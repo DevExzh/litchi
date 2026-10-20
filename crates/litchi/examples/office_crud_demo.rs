@@ -86,7 +86,7 @@ fn demo_docx_operations() -> ExampleResult<()> {
         description: Some("Demonstration of DOCX creation".to_owned()),
         ..Metadata::default()
     });
-    let mut pkg = metadata.commit()?.into_package();
+    let pkg = metadata.commit()?.into_package();
 
     // Save
     pkg.save("demo_catalog.docx")?;
@@ -127,7 +127,7 @@ fn demo_docx_operations() -> ExampleResult<()> {
     }
     let mut metadata = edit.commit()?.into_package().edit_metadata();
     metadata.update(|props| props.last_modified_by = Some("Litchi Update".to_string()));
-    let mut pkg = metadata.commit()?.into_package();
+    let pkg = metadata.commit()?.into_package();
     pkg.save("demo_catalog_updated.docx")?;
     println!("✓ Updated: demo_catalog_updated.docx");
 

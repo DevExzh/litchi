@@ -685,12 +685,16 @@ impl Docx {
     /// ```
     pub fn section_inventory_with_limits(&self, limits: &SectionLimits) -> Result<Inventory> {
         match &self.0.owner {
-            DocxOwner::Eager(package) => {
-                Ok(package.document()?.section_inventory_with_limits(limits)?)
-            },
+            DocxOwner::Eager(package) => Ok(package
+                .with_semantic_limits(package.semantic_limits().clone().sections(limits.clone()))
+                .document()?
+                .section_inventory()?),
             DocxOwner::Source(package) => {
                 let result = package
-                    .section_inventory_snapshot_with_limits(limits)
+                    .with_semantic_limits(
+                        package.semantic_limits().clone().sections(limits.clone()),
+                    )
+                    .section_inventory_snapshot()
                     .map(|snapshot| snapshot.inventory().clone())
                     .map_err(Error::from);
                 self.0.owner.finish(result)
@@ -763,7 +767,7 @@ impl Docx {
         if let Some(package) = self.0.unsigned.get() {
             return Ok(package.clone());
         }
-        let mut package = match &self.0.owner {
+        let package = match &self.0.owner {
             DocxOwner::Eager(package) => {
                 // A copy of the graph would drop the encryption profile the
                 // eager owner keeps, and the leaf refuses to edit a package
@@ -780,7 +784,7 @@ impl Docx {
             },
             DocxOwner::Source(package) => package.to_owned_package_preserving_source()?,
         };
-        package.unsign();
+        let package = package.unsign();
         self.owner().check_source()?;
         // Concurrent first users may each build a candidate; only a complete
         // successfully fenced result is retained. Each writer gets a clone.

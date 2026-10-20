@@ -20,7 +20,7 @@ fn every_level_publishes_the_default_save_bytes() {
         .document()
         .unwrap()
         .add_paragraph_with_text("save durability 0761");
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let reference = directory.path().join("reference.docx");
     package.save(&reference).unwrap();

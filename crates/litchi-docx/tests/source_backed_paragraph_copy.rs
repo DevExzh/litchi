@@ -290,7 +290,11 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
-        open(source.clone()).plain_paragraph_copy_snapshot_with_limits(paragraph_limited),
+        open(source.clone())
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
+            )
+            .plain_paragraph_copy_snapshot(),
         Err(Error::Limit {
             resource: "paragraphs",
             ..
@@ -298,7 +302,8 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     ));
     let output_limited = Limits::new(1024, 4, 100, 8, document(&["a", "b"]).len(), 4096).unwrap();
     let snapshot = open(source)
-        .plain_paragraph_copy_snapshot_with_limits(output_limited)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(output_limited))
+        .plain_paragraph_copy_snapshot()
         .unwrap();
     let mut edit = snapshot.edit();
     assert!(matches!(
@@ -312,7 +317,10 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
     let snapshot = open(bytes(&fixture(MAIN, document(&["a"]))))
-        .plain_paragraph_copy_snapshot_with_limits(durable_limited)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().paragraph_copy(durable_limited),
+        )
+        .plain_paragraph_copy_snapshot()
         .unwrap();
     let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))

@@ -2,7 +2,8 @@ use super::model::{
     A, C, CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Conformance, DOCUMENT_CT, MAX_WORKBOOK_BYTES,
     STYLE_CT, STYLE_REL, WORKBOOK_CT,
 };
-use super::{Patch, Snapshot, Transaction, load, store};
+use super::transaction::{Patch, Transaction};
+use super::{Snapshot, load, store};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
@@ -251,9 +252,9 @@ fn transaction_noop_keeps_exact_source_bytes_and_relationship_topology() {
         })
         .collect::<Vec<_>>();
 
-    let commit = Transaction::new(&mut package, &name)
+    let commit = Transaction::new(&package, &name)
         .unwrap()
-        .commit()
+        .commit(&mut package)
         .unwrap();
     assert!(!commit.changed());
     assert!(commit.patch().is_empty());
@@ -281,7 +282,7 @@ fn transaction_noop_keeps_exact_source_bytes_and_relationship_topology() {
 fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
     let (mut package, name) = synthetic(Conformance::Transitional);
     let source = Snapshot::load(&package, &name).unwrap();
-    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    let mut transaction = Transaction::new(&package, &name).unwrap();
     transaction
         .edit_graph(|graph| {
             graph.charts[0].workbook.as_mut().unwrap().data = b"changed workbook".to_vec();
@@ -289,7 +290,7 @@ fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
         })
         .unwrap();
 
-    let commit = transaction.commit().unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     assert!(commit.changed());
     assert!(commit.patch().is_changed());
     assert_eq!(
@@ -322,14 +323,14 @@ fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
 #[test]
 fn chart_patches_reject_stale_sources_and_invalid_graphs_atomically() {
     let (mut package, name) = synthetic(Conformance::Transitional);
-    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    let mut transaction = Transaction::new(&package, &name).unwrap();
     transaction
         .edit_graph(|graph| {
             graph.charts[0].workbook.as_mut().unwrap().data = b"next workbook".to_vec();
             Ok(())
         })
         .unwrap();
-    let commit = transaction.commit().unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
 
     let mut stale = package.clone();
     stale
@@ -341,13 +342,13 @@ fn chart_patches_reject_stale_sources_and_invalid_graphs_atomically() {
     assert!(commit.patch().apply(&mut stale).is_err());
     assert_eq!(stale.get_part(&workbook_name).unwrap().blob(), stale_before);
 
-    let (mut package, name) = synthetic(Conformance::Transitional);
+    let (package, name) = synthetic(Conformance::Transitional);
     let before = package
         .get_part(&PackURI::new("/word/embeddings/data1.xlsx").unwrap())
         .unwrap()
         .blob()
         .to_vec();
-    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    let mut transaction = Transaction::new(&package, &name).unwrap();
     assert!(
         transaction
             .edit_graph(|graph| {
@@ -357,7 +358,7 @@ fn chart_patches_reject_stale_sources_and_invalid_graphs_atomically() {
             .is_err()
     );
     assert!(!transaction.is_changed());
-    let _ = transaction.rollback();
+    drop(transaction);
     assert_eq!(
         package
             .get_part(&PackURI::new("/word/embeddings/data1.xlsx").unwrap())
@@ -374,7 +375,7 @@ fn patch_round_trip_keeps_style_color_and_workbook_relationship_edges() {
     let chart_name = PackURI::new("/word/charts/chart1.xml").unwrap();
     let chart_relationships = relationship_signature(&package, &chart_name);
     let source_package = package.clone();
-    let mut transaction = Transaction::new(&mut package, &name).unwrap();
+    let mut transaction = Transaction::new(&package, &name).unwrap();
     transaction
         .edit_graph(|graph| {
             graph.charts[0].styles[0].data = style_xml().replace("FF0000", "00FF00").into_bytes();
@@ -383,7 +384,7 @@ fn patch_round_trip_keeps_style_color_and_workbook_relationship_edges() {
             Ok(())
         })
         .unwrap();
-    let commit = transaction.commit().unwrap();
+    let commit = transaction.commit(&mut package).unwrap();
     let patch: Patch = commit.patch().clone();
     let before = patch.before().graph().clone();
     let mut replay = source_package;

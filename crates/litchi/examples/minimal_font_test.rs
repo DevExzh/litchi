@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Finalize and save
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save("minimal_font_test.docx")?;
 
     println!("✓ Created: minimal_font_test.docx");

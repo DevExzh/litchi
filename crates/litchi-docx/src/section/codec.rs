@@ -347,11 +347,11 @@ impl Raw {
             return Ok(());
         };
         let Some(namespace) = &self.word_namespace else {
-            return Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "edit_section_layout",
-                reason: "the generated section property has no resolved owning Word namespace",
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_section_layout",
+                "the generated section property has no resolved owning Word namespace",
+            ));
         };
         write!(
             xml,
@@ -505,11 +505,11 @@ fn ensure_no_unknown_word_insertion_barrier(raw: &Raw, state: &State, dirty: Dir
             })
     });
     if needs_insertion {
-        return Err(Error::UnsafeEdit {
-            format: "DOCX",
-            operation: "edit_section_layout",
-            reason: "an unknown direct Word section child blocks safe modeled insertion",
-        });
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_section_layout",
+            "an unknown direct Word section child blocks safe modeled insertion",
+        ));
     }
     Ok(())
 }

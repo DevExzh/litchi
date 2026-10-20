@@ -1,4 +1,4 @@
-use litchi_docx::writer::{MutableDocument, SectionProperties, TableOfContents};
+use litchi_docx::builder::{Document, SectionProperties, TableOfContents};
 use litchi_docx::{Package, section::Start};
 use litchi_opc::packuri::PackURI;
 use std::io::Cursor;
@@ -34,7 +34,7 @@ fn inserts_and_removes_paragraphs_and_tables_then_reparses() {
         assert_eq!(doc.table_count(), 0);
         assert!(!doc.to_xml().unwrap().contains("inserted"));
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();
@@ -48,7 +48,7 @@ fn inserts_and_removes_paragraphs_and_tables_then_reparses() {
 
 #[test]
 fn rejects_out_of_range_insertion_and_removal() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     doc.add_paragraph_with_text("only");
     assert!(doc.insert_paragraph(2).is_err());
     assert!(doc.remove_paragraph(1).is_err());
@@ -60,7 +60,7 @@ fn rejects_out_of_range_insertion_and_removal() {
 
 #[test]
 fn mutates_blocks_around_preserved_paragraphs_and_final_section() {
-    let mut doc = MutableDocument::from_xml(RAW).unwrap();
+    let mut doc = Document::from_xml(RAW).unwrap();
     assert_eq!(doc.paragraph_count(), 2);
 
     // Append lands before the body-final sectPr.
@@ -82,14 +82,14 @@ fn mutates_blocks_around_preserved_paragraphs_and_final_section() {
     assert!(xml.trim_end().ends_with("</w:document>"));
 
     // The result still parses and validates section placement.
-    let reparsed = MutableDocument::from_xml(&xml).unwrap();
+    let reparsed = Document::from_xml(&xml).unwrap();
     assert_eq!(reparsed.paragraph_count(), 3);
     assert_eq!(reparsed.section().page_width, 12240);
 }
 
 #[test]
 fn removing_a_section_ending_paragraph_merges_sections() {
-    let mut doc = MutableDocument::new();
+    let mut doc = Document::new();
     doc.add_paragraph_with_text("first");
     doc.add_paragraph_with_text("second");
     doc.insert_section_break(
@@ -117,7 +117,7 @@ fn structural_edits_keep_the_pending_toc_anchored_after_existing_content() {
             .add_run()
             .set_text("front-text");
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

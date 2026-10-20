@@ -741,7 +741,7 @@ impl SourceAdmission {
 /// # Errors
 ///
 /// Returns the projection's markup-compatibility error, or
-/// [`crate::Error::UnsafeEdit`] for a part whose projection selects, unwraps
+/// [`crate::Error::Refused`] for a part whose projection selects, unwraps
 /// or hides content outside run-level alternate content.
 pub(crate) fn admit_document_source(
     raw: &[u8],
@@ -764,11 +764,11 @@ pub(crate) fn admit_document_source(
             std::borrow::Cow::Owned(_) if holds_run_alternate_content(raw) => {
                 Ok(SourceAdmission::RunAlternateContent)
             },
-            std::borrow::Cow::Owned(_) => Err(crate::Error::UnsafeEdit {
-                format: "DOCX",
+            std::borrow::Cow::Owned(_) => Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
                 operation,
                 reason,
-            }),
+            )),
         },
     }
 }
@@ -1371,14 +1371,14 @@ impl<'a> DocumentPart<'a> {
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
     pub fn revisions(&self) -> Result<SmallVec<[crate::revision::Revision; 4]>> {
-        self.revisions_with_limits(crate::revision::Limits::default())
+        self.revisions_bounded(crate::revision::Limits::default())
     }
 
     /// Read tracked revision metadata with explicit parser and retention limits.
     ///
     /// # Errors
     /// Returns malformed metadata, XML, or revision resource-limit errors.
-    pub fn revisions_with_limits(
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<SmallVec<[crate::revision::Revision; 4]>> {

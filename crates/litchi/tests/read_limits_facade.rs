@@ -89,7 +89,7 @@ fn docx_limits_are_nameable() {
 fn document_limits_bound_path_and_byte_ingress() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let path = directory.path().join("bounded.docx");
-    let mut package = litchi::docx::Package::new().expect("new DOCX package");
+    let package = litchi::docx::Package::new().expect("new DOCX package");
     package.save(&path).expect("save DOCX package");
 
     let bytes = std::fs::read(&path).expect("read DOCX fixture");
@@ -128,7 +128,7 @@ fn document_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
     );
 
     let unknown = directory.path().join("bounded-package");
-    let mut package = litchi::docx::Package::new().expect("new DOCX package");
+    let package = litchi::docx::Package::new().expect("new DOCX package");
     package.save(&unknown).expect("save DOCX package");
     let bytes = std::fs::read(&unknown).expect("read DOCX fixture");
     let tight = one_byte_short(&bytes);

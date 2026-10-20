@@ -1053,7 +1053,7 @@ fn retained_property_views_resolve_ancestor_aliases_and_foreign_prefixes() {
     );
     let mut package = crate::Package::new().unwrap();
     package
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&litchi_opc::PackURI::new("/word/document.xml").unwrap())?
                 .set_blob(xml.into_bytes());
             Ok::<_, crate::Error>(())

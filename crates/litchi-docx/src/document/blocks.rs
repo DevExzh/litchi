@@ -609,28 +609,27 @@ impl IndexedBlock {
     ///
     /// # Errors
     ///
-    /// Refuses with [`Error::UnsafeEdit`] instead of guessing when the block
+    /// Refuses with [`Error::Refused`] instead of guessing when the block
     /// sits inside a `w:customXml` wrapper, when its kind has no transaction
     /// address, or when the raw and visible positions are not proven to agree
     /// ([`Blocks::raw_positions_proven`]).
     pub fn transaction_position(&self) -> Result<Position> {
-        let refuse = |reason| {
-            Err(Error::UnsafeEdit {
-                format: "DOCX",
-                operation: "block transaction position",
-                reason,
-            })
-        };
+        let refuse = |kind, reason| Err(Error::refused(kind, "block transaction position", reason));
         if self.entry.wrapped {
             return refuse(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
                 "the block sits inside a w:customXml wrapper, which document transactions do not address",
             );
         }
         let Some(position) = self.direct_position() else {
-            return refuse("document transactions do not address this kind of block");
+            return refuse(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "document transactions do not address this kind of block",
+            );
         };
         if !self.blocks.raw_positions_proven() {
             return refuse(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
                 "markup compatibility selected or unwrapped content, so raw and visible block positions are not proven to agree",
             );
         }

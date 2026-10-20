@@ -420,3 +420,20 @@ impl PayloadHandle {
         &self.0
     }
 }
+
+impl PartPayload {
+    /// Whether both payloads are one allocation: the same ready, verified or
+    /// transferred bytes, or the same deferred source cell. Never decodes,
+    /// so two separately loaded copies of equal bytes compare unequal.
+    pub(crate) fn same_allocation(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Ready(left), Self::Ready(right)) => Arc::ptr_eq(left, right),
+            (Self::Deferred(left), Self::Deferred(right)) => Arc::ptr_eq(left, right),
+            (Self::Transferred(left), Self::Transferred(right)) => Arc::ptr_eq(left, right),
+            (Self::Verified(left), Self::Verified(right)) => {
+                Arc::ptr_eq(left.bytes(), right.bytes())
+            },
+            _ => false,
+        }
+    }
+}

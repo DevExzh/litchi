@@ -8,9 +8,9 @@ use std::io::Cursor;
 const REVISION_DATE_UTC: &str = "2026-07-17T00:00:00.123456+00:00";
 
 fn authored_source_docx() -> Vec<u8> {
-    let mut package = Package::new().unwrap();
+    let mut builder = crate::Builder::new().unwrap();
     {
-        let document = package.authoring_document().unwrap();
+        let document = builder.document().unwrap();
         let paragraph = document.add_paragraph();
         paragraph.add_run_with_text("before ");
         paragraph
@@ -34,6 +34,7 @@ fn authored_source_docx() -> Vec<u8> {
         paragraph.add_run_with_text(" after");
     }
     let mut stream = Cursor::new(Vec::new());
+    let package = builder.build().unwrap();
     package.to_plain_stream(&mut stream).unwrap();
     stream.into_inner()
 }
@@ -91,16 +92,20 @@ fn authored_revision_actions_round_trip_through_borrowed_package_and_durable_inv
 
     let changed_file = NamedTempFile::with_suffix(".docx").unwrap();
     package.save(changed_file.path()).unwrap();
-    let mut reopened = Package::open(changed_file.path()).unwrap();
+    let reopened = Package::open(changed_file.path()).unwrap();
     assert_eq!(
         reopened.document_snapshot().unwrap().xml_bytes(),
         target_xml.as_slice()
     );
 
-    let restored = reopened
-        .apply_durable_document_patch(&durable.inverse())
-        .unwrap();
-    assert_eq!(restored.xml_bytes(), source_xml.as_slice());
+    let reopened = reopened
+        .apply_durable_document(&durable.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        reopened.document_snapshot().unwrap().xml_bytes(),
+        source_xml.as_slice()
+    );
 
     let restored_file = NamedTempFile::with_suffix(".docx").unwrap();
     reopened.save(restored_file.path()).unwrap();

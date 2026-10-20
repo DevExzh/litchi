@@ -105,7 +105,7 @@ fn docx(paragraphs: usize, matches: usize) -> Outcome<serde_json::Value> {
     let unified = || -> Outcome<File> {
         Ok(file.set("/", props! { "find" => "needle", "replace" => "pin" })?)
     };
-    let mut leaf_package = leaf()?;
+    let leaf_package = leaf()?;
     let leaf_text = leaf_package.document()?.text()?;
     if leaf_text.matches("pin").count() != matches
         || leaf_package.to_bytes()? != unified()?.to_bytes()?
@@ -168,7 +168,7 @@ fn docx_paragraph(paragraphs: usize) -> Outcome<serde_json::Value> {
             props! { "find" => "needle", "replace" => "pin" },
         )?)
     };
-    let mut leaf_package = leaf()?;
+    let leaf_package = leaf()?;
     if leaf_package.document()?.text()?.matches("pin").count() != 1
         || leaf_package.to_bytes()? != unified()?.to_bytes()?
     {

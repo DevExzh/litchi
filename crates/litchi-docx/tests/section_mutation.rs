@@ -1,4 +1,4 @@
-use litchi_docx::writer::{MutableDocument, SectionProperties};
+use litchi_docx::builder::{Document as MutableDocument, SectionProperties};
 use litchi_docx::{Package, header_footer::Kind, section::Start};
 use std::io::Cursor;
 
@@ -79,7 +79,7 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
             )
             .unwrap();
     }
-    let mut package = builder.build().unwrap();
+    let package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

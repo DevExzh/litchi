@@ -2766,6 +2766,12 @@
    "series": "pptx_p0_final:cell_.*_batch/eager/.*/cold",
    "explanation": "Record 0346 §6: a fresh handle reads every cell's properties and text body once (about 5 µs per cell) to judge each item's change before staging, which the leaf leg does not, plus the first edit's admission on a fresh eager handle (≈ 0.35 ms); warm batches are 1.06–1.15×. Follow-up 0346-P1: per-edit change flags from set_text_property_chunks.",
    "disposition": "follow-up"
+  },
+  {
+   "record": "0355",
+   "series": "docx_w1_contract:docx:file_(batch|edit)_1k_paragraph_text_sets",
+   "explanation": "Record 0355 §5: pre-existing (base and head equal, 1.46 s). Each item's path resolution reloads the staged body (docx::nav::load_body, 58% of instructions in a 300×300 callgrind probe), so the cost is O(paragraphs × items), about 1.5 µs per paragraph per item. Follow-up 0355-P1: cache the body navigation across the items of one batch.",
+   "disposition": "follow-up"
   }
  ],
  "evidence_without_rows": [

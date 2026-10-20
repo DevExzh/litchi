@@ -2553,6 +2553,45 @@ def p0347():
     return out
 
 
+W1_DOCX_OPS = {
+    "open (1,000 paragraphs)": ("open", OPEN, "unified/native"),
+    "set paragraph text": ("set", SINGLE, "unified/native"),
+    "add paragraph": ("add", SINGLE, "unified/native"),
+    "set / title": ("metadata set", SINGLE, "unified/native"),
+    "File::edit 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
+    "File::batch 1k paragraph text sets": ("batch", BATCH, "unified/native (one leaf edit)"),
+    "save (to_bytes) after one set": ("save", SINGLE, "unified/native"),
+    "repeated save of one package (second to_bytes)": ("save", SINGLE, "unified/native"),
+}
+
+
+@needs("0355")
+def p0355():
+    """Record 0355 §5: docx_w1_contract_bench, release, pinned, ABBA (two
+    base and two head runs). Head rows pair the unified call with the leaf
+    call; after/before rows compare each leg at the wave's head with the same
+    leg at its base (e652864de8)."""
+    base, head = RES / "0355" / "docx-w1-contract-base.txt", RES / "0355" / "docx-w1-contract-head.txt"
+    out = native_lines("0355", "docx_w1_contract", head, W1_DOCX_OPS)
+    legs: dict = {}
+    for leg, path in (("before", base), ("after", head)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = NATIVE_LINE.match(line.strip())
+            if m:
+                slot = legs.setdefault(m.group(2), {"before": ([], []), "after": ([], [])})[leg]
+                slot[0].append(int(m.group(3)))
+                slot[1].append(int(m.group(4)))
+    for scen, v in legs.items():
+        op = W1_DOCX_OPS.get(scen, ("set",))[0]
+        for index, name in ((0, "leaf"), (1, "unified")):
+            b, a = us(med(v["before"][index])), us(med(v["after"][index]))
+            out.append(row("0355", "docx", op, f"{scen} ({name} leg, W1 head vs base)", "",
+                           b, a, [a / b], regression("0355"),
+                           f"docx_w1_contract:{name}:{slug(scen)}:after-before",
+                           src([base, head]), comparison="after/before"))
+    return out
+
+
 CONTRACT_0356 = {
     "open": ("open", OPEN), "save": ("save", SINGLE), "save_twice": ("save", SINGLE),
     "set": ("set", SINGLE), "set_save": ("set", SINGLE), "batch1k": ("batch", BATCH),
@@ -2607,7 +2646,9 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0356]
+           p0347, p0348, p0355, p0356]
+
+
 
 
 # ---------------------------------------------------------------- merge

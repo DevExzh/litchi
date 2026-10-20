@@ -8,9 +8,15 @@
 /// byte ranges, read and edited in place (record 0319).
 pub mod catalog;
 mod codec;
+mod edit;
 mod lists;
 mod model;
 mod package;
+#[allow(
+    dead_code,
+    unreachable_pub,
+    reason = "the part-level draft stages the family edit; its accessors serve unit tests"
+)]
 mod transaction;
 mod validation;
 
@@ -47,4 +53,6 @@ pub(crate) fn parse_list_level(raw: &str) -> Option<(u8, bool)> {
         _ => Some((MAX_LIST_LEVEL, true)),
     }
 }
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub(crate) use transaction::Patch as DraftPatch;
+pub use transaction::Snapshot;

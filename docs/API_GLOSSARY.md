@@ -141,7 +141,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | Wave | Crates | Immutable owner | Commit triad / no snapshot | No `Transaction`/`rollback`/`is_changed` | `Refused` replaces `UnsafeEdit` | Limits through options | Gate |
 |---|---|---|---|---|---|---|---|
 | F0 foundation | `litchi-core`, gate | ➖ | ✅ shared types | ✅ bans on clean crates | ✅ shared types, ops classification | ➖ | ✅ 0351 |
-| W1 | DOCX | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 | 🔴 |
+| W1 | DOCX | ✅ (0355; `litchi_docx::Package`, `source_backed::Package`, `Document`) | ✅ (0355; 23 families registered; source-backed streaming families keep part-level commits, W1b) | ✅ (0355; banned in both `docx` profiles) | ✅ (0355; `Refused`/`PatchConflict`/`Internal`) | ✅ (0355; `SemanticLimits` on `OpenOptions`) | ✅ 0355 |
 | W2 | PPTX | ✅ `Package` (0356) | ✅ 33 registered families (0356) · 🔴 the five `SourceBacked*` stream-publishing editors (0356 gap 1) | ✅ (0252) | ✅ (0356) | ✅ (0356) | ✅ (0356) |
 | W3 | PPT | ✅ | 🔴 | 🔴 | ➖ | 🔴 (`raw::Reader`, record parsers) | 🔴 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | 🔴 | 🔴 | 🔴 | ➖ | 🔴 | 🔴 |

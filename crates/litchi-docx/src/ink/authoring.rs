@@ -1644,11 +1644,11 @@ fn wordprocessing_drawing_namespace(dialect: StoryDialect) -> &'static str {
 }
 
 fn strict_extension_refusal() -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "author_ink_host",
-        reason: "Strict WordprocessingML has no accepted Word 2010 Ink extension relationship policy",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "author_ink_host",
+        "Strict WordprocessingML has no accepted Word 2010 Ink extension relationship policy",
+    )
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -1980,7 +1980,7 @@ mod tests {
         let style = Style::drawing(Placement::inline(extent()), image());
         assert!(matches!(
             render(&style, StoryDialect::Strict, "ink", Some("image"), 1),
-            Err(Error::UnsafeEdit { .. })
+            Err(Error::Refused(_))
         ));
         let fallback = render_fallback(&image(), StoryDialect::Strict, "image", 1)
             .expect("standalone fallback");

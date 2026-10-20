@@ -685,6 +685,20 @@ impl Relationships {
         self.rels.values()
     }
 
+    /// Whether both collections hold the same relationships: the same IDs
+    /// with the same types, target references and target modes.
+    #[must_use]
+    pub fn same_entries(&self, other: &Self) -> bool {
+        self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    candidate.reltype == relationship.reltype
+                        && candidate.target_ref == relationship.target_ref
+                        && candidate.target_mode == relationship.target_mode
+                })
+            })
+    }
+
     /// Get the number of relationships in the collection.
     #[inline]
     #[must_use]

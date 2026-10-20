@@ -77,7 +77,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_mail_merge(
+    pub(crate) fn set_mail_merge(
         &mut self,
         mut settings: MailMergeSettings,
         data_source: Option<Source>,
@@ -210,7 +210,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn update_mail_merge(
+    pub(crate) fn update_mail_merge(
         &mut self,
         settings: MailMergeSettings,
         data_source: Option<Source>,
@@ -234,7 +234,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn update_mail_merge_recipients(
+    pub(crate) fn update_mail_merge_recipients(
         &mut self,
         recipients: Recipients,
         conformance: mail_merge::Conformance,
@@ -276,7 +276,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn clear_mail_merge(&mut self) -> Result<bool> {
+    pub(crate) fn clear_mail_merge(&mut self) -> Result<bool> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         if DocumentSettings::extract_from_part(&original)?

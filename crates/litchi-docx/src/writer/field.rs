@@ -7,10 +7,6 @@
     reason = "the invariant is established immediately before extraction"
 )]
 #![expect(
-    clippy::module_name_repetitions,
-    reason = "public names retain established OOXML facade terminology"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]
@@ -518,7 +514,7 @@ fn append_quoted_field_argument(instruction: &mut String, value: &str) {
 ///
 /// This enum supports both complete fields and individual field characters for complex field structures.
 #[derive(Debug, Clone)]
-pub enum MutableField {
+pub enum Field {
     /// A complete field with instruction and optional result
     Complete {
         /// Field instruction (e.g., "PAGE", "DATE", "REF `MyBookmark`")
@@ -541,7 +537,7 @@ pub enum MutableField {
     End,
 }
 
-impl MutableField {
+impl Field {
     /// Create a new complete field.
     ///
     /// # Arguments
@@ -876,7 +872,7 @@ mod tests {
 
     #[test]
     fn test_field_creation() {
-        let field = MutableField::new("PAGE".to_string());
+        let field = Field::new("PAGE".to_string());
         assert_eq!(field.instruction(), "PAGE");
         assert!(field.is_dirty());
         assert!(field.result().is_none());
@@ -884,7 +880,7 @@ mod tests {
 
     #[test]
     fn test_field_with_result() {
-        let field = MutableField::with_result("PAGE".to_string(), "5".to_string());
+        let field = Field::with_result("PAGE".to_string(), "5".to_string());
         assert_eq!(field.instruction(), "PAGE");
         assert_eq!(field.result(), Some("5"));
         assert!(!field.is_dirty());
@@ -892,14 +888,14 @@ mod tests {
 
     #[test]
     fn test_field_factories() {
-        let page = MutableField::page();
+        let page = Field::page();
         assert_eq!(page.instruction(), "PAGE");
 
-        let date = MutableField::date(Some("MMMM d, yyyy"));
+        let date = Field::date(Some("MMMM d, yyyy"));
         assert!(date.instruction().contains("DATE"));
         assert!(date.instruction().contains("MMMM d, yyyy"));
 
-        let ref_field = MutableField::reference("MyBookmark");
+        let ref_field = Field::reference("MyBookmark");
         assert!(ref_field.instruction().contains("REF MyBookmark"));
     }
 
@@ -919,7 +915,7 @@ mod tests {
             .unwrap();
         citation.set_dirty(false);
 
-        let field = MutableField::citation(&citation).unwrap();
+        let field = Field::citation(&citation).unwrap();
         assert_eq!(
             field.instruction(),
             r#"CITATION \l 1033 Doe2024 \v 3 \f "qtd. in" \s "in press" \m "Smith 2025" \v 2"#
@@ -962,7 +958,7 @@ mod tests {
             .unwrap();
         bibliography.set_dirty(false);
 
-        let field = MutableField::bibliography(&bibliography).unwrap();
+        let field = Field::bibliography(&bibliography).unwrap();
         assert_eq!(
             field.instruction(),
             r#"BIBLIOGRAPHY \l 1033 \f 1036 \m Doe2024 \m "Smith 2025""#
@@ -1012,7 +1008,7 @@ mod tests {
 
     #[test]
     fn test_field_xml() {
-        let mut field = MutableField::with_result("PAGE".to_string(), "1".to_string());
+        let mut field = Field::with_result("PAGE".to_string(), "1".to_string());
         field.mark_dirty();
 
         let xml = field.to_xml().unwrap();

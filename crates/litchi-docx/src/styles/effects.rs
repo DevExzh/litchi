@@ -19,8 +19,12 @@ use litchi_opc::{
 use quick_xml::events::Event;
 use quick_xml::{Reader, XmlVersion};
 
+use crate::Result;
 use crate::styles::{Style, Styles, Type};
-use crate::{Error, Result};
+
+#[path = "effects/edit.rs"]
+mod edit;
+pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg(test)]
@@ -60,14 +64,6 @@ mod test_trace {
         COUNTS.with(|counts| {
             let mut value = counts.get();
             value.loads = value.loads.saturating_add(1);
-            counts.set(value);
-        });
-    }
-
-    pub(super) fn record_candidate_clone() {
-        COUNTS.with(|counts| {
-            let mut value = counts.get();
-            value.candidate_clones = value.candidate_clones.saturating_add(1);
             counts.set(value);
         });
     }
@@ -447,8 +443,8 @@ impl Snapshot {
 
     /// Start an isolated edit over this optional resource.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub(crate) fn edit(&self) -> Draft {
+        Draft {
             base: self.clone(),
             next: self.resource.clone(),
         }
@@ -478,21 +474,14 @@ impl Snapshot {
 
 /// An isolated replacement transaction over one owner-wide resource state.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub(crate) struct Draft {
     base: Snapshot,
     next: Option<Resource>,
 }
 
-impl Transaction {
-    /// Borrow the currently staged optional resource.
-    #[inline]
-    #[must_use]
-    pub const fn resource(&self) -> Option<&Resource> {
-        self.next.as_ref()
-    }
-
+impl Draft {
     /// Replace the complete resource, or pass None to stage removal.
-    pub fn replace_resource(&mut self, resource: Option<Resource>) -> Result<&mut Self> {
+    pub(crate) fn replace_resource(&mut self, resource: Option<Resource>) -> Result<&mut Self> {
         if let Some(resource) = &resource {
             if resource.conformance() != self.base.conformance {
                 return Err(Error::InvalidFormat(
@@ -504,20 +493,14 @@ impl Transaction {
         Ok(self)
     }
 
-    /// Clear the staged resource.
-    pub fn clear_resource(&mut self) -> &mut Self {
-        self.next = None;
-        self
-    }
-
     /// Whether the staged owner state differs from its source snapshot.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         !same_resource(self.base.resource.as_ref(), self.next.as_ref())
     }
 
     /// Validate and produce a source-checked commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<DraftCommit> {
         let changed = self.is_changed();
         if !changed {
             let patch = Patch {
@@ -529,11 +512,7 @@ impl Transaction {
                 after_graph: self.base.graph.clone(),
                 package_bound: self.base.graph.is_some(),
             };
-            return Ok(Commit {
-                snapshot: self.base,
-                patch,
-                changed: false,
-            });
+            return Ok(DraftCommit { patch });
         }
 
         let after_graph = graph_after_transaction(&self.base, self.next.as_ref())?;
@@ -556,67 +535,19 @@ impl Transaction {
             after_graph,
             package_bound,
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        Ok(DraftCommit { patch })
     }
 }
 
-/// A successful source-bound owner publication.
+/// The patch a draft computed.
 #[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
+pub(crate) struct DraftCommit {
     patch: Patch,
-    changed: bool,
 }
 
-impl Commit {
-    /// Whether the transaction changed the owner resource.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Alias for [`Self::changed`].
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed()
-    }
-
-    /// Borrow the owner snapshot produced by the edit.
-    #[inline]
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the owner snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible source patch.
-    #[inline]
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible source patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
+impl DraftCommit {
+    pub(crate) fn into_patch(self) -> Patch {
         self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
@@ -698,28 +629,11 @@ impl Patch {
         })
     }
 
-    /// Apply this source-checked patch atomically to its owner in a package.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        apply_patch(package, self.owner, self)
-    }
-
-    /// Apply the exact inverse of this patch atomically to a package.
-    pub fn undo(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(package)
-    }
-
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         same_resource(self.before.as_ref(), self.after.as_ref())
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 }
 
@@ -1461,29 +1375,6 @@ pub fn load_snapshot(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
     load(package, owner)
 }
 
-/// Apply a source-checked patch atomically to one package owner.
-pub fn apply_patch(package: &mut OpcPackage, owner: Owner, patch: &Patch) -> Result<Snapshot> {
-    let current = load(package, owner)?;
-    if patch.owner != owner {
-        return Err(Error::InvalidFormat(
-            "stylesWithEffects patch owner does not match the requested package owner".to_owned(),
-        ));
-    }
-    let projected = patch.apply_to_snapshot(&current)?;
-    if current.same_state(&projected) {
-        return Ok(current);
-    }
-
-    let mut candidate = {
-        #[cfg(test)]
-        test_trace::record_candidate_clone();
-        package.clone()
-    };
-    let published = apply_projected_patch(&mut candidate, owner, patch, projected, Some(package))?;
-    *package = candidate;
-    Ok(published)
-}
-
 /// Apply a patch to the exact candidate clone owned by the package facade.
 ///
 /// The caller must have loaded `current` from the same source package immediately
@@ -1638,11 +1529,6 @@ fn readback_existing_resource_replacement(
         graph.conformance,
         Some(graph_token),
     ))
-}
-
-/// Apply a committed source patch to one package owner.
-pub fn apply_commit(package: &mut OpcPackage, owner: Owner, commit: Commit) -> Result<Snapshot> {
-    apply_patch(package, owner, &commit.patch)
 }
 
 /// Add or replace one owner resource. The operation returns false for an
@@ -3100,7 +2986,7 @@ mod tests {
 
     #[test]
     fn staged_facade_reuses_snapshot_and_skips_nested_effects_clone() {
-        let mut package = crate::Package::from_reader(Cursor::new(FIXTURE.to_vec()))
+        let package = crate::Package::from_reader(Cursor::new(FIXTURE.to_vec()))
             .expect("open effects fixture");
         let snapshot = package
             .styles_with_effects(Owner::MainDocument)
@@ -3108,39 +2994,17 @@ mod tests {
         let (patch, expected) = changed_patch(&snapshot);
 
         test_trace::reset();
-        let applied = package
-            .apply_styles_with_effects_patch(Owner::MainDocument, &patch)
+        let commit = package
+            .apply_styles_with_effects(&patch)
             .expect("apply staged effects patch");
         let counts = test_trace::take();
+        let applied = commit
+            .package()
+            .styles_with_effects(Owner::MainDocument)
+            .expect("reload effects");
 
         assert_eq!(counts.loads, 1);
         assert_eq!(counts.candidate_clones, 0);
-        assert_eq!(counts.projection_builds, 1);
-        assert_eq!(counts.readbacks, 1);
-        assert_eq!(counts.graph_validations, 4);
-        assert_eq!(
-            applied
-                .resource()
-                .expect("published effects resource")
-                .xml_bytes(),
-            expected.xml_bytes()
-        );
-    }
-
-    #[test]
-    fn direct_patch_retains_nested_effects_candidate_clone() {
-        let mut package = OpcPackage::from_vec(FIXTURE.to_vec()).expect("open effects fixture");
-        let snapshot = load(&package, Owner::MainDocument).expect("load effects fixture");
-        let (patch, expected) = changed_patch(&snapshot);
-
-        test_trace::reset();
-        let applied = patch
-            .apply(&mut package)
-            .expect("apply direct effects patch");
-        let counts = test_trace::take();
-
-        assert_eq!(counts.loads, 1);
-        assert_eq!(counts.candidate_clones, 1);
         assert_eq!(counts.projection_builds, 1);
         assert_eq!(counts.readbacks, 1);
         assert_eq!(counts.graph_validations, 4);

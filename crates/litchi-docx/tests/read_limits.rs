@@ -13,7 +13,7 @@ fn input_limit(bytes: usize) -> SourceLimits {
 }
 
 fn document_bytes() -> Vec<u8> {
-    let mut package = Package::new().expect("new DOCX package");
+    let package = Package::new().expect("new DOCX package");
     let mut output = Cursor::new(Vec::new());
     package
         .write_to(&mut output)
@@ -81,7 +81,7 @@ fn decrypted_docx_uses_the_supplied_opc_limits() {
     use litchi_docx::encryption::{Limits as EncryptionLimits, Mode};
 
     let bytes = document_bytes();
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).expect("valid DOCX");
+    let package = Package::from_reader(Cursor::new(bytes.clone())).expect("valid DOCX");
     let encrypted = package
         .to_encrypted("read-limits", Mode::Standard)
         .expect("encrypt DOCX fixture");
@@ -188,7 +188,7 @@ fn encrypted_options_preserve_independent_bounds_and_source_profile_on_every_rou
                 options.clone(),
             ),
         };
-        let mut package = open(options.clone()).expect("both exact bounds admit source");
+        let package = open(options.clone()).expect("both exact bounds admit source");
         assert_eq!(package.encryption(), Some(Mode::Standard));
         assert!(
             package.write_to(&mut Cursor::new(Vec::new())).is_err(),

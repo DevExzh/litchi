@@ -180,11 +180,11 @@ fn validate_changed_document_inner(package: &Package) -> Result<()> {
 /// The refusal of a changed publication under enforced protection or
 /// tracked revisions, identical for both owners.
 fn protection_refusal() -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "changed document publication",
-        reason: "document or write protection, or tracked revisions, is enabled",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::Protected,
+        "changed document publication",
+        "document or write protection, or tracked revisions, is enabled",
+    )
 }
 
 /// Validate the policy for a real changed main-document publication from an
@@ -550,18 +550,18 @@ fn guard_settings_source(
                 saw_declaration = true;
             },
             Event::PI(_) => {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "changed document publication",
-                    reason: "processing instructions are not admitted in source-bound settings",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "changed document publication",
+                    "processing instructions are not admitted in source-bound settings",
+                ));
             },
             Event::DocType(_) => {
-                return Err(Error::UnsafeEdit {
-                    format: "DOCX",
-                    operation: "changed document publication",
-                    reason: "DTD declarations are not admitted in source-bound settings",
-                });
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "changed document publication",
+                    "DTD declarations are not admitted in source-bound settings",
+                ));
             },
             Event::GeneralRef(reference) => {
                 if depth == 0 {
@@ -588,11 +588,11 @@ fn guard_settings_source(
                         .decode()
                         .map_err(|error| Error::Xml(error.to_string()))?;
                     if !matches!(name.as_ref(), "amp" | "apos" | "gt" | "lt" | "quot") {
-                        return Err(Error::UnsafeEdit {
-                            format: "DOCX",
-                            operation: "changed document publication",
-                            reason: "non-predefined entity references are not admitted in source-bound settings",
-                        });
+                        return Err(Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "changed document publication",
+                            "non-predefined entity references are not admitted in source-bound settings",
+                        ));
                     }
                 }
             },
@@ -759,11 +759,11 @@ fn reject_settings_mce(
 }
 
 fn mce_refusal() -> Error {
-    Error::UnsafeEdit {
-        format: "DOCX",
-        operation: "changed document publication",
-        reason: "markup-compatibility projection or unknown source policy is not admitted",
-    }
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "changed document publication",
+        "markup-compatibility projection or unknown source policy is not admitted",
+    )
 }
 
 fn map_execution_error(error: ExecutionError) -> Error {

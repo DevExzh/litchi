@@ -231,22 +231,13 @@ impl From<ValidationReportError> for DocxValidationError {
 /// Result returned by the DOCX validation-report API.
 pub type Result<T> = std::result::Result<T, DocxValidationError>;
 
-/// Validate an immutable positional DOCX source under finite default limits.
+/// Validate an immutable positional DOCX source under explicit finite limits
+/// (`Default::default()` for each gives the standard limits).
 ///
 /// The source is never changed, the ZIP package is not rewritten, external
 /// targets are not fetched, macros are not executed, and signatures are not
 /// cryptographically verified.
-pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
-    validate_read_at_with_limits(
-        source,
-        SourceLimits::default(),
-        DocxValidationLimits::default(),
-        ValidationLimits::default(),
-    )
-}
-
-/// Validate an immutable positional DOCX source with explicit finite limits.
-pub fn validate_read_at_with_limits(
+pub fn validate_read_at(
     source: Arc<dyn ReadAt>,
     read_limits: SourceLimits,
     docx_limits: DocxValidationLimits,

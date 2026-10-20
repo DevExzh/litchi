@@ -2400,6 +2400,40 @@ impl OpcPackage {
         })
     }
 
+    /// The names of the parts whose presence, content type, payload or
+    /// relationships differ from `base`, sorted.
+    ///
+    /// Payloads are compared by allocation, never decoded: a package and the
+    /// clone an edit derived from it share every untouched payload, so this
+    /// finds what the edit replaced at a cost proportional to the part count.
+    /// Two separately loaded copies of equal bytes compare as different.
+    #[must_use]
+    pub fn changed_parts(&self, base: &Self) -> Vec<PackURI> {
+        let mut changed: Vec<PackURI> = self
+            .parts
+            .iter()
+            .filter(|(name, part)| {
+                base.parts.get(*name).is_none_or(|before| {
+                    before.content_type() != part.content_type()
+                        || !before
+                            .payload_handle()
+                            .payload()
+                            .same_allocation(part.payload_handle().payload())
+                        || !before.rels().same_entries(part.rels())
+                })
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        changed.extend(
+            base.parts
+                .keys()
+                .filter(|name| !self.parts.contains_key(*name))
+                .cloned(),
+        );
+        changed.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        changed
+    }
+
     /// Get the number of parts in the package.
     #[must_use]
     pub fn part_count(&self) -> usize {

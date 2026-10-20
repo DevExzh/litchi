@@ -202,7 +202,8 @@ impl Paragraph {
     ///
     /// # Errors
     /// Returns an error for malformed revision XML or an exceeded resource limit.
-    pub fn revisions_with_limits(
+    #[cfg(test)]
+    pub(crate) fn revisions_bounded(
         &self,
         limits: crate::revision::Limits,
     ) -> Result<SmallVec<[Revision; 4]>> {

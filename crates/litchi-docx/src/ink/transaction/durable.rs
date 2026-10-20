@@ -30,7 +30,7 @@ use super::super::authoring::{
     HorizontalRelativeFrom, ImageDimensions, ImageType, Placement, Point, Style, VerticalAlignment,
     VerticalPosition, VerticalRelativeFrom, WrapMode,
 };
-use super::{Destination, EditLimits, Patch, SemanticIntent, Snapshot};
+use super::{Destination, EditOptions, Patch, SemanticIntent, Snapshot};
 use crate::ink::Limits;
 use crate::package::story::{self, StoryKind};
 use crate::{Error, Package, Result};
@@ -68,7 +68,7 @@ impl Patch {
     /// `commit.patch().to_durable(patch_limits)`,
     /// `CorePatch::<Reversible>::to_deterministic_json` and
     /// `from_deterministic_json`, followed by
-    /// [`Package::apply_durable_ink_patch`].  The source guard binds the
+    /// [`Package::apply_durable_ink`].  The source guard binds the
     /// logical OPC content-types member, relationship members and presence,
     /// part names/types/payloads, and the public non-part name/reason
     /// inventory.  ZIP compression bytes and other physical archive details
@@ -80,7 +80,7 @@ impl Patch {
     ) -> std::result::Result<CorePatch<Reversible>, PatchError> {
         let before_artifact = package_fingerprint(&self.before.package)?;
         let after_artifact = package_fingerprint(&self.after.package)?;
-        if self.is_empty() {
+        if self.is_noop() {
             let forward = PatchOperation::new(
                 limits,
                 NOOP,
@@ -220,21 +220,41 @@ impl Patch {
 }
 
 impl Package {
-    /// Apply one durable typed Ink edit atomically.
+    /// Apply one durable typed Ink edit; returns the new package.
     ///
     /// Forward operations replay through [`super::Edit`].  Inverse operations
     /// first rebuild a private source from their exact closure, replay the
     /// original forward intent there, and then apply that checked in-memory
     /// inverse.  No durable blob is ever installed as an unverified package.
-    pub fn apply_durable_ink_patch<Mode>(&mut self, patch: &CorePatch<Mode>) -> Result<Snapshot> {
-        self.apply_durable_ink_patch_with_limits(patch, EditLimits::default())
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale source, an unsupported durable vocabulary
+    /// or a replay the edit refuses.
+    pub fn apply_durable_ink<Mode>(&self, patch: &CorePatch<Mode>) -> Result<Package> {
+        self.apply_durable_ink_with_options(patch, EditOptions::default())
     }
 
-    /// Apply a durable Ink edit with explicit replay and reconstruction bounds.
-    pub fn apply_durable_ink_patch_with_limits<Mode>(
+    /// Apply a durable Ink edit with explicit replay and reconstruction
+    /// bounds; returns the new package.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply_durable_ink`].
+    pub fn apply_durable_ink_with_options<Mode>(
+        &self,
+        patch: &CorePatch<Mode>,
+        options: EditOptions,
+    ) -> Result<Package> {
+        let mut next = self.clone();
+        next.apply_durable_ink_in_place(patch, options)?;
+        Ok(next)
+    }
+
+    fn apply_durable_ink_in_place<Mode>(
         &mut self,
         patch: &CorePatch<Mode>,
-        limits: EditLimits,
+        limits: EditOptions,
     ) -> Result<Snapshot> {
         let limits = limits.validate()?;
         let fingerprint_bounds = FingerprintBounds::from_edit_limits(limits);
@@ -252,10 +272,10 @@ impl Package {
         // Run the same bounded source admission that owns every semantic edit
         // before hashing the package.  In particular, this prevents a durable
         // no-op or stale-source check from walking an unbounded package before
-        // the caller's EditLimits have had a chance to refuse it.
+        // the caller's EditOptions have had a chance to refuse it.
         let source_snapshot = {
-            let edit = self.edit_ink_with_limits(limits)?;
-            edit.snapshot().clone()
+            let edit = self.edit_ink_with_options(limits)?;
+            edit.inventory().clone()
         };
         let source_artifact =
             package_fingerprint_with_bounds(self.opc_package(), fingerprint_bounds)
@@ -350,13 +370,13 @@ impl Package {
 fn replay_intents(
     source: OpcPackage,
     intents: &[SemanticIntent],
-    limits: EditLimits,
-) -> Result<super::Commit> {
+    limits: EditOptions,
+) -> Result<super::Planned> {
     if intents.is_empty() || intents.len() > MAX_INTENTS {
         return Err(invalid_durable("invalid Ink durable intent count"));
     }
     let source_package = Package::from_opc_package(source)?;
-    let mut edit = source_package.edit_ink_with_limits(limits)?;
+    let mut edit = source_package.edit_ink_with_options(limits)?;
     for intent in intents {
         match intent {
             SemanticIntent::Insert {
@@ -384,7 +404,7 @@ fn replay_intents(
             },
         }
     }
-    let commit = edit.commit()?;
+    let commit = edit.plan()?;
     if !commit.changed() {
         return Err(invalid_durable(
             "Ink durable intent produced no changed commit",
@@ -928,7 +948,7 @@ impl<'a> IntentDecoder<'a> {
     }
 }
 
-fn decode_intents(bytes: &[u8], limits: EditLimits) -> Result<Vec<SemanticIntent>> {
+fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticIntent>> {
     let maximum = MAX_INTENT_BYTES.min(limits.max_staged_bytes);
     if bytes.len() > maximum {
         return Err(Error::InkLimit {
@@ -1141,7 +1161,7 @@ fn decode_fallback(
     }
 }
 
-fn decode_restore(bytes: &[u8], limits: EditLimits) -> Result<(&[u8], &[u8])> {
+fn decode_restore(bytes: &[u8], limits: EditOptions) -> Result<(&[u8], &[u8])> {
     let maximum = MAX_INTENT_BYTES
         .min(limits.max_staged_bytes)
         .checked_add(MAX_DELTA_BYTES.min(limits.max_package_bytes))
@@ -1683,7 +1703,7 @@ impl Default for FingerprintBounds {
 }
 
 impl FingerprintBounds {
-    fn from_edit_limits(limits: EditLimits) -> Self {
+    fn from_edit_limits(limits: EditOptions) -> Self {
         Self {
             max_non_part_members: limits
                 .inventory
@@ -1885,7 +1905,7 @@ impl<'a> Decoder<'a> {
 
 fn decode_delta(
     bytes: &[u8],
-    limits: EditLimits,
+    limits: EditOptions,
     story_names: &BTreeSet<String>,
 ) -> Result<Vec<Record>> {
     let maximum = limits.max_package_bytes.min(MAX_DELTA_BYTES);
@@ -2088,7 +2108,7 @@ fn decode_member(
     decoder: &mut Decoder<'_>,
     kind: u8,
     name: &str,
-    limits: EditLimits,
+    limits: EditOptions,
     story_names: &BTreeSet<String>,
 ) -> Result<Option<Member>> {
     let present = decoder.u8()?;
@@ -2935,12 +2955,10 @@ mod tests {
     }
 
     fn make_patch() -> (Patch, CorePatch<Reversible>) {
-        let mut package = Package::new().expect("new DOCX");
-        package
-            .authoring_document()
-            .expect("document")
-            .add_paragraph();
+        let mut builder = crate::Builder::new().expect("new DOCX");
+        builder.document().expect("document").add_paragraph();
         let mut bytes = std::io::Cursor::new(Vec::new());
+        let package = builder.build().expect("new DOCX");
         package
             .to_plain_stream(&mut bytes)
             .expect("materialize DOCX");
@@ -2961,7 +2979,7 @@ mod tests {
     #[test]
     fn inverse_restore_replays_intent_before_publishing_forged_story() {
         let (patch, durable) = make_patch();
-        let mut target = Package::from_opc_package(patch.after.package.clone()).expect("target");
+        let target = Package::from_opc_package(patch.after.package.clone()).expect("target");
         let forged_source = tamper_story(&patch.before.package);
         let intent_id = durable.operations()[0].preconditions["intent_sha256"]
             .as_str()
@@ -2999,8 +3017,9 @@ mod tests {
         .expect("forged patch parses");
         let before = package_fingerprint(target.opc_package()).expect("target fingerprint");
         let error = target
-            .apply_durable_ink_patch(&forged)
-            .expect_err("forged source must fail forward replay");
+            .apply_durable_ink(&forged)
+            .err()
+            .expect("forged source must fail forward replay");
         assert!(
             error
                 .to_string()
@@ -3027,9 +3046,9 @@ mod tests {
             limits(),
         )
         .expect("forged patch parses");
-        let mut source = Package::from_opc_package(patch.before.package.clone()).expect("source");
+        let source = Package::from_opc_package(patch.before.package.clone()).expect("source");
         let before = package_fingerprint(source.opc_package()).expect("source fingerprint");
-        assert!(source.apply_durable_ink_patch(&forged).is_err());
+        assert!(source.apply_durable_ink(&forged).is_err());
         assert_eq!(
             package_fingerprint(source.opc_package()).expect("unchanged"),
             before
@@ -3049,11 +3068,11 @@ mod tests {
         .expect("replace");
         let commit = edit.commit().expect("commit");
         let durable = commit.patch().to_durable(limits()).expect("durable");
-        let mut target =
+        let target =
             Package::from_opc_package(commit.patch().after.package.clone()).expect("target");
 
-        target
-            .apply_durable_ink_patch(&durable.inverse())
+        let target = target
+            .apply_durable_ink(&durable.inverse())
             .expect("inverse replay");
         assert_eq!(
             package_fingerprint(target.opc_package()).expect("restored fingerprint"),
@@ -3064,8 +3083,8 @@ mod tests {
     #[test]
     fn durable_decoders_reject_impossible_counts_before_reserving_records() {
         let mut intent = INTENT_HEADER.to_vec();
-        intent.extend_from_slice(&(EditLimits::default().max_operations as u64).to_le_bytes());
-        let intent_error = match decode_intents(&intent, EditLimits::default()) {
+        intent.extend_from_slice(&(EditOptions::default().max_operations as u64).to_le_bytes());
+        let intent_error = match decode_intents(&intent, EditOptions::default()) {
             Err(error) => error,
             Ok(_) => panic!("truncated intent count must be rejected"),
         };
@@ -3077,7 +3096,7 @@ mod tests {
 
         let mut closure = DELTA_HEADER.to_vec();
         closure.extend_from_slice(&(MAX_DELTA_RECORDS as u64).to_le_bytes());
-        let closure_error = match decode_delta(&closure, EditLimits::default(), &BTreeSet::new()) {
+        let closure_error = match decode_delta(&closure, EditOptions::default(), &BTreeSet::new()) {
             Err(error) => error,
             Ok(_) => panic!("truncated closure count must be rejected"),
         };

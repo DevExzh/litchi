@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output_docx_with_fonts.docx";
-    let mut pkg = builder.build()?;
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("✓ Successfully created: {}", output_path);

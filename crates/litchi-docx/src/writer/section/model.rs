@@ -87,7 +87,7 @@ impl PageOrientation {
 pub struct SectionHeaderFooterReference {
     pub kind: Kind,
     /// Existing relationship ID. `None` binds a default reference to content
-    /// created through [`crate::writer::MutableDocument::header`] or `footer`.
+    /// created through [`crate::builder::Document::header`] or `footer`.
     pub relationship_id: Option<String>,
     /// New or replacement part owned by this section. References with the same
     /// non-empty key are deliberately shared and must have identical XML.

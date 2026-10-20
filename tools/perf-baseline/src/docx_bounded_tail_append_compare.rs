@@ -929,7 +929,9 @@ fn build_materialized_candidate(
 ) -> BenchResult<(Vec<u8>, bool, bool)> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(source_archive_bytes.to_vec()));
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
-    let snapshot = package.plain_paragraph_copy_snapshot_with_limits(limits)?;
+    let snapshot = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
+        .plain_paragraph_copy_snapshot()?;
     if snapshot.paragraph_count() != count || snapshot.xml_bytes() != source_xml_bytes {
         return Err("materialized source snapshot differs from generated XML".into());
     }
@@ -971,7 +973,9 @@ fn build_bounded_candidate(
     let source = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         source_archive_bytes.to_vec(),
     )))?;
-    let edit = source.tail_append_plain_paragraph_with_limits(append_text, limits)?;
+    let source =
+        source.with_semantic_limits(litchi_docx::SemanticLimits::default().tail_append(limits));
+    let edit = source.tail_append_plain_paragraph(append_text);
     let plan = edit.prepare()?;
     let source_proof = plan.source_proof();
     let candidate_proof = plan.candidate_proof();
@@ -1008,7 +1012,9 @@ fn materialized_stale_source_refusal(
     let source = Arc::new(MeasureSource::new(Arc::from(source_archive_bytes.to_vec())));
     let package =
         litchi_docx::source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-    let snapshot = package.plain_paragraph_copy_snapshot_with_limits(limits)?;
+    let snapshot = package
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
+        .plain_paragraph_copy_snapshot()?;
     let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
     let commit = edit.commit();
@@ -1026,7 +1032,9 @@ fn bounded_stale_source_refusal(
     let source = Arc::new(MeasureSource::new(Arc::from(source_archive_bytes.to_vec())));
     let package =
         litchi_docx::source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-    let edit = package.tail_append_plain_paragraph_with_limits(append_text, limits)?;
+    let package =
+        package.with_semantic_limits(litchi_docx::SemanticLimits::default().tail_append(limits));
+    let edit = package.tail_append_plain_paragraph(append_text);
     let plan = edit.prepare()?;
     source.bump_revision();
     let mut output = Vec::new();
@@ -1301,7 +1309,11 @@ fn run_materialized_iteration(
         let package = litchi_docx::source_backed::Package::from_read_at(
             Arc::clone(&source) as Arc<dyn ReadAt>
         )?;
-        let snapshot = package.plain_paragraph_copy_snapshot_with_limits(corpus.copy_limits)?;
+        let snapshot = package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().paragraph_copy(corpus.copy_limits),
+            )
+            .plain_paragraph_copy_snapshot()?;
         let mut edit = snapshot.edit();
         edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
         let commit = edit.commit();
@@ -1340,10 +1352,10 @@ fn run_bounded_iteration(
         let package = litchi_docx::source_backed::Package::from_read_at(
             Arc::clone(&source) as Arc<dyn ReadAt>
         )?;
-        let edit = package.tail_append_plain_paragraph_with_limits(
-            corpus.append_text.as_str(),
-            corpus.bounded_limits,
-        )?;
+        let package = package.with_semantic_limits(
+            litchi_docx::SemanticLimits::default().tail_append(corpus.bounded_limits),
+        );
+        let edit = package.tail_append_plain_paragraph(corpus.append_text.as_str());
         let plan = edit.prepare()?;
         let mut output = HashingSink::new();
         let _publication = plan.write_to(&mut output)?;
