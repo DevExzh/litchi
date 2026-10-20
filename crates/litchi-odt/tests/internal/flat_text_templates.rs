@@ -9,21 +9,21 @@ use std::{
     },
 };
 
-use litchi_core::{
-    Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
-    Position, Resource,
-};
-use litchi_odt::constants::{
+use crate::constants::{
     ODF_CHART_TEMPLATE, ODF_CONTENT, ODF_DRAWING_TEMPLATE, ODF_FORMULA_TEMPLATE,
     ODF_IMAGE_TEMPLATE, ODF_MASTER_TEMPLATE, ODF_PRESENTATION_TEMPLATE, ODF_SPREADSHEET_TEMPLATE,
     ODF_TEXT, ODF_TEXT_TEMPLATE, ODF_WEB, get_flat_extension_from_mime_type,
     get_mime_type_from_extension, is_odf_extension,
 };
-use litchi_odt::core::PackageWriter;
-use litchi_odt::flat::Document;
-use litchi_odt::generic::{Family, FlatDocument, Package};
-use litchi_odt::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
-use litchi_odt::{RdfaAttributes, RdfaOccurrence, TextMeta, XFormsModel};
+use crate::core::PackageWriter;
+use crate::flat::Document;
+use crate::generic::{Family, FlatDocument, Package};
+use crate::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
+use crate::{RdfaAttributes, RdfaOccurrence, TextMeta, XFormsModel};
+use litchi_core::{
+    Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
+    Position, Resource,
+};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -345,27 +345,21 @@ fn common_template_mapping_and_neutral_detection_are_public() {
     );
     assert!(is_odf_extension("fott"));
     assert_eq!(
-        litchi_odt::detect::mime(ODF_TEXT_TEMPLATE.as_bytes()),
-        Some(litchi_odt::detect::Format::Odt)
+        crate::detect::mime(ODF_TEXT_TEMPLATE.as_bytes()),
+        Some(crate::detect::Format::Odt)
     );
     assert_eq!(
-        litchi_odt::detect::flat_mime(
-            TEMPLATE_XML.as_bytes(),
-            litchi_odt::detect::Limits::default()
-        )
-        .ok()
-        .flatten()
-        .as_deref(),
+        crate::detect::flat_mime(TEMPLATE_XML.as_bytes(), crate::detect::Limits::default())
+            .ok()
+            .flatten()
+            .as_deref(),
         Some(ODF_TEXT_TEMPLATE)
     );
     assert_eq!(
-        litchi_odt::detect::flat(
-            TEMPLATE_XML.as_bytes(),
-            litchi_odt::detect::Limits::default()
-        )
-        .ok()
-        .flatten(),
-        Some(litchi_odt::detect::Format::Odt)
+        crate::detect::flat(TEMPLATE_XML.as_bytes(), crate::detect::Limits::default())
+            .ok()
+            .flatten(),
+        Some(crate::detect::Format::Odt)
     );
 }
 
@@ -401,7 +395,7 @@ fn execution_context_admission_charges_retained_vec_capacity_and_releases_on_dro
     let maximum = u64::try_from(TEMPLATE_XML.len()).unwrap();
     let (zero_budget, _zero_cancel, zero_context) = execution_context_with_memory(0);
     assert_memory_limit(
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, zero_context)
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, zero_context)
             .err()
             .unwrap(),
     );
@@ -412,7 +406,7 @@ fn execution_context_admission_charges_retained_vec_capacity_and_releases_on_dro
     let (under_budget, _under_cancel, under_context) =
         execution_context_with_memory(retained_capacity - 1);
     assert_memory_limit(
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, under_context)
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, under_context)
             .err()
             .unwrap(),
     );
@@ -422,7 +416,7 @@ fn execution_context_admission_charges_retained_vec_capacity_and_releases_on_dro
     assert_eq!(retained_capacity_again, retained_capacity);
     let (budget, _cancel, context) = execution_context_with_memory(retained_capacity);
     let document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, context).unwrap();
     assert_eq!(budget.used(Resource::Memory), retained_capacity);
     drop(document);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -434,7 +428,7 @@ fn execution_context_transfer_preserves_old_reservation_on_failure_and_moves_on_
     let maximum = u64::try_from(TEMPLATE_XML.len()).unwrap();
     let (old_budget, _old_cancel, old_context) = execution_context_with_memory(retained_capacity);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(bytes, maximum, old_context).unwrap();
+        FlatDocument::from_bytes_with_limit_and_context(bytes, maximum, old_context).unwrap();
     let before = document.to_bytes();
     assert_eq!(old_budget.used(Resource::Memory), retained_capacity);
 
@@ -451,7 +445,7 @@ fn execution_context_transfer_preserves_old_reservation_on_failure_and_moves_on_
     assert_eq!(failed_budget.used(Resource::Memory), 0);
 
     let (new_budget, _new_cancel, new_context) = execution_context_with_memory(retained_capacity);
-    document.with_execution_context(new_context).unwrap();
+    document = document.with_execution_context(new_context).unwrap();
     assert_eq!(old_budget.used(Resource::Memory), 0);
     assert_eq!(new_budget.used(Resource::Memory), retained_capacity);
     drop(document);
@@ -499,7 +493,7 @@ fn already_cancelled_flat_reader_refuses_before_invoking_read() {
         reads: Arc::clone(&reads),
     };
     let result = catch_unwind(AssertUnwindSafe(|| {
-        FlatDocument::from_reader_with_execution_context(reader, maximum, context)
+        FlatDocument::from_reader_with_limit_and_context(reader, maximum, context)
     }));
     assert!(result.is_ok(), "cancelled flat input invoked its reader");
     assert_cancelled(result.unwrap().err().unwrap());
@@ -518,7 +512,7 @@ fn mid_read_flat_cancellation_refuses_without_retaining_input_memory() {
         reads: Arc::clone(&reads),
     };
     let result = catch_unwind(AssertUnwindSafe(|| {
-        FlatDocument::from_reader_with_execution_context(reader, maximum, context)
+        FlatDocument::from_reader_with_limit_and_context(reader, maximum, context)
     }));
     assert!(result.is_ok(), "flat input read past cancellation");
     assert_cancelled(result.unwrap().err().unwrap());
@@ -540,7 +534,7 @@ fn oversized_flat_reader_charges_growth_peak_and_admits_with_enough_memory() {
     assert!(u64::try_from(source.len()).unwrap() < peak_limit);
     let (refusal_budget, _refusal_cancel, refusal_context) =
         execution_context_with_memory(peak_limit);
-    let refusal = FlatDocument::from_reader_with_execution_context(
+    let refusal = FlatDocument::from_reader_with_limit_and_context(
         Cursor::new(source.clone()),
         maximum,
         refusal_context,
@@ -562,7 +556,7 @@ fn oversized_flat_reader_charges_growth_peak_and_admits_with_enough_memory() {
 
     let (admission_budget, _admission_cancel, admission_context) =
         execution_context_with_memory(u64::try_from(source.len() * 8).unwrap());
-    let document = FlatDocument::from_reader_with_execution_context(
+    let document = FlatDocument::from_reader_with_limit_and_context(
         Cursor::new(source.clone()),
         maximum,
         admission_context,
@@ -578,7 +572,7 @@ fn cancellation_before_flat_mutation_refuses_before_candidate_publication() {
     let source = template_bytes();
     let source_memory = u64::try_from(source.len()).unwrap();
     let (budget, cancellation, context) = execution_context_with_memory(source_memory * 8);
-    let mut document = FlatDocument::from_bytes_with_execution_context(
+    let mut document = FlatDocument::from_bytes_with_limit_and_context(
         source.clone(),
         u64::try_from(source.len()).unwrap() + 256,
         context,
@@ -607,12 +601,12 @@ fn flat_mutation_work_limits_refuse_atomically_and_release_memory_on_drop() {
         let (admission_budget, _admission_cancel, admission_context) =
             execution_context_with_memory_and_work(source_capacity * 16, u64::MAX);
         let mut document =
-            FlatDocument::from_bytes_with_execution_context(source, maximum, admission_context)
+            FlatDocument::from_bytes_with_limit_and_context(source, maximum, admission_context)
                 .unwrap();
 
         let (mutation_budget, _mutation_cancel, mutation_context) =
             execution_context_with_memory_and_work(source_capacity * 16, work);
-        document.with_execution_context(mutation_context).unwrap();
+        document = document.with_execution_context(mutation_context).unwrap();
         assert_eq!(admission_budget.used(Resource::Memory), 0);
         assert_eq!(mutation_budget.used(Resource::Memory), source_capacity);
         let before = document.to_bytes();
@@ -641,11 +635,11 @@ fn whitespace_heavy_metadata_scan_consumes_work_without_candidate_allocation() {
     let (admission_budget, _admission_cancel, admission_context) =
         execution_context_with_memory_and_work(source_capacity * 16, u64::MAX);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(source.clone(), maximum, admission_context)
+        FlatDocument::from_bytes_with_limit_and_context(source.clone(), maximum, admission_context)
             .unwrap();
     let (mutation_budget, _mutation_cancel, mutation_context) =
         execution_context_with_memory_and_work(source_capacity * 16, 16);
-    document.with_execution_context(mutation_context).unwrap();
+    document = document.with_execution_context(mutation_context).unwrap();
     assert_eq!(admission_budget.used(Resource::Memory), 0);
     assert_eq!(mutation_budget.used(Resource::Memory), source_capacity);
     let before = document.to_bytes();
@@ -681,7 +675,7 @@ fn many_small_rdfa_nodes_cannot_evade_context_memory_accounting() {
         .unwrap();
     let (budget, _cancellation, context) = execution_context_with_memory(memory_limit);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(source.clone(), source_len + 1024, context)
+        FlatDocument::from_bytes_with_limit_and_context(source.clone(), source_len + 1024, context)
             .unwrap();
     assert_eq!(document.in_content_metadata().unwrap().rdfa.len(), count);
     let before = document.to_bytes();
@@ -711,7 +705,7 @@ fn many_small_xforms_models_cannot_evade_context_memory_accounting() {
         .unwrap();
     let (budget, _cancellation, context) = execution_context_with_memory(memory_limit);
     let mut document =
-        FlatDocument::from_bytes_with_execution_context(source.clone(), source_len + 1024, context)
+        FlatDocument::from_bytes_with_limit_and_context(source.clone(), source_len + 1024, context)
             .unwrap();
     assert_eq!(document.xforms_models().unwrap().len(), count);
     let before = document.to_bytes();
@@ -887,11 +881,11 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
     oversized.push(b'x');
     assert!(matches!(
         Document::from_bytes_with_options(&oversized, limits),
-        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
     ));
     assert!(matches!(
         Document::from_reader_with_options(Cursor::new(oversized), limits),
-        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
     ));
 }
 
@@ -945,7 +939,7 @@ fn specialized_template_output_limit_accepts_exact_output_and_rejects_one_over()
     over_edit.update_paragraph(0, "Omega!").unwrap().unwrap();
     assert!(matches!(
         over_edit.commit(),
-        Err(litchi_odt::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
     ));
     assert_eq!(source.as_bytes(), TEMPLATE_XML.as_bytes());
 }
@@ -962,7 +956,7 @@ fn formatted_template_no_op_is_exact_but_changed_edit_keeps_compactness_refusal(
     edit.update_paragraph(0, "Omega").unwrap().unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(litchi_odt::flat::Error::Core(Error::XmlCompactness { .. }))
+        Err(crate::flat::Error::Core(Error::XmlCompactness { .. }))
     ));
     assert_eq!(source.as_bytes(), formatted.as_bytes());
 }
@@ -1093,9 +1087,9 @@ fn packaged_ott_template_behavior_remains_package_owned() {
     assert!(Document::from_bytes(&bytes).is_err());
 }
 
-fn document_limit(bytes: usize) -> litchi_odt::OpenOptions {
-    litchi_odt::OpenOptions::new().source_limits(
-        litchi_odt::SourceLimits::builder()
+fn document_limit(bytes: usize) -> crate::OpenOptions {
+    crate::OpenOptions::new().source_limits(
+        crate::SourceLimits::builder()
             .max_input_bytes(u64::try_from(bytes).unwrap())
             .unwrap()
             .build()

@@ -1,6 +1,6 @@
-use litchi_odt::style::paragraph::drop_cap::{Distance, DropCap, Length, Style, parse};
-use litchi_odt::style::paragraph::tab_stop::{Position, Stop, Stops, Style as TabStyle};
-use litchi_odt::{Builder, Package};
+use crate::style::paragraph::drop_cap::{Distance, DropCap, Length, Style, parse};
+use crate::style::paragraph::tab_stop::{Position, Stop, Stops, Style as TabStyle};
+use crate::{Builder, Package};
 use std::io::Cursor;
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -34,7 +34,7 @@ fn parses_real_libreoffice_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt"
     ));
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = crate::generic::flat::Document::from_reader(Cursor::new(bytes)).unwrap();
     let parsed = flat.paragraph_style_drop_caps().unwrap();
     assert!(parsed.styles.iter().any(|style| {
         style
@@ -104,7 +104,7 @@ fn builder_package_composition_and_mutation_round_trip() {
         .unwrap();
     builder.add_paragraph("Opening text").unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
+    let package = crate::generic::Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         package.paragraph_style_drop_caps().unwrap().get("Opening"),
         Some(&drop_style)
@@ -116,7 +116,7 @@ fn builder_package_composition_and_mutation_round_trip() {
             .get("Opening")
             .is_some()
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(
+    let mut mutable = crate::mutable::MutableDocument::from_document(
         Package::from_bytes(&bytes).unwrap().document().unwrap(),
     )
     .unwrap();
@@ -128,7 +128,7 @@ fn builder_package_composition_and_mutation_round_trip() {
     };
     drop_style.drop_cap = Some(replacement.clone());
     mutable.set_paragraph_style_drop_cap(&drop_style).unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(&mutable.to_bytes().unwrap()).unwrap();
+    let package = crate::generic::Package::from_bytes(&mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package
             .paragraph_style_drop_caps()

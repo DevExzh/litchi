@@ -1,7 +1,7 @@
-use litchi_odt::style::paragraph::tab_stop::{
+use crate::style::paragraph::tab_stop::{
     LeaderColor, LeaderStyle, LeaderType, LeaderWidth, Position, Stop, Stops, Style, Type, parse,
 };
-use litchi_odt::{Builder, Package};
+use crate::{Builder, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -133,7 +133,7 @@ fn builder_package_and_mutable_document_preserve_typed_styles() {
     builder.add_paragraph_tab_style(style.clone()).unwrap();
     builder.add_paragraph("tabbed").unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
+    let package = crate::generic::Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         package
             .paragraph_style_tab_stops()
@@ -143,9 +143,9 @@ fn builder_package_and_mutable_document_preserve_typed_styles() {
     );
 
     let document = Package::from_bytes(&bytes).unwrap().document().unwrap();
-    let mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
+    let mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
     let round_trip = mutable.to_bytes().unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(&round_trip).unwrap();
+    let package = crate::generic::Package::from_bytes(&round_trip).unwrap();
     assert_eq!(
         package
             .paragraph_style_tab_stops()

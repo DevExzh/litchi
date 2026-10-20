@@ -1,5 +1,5 @@
-use litchi_odt::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
-mod support;
+use super::support;
+use crate::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -33,7 +33,7 @@ fn group(name: &str) -> Group {
 
 #[test]
 fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
-    let mut document = litchi_odt::generic::Package::from_bytes(&package(CONTENT)).unwrap();
+    let mut document = crate::generic::Package::from_bytes(&package(CONTENT)).unwrap();
     let first = group("counter");
     assert_eq!(
         document.set_variable_declaration_group(&first).unwrap(),
@@ -76,8 +76,7 @@ fn mutates_packaged_declarations_and_preserves_auxiliary_parts() {
 
 #[test]
 fn referenced_declaration_removal_is_atomic() {
-    let mut document =
-        litchi_odt::generic::Package::from_bytes(&package(REFERENCED_CONTENT)).unwrap();
+    let mut document = crate::generic::Package::from_bytes(&package(REFERENCED_CONTENT)).unwrap();
     let before = document.as_bytes().to_vec();
     assert!(
         document

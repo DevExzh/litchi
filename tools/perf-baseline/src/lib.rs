@@ -21001,11 +21001,11 @@ fn odt_resource_batch_image(
 }
 
 fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = litchi_odt::Builder::new();
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    let base = document.to_bytes()?;
+    let base = document.build()?.to_bytes()?;
     let source = ArchiveReader::new(&base)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;

@@ -1,12 +1,12 @@
-use litchi_odt::bibliography_configuration::{Configuration, Field, SortKey};
-use litchi_odt::{Document, Package};
-mod support;
+use super::support;
+use crate::bibliography_configuration::{Configuration, Field, SortKey};
+use crate::{Document, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 const STYLES: &str =
-    include_str!("../../../test-data/odf/odt/bibliography-configuration-styles.xml");
+    include_str!("../../../../test-data/odf/odt/bibliography-configuration-styles.xml");
 
 fn package(styles: &str) -> Package {
     let content = format!(
@@ -87,8 +87,7 @@ fn document_reads_styles_bibliography_configuration() {
             .bibliography_configuration,
         Some(expected.clone())
     );
-    let generic =
-        litchi_odt::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
+    let generic = crate::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
     assert_eq!(
         generic.bibliography_configuration().unwrap(),
         Some(expected)
@@ -101,7 +100,7 @@ fn mutable_document_replaces_removes_and_inserts_bibliography_configuration() {
     let replacement = replacement_configuration();
     let compact_styles = support::compact_xml_fixture(STYLES);
     let mut mutable =
-        litchi_odt::mutable::MutableDocument::from_document(document(&compact_styles)).unwrap();
+        crate::mutable::MutableDocument::from_document(document(&compact_styles)).unwrap();
 
     assert_eq!(
         mutable

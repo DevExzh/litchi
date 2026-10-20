@@ -1,10 +1,10 @@
-use litchi_odt::parser::{
+use crate::parser::{
     ChangeType, Section, SectionDdeSource, SectionDisplay, SectionSource, TrackChange,
     TrackedChanges,
 };
-use litchi_odt::section::{Block, add_section_xml, wrap_section_xml};
-use litchi_odt::tracked_changes::{Position, Story};
-use litchi_odt::{Builder, Package};
+use crate::section::{Block, add_section_xml, wrap_section_xml};
+use crate::tracked_changes::{Position, Story};
+use crate::{Builder, Package};
 
 fn section(name: &str) -> Section {
     Section {
@@ -82,7 +82,7 @@ fn builder_authors_linked_conditional_protected_and_dde_sections() {
 
 #[test]
 fn mutable_wraps_nested_sections_and_preserves_tracked_changes() {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = crate::mutable::MutableDocument::new();
     document.add_paragraph("A😀B").unwrap();
     document.add_paragraph("Second").unwrap();
     document
@@ -183,7 +183,7 @@ fn mixed_body_and_table_cell_ranges_are_lossless_and_errors_roll_back() {
 
 #[test]
 fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
-    let mut unwrap = litchi_odt::mutable::MutableDocument::new();
+    let mut unwrap = crate::mutable::MutableDocument::new();
     unwrap.add_paragraph("keep me").unwrap();
     let mut wrapper = section("Wrapper");
     wrapper.content.clear();
@@ -201,7 +201,7 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         "keep me"
     );
 
-    let mut remove = litchi_odt::mutable::MutableDocument::new();
+    let mut remove = crate::mutable::MutableDocument::new();
     remove.add_paragraph("delete me").unwrap();
     remove
         .wrap_section(&wrapper, Block::BodyParagraph(0), Block::BodyParagraph(0))

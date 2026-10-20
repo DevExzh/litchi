@@ -1,10 +1,10 @@
-use litchi_odt::{Document, Package};
-mod support;
+use super::support;
+use crate::{Document, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
-const STYLES: &str = include_str!("../../../test-data/odf/odt/outline-style-styles.xml");
+const STYLES: &str = include_str!("../../../../test-data/odf/odt/outline-style-styles.xml");
 
 fn document(styles: &str) -> Document {
     let content = format!(
@@ -54,7 +54,7 @@ fn mutable_document_manages_outline_styles_without_rewriting_other_styles() {
     let mut replacement = original.clone();
     replacement.levels[0].number_prefix = Some("(".to_string());
     replacement.levels[0].number_suffix = Some(")".to_string());
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
 
     assert_eq!(
         mutable.set_outline_style(&replacement).unwrap(),

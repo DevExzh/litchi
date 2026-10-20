@@ -292,7 +292,7 @@ fn parses_real_libreoffice_fixture() {
     let bytes = include_bytes!(
         "../../../test-data/libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(bytes)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(bytes)).unwrap();
     let set = flat.paragraph_style_borders().unwrap();
     assert!(!set.styles.is_empty());
     assert!(

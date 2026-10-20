@@ -1,5 +1,5 @@
-use litchi_odt::list_label_alignment::{Alignment, FollowedBy, Kind, Length, Style, parse};
-use litchi_odt::{Builder, Package};
+use crate::list_label_alignment::{Alignment, FollowedBy, Kind, Length, Style, parse};
+use crate::{Builder, Package};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -23,7 +23,7 @@ fn parses_aliases_values_and_round_trip() {
 }
 #[test]
 fn parses_odfdo_and_libreoffice_fixtures() {
-    let odfdo = include_str!("../../../test-data/odfdo/tests/samples/example.xml");
+    let odfdo = include_str!("../../../../test-data/odfdo/tests/samples/example.xml");
     let odfdo_parsed = parse(odfdo).unwrap();
     assert!(odfdo_parsed.levels.len() >= 10);
     assert!(
@@ -33,9 +33,9 @@ fn parses_odfdo_and_libreoffice_fixtures() {
             .any(|x| x.list_style_kind == Kind::Outline)
     );
     let lo = include_bytes!(
-        "../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
+        "../../../../test-data/libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt"
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(lo)).unwrap();
+    let flat = crate::generic::flat::Document::from_reader(Cursor::new(lo)).unwrap();
     assert!(!flat.alignments().unwrap().levels.is_empty());
 }
 #[test]
@@ -48,16 +48,16 @@ fn builder_package_and_mutable_round_trip() {
         .unwrap();
     b.add_paragraph("x").unwrap();
     let bytes = b.build().unwrap().to_bytes().unwrap();
-    let p = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
+    let p = crate::generic::Package::from_bytes(&bytes).unwrap();
     assert_eq!(&p.alignments().unwrap().get("L1", 1).unwrap().alignment, &a);
-    let mut m = litchi_odt::mutable::MutableDocument::from_document(
+    let mut m = crate::mutable::MutableDocument::from_document(
         Package::from_bytes(&bytes).unwrap().document().unwrap(),
     )
     .unwrap();
     let replacement = Alignment::new(FollowedBy::Nothing);
     m.set_list_level_label_alignment(&Style::new("L1", 1, replacement.clone()).unwrap())
         .unwrap();
-    let p = litchi_odt::generic::Package::from_bytes(&m.to_bytes().unwrap()).unwrap();
+    let p = crate::generic::Package::from_bytes(&m.to_bytes().unwrap()).unwrap();
     assert_eq!(
         &p.alignments().unwrap().get("L1", 1).unwrap().alignment,
         &replacement

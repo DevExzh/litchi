@@ -1,6 +1,4 @@
-use litchi_odt::variable_declaration::{
-    Body, Declaration, Group, Kind, Part, Scope, Value, ValueType,
-};
+use crate::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, Value, ValueType};
 
 fn group(kind: Kind, declarations: Vec<Declaration>) -> Group {
     Group {
@@ -55,7 +53,7 @@ fn canonical_writer_escapes_and_round_trips_every_declaration_kind() {
 
 #[test]
 fn mutable_document_upserts_orders_replaces_and_removes_groups_atomically() {
-    let mut document = litchi_odt::mutable::MutableDocument::new();
+    let mut document = crate::mutable::MutableDocument::new();
     let user = group(
         Kind::User,
         vec![Declaration::User {

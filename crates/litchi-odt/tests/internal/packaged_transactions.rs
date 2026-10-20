@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
-use litchi_odf_common::package::raw_identical_members;
-use litchi_odt::form::TextControl;
-use litchi_odt::{
+use super::support;
+use crate::form::TextControl;
+use crate::{
     Package, ScriptResourceKind, ScriptResourceSpec,
     core::{OwnedPackage as CoreOwnedPackage, PackageWriter, Profile},
     elements::field::DynamicTextField,
@@ -24,7 +24,7 @@ use litchi_odt::{
         Position, SubEditJoinFailure, TransferDependencyKind,
     },
 };
-mod support;
+use litchi_odf_common::package::raw_identical_members;
 
 fn source() -> Package {
     let mut document = MutableDocument::new();
@@ -393,7 +393,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
             .count(),
         4
     );
-    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let replayed = decoded.apply(&snapshot).unwrap();
     assert_eq!(replayed.as_bytes(), committed.package().as_bytes());
     assert_eq!(
@@ -540,7 +540,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
 
     let durable = coalesced.patch().durable().unwrap();
     let wire = durable.to_deterministic_json().unwrap();
-    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(
         decoded.apply(&snapshot).unwrap().as_bytes(),
         coalesced.package().as_bytes()
@@ -743,7 +743,7 @@ fn real_producer_source() -> Package {
     writer
         .add_file(
             "content.xml",
-            include_bytes!("fixtures/libreoffice-master-document-content.xml"),
+            include_bytes!("../fixtures/libreoffice-master-document-content.xml"),
         )
         .unwrap();
     writer
@@ -762,7 +762,7 @@ fn real_producer_source() -> Package {
 }
 
 fn assert_all_package_xml_is_compact(bytes: &[u8]) {
-    let package = litchi_odt::core::package::OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
+    let package = crate::core::package::OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
     let archive = package.package().unwrap();
     for path in archive.files().unwrap() {
         if path.ends_with(".xml") || path.ends_with(".rdf") {
@@ -1136,8 +1136,7 @@ fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() 
     let second_json = durable.to_deterministic_json().unwrap();
     assert_eq!(first_json, second_json);
 
-    let decoded =
-        litchi_odt::transaction::DurablePatch::from_deterministic_json(&first_json).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&first_json).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_all_package_xml_is_compact(applied.as_bytes());
@@ -1211,7 +1210,7 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
     }
     assert!(!wire_text.contains("durable inert payload"));
 
-    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
     assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     let reopened = applied.document().unwrap();
@@ -1226,7 +1225,7 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
     assert_eq!(reopened.script_resources().unwrap()[0].bytes, script.bytes);
 
     let package =
-        litchi_odt::core::package::OwnedPackage::from_bytes(applied.as_bytes().to_vec()).unwrap();
+        crate::core::package::OwnedPackage::from_bytes(applied.as_bytes().to_vec()).unwrap();
     let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
     assert!(content.contains("&#32;&#9;&#32;"));
 }
@@ -1249,7 +1248,7 @@ fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
     assert!(wire_text.contains("ruby.annotation.insert"));
     assert!(!wire_text.contains("document.replace"));
 
-    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let inserted = decoded.apply(&snapshot).unwrap();
     assert_eq!(inserted.as_bytes(), committed.package().as_bytes());
     let reopened = inserted.document().unwrap();
@@ -1320,7 +1319,7 @@ fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() 
     assert!(wire_text.contains("resource.embedded.add"));
     assert!(!wire_text.contains("durable-resource-payload"));
 
-    let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
+    let decoded = crate::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
     assert_eq!(applied.as_bytes(), committed.package().as_bytes());
     applied.document().unwrap().embedded_chart(0).unwrap();
@@ -1495,7 +1494,7 @@ fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits(
 #[test]
 fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
     let producer = Package::from_bytes(include_bytes!(
-            "../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt"
+            "../../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt"
         ).as_ref()).unwrap();
     let snapshot = producer.clone();
     let triple = Triple {
@@ -1592,8 +1591,7 @@ fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
         .unwrap();
     assert!(sealed_json.len() < reversible_json.len());
 
-    let sealed =
-        litchi_odt::transaction::SealedPatch::from_deterministic_json(&sealed_json).unwrap();
+    let sealed = crate::transaction::SealedPatch::from_deterministic_json(&sealed_json).unwrap();
     assert_eq!(
         sealed.apply(&snapshot).unwrap().as_bytes(),
         commit.package().as_bytes()
@@ -1617,7 +1615,7 @@ fn durable_patch_parser_rejects_noncanonical_json() {
     let mut noncanonical = Vec::with_capacity(json.len() + 1);
     noncanonical.push(b' ');
     noncanonical.extend_from_slice(&json);
-    assert!(litchi_odt::transaction::DurablePatch::from_deterministic_json(&noncanonical).is_err());
+    assert!(crate::transaction::DurablePatch::from_deterministic_json(&noncanonical).is_err());
 
     let mut foreign_format = json;
     let format = foreign_format
@@ -1625,9 +1623,7 @@ fn durable_patch_parser_rejects_noncanonical_json() {
         .position(|window| window == b"litchi.odt")
         .unwrap();
     foreign_format[format + b"litchi.odt".len() - 1] = b'x';
-    assert!(
-        litchi_odt::transaction::DurablePatch::from_deterministic_json(&foreign_format).is_err()
-    );
+    assert!(crate::transaction::DurablePatch::from_deterministic_json(&foreign_format).is_err());
 }
 
 #[test]
@@ -1692,7 +1688,7 @@ fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() 
     document.add_paragraph("one").unwrap();
     let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
 
-    let mut joined = snapshot.joined_edit();
+    let mut joined = snapshot.joined_edits();
     let mut second = snapshot.edit();
     second.replace_paragraph(Position::new(1), "ONE").unwrap();
     joined.join("z-second", second).unwrap();
@@ -1725,14 +1721,14 @@ fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() 
 #[test]
 fn three_way_plan_is_non_applying_and_requires_explicit_conflict_resolution() {
     let snapshot = source().clone();
-    let mut left = snapshot.joined_edit();
+    let mut left = snapshot.joined_edits();
     let mut left_edit = snapshot.edit();
     left_edit
         .replace_paragraph(Position::new(0), "left")
         .unwrap();
     left.join("left", left_edit).unwrap();
 
-    let mut right = snapshot.joined_edit();
+    let mut right = snapshot.joined_edits();
     let mut right_edit = snapshot.edit();
     right_edit
         .append_run(Position::new(0), " right", None)

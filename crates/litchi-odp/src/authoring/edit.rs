@@ -117,6 +117,21 @@ pub enum CryptoRefusal {
     UsePasswordOpening,
 }
 
+impl CryptoRefusal {
+    /// The refusal class litchi-ops reports for this reason (record 0351
+    /// §2.4): the editor does not implement the lifecycle operation.
+    #[must_use]
+    pub const fn kind(self) -> litchi_core::edit::RefusalKind {
+        match self {
+            Self::SignatureVerificationUnavailable
+            | Self::SignatureAuthoringUnavailable
+            | Self::SignatureRemovalUnavailable
+            | Self::EncryptionAuthoringUnavailable
+            | Self::UsePasswordOpening => litchi_core::edit::RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
 /// Typed availability result for one cryptographic lifecycle operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]

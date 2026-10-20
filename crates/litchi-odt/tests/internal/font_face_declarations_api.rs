@@ -1,10 +1,12 @@
-use litchi_odt::font_face::{Declarations, Face};
-use litchi_odt::{Document, Package};
-mod support;
+use super::support;
+use crate::font_face::{Declarations, Face};
+use crate::{Document, Package};
 
-const CONTENT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-content.xml");
-const STYLES: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-styles.xml");
-const FLAT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-flat.fodt");
+const CONTENT: &str =
+    include_str!("../../../../test-data/odf/odt/font-face-declarations-content.xml");
+const STYLES: &str =
+    include_str!("../../../../test-data/odf/odt/font-face-declarations-styles.xml");
+const FLAT: &str = include_str!("../../../../test-data/odf/odt/font-face-declarations-flat.fodt");
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 fn declarations(name: &str) -> Declarations {
@@ -48,8 +50,7 @@ fn document_and_generic_package_keep_content_and_styles_declarations_separate() 
         Some(styles.clone())
     );
 
-    let package =
-        litchi_odt::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
+    let package = crate::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package.content_font_face_declarations().unwrap(),
         Some(content)
@@ -66,7 +67,7 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
     let original_styles = declarations("Styles Body");
     let replacement_content = declarations("Content Replacement");
     let replacement_styles = declarations("Styles Replacement");
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document()).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(document()).unwrap();
 
     assert_eq!(
         mutable
@@ -162,7 +163,7 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
 
 #[test]
 fn flat_document_exposes_its_single_font_face_declarations_part() {
-    let document = litchi_odt::generic::FlatDocument::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
+    let document = crate::generic::flat::Document::from_bytes(FLAT.as_bytes().to_vec()).unwrap();
 
     assert_eq!(
         document.font_face_declarations().unwrap(),

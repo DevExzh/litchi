@@ -1,5 +1,4 @@
-use litchi_odf_common::package::raw_identical_members;
-use litchi_odt::{
+use crate::{
     Package,
     mutable::MutableDocument,
     package::embedded::{
@@ -8,6 +7,7 @@ use litchi_odt::{
     },
     transaction::{OperationResult, Position},
 };
+use litchi_odf_common::package::raw_identical_members;
 
 fn source() -> Package {
     let mut document = MutableDocument::new();
@@ -74,7 +74,7 @@ fn package_object(name: &str, path: &str) -> EmbeddedResource {
 }
 
 fn with_content(snapshot: &Package, content: &str) -> Package {
-    let package = litchi_odt::core::OwnedPackage::from_bytes(snapshot.as_bytes().to_vec()).unwrap();
+    let package = crate::core::OwnedPackage::from_bytes(snapshot.as_bytes().to_vec()).unwrap();
     let bytes = litchi_odf_common::package::replace_content_xml(&package, content).unwrap();
     Package::from_bytes(&bytes).unwrap()
 }
@@ -133,7 +133,7 @@ fn batch_publishes_media_rich_create_update_delete_once_and_replays_durably() {
             .unwrap()
             .contains("resource.embedded.batch")
     );
-    let replayed = litchi_odt::transaction::DurablePatch::from_deterministic_json(&json)
+    let replayed = crate::transaction::DurablePatch::from_deterministic_json(&json)
         .unwrap()
         .apply(&setup)
         .unwrap();

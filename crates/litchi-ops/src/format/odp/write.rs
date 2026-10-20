@@ -15,7 +15,7 @@ use std::collections::HashSet;
 
 use litchi_core::{FileFormat, Position};
 use litchi_odp::scene::{
-    Attribute, Change, NewPage, NewTextBox, Scene, Scope, StoryRef, TextPropertyEdit,
+    Attribute, Change, NewPage, NewTextBox, Scene, Scope, StoryRef, TextPropertyUpdate,
 };
 
 use super::node::{Item, Node, object_kind};
@@ -76,7 +76,7 @@ struct Values {
     name: Option<String>,
     geometry: [Option<String>; 4],
     /// Character formatting (paragraphs and runs, record 0308).
-    format: TextPropertyEdit,
+    format: TextPropertyUpdate,
 }
 
 /// A font size as ODF points (`18pt`, `10.5pt`).
@@ -536,7 +536,7 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
 fn format_story(
     node: &Node<'_>,
     story: &StoryRef,
-    format: &TextPropertyEdit,
+    format: &TextPropertyUpdate,
     plan: &mut Plan,
 ) -> Result<()> {
     let paragraphs = node
@@ -568,7 +568,7 @@ fn format_story(
 }
 
 /// Whether a run's own properties set a value `format` changes.
-fn overrides(own: &litchi_odp::scene::TextProperties, format: &TextPropertyEdit) -> bool {
+fn overrides(own: &litchi_odp::scene::TextProperties, format: &TextPropertyUpdate) -> bool {
     let differs =
         |set: Option<bool>, held: Option<bool>| set.zip(held).is_some_and(|(a, b)| a != b);
     differs(format.bold, own.bold())

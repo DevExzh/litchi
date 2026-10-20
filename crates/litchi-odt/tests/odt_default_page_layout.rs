@@ -1,4 +1,4 @@
-use litchi_odt::generic::FlatDocument;
+use litchi_odt::generic::flat::Document as FlatDocument;
 use std::error::Error;
 
 const STYLE_NS: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";

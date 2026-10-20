@@ -1,11 +1,11 @@
 //! Authoring of explicit ODT page sequences (`text:page-sequence`, ODF 1.3
-//! §5.3) through `Builder` and `litchi_odt::mutable::MutableDocument`.
+//! §5.3) through `Builder` and `crate::mutable::MutableDocument`.
 //!
 //! The model preserves only the ordered `text:master-page-name` assignments;
 //! litchi never paginates or resolves the referenced master pages.
 
-use litchi_odt::page_sequence::Sequence;
-use litchi_odt::{Builder, Package};
+use crate::page_sequence::Sequence;
+use crate::{Builder, Package};
 
 fn sequence() -> Sequence {
     Sequence::new(vec![
@@ -86,7 +86,7 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
         .unwrap()
         .document()
         .unwrap();
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
     assert_eq!(mutable.page_sequence().unwrap(), None);
 
     // Insert ahead of the existing content.
@@ -99,7 +99,7 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
 
     // Replace the assignments in place.
     let replacement = Sequence::new(vec!["Standard".to_string()]).unwrap();
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(Some(&replacement)).unwrap();
     let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
@@ -108,7 +108,7 @@ fn mutable_sets_replaces_and_removes_page_sequence() {
     assert_eq!(reopened.page_sequence().unwrap(), Some(replacement));
 
     // Remove the sequence; removing again is a no-op.
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(None).unwrap();
     mutable.set_page_sequence(None).unwrap();
     let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())

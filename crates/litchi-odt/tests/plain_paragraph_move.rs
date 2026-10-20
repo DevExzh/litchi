@@ -165,7 +165,7 @@ fn paragraph_move_conflicts_with_intervening_content_edits() {
     replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = source.joined_edit();
+    let mut joined = source.joined_edits();
     joined.join("move", movement).unwrap();
     assert!(joined.join("replace-middle", replacement).is_err());
 }

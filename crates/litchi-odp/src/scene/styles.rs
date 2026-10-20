@@ -6,7 +6,7 @@
 //! a `text:p` a `paragraph`-family style, and either style's
 //! `style:text-properties` holds the bold, italic, underline, size, colour
 //! and font. The scene indexes those styles once while it scans; a
-//! [`TextPropertyEdit`] never changes a style other markup may share, it
+//! [`TextPropertyUpdate`] never changes a style other markup may share, it
 //! derives a new automatic style from the node's own and points the node at
 //! it.
 
@@ -100,7 +100,7 @@ impl TextProperties {
     }
 
     /// Whether every property `edit` sets already has that value here.
-    pub(crate) fn satisfies(&self, edit: &TextPropertyEdit) -> bool {
+    pub(crate) fn satisfies(&self, edit: &TextPropertyUpdate) -> bool {
         edit.bold.is_none_or(|bold| self.bold() == Some(bold))
             && edit
                 .italic
@@ -560,7 +560,7 @@ pub(crate) enum StylesInsertion {
 /// `None` keeps what the node's style had.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub struct TextPropertyEdit {
+pub struct TextPropertyUpdate {
     /// Bold (`fo:font-weight`, with its Asian and complex twins).
     pub bold: Option<bool>,
     /// Italic (`fo:font-style`, with its twins).
@@ -575,7 +575,7 @@ pub struct TextPropertyEdit {
     pub font: Option<String>,
 }
 
-impl TextPropertyEdit {
+impl TextPropertyUpdate {
     /// An edit that changes nothing.
     #[must_use]
     pub fn new() -> Self {

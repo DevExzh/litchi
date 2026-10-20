@@ -325,7 +325,7 @@ impl Package {
     }
 
     /// Set or clear paragraph RDFa and atomically publish `content.xml`.
-    pub fn set_paragraph_rdfa(
+    pub(crate) fn set_paragraph_rdfa(
         &mut self,
         position: litchi_core::Position,
         value: &crate::RdfaAttributes,
@@ -336,14 +336,18 @@ impl Package {
     }
 
     /// Set or clear RDFa on a uniquely named bookmark start and publish it.
-    pub fn set_bookmark_rdfa(&mut self, name: &str, value: &crate::RdfaAttributes) -> Result<()> {
+    pub(crate) fn set_bookmark_rdfa(
+        &mut self,
+        name: &str,
+        value: &crate::RdfaAttributes,
+    ) -> Result<()> {
         let content =
             crate::content_metadata::set_bookmark_rdfa(&self.content_xml()?, name, value)?;
         self.replace_content_xml(content)
     }
 
     /// Set or clear RDFa on one inline `text:meta` occurrence and publish it.
-    pub fn set_text_meta_rdfa(
+    pub(crate) fn set_text_meta_rdfa(
         &mut self,
         position: litchi_core::Position,
         value: &crate::RdfaAttributes,
@@ -354,7 +358,7 @@ impl Package {
     }
 
     /// Insert an inline `text:meta` and atomically publish `content.xml`.
-    pub fn insert_text_meta(
+    pub(crate) fn insert_text_meta(
         &mut self,
         paragraph: litchi_core::Position,
         value: &crate::TextMeta,
@@ -365,7 +369,7 @@ impl Package {
     }
 
     /// Replace one inline `text:meta` and atomically publish `content.xml`.
-    pub fn replace_text_meta(
+    pub(crate) fn replace_text_meta(
         &mut self,
         position: litchi_core::Position,
         value: &crate::TextMeta,
@@ -376,13 +380,13 @@ impl Package {
     }
 
     /// Remove one inline `text:meta` and atomically publish `content.xml`.
-    pub fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
+    pub(crate) fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
         let content = crate::content_metadata::remove_text_meta(&self.content_xml()?, position)?;
         self.replace_content_xml(content)
     }
 
     /// Replace one inert XForms model and atomically publish `content.xml`.
-    pub fn replace_xforms_model(
+    pub(crate) fn replace_xforms_model(
         &mut self,
         position: litchi_core::Position,
         model: &crate::xforms::Model,
@@ -392,13 +396,13 @@ impl Package {
     }
 
     /// Insert an inert XForms model into the existing `office:forms` container.
-    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
+    pub(crate) fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
         let content = crate::xforms::insert_model(&self.content_xml()?, model)?;
         self.replace_content_xml(content)
     }
 
     /// Remove one inert XForms model from `office:forms` and publish it.
-    pub fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
+    pub(crate) fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
         let content = crate::xforms::remove_model(&self.content_xml()?, position.get())?;
         self.replace_content_xml(content)
     }
@@ -418,7 +422,7 @@ impl Package {
     ///
     /// The group must target `content.xml` or `styles.xml`. Auxiliary package
     /// entries remain byte-for-byte intact, and formulas remain inert.
-    pub fn set_variable_declaration_group(
+    pub(crate) fn set_variable_declaration_group(
         &mut self,
         group: &crate::variable_declaration::Group,
     ) -> Result<Option<crate::variable_declaration::Group>> {
@@ -466,7 +470,7 @@ impl Package {
     ///
     /// Removal fails without mutation if any remaining field references a
     /// declaration owned by the container.
-    pub fn remove_variable_declaration_group(
+    pub(crate) fn remove_variable_declaration_group(
         &mut self,
         part: crate::variable_declaration::Part,
         scope: &crate::variable_declaration::Scope,

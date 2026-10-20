@@ -243,7 +243,7 @@ fn parses_real_odf_fixture() {
             .filter_map(|x| x.properties.as_ref())
             .any(|p| p.horizontal == Some(Horizontal::End))
     );
-    let flat = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(xml)).unwrap();
+    let flat = litchi_odt::generic::flat::Document::from_reader(Cursor::new(xml)).unwrap();
     assert_eq!(
         flat.paragraph_style_alignments().unwrap().styles.len(),
         set.styles.len()

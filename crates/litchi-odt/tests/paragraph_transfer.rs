@@ -312,7 +312,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
 
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 
@@ -321,7 +321,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
         .unwrap();
     let mut transfer = target.edit();
     plan.apply(&mut transfer).unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     let mut replacement = target.edit();
     replacement
         .replace_paragraph(Position::new(0), "changed")
@@ -334,13 +334,13 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     mixed
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     assert!(joined.join("mixed-single-edit", mixed).is_err());
 
     let mut duplicated = target.edit();
     plan.apply(&mut duplicated).unwrap();
     plan.apply(&mut duplicated).unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     assert!(joined.join("duplicate-transfers", duplicated).is_err());
 
     // Even a paragraph-count-preserving content edit can regenerate
@@ -354,7 +354,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("replace", replacement).unwrap();
     assert!(joined.join("transfer", transfer).is_err());
 
@@ -367,7 +367,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 
@@ -380,7 +380,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     shifted_replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", shifted_replacement).is_err());
 
@@ -393,7 +393,7 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
     shifted_replacement
         .replace_paragraph(Position::new(1), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("replace", shifted_replacement).unwrap();
     assert!(joined.join("transfer", transfer).is_err());
 }
@@ -473,7 +473,7 @@ fn mixed_transfer_refuses_lexical_regeneration_for_cdata_and_prefixes() {
     replacement
         .replace_paragraph(Position::new(0), "changed")
         .unwrap();
-    let mut joined = target.joined_edit();
+    let mut joined = target.joined_edits();
     joined.join("transfer", transfer).unwrap();
     assert!(joined.join("replace", replacement).is_err());
 }

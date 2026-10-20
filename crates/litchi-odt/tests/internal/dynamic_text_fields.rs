@@ -1,11 +1,11 @@
-use litchi_odt::elements::field::{
+use super::support;
+use crate::elements::field::{
     CalculatedFieldValue, CrossReferenceFormat, DropDownLabel, DynamicTextField, FieldValueType,
     FormulaFieldDisplay, MeasureKind, NoteReferenceClass, NoteReferenceFormat, PlaceholderType,
     SequenceNumberFormat, SequenceReferenceFormat, StatisticKind, UserFieldDisplay,
     VariableSetDisplay,
 };
-use litchi_odt::{Builder, Document, Package};
-mod support;
+use crate::{Builder, Document, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -170,7 +170,7 @@ fn mutable_document_inserts_replaces_and_removes_fields_without_rewriting_neighb
         r#"before<t:span t:style-name="Keep">unchanged &amp; exact</t:span>"#,
         r#"<t:placeholder t:placeholder-type="text">old</t:placeholder>after"#,
     ));
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     let conditional = DynamicTextField::ConditionalText {
         condition: "of:=1<2 & 3>2".to_string(),
         value_if_true: "yes".to_string(),
@@ -210,7 +210,7 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
         is_hidden: Some(true),
         display_text: "cached".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document("")).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(document("")).unwrap();
     mutable.insert_dynamic_text_field(0, &field).unwrap();
     let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
@@ -232,8 +232,7 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
 
 #[test]
 fn mutation_rejects_out_of_bounds_targets_without_changing_content() {
-    let mut mutable =
-        litchi_odt::mutable::MutableDocument::from_document(document("plain")).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(document("plain")).unwrap();
     let before = Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
         .document()
@@ -295,7 +294,7 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
         reference_name: None,
         display_text: "IV".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert_eq!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
@@ -309,7 +308,7 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
         vec![replacement.clone()]
     );
 
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert!(
         Package::from_bytes(&mutable.to_bytes().unwrap())
@@ -378,7 +377,7 @@ fn sequence_references_support_namespace_aware_document_mutation() {
         reference_format: Some(SequenceReferenceFormat::CategoryAndValue),
         display_text: "Figure 2".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert_eq!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
@@ -397,7 +396,7 @@ fn sequence_references_support_namespace_aware_document_mutation() {
         reference_format: Some(SequenceReferenceFormat::Page),
         display_text: "12".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     let final_document = Package::from_bytes(&mutable.to_bytes().unwrap())
@@ -519,7 +518,7 @@ fn calculated_variables_support_namespace_aware_document_mutation() {
         data_style_name: None,
         display_text: String::new(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::Expression { .. }
@@ -532,7 +531,7 @@ fn calculated_variables_support_namespace_aware_document_mutation() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert!(
         Package::from_bytes(&mutable.to_bytes().unwrap())
@@ -628,7 +627,7 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
         ],
         display_text: "High & urgent".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert_eq!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
@@ -650,7 +649,7 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
         }],
         display_text: "Open".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
     let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
@@ -660,7 +659,7 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted.clone()]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert_eq!(
         Package::from_bytes(&mutable.to_bytes().unwrap())
@@ -690,7 +689,7 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
         language: Some("text/x-basic".to_string()),
         content: "REM stored macro payload".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert_eq!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
@@ -709,7 +708,7 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
         language: None,
         content: String::new(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
     let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
@@ -770,7 +769,7 @@ fn interactive_fields_support_namespace_aware_mutation() {
         data_style_name: None,
         display_text: String::new(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::UserFieldGet { .. }
@@ -788,7 +787,7 @@ fn interactive_fields_support_namespace_aware_mutation() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), input]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
 }
 
@@ -845,7 +844,7 @@ fn table_formula_supports_namespace_aware_insert_replace_and_remove() {
         data_style_name: None,
         display_text: "4".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::TableFormula { .. }
@@ -865,7 +864,7 @@ fn table_formula_supports_namespace_aware_insert_replace_and_remove() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
 }
 
@@ -920,7 +919,7 @@ fn measure_fields_support_namespace_aware_insert_replace_and_remove() {
         kind: MeasureKind::Value,
         display_text: "12.5".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::Measure {
@@ -941,7 +940,7 @@ fn measure_fields_support_namespace_aware_insert_replace_and_remove() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
 }
 
@@ -1039,7 +1038,7 @@ fn cross_references_support_namespace_aware_insert_replace_and_remove() {
         reference_format: Some(CrossReferenceFormat::NumberAllSuperior),
         display_text: "1.2.3".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::BookmarkReference { .. }
@@ -1059,7 +1058,7 @@ fn cross_references_support_namespace_aware_insert_replace_and_remove() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
 }
 
@@ -1133,7 +1132,7 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
         number_format: Some(SequenceNumberFormat::new("1", None).unwrap()),
         display_text: "12".to_string(),
     };
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     assert!(matches!(
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::DocumentStatistic {
@@ -1155,7 +1154,7 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
     );
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
 }
 

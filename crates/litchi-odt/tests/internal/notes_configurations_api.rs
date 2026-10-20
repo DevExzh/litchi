@@ -1,9 +1,7 @@
-use litchi_odt::line_numbering::Format;
-use litchi_odt::notes_configuration::{
-    Class, Configuration, Configurations, NumberingScope, Position,
-};
-use litchi_odt::{Document, Package};
-mod support;
+use super::support;
+use crate::line_numbering::Format;
+use crate::notes_configuration::{Class, Configuration, Configurations, NumberingScope, Position};
+use crate::{Document, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -77,10 +75,9 @@ fn document_reads_note_configurations_from_styles() {
 fn mutable_document_updates_note_configurations_without_touching_unrelated_styles() {
     let footnote = footnote();
     let endnote = endnote();
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document(
-        r#"<s:style s:name="Keep"/>"#,
-    ))
-    .unwrap();
+    let mut mutable =
+        crate::mutable::MutableDocument::from_document(document(r#"<s:style s:name="Keep"/>"#))
+            .unwrap();
 
     assert_eq!(mutable.notes_configurations().unwrap(), Default::default());
     assert_eq!(mutable.set_notes_configuration(&footnote).unwrap(), None);

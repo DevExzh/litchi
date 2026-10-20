@@ -10,6 +10,9 @@ use std::io::Read;
 use std::path::Path;
 
 /// A validated standalone `OpenDocument` chart or chart template.
+///
+/// The document is immutable: [`Document::edit`] stages an
+/// [`Edit`](super::Edit) whose commit publishes a new document.
 pub struct Document {
     pub(crate) package: Package,
     pub(crate) chart: Element,
@@ -114,7 +117,7 @@ impl Document {
     }
 
     /// Replace the typed chart content while preserving package entries.
-    pub fn set_definition(&mut self, definition: &Definition) -> Result<()> {
+    pub(crate) fn set_definition(&mut self, definition: &Definition) -> Result<()> {
         let content = serialize_content(definition)?;
         let parsed = read(&content)?;
         self.package.replace_content_xml(content)?;

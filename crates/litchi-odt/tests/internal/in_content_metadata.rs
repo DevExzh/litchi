@@ -1,10 +1,10 @@
-use litchi_core::Position;
-use litchi_odt::{
+use crate::{
     RdfaAttributes, TextMeta,
     core::PackageWriter,
     generic::{FlatDocument, Package},
     xforms::ModelChild,
 };
+use litchi_core::Position;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -52,7 +52,7 @@ fn public_flat_facade_reads_and_preserves_in_content_metadata_and_xforms() {
         metadata
             .rdfa
             .iter()
-            .any(|item| matches!(item.host, litchi_odt::RdfaHost::Paragraph { index: 0 }))
+            .any(|item| matches!(item.host, crate::RdfaHost::Paragraph { index: 0 }))
     );
     let models = document.xforms_models().unwrap();
     assert_eq!(models.len(), 1);
@@ -110,7 +110,7 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
         r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:h="{XHTML}" o:version="1.3"><o:styles><t:meta h:property="dc:style">style value</t:meta></o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>"#
     );
     let bytes = package(&content(body()), Some(&styles));
-    let document = litchi_odt::Package::from_bytes(&bytes)
+    let document = crate::Package::from_bytes(&bytes)
         .unwrap()
         .document()
         .unwrap();
@@ -119,7 +119,7 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
         metadata
             .text_meta
             .iter()
-            .any(|item| item.part == litchi_odt::MetadataPart::Styles)
+            .any(|item| item.part == crate::MetadataPart::Styles)
     );
     assert_eq!(document.xforms_models().unwrap().len(), 1);
 
@@ -161,14 +161,14 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
             .unwrap()
             .rdfa
             .iter()
-            .any(|item| matches!(item.host, litchi_odt::RdfaHost::Paragraph { index: 0 }))
+            .any(|item| matches!(item.host, crate::RdfaHost::Paragraph { index: 0 }))
     );
 
-    let source = litchi_odt::Package::from_bytes(&package(&content(body()), None))
+    let source = crate::Package::from_bytes(&package(&content(body()), None))
         .unwrap()
         .document()
         .unwrap();
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(source).unwrap();
     mutable
         .set_bookmark_rdfa(
             "mark",
@@ -180,7 +180,7 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
         .unwrap();
     mutable.remove_text_meta(Position::new(0)).unwrap();
     mutable.remove_xforms_model(Position::new(0)).unwrap();
-    let reopened = litchi_odt::Package::from_bytes(&mutable.to_bytes().unwrap())
+    let reopened = crate::Package::from_bytes(&mutable.to_bytes().unwrap())
         .unwrap()
         .document()
         .unwrap();

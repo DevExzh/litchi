@@ -1,10 +1,10 @@
 use std::{collections::BTreeMap, io::Write};
 
+use crate::core::OwnedPackage as CoreOwnedPackage;
+use crate::odc::{ChartClass, Definition, Document, Text, serialize_content};
 use flate2::{Compression, write::DeflateEncoder};
 use litchi_core::Error;
 use litchi_odf_common::constants;
-use litchi_odt::core::OwnedPackage as CoreOwnedPackage;
-use litchi_odt::odc::{ChartClass, Definition, Document, Text, serialize_content};
 use soapberry_zip::{
     CompressionMethod, Header, PreservationIndex, ZipArchive, ZipArchiveWriter,
     extra_fields::ExtraFieldId,
@@ -592,7 +592,7 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
             Some(alias),
         );
         match Document::from_bytes(&aliased) {
-            Err(litchi_odt::Error::Core(Error::InvalidFormat(_))) => {},
+            Err(crate::Error::Core(Error::InvalidFormat(_))) => {},
             Ok(_) => panic!("accepted unsafe manifest alias {alias:?}"),
             Err(error) => panic!("unexpected error for unsafe manifest alias {alias:?}: {error}"),
         }

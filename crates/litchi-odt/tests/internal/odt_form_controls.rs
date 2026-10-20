@@ -4,16 +4,16 @@
 //! strictly typed inert data — control ids, names, labels, current values,
 //! checked/selected state, options, and event-listener metadata that is
 //! retained but never executed — while `Builder` and
-//! `litchi_odt::mutable::MutableDocument` author, edit, and remove controls with packaged
+//! `crate::mutable::MutableDocument` author, edit, and remove controls with packaged
 //! round trips.
 
-use litchi_odt::form::{
+use crate::form::{
     ButtonControl, CheckboxControl, CheckboxState, ComboItem, ComboboxControl, ControlForm,
     ControlKind, FixedTextControl, GenericForm, HiddenControl, InteractiveForm, ListOption,
     ListboxControl, Node, RadioControl, SelectionForm, TextControl, TypedValueControl,
     TypedValueControlKind, TypedValueForm, VisualForm,
 };
-use litchi_odt::{Builder, Package};
+use crate::{Builder, Package};
 
 /// Flat text document holding one form with every common control kind.
 const FIXTURE: &str = "../../test-data/odf/odt/form-controls.fodt";
@@ -120,7 +120,7 @@ fn visual_form() -> VisualForm {
 
 #[test]
 fn reads_fixture_form_controls_as_typed_inert_data() {
-    let document = litchi_odt::generic::FlatDocument::open(FIXTURE).unwrap();
+    let document = crate::generic::flat::Document::open(FIXTURE).unwrap();
     let forms = document.forms().unwrap();
     assert_eq!(forms.groups.len(), 1);
     assert_eq!(forms.groups[0].apply_design_mode, Some(true));
@@ -128,7 +128,7 @@ fn reads_fixture_form_controls_as_typed_inert_data() {
     let form = &forms.groups[0].forms[0];
     assert_eq!(form.name.as_deref(), Some("registration"));
 
-    let controls: Vec<&litchi_odt::form::Control> = form
+    let controls: Vec<&crate::form::Control> = form
         .children
         .iter()
         .map(|node| match node {
@@ -232,7 +232,7 @@ fn builder_authored_forms_round_trip_the_package() {
             .map(|name| Some(name.to_string()))
     );
 
-    let mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
+    let mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
     assert_eq!(mutable.text_controls().unwrap(), text_form().controls);
     assert_eq!(
         mutable.interactive_controls().unwrap(),
@@ -269,7 +269,7 @@ fn mutable_inserts_replaces_and_removes_controls() {
         .unwrap()
         .document()
         .unwrap();
-    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
+    let mut mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
 
     // Insert a new textarea into the first form (document order).
     let extra = TextControl::textarea("Notes", "notes_area");
@@ -304,7 +304,7 @@ fn mutable_inserts_replaces_and_removes_controls() {
         .unwrap()
         .document()
         .unwrap();
-    let reopened = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
+    let reopened = crate::mutable::MutableDocument::from_document(reopened).unwrap();
 
     let texts = reopened.text_controls().unwrap();
     assert_eq!(texts.len(), 2);

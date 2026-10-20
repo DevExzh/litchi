@@ -1,5 +1,5 @@
-use litchi_odt::footnote_separator::{Adjustment, Length, LineStyle, Percent, Separator, parse};
-use litchi_odt::{Builder, Package};
+use crate::footnote_separator::{Adjustment, Length, LineStyle, Percent, Separator, parse};
+use crate::{Builder, Package};
 use std::io::Cursor;
 
 fn sample() -> Separator {
@@ -31,7 +31,7 @@ fn parses_bundled_libreoffice_flat_fixture() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt"
     ));
-    let document = litchi_odt::generic::FlatDocument::from_reader(Cursor::new(fixture)).unwrap();
+    let document = crate::generic::flat::Document::from_reader(Cursor::new(fixture)).unwrap();
     let separators = document.style_footnote_separators().unwrap();
     assert!(!separators.is_empty());
     assert!(separators.iter().any(|separator| separator == &sample()));
@@ -44,7 +44,7 @@ fn builder_and_package_accessors_round_trip_typed_state() {
         .add_page_layout_footnote_separator("pm1", sample())
         .unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let package = litchi_odt::generic::Package::from_reader(Cursor::new(bytes)).unwrap();
+    let package = crate::generic::Package::from_reader(Cursor::new(bytes)).unwrap();
     assert_eq!(package.style_footnote_separators().unwrap(), [sample()]);
 }
 
@@ -56,7 +56,7 @@ fn page_layout_parser_exposes_the_typed_separator() {
         .unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
     let document = Package::from_bytes(&bytes).unwrap().document().unwrap();
-    let mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
+    let mutable = crate::mutable::MutableDocument::from_document(document).unwrap();
     let layouts = mutable.page_layouts().unwrap();
     assert_eq!(
         layouts[0]
