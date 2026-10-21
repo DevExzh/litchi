@@ -1662,6 +1662,26 @@ publication, and changed `finish` rendering. The end-to-end case times all
 three. Stage preparation, exact deterministic output comparison and a complete
 public CFB reopen of all five streams remain outside each timed interval.
 
+For the paired W5 owner/property-limit probe, use the small deterministic
+example rather than changing the large case matrix:
+
+```sh
+cargo run --release --locked --example ole_w5_probe -- \
+  --route open --warmup 10 --samples 100
+cargo run --release --locked --example ole_w5_probe -- \
+  --route read --warmup 10 --samples 100
+```
+
+The `open`, `begin_edit`, `noop_commit`, and `replace_stream` routes are the
+0359g owner routes. The `read` and `edit` routes cover the 0359h typed
+user-defined overlay. The example emits CSV rows for an external ABBA runner;
+all setup and deterministic output checks are outside the timed operation.
+Build the old API revision with
+`--no-default-features --features legacy-owner-api,legacy-property-api`.
+The owner pair is `0ce4bb8b61` to the corrected owner tip; the typed-overlay
+pair starts at `604822b441` and ends at the corrected 0359h tip. Use absolute,
+distinct target directories and record source and binary SHA-256 values.
+
 Measure the current evidence-first OPC source overlay path on its fixed
 few-large incompressible corpus:
 
