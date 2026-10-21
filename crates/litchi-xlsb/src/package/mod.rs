@@ -110,7 +110,9 @@ pub use shared_strings::{
 /// package is handed to callers.
 #[derive(Debug, Clone)]
 pub struct Package(
-    OpcPackage,
+    // Shared: a clone of the package (every edit starts from one) is a
+    // reference-count increment, and a commit's patch shares both graphs.
+    Arc<OpcPackage>,
     ExternalLinkLimits,
     ToleranceReport,
     DrawingLoadPolicy,
@@ -292,7 +294,7 @@ impl Package {
         workbook.set_semantic_limits(options.semantic_limits);
         let tolerance = workbook.tolerance_report().clone();
         Ok(Self(
-            package,
+            Arc::new(package),
             options.external_link_limits,
             tolerance,
             drawing_load_policy,
@@ -304,7 +306,7 @@ impl Package {
 
     pub(crate) fn from_workbook(workbook: &Workbook) -> Self {
         Self(
-            workbook.package.clone(),
+            Arc::new(workbook.package.clone()),
             workbook.external_link_limits(),
             workbook.tolerance_report().clone(),
             workbook.drawing_load_policy(),
@@ -324,7 +326,7 @@ impl Package {
         let semantic_limits = workbook.semantic_limits();
         let package = workbook.package.clone();
         Self(
-            package,
+            Arc::new(package),
             limits,
             tolerance,
             drawing_policy,
@@ -339,9 +341,10 @@ impl Package {
     /// the candidate again.
     pub(crate) fn reparse_candidate_retaining_projection(
         &self,
-        candidate: OpcPackage,
+        candidate: impl Into<Arc<OpcPackage>>,
     ) -> Result<Self> {
-        let workbook = self.project_candidate(candidate.clone())?;
+        let candidate = candidate.into();
+        let workbook = self.project_candidate((*candidate).clone())?;
         let tolerance = workbook.tolerance_report().clone();
         Ok(Self(
             candidate,
@@ -361,9 +364,9 @@ impl Package {
     /// Publish a candidate whose workbook projection the change cannot
     /// affect (a signature, ribbon, task-pane, VBA or theme part change)
     /// without validating it again. The projection is parsed on first use.
-    pub(crate) fn with_unparsed(&self, candidate: OpcPackage) -> Self {
+    pub(crate) fn with_unparsed(&self, candidate: impl Into<Arc<OpcPackage>>) -> Self {
         Self(
-            candidate,
+            candidate.into(),
             self.1,
             self.2.clone(),
             self.3,
@@ -474,7 +477,7 @@ impl Package {
     /// Returns the signing errors.
     #[cfg(feature = "sign")]
     pub fn sign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
-        let mut candidate = self.0.clone();
+        let mut candidate = (*self.0).clone();
         candidate.sign(signer)?;
         Ok(self.with_unparsed(candidate))
     }
@@ -490,7 +493,7 @@ impl Package {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> litchi_opc::sign::Result<Self> {
-        let mut candidate = self.0.clone();
+        let mut candidate = (*self.0).clone();
         candidate.sign_with(signer, limits)?;
         Ok(self.with_unparsed(candidate))
     }
@@ -503,7 +506,7 @@ impl Package {
     /// Returns the signing errors.
     #[cfg(feature = "sign")]
     pub fn resign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
-        let mut candidate = self.0.clone();
+        let mut candidate = (*self.0).clone();
         candidate.resign(signer)?;
         Ok(self.with_unparsed(candidate))
     }
@@ -519,7 +522,7 @@ impl Package {
         signer: &litchi_sign::Signer,
         limits: &litchi_sign::Limits,
     ) -> litchi_opc::sign::Result<Self> {
-        let mut candidate = self.0.clone();
+        let mut candidate = (*self.0).clone();
         candidate.resign_with(signer, limits)?;
         Ok(self.with_unparsed(candidate))
     }
@@ -532,7 +535,7 @@ impl Package {
     /// is refused with [`PackageError::Signed`] until this is called.
     #[must_use]
     pub fn unsign(&self) -> Self {
-        let mut candidate = self.0.clone();
+        let mut candidate = (*self.0).clone();
         candidate.unsign();
         self.with_unparsed(candidate)
     }
@@ -541,7 +544,7 @@ impl Package {
     /// policies (for crate paths that author into a donor workbook).
     pub(crate) fn materialize_workbook(&self) -> Result<Workbook> {
         let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
-            self.0.clone(),
+            (*self.0).clone(),
             self.1,
             self.3,
         )?;
@@ -552,7 +555,12 @@ impl Package {
 
     /// Consume this package and return its underlying OPC graph.
     pub fn into_opc(self) -> OpcPackage {
-        self.0
+        Arc::try_unwrap(self.0).unwrap_or_else(|shared| (*shared).clone())
+    }
+
+    /// The shared OPC graph, for patches that keep it.
+    pub(crate) fn opc_shared(&self) -> &Arc<OpcPackage> {
+        &self.0
     }
 
     /// Serialize the validated package into owned bytes.
@@ -623,7 +631,7 @@ impl From<Package> for OpcPackage {
 impl From<OpcPackage> for Package {
     fn from(package: OpcPackage) -> Self {
         Self(
-            package,
+            Arc::new(package),
             ExternalLinkLimits::default(),
             ToleranceReport::default(),
             DrawingLoadPolicy::Eager,

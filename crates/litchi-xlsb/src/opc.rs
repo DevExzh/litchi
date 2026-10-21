@@ -132,7 +132,8 @@ impl Edit {
         let Some(staged) = self.staged else {
             return Ok(Commit::new((self.source, PartPatch::default())));
         };
-        let patch = PartPatch::capture_all(self.source.opc_package(), &staged)?;
+        let staged = std::sync::Arc::new(staged);
+        let patch = PartPatch::capture_all(self.source.opc_shared(), &staged)?;
         if patch.is_noop() {
             return Ok(Commit::new((self.source, patch)));
         }

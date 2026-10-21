@@ -170,16 +170,49 @@ struct Delta {
 /// The publication manifests of one side of a patch: the content-types view
 /// and the relationship views of the changed owners, so a replay publishes
 /// the same manifest spelling as the commit it was captured from.
+///
+/// Only the views a patch can change are captured: the relationships of a
+/// part that is added, removed or whose relationships change, the
+/// content-types view when a part is added or removed or changes its content
+/// type, and the package relationships when they change. A part whose
+/// payload alone changes is replayed in place, so its own views are kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Manifests {
-    content_types: OwnedContentTypes,
+    content_types: Option<OwnedContentTypes>,
     relationships: Vec<OwnedRelationships>,
 }
 
+impl Delta {
+    /// Whether only the payload changes: the part exists on both sides with
+    /// the same content type and relationships.
+    fn payload_only(&self) -> bool {
+        match (&self.before, &self.after) {
+            (Some(before), Some(after)) => {
+                before.content_type == after.content_type
+                    && before.relationships == after.relationships
+            },
+            _ => false,
+        }
+    }
+
+    /// Whether the part is added, removed or changes its content type.
+    fn changes_content_types(&self) -> bool {
+        match (&self.before, &self.after) {
+            (Some(before), Some(after)) => before.content_type != after.content_type,
+            _ => true,
+        }
+    }
+}
+
 impl Manifests {
+    /// Whether a patch of `deltas` changes any manifest view.
+    fn needed(deltas: &[Delta], root: bool) -> bool {
+        root || deltas.iter().any(|delta| !delta.payload_only())
+    }
+
     fn capture(package: &OpcPackage, deltas: &[Delta], after: bool, root: bool) -> Result<Self> {
         let mut relationships = Vec::new();
-        for delta in deltas {
+        for delta in deltas.iter().filter(|delta| !delta.payload_only()) {
             let present = if after {
                 delta.after.is_some()
             } else {
@@ -193,8 +226,13 @@ impl Manifests {
             let owner = PackURI::new("/")?;
             relationships.push(package.source_relationships(&owner)?);
         }
+        let content_types = if deltas.iter().any(Delta::changes_content_types) {
+            Some(package.source_content_types()?)
+        } else {
+            None
+        };
         Ok(Self {
-            content_types: package.source_content_types()?,
+            content_types,
             relationships,
         })
     }
@@ -202,9 +240,11 @@ impl Manifests {
     /// Publish these manifest views on `package`, whose typed graph is the
     /// one they were captured from.
     fn restore(&self, package: &mut OpcPackage) -> Result<()> {
-        let current = package.source_content_types()?;
-        if current.bytes() != self.content_types.bytes() {
-            package.try_replace_content_types(current.bytes(), &self.content_types)?;
+        if let Some(content_types) = &self.content_types {
+            let current = package.source_content_types()?;
+            if current.bytes() != content_types.bytes() {
+                package.try_replace_content_types(current.bytes(), content_types)?;
+            }
         }
         for relationships in &self.relationships {
             let current = package.source_relationships(relationships.owner())?;
@@ -223,8 +263,60 @@ impl Manifests {
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
     root: Option<(Vec<Relationship>, Vec<Relationship>)>,
-    manifests: Option<(Manifests, Manifests)>,
+    manifests: Option<LazyManifests>,
 }
+
+/// The manifest views of both sides of a changed patch, captured on first
+/// replay: a commit publishes its own staged graph and never needs them, so
+/// the patch keeps (shares of) the two graphs instead of serializing their
+/// manifests on every commit.
+#[derive(Debug, Clone)]
+struct LazyManifests {
+    graphs: (Arc<OpcPackage>, Arc<OpcPackage>),
+    deltas: Arc<[Delta]>,
+    root: bool,
+    /// Whether this is the inverse of the captured direction.
+    inverse: bool,
+    captured: Arc<std::sync::OnceLock<(Manifests, Manifests)>>,
+}
+
+impl LazyManifests {
+    /// The `(before, after)` manifest views of this direction.
+    fn get(&self) -> Result<(&Manifests, &Manifests)> {
+        let pair = if let Some(pair) = self.captured.get() {
+            pair
+        } else {
+            let (before, after) = &self.graphs;
+            let captured = (
+                Manifests::capture(before, &self.deltas, false, self.root)?,
+                Manifests::capture(after, &self.deltas, true, self.root)?,
+            );
+            self.captured.get_or_init(|| captured)
+        };
+        Ok(if self.inverse {
+            (&pair.1, &pair.0)
+        } else {
+            (&pair.0, &pair.1)
+        })
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            inverse: !self.inverse,
+            ..self.clone()
+        }
+    }
+}
+
+/// Two patches are equal when they change the same parts the same way; the
+/// manifest views are derived from the graphs the patches were captured on.
+impl PartialEq for LazyManifests {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for LazyManifests {}
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
@@ -262,21 +354,20 @@ impl PartPatch {
                 .root
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
-            manifests: self
-                .manifests
-                .as_ref()
-                .map(|(before, after)| (after.clone(), before.clone())),
+            manifests: self.manifests.as_ref().map(LazyManifests::inverse),
         }
     }
 
     /// Attach the manifest views of both sides to a changed patch.
-    fn with_manifests(mut self, before: &OpcPackage, after: &OpcPackage) -> Result<Self> {
-        if !self.is_noop() {
-            let root = self.root.is_some();
-            self.manifests = Some((
-                Manifests::capture(before, &self.deltas, false, root)?,
-                Manifests::capture(after, &self.deltas, true, root)?,
-            ));
+    fn with_manifests(mut self, before: &Arc<OpcPackage>, after: &Arc<OpcPackage>) -> Result<Self> {
+        if Manifests::needed(&self.deltas, self.root.is_some()) {
+            self.manifests = Some(LazyManifests {
+                graphs: (Arc::clone(before), Arc::clone(after)),
+                deltas: self.deltas.clone().into(),
+                root: self.root.is_some(),
+                inverse: false,
+                captured: Arc::default(),
+            });
         }
         Ok(self)
     }
@@ -294,7 +385,11 @@ impl PartPatch {
 
     /// Capture the parts named in `names` that differ between `before` and
     /// `after`, and the package-level relationships when they differ.
-    fn capture(before: &OpcPackage, after: &OpcPackage, names: &BTreeSet<String>) -> Result<Self> {
+    fn capture(
+        before: &Arc<OpcPackage>,
+        after: &Arc<OpcPackage>,
+        names: &BTreeSet<String>,
+    ) -> Result<Self> {
         let mut deltas = Vec::new();
         for name in names {
             let name = PackURI::new(name.as_str())?;
@@ -321,7 +416,7 @@ impl PartPatch {
     /// The staged graph is a clone of the source, so an untouched part shares
     /// its payload allocation and compares by pointer; only changed parts are
     /// compared by value.
-    pub(crate) fn capture_all(before: &OpcPackage, after: &OpcPackage) -> Result<Self> {
+    pub(crate) fn capture_all(before: &Arc<OpcPackage>, after: &Arc<OpcPackage>) -> Result<Self> {
         // One commit changes at most as many parts as the package's source
         // limits admit.
         let maximum = before.read_limits().max_parts();
@@ -418,6 +513,15 @@ impl PartPatch {
         crate::signature_policy::ensure_unsigned(source)?;
         let mut target = source.clone();
         for delta in &self.deltas {
+            if delta.payload_only()
+                && let Some(after) = &delta.after
+            {
+                // Keep the part's own relationship and content-type views.
+                target
+                    .get_part_mut(&delta.name)?
+                    .set_blob_shared(Arc::clone(&after.blob));
+                continue;
+            }
             target.remove_part(&delta.name);
             if let Some(after) = &delta.after {
                 target.add_part(Box::new(after.to_part(delta.name.clone())?));
@@ -430,8 +534,8 @@ impl PartPatch {
             }
             add_relationships(graph, after)?;
         }
-        if let Some((_, after)) = &self.manifests {
-            after.restore(&mut target)?;
+        if let Some(manifests) = &self.manifests {
+            manifests.get()?.1.restore(&mut target)?;
         }
         Ok(target)
     }
@@ -605,10 +709,11 @@ impl Staged {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
+        let staged = Arc::new(staged);
         let patch = if self.all {
-            PartPatch::capture_all(self.source.opc_package(), &staged)?
+            PartPatch::capture_all(self.source.opc_shared(), &staged)?
         } else {
-            PartPatch::capture(self.source.opc_package(), &staged, &self.touched)?
+            PartPatch::capture(self.source.opc_shared(), &staged, &self.touched)?
         };
         if patch.is_noop() {
             return Ok((self.source, patch));
