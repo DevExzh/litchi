@@ -30,6 +30,7 @@ use std::ops::Range;
 use std::sync::Arc;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
+use sha2::{Digest as _, Sha256};
 
 use crate::Workbook;
 use crate::package::Package;
@@ -110,35 +111,27 @@ fn relationships_match(graph: &Relationships, states: &[Relationship]) -> bool {
 /// beside the typed edge graph. Keep both views in a patch so a raw edit that
 /// changes only whitespace, attribute order, or another admitted lexical
 /// detail remains an observable, reversible edit.
-#[derive(Debug, Clone)]
+/// The admitted source member, or `None` for a deterministic authored
+/// relationship graph. Keeping this as an optional Arc preserves the compact
+/// payload-only state layout while deferring canonical serialization.
+type RelationshipXml = Option<Arc<Vec<u8>>>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct RelationshipState {
     entries: Vec<Relationship>,
-    xml: Arc<Vec<u8>>,
+    xml: RelationshipXml,
     member_present: bool,
 }
-
-impl PartialEq for RelationshipState {
-    fn eq(&self, other: &Self) -> bool {
-        self.entries == other.entries
-            && self.member_present == other.member_present
-            && (Arc::ptr_eq(&self.xml, &other.xml) || self.xml == other.xml)
-    }
-}
-
-impl Eq for RelationshipState {}
 
 impl RelationshipState {
     fn read(package: &OpcPackage, owner: &PackURI, graph: &Relationships) -> Result<Self> {
         let (xml, member_present) =
             if let Some((xml, member_present)) = package.retained_relationships_xml(owner)? {
-                (xml, member_present)
+                (Some(xml), member_present)
             } else if owner.as_str() != "/" && graph.is_empty() {
-                (Arc::new(Vec::new()), false)
+                (None, false)
             } else {
-                (
-                    package.authored_relationships_xml(owner, package.read_limits())?,
-                    owner.as_str() == "/" || !graph.is_empty(),
-                )
+                (None, owner.as_str() == "/" || !graph.is_empty())
             };
         Ok(Self {
             entries: relationships(graph),
@@ -168,10 +161,22 @@ impl RelationshipState {
             return Ok(true);
         }
         if let Some((bytes, _)) = current {
-            return Ok(self.xml.as_slice() == bytes.as_slice());
+            return match &self.xml {
+                Some(expected) => Ok(expected.as_slice() == bytes.as_slice()),
+                None => {
+                    let authored =
+                        package.authored_relationships_xml(owner, package.read_limits())?;
+                    Ok(authored.as_slice() == bytes.as_slice())
+                },
+            };
         }
-        let source = package.authored_relationships_xml(owner, package.read_limits())?;
-        Ok(self.xml.as_slice() == source.as_slice())
+        match &self.xml {
+            Some(expected) => {
+                let authored = package.authored_relationships_xml(owner, package.read_limits())?;
+                Ok(expected.as_slice() == authored.as_slice())
+            },
+            None => Ok(true),
+        }
     }
 }
 
@@ -260,37 +265,99 @@ struct Delta {
 /// whole parsed package graph just to defer this capture would pin every
 /// unchanged part while callers keep a patch alive.
 #[derive(Debug, Clone, PartialEq, Eq)]
+enum ContentTypesXml {
+    /// The admitted source member, kept for exact lexical replay.
+    Retained(Arc<Vec<u8>>),
+    /// The deterministic authored form of the typed content-type graph.
+    /// Serialize it only when replay needs to compare or publish it.
+    Authored,
+}
+
+impl ContentTypesXml {
+    fn bytes(
+        &self,
+        package: &OpcPackage,
+        limits: litchi_opc::SourceLimits,
+    ) -> Result<Arc<Vec<u8>>> {
+        match self {
+            Self::Retained(bytes) => Ok(Arc::clone(bytes)),
+            Self::Authored => package
+                .authored_content_types_xml(limits)
+                .map_err(Into::into),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ContentTypesImage {
-    /// The exact admitted source member when the package still owns one, or
-    /// the authored publication view for a package without source metadata.
-    bytes: Arc<Vec<u8>>,
+    /// The exact replacement image. Authored images are serialized only when
+    /// replay needs to publish them.
+    bytes: ContentTypesXml,
     /// The publication view for this graph. This can be authored XML even
     /// when `bytes` is an admitted source image whose binding is temporarily
     /// incompatible with the typed graph.
-    publication: Arc<Vec<u8>>,
+    publication: ContentTypesXml,
     source: bool,
     explicit: bool,
+    /// A canonical publication guard for the authored side of an explicit
+    /// lexical replacement.  It keeps replay exact without serializing the
+    /// authored manifest during every ordinary structural commit.
+    exact_canonical: Option<[u8; 32]>,
 }
 
 impl ContentTypesImage {
+    fn bind_exact(&mut self, package: &OpcPackage) -> Result<()> {
+        if matches!(self.publication, ContentTypesXml::Authored) {
+            let bytes = package.authored_content_types_xml(package.read_limits())?;
+            self.exact_canonical = Some(Sha256::digest(&*bytes).into());
+        }
+        Ok(())
+    }
+
+    fn current_publication(package: &OpcPackage) -> Result<ContentTypesXml> {
+        Ok(match package.retained_content_types_xml()? {
+            Some(bytes) => ContentTypesXml::Retained(bytes),
+            None => ContentTypesXml::Authored,
+        })
+    }
+
+    fn publication_matches_current(&self, package: &OpcPackage) -> Result<bool> {
+        let current = Self::current_publication(package)?;
+        if let Some(expected) = self.exact_canonical {
+            let bytes = current.bytes(package, package.read_limits())?;
+            let digest: [u8; 32] = Sha256::digest(&*bytes).into();
+            return Ok(digest == expected);
+        }
+        match (&self.publication, current) {
+            (ContentTypesXml::Retained(expected), ContentTypesXml::Retained(actual)) => {
+                Ok(expected.as_slice() == actual.as_slice())
+            },
+            (ContentTypesXml::Authored, ContentTypesXml::Authored) => Ok(true),
+            (expected, actual) => {
+                let limits = package.read_limits();
+                let expected = expected.bytes(package, limits)?;
+                let actual = actual.bytes(package, limits)?;
+                Ok(expected.as_slice() == actual.as_slice())
+            },
+        }
+    }
+
     /// Whether this image still describes the destination before the patch's
     /// typed deltas are applied. Explicit raw replacements need both the
     /// publication view and the admitted source allocation: comparing only
     /// source bytes would accept an unrelated typed manifest overlay.
     fn matches_base(&self, package: &OpcPackage) -> Result<bool> {
         let retained = package.retained_content_types_xml()?;
-        let current = match retained.as_ref() {
-            Some(bytes) => Arc::clone(bytes),
-            None => package.authored_content_types_xml(package.read_limits())?,
-        };
-        if current.as_slice() != self.publication.as_slice() {
+        if !self.publication_matches_current(package)? {
             return Ok(false);
         }
         if self.source {
             let source = package.content_types_source_bytes();
             let source_matches = source
                 .as_ref()
-                .is_some_and(|bytes| bytes.as_slice() == self.bytes.as_slice());
+                .is_some_and(|bytes| {
+                    matches!(&self.bytes, ContentTypesXml::Retained(expected) if bytes.as_slice() == expected.as_slice())
+                });
             // A source member that still binds to the typed graph is the
             // publication already checked above. Reopening can regenerate
             // that publication and discard an invalid, non-published source
@@ -305,7 +372,7 @@ impl ContentTypesImage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RelationshipImage {
     owner: PackURI,
-    bytes: Arc<Vec<u8>>,
+    bytes: RelationshipXml,
     member_present: bool,
 }
 
@@ -360,7 +427,7 @@ impl Manifests {
             if let Some(state) = state.filter(|state| state.relationships.member_present) {
                 relationships.push(RelationshipImage {
                     owner: delta.name.clone(),
-                    bytes: Arc::clone(&state.relationships.xml),
+                    bytes: state.relationships.xml.clone(),
                     member_present: true,
                 });
             }
@@ -370,7 +437,7 @@ impl Manifests {
             let owner = PackURI::new("/")?;
             relationships.push(RelationshipImage {
                 owner,
-                bytes: Arc::clone(&state.xml),
+                bytes: state.xml.clone(),
                 member_present: state.member_present,
             });
         }
@@ -389,22 +456,25 @@ impl Manifests {
     ) -> Result<()> {
         let limits = package.read_limits();
         if let Some(content_types) = &self.content_types {
-            let current = match package.retained_content_types_xml()? {
-                Some(bytes) => bytes,
-                None => package.authored_content_types_xml(limits)?,
-            };
+            let current = ContentTypesImage::current_publication(package)?;
+            let replacement = content_types.bytes.bytes(package, limits)?;
+            let current_bytes = current.bytes(package, limits)?;
             let source_differs = content_types.explicit
                 && content_types.source
                 && package
                     .content_types_source_bytes()
-                    .is_none_or(|bytes| bytes.as_slice() != content_types.bytes.as_slice());
-            if current.as_slice() != content_types.bytes.as_slice() || source_differs {
-                let current_matches_base = expected
-                    .is_some_and(|expected| current.as_slice() == expected.publication.as_slice());
+                    .is_none_or(|bytes| {
+                        !matches!(&content_types.bytes, ContentTypesXml::Retained(expected) if bytes.as_slice() == expected.as_slice())
+                    });
+            if current_bytes.as_slice() != replacement.as_slice() || source_differs {
+                let current_matches_base = match expected {
+                    Some(expected) => expected.publication_matches_current(package)?,
+                    None => false,
+                };
                 if content_types.explicit || current_matches_base {
                     package.try_replace_content_types_bytes_with_limits(
-                        current.as_slice(),
-                        Arc::clone(&content_types.bytes),
+                        current_bytes.as_slice(),
+                        replacement,
                         limits,
                     )?;
                 }
@@ -430,14 +500,18 @@ impl Manifests {
                     member_present,
                 )
             };
-            if current.as_slice() != relationship.bytes.as_slice()
+            let replacement = match &relationship.bytes {
+                Some(bytes) => Arc::clone(bytes),
+                None => package.authored_relationships_xml(&relationship.owner, limits)?,
+            };
+            if current.as_slice() != replacement.as_slice()
                 || current_member_present != relationship.member_present
             {
                 package.try_replace_relationships_source_bytes(
                     &relationship.owner,
                     current.as_slice(),
                     current_member_present,
-                    Arc::clone(&relationship.bytes),
+                    replacement,
                     relationship.member_present,
                     limits,
                 )?;
@@ -570,6 +644,14 @@ impl PartPatch {
                     source_changed && (before_content_types.source || after_content_types.source);
                 before_content_types.explicit = explicit;
                 after_content_types.explicit = explicit;
+                if explicit {
+                    before_content_types.bind_exact(before)?;
+                    after_content_types.bind_exact(after)?;
+                }
+                if !explicit {
+                    before_content_types.bytes = before_content_types.publication.clone();
+                    after_content_types.bytes = after_content_types.publication.clone();
+                }
                 (Some(before_content_types), Some(after_content_types))
             } else {
                 (None, None)
@@ -592,20 +674,22 @@ impl PartPatch {
     }
 
     fn content_types_image(package: &OpcPackage) -> Result<ContentTypesImage> {
-        let source = package.content_types_source_bytes().is_some();
+        let source_bytes = package.content_types_source_bytes();
+        let source = source_bytes.is_some();
         let publication = match package.retained_content_types_xml()? {
-            Some(bytes) => bytes,
-            None => package.authored_content_types_xml(package.read_limits())?,
+            Some(bytes) => ContentTypesXml::Retained(bytes),
+            None => ContentTypesXml::Authored,
         };
-        let bytes = match (source, package.content_types_source_bytes()) {
-            (true, Some(bytes)) => bytes,
-            _ => Arc::clone(&publication),
+        let bytes = match source_bytes {
+            Some(bytes) => ContentTypesXml::Retained(bytes),
+            None => publication.clone(),
         };
         Ok(ContentTypesImage {
             bytes,
             publication,
             source,
             explicit: false,
+            exact_canonical: None,
         })
     }
 

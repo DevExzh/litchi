@@ -347,6 +347,64 @@ mod tests {
     }
 
     #[test]
+    fn content_types_replay_accepts_matching_publication_with_stale_source() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/source.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (valid, _) = seed.commit().unwrap().into_parts();
+
+        // Leave a valid typed graph paired with a source manifest whose
+        // declaration no longer covers it.  Publication therefore falls back
+        // to the same authored bytes as `valid`, while provenance differs.
+        let mut make_stale = valid.edit_opc().unwrap();
+        make_stale
+            .update(|opc| {
+                let limits = opc.read_limits();
+                let current = opc.source_content_types_with_limits(limits)?;
+                let marker = b"application/octet-stream";
+                let at = current
+                    .bytes()
+                    .windows(marker.len())
+                    .position(|window| window == marker)
+                    .expect("authored content type");
+                let mut bytes = current.bytes().to_vec();
+                bytes.splice(at..at + marker.len(), b"application/custom".iter().copied());
+                opc.try_replace_content_types_bytes_with_limits(
+                    current.bytes(),
+                    Arc::new(bytes),
+                    limits,
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let (stale, _) = make_stale.commit().unwrap().into_parts();
+        assert!(
+            stale
+                .opc_package()
+                .retained_content_types_xml()
+                .unwrap()
+                .is_none()
+        );
+
+        // The patch starts from the stale-source package and changes only the
+        // lexical publication.  Replaying it onto the independently retained
+        // publication must use the recorded content base, not the stale source
+        // allocation as an additional conflict key.
+        let mut edit = stale.edit_opc().unwrap();
+        edit.update(lexical_content_types_edit).unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        let replayed = valid
+            .apply_opc(&patch)
+            .expect("matching publication with stale source")
+            .into_package();
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+    }
+
+    #[test]
     fn mixed_lexical_content_types_edit_refuses_an_unrelated_manifest_change() {
         let package = Package::new().unwrap();
         let mut seed = package.edit_opc().unwrap();
