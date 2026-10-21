@@ -400,7 +400,7 @@ impl<'source> FootnoteStorageProjection<'source> {
         label: &str,
         wire_budget: &mut FootnoteGraphBudget,
     ) -> Result<Self> {
-        let validation = litchi_iwa_text_wire::validate_storage_with_limits(
+        let validation = litchi_iwa_text_wire::validate_storage(
             source,
             litchi_iwa_text_wire::RewriteLimits::default(),
         )

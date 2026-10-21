@@ -12167,6 +12167,27 @@
       "families": []
     },
     {
+      "id": "iwa-text-wire",
+      "package": "litchi-iwa-text-wire",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_text_wire",
+          "replacement": "raw text-wire calls take required limits on their canonical names (record 0361g)",
+          "match": "suffix"
+        },
+        {
+          "name": "_and_limits",
+          "scope": "litchi_iwa_text_wire",
+          "replacement": "behavior variants also take required limits without a limit suffix (record 0361g)",
+          "match": "suffix"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "iwa-core",
       "package": "litchi-iwa-core",
       "default_features": true,

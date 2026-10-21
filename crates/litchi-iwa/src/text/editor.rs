@@ -2460,7 +2460,7 @@ pub(super) fn replace_storage_text(
     .map_err(|error| {
         Error::InvalidFormat(format!("TSWP text-storage rewrite limit failed: {error}"))
     })?;
-    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
         original,
         range,
         replacement,

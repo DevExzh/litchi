@@ -1264,7 +1264,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             self.budget.wire().remaining_wire_work().max(1),
         )
         .map_err(|_| Error::InvalidSource)?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(storage_payload, limits)
+        let storage = litchi_iwa_text_wire::from_bytes(storage_payload, limits)
             .map_err(|_| Error::InvalidSource)?;
         self.budget.charge(storage.len())?;
         Ok(storage.into_text())

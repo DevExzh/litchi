@@ -1372,7 +1372,7 @@ fn rewrite_storage_payload(
     after: &str,
     rewrite_limits: litchi_iwa_text_wire::RewriteLimits,
 ) -> Result<Vec<u8>, Error> {
-    let storage = litchi_iwa_text_wire::decode_storage_with_limits(payload, rewrite_limits)
+    let storage = litchi_iwa_text_wire::decode_storage(payload, rewrite_limits)
         .map_err(map_text_rewrite_error)?
         .into_storage();
     let full_text = storage.text();
@@ -1391,7 +1391,7 @@ fn rewrite_storage_payload(
             observed: u64::MAX,
             maximum: u64::from(u32::MAX),
         })?;
-    let rewritten = litchi_iwa_text_wire::rewrite_storage_text_with_limits(
+    let rewritten = litchi_iwa_text_wire::rewrite_storage_text(
         payload,
         prefix_units..content_end,
         after,

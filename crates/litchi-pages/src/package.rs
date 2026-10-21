@@ -1597,7 +1597,7 @@ fn decode_body_storage_with_wire_error(
             "Pages body object {identifier} text validation limits are invalid: {wire_error}"
         )),
     })?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(payload, wire_limits)
+    let decoded = litchi_iwa_text_wire::decode_storage(payload, wire_limits)
         .map_err(BodyStorageDecodeError::Wire)?;
     // The strict text-wire pass above is authoritative for legacy balanced
     // unknown groups. `WireView` intentionally rejects group wire values, so
@@ -2995,7 +2995,7 @@ fn extract_storages(
                 if !is_storage_message_type(message.type_) {
                     continue;
                 }
-                let validation_result = litchi_iwa_text_wire::validate_storage_with_limits(
+                let validation_result = litchi_iwa_text_wire::validate_storage(
                     message.data.as_slice(),
                     validation_limits,
                 );
@@ -3059,10 +3059,8 @@ fn extract_storages(
                 // payload is not a strict TSWP storage is not promoted into
                 // semantic state. Valid candidates pass raw-wire preflight and
                 // the bounded Buffa projection before any text is published.
-                let storage_result = litchi_iwa_text_wire::from_bytes_with_limits(
-                    message.data.as_slice(),
-                    text_limits,
-                );
+                let storage_result =
+                    litchi_iwa_text_wire::from_bytes(message.data.as_slice(), text_limits);
                 let storage = match storage_result {
                     Ok(storage) => storage,
                     Err(error) => {

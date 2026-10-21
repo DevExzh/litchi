@@ -487,6 +487,12 @@ archive policy is `litchi_iwa_core::Limits`; its former `ArchiveLimits` and
 `ResourceLimits` aliases are removed. The archive's catalogs and frozen source
 projections are registered as immutable owners.
 
+The `iwa-text-wire` profile (record 0361g) applies the same rule to raw text
+projection, validation, decoding, boundary scans and rewrites. `from_bytes`
+requires `Limits`; the other raw operations require `RewriteLimits`, including
+the `with_behavior` variants. Their former `_with_limits` and `_and_limits`
+names are removed, with no default-policy twin.
+
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,
 `Diagnostics`, `Error` and `LimitKind` directly; nested or private names and

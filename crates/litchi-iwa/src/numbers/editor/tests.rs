@@ -10581,7 +10581,7 @@ fn numbers_text_storage_info_uses_bounded_text_wire_projection() {
         .and_then(|(_, rest)| rest.split_once("    fn text_box_graph_current"))
         .map(|(body, _)| body)
         .expect("text storage info source boundary is present");
-    assert!(body.contains("decode_storage_with_limits"));
+    assert!(body.contains("decode_storage"));
     assert!(!body.contains("StorageArchive::decode"));
     assert!(!body.contains("storage.text.concat"));
 }

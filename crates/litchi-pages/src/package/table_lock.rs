@@ -1075,7 +1075,7 @@ fn validate_body_storage_wire(
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
         super::StorageWireLimitsError::Wire(_) => Error::InvalidSource,
     })?;
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits)
+    let validation = litchi_iwa_text_wire::validate_storage(payload, wire_limits)
         .map_err(map_body_storage_wire_error)?;
     budget.charge_payload_work(validation.validation_work())?;
     Ok(BodyWireValidation {
@@ -3255,9 +3255,8 @@ mod tests {
         .encode_to_vec();
         let rewrite_limits = super::super::storage_rewrite_limits(Limits::default())
             .unwrap_or_else(|_| panic!("default text-wire limits"));
-        let validation =
-            litchi_iwa_text_wire::validate_storage_with_limits(&payload, rewrite_limits)
-                .expect("oversized trailing run is within the test source ceiling");
+        let validation = litchi_iwa_text_wire::validate_storage(&payload, rewrite_limits)
+            .expect("oversized trailing run is within the test source ceiling");
         let exact_work = validation
             .validation_work()
             .checked_add(1)

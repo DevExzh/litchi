@@ -896,7 +896,7 @@ impl NumbersObjectCatalog {
                 catalog.record_semantic_decode(format!(
                     "storage object {storage_id} message {message_index}"
                 ))?;
-                let decoded = match litchi_iwa_text_wire::decode_storage_with_limits(
+                let decoded = match litchi_iwa_text_wire::decode_storage(
                     message.data.as_slice(),
                     numbers_text_storage_wire_limits(message.data.as_slice())?,
                 ) {

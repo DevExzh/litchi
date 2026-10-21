@@ -92,7 +92,7 @@ impl PagesTextStorageLimits {
 /// Run the strict text-wire qualification without changing the source bytes.
 fn validate(source: &[u8]) -> Result<StorageValidation, RewriteError> {
     let limits = PagesTextStorageLimits::for_source(source).into_wire()?;
-    litchi_iwa_text_wire::validate_storage_with_limits(source, limits)
+    litchi_iwa_text_wire::validate_storage(source, limits)
 }
 
 /// Return whether a source payload is a valid, bounded Pages text storage.
@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(limits.rewrite_work, source.len().saturating_mul(16));
 
         let wire = limits.into_wire().expect("source-derived profile is valid");
-        assert!(litchi_iwa_text_wire::validate_storage_with_limits(&source, wire).is_ok());
+        assert!(litchi_iwa_text_wire::validate_storage(&source, wire).is_ok());
 
         let one_over_fragments = StorageArchive {
             text: vec!["a".to_owned(), "b".to_owned()],
@@ -290,7 +290,7 @@ mod tests {
         .encode_to_vec();
         let mut one_fragment = PagesTextStorageLimits::for_source(&one_over_fragments);
         one_fragment.fragments = 1;
-        let error = litchi_iwa_text_wire::validate_storage_with_limits(
+        let error = litchi_iwa_text_wire::validate_storage(
             &one_over_fragments,
             one_fragment.into_wire().expect("test profile is valid"),
         )

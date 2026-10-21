@@ -679,7 +679,7 @@ fn project_storage_text(
             "iWork text storage {storage_id} has invalid text projection limits: {error}"
         ))
     })?;
-    litchi_iwa_text_wire::from_bytes_with_limits(data, limits).map_err(|error| {
+    litchi_iwa_text_wire::from_bytes(data, limits).map_err(|error| {
         Error::InvalidFormat(format!(
             "iWork text storage {storage_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
         ))

@@ -680,7 +680,7 @@ fn anchored_body(
 ) -> Result<Vec<u8>, Error> {
     let limits = super::storage_rewrite_limits(source.state.source.limits())
         .map_err(|_error| Error::InvalidSource)?;
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         payload,
         anchor..anchor,
         ANCHOR,

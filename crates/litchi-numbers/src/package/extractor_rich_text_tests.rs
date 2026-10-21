@@ -58,7 +58,7 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
     let limits =
         litchi_iwa_text_wire::Limits::new(source.len(), source.len(), source.len(), source.len())
             .unwrap_or_else(|error| panic!("focused storage limits should be valid: {error}"));
-    let projected = litchi_iwa_text_wire::from_bytes_with_limits(&source, limits)
+    let projected = litchi_iwa_text_wire::from_bytes(&source, limits)
         .unwrap_or_else(|error| panic!("compatibility storage projection should succeed: {error}"));
 
     // The semantic text is the source-order concatenation, while the
@@ -84,7 +84,7 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
     let permissive_limits = litchi_iwa_text_wire::Limits::new(32, 32, 32, 32)
         .unwrap_or_else(|error| panic!("compatibility limits should be valid: {error}"));
     assert_eq!(
-        litchi_iwa_text_wire::from_bytes_with_limits(&noncanonical_length, permissive_limits)
+        litchi_iwa_text_wire::from_bytes(&noncanonical_length, permissive_limits)
             .unwrap_or_else(|error| panic!("compatibility wire should remain accepted: {error}"))
             .text(),
         "x"
@@ -93,7 +93,7 @@ fn focused_storage_contract_joins_fragments_without_admitting_legacy_type_2022()
         litchi_iwa_text_wire::RewriteLimits::new(32, 32, 4, 32, 32, 32, 32, 32, 512)
             .unwrap_or_else(|error| panic!("strict storage limits should be valid: {error}"));
     assert!(
-        litchi_iwa_text_wire::validate_storage_with_limits(&noncanonical_length, strict_limits)
+        litchi_iwa_text_wire::validate_storage(&noncanonical_length, strict_limits)
             .is_err(),
         "focused/native storage validation must reject noncanonical framing"
     );

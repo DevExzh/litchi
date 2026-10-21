@@ -2334,11 +2334,7 @@ fn unique_body_message_index(object: &ArchiveObject) -> Result<usize, Error> {
     let mut found = None;
     for (index, message) in object.messages.iter().enumerate() {
         if is_body_storage_message_type(message.type_)
-            || litchi_iwa_text_wire::decode_storage_with_limits(
-                &message.data,
-                RewriteLimits::default(),
-            )
-            .is_ok()
+            || litchi_iwa_text_wire::decode_storage(&message.data, RewriteLimits::default()).is_ok()
         {
             if found.replace(index).is_some() {
                 return Err(Error::InvalidSource);
@@ -2381,7 +2377,7 @@ fn rewrite_body_storage(
     } else {
         FOOTNOTE_ANCHOR_TEXT
     };
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         payload,
         range,
         replacement,

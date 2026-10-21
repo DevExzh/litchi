@@ -828,7 +828,7 @@ fn map_cell_storage_decode_error(
 
 fn first_cell_storage_text(storage_id: u64, source: &[u8]) -> Result<String> {
     let limits = cell_storage_wire_limits(source)?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(source, limits)
+    let decoded = litchi_iwa_text_wire::decode_storage(source, limits)
         .map_err(|error| map_cell_storage_decode_error(storage_id, error))?;
     let storage = decoded.storage();
     let Some(first_run) = storage.runs().first().copied() else {
@@ -1323,7 +1323,7 @@ mod tests {
         let source = [first, unknown.clone(), second].concat();
 
         assert_eq!(first_cell_storage_text(17, &source).unwrap(), "first");
-        let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+        let decoded = litchi_iwa_text_wire::decode_storage(
             &source,
             cell_storage_wire_limits(&source).unwrap(),
         )
@@ -1351,7 +1351,7 @@ mod tests {
         assert_eq!(limits.max_nesting(), 4);
         assert_eq!(limits.max_rewrite_work(), source_bytes.saturating_mul(16));
         assert_eq!(
-            litchi_iwa_text_wire::decode_storage_with_limits(&source, limits)
+            litchi_iwa_text_wire::decode_storage(&source, limits)
                 .unwrap()
                 .storage()
                 .text(),

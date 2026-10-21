@@ -14,8 +14,8 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_text_wire::{
     PreparedStorageRewrite, RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite,
-    StorageRewriteExecutionLimits, StorageValidation,
-    prepare_storage_text_rewrite_with_behavior_and_limits, validate_storage_with_limits,
+    StorageRewriteExecutionLimits, StorageValidation, prepare_storage_text_rewrite_with_behavior,
+    validate_storage,
 };
 
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
@@ -395,9 +395,8 @@ pub(super) fn prepare_text<'source, 'replacement>(
     limits: Limits,
 ) -> Result<PreparedPlan<'source, 'replacement>, Error> {
     let payload_fields = validate_request(request, limits)?;
-    let validation =
-        validate_storage_with_limits(request.storage.payload, limits.text).map_err(map_text)?;
-    let storage = prepare_storage_text_rewrite_with_behavior_and_limits(
+    let validation = validate_storage(request.storage.payload, limits.text).map_err(map_text)?;
+    let storage = prepare_storage_text_rewrite_with_behavior(
         request.storage.payload,
         Range {
             start: 0,

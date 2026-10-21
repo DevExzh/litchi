@@ -492,7 +492,7 @@ pub(super) fn set_text(
     let object = workspace.require(storage).map_err(lift)?;
     let (index, payload) = unique_message(object, inventory::STORAGE).map_err(lift)?;
     let limits = rewrite_limits(source, workspace.archive_limits().max_message_bytes())?;
-    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
         payload,
         start..end,
         inserted,
@@ -539,8 +539,8 @@ pub(super) fn storage_admits_combined_splice(
         .effective_archive_limits()
         .map_err(|_error| Error::InvalidSource)?;
     let limits = rewrite_limits(source, archive_limits.max_message_bytes())?;
-    let boundaries = litchi_iwa_text_wire::storage_boundaries_with_limits(payload, limits)
-        .map_err(map_rewrite_error)?;
+    let boundaries =
+        litchi_iwa_text_wire::storage_boundaries(payload, limits).map_err(map_rewrite_error)?;
     Ok(boundaries.admits_combined_splice(hull))
 }
 

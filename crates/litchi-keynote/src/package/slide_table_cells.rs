@@ -1485,7 +1485,7 @@ impl CellSidecarResolver for KeynoteCellSidecarResolver<'_, '_, '_> {
             limits.max_rewrite_work().max(1),
         )
         .map_err(|_| Error::InvalidSource)?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(storage_payload, text_limits)
+        let storage = litchi_iwa_text_wire::from_bytes(storage_payload, text_limits)
             .map_err(|_| Error::InvalidSource)?;
         self.budget.charge_text(storage.len())?;
         Ok(storage.into_text())

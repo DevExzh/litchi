@@ -3877,9 +3877,8 @@ impl<'a> TableDataExtractor<'a> {
             .map_err(|_error| {
                 Error::InvalidFormat("Numbers rich-text limits are invalid".to_owned())
             })?;
-            let validation =
-                litchi_iwa_text_wire::validate_storage_with_limits(&message.data, rewrite_limits)
-                    .map_err(map_rich_text_rewrite_error)?;
+            let validation = litchi_iwa_text_wire::validate_storage(&message.data, rewrite_limits)
+                .map_err(map_rich_text_rewrite_error)?;
             budget.payload_fields = projection_charge(
                 budget.payload_fields,
                 validation.fields(),
@@ -3911,8 +3910,8 @@ impl<'a> TableDataExtractor<'a> {
         } else {
             None
         };
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(&message.data, limits)
-            .map_err(map_rich_text_error)?;
+        let storage =
+            litchi_iwa_text_wire::from_bytes(&message.data, limits).map_err(map_rich_text_error)?;
         if self.document_projection {
             if validated_text_len != Some(storage.len()) {
                 return Err(Error::InvalidFormat(

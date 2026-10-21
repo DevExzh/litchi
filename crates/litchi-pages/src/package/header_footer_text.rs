@@ -1244,18 +1244,16 @@ fn discover_slots_with_budget(
                     let limits = storage_rewrite_limits(source.state.source.limits())
                         .map_err(|_| Error::InvalidSource)?;
                     let residual = residual_storage_limits(limits, budget)?;
-                    let validation =
-                        litchi_iwa_text_wire::validate_storage_with_limits(payload, residual)
-                            .map_err(map_text_error)?;
+                    let validation = litchi_iwa_text_wire::validate_storage(payload, residual)
+                        .map_err(map_text_error)?;
                     if validation.storage_kind() != 1 {
                         return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     budget.charge_text_validation(payload.len(), validation)?;
                     budget.charge_text_allocation(validation)?;
                     let residual = residual_storage_limits(limits, budget)?;
-                    let decoded =
-                        litchi_iwa_text_wire::decode_storage_with_limits(payload, residual)
-                            .map_err(map_text_error)?;
+                    let decoded = litchi_iwa_text_wire::decode_storage(payload, residual)
+                        .map_err(map_text_error)?;
                     if decoded.validation() != validation {
                         return Err(Error::Verification);
                     }
@@ -1925,8 +1923,8 @@ fn rewrite_storage_component(
         storage_rewrite_limits(source.state.source.limits()).map_err(|_| Error::InvalidSource)?,
         budget,
     )?;
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(&message.data, limits)
-        .map_err(map_text_error)?;
+    let validation =
+        litchi_iwa_text_wire::validate_storage(&message.data, limits).map_err(map_text_error)?;
     if validation.storage_kind() != 1 {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
@@ -1936,8 +1934,8 @@ fn rewrite_storage_component(
         storage_rewrite_limits(source.state.source.limits()).map_err(|_| Error::InvalidSource)?,
         budget,
     )?;
-    let validated = litchi_iwa_text_wire::decode_storage_with_limits(&message.data, limits)
-        .map_err(map_text_error)?;
+    let validated =
+        litchi_iwa_text_wire::decode_storage(&message.data, limits).map_err(map_text_error)?;
     if validated.validation() != validation {
         return Err(Error::Verification);
     }
@@ -1960,7 +1958,7 @@ fn rewrite_storage_component(
             ),
     )?;
     budget.charge(LimitKind::Allocations, 3)?;
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         &message.data,
         0..units,
         after,

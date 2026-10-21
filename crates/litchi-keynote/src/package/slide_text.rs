@@ -1265,7 +1265,7 @@ pub(super) fn read_owned_storage_text(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+    let decoded = litchi_iwa_text_wire::decode_storage(
         &message.data,
         storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
     )
@@ -1291,7 +1291,7 @@ pub(super) fn owned_storage_admits_combined_splice(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let boundaries = litchi_iwa_text_wire::storage_boundaries_with_limits(
+    let boundaries = litchi_iwa_text_wire::storage_boundaries(
         &message.data,
         storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
     )
@@ -1364,7 +1364,7 @@ pub(super) fn rewrite_owned_storage_text(
         if let Some(object) = archive.object(storage_identifier) {
             let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
             validate_selected_storage_metadata(object, message_index)?;
-            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
                 &message.data,
                 span.clone(),
                 replacement,

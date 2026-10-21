@@ -733,7 +733,10 @@ fn native_storage_messages_match_the_prost_oracle() -> TestResult<()> {
                     continue;
                 }
                 let oracle = tswp::StorageArchive::decode(message.data.as_slice())?;
-                let projected = litchi_iwa_text_wire::from_bytes(&message.data)?;
+                let projected = litchi_iwa_text_wire::from_bytes(
+                    &message.data,
+                    litchi_iwa_text_wire::Limits::default(),
+                )?;
                 assert_eq!(projected.text(), oracle.text.concat());
                 assert_eq!(projected.runs().len(), oracle.text.len());
                 checked = checked

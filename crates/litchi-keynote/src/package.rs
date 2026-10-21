@@ -1902,7 +1902,7 @@ impl SemanticBudget {
             reason: TextStorageFailure::Projection,
             path,
         })?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(payload, text_limits)
+        let storage = litchi_iwa_text_wire::from_bytes(payload, text_limits)
             .map_err(|error| self.map_text_error(&error, text_limits, path))?;
         self.charge_fragments(storage.runs().len(), path)?;
         self.charge_text(storage.len(), path)?;

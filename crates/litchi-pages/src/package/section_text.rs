@@ -1085,7 +1085,7 @@ pub(crate) fn section_boundaries(
     let payload = transaction::selected_payload(package, target).map_err(map_transaction_error)?;
     let limits = storage_rewrite_limits(package.state.source.limits())
         .map_err(map_storage_wire_limits_error)?;
-    let storage = litchi_iwa_text_wire::storage_boundaries_with_limits(payload, limits)
+    let storage = litchi_iwa_text_wire::storage_boundaries(payload, limits)
         .map_err(map_text_rewrite_error)?;
     Ok(SectionBoundaries { storage, offset })
 }
@@ -1168,7 +1168,7 @@ fn rewrite_package_text(
     let residual_limits = budget
         .residual_storage_limits(rewrite_limits, path)
         .map_err(map_transaction_error)?;
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         payload,
         absolute_start..absolute_end,
         replacement,

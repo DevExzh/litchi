@@ -30,10 +30,9 @@ pub use rewrite::{
     PreparedStorageRewrite, RemovedObjectReference, RewriteBehavior, RewriteError, RewriteLimits,
     RewriteResult, StorageBoundaries, StorageRewrite, StorageRewriteExecutionLimits,
     StorageRewriteExecutionReport, StorageRewriteExecutionRequirements,
-    StorageRewritePrepareReport, StorageValidation, ValidatedStorage, decode_storage_with_limits,
-    prepare_storage_text_rewrite_with_behavior_and_limits,
-    rewrite_storage_text_with_behavior_and_limits, rewrite_storage_text_with_limits,
-    storage_boundaries_with_limits, validate_storage_with_limits,
+    StorageRewritePrepareReport, StorageValidation, ValidatedStorage, decode_storage,
+    prepare_storage_text_rewrite_with_behavior, rewrite_storage_text,
+    rewrite_storage_text_with_behavior, storage_boundaries, validate_storage,
 };
 
 use std::{cell::Cell, mem::size_of};
@@ -234,18 +233,6 @@ struct Preflight {
     element_memory: usize,
 }
 
-/// Decode raw `TSWP.StorageArchive` bytes through the default bounded Buffa
-/// projection and return only archive-free semantic text.
-///
-/// # Errors
-///
-/// Returns a typed error for malformed root wire data, invalid UTF-8,
-/// exceeded resource limits, projection failure, allocation failure, or an
-/// invalid semantic text/range relation.
-pub fn from_bytes(source: &[u8]) -> Result<Storage> {
-    from_bytes_with_limits(source, Limits::default())
-}
-
 /// Decode raw `TSWP.StorageArchive` bytes through an explicit finite resource
 /// profile.
 ///
@@ -259,7 +246,7 @@ pub fn from_bytes(source: &[u8]) -> Result<Storage> {
 /// Returns a typed error for malformed root wire data, invalid UTF-8,
 /// exceeded resource limits, projection failure, allocation failure, or an
 /// invalid semantic text/range relation.
-pub fn from_bytes_with_limits(source: &[u8], limits: Limits) -> Result<Storage> {
+pub fn from_bytes(source: &[u8], limits: Limits) -> Result<Storage> {
     let preflight = preflight_storage(source, limits)?;
 
     // The derived projection has no work to do when the raw message contains
@@ -531,7 +518,7 @@ mod tests {
             .map_err(|error| error.to_string())
             .and_then(|archive| from_archive(archive).map_err(|error| error.to_string()))
             .unwrap_or_else(|error| panic!("Prost oracle should decode: {error}"));
-        let projected = from_bytes(&encoded)
+        let projected = from_bytes(&encoded, Limits::default())
             .unwrap_or_else(|error| panic!("Buffa projection should decode: {error}"));
 
         assert_eq!(projected, oracle);
@@ -547,7 +534,7 @@ mod tests {
         let encoded = field(3, &[0xff]);
 
         assert_eq!(
-            from_bytes(&encoded),
+            from_bytes(&encoded, Limits::default()),
             Err(Error::InvalidUtf8 {
                 fragment: 0,
                 valid_up_to: 0,
@@ -561,7 +548,7 @@ mod tests {
         let encoded = [field(3, &[]), field(3, &[]), field(3, &[])].concat();
 
         assert_eq!(
-            from_bytes_with_limits(&encoded, limits(2, 16)),
+            from_bytes(&encoded, limits(2, 16)),
             Err(Error::TooManyFragments {
                 actual: 3,
                 limit: 2,
@@ -573,11 +560,11 @@ mod tests {
     fn aggregate_text_limit_is_checked_before_semantic_allocation() {
         let encoded = [field(3, b"abc"), field(3, b"de")].concat();
 
-        let exact = from_bytes_with_limits(&encoded, limits(2, 5))
+        let exact = from_bytes(&encoded, limits(2, 5))
             .unwrap_or_else(|error| panic!("exact resource boundaries should decode: {error}"));
         assert_eq!(exact.text(), "abcde");
         assert_eq!(
-            from_bytes_with_limits(&encoded, limits(4, 4)),
+            from_bytes(&encoded, limits(4, 4)),
             Err(Error::TooManyTextBytes {
                 actual: 5,
                 limit: 4,
@@ -588,7 +575,7 @@ mod tests {
     #[test]
     fn field_three_requires_the_declared_string_wire_type() {
         assert_eq!(
-            from_bytes(&[0x18, 0x01]),
+            from_bytes(&[0x18, 0x01], Limits::default()),
             Err(Error::WrongTextWireType { actual: 0 })
         );
     }
@@ -601,7 +588,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("Prost should accept the noncanonical length: {error}"));
         let oracle = from_archive(archive)
             .unwrap_or_else(|error| panic!("Prost oracle should convert: {error}"));
-        let projected = from_bytes(&encoded)
+        let projected = from_bytes(&encoded, Limits::default())
             .unwrap_or_else(|error| panic!("projection should accept compatible wire: {error}"));
 
         assert_eq!(projected, oracle);
@@ -612,7 +599,7 @@ mod tests {
     fn malformed_unrelated_submessage_remains_opaque_to_projection() {
         let encoded = [field(3, b"safe"), field(5, &[0x0a])].concat();
 
-        let storage = from_bytes(&encoded)
+        let storage = from_bytes(&encoded, Limits::default())
             .unwrap_or_else(|error| panic!("unrelated payload should stay opaque: {error}"));
         assert_eq!(storage.text(), "safe");
         assert!(
@@ -632,7 +619,7 @@ mod tests {
         encoded.extend_from_slice(&[0x9a, 0x06, 0x06, b'o', b'p', b'a', b'q', b'u', b'e']);
         let before = encoded.clone();
 
-        let storage = from_bytes(&encoded)
+        let storage = from_bytes(&encoded, Limits::default())
             .unwrap_or_else(|error| panic!("empty text projection should decode: {error}"));
 
         assert!(storage.is_empty());
@@ -644,7 +631,10 @@ mod tests {
     fn malformed_unknown_root_framing_is_rejected_by_common_preflight() {
         let encoded = [0x2a, 0x02, 0x00];
 
-        assert!(matches!(from_bytes(&encoded), Err(Error::Common(_))));
+        assert!(matches!(
+            from_bytes(&encoded, Limits::default()),
+            Err(Error::Common(_))
+        ));
     }
 
     #[test]

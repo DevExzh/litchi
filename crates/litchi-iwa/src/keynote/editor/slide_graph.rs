@@ -12,7 +12,7 @@ fn decode_storage_text_payload(
     source: &[u8],
     limits: litchi_iwa_text_wire::Limits,
 ) -> Result<String> {
-    litchi_iwa_text_wire::from_bytes_with_limits(source, limits)
+    litchi_iwa_text_wire::from_bytes(source, limits)
         .map(litchi_iwa_text::storage::Storage::into_text)
         .map_err(|error| {
             Error::InvalidFormat(format!(

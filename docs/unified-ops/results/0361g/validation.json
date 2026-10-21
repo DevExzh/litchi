@@ -1,0 +1,273 @@
+{
+  "base_commit": "2c4c47512b4e74ff423c2a150e44500bd2661b48",
+  "environment": {
+    "cargo_build_jobs": 2,
+    "rust_test_threads": 4,
+    "capped_cargo_shim": "../.coord/bin/cargo",
+    "cargo_incremental": 0,
+    "dev_test_debug": 0,
+    "target_dir": "target"
+  },
+  "checks": [
+    {
+      "label": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792616952277634456,
+      "finished_ns": 1792616978804565891,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/fmt.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_results": []
+    },
+    {
+      "label": "consumer-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "litchi-iwa-text-wire",
+        "-p",
+        "litchi-iwa",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "-p",
+        "litchi-pages",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792616978804799262,
+      "finished_ns": 1792617056851224281,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/consumer-check.log",
+        "bytes": 1712,
+        "sha256": "d768ee8b35f261ccd330e85b6c291b1d41127a6fec5eb914af8a5d8933420866"
+      },
+      "test_results": []
+    },
+    {
+      "label": "wire-tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-iwa-text-wire",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617056851476252,
+      "finished_ns": 1792617085881629526,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/wire-tests.log",
+        "bytes": 4932,
+        "sha256": "88d5d2cca448df841d2b1ebe2458197fd22e786546b971a94a2503bd3aaa180c"
+      },
+      "test_results": [
+        {
+          "passed": 48,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "label": "consumer-libraries",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-iwa",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "-p",
+        "litchi-pages",
+        "--all-features",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617085882556720,
+      "finished_ns": 1792617215223172068,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/consumer-libraries.log",
+        "bytes": 273626,
+        "sha256": "44930e3a2b81edeccbda170d80d66e31226a3bda59cfe17d375237e456afc53d"
+      },
+      "test_results": [
+        {
+          "passed": 1693,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "passed": 329,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "passed": 476,
+          "failed": 0,
+          "ignored": 4
+        },
+        {
+          "passed": 207,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "label": "keynote-rich-storage",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "litchi-keynote",
+        "--all-features",
+        "--test",
+        "rich_storage"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617215224072952,
+      "finished_ns": 1792617226524712679,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/keynote-rich-storage.log",
+        "bytes": 1300,
+        "sha256": "c6da24f311db1e602d8477cfa399dcd04d029160fa7108141d8df4377501f0ad"
+      },
+      "test_results": [
+        {
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        }
+      ]
+    },
+    {
+      "label": "consumer-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "litchi-iwa-text-wire",
+        "-p",
+        "litchi-iwa",
+        "-p",
+        "litchi-keynote",
+        "-p",
+        "litchi-numbers",
+        "-p",
+        "litchi-pages",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617226524958240,
+      "finished_ns": 1792617337968646052,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/consumer-clippy.log",
+        "bytes": 2075,
+        "sha256": "1268a7762036c2af3a4a51d83dae6adb5040ed9823e866e88f1a3adcba5ff4e1"
+      },
+      "test_results": []
+    },
+    {
+      "label": "fuzz-check",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--manifest-path",
+        "crates/litchi-iwa-protos/fuzz/Cargo.toml",
+        "--bin",
+        "pages_section_text_codec"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617337968873613,
+      "finished_ns": 1792617374034689950,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/fuzz-check.log",
+        "bytes": 1633,
+        "sha256": "3ff63697cb0f157546969598362a8c714e08651969ad36e075e0e806fffe8933"
+      },
+      "test_results": []
+    },
+    {
+      "label": "glossary",
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "iwa-text-wire",
+        "--target-dir",
+        "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617374034915031,
+      "finished_ns": 1792617409268741369,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/glossary.log",
+        "bytes": 1119,
+        "sha256": "739d18d74fffb137373293cc6c620f485d25db17dc45e3f79927937c2d46a2e9"
+      },
+      "test_results": []
+    },
+    {
+      "label": "inventory",
+      "command": [
+        "python3",
+        "tools/api_debt_inventory.py",
+        "target/doc/litchi_iwa_text_wire.json"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617409268967520,
+      "finished_ns": 1792617409320719693,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/inventory.log",
+        "bytes": 34,
+        "sha256": "557372144b7879942bcfeb5ed3d4210bcd1d1657d42c879f1efd5bfae8f911c9"
+      },
+      "test_results": []
+    },
+    {
+      "label": "fmt-check",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "started_ns": 1792617409320866504,
+      "finished_ns": 1792617435905642519,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-text-wire-0361g/fmt-check.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "test_results": []
+    }
+  ],
+  "passed_tests": 2767,
+  "ignored_tests": 5,
+  "inventory_rows": 0,
+  "scope": "Targeted raw text-wire naming/required-argument migration; no final integrated workspace gate or new native timing claimed."
+}

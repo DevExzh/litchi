@@ -286,9 +286,8 @@ impl<'a> Edit<'a> {
             .effective_archive_limits()
             .map_err(map_archive_error)?;
         let limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
-        let boundaries =
-            litchi_iwa_text_wire::storage_boundaries_with_limits(&message.data, limits)
-                .map_err(map_text_rewrite_error)?;
+        let boundaries = litchi_iwa_text_wire::storage_boundaries(&message.data, limits)
+            .map_err(map_text_rewrite_error)?;
         Ok(boundaries.admits_combined_splice(hull))
     }
 
@@ -815,7 +814,7 @@ fn decode_notes_storage(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let text_limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
-    let validated = litchi_iwa_text_wire::decode_storage_with_limits(payload, text_limits)
+    let validated = litchi_iwa_text_wire::decode_storage(payload, text_limits)
         .map_err(map_text_rewrite_error)?;
     let validation = validated.validation();
     budget
@@ -915,7 +914,7 @@ fn rewrite_notes(
     let start =
         usize::try_from(span.start().utf16_index()).map_err(|_error| Error::InvalidSource)?;
     let end = usize::try_from(span.end().utf16_index()).map_err(|_error| Error::InvalidSource)?;
-    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
         &message.data,
         start..end,
         replacement,
