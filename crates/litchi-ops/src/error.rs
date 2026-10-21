@@ -1668,6 +1668,10 @@ impl Classify for litchi_ole_common::Error {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Refused(refusal) => refusal.classify(),
+            // `litchi_ole_common::Error` is non-exhaustive by contract. Keep
+            // a future native error conservative until its facade mapping is
+            // assigned explicitly.
+            _ => Class::of(Code::InternalError),
         }
     }
 }
