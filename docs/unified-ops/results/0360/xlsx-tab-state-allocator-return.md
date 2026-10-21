@@ -54,12 +54,12 @@ receipt therefore attributes the +1,016,864 bytes to both the new read-only
 owner admission and the duplicate snapshot catalog; it must not be presented
 as an isolated cost of the deferred publisher.
 
-The repair is now implemented in the W4 candidate, but this returned receipt
-remains unaccepted until the candidate is rebuilt and the paired allocator
-route is rerun. `SourceInner`, the defined-name and tab-state snapshots, the
-deferred `Catalog`, and both restore endpoints now share an immutable
-`Arc<[DefinedName]>`; a changed defined-name edit creates a new Arc. Deferred
-materialization passes the known Arc into the normal source-backed open path.
+The repair is implemented in W4 candidate `14370c12c9` (the stale deferred
+catalog documentation was corrected in the same follow-up). `SourceInner`,
+the defined-name and tab-state snapshots, the deferred `Catalog`, and both
+restore endpoints now share an immutable `Arc<[DefinedName]>`; a changed
+defined-name edit creates a new Arc. Deferred materialization passes the known
+Arc into the normal source-backed open path.
 That path still parses and validates the reopened workbook under the owner
 options and compares its parsed names with the shared catalog before retaining
 the Arc. A non-workbook family reuses the base Arc because its change contract
@@ -71,9 +71,39 @@ The source validation after this repair passed the focused defined-name suite
 (7 tests), focused tab-state suite (14 tests), all-feature checks for the W4
 consumers, and warning-denied Clippy for the same consumer set. These checks
 establish correctness and policy preservation only; they do not replace the
-required paired allocator rerun. The original admission and retained-history
-numbers above remain the baseline evidence, and the b1a5 result remains a
-returned performance failure until the new binary is measured.
+paired allocator evidence below.
+
+The repaired allocator pair was rerun sequentially in the fresh directory
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-14370-v1`, with
+the same 64-step, two-name fixture and two warmups. The e63 JSON was unchanged
+from the protected baseline; its SHA-256 is
+`539a1c9c6643f15a4c7988a7e3663d5f26065797c060535b9b53fab8e41ccac8`.
+The repaired binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-14370-alloc/release/xlsx_tab_state_history_alloc`,
+SHA-256 `87973a079fc1bb5e3b87032c8b58702b320bde817bbfdf5096517ac530935173`;
+its JSON receipt SHA-256 is
+`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`.
+
+| interval | e63 | 14370c12c9 | change vs e63 |
+| --- | ---: | ---: | ---: |
+| retained history allocated bytes | 4,834,958 | 4,942,259 | +107,301 (+2.22%) |
+| retained history allocation calls | 46,730 | 46,859 | +129 (+0.28%) |
+| retained history live bytes after | 167,697 | 283,681 | +115,984 |
+| retained history peak live after | 427,929 | 427,929 | unchanged |
+| independent replay allocated bytes | 103,381,056 | 102,907,436 | -473,620 (-0.46%) |
+| independent replay live bytes after | 167,953 | 287,849 | +119,896 |
+| independent replay peak live after | 606,577 | 741,779 | +135,202 (+22.29%) |
+| source-owner admission allocated bytes | 23,346,752 | 24,392,288 | +1,045,536 (+4.48%) |
+
+Exact fixture and output hashes match between the two revisions, with 64/64
+forward and inverse checks. The Arc repair materially reduces the b1a5
+candidate's retained live bytes (371,809 to 283,681), replay live bytes
+(375,977 to 287,849), and replay peak (831,267 to 741,779), but the repaired
+candidate remains above the e63 allocation baseline. The retained names and
+read-only `SourceBackedWorkbook` admission are mandatory capability costs, so
+the result is retained as a returned performance result pending the required
+equivalent-workload decision; no elapsed-time, RSS, or native source-family
+acceptance is claimed.
 
 The native source-family attempt was not a measurement: a wrapper path typo
 failed before any child launch. Its host/error files are retained under

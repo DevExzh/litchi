@@ -654,8 +654,9 @@ impl SourceBackedWorkbook {
     ///
     /// A worksheet-level commit leaves the catalog unchanged, so a committed
     /// workbook answers from its base catalog without materializing its
-    /// output; workbook-level families (defined names, tab state, calculation
-    /// properties) publish an already materialized catalog.
+    /// output. Workbook-level families retain catalog-only state in their
+    /// deferred projection; a read that needs the reopened owner materializes
+    /// and validates that output before replacing the base projection.
     #[must_use]
     pub fn sheet_names(&self) -> impl ExactSizeIterator<Item = &str> + DoubleEndedIterator + '_ {
         self.current()
@@ -734,7 +735,8 @@ impl SourceBackedWorkbook {
     /// The catalog state infallible accessors read: the reopened output of a
     /// committed workbook once a read has materialized it, otherwise the
     /// opened (or base) catalog, which a worksheet-level commit leaves
-    /// unchanged. Workbook-level families materialize at commit.
+    /// unchanged. Catalog-only workbook-level projections remain deferred;
+    /// accessors that need their reopened owner go through [`Self::view`].
     fn current(&self) -> &Arc<SourceInner> {
         match &self.pending {
             Some(pending) => pending
