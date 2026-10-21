@@ -2,6 +2,7 @@
 
 - Date: 2026-10-21.
 - Base: `1c7c6d8f7b` (the frozen W5 COW/state-reuse candidate).
+- Candidate source: `d0f548f90c`.
 - Status: source repair complete; focused validation and native qualification
   are pending coordinator release from the current heavy hold.
 
