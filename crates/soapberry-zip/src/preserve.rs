@@ -4110,6 +4110,20 @@ mod tests {
                 .unwrap();
             assert_eq!(output, data);
 
+            if extra_len > 65_000 {
+                let (archive, _) = indexed(&data);
+                let mut larger_scratch = vec![0_u8; 128 * 1024];
+                let index =
+                    PreservationIndex::new_with_limits(&archive, &mut larger_scratch, limits)
+                        .expect("a larger caller workspace must remain supported");
+                assert_eq!(
+                    index
+                        .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                        .unwrap(),
+                    data
+                );
+            }
+
             let (archive, _) = indexed(&data);
             let mut scratch = [0_u8; 4 * 1024];
             limits.max_metadata_bytes = metadata_bytes - 1;
