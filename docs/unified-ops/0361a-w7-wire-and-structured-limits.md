@@ -170,3 +170,18 @@ features (359 passed).
 
 Commits: `d84cc0fed9` (wire), `e1183e711f` (structured), `e070ef237e`
 (trunk merge), `bb71058dcd` (this record), `07d91aaa47` (trunk merge).
+
+### Coordinator isolated documentation rerun (2026-10-21)
+
+The 0361a post-merge gate at `f2bbbc8d07` passed 51 of its 52 recorded checks;
+`wsdoc` exited 101 after rustdoc for `litchi-iwa-protos` was killed.
+An isolated rerun of `RUSTDOCFLAGS=-Dwarnings cargo doc -q --workspace
+--no-deps --all-features`, with `CARGO_BUILD_JOBS=1`, fresh debug/rustdoc
+caches and the same 26 GiB cargo scope, exited **0**. It took 635.98 s
+and peaked at 4,293,644 KiB RSS (4.095 GiB). No Rust code changed.
+The rerun closes that failed check; it does not identify whether concurrent
+load, stale rustdoc state, or both caused the original kill.
+
+The compact receipt is [`results/0361a/wsdoc-isolated.json`](results/0361a/wsdoc-isolated.json);
+it records the command, environment and external log size/hash. Trunk's
+stale generated target cache was reduced from 264 GiB to 5.4 GiB.
