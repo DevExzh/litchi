@@ -1723,7 +1723,8 @@ fn decode_formula_entries<'source>(
     // raw projection is a second bounded pass over the same source.
     charge(&mut usage.wire_bytes, source.len(), limits.wire_bytes)?;
     graph_step(usage, source.len(), limits)?;
-    let view = WireView::parse(source).map_err(|_error| Failure::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_error| Failure::InvalidSource)?;
     let mut output = Vec::new();
     for field in view.fields() {
         if field.number() != 3 {
@@ -1841,7 +1842,8 @@ fn segment_contains_nested_reference(
 ) -> Result<bool, Failure> {
     charge(&mut usage.wire_bytes, source.len(), limits.wire_bytes)?;
     graph_step(usage, source.len(), limits)?;
-    let view = WireView::parse(source).map_err(|_error| Failure::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_error| Failure::InvalidSource)?;
     for field in view.fields() {
         if field.number() == 4 {
             field
@@ -3073,11 +3075,12 @@ fn reject_unsupported_owner(
 }
 
 fn empty_message(payload: &[u8]) -> bool {
-    WireView::parse(payload).is_ok_and(|view| view.fields().next().is_none())
+    WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+        .is_ok_and(|view| view.fields().next().is_none())
 }
 
 fn empty_volatile_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = WireView::parse(payload) else {
+    let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     let mut seen = [false; 7];
@@ -3099,7 +3102,7 @@ fn empty_volatile_dependencies(payload: &[u8]) -> bool {
 }
 
 fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = WireView::parse(payload) else {
+    let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     let mut fields = view.fields();
@@ -3118,7 +3121,7 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
 /// records only in the native total/body context shape (record 0301).
 fn inert_foreign_owner(owner: dependency::FormulaOwnerDependenciesSnapshot<'_>) -> bool {
     let context_shape = |payload: &[u8]| {
-        let Ok(view) = WireView::parse(payload) else {
+        let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {
             return false;
         };
         view.fields().all(|field| {
@@ -3161,7 +3164,7 @@ fn owner_spanning_dependencies(payload: &[u8], owner: u32, source: CacheSource<'
     else {
         return false;
     };
-    let Ok(view) = WireView::parse(payload) else {
+    let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     let mut total = false;
@@ -3194,14 +3197,14 @@ fn owner_spanning_dependencies(payload: &[u8], owner: u32, source: CacheSource<'
 }
 
 fn inactive_spill_sizes(payload: &[u8]) -> bool {
-    let Ok(view) = WireView::parse(payload) else {
+    let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     view.fields().next().is_none()
 }
 
 fn parse_varint_fields<const N: usize>(source: &[u8], expected: [u32; N]) -> Option<[u64; N]> {
-    let view = WireView::parse(source).ok()?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).ok()?;
     let mut fields = view.fields();
     let mut values = [0u64; N];
     for (index, number) in expected.into_iter().enumerate() {

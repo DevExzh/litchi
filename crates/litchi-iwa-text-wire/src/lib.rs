@@ -38,7 +38,7 @@ pub use rewrite::{
 
 use std::{cell::Cell, mem::size_of};
 
-use litchi_iwa_common::{WireLimits, wire::WireDescent, wire::preflight_wire_tree_with_limits};
+use litchi_iwa_common::{WireLimits, wire::WireDescent, wire::preflight_wire_tree};
 use litchi_iwa_protos::text_storage_codec;
 #[cfg(test)]
 use litchi_iwa_protos::tswp::StorageArchive;
@@ -388,7 +388,7 @@ fn preflight_storage(source: &[u8], limits: Limits) -> Result<Preflight> {
     let invalid_utf8 = Cell::new(None);
     let wrong_wire_type = Cell::new(None);
 
-    let report = preflight_wire_tree_with_limits(source, wire_limits, |visit| {
+    let report = preflight_wire_tree(source, wire_limits, |visit| {
         let field = visit.field();
         if visit.path().is_empty() && field.number() == 3 {
             if field.wire_type() != 2 {

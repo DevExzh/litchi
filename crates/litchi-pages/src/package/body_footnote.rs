@@ -2440,8 +2440,7 @@ fn rewrite_body_storage(
         .with_input_bytes(rewritten.len().max(1))
         .and_then(|value| value.with_output_bytes(wire_output))
         .map_err(|_| Error::InvalidSource)?;
-    let view =
-        WireView::parse_with_limits(&rewritten, wire_limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(&rewritten, wire_limits).map_err(|_| Error::InvalidSource)?;
     let table_field = view
         .fields()
         .find(|field| field.number() == FOOTNOTE_TABLE_FIELD)
@@ -2536,7 +2535,7 @@ fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let storage = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let storage = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let Some(table_field) = storage
         .fields()
         .find(|field| field.number() == FOOTNOTE_TABLE_FIELD)
@@ -2546,22 +2545,21 @@ fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
     if table_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let table = WireView::parse_with_limits(table_field.payload(), limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let table = WireView::parse(table_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
     for entry_field in table.fields().filter(|field| field.number() == 1) {
         if entry_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let entry = WireView::parse_with_limits(entry_field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let entry =
+            WireView::parse(entry_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         let Some(reference_field) = entry.fields().find(|field| field.number() == 2) else {
             continue;
         };
         if reference_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let reference = WireView::parse_with_limits(reference_field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let reference =
+            WireView::parse(reference_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         if reference
             .fields()
             .any(|field| matches!(field.number(), 2 | 3))
@@ -2576,7 +2574,7 @@ fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error>
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut stylesheet = None;
     let mut paragraph_style: Option<Option<NonZeroU64>> = None;
     let mut list_style: Option<Option<NonZeroU64>> = None;
@@ -2633,7 +2631,7 @@ fn parse_language_table(source: &[u8]) -> Result<Option<String>, Error> {
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let table = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let table = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut language_at_zero = None;
     for field in table.fields() {
         if field.number() != 1 {
@@ -2655,7 +2653,7 @@ fn parse_language_table(source: &[u8]) -> Result<Option<String>, Error> {
 }
 
 fn parse_language_entry(source: &[u8], limits: WireLimits) -> Result<(u32, Option<String>), Error> {
-    let entry = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let entry = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut index = None;
     let mut value = None;
     for field in entry.fields() {
@@ -2698,7 +2696,7 @@ fn parse_storage_reference(source: &[u8]) -> Result<NonZeroU64, Error> {
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut identifier = None;
     for field in view.fields() {
         match field.number() {
@@ -2727,7 +2725,7 @@ fn parse_style_table_reference(source: &[u8]) -> Result<Option<NonZeroU64>, Erro
     let limits = WireLimits::default()
         .with_input_bytes(source.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let table = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let table = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut reference_at_zero = None;
     let mut saw_entry = false;
     for field in table.fields() {
@@ -2758,7 +2756,7 @@ fn parse_style_table_entry(
     source: &[u8],
     limits: WireLimits,
 ) -> Result<(u32, Option<NonZeroU64>), Error> {
-    let entry = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let entry = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut index = None;
     let mut reference = None;
     for field in entry.fields() {
@@ -2812,7 +2810,7 @@ fn replace_length_delimited_field(
         .with_input_bytes(source.len().max(1))
         .and_then(|value| value.with_output_bytes(output_capacity))
         .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(reserve_capacity)
@@ -3287,8 +3285,8 @@ fn validate_storage_attachment_owners(
     let limits = WireLimits::default()
         .with_input_bytes(storage_message.data.len().max(1))
         .map_err(|_| Error::InvalidSource)?;
-    let storage = WireView::parse_with_limits(&storage_message.data, limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let storage =
+        WireView::parse(&storage_message.data, limits).map_err(|_| Error::InvalidSource)?;
     let mut attachment_field = None;
     for field in storage.fields().filter(|field| field.number() == 9) {
         if attachment_field.replace(field).is_some() {
@@ -3299,15 +3297,15 @@ fn validate_storage_attachment_owners(
     if attachment_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let table = WireView::parse_with_limits(attachment_field.payload(), limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let table =
+        WireView::parse(attachment_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
     let mut marker_count = 0usize;
     for entry_field in table.fields().filter(|field| field.number() == 1) {
         if entry_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let entry = WireView::parse_with_limits(entry_field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let entry =
+            WireView::parse(entry_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         let mut reference_field = None;
         for field in entry.fields().filter(|field| field.number() == 2) {
             if reference_field.replace(field).is_some() {
@@ -3318,8 +3316,8 @@ fn validate_storage_attachment_owners(
         if reference_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let reference = WireView::parse_with_limits(reference_field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let reference =
+            WireView::parse(reference_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         let mut identifier_field = None;
         for field in reference.fields().filter(|field| field.number() == 1) {
             if identifier_field.replace(field).is_some() {

@@ -1236,7 +1236,7 @@ fn validate_required_super(source: &[u8], budget: &mut TransactionBudget) -> Res
         .map_err(map_wire_error)?
         .with_fields(source.len().max(1))
         .map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut super_payload = None;
     for field in outer.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -1249,7 +1249,7 @@ fn validate_required_super(source: &[u8], budget: &mut TransactionBudget) -> Res
     let nested_source = super_payload.ok_or_else(invalid_source)?;
     budget.charge_fields(nested_source.len())?;
     budget.charge_work(nested_source.len().saturating_mul(2))?;
-    let nested = WireView::parse_with_limits(
+    let nested = WireView::parse(
         nested_source,
         WireLimits::default()
             .with_input_bytes(source.len().max(1))
@@ -1749,11 +1749,13 @@ mod tests {
                 &mut info_payload,
                 1,
                 &tsd::DrawableArchive::default().encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             append_length_delimited_field(
                 &mut info_payload,
                 2,
                 &reference(model_identifier).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             let mut info = object(drawable_identifier, 6_000, info_payload)?;
             info.archive_info.message_infos[0].object_references = vec![model_identifier];

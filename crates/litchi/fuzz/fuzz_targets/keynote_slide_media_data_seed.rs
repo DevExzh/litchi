@@ -107,7 +107,12 @@ fn movie_payload(movie: usize) -> SeedResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -144,7 +149,12 @@ fn audio_payload() -> SeedResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -211,7 +221,12 @@ fn metadata_payload() -> SeedResult<Vec<u8>> {
         ..Default::default()
     };
     let mut payload = metadata.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 

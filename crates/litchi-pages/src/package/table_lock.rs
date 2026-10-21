@@ -3027,7 +3027,7 @@ impl WireBudget {
                 maximum: usize_as_u64(self.limits.max_input_bytes()),
             });
         }
-        let view = WireView::parse_with_limits(source, self.limits).map_err(map_wire_error)?;
+        let view = WireView::parse(source, self.limits).map_err(map_wire_error)?;
         let fields = self
             .total_fields
             .checked_add(view.len())
@@ -3219,14 +3219,29 @@ mod tests {
             .expect("reference field");
 
         let mut drawable = Vec::new();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut drawable, 2, &reference)
-            .expect("drawable parent field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut drawable,
+            2,
+            &reference,
+            WireLimits::DEFAULT,
+        )
+        .expect("drawable parent field");
 
         let mut table_info = Vec::new();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut table_info, 1, &drawable)
-            .expect("table-info super field");
-        litchi_iwa_common::wire::append_length_delimited_field(&mut table_info, 2, &reference)
-            .expect("table-info model field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut table_info,
+            1,
+            &drawable,
+            WireLimits::DEFAULT,
+        )
+        .expect("table-info super field");
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut table_info,
+            2,
+            &reference,
+            WireLimits::DEFAULT,
+        )
+        .expect("table-info model field");
         table_info
     }
 

@@ -834,7 +834,7 @@ fn parse_wire_view<'source>(
         .checked_mul(WIRE_VIEW_SPAN_BYTES_PER_INPUT_BYTE)
         .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(span_allocation)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }

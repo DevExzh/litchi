@@ -25,7 +25,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into,
     varint::encoded_len,
-    wire::{WireField, parse_wire_fields_with_limits},
+    wire::{WireField, parse_wire_fields},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_chart_legend_codec::{
@@ -616,7 +616,7 @@ fn read_selected_visibility(package: &Package, selection: &ChartSelection) -> Re
 }
 
 fn read_chart_legend_visibility(data: &[u8], limits: WireLimits) -> Result<bool, Error> {
-    let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(data, limits).map_err(map_wire_error)?;
     let mut extension = None;
     for field in fields
         .iter()
@@ -735,7 +735,7 @@ fn patch_chart_non_style_visibility(
     visible: bool,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(data, limits).map_err(map_wire_error)?;
     let extension_field = fields
         .iter()
         .copied()

@@ -726,7 +726,7 @@ fn rewrite_soundtrack_payload(
     new_identifier: Option<u64>,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let new_ref_len = new_identifier.map_or(0, |identifier| {
         encoded_len(u64::from(SOUNDTRACK_MEDIA_FIELD << 3) | 2)
             + encoded_len(

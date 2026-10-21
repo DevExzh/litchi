@@ -357,7 +357,7 @@ fn validate_reference_ownership(
         return Err(Error::InvalidSource { path });
     }
     let payload = transaction::selected_payload(package, target).map_err(map_transaction)?;
-    let view = WireView::parse_with_limits(
+    let view = WireView::parse(
         payload,
         transaction::wire_limits(package).map_err(map_transaction)?,
     )

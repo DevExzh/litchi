@@ -559,7 +559,7 @@ pub(in crate::package) fn repeated_length_payloads(
     source: &[u8],
     field_number: u32,
 ) -> Result<Vec<&[u8]>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)
@@ -637,7 +637,7 @@ pub(in crate::package) fn require_local_reference(
 }
 
 pub(in crate::package) fn local_reference_identifier(source: &[u8]) -> Result<u64, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut external = None;

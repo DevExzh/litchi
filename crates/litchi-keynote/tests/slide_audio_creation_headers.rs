@@ -142,7 +142,7 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         let header = &stream.as_bytes()[header_start..header_end];
         let mut rewritten_header = Vec::with_capacity(header.len() + 64);
         let mut rewrote_identifier = false;
-        for field in WireView::parse(header)?.fields() {
+        for field in WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
             if field.number() == 1 && field.wire_type() == 0 && !rewrote_identifier {
                 let (identifier, consumed) = decode_varint_from_bytes(field.payload())?;
                 if consumed != field.payload().len() {
@@ -208,12 +208,15 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
     let edit = EntryEdit::new(&component_name, &compressed);
     let rewritten_package = catalog.reassemble_to_bytes(&[edit], Limits::default())?;
     let header = slide_header(&rewritten_package, &component_name)?;
-    if !WireView::parse(&header)?.fields().any(|field| {
-        field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
-    }) {
+    if !WireView::parse(&header, litchi_iwa_common::WireLimits::DEFAULT)?
+        .fields()
+        .any(|field| {
+            field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
+        })
+    {
         return Err(io::Error::other("rewritten slide header lost its unknown field").into());
     }
-    let identifier_field = WireView::parse(&header)?
+    let identifier_field = WireView::parse(&header, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1 && field.wire_type() == 0)
         .map(|field| field.raw().to_vec())
@@ -247,7 +250,8 @@ fn fresh_audio_preserves_unknown_and_noncanonical_slide_header_bytes() -> TestRe
         .and_then(|edit| edit.commit())?;
     let candidate_bytes = exact_bytes(commit.package())?;
     let candidate_header = slide_header(&candidate_bytes, &component_name)?;
-    let candidate_view = WireView::parse(&candidate_header)?;
+    let candidate_view =
+        WireView::parse(&candidate_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(candidate_view.fields().any(|field| {
         field.number() == UNKNOWN_HEADER_FIELD && field.raw() == unknown_field.as_slice()
     }));

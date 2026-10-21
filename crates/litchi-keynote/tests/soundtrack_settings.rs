@@ -40,7 +40,10 @@ fn without_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
             else {
                 continue;
             };
-            let view = WireView::parse(&object.messages[index].data)?;
+            let view = WireView::parse(
+                &object.messages[index].data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             if !view.fields().any(|field| field.number() == 17) {
                 continue;
             }
@@ -77,7 +80,7 @@ fn soundtrack_media_fields(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         let archive = Archive::parse(stream.as_bytes())?;
         for object in &archive.objects {
             if let Some(message) = object.messages.iter().find(|message| message.type_ == 21) {
-                let view = WireView::parse(&message.data)?;
+                let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 return Ok(view
                     .fields()
                     .filter(|field| field.number() == 3)

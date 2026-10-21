@@ -2,8 +2,8 @@ use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits,
     wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireDescent,
-        patch_nested_fields_batched_with_limits, preflight_wire_tree_with_limits,
+        NestedFieldEdit, NestedFieldReplacement, WireDescent, patch_nested_fields_batched,
+        preflight_wire_tree,
     },
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
@@ -89,10 +89,8 @@ fn rewritten_payload(
         .with_rewrite_work(source.len().saturating_mul(4).max(1))
         .map_err(map_wire_error)?;
     budget.charge_transaction_work(source.len().saturating_mul(4))?;
-    preflight_wire_tree_with_limits(source, limits, |_visit| Ok(WireDescent::Skip))
-        .map_err(map_wire_error)?;
-    let output =
-        patch_nested_fields_batched_with_limits(source, &edits, limits).map_err(map_wire_error)?;
+    preflight_wire_tree(source, limits, |_visit| Ok(WireDescent::Skip)).map_err(map_wire_error)?;
+    let output = patch_nested_fields_batched(source, &edits, limits).map_err(map_wire_error)?;
     let decoded = decode_title_with_budget(&output, budget)?;
     if decoded.settings != after {
         return Err(Error::Verification);

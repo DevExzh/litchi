@@ -597,7 +597,7 @@ fn engine(source: &Package) -> Result<Option<(u64, usize)>, Error> {
 
 /// The decoded double at field `number` of `data`, if present.
 fn double(data: &[u8], number: u32) -> Option<f64> {
-    let view = litchi_iwa_common::wire::parse_wire_view(data).ok()?;
+    let view = litchi_iwa_common::wire::parse_wire_view(data, WireLimits::DEFAULT).ok()?;
     view.fields()
         .filter(|field| field.number() == number && field.wire_type() == 1)
         .last()
@@ -610,7 +610,8 @@ fn template_position(info: &[u8]) -> Option<(f32, f32)> {
     let drawable = repeated_length_delimited_payloads(info, 1).ok()?;
     let geometry = repeated_length_delimited_payloads(drawable.first()?, 1).ok()?;
     let position = repeated_length_delimited_payloads(geometry.first()?, 1).ok()?;
-    let view = litchi_iwa_common::wire::parse_wire_view(position.first()?).ok()?;
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(position.first()?, WireLimits::DEFAULT).ok()?;
     let mut point = (0.0_f32, 0.0_f32);
     for field in view.fields() {
         let value = field
@@ -703,8 +704,7 @@ fn anchored_body(
     let wire = WireLimits::default()
         .with_input_bytes(rewritten.len().max(1))
         .map_err(|_error| Error::InvalidSource)?;
-    let view =
-        WireView::parse_with_limits(&rewritten, wire).map_err(|_error| Error::InvalidSource)?;
+    let view = WireView::parse(&rewritten, wire).map_err(|_error| Error::InvalidSource)?;
     let tables: Vec<&[u8]> = view
         .fields()
         .filter(|field| field.number() == ATTACHMENT_TABLE_FIELD)
@@ -716,12 +716,17 @@ fn anchored_body(
     let mut entry = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut entry, 1, anchor as u64)
         .map_err(|_error| Error::InvalidSource)?;
-    append_length_delimited_field(&mut entry, 2, &table_create::reference_payload(attachment))
-        .map_err(|_error| Error::InvalidSource)?;
+    append_length_delimited_field(
+        &mut entry,
+        2,
+        &table_create::reference_payload(attachment),
+        WireLimits::DEFAULT,
+    )
+    .map_err(|_error| Error::InvalidSource)?;
     let mut table = Vec::new();
     let mut placed = false;
     if let Some(existing) = tables.first() {
-        let view = litchi_iwa_common::wire::parse_wire_view(existing)
+        let view = litchi_iwa_common::wire::parse_wire_view(existing, WireLimits::DEFAULT)
             .map_err(|_error| Error::InvalidSource)?;
         for field in view.fields() {
             if field.number() != 1 || field.wire_type() != 2 {
@@ -736,7 +741,7 @@ fn anchored_body(
                 return Err(Error::InvalidSource);
             }
             if !placed && *index > anchor as u64 {
-                append_length_delimited_field(&mut table, 1, &entry)
+                append_length_delimited_field(&mut table, 1, &entry, WireLimits::DEFAULT)
                     .map_err(|_error| Error::InvalidSource)?;
                 placed = true;
             }
@@ -744,7 +749,7 @@ fn anchored_body(
         }
     }
     if !placed {
-        append_length_delimited_field(&mut table, 1, &entry)
+        append_length_delimited_field(&mut table, 1, &entry, WireLimits::DEFAULT)
             .map_err(|_error| Error::InvalidSource)?;
     }
     let present = !tables.is_empty();

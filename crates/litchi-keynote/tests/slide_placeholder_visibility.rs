@@ -70,7 +70,7 @@ fn rewrite_slide_payload(
 
 fn without_body_placeholder(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body_reference = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -94,7 +94,7 @@ fn without_body_placeholder(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_mismatched_body_membership(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body_reference = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -115,13 +115,18 @@ fn with_mismatched_body_membership(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn length_field(number: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len().saturating_add(8));
-    litchi_iwa_common::wire::append_length_delimited_field(&mut output, number, payload)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut output,
+        number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(output)
 }
 
 fn malformed_body_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let body = view
             .fields()
             .find(|field| field.number() == BODY_REFERENCE_FIELD)
@@ -151,7 +156,7 @@ fn malformed_body_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
 
 fn malformed_slide_number_reference(source: &[u8], mode: u8) -> TestResult<Vec<u8>> {
     rewrite_slide_payload(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let number = view
             .fields()
             .find(|field| field.number() == SLIDE_NUMBER_REFERENCE_FIELD)

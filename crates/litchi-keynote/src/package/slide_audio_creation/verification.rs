@@ -1451,8 +1451,8 @@ fn wire_view<'a>(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<WireView<'a>, SlideAudioCreationError> {
-    let view = WireView::parse_with_limits(payload, limits)
-        .map_err(|_| SlideAudioCreationError::Verification)?;
+    let view =
+        WireView::parse(payload, limits).map_err(|_| SlideAudioCreationError::Verification)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
     for field in view.fields() {

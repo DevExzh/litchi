@@ -1373,7 +1373,7 @@ fn repeated_drawable_references(
 ) -> Result<Vec<u64>, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let reference_capacity = fields
@@ -1422,7 +1422,7 @@ fn unique_movie_data_identifier(
 ) -> Result<Option<u64>, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let mut identifier = None;
@@ -1453,7 +1453,7 @@ fn movie_parent_identifier(
 ) -> Result<u64, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let mut parent = None;
@@ -1467,8 +1467,8 @@ fn movie_parent_identifier(
         field
             .validate_canonical_framing()
             .map_err(|_| Error::InvalidSource)?;
-        let super_fields = WireView::parse_with_limits(field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let super_fields =
+            WireView::parse(field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         budget.input_bytes(field.payload().len())?;
         budget.wire_work(field.payload().len())?;
         budget.wire_fields(super_fields.len())?;

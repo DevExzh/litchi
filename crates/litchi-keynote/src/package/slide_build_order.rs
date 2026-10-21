@@ -795,7 +795,7 @@ fn parse_slide_order_payload(
     limits: WireLimits,
     max_references: usize,
 ) -> Result<(Vec<RawReference>, Vec<RawReference>, HashSet<u64>), Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build_count = 0usize;
     let mut chunk_count = 0usize;
     let mut owned_count = 0usize;
@@ -887,7 +887,7 @@ fn parse_reference_field(
 }
 
 fn parse_reference_payload(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut external = None;
@@ -934,7 +934,7 @@ fn parse_build_payload(
     limits: WireLimits,
     owned_drawables: &HashSet<u64>,
 ) -> Result<Option<bool>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut drawable = None;
     let mut delivery = false;
     let mut attributes = None;
@@ -984,7 +984,7 @@ fn parse_reference_payload_field(
 }
 
 fn parse_animation_automatic(payload: &[u8], limits: WireLimits) -> Result<Option<bool>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut animation = None;
     for field in view.fields() {
         if field.number() != ATTRIBUTES_ANIMATION_FIELD {
@@ -999,7 +999,7 @@ fn parse_animation_automatic(payload: &[u8], limits: WireLimits) -> Result<Optio
     let Some(animation) = animation else {
         return Ok(None);
     };
-    let animation_view = WireView::parse_with_limits(animation, limits).map_err(map_wire_error)?;
+    let animation_view = WireView::parse(animation, limits).map_err(map_wire_error)?;
     let mut automatic = None;
     for field in animation_view.fields() {
         if field.number() != ANIMATION_AUTOMATIC_FIELD {
@@ -1017,7 +1017,7 @@ fn parse_chunk_payload(
     payload: &[u8],
     limits: WireLimits,
 ) -> Result<(u64, Option<bool>, Option<bool>), Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build = None;
     let mut automatic = None;
     let mut referent = None;
@@ -1070,7 +1070,7 @@ fn parse_chunk_payload(
 }
 
 fn parse_chunk_identifier(payload: &[u8], limits: WireLimits) -> Result<Uuid, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut uuid = None;
     let mut chunk_id = None;
     for field in view.fields() {
@@ -1095,7 +1095,7 @@ fn parse_chunk_identifier(payload: &[u8], limits: WireLimits) -> Result<Uuid, Er
 }
 
 fn parse_uuid(payload: &[u8], limits: WireLimits) -> Result<Uuid, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut lower = None;
     let mut upper = None;
     for field in view.fields() {
@@ -1520,7 +1520,7 @@ fn permute_slide_build_references(
     after: &BuildOrderSnapshot,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut build_raw_by_id = HashMap::new();
     build_raw_by_id
         .try_reserve(before.builds.len())
@@ -1932,7 +1932,8 @@ mod tests {
             ..Default::default()
         }
         .encode_to_vec();
-        let view = WireView::parse(&canonical).expect("canonical slide parses");
+        let view =
+            WireView::parse(&canonical, WireLimits::DEFAULT).expect("canonical slide parses");
         let mut build_index = 0usize;
         let mut chunk_index = 0usize;
         let mut output = Vec::with_capacity(canonical.len().saturating_add(64));
@@ -2095,7 +2096,7 @@ mod tests {
             .object(4)
             .and_then(|object| object.messages.iter().find(|message| message.type_ == 5))
             .ok_or_else(|| io::Error::other("fixture slide object missing"))?;
-        Ok(WireView::parse(&slide.data)?
+        Ok(WireView::parse(&slide.data, WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == number)
             .map(|field| field.raw().to_vec())

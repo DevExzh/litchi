@@ -578,7 +578,7 @@ fn is_paragraph_style_wire(data: &[u8]) -> Result<bool> {
                 "paragraph-style wire classifier limits are invalid: {error}"
             ))
         })?;
-    let fields = litchi_iwa_common::wire::parse_wire_fields_with_limits(data, limits)
+    let fields = litchi_iwa_common::wire::parse_wire_fields(data, limits)
         .map_err(|error| Error::InvalidFormat(format!("invalid paragraph-style wire: {error}")))?;
     let mut super_present = false;
     for field in fields {

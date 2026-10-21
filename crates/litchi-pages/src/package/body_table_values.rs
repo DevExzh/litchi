@@ -375,11 +375,15 @@ impl Staged<'_> {
 
 fn reference(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     for field in view.fields() {
         if field.number() == number {
-            let inner = litchi_iwa_common::wire::WireView::parse(field.payload())
-                .map_err(|_error| Error::InvalidSource)?;
+            let inner = litchi_iwa_common::wire::WireView::parse(
+                field.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(|_error| Error::InvalidSource)?;
             for value in inner.fields() {
                 if value.number() == 1 {
                     let (identifier, _) =
@@ -395,7 +399,8 @@ fn reference(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
 
 fn varint(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     for field in view.fields() {
         if field.number() == number && field.wire_type() == 0 {
             let (value, _) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
@@ -408,7 +413,8 @@ fn varint(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
 
 fn message(payload: &[u8], number: u32) -> Result<Vec<&[u8]>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     Ok(view
         .fields()
         .filter(|field| field.number() == number && field.wire_type() == 2)
@@ -464,8 +470,11 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             message(headers, 2)?
                 .into_iter()
                 .map(|bucket| {
-                    let view = litchi_iwa_common::wire::WireView::parse(bucket)
-                        .map_err(|_error| Error::InvalidSource)?;
+                    let view = litchi_iwa_common::wire::WireView::parse(
+                        bucket,
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )
+                    .map_err(|_error| Error::InvalidSource)?;
                     let field = view.fields().next().ok_or(Error::InvalidSource)?;
                     litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
                         .map(|(value, _)| value)

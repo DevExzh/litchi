@@ -618,9 +618,8 @@ fn read_order(package: &Package) -> Result<(OrderLocation, Vec<NonZeroU64>), Err
         .get(root_message_index)
         .ok_or(Error::InvalidSource)?;
     validate_message_metadata(root, root_message_index)?;
-    let root_view =
-        WireView::parse_with_limits(root_message.data.as_slice(), wire_limits(package)?)
-            .map_err(|_| Error::InvalidSource)?;
+    let root_view = WireView::parse(root_message.data.as_slice(), wire_limits(package)?)
+        .map_err(|_| Error::InvalidSource)?;
     let mut zorder_identifier = None;
     let mut body_storage_identifier = None;
     for field in root_view.fields() {
@@ -1215,7 +1214,7 @@ fn strict_reference_with_limits(source: &[u8], limits: WireLimits) -> Result<Non
     // duplicate is ambiguous even when both values happen to agree.  Keep
     // this parser independent from the generated value path and reject the
     // external-reference marker before it can become a local object handle.
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut deprecated_external_seen = false;

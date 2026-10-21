@@ -18,7 +18,7 @@ use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::table_header_settings_codec::{
@@ -631,7 +631,7 @@ fn decode_snapshot(
     budget: &mut table_lock::WireBudget,
 ) -> Result<TableHeaderSettingsSnapshot, Error> {
     let limits = budget.wire_limits();
-    let preflight = preflight_wire_tree_with_limits(source, limits, |_| Ok(WireDescent::Skip))
+    let preflight = preflight_wire_tree(source, limits, |_| Ok(WireDescent::Skip))
         .map_err(map_common_wire_error)?;
     budget
         .charge_codec_report(
@@ -1019,7 +1019,8 @@ fn validate_dependencies(
         != after.repeating_header_rows_enabled
         || before.repeating_header_columns_enabled != after.repeating_header_columns_enabled;
     let model = model_message(package, target)?;
-    let model_view = WireView::parse(&model.data).map_err(|_| Error::InvalidSource)?;
+    let model_view =
+        WireView::parse(&model.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(model.data.len())
         .map_err(map_lock_error)?;
@@ -1065,7 +1066,8 @@ fn validate_dependencies(
         .get(target.info_message_index)
         .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
         .ok_or(Error::InvalidSource)?;
-    let info_view = WireView::parse(&info_message.data).map_err(|_| Error::InvalidSource)?;
+    let info_view = WireView::parse(&info_message.data, WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(info_message.data.len())
         .map_err(map_lock_error)?;
@@ -1106,7 +1108,8 @@ fn validate_dependencies(
             .and_then(|object| object.messages.get(target.sheet_message_index))
             .filter(|message| message.type_ == target.sheet_message_type)
             .ok_or(Error::InvalidSource)?;
-        let view = WireView::parse(&sheet.data).map_err(|_| Error::InvalidSource)?;
+        let view =
+            WireView::parse(&sheet.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
         budget
             .charge_payload_work(sheet.data.len())
             .map_err(map_lock_error)?;
@@ -1183,8 +1186,7 @@ fn category_owner_grouping_active(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, budget.wire_limits())
-        .map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, budget.wire_limits()).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_codec_report(view.len(), source.len().saturating_mul(2), 1, 0)
         .map_err(map_lock_error)?;
@@ -1201,7 +1203,7 @@ fn category_owner_grouping_active(
             return Err(Error::InvalidSource);
         }
         seen = true;
-        let group = WireView::parse_with_limits(field.payload(), budget.wire_limits())
+        let group = WireView::parse(field.payload(), budget.wire_limits())
             .map_err(|_| Error::InvalidSource)?;
         budget
             .charge_codec_report(group.len(), field.payload().len().saturating_mul(2), 2, 0)

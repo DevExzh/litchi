@@ -131,6 +131,7 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
                 &mut payload,
                 UNKNOWN_COMMENT_EXTENSION_FIELD,
                 UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message(
                 *message_index,
@@ -180,7 +181,7 @@ fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
                 .filter(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             {
                 spans.extend(
-                    WireView::parse(&message.data)?
+                    WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
                         .fields()
                         .filter(|field| field.number() == UNKNOWN_COMMENT_EXTENSION_FIELD)
                         .map(|field| field.raw().to_vec()),
@@ -255,6 +256,7 @@ fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
         &mut header,
         UNKNOWN_COMMENT_HEADER_FIELD,
         UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let mut modified = Vec::with_capacity(bytes.len().saturating_add(header.len()));
     modified.extend_from_slice(&bytes[..header_offset]);
@@ -700,6 +702,7 @@ fn unknown_comment_payload_extensions_survive_root_and_reply_rewrites() -> TestR
             &mut field,
             UNKNOWN_COMMENT_EXTENSION_FIELD,
             UNKNOWN_COMMENT_EXTENSION_PAYLOAD,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         field
     };
@@ -1210,7 +1213,12 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
                 ..Default::default()
             }
             .encode_to_vec();
-            append_length_delimited_field(&mut payload, 4, &reference)?;
+            append_length_delimited_field(
+                &mut payload,
+                4,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             payload = vec![0xff];
         }

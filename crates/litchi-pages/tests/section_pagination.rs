@@ -296,7 +296,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -311,7 +311,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -335,7 +335,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_pagination(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| !matches!(field.number(), 20..=22))
         .map(|field| field.raw().to_vec())
@@ -623,7 +623,7 @@ fn changed_pagination_preserves_opaque_content_and_inverse_restores_source() -> 
         fields_except_pagination(&source_first_payload)?
     );
     assert!(
-        WireView::parse(&target_first_payload)?
+        WireView::parse(&target_first_payload, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -633,7 +633,7 @@ fn changed_pagination_preserves_opaque_content_and_inverse_restores_source() -> 
         "only the pagination payload length may change in the opaque archive header"
     );
     assert!(
-        WireView::parse(&target_first_header)?
+        WireView::parse(&target_first_header, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );

@@ -1382,7 +1382,7 @@ def add_iwa_numbers_wire_formula_names_scaffold(
         source
         if source is not None
         else (
-            "use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};\n"
+            "use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};\n"
             "use litchi_iwa_protos::group_node_category_codec;\n"
             "pub struct ReadLimits;\n"
             "pub struct ReadReport;\n"
@@ -1395,7 +1395,7 @@ def add_iwa_numbers_wire_formula_names_scaffold(
             "pub struct CategoryReadError;\n"
             "pub fn read_formula_owner_dependencies(source: &[u8], limits: ReadLimits)\n"
             "    -> Result<FormulaOwnerDependencies, FormulaOwnerReadError> {\n"
-            "    let _ = (source, limits, preflight_wire_tree_with_limits, WireDescent);\n"
+            "    let _ = (source, limits, preflight_wire_tree, WireDescent);\n"
             "    todo!()\n"
             "}\n"
             "pub fn read_formula_category_names<'source>(source: &'source [u8], limits: CategoryReadLimits)\n"
@@ -5533,7 +5533,7 @@ def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
         )
         + "struct TitleBudget;\n"
         + "fn strict_projections() { numbers_table_title_codec; table_info_codec; }\n"
-        + "fn raw_preserving() { patch_nested_fields_batched_with_limits; NestedFieldReplacement; }\n"
+        + "fn raw_preserving() { patch_nested_fields_batched; NestedFieldReplacement; }\n"
         + "fn exact() { ExactArtifacts; inverse; }\n"
         + "fn publish() { prepare_reassembly_with_deletions; root_preview_deletions; }\n"
         + "fn verify() { candidate.validate; verify_locality; }\n"

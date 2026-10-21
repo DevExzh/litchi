@@ -24,7 +24,7 @@ use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{
-    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree,
 };
 use litchi_iwa_core::{
     Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
@@ -1010,7 +1010,7 @@ impl Package {
             .map_err(|_| Error::InvalidSource { path })?
             .ok_or(Error::InvalidSource { path })?;
         let populated = resolved.messages.iter().any(|message| {
-            WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+            WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
                 view.fields()
                     .any(|field| field.number() == 3 || field.number() == 4)
             })
@@ -1535,7 +1535,8 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .and_then(|object| object.messages.get(target.message_index))
         .ok_or(Error::InvalidSource { path })?;
     let field = |data: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
-        let view = WireView::parse(data).map_err(|_| Error::InvalidSource { path })?;
+        let view = WireView::parse(data, WireLimits::DEFAULT)
+            .map_err(|_| Error::InvalidSource { path })?;
         Ok(view
             .fields()
             .find(|field| field.number() == number && field.wire_type() == 2)
@@ -1547,7 +1548,8 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
     let Some(reference) = field(&store, 19)? else {
         return Ok(false);
     };
-    let view = WireView::parse(&reference).map_err(|_| Error::InvalidSource { path })?;
+    let view = WireView::parse(&reference, WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource { path })?;
     let identifier = view
         .fields()
         .find(|field| field.number() == 1 && field.wire_type() == 0)
@@ -1561,7 +1563,7 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
     Ok(resolved.messages.iter().any(|message| {
-        WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
             view.fields()
                 .any(|field| field.number() == 3 || field.number() == 4)
         })
@@ -1777,7 +1779,7 @@ fn has_comment_legacy_table_model_shape(source: &[u8], path: Path) -> Result<boo
     let mut present = 0_u8;
     let mut ambiguous = false;
     let limits = wire_limits_for(source.len(), 0, path)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         if !visit.path().is_empty() {
             return Ok(WireDescent::Skip);
         }
@@ -2129,7 +2131,7 @@ fn resolve_comment_native_with_mode(
             reply_ids: Vec::new(),
         });
     };
-    let tile_view = WireView::parse_with_limits(
+    let tile_view = WireView::parse(
         tile_message.data.as_slice(),
         wire_limits_for(tile_message.data.len(), 0, target.path)?,
     )
@@ -4051,7 +4053,7 @@ fn scan_global_comment_cells(
                 amount: rows.rows.len(),
                 path,
             })?;
-        let tile_view = WireView::parse_with_limits(
+        let tile_view = WireView::parse(
             tile_message.data.as_slice(),
             wire_limits_for(tile_message.data.len(), 0, path)?,
         )
@@ -5360,9 +5362,8 @@ fn census_models_and_cells(
 }
 
 fn comment_field_present(source: &[u8], field_number: u32) -> Result<bool, Error> {
-    let view =
-        WireView::parse_with_limits(source, wire_limits_for(source.len(), 0, Path::Package)?)
-            .map_err(|error| map_wire_error(error, Path::Package))?;
+    let view = WireView::parse(source, wire_limits_for(source.len(), 0, Path::Package)?)
+        .map_err(|error| map_wire_error(error, Path::Package))?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)

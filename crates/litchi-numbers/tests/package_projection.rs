@@ -160,7 +160,12 @@ fn length_delimited_wire_fields_are_not_accidentally_treated_as_scalars() -> Tes
     // Field 99 is unknown, but its payload is deliberately framed as a
     // length-delimited value.  The root projection must skip it without
     // recursing into arbitrary bytes or changing semantic output.
-    append_length_delimited_field(&mut root, 99, b"opaque root bytes")?;
+    append_length_delimited_field(
+        &mut root,
+        99,
+        b"opaque root bytes",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let package = Package::from_bytes(&package_bytes(vec![object(
         1,
         DOCUMENT_MESSAGE_TYPE,

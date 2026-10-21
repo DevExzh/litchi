@@ -1636,7 +1636,7 @@ fn repeated_references(
     limits: WireLimits,
     budget: &mut LockBudget,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields
         .fields()
         .filter(|field| field.number() == field_number)
@@ -1663,7 +1663,7 @@ fn repeated_references(
 
 fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut LockBudget) -> Result<u64, Error> {
     budget.work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_payload = None;
     let mut super_count = 0usize;
     for field in fields.fields() {
@@ -1680,8 +1680,7 @@ fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut LockBudget) -> 
     if super_count != 1 || super_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut parent_payload = None;
     let mut parent_count = 0usize;
     for field in drawable.fields() {
@@ -1706,7 +1705,7 @@ fn strict_reference(
     limits: WireLimits,
     budget: &mut LockBudget,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;

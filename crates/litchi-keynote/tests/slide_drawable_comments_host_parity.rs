@@ -187,7 +187,7 @@ fn first_slide(source: &[u8]) -> TestResult<(String, u64, Vec<u64>)> {
 fn nested_payload(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -204,7 +204,12 @@ fn wrap_field_one(payload: &[u8], count: usize) -> TestResult<Vec<u8>> {
     let mut wrapped = payload.to_owned();
     for _ in 0..count {
         let mut outer = Vec::new();
-        append_length_delimited_field(&mut outer, 1, &wrapped)?;
+        append_length_delimited_field(
+            &mut outer,
+            1,
+            &wrapped,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         wrapped = outer;
     }
     Ok(wrapped)
@@ -220,7 +225,9 @@ fn reorder_slide_owned_drawables(archive: &mut Archive, slide_identifier: u64) -
         .position(|message| message.type_ == SLIDE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("rooted slide payload disappeared"))?;
     let payload = slide.messages[message_index].data.clone();
-    let fields = WireView::parse(&payload)?.fields().collect::<Vec<_>>();
+    let fields = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+        .fields()
+        .collect::<Vec<_>>();
     let mut owned = fields
         .iter()
         .copied()
@@ -353,7 +360,7 @@ fn unique_message(object: &ArchiveObject, message_type: u32) -> TestResult<(usiz
 fn comment_identifier(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for (depth, field_number) in path.iter().copied().enumerate() {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == field_number)
             .collect::<Vec<_>>();
@@ -371,7 +378,7 @@ fn comment_identifier(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
         }
         current = field.payload();
     }
-    let fields = WireView::parse(current)?
+    let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == 1)
         .collect::<Vec<_>>();
@@ -453,7 +460,12 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
         }
         .encode_to_vec();
         let mut output = payload.to_vec();
-        append_length_delimited_field(&mut output, field_number, &reference)?;
+        append_length_delimited_field(
+            &mut output,
+            field_number,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         return Ok(output);
     }
     transform_length_delimited_field(payload, field_number, |nested| {
@@ -566,6 +578,7 @@ fn append_reply_and_second_root(
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let root_object = archive
         .object_mut(root_identifier)
@@ -723,7 +736,10 @@ fn annotation_author_state(
                                 .into());
                             }
                         }
-                        for field in WireView::parse(&message.data)?.fields() {
+                        for field in
+                            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
+                                .fields()
+                        {
                             if field.number() != 1 || field.wire_type() != 2 {
                                 continue;
                             }
@@ -1304,7 +1320,7 @@ fn without_annotation_author_storage(source: &[u8]) -> TestResult<Vec<u8>> {
 fn reference_at_path(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();

@@ -108,7 +108,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::package::SharedBytes;
 use litchi_iwa_archive::{ComponentCatalog, OwnedSourceCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
@@ -2036,7 +2036,7 @@ fn preflight_application_payload(payload: &[u8], archive_limits: Limits) -> Resu
     let wire_limits = WireLimits::default()
         .with_input_bytes(input_bytes)?
         .with_fields(fields)?;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field().number();
         let descend = match visit.path() {
             [] => matches!(field, 2 | 3 | 4 | 5 | 6 | 8 | 15) && visit.field().wire_type() == 2,

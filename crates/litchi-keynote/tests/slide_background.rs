@@ -174,19 +174,29 @@ fn fill_payload(background: &Background) -> Vec<u8> {
 }
 
 fn replace_first_length_delimited(data: &[u8], number: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(data)?;
+    let view = WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(data.len() + payload.len());
     let mut replaced = false;
     for field in view.fields() {
         if field.number() == number && !replaced {
-            append_length_delimited_field(&mut output, number, payload)?;
+            append_length_delimited_field(
+                &mut output,
+                number,
+                payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         } else {
             output.extend_from_slice(field.raw());
         }
     }
     if !replaced {
-        append_length_delimited_field(&mut output, number, payload)?;
+        append_length_delimited_field(
+            &mut output,
+            number,
+            payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
@@ -778,7 +788,7 @@ fn shared_variation_is_copy_on_write_and_unselected_slide_is_unchanged() -> Test
 #[test]
 fn unsupported_backgrounds_are_preserved_and_refuse_changed_edits_atomically() -> TestResult<()> {
     let canonical = native_gradient_payload(&gradient());
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut gradient_payload = view
         .fields()
         .find(|field| field.number() == 2)
@@ -881,7 +891,7 @@ fn unknown_style_and_fill_fields_survive_a_background_rewrite() -> TestResult<()
         rewritten_slide.style.identifier,
         STYLE_MESSAGE_TYPE,
     )?;
-    let style_view = WireView::parse(&style)?;
+    let style_view = WireView::parse(&style, litchi_iwa_common::WireLimits::DEFAULT)?;
     let parent_style = message_payload(
         &exact_bytes(commit.package())?,
         STYLESHEET_MEMBER,
@@ -889,18 +899,20 @@ fn unknown_style_and_fill_fields_survive_a_background_rewrite() -> TestResult<()
         STYLE_MESSAGE_TYPE,
     )?;
     assert!(
-        WireView::parse(&parent_style)?
+        WireView::parse(&parent_style, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
     );
     let fill = style_view
         .fields()
         .find(|field| field.number() == 11)
-        .and_then(|field| WireView::parse(field.payload()).ok())
+        .and_then(|field| {
+            WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT).ok()
+        })
         .and_then(|properties| properties.fields().find(|field| field.number() == 1))
         .ok_or_else(|| io::Error::other("rewritten fill missing"))?;
     assert!(
-        WireView::parse(fill.payload())?
+        WireView::parse(fill.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_FILL_FIELD)
     );
@@ -1214,6 +1226,7 @@ fn unknown_other_style_field_prevents_selected_style_culling() -> TestResult<()>
         &mut owner_payload,
         UNKNOWN_STYLE_FIELD,
         &reference(VARIATION_STYLE_ID).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     archive
         .objects
@@ -1239,9 +1252,12 @@ fn unknown_other_style_field_prevents_selected_style_culling() -> TestResult<()>
         .object(82)
         .ok_or_else(|| io::Error::other("missing other style owner"))?;
     assert!(
-        WireView::parse(&owner.messages[0].data)?
-            .fields()
-            .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
+        WireView::parse(
+            &owner.messages[0].data,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == UNKNOWN_STYLE_FIELD)
     );
     Ok(())
 }
@@ -1252,7 +1268,7 @@ fn other_style_stylesheet_reference_prevents_selected_style_culling() -> TestRes
     let stream = component_stream(&bytes, STYLESHEET_MEMBER)?;
     let mut archive = Archive::parse(&stream)?;
     let owner_payload = style_payload(None, false, None, None)?;
-    let owner_view = WireView::parse(&owner_payload)?;
+    let owner_view = WireView::parse(&owner_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_payload = owner_view
         .fields()
         .find(|field| field.number() == 1)
@@ -1352,6 +1368,7 @@ fn unknown_slide_field_prevents_style_retargeting_atomically() -> TestResult<()>
         &mut slide.messages[0].data,
         UNKNOWN_STYLE_FIELD,
         &reference(BASE_STYLE_ID).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let stream = archive.to_bytes()?;
     let compressed = SnappyStream::compress(&stream)?;
@@ -1406,12 +1423,15 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
     let source_object = source_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing source stylesheet"))?;
-    let source_versioned = WireView::parse(&source_object.messages[0].data)?
-        .fields()
-        .find(|field| field.number() == 14)
-        .ok_or_else(|| io::Error::other("missing versioned stylesheet branch"))?
-        .raw()
-        .to_vec();
+    let source_versioned = WireView::parse(
+        &source_object.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 14)
+    .ok_or_else(|| io::Error::other("missing versioned stylesheet branch"))?
+    .raw()
+    .to_vec();
     let source_fields = source_object.archive_info.message_infos[0]
         .field_infos
         .clone();
@@ -1430,12 +1450,15 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
     let changed_object = changed_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing changed stylesheet"))?;
-    let changed_versioned = WireView::parse(&changed_object.messages[0].data)?
-        .fields()
-        .find(|field| field.number() == 14)
-        .ok_or_else(|| io::Error::other("missing changed versioned branch"))?
-        .raw()
-        .to_vec();
+    let changed_versioned = WireView::parse(
+        &changed_object.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 14)
+    .ok_or_else(|| io::Error::other("missing changed versioned branch"))?
+    .raw()
+    .to_vec();
     assert_eq!(changed_versioned, source_versioned);
     assert_eq!(
         changed_object.archive_info.message_infos[0].field_infos,
@@ -1469,7 +1492,7 @@ fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestR
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
     let stylesheet_data = stylesheet.messages[0].data.clone();
-    let child = WireView::parse(&stylesheet_data)?
+    let child = WireView::parse(&stylesheet_data, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 5)
         .ok_or_else(|| io::Error::other("missing stylesheet child entry"))?
@@ -1516,16 +1539,19 @@ fn unknown_style_child_entry_prevents_cull_and_survives_cow_insertion() -> TestR
     let stylesheet = changed_archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing changed stylesheet"))?;
-    let child_entries = WireView::parse(&stylesheet.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() == 5)
-        .map(|field| field.payload().to_vec())
-        .collect::<Vec<_>>();
+    let child_entries = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 5)
+    .map(|field| field.payload().to_vec())
+    .collect::<Vec<_>>();
     assert!(!child_entries.is_empty(), "culled stylesheet child entry");
     let mut unknown_entry_found = false;
     let mut replacement_entry_found = false;
     for child in child_entries {
-        let child_view = WireView::parse(&child)?;
+        let child_view = WireView::parse(&child, litchi_iwa_common::WireLimits::DEFAULT)?;
         unknown_entry_found |= child_view
             .fields()
             .any(|field| field.number() == UNKNOWN_CHILD_FIELD && field.payload() == [73]);
@@ -1549,7 +1575,10 @@ fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()>
     let slide = archive
         .object_mut(FIRST_SLIDE_ID)
         .ok_or_else(|| io::Error::other("missing first slide"))?;
-    let view = WireView::parse(&slide.messages[0].data)?;
+    let view = WireView::parse(
+        &slide.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut reference_payload = view
         .fields()
         .find(|field| field.number() == 1)
@@ -1580,13 +1609,13 @@ fn unknown_nested_reference_fields_survive_style_retargeting() -> TestResult<()>
         FIRST_SLIDE_ID,
         SLIDE_MESSAGE_TYPE,
     )?;
-    let slide_view = WireView::parse(&slide)?;
+    let slide_view = WireView::parse(&slide, litchi_iwa_common::WireLimits::DEFAULT)?;
     let reference = slide_view
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("rewritten style reference missing"))?;
     assert!(
-        WireView::parse(reference.payload())?
+        WireView::parse(reference.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99 && field.payload() == [73])
     );
@@ -1601,7 +1630,10 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;
-    let view = WireView::parse(&stylesheet.messages[0].data)?;
+    let view = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut rewritten = Vec::new();
     for field in view.fields() {
         if field.number() == 1
@@ -1609,7 +1641,12 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
         {
             let mut reference_payload = field.payload().to_vec();
             append_unknown(&mut reference_payload, UNKNOWN_STYLE_FIELD, 73)?;
-            append_length_delimited_field(&mut rewritten, 1, &reference_payload)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                1,
+                &reference_payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             rewritten.extend_from_slice(field.raw());
         }
@@ -1635,16 +1672,21 @@ fn unknown_stylesheet_reference_fields_prevent_cull_and_survive_reset() -> TestR
     let stylesheet = archive
         .object(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing rewritten stylesheet"))?;
-    let retained_extension = WireView::parse(&stylesheet.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() == 1)
-        .any(|field| {
-            WireView::parse(field.payload()).is_ok_and(|reference| {
+    let retained_extension = WireView::parse(
+        &stylesheet.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 1)
+    .any(|field| {
+        WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT).is_ok_and(
+            |reference| {
                 reference.fields().any(|nested| {
                     nested.number() == UNKNOWN_STYLE_FIELD && nested.payload() == [73]
                 })
-            })
-        });
+            },
+        )
+    });
     assert!(retained_extension);
     Ok(())
 }
@@ -1657,11 +1699,14 @@ fn stylesheet_cull_flag_is_authoritative() -> TestResult<()> {
     let base = archive
         .object_mut(BASE_STYLE_ID)
         .ok_or_else(|| io::Error::other("missing base style"))?;
-    base.messages[0].data = WireView::parse(&base.messages[0].data)?
-        .fields()
-        .filter(|field| field.number() != UNKNOWN_STYLE_FIELD)
-        .flat_map(|field| field.raw().iter().copied())
-        .collect();
+    base.messages[0].data = WireView::parse(
+        &base.messages[0].data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() != UNKNOWN_STYLE_FIELD)
+    .flat_map(|field| field.raw().iter().copied())
+    .collect();
     let stylesheet = archive
         .object_mut(STYLESHEET_ID)
         .ok_or_else(|| io::Error::other("missing stylesheet"))?;

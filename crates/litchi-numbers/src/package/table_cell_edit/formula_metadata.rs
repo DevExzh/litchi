@@ -9,9 +9,7 @@ use core::{fmt, mem::size_of};
 use litchi_iwa_common::{
     WireLimits,
     varint::{encode_varint_into, encoded_len},
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_protos::numbers_table_cell_dependency_codec as dependency;
 
@@ -1153,7 +1151,7 @@ fn execute_complete_graph(
         )
         .map_err(|_error| Error::StrictDependency)?;
     add_decode_report(&mut report, current_tracker_report)?;
-    let engine_candidate = patch_nested_fields_batched_with_limits(
+    let engine_candidate = patch_nested_fields_batched(
         graph.engine.payload,
         &[NestedFieldEdit::new(
             &ENGINE_COUNT_PATH,
@@ -2024,8 +2022,7 @@ fn attach_cell_raw<'a>(
         }
         return Ok(());
     };
-    let view = WireView::parse_with_limits(container, wire_limits(limits)?)
-        .map_err(|_error| Error::Wire)?;
+    let view = WireView::parse(container, wire_limits(limits)?).map_err(|_error| Error::Wire)?;
     let mut records = hosts.iter_mut().filter(|host| host.has_cell_record);
     for field in view.fields().filter(|field| field.number() == field_number) {
         field
@@ -2053,8 +2050,7 @@ fn attach_inline_range_raw<'a>(
             Err(Error::InvalidGraph)
         };
     };
-    let view = WireView::parse_with_limits(container, wire_limits(limits)?)
-        .map_err(|_error| Error::Wire)?;
+    let view = WireView::parse(container, wire_limits(limits)?).map_err(|_error| Error::Wire)?;
     let mut raw = view.fields().filter(|field| field.number() == 2);
     for host in hosts.iter_mut().filter(|host| !host.ranges.is_empty()) {
         host.raw_range_records = try_vec(host.ranges.len())?;
@@ -2077,8 +2073,7 @@ fn attach_tiled_range_raw<'a>(
     container: &'a [u8],
     limits: Limits,
 ) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(container, wire_limits(limits)?)
-        .map_err(|_error| Error::Wire)?;
+    let view = WireView::parse(container, wire_limits(limits)?).map_err(|_error| Error::Wire)?;
     let mut raw = view.fields().filter(|field| field.number() == 2);
     for (_, _, destination) in ranges {
         let field = raw.next().ok_or(Error::InvalidGraph)?;
@@ -2337,7 +2332,7 @@ fn rewrite_owner(
     let range_replacement = range_payload
         .as_deref()
         .filter(|payload| !payload.is_empty());
-    let candidate = patch_nested_fields_batched_with_limits(
+    let candidate = patch_nested_fields_batched(
         owner.message.payload,
         &[
             NestedFieldEdit::new(
@@ -2981,7 +2976,7 @@ fn replace_repeated(
     payloads: &[Vec<u8>],
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(|_error| Error::Wire)?;
+    let view = WireView::parse(source, limits).map_err(|_error| Error::Wire)?;
     let inserted = payloads.iter().try_fold(0usize, |sum, payload| {
         checked_add(sum, message_field_len(number, payload.len())?)
     })?;
@@ -4137,20 +4132,19 @@ mod tests {
         assert_eq!(tile.internal_owner_id(), 10);
         assert_eq!(tile.tile_column_begin(), 0);
         assert_eq!(tile.tile_row_begin(), 0);
-        let owner_view =
-            WireView::parse_with_limits(owner_candidate, WireLimits::default()).unwrap();
+        let owner_view = WireView::parse(owner_candidate, WireLimits::default()).unwrap();
         let inline = owner_view
             .fields()
             .find(|field| field.number() == 4)
             .unwrap()
             .payload();
-        let inline_view = WireView::parse_with_limits(inline, WireLimits::default()).unwrap();
+        let inline_view = WireView::parse(inline, WireLimits::default()).unwrap();
         let inline_record = inline_view
             .fields()
             .find(|field| field.number() == 1)
             .unwrap()
             .payload();
-        let tile_view = WireView::parse_with_limits(tile_candidate, WireLimits::default()).unwrap();
+        let tile_view = WireView::parse(tile_candidate, WireLimits::default()).unwrap();
         let tiled_record = tile_view
             .fields()
             .find(|field| field.number() == 4)

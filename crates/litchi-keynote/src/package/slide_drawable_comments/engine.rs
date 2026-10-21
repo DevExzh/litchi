@@ -1929,7 +1929,7 @@ fn replace_drawable_reference(
     let first_envelope_missing = if old.is_none() && selection.comment_wire_path.len() > 1 {
         budget.charge_allocations(message.data.len())?;
         budget.charge_wire_work(message.data.len().max(1))?;
-        let fields = wire::parse_wire_fields_with_limits(message.data.as_slice(), wire_limits)
+        let fields = wire::parse_wire_fields(message.data.as_slice(), wire_limits)
             .map_err(|_| Error::InvalidSource)?;
         budget.charge_wire_fields(fields.len())?;
         !fields
@@ -2111,8 +2111,8 @@ fn patch_nested_fields(
             .checked_add(output_bound)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let output = wire::patch_nested_fields_batched_with_limits(data, edits, limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let output =
+        wire::patch_nested_fields_batched(data, edits, limits).map_err(|_| Error::InvalidSource)?;
     if output.len() > output_bound {
         return Err(Error::InvalidSource);
     }
@@ -2912,8 +2912,7 @@ fn decode_drawable_reference(
         budget.charge_allocations(current.len())?;
         budget.charge_wire_work(current.len().max(1))?;
         budget.charge_nesting(depth.saturating_add(1))?;
-        let fields = wire::parse_wire_fields_with_limits(current, limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let fields = wire::parse_wire_fields(current, limits).map_err(|_| Error::InvalidSource)?;
         budget.charge_wire_fields(fields.len())?;
         let mut selected = None;
         for field in fields {

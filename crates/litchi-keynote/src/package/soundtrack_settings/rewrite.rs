@@ -5,7 +5,7 @@ use litchi_iwa_archive::{
     package::{EntryEdit, ExactArtifacts},
 };
 use litchi_iwa_common::wire::{
-    NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
+    NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched,
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 
@@ -399,7 +399,7 @@ fn rewrite_payload(
     let limits = package.wire_limits().map_err(map_wire_error)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     drop(view);
     let edit_fields = [
@@ -422,8 +422,8 @@ fn rewrite_payload(
         .with_fields(budget.remaining_fields())
         .and_then(|field_bounded| field_bounded.with_rewrite_work(budget.remaining_work()))
         .map_err(map_wire_error)?;
-    let output = patch_nested_fields_batched_with_limits(source, &edit_fields, bounded)
-        .map_err(map_wire_error)?;
+    let output =
+        patch_nested_fields_batched(source, &edit_fields, bounded).map_err(map_wire_error)?;
     budget.charge_work(
         source
             .len()

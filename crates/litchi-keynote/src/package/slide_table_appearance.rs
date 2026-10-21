@@ -3402,7 +3402,7 @@ fn repeated_references(
     limits: WireLimits,
     budget: &mut AppearanceBudget,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let field_count = fields.fields().count();
     budget.fields(field_count)?;
     budget.work(payload.len())?;
@@ -3432,7 +3432,7 @@ fn repeated_references(
 }
 
 fn slide_name(payload: &[u8], limits: WireLimits) -> Result<Option<&str>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut name = None;
     for field in fields.fields().filter(|field| field.number() == 10) {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -3446,7 +3446,7 @@ fn slide_name(payload: &[u8], limits: WireLimits) -> Result<Option<&str>, Error>
 }
 
 fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_payload = None;
     for field in fields
         .fields()
@@ -3459,7 +3459,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
         super_payload = Some(field.payload());
     }
     let super_payload = super_payload.ok_or(Error::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let mut parent_payload = None;
     for field in drawable
         .fields()
@@ -3475,7 +3475,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
@@ -3954,7 +3954,7 @@ fn validate_stylesheet_registry(
     if snapshot.style_count() == 0 || snapshot.style_count() < style_ids.len() {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.allocations(1)?;
     budget.scratch(
         snapshot

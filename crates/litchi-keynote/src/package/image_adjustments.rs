@@ -1759,8 +1759,8 @@ fn visit_references_with_callback<F>(
 where
     F: FnMut(u64, &mut ImageBudget) -> Result<(), Error>,
 {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let count = fields
         .fields()
@@ -1777,7 +1777,7 @@ where
             return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
-        let nested = WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
+        let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
             .map_err(map_wire_error)?;
         budget.scan(field.payload(), nested.len(), 2)?;
         strict_reference_view(&nested)?;
@@ -1787,7 +1787,7 @@ where
         .fields()
         .filter(|field| field.number() == SLIDE_OWNED_DRAWABLES_FIELD)
     {
-        let nested = WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
+        let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
             .map_err(map_wire_error)?;
         callback(strict_reference_view(&nested)?, budget)?;
     }
@@ -1821,8 +1821,8 @@ fn strict_reference_view(fields: &WireView<'_>) -> Result<u64, Error> {
 }
 
 fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<(u64, bool), Error> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let mut parent = None;
     let mut seen_super = false;
@@ -1837,9 +1837,8 @@ fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<(u64, bool
                     return Err(Error::InvalidSource);
                 }
                 seen_super = true;
-                let nested =
-                    WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
-                        .map_err(map_wire_error)?;
+                let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
+                    .map_err(map_wire_error)?;
                 budget.scan(field.payload(), nested.len(), 2)?;
                 let mut found = None;
                 for inner in nested.fields() {
@@ -1891,8 +1890,8 @@ fn validate_image_parent(parent: u64, expected: u64) -> Result<(), Error> {
 }
 
 fn strict_reference_payload(payload: &[u8], budget: &mut ImageBudget) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 3)?;
     let mut identifier = None;
     for field in fields.fields() {

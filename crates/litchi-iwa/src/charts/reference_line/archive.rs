@@ -1075,7 +1075,7 @@ fn strict_optional_bool(data: &[u8], field_number: u32) -> Result<Option<bool>> 
 }
 
 fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let view = parse_wire_view(data)?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
@@ -1107,7 +1107,7 @@ fn strict_optional_varint(data: &[u8], field_number: u32) -> Result<Option<u64>>
 }
 
 fn strict_optional_message(data: &[u8], field_number: u32) -> Result<Option<&[u8]>> {
-    let view = parse_wire_view(data)?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);
@@ -1135,7 +1135,7 @@ fn read_custom_value(data: &[u8]) -> Result<Value> {
 }
 
 fn strict_optional_fixed64(data: &[u8], field_number: u32) -> Result<Option<u64>> {
-    let view = parse_wire_view(data)?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut matches = view.fields().filter(|field| field.number() == field_number);
     let Some(field) = matches.next() else {
         return Ok(None);

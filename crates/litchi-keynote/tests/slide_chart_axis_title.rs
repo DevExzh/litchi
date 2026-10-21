@@ -484,7 +484,7 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
 fn locked_or_unsupported_chart_graphs_are_rejected_for_mutation() -> TestResult<()> {
     let source = synthetic_metadata_package(false)?;
     let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&chart)?
+    let drawable = WireView::parse(&chart, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;

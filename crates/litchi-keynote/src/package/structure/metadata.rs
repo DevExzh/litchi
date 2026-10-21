@@ -9,7 +9,7 @@
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
-use litchi_iwa_common::wire::{WireField, parse_wire_fields_with_limits};
+use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 
 use super::StructureError;
 
@@ -241,7 +241,7 @@ impl Component {
             save_token: None,
             other: Vec::new(),
         };
-        for field in parse_wire_fields_with_limits(payload, limits)? {
+        for field in parse_wire_fields(payload, limits)? {
             match (field.number(), field.wire_type()) {
                 (COMPONENT_EXTERNAL_REFERENCES, LENGTH_DELIMITED) => {
                     let inner = field.payload(payload)?;
@@ -251,7 +251,7 @@ impl Component {
                         is_weak: None,
                     };
                     let mut has_component = false;
-                    for part in parse_wire_fields_with_limits(inner, limits)? {
+                    for part in parse_wire_fields(inner, limits)? {
                         match (part.number(), part.wire_type()) {
                             (1, VARINT) => {
                                 reference.component = varint(part, inner)?;
@@ -271,14 +271,14 @@ impl Component {
                     let inner = field.payload(payload)?;
                     let mut data = None;
                     let mut owners = Vec::new();
-                    for part in parse_wire_fields_with_limits(inner, limits)? {
+                    for part in parse_wire_fields(inner, limits)? {
                         match (part.number(), part.wire_type()) {
                             (1, VARINT) => data = Some(varint(part, inner)?),
                             (2, LENGTH_DELIMITED) => {
                                 let owner = part.payload(inner)?;
                                 let mut object = None;
                                 let mut count = None;
-                                for item in parse_wire_fields_with_limits(owner, limits)? {
+                                for item in parse_wire_fields(owner, limits)? {
                                     match (item.number(), item.wire_type()) {
                                         (1, VARINT) => object = Some(varint(item, owner)?),
                                         (2, VARINT) => {
@@ -313,7 +313,7 @@ impl Component {
                     let inner = field.payload(payload)?;
                     let mut object = None;
                     let mut uuid = None;
-                    for part in parse_wire_fields_with_limits(inner, limits)? {
+                    for part in parse_wire_fields(inner, limits)? {
                         match (part.number(), part.wire_type()) {
                             (1, VARINT) => object = Some(varint(part, inner)?),
                             (2, LENGTH_DELIMITED) => {
@@ -451,7 +451,7 @@ impl Registry {
         let mut entries = Vec::new();
         let mut last = None;
         let mut save_token = None;
-        for field in parse_wire_fields_with_limits(payload, limits)? {
+        for field in parse_wire_fields(payload, limits)? {
             let raw = field.raw(payload)?.to_vec();
             match (field.number(), field.wire_type()) {
                 (LAST_OBJECT_IDENTIFIER, VARINT) => {
@@ -578,13 +578,13 @@ impl Registry {
             if field_number(raw) != Some(DATAS) {
                 continue;
             }
-            let outer = parse_wire_fields_with_limits(raw, limits)?;
+            let outer = parse_wire_fields(raw, limits)?;
             let [field] = outer.as_slice() else {
                 return Err(StructureError::Registry("data info"));
             };
             let inner = field.payload(raw)?;
             let mut identifier = None;
-            for part in parse_wire_fields_with_limits(inner, limits)? {
+            for part in parse_wire_fields(inner, limits)? {
                 if part.number() == 1 && part.wire_type() == VARINT {
                     identifier = Some(varint(part, inner)?);
                 }
@@ -707,7 +707,7 @@ fn utf8(field: WireField, payload: &[u8]) -> Result<String, StructureError> {
 fn decode_uuid(payload: &[u8], limits: WireLimits) -> Result<Uuid, StructureError> {
     let mut lower = None;
     let mut upper = None;
-    for field in parse_wire_fields_with_limits(payload, limits)? {
+    for field in parse_wire_fields(payload, limits)? {
         match (field.number(), field.wire_type()) {
             (1, VARINT) => lower = Some(varint(field, payload)?),
             (2, VARINT) => upper = Some(varint(field, payload)?),
@@ -742,7 +742,7 @@ mod tests {
     }
 
     fn raw_components(payload: &[u8]) -> Vec<Vec<u8>> {
-        parse_wire_fields_with_limits(payload, limits())
+        parse_wire_fields(payload, limits())
             .expect("registry fields")
             .into_iter()
             .filter(|field| field.number() == COMPONENTS)

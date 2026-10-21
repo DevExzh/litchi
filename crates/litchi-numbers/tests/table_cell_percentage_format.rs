@@ -775,7 +775,12 @@ fn percentage_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"percentage extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"percentage extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -805,7 +810,7 @@ fn percentage_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -899,7 +904,12 @@ fn percentage_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() ->
     assert_rejected_or_owner(&rewrite_payload(&source, &duplicate)?)?;
 
     let mut wrong_wire = Vec::new();
-    append_length_delimited_field(&mut wrong_wire, 1, &[0x82, 0x02])?;
+    append_length_delimited_field(
+        &mut wrong_wire,
+        1,
+        &[0x82, 0x02],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut wrong_wire, 2, 2)?;
     append_varint_field(&mut wrong_wire, 4, 2)?;
     append_varint_field(&mut wrong_wire, 5, 1)?;

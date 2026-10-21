@@ -629,9 +629,14 @@ mod tests {
             &mut source,
             GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
             &title,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )
         .expect("title extension framing");
-        let view = litchi_iwa_common::wire::WireView::parse(&source).expect("title field");
+        let view = litchi_iwa_common::wire::WireView::parse(
+            &source,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("title field");
         let result = decode_title(view.fields().next().expect("title extension"), &mut budget);
         assert!(matches!(
             result,

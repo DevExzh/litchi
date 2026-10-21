@@ -178,7 +178,12 @@ fn bucket_payload(headers: &[(u32, f32)], unknown_header: bool) -> TestResult<Ve
     let mut payload = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut payload, 1, 1)?;
     for raw in raw_headers {
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 2, &raw)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            2,
+            &raw,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     litchi_iwa_common::wire::append_varint_field(
         &mut payload,
@@ -424,13 +429,18 @@ fn append_duplicate_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8
             .iter_mut()
             .find(|message| message.type_ == HEADER_BUCKET_MESSAGE_TYPE)
             .ok_or("missing bucket message")?;
-        let headers = WireView::parse(&message.data)?
+        let headers = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == 2)
             .map(|field| field.payload().to_vec())
             .next()
             .ok_or("missing header")?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut message.data, 2, &headers)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut message.data,
+            2,
+            &headers,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -638,7 +648,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .set(points(31.0)?)
         .commit()?;
     let after = bucket_bytes(&commit.package().exact_bytes(), ROW_BUCKET_IDENTIFIER)?;
-    let bucket_view = WireView::parse(&after)?;
+    let bucket_view = WireView::parse(&after, litchi_iwa_common::WireLimits::DEFAULT)?;
     let bucket_unknown = bucket_view
         .fields()
         .find(|field| field.number() == UNKNOWN_BUCKET_FIELD)
@@ -651,7 +661,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .fields()
         .find(|field| field.number() == 2)
         .ok_or("header was dropped")?;
-    let header_view = WireView::parse(header.payload())?;
+    let header_view = WireView::parse(header.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let header_unknown = header_view
         .fields()
         .find(|field| field.number() == UNKNOWN_HEADER_FIELD)

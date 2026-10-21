@@ -255,7 +255,7 @@ fn export_candidate(package: &Package, name: &str) -> TestResult {
 }
 
 fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<u8>> {
-    let root = WireView::parse(payload)?;
+    let root = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let comment = tsp::Reference {
         identifier: root_identifier,
         ..Default::default()
@@ -271,7 +271,7 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
         drawable_count = drawable_count
             .checked_add(1)
             .ok_or_else(|| io::Error::other("movie drawable count overflow"))?;
-        let drawable = WireView::parse(field.payload())?;
+        let drawable = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable = Vec::with_capacity(field.payload().len() + comment.len() + 8);
         if drawable.fields().any(|nested| nested.number() == 6) {
             return Err(io::Error::other("fixture movie already has a comment").into());
@@ -279,8 +279,18 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
         for nested in drawable.fields() {
             rewritten_drawable.extend_from_slice(nested.raw());
         }
-        append_length_delimited_field(&mut rewritten_drawable, 6, &comment)?;
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_drawable,
+            6,
+            &comment,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if drawable_count != 1 {
         return Err(io::Error::other("fixture movie must have one drawable").into());

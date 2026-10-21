@@ -881,7 +881,8 @@ pub(crate) fn preclassify_tile(
         .ok_or(TileError::InvalidSource)?;
     counters.record_scratch_allocation(retained_capacity)?;
 
-    let tile_view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let tile_view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut position_start = 0usize;
     let mut previous_row = None;
     let mut row_records = 0usize;
@@ -1577,7 +1578,8 @@ fn prepare_tile_internal<'source>(
     counters.report.wire_fields = u64_from_usize(codec_report.fields())?;
     counters.charge(u64_from_usize(codec_report.work_bytes())?)?;
 
-    let source_view = WireView::parse(request.source).map_err(|_| TileError::InvalidSource)?;
+    let source_view = WireView::parse(request.source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let row_capacity = usize::try_from(snapshot.num_rows())
         .map_err(|_| TileError::InvalidSource)?
         .min(request.limits.max_rows);
@@ -1988,7 +1990,8 @@ fn prepared_tile_output_len(
     if rows.is_empty() {
         return Ok(0);
     }
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut length = 0usize;
     for (field_index, field) in view.fields().enumerate() {
         counters.charge(u64_from_usize(binary_search_work(rows.len()))?)?;
@@ -2289,7 +2292,8 @@ fn merge_legacy_phase_reports(prepare: TileReport, execute: TileReport) -> Resul
 }
 
 fn tile_has_no_rows(source: &[u8]) -> Result<bool> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     for field in view.fields() {
         if field.number() == 5 {
             if field.wire_type() != 2 {
@@ -2818,7 +2822,8 @@ fn write_canonical_row_message(
 fn write_prepared_tile(plan: &PreparedTileRewrite<'_>, counters: &mut Counters) -> Result<Vec<u8>> {
     counters.charge(u64_from_usize(plan.output_len)?)?;
     let mut output = exact_scratch_vec::<u8>(plan.output_len, plan.output_len, counters)?;
-    let view = WireView::parse(plan.source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(plan.source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     for (field_index, field) in view.fields().enumerate() {
         // Materialized rows keep the tile's ascending row order: each goes
         // right before the first source row that follows it.
@@ -3397,7 +3402,8 @@ fn plan_row_message(
     previous_wide: Option<bool>,
     wide: bool,
 ) -> Result<RowMessageLayout> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     let mut count_present = false;
     let mut storage_present = false;
     let mut offsets_present = false;
@@ -3457,7 +3463,8 @@ fn write_row_message(
     layout: RowMessageLayout,
     counters: &mut Counters,
 ) -> Result<Vec<u8>> {
-    let view = WireView::parse(source).map_err(|_| TileError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| TileError::InvalidSource)?;
     counters.charge(u64_from_usize(layout.output_len)?)?;
     let mut output = Vec::new();
     counters.preflight_scratch_allocation(layout.output_len)?;
@@ -3986,7 +3993,7 @@ mod tests {
     }
 
     fn unknown_99(payload: &[u8]) -> Vec<u8> {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .expect("tile wire")
             .fields()
             .find(|field| field.number() == 99)

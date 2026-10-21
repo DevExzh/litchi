@@ -28,7 +28,7 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{
     ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
@@ -1018,7 +1018,7 @@ fn parse_wire<'a>(
     // Skip visits inspect this payload once without descending into opaque
     // length-delimited fields. Reserve that work before the preflight.
     budget.work(payload.len())?;
-    let report = preflight_wire_tree_with_limits(payload, limits, |_visit| Ok(WireDescent::Skip))
+    let report = preflight_wire_tree(payload, limits, |_visit| Ok(WireDescent::Skip))
         .map_err(|_| Error::InvalidSource)?;
     budget.fields(report.fields())?;
     budget.nesting(report.max_depth())?;
@@ -1033,7 +1033,7 @@ fn parse_wire<'a>(
     budget.scratch(field_storage)?;
     budget.fields(report.fields())?;
     budget.work(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     Ok(view)
 }
 

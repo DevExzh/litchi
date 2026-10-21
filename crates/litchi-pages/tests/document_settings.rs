@@ -568,13 +568,15 @@ fn object_location(package: &[u8], identifier: u64) -> TestResult<(String, Archi
 
 fn header_without_message_lengths(header: &[u8]) -> TestResult<Vec<Vec<u8>>> {
     let mut retained = Vec::new();
-    for field in WireView::parse(header)?.fields() {
+    for field in WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != 2 || field.wire_type() != 2 {
             retained.push(field.raw().to_vec());
             continue;
         }
         let mut message_info = vec![0x12];
-        for nested in WireView::parse(field.payload())?.fields() {
+        for nested in
+            WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?.fields()
+        {
             if nested.number() != 3 {
                 message_info.extend_from_slice(nested.raw());
             }
@@ -585,11 +587,13 @@ fn header_without_message_lengths(header: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn entry_names(package: &[u8]) -> TestResult<Vec<String>> {
@@ -984,7 +988,7 @@ fn root_reference_and_header_ownership_must_be_exact() -> TestResult {
         Ok(())
     })?;
     let duplicate = rewrite_document_payload(&bytes, |payload| {
-        let field = WireView::parse(payload)?
+        let field = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == 7)
             .ok_or_else(|| io::Error::other("missing settings field"))?
@@ -1195,7 +1199,7 @@ fn settings_payload_rejects_duplicate_wrong_wire_noncanonical_and_invalid_scalar
     let before = mixed_settings()?;
     let bytes = synthetic_package(before, true, false)?;
     let duplicate = rewrite_settings_payload(&bytes, SETTINGS_MEMBER, |payload| {
-        let raw = WireView::parse(payload)?
+        let raw = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == 1)
             .ok_or_else(|| io::Error::other("missing settings body field"))?
@@ -1205,7 +1209,12 @@ fn settings_payload_rejects_duplicate_wrong_wire_noncanonical_and_invalid_scalar
         Ok(())
     })?;
     let wrong_wire = rewrite_settings_payload(&bytes, SETTINGS_MEMBER, |payload| {
-        litchi_iwa_common::wire::append_length_delimited_field(payload, 3, b"false")?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            payload,
+            3,
+            b"false",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let invalid_bool = rewrite_settings_payload(&bytes, SETTINGS_MEMBER, |payload| {

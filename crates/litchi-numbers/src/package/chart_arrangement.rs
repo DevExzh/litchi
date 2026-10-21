@@ -23,9 +23,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{Entry, EntryEdit, OwnedExactArtifacts};
 use litchi_iwa_common::chart::arrangement::ChartArrangement;
-use litchi_iwa_common::wire::{
-    WireDescent, WirePreflight, WireView, preflight_wire_tree_with_limits,
-};
+use litchi_iwa_common::wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree};
 use litchi_iwa_common::{
     Error as CommonError, LimitKind as CommonLimitKind, WireLimits, decode_varint_from_bytes,
 };
@@ -1457,50 +1455,49 @@ fn sheet_drawable_identifiers(
 ) -> Result<Vec<u64>, Error> {
     let maximum = budget.max_references.saturating_sub(budget.references);
     let mut count = 0usize;
-    let preflight =
-        preflight_wire_tree_with_limits(source, budget.residual_wire_limits()?, |visit| {
-            let is_drawable = match message_type {
-                SHEET_MESSAGE_TYPE => {
-                    visit.path().is_empty() && visit.field().number() == SHEET_DRAWABLE_FIELD
-                },
-                FORM_BASED_SHEET_MESSAGE_TYPE => {
-                    visit.path() == [FORM_SHEET_SUPER_FIELD]
-                        && visit.field().number() == SHEET_DRAWABLE_FIELD
-                },
-                _ => {
-                    return Err(CommonError::InvalidFormat(
-                        "invalid Numbers sheet type".into(),
-                    ));
-                },
-            };
-            if is_drawable && visit.field().wire_type() != 2 {
+    let preflight = preflight_wire_tree(source, budget.residual_wire_limits()?, |visit| {
+        let is_drawable = match message_type {
+            SHEET_MESSAGE_TYPE => {
+                visit.path().is_empty() && visit.field().number() == SHEET_DRAWABLE_FIELD
+            },
+            FORM_BASED_SHEET_MESSAGE_TYPE => {
+                visit.path() == [FORM_SHEET_SUPER_FIELD]
+                    && visit.field().number() == SHEET_DRAWABLE_FIELD
+            },
+            _ => {
                 return Err(CommonError::InvalidFormat(
-                    "invalid Numbers drawable reference".into(),
+                    "invalid Numbers sheet type".into(),
                 ));
+            },
+        };
+        if is_drawable && visit.field().wire_type() != 2 {
+            return Err(CommonError::InvalidFormat(
+                "invalid Numbers drawable reference".into(),
+            ));
+        }
+        if is_drawable {
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| CommonError::InvalidFormat("drawable count overflow".into()))?;
+            if count > maximum {
+                return Err(CommonError::LimitExceeded {
+                    kind: CommonLimitKind::Fields,
+                    observed: count,
+                    limit: maximum,
+                });
             }
-            if is_drawable {
-                count = count
-                    .checked_add(1)
-                    .ok_or_else(|| CommonError::InvalidFormat("drawable count overflow".into()))?;
-                if count > maximum {
-                    return Err(CommonError::LimitExceeded {
-                        kind: CommonLimitKind::Fields,
-                        observed: count,
-                        limit: maximum,
-                    });
-                }
-            }
-            let descend = (message_type == FORM_BASED_SHEET_MESSAGE_TYPE
-                && visit.path().is_empty()
-                && visit.field().number() == FORM_SHEET_SUPER_FIELD)
-                || is_drawable;
-            Ok(if descend {
-                WireDescent::Descend
-            } else {
-                WireDescent::Skip
-            })
+        }
+        let descend = (message_type == FORM_BASED_SHEET_MESSAGE_TYPE
+            && visit.path().is_empty()
+            && visit.field().number() == FORM_SHEET_SUPER_FIELD)
+            || is_drawable;
+        Ok(if descend {
+            WireDescent::Descend
+        } else {
+            WireDescent::Skip
         })
-        .map_err(map_common_error)?;
+    })
+    .map_err(map_common_error)?;
     budget.preflight_scan(preflight)?;
     let identifier_bound = count
         .checked_mul(size_of::<u64>())
@@ -1708,11 +1705,10 @@ pub(super) fn parse_wire_view_with_budget<'source>(
     // span vector grows with fields, rather than with the size of an opaque
     // length-delimited payload. The preflight itself is allocation-free but
     // still belongs to the transaction's source/work ledger.
-    let preflight =
-        preflight_wire_tree_with_limits(payload, budget.residual_wire_limits()?, |_visit| {
-            Ok(WireDescent::Skip)
-        })
-        .map_err(map_common_error)?;
+    let preflight = preflight_wire_tree(payload, budget.residual_wire_limits()?, |_visit| {
+        Ok(WireDescent::Skip)
+    })
+    .map_err(map_common_error)?;
     budget.preflight_scan(preflight)?;
     let span_bytes = preflight
         .fields()
@@ -1725,8 +1721,8 @@ pub(super) fn parse_wire_view_with_budget<'source>(
     budget.preflight_allocations(span_allocations)?;
     budget.preflight_retained(span_bytes)?;
     budget.charge_preflight_scan(preflight)?;
-    let view = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_common_error)?;
+    let view =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_common_error)?;
     budget.allocations(span_allocations)?;
     budget.retained(span_bytes)?;
     budget.scan(payload, view.len(), depth)?;

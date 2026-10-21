@@ -17,7 +17,7 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement},
     varint::encoded_len,
-    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::image_adjustments_codec::{
@@ -230,7 +230,7 @@ fn preflight_sheet_drawables(
     budget: &ImageBudget,
 ) -> Result<SheetDrawablePreflight, Error> {
     let mut drawable_count = 0usize;
-    let report = preflight_wire_tree_with_limits(source, budget.residual_wire_limits()?, |visit| {
+    let report = preflight_wire_tree(source, budget.residual_wire_limits()?, |visit| {
         let is_drawable = match message_type {
             SHEET_MESSAGE_TYPE => visit.path().is_empty() && visit.field().number() == 2,
             FORM_BASED_SHEET_MESSAGE_TYPE => {
@@ -1479,8 +1479,8 @@ fn image_parent_metadata_is_owned(info: &litchi_iwa_core::MessageInfo, identifie
 }
 
 fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageMetadata, Error> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
     let mut parent = None;
     let mut data_identifier = None;
@@ -1494,9 +1494,8 @@ fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageMetad
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 seen_super = true;
-                let nested =
-                    WireView::parse_with_limits(field.payload(), budget.residual_wire_limits()?)
-                        .map_err(map_wire_error)?;
+                let nested = WireView::parse(field.payload(), budget.residual_wire_limits()?)
+                    .map_err(map_wire_error)?;
                 budget.scan(field.payload(), nested.len(), 2)?;
                 for inner in nested.fields() {
                     if inner.number() == DRAWABLE_PARENT_FIELD {
@@ -1542,8 +1541,8 @@ fn strict_reference_payload(
     budget: &mut ImageBudget,
     kind: ReferenceKind,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
-        .map_err(map_wire_error)?;
+    let fields =
+        WireView::parse(payload, budget.residual_wire_limits()?).map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 3)?;
     let mut identifier = None;
     let mut deprecated_type = None;

@@ -133,7 +133,12 @@ fn movie_payload(movie: usize) -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -177,7 +182,12 @@ fn audio_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = value;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -207,6 +217,7 @@ fn image_payload() -> TestResult<Vec<u8>> {
         &mut payload,
         UNKNOWN_FIELD,
         b"shared-poster-image-unknown-extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -243,7 +254,12 @@ fn metadata_component_payload(
     }
     .encode_to_vec();
     let mut payload = component;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, METADATA_UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -328,11 +344,21 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     // This keeps the fixture's component/data shape easy to inspect while
     // retaining a byte that changed writers must preserve.
     let mut payload = metadata.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, METADATA_UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // Keep the unrelated component in the same root payload after the typed
     // projection so selected-component ownership is tested against a second
     // locator and UUID namespace.
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 

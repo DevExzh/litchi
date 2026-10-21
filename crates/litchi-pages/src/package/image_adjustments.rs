@@ -561,8 +561,8 @@ impl ImageBudget {
     }
 
     fn parse<'a>(&mut self, payload: &'a [u8], depth: usize) -> Result<WireView<'a>, Error> {
-        let view = WireView::parse_with_limits(payload, self.residual_wire_limits()?)
-            .map_err(map_wire_error)?;
+        let view =
+            WireView::parse(payload, self.residual_wire_limits()?).map_err(map_wire_error)?;
         self.scan(payload, view.len(), depth)?;
         Ok(view)
     }
@@ -2565,7 +2565,7 @@ mod tests {
     #[test]
     fn wire_parse_accepts_inclusive_cost_and_rejects_each_one_under_limit() {
         let source = [0x08, 0x01, 0x10, 0x02];
-        let fields = WireView::parse(&source).unwrap().len();
+        let fields = WireView::parse(&source, WireLimits::DEFAULT).unwrap().len();
         let work = source.len().checked_add(fields).unwrap();
         let limits = WireLimits::default()
             .with_input_bytes(source.len())

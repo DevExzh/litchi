@@ -325,8 +325,7 @@ fn validate_data_metadata_map(
     budget.input_bytes(metadata_payload.len())?;
     budget.wire_work(metadata_payload.len())?;
     budget.wire_nesting(1)?;
-    let metadata =
-        WireView::parse_with_limits(metadata_payload, limits).map_err(|_| Error::InvalidSource)?;
+    let metadata = WireView::parse(metadata_payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(metadata.len())?;
     let mut map_identifier = None;
     for field in metadata.fields() {
@@ -498,8 +497,7 @@ fn parse_local_reference(
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
     budget.wire_nesting(1)?;
-    let reference =
-        WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let reference = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(reference.len())?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;

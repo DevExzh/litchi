@@ -102,6 +102,7 @@ fn append_unknown_scalar_fields(output: &mut Vec<u8>, varint_field: u32, value: 
         output,
         UNKNOWN_LENGTH_FIELD,
         UNKNOWN_LENGTH_VALUE,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(())
 }
@@ -423,7 +424,12 @@ fn model_payload(index: usize, name: &str, options: TableOptions) -> TestResult<
     if options.user_hidden {
         let mut owner_payload = owner.encode_to_vec();
         append_unknown_wire_fields(&mut owner_payload, UNKNOWN_OWNER_FIELD, UNKNOWN_OWNER_VALUE)?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 70, &owner_payload)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            70,
+            &owner_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     // Literal unknown model field: no focused codec can manufacture this
     // field, so source preservation is tested against an independent shape.
@@ -1009,7 +1015,7 @@ fn replace_length_field(
     field_number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -1018,6 +1024,7 @@ fn replace_length_field(
                 &mut output,
                 field_number,
                 replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             replaced = true;
         } else {
@@ -1031,7 +1038,7 @@ fn replace_length_field(
 }
 
 fn replace_raw_field(source: &[u8], field_number: u32, replacement: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -1259,14 +1266,19 @@ fn duplicate_uid_map_entry(package: &[u8], index: usize) -> TestResult<Vec<u8>> 
 
 fn duplicate_hidden_owner_field(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    let owner = WireView::parse(&payload)?
+    let owner = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 70)
         .ok_or("missing hidden-state owner")?
         .payload()
         .to_vec();
     let mut duplicate = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut duplicate, 70, &owner)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut duplicate,
+        70,
+        &owner,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_model_raw(package, index, &duplicate)
 }
 
@@ -1432,12 +1444,14 @@ fn info_payload(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn hidden_owner_payload_from_package(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    Ok(WireView::parse(&payload)?
-        .fields()
-        .find(|field| field.number() == 70)
-        .ok_or("missing hidden-state owner")?
-        .payload()
-        .to_vec())
+    Ok(
+        WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 70)
+            .ok_or("missing hidden-state owner")?
+            .payload()
+            .to_vec(),
+    )
 }
 
 // The fuzz input is a small descriptor.  It always builds and exercises a
@@ -2783,7 +2797,7 @@ fn assert_non_identity_uid_map(archive: &Archive, index: usize) {
 fn assert_uid_map_route(package: &[u8], index: usize) {
     let model = model_payload_from_package(package, index)
         .unwrap_or_else(|error| panic!("table {index} model payload is present: {error}"));
-    let model_fields = WireView::parse(&model)
+    let model_fields = WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("table {index} model wire is valid: {error}"))
         .fields()
         .filter(|field| field.number() == TABLE_MODEL_UID_MAP_FIELD)
@@ -2795,7 +2809,7 @@ fn assert_uid_map_route(package: &[u8], index: usize) {
 
     let info = info_payload(package, index)
         .unwrap_or_else(|error| panic!("table {index} info payload is present: {error}"));
-    let info_fields = WireView::parse(&info)
+    let info_fields = WireView::parse(&info, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("table {index} info wire is valid: {error}"))
         .fields()
         .filter(|field| field.number() == TABLE_INFO_VIEW_UIDS_FIELD)

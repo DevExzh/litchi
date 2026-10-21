@@ -221,15 +221,21 @@ impl WireLimits {
     }
 }
 
+impl WireLimits {
+    /// The default finite wire profile (record 0361: the limits a caller
+    /// passes when it selects none).
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: Self::MAX_INPUT_BYTES,
+        max_fields: 100_000,
+        max_output_bytes: Self::MAX_OUTPUT_BYTES,
+        max_nesting: Self::MAX_NESTING,
+        max_rewrite_work: Self::MAX_REWRITE_WORK,
+    };
+}
+
 impl Default for WireLimits {
     fn default() -> Self {
-        Self {
-            max_input_bytes: Self::MAX_INPUT_BYTES,
-            max_fields: 100_000,
-            max_output_bytes: Self::MAX_OUTPUT_BYTES,
-            max_nesting: Self::MAX_NESTING,
-            max_rewrite_work: Self::MAX_REWRITE_WORK,
-        }
+        Self::DEFAULT
     }
 }
 

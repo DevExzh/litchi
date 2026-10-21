@@ -8,12 +8,12 @@ fn rich_text_reference(identifier: u64) -> Vec<u8> {
 fn rich_text_payload(identifier: u64) -> Vec<u8> {
     let reference = rich_text_reference(identifier);
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &reference)
+    append_length_delimited_field(&mut payload, 1, &reference, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
     // CellID is a required message in the native schema.  An empty message is
     // the generated decoder's default and is sufficient for this envelope
     // projection: the extractor only needs to identify the storage edge.
-    append_length_delimited_field(&mut payload, 3, &[])
+    append_length_delimited_field(&mut payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     payload
 }
@@ -105,7 +105,7 @@ fn rich_text_projection_preserves_unknown_fields_and_matches_oracle() {
     // Unknown length-delimited bytes are intentionally opaque to this narrow
     // projection.  Include bytes which are not a valid nested protobuf so the
     // test proves the scanner does not recurse into unrelated fields.
-    append_length_delimited_field(&mut source, 100, &[0xff, 0x80, 0x00])
+    append_length_delimited_field(&mut source, 100, &[0xff, 0x80, 0x00], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("unknown field should encode: {error}"));
     append_varint_field(&mut source, 101, u64::MAX)
         .unwrap_or_else(|error| panic!("unknown scalar should encode: {error}"));
@@ -125,27 +125,27 @@ fn rich_text_projection_preserves_unknown_fields_and_matches_oracle() {
 fn rich_text_projection_rejects_missing_duplicate_and_wrong_wire_edges() {
     let reference = rich_text_reference(42);
     let mut missing_storage = Vec::new();
-    append_length_delimited_field(&mut missing_storage, 3, &[])
+    append_length_delimited_field(&mut missing_storage, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&missing_storage);
 
     let mut missing_cell = Vec::new();
-    append_length_delimited_field(&mut missing_cell, 1, &reference)
+    append_length_delimited_field(&mut missing_cell, 1, &reference, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
     assert_rich_text_payload_rejected(&missing_cell);
 
     let mut duplicate_storage = rich_text_payload(42);
-    append_length_delimited_field(&mut duplicate_storage, 1, &reference)
+    append_length_delimited_field(&mut duplicate_storage, 1, &reference, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("duplicate storage should encode: {error}"));
     assert_rich_text_payload_rejected(&duplicate_storage);
 
     let mut duplicate_cell = rich_text_payload(42);
-    append_length_delimited_field(&mut duplicate_cell, 3, &[])
+    append_length_delimited_field(&mut duplicate_cell, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("duplicate cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&duplicate_cell);
 
     let mut wrong_storage_wire = vec![0x08, 0x2a];
-    append_length_delimited_field(&mut wrong_storage_wire, 3, &[])
+    append_length_delimited_field(&mut wrong_storage_wire, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&wrong_storage_wire);
 
@@ -162,9 +162,9 @@ fn rich_text_projection_rejects_invalid_local_references() {
     append_varint_field(&mut zero, 1, 0)
         .unwrap_or_else(|error| panic!("zero reference should encode: {error}"));
     let mut zero_payload = Vec::new();
-    append_length_delimited_field(&mut zero_payload, 1, &zero)
+    append_length_delimited_field(&mut zero_payload, 1, &zero, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
-    append_length_delimited_field(&mut zero_payload, 3, &[])
+    append_length_delimited_field(&mut zero_payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&zero_payload);
 
@@ -172,9 +172,9 @@ fn rich_text_projection_rejects_invalid_local_references() {
     append_varint_field(&mut external, 3, 1)
         .unwrap_or_else(|error| panic!("external flag should encode: {error}"));
     let mut external_payload = Vec::new();
-    append_length_delimited_field(&mut external_payload, 1, &external)
+    append_length_delimited_field(&mut external_payload, 1, &external, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
-    append_length_delimited_field(&mut external_payload, 3, &[])
+    append_length_delimited_field(&mut external_payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&external_payload);
 
@@ -182,17 +182,17 @@ fn rich_text_projection_rejects_invalid_local_references() {
     append_varint_field(&mut duplicate_identifier, 1, 43)
         .unwrap_or_else(|error| panic!("duplicate identifier should encode: {error}"));
     let mut duplicate_payload = Vec::new();
-    append_length_delimited_field(&mut duplicate_payload, 1, &duplicate_identifier)
+    append_length_delimited_field(&mut duplicate_payload, 1, &duplicate_identifier, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
-    append_length_delimited_field(&mut duplicate_payload, 3, &[])
+    append_length_delimited_field(&mut duplicate_payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&duplicate_payload);
 
     let noncanonical_value = [0x08, 0x81, 0x00];
     let mut noncanonical_payload = Vec::new();
-    append_length_delimited_field(&mut noncanonical_payload, 1, &noncanonical_value)
+    append_length_delimited_field(&mut noncanonical_payload, 1, &noncanonical_value, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
-    append_length_delimited_field(&mut noncanonical_payload, 3, &[])
+    append_length_delimited_field(&mut noncanonical_payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&noncanonical_payload);
 }
@@ -206,14 +206,14 @@ fn rich_text_projection_rejects_noncanonical_selected_framing() {
     // otherwise valid.
     let mut noncanonical_key = vec![0x8a, 0x00, reference.len() as u8];
     noncanonical_key.extend_from_slice(&reference);
-    append_length_delimited_field(&mut noncanonical_key, 3, &[])
+    append_length_delimited_field(&mut noncanonical_key, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&noncanonical_key);
 
     // Field 1's length is encoded as the redundant two-byte varint 0x82 0x00.
     let mut noncanonical_length = vec![0x0a, 0x82, 0x00];
     noncanonical_length.extend_from_slice(&reference);
-    append_length_delimited_field(&mut noncanonical_length, 3, &[])
+    append_length_delimited_field(&mut noncanonical_length, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&noncanonical_length);
 
@@ -221,9 +221,9 @@ fn rich_text_projection_rejects_noncanonical_selected_framing() {
     // canonical.  Its key value is 0x08, redundantly encoded as 0x88 0x00.
     let noncanonical_nested_key = [0x88, 0x00, 0x2a];
     let mut nested_key_payload = Vec::new();
-    append_length_delimited_field(&mut nested_key_payload, 1, &noncanonical_nested_key)
+    append_length_delimited_field(&mut nested_key_payload, 1, &noncanonical_nested_key, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("storage reference should encode: {error}"));
-    append_length_delimited_field(&mut nested_key_payload, 3, &[])
+    append_length_delimited_field(&mut nested_key_payload, 3, &[], litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("cell owner should encode: {error}"));
     assert_rich_text_payload_rejected(&nested_key_payload);
 }
@@ -246,7 +246,7 @@ fn rich_text_projection_rejects_truncated_and_unbalanced_wire() {
 fn rich_text_projection_reports_unknown_field_work_without_descending() {
     let opaque = vec![0xff; 4_096];
     let mut source = rich_text_payload(99);
-    append_length_delimited_field(&mut source, 127, &opaque)
+    append_length_delimited_field(&mut source, 127, &opaque, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("opaque unknown field should encode: {error}"));
 
     let (storage, report) = super::preflight_rich_text_payload(&source)
@@ -306,7 +306,7 @@ fn rich_text_projection_failure_is_atomic_and_source_is_unchanged() {
     let mut malformed = source.clone();
     // A duplicate selected field appears after a complete valid prefix.  The
     // projection must not publish the prefix's storage identifier or report.
-    append_length_delimited_field(&mut malformed, 1, &rich_text_reference(43))
+    append_length_delimited_field(&mut malformed, 1, &rich_text_reference(43), litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap_or_else(|error| panic!("duplicate storage should encode: {error}"));
     let before = malformed.clone();
     assert_rich_text_payload_rejected(&malformed);

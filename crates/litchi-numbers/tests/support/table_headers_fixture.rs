@@ -110,11 +110,13 @@ pub(crate) fn synthetic_package() -> FixtureResult<Vec<u8>> {
         &mut table_info_payload,
         1,
         &tsd::DrawableArchive::default().encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut table_info_payload,
         2,
         &reference(TABLE_MODEL).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let mut table_info = object(TABLE_INFO, TABLE_INFO_MESSAGE_TYPE, table_info_payload)?;
     table_info.archive_info.message_infos[0].object_references = vec![TABLE_MODEL];
@@ -185,6 +187,7 @@ pub(crate) fn append_reference_field(
         &mut data,
         field_number,
         &reference(identifier).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     object.replace_message_preserving_header(
         message_index,

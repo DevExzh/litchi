@@ -1470,7 +1470,7 @@ const ANNOTATION_AUTHOR_MESSAGE_KIND: u32 = 212;
 fn preflight_rich_text_payload(
     source: &[u8],
 ) -> Result<(u64, litchi_iwa_common::wire::WirePreflight), Error> {
-    use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree_with_limits};
+    use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 
     let limits = litchi_iwa_common::WireLimits::default()
         .with_input_bytes(
@@ -1489,7 +1489,7 @@ fn preflight_rich_text_payload(
         .map_err(|_| Error::InvalidSource)?;
     let mut storage = None;
     let mut has_cell_owner = false;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {
@@ -1525,9 +1525,10 @@ fn preflight_rich_text_payload(
 fn parse_local_reference(source: &[u8]) -> Result<u64, litchi_iwa_common::Error> {
     use litchi_iwa_common::decode_varint_from_bytes;
     let mut identifier = None;
-    for field in litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?
-        .fields()
+    for field in
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?
+            .fields()
     {
         if field.number() != 1 || field.wire_type() != 0 || identifier.is_some() {
             return Err(litchi_iwa_common::Error::InvalidFormat(

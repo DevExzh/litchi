@@ -6,9 +6,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::{SourceCatalog, package::Entry};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::SnappyStream;
 use litchi_iwa_protos::pages_section_codec::{
@@ -414,9 +412,8 @@ fn rewrite_payload(
         ),
     ];
     let path = Path::Package;
-    let rewritten =
-        patch_nested_fields_batched_with_limits(source, &edits, transaction::wire_limits(package)?)
-            .map_err(transaction::map_wire_error)?;
+    let rewritten = patch_nested_fields_batched(source, &edits, transaction::wire_limits(package)?)
+        .map_err(transaction::map_wire_error)?;
     budget.charge_work(
         source
             .len()
@@ -541,7 +538,7 @@ fn required_reference(
     budget: &mut transaction::TransactionBudget,
 ) -> Result<u64, Error> {
     let path = Path::section(position);
-    let view = WireView::parse_with_limits(payload, transaction::wire_limits(package)?)
+    let view = WireView::parse(payload, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     budget.charge_work(payload.len(), path)?;
@@ -579,7 +576,7 @@ fn validate_template(
         transaction::unique_message(object, transaction::TEMPLATE_MESSAGE_TYPE, path)?;
     transaction::validate_selected_metadata(object, message_index, path)?;
     budget.charge_work(message.data.len(), path)?;
-    let view = WireView::parse_with_limits(&message.data, transaction::wire_limits(package)?)
+    let view = WireView::parse(&message.data, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     // Template drawables and UUID paths remain preservation-only. The native
@@ -741,7 +738,7 @@ fn validate_storage(
         return Err(Error::InvalidSource { path });
     }
     transaction::validate_selected_metadata(object, message_index, path)?;
-    let view = WireView::parse_with_limits(&message.data, transaction::wire_limits(package)?)
+    let view = WireView::parse(&message.data, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     budget.charge_fields(view.len(), path)?;
     budget.charge_work(message.data.len(), path)?;
@@ -1112,7 +1109,7 @@ fn normalized_message_length(
     target_index: usize,
     package: &Package,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(header, transaction::wire_limits(package)?)
+    let view = WireView::parse(header, transaction::wire_limits(package)?)
         .map_err(transaction::map_wire_error)?;
     let reserve = header.len().saturating_add(48);
     let mut output = Vec::new();
@@ -1132,9 +1129,8 @@ fn normalized_message_length(
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message =
-            WireView::parse_with_limits(field.payload(), transaction::wire_limits(package)?)
-                .map_err(transaction::map_wire_error)?;
+        let message = WireView::parse(field.payload(), transaction::wire_limits(package)?)
+            .map_err(transaction::map_wire_error)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -1168,9 +1164,8 @@ fn unchanged_section_fields_preserved(
     additionally_ignored_field: Option<u32>,
 ) -> Result<bool, Error> {
     let limits = transaction::wire_limits(package)?;
-    let left = WireView::parse_with_limits(source, limits).map_err(transaction::map_wire_error)?;
-    let right =
-        WireView::parse_with_limits(candidate, limits).map_err(transaction::map_wire_error)?;
+    let left = WireView::parse(source, limits).map_err(transaction::map_wire_error)?;
+    let right = WireView::parse(candidate, limits).map_err(transaction::map_wire_error)?;
     let mut left_fields = left.fields().filter(|field| {
         Some(field.number()) != additionally_ignored_field
             && !owned_field_changed(field.number(), before, after)

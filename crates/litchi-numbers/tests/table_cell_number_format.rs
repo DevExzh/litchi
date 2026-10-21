@@ -100,12 +100,12 @@ fn format_next_list_id(source: &[u8]) -> TestResult<u32> {
 
 fn first_format_payload(source: &[u8]) -> TestResult<Vec<u8>> {
     let payload = read_format_list(source)?;
-    let list = WireView::parse(&payload)?;
+    let list = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let entry = list
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("format entry field is missing"))?;
-    let entry = WireView::parse(entry.payload())?;
+    let entry = WireView::parse(entry.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     entry
         .fields()
         .find(|field| field.number() == 6)
@@ -114,7 +114,7 @@ fn first_format_payload(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn unknown_field_record(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
-    WireView::parse(source)?
+    WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .map(|field| field.raw().to_vec())
@@ -151,7 +151,7 @@ fn rewrite_first_format_varint_payload(
     field_number: u32,
     value: u64,
 ) -> TestResult<Vec<u8>> {
-    let list = WireView::parse(source)?;
+    let list = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len());
     let mut replaced = false;
     for field in list.fields() {
@@ -159,7 +159,7 @@ fn rewrite_first_format_varint_payload(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut entry = Vec::with_capacity(field.payload().len());
         let mut format_replaced = false;
         for entry_field in entry_view.fields() {
@@ -173,13 +173,23 @@ fn rewrite_first_format_varint_payload(
                 true,
                 Some(value),
             )?;
-            append_length_delimited_field(&mut entry, 6, &format)?;
+            append_length_delimited_field(
+                &mut entry,
+                6,
+                &format,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             format_replaced = true;
         }
         if !format_replaced {
             return Err(io::Error::other("format payload field is missing").into());
         }
-        append_length_delimited_field(&mut output, 3, &entry)?;
+        append_length_delimited_field(
+            &mut output,
+            3,
+            &entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         replaced = true;
     }
     if !replaced {
@@ -864,7 +874,7 @@ fn unknown_table_data_list_wire_survives_an_admitted_rewrite() -> TestResult {
         .package()
         .exact_bytes();
     let payload = read_format_list(&target)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(view.fields().any(|field| field.number() == 90));
     assert!(view.fields().any(|field| field.number() == 94));
     assert_exact_locality(&source, &target)?;

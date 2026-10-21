@@ -896,7 +896,7 @@ pub(super) fn resolve_target(
 }
 
 fn message_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    WireView::parse_with_limits(payload, limits)
+    WireView::parse(payload, limits)
         .map(|view| view.len())
         .map_err(map_wire_error)
 }
@@ -1284,7 +1284,7 @@ pub(super) fn strict_reference(
     limits: WireLimits,
     path: Path,
 ) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut type_seen = false;
     let mut external_seen = false;

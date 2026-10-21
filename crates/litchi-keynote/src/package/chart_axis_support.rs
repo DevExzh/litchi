@@ -22,7 +22,7 @@ use litchi_iwa_archive::{SourceCatalog, package::Entry};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireField, WireView, parse_wire_fields_with_limits},
+    wire::{WireField, WireView, parse_wire_fields},
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
@@ -515,7 +515,7 @@ pub(super) fn repeated_references(
     // decoded field scan below. This keeps repeated-reference parsing on the
     // same ledger as `accounted_wire_fields`.
     budget.charge_wire_vector(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(fields.len())?;
     let mut references = Vec::new();
     budget.charge_reference_vector(fields.len())?;
@@ -544,7 +544,7 @@ pub(super) fn accounted_wire_fields(
     budget: &mut dyn AxisSupportBudget,
 ) -> Result<Vec<WireField>, AxisSupportError> {
     budget.charge_wire_vector(payload.len())?;
-    let fields = parse_wire_fields_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(fields.len())?;
     Ok(fields)
 }
@@ -633,7 +633,7 @@ pub(super) fn validate_unlocked_drawable(
     budget: &mut dyn AxisSupportBudget,
 ) -> Result<(), AxisSupportError> {
     budget.charge_wire_vector(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(view.len())?;
     let mut locked = None;
     for field in view
@@ -2112,9 +2112,8 @@ fn compare_archive_info_headers<B: LocalityBudget + ?Sized>(
 ) -> Result<(), AxisSupportError> {
     budget.charge_wire_vector(source.len())?;
     budget.charge_wire_vector(candidate.len())?;
-    let source_fields = parse_wire_fields_with_limits(source, limits).map_err(map_wire_error)?;
-    let candidate_fields =
-        parse_wire_fields_with_limits(candidate, limits).map_err(map_wire_error)?;
+    let source_fields = parse_wire_fields(source, limits).map_err(map_wire_error)?;
+    let candidate_fields = parse_wire_fields(candidate, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(source_fields.len())?;
     budget.finish_wire_scan(candidate_fields.len())?;
     if source_fields.len() != candidate_fields.len() {
@@ -2187,10 +2186,8 @@ fn compare_selected_message_info<B: LocalityBudget + ?Sized>(
     )?;
     budget.charge_wire_vector(source_payload.len())?;
     budget.charge_wire_vector(candidate_payload.len())?;
-    let source_fields =
-        parse_wire_fields_with_limits(source_payload, limits).map_err(map_wire_error)?;
-    let candidate_fields =
-        parse_wire_fields_with_limits(candidate_payload, limits).map_err(map_wire_error)?;
+    let source_fields = parse_wire_fields(source_payload, limits).map_err(map_wire_error)?;
+    let candidate_fields = parse_wire_fields(candidate_payload, limits).map_err(map_wire_error)?;
     budget.finish_wire_scan(source_fields.len())?;
     budget.finish_wire_scan(candidate_fields.len())?;
     if source_fields.len() != candidate_fields.len() {
@@ -2613,7 +2610,7 @@ mod tests {
     }
 
     fn put_bytes(output: &mut Vec<u8>, field: u32, value: &[u8]) {
-        append_length_delimited_field(output, field, value)
+        append_length_delimited_field(output, field, value, litchi_iwa_common::WireLimits::DEFAULT)
             .expect("test bytes field fits wire limits");
     }
 

@@ -30,7 +30,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireView, append_length_delimited_field_with_limits, append_varint_field},
+    wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -1716,9 +1716,9 @@ fn chart_caption_reference(package: &Package, payload: &[u8]) -> Result<Option<u
         return Err(Error::InvalidSource);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let reference = unique_payload_field(&drawable, 11)?.ok_or(Error::InvalidSource)?;
     let projected = super::validate_reference_payload(reference, limits, "Keynote chart caption")
         .map_err(map_wire_error)?;
@@ -2822,8 +2822,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let document_view =
-        WireView::parse_with_limits(document_payload, limits).map_err(map_wire_error)?;
+    let document_view = WireView::parse(document_payload, limits).map_err(map_wire_error)?;
     let show_payload = unique_payload_field(&document_view, 2)?.ok_or(Error::InvalidSource)?;
     let show_identifier = reference_identifier(show_payload, limits)?;
     let show = package
@@ -2838,7 +2837,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let show_view = WireView::parse_with_limits(show_payload, limits).map_err(map_wire_error)?;
+    let show_view = WireView::parse(show_payload, limits).map_err(map_wire_error)?;
     let theme_identifier = reference_identifier(
         unique_payload_field(&show_view, 2)?.ok_or(Error::InvalidSource)?,
         limits,
@@ -2859,16 +2858,14 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let theme_view = WireView::parse_with_limits(theme_payload, limits).map_err(map_wire_error)?;
+    let theme_view = WireView::parse(theme_payload, limits).map_err(map_wire_error)?;
     let theme_super = unique_payload_field(&theme_view, 1)?.ok_or(Error::InvalidSource)?;
-    let theme_super_view =
-        WireView::parse_with_limits(theme_super, limits).map_err(map_wire_error)?;
+    let theme_super_view = WireView::parse(theme_super, limits).map_err(map_wire_error)?;
     let presets = unique_payload_field(&theme_super_view, 210)?.ok_or(Error::InvalidSource)?;
-    let presets_view = WireView::parse_with_limits(presets, limits).map_err(map_wire_error)?;
+    let presets_view = WireView::parse(presets, limits).map_err(map_wire_error)?;
     let paragraph_style = first_reference_identifier(&presets_view, 1, limits)?;
     let document_super = unique_payload_field(&document_view, 3)?.ok_or(Error::InvalidSource)?;
-    let document_super_view =
-        WireView::parse_with_limits(document_super, limits).map_err(map_wire_error)?;
+    let document_super_view = WireView::parse(document_super, limits).map_err(map_wire_error)?;
     let language = match unique_payload_field(&document_super_view, 3)? {
         Some(bytes) => Some(
             std::str::from_utf8(bytes)
@@ -2885,7 +2882,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
 }
 
 fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 1) {
         if selected.is_some() || field.wire_type() != 0 {
@@ -2930,13 +2927,13 @@ fn caption_drawable_width(package: &Package, drawable_identifier: u64) -> Result
         .object(drawable_identifier)
         .ok_or(Error::InvalidSource)?;
     let payload = &object.messages.first().ok_or(Error::InvalidSource)?.data;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let drawable = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable_view = WireView::parse_with_limits(drawable, limits).map_err(map_wire_error)?;
+    let drawable_view = WireView::parse(drawable, limits).map_err(map_wire_error)?;
     let geometry = unique_payload_field(&drawable_view, 1)?.ok_or(Error::InvalidSource)?;
-    let geometry_view = WireView::parse_with_limits(geometry, limits).map_err(map_wire_error)?;
+    let geometry_view = WireView::parse(geometry, limits).map_err(map_wire_error)?;
     let size = unique_payload_field(&geometry_view, 2)?.ok_or(Error::InvalidSource)?;
-    let size_view = WireView::parse_with_limits(size, limits).map_err(map_wire_error)?;
+    let size_view = WireView::parse(size, limits).map_err(map_wire_error)?;
     let mut width = None;
     for field in size_view.fields().filter(|field| field.number() == 1) {
         if width.is_some() || field.wire_type() != 5 {
@@ -3122,12 +3119,10 @@ fn patch_caption_edge(
             )?;
             let input_bytes = payload.len();
             let output_bytes = rewritten.len();
-            let source_view =
-                WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
-            let output_view =
-                WireView::parse_with_limits(&rewritten, limits).map_err(map_wire_error)?;
+            let source_view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
+            let output_view = WireView::parse(&rewritten, limits).map_err(map_wire_error)?;
             let source_fields = source_view.fields().count()
-                + WireView::parse_with_limits(
+                + WireView::parse(
                     unique_payload_field(&source_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
@@ -3135,7 +3130,7 @@ fn patch_caption_edge(
                 .fields()
                 .count();
             let output_fields = output_view.fields().count()
-                + WireView::parse_with_limits(
+                + WireView::parse(
                     unique_payload_field(&output_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
@@ -3252,9 +3247,9 @@ fn insert_movie_caption_edge(
     if replacement_identifier == 0 {
         return Err(Error::InvalidSource);
     }
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let edge_field = match edge_kind {
         CaptionEdgeKind::Movie => 11,
         CaptionEdgeKind::MovieTitle => 10,
@@ -3286,13 +3281,8 @@ fn insert_movie_caption_edge(
         field.validate_canonical_framing().map_err(map_wire_error)?;
         drawable_output.extend_from_slice(field.raw());
     }
-    append_length_delimited_field_with_limits(
-        &mut drawable_output,
-        edge_field,
-        &reference_payload,
-        limits,
-    )
-    .map_err(map_wire_error)?;
+    append_length_delimited_field(&mut drawable_output, edge_field, &reference_payload, limits)
+        .map_err(map_wire_error)?;
 
     budget.charge_allocation(1, 0)?;
     let mut output = Vec::new();
@@ -3305,7 +3295,7 @@ fn insert_movie_caption_edge(
         field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.number() == 1 {
-            append_length_delimited_field_with_limits(&mut output, 1, &drawable_output, limits)
+            append_length_delimited_field(&mut output, 1, &drawable_output, limits)
                 .map_err(map_wire_error)?;
         } else {
             output.extend_from_slice(field.raw());

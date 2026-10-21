@@ -488,7 +488,7 @@ fn section_entries(payload: &[u8]) -> FaultResult<Vec<(u64, u64, Vec<u8>)>> {
 
 /// The body payload with its section table holding exactly `entries`.
 fn with_section_entries(payload: &[u8], entries: &[Vec<u8>]) -> FaultResult<Vec<u8>> {
-    let present = parse_wire_view(payload)
+    let present = parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT)
         .map_err(|error| map_wire(&error))?
         .fields()
         .any(|field| field.number() == SECTION_TABLE_FIELD);
@@ -501,8 +501,13 @@ fn with_section_entries(payload: &[u8], entries: &[Vec<u8>]) -> FaultResult<Vec<
     }
     let mut table = Vec::new();
     for entry in entries {
-        append_length_delimited_field(&mut table, TABLE_ENTRY_FIELD, entry)
-            .map_err(|error| map_wire(&error))?;
+        append_length_delimited_field(
+            &mut table,
+            TABLE_ENTRY_FIELD,
+            entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|error| map_wire(&error))?;
     }
     patch_length_delimited_field(payload, SECTION_TABLE_FIELD, false, Some(&table))
         .map_err(|error| map_wire(&error))
@@ -513,8 +518,13 @@ fn section_entry(boundary: u64, section: u64) -> FaultResult<Vec<u8>> {
     let mut entry = Vec::new();
     append_varint_field(&mut entry, ENTRY_INDEX_FIELD, boundary)
         .map_err(|error| map_wire(&error))?;
-    append_length_delimited_field(&mut entry, ENTRY_OBJECT_FIELD, &reference_payload(section)?)
-        .map_err(|error| map_wire(&error))?;
+    append_length_delimited_field(
+        &mut entry,
+        ENTRY_OBJECT_FIELD,
+        &reference_payload(section)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|error| map_wire(&error))?;
     Ok(entry)
 }
 
@@ -684,7 +694,7 @@ fn add_section(
                 for path in SECTION_REFERENCE_PATHS {
                     data = remap_at(&data, path, &remap)?;
                 }
-                let present = parse_wire_view(&data)
+                let present = parse_wire_view(&data, litchi_iwa_common::WireLimits::DEFAULT)
                     .map_err(|error| map_wire(&error))?
                     .fields()
                     .any(|field| field.number() == SECTION_NAME_FIELD);
@@ -711,7 +721,7 @@ fn add_section(
                         .map_err(|error| map_wire(&error))?;
                 let mut replacements = Vec::new();
                 if let Some(entry) = entries.first() {
-                    let present = parse_wire_view(entry)
+                    let present = parse_wire_view(entry, litchi_iwa_common::WireLimits::DEFAULT)
                         .map_err(|error| map_wire(&error))?
                         .fields()
                         .any(|field| field.number() == GUIDE_ENTRY_PAGE_FIELD);

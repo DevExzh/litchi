@@ -173,7 +173,7 @@ fn info_at_location(
 /// malformed singular/count encodings that Prost's generated value decoder
 /// would otherwise normalize while materializing the entire graph.
 fn strict_conditional_style_rule_count(source: &[u8]) -> Result<u32> {
-    let view = parse_wire_view(source)?;
+    let view = parse_wire_view(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut fields = view
         .fields()
         .filter(|field| field.number() == CONDITIONAL_STYLE_RULE_COUNT_FIELD);

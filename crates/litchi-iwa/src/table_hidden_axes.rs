@@ -326,7 +326,10 @@ fn decode_table_info_candidate(message: &RawMessage) -> Result<Option<tst::Table
     }
 
     let compatibility = if message.type_ == TABLE_INFO_LEGACY_MESSAGE_TYPE {
-        let view = match parse_wire_view(message.data.as_slice()) {
+        let view = match parse_wire_view(
+            message.data.as_slice(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        ) {
             Ok(view) => view,
             Err(_) => return Ok(None),
         };

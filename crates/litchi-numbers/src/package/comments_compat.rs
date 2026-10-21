@@ -18,7 +18,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::LimitKind as ArchiveLimitKind;
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireDescent, preflight_wire_tree_with_limits},
+    wire::{WireDescent, preflight_wire_tree},
 };
 use litchi_iwa_core::{LimitKind as CoreLimitKind, RawMessage};
 use litchi_iwa_protos::table_info_codec;
@@ -311,7 +311,7 @@ fn visit_drawable_payloads(
     let limits = drawable_wire_limits(source, message_type)?;
     let mut form_super_seen = false;
     let mut callback_error = None;
-    let preflight = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let preflight = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         let is_form_super = message_type == FORM_BASED_SHEET_MESSAGE_TYPE
             && visit.path().is_empty()

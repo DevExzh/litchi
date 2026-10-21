@@ -25,7 +25,7 @@ use litchi_iwa_common::chart::arrangement::ChartArrangement;
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
@@ -683,11 +683,10 @@ impl ArrangementBudget {
                 maximum: self.max_nesting as u64,
             });
         }
-        let preflight =
-            preflight_wire_tree_with_limits(source, self.residual_wire_limits()?, |_| {
-                Ok(WireDescent::Skip)
-            })
-            .map_err(map_wire_error)?;
+        let preflight = preflight_wire_tree(source, self.residual_wire_limits()?, |_| {
+            Ok(WireDescent::Skip)
+        })
+        .map_err(map_wire_error)?;
         self.input(preflight.scanned_bytes())?;
         self.work(preflight.scanned_bytes())?;
         self.fields(preflight.fields())?;
@@ -700,8 +699,7 @@ impl ArrangementBudget {
         let span_allocations = preflight.fields();
         self.preflight_allocations(span_allocations)?;
         self.preflight_retained(span_bytes)?;
-        let view = WireView::parse_with_limits(source, self.residual_wire_limits()?)
-            .map_err(map_wire_error)?;
+        let view = WireView::parse(source, self.residual_wire_limits()?).map_err(map_wire_error)?;
         self.allocations(span_allocations)?;
         self.retained(span_bytes)?;
         self.input(source.len())?;
@@ -1452,7 +1450,7 @@ fn root_projection_options(
     // Selected descent is one level, requiring one small path vector.
     budget.allocations(1)?;
     budget.retained(size_of::<[u32; 4]>())?;
-    let report = preflight_wire_tree_with_limits(source, budget.residual_wire_limits()?, |visit| {
+    let report = preflight_wire_tree(source, budget.residual_wire_limits()?, |visit| {
         let selected = visit.path().is_empty()
             && if body_only {
                 matches!(visit.field().number(), 4 | 5)

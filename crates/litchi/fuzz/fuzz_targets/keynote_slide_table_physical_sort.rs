@@ -613,7 +613,12 @@ fn synthetic_tile_payload_for(
     .encode_to_vec();
     if matches!(variant, Some(SyntheticVariant::UnknownMutableRoot)) {
         append_varint_field(&mut payload, 99, 0x0bad_cafe)?;
-        append_length_delimited_field(&mut payload, 100, SYNTHETIC_TILE_UNKNOWN_MARKER)?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            SYNTHETIC_TILE_UNKNOWN_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -645,7 +650,12 @@ fn synthetic_row_header_payload(
     .encode_to_vec();
     if matches!(variant, Some(SyntheticVariant::UnknownMutableHeaderRoot)) {
         append_varint_field(&mut payload, 99, 0x0bad_fade)?;
-        append_length_delimited_field(&mut payload, 100, SYNTHETIC_HEADER_UNKNOWN_MARKER)?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            SYNTHETIC_HEADER_UNKNOWN_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -758,10 +768,20 @@ fn synthetic_table_model(
     .encode_to_vec();
     if with_unknowns {
         append_varint_field(&mut payload, 99, 0xfeed_beef)?;
-        append_length_delimited_field(&mut payload, 100, b"physical-sort-unknown")?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            b"physical-sort-unknown",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if let Some(field) = variant.and_then(SyntheticVariant::model_field) {
-        append_length_delimited_field(&mut payload, field, SYNTHETIC_MODEL_FIELD_INVALID_PAYLOAD)?;
+        append_length_delimited_field(
+            &mut payload,
+            field,
+            SYNTHETIC_MODEL_FIELD_INVALID_PAYLOAD,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -1326,8 +1346,11 @@ fn assert_synthetic_variant_shape(package: &[u8], variant: SyntheticVariant) {
                 .iter()
                 .find(|message| message.type_ == SYNTHETIC_TABLE_MODEL_MESSAGE_TYPE)
                 .unwrap_or_else(|| panic!("synthetic {variant:?} model message is missing"));
-            let fields = WireView::parse(model_message.data.as_slice())
-                .unwrap_or_else(|error| panic!("synthetic {variant:?} model wire failed: {error}"));
+            let fields = WireView::parse(
+                model_message.data.as_slice(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .unwrap_or_else(|error| panic!("synthetic {variant:?} model wire failed: {error}"));
             assert!(
                 fields.fields().any(|field| {
                     field.number() == model_field

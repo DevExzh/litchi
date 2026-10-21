@@ -1,5 +1,5 @@
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
-use litchi_iwa_common::{WireLimits, wire::parse_wire_fields_with_limits};
+use litchi_iwa_common::{WireLimits, wire::parse_wire_fields};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::numbers_sheet_order_codec::ReferenceSnapshot;
 
@@ -309,7 +309,7 @@ fn reorder_raw_records(
     destination_position: usize,
 ) -> Result<RawReorder, Error> {
     let limits = wire_limits(source.len())?;
-    let fields = parse_wire_fields_with_limits(source, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(source, limits).map_err(map_wire_error)?;
     let selected_count = fields
         .iter()
         .filter(|field| field.number() == field_number)
@@ -916,10 +916,10 @@ fn raw_records_reordered_exact(
     {
         return Ok(false);
     }
-    let source_fields = parse_wire_fields_with_limits(source, wire_limits(source.len())?)
-        .map_err(map_wire_error)?;
-    let candidate_fields = parse_wire_fields_with_limits(candidate, wire_limits(candidate.len())?)
-        .map_err(map_wire_error)?;
+    let source_fields =
+        parse_wire_fields(source, wire_limits(source.len())?).map_err(map_wire_error)?;
+    let candidate_fields =
+        parse_wire_fields(candidate, wire_limits(candidate.len())?).map_err(map_wire_error)?;
     if source_fields.len() != candidate_fields.len() {
         return Ok(false);
     }
@@ -1342,9 +1342,15 @@ mod tests {
                 &mut payload,
                 1,
                 &reference(*identifier).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
-        append_length_delimited_field(&mut payload, 5, &reference(SIDEBAR).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            5,
+            &reference(SIDEBAR).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let options = numbers_sheet_order_codec::DecodeOptions::new(
             payload.len(),
             payload.len().saturating_mul(2),

@@ -106,7 +106,11 @@ fn exercise_source(source: &[u8]) {
     exercise_archive(source);
     assert_eq!(source, before.as_slice(), "Custom probes modified source");
     exercise_list(source);
-    assert_eq!(source, before.as_slice(), "Custom list probe modified source");
+    assert_eq!(
+        source,
+        before.as_slice(),
+        "Custom list probe modified source"
+    );
 }
 
 fn exercise_archive(source: &[u8]) {
@@ -135,9 +139,9 @@ fn exercise_archive(source: &[u8]) {
             right.resource_limit(),
             "Custom archive scalar/report errors disagree"
         ),
-        (left, right) => panic!(
-            "Custom archive scalar/report disagreement: scalar={left:?}, report={right:?}"
-        ),
+        (left, right) => {
+            panic!("Custom archive scalar/report disagreement: scalar={left:?}, report={right:?}")
+        },
     }
 }
 
@@ -204,9 +208,9 @@ fn exercise_list(source: &[u8]) {
             right.resource_limit(),
             "Custom list scalar/report errors disagree"
         ),
-        (left, right) => panic!(
-            "Custom list scalar/report disagreement: scalar={left:?}, report={right:?}"
-        ),
+        (left, right) => {
+            panic!("Custom list scalar/report disagreement: scalar={left:?}, report={right:?}")
+        },
     }
 }
 
@@ -258,10 +262,8 @@ fn exercise_list_rewrite(
 }
 
 fn exercise_canonical_writes() {
-    let default = codec::FormatStructWrite::new(
-        codec::NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
-        "#,##0.00",
-    );
+    let default =
+        codec::FormatStructWrite::new(codec::NATIVE_CUSTOM_NUMBER_FORMAT_TYPE, "#,##0.00");
     let condition = codec::CustomConditionWrite::with_double(1, 5.0, default);
     let conditions = [condition];
     let write = codec::CustomFormatWrite::new(
@@ -288,10 +290,8 @@ fn exercise_canonical_writes() {
 }
 
 fn exercise_limit_guards() {
-    let default = codec::FormatStructWrite::new(
-        codec::NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,
-        "#,##0.00",
-    );
+    let default =
+        codec::FormatStructWrite::new(codec::NATIVE_CUSTOM_NUMBER_FORMAT_TYPE, "#,##0.00");
     let write = codec::CustomFormatWrite::new(
         "Custom",
         codec::NATIVE_CUSTOM_NUMBER_FORMAT_TYPE,

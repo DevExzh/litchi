@@ -300,7 +300,8 @@ fn info_payload(
 
 /// Move a `TSP.Point` by [`POSITION_OFFSET`] on both axes.
 fn offset_point(point: &[u8]) -> FaultResult<Vec<u8>> {
-    let view = parse_wire_view(point).map_err(|error| structure::map_wire(&error))?;
+    let view = parse_wire_view(point, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|error| structure::map_wire(&error))?;
     let mut output = Vec::new();
     structure::reserve(&mut output, point.len())?;
     for field in view.fields() {
@@ -364,13 +365,25 @@ fn empty_storage(
             let mut output = Vec::new();
             for index in 0..columns {
                 let uuid = encode_uuid(column_base + u64::from(index), column_upper)?;
-                append_length_delimited_field(&mut output, 1, &uuid).map_err(wire)?;
+                append_length_delimited_field(
+                    &mut output,
+                    1,
+                    &uuid,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(wire)?;
             }
             packed(&mut output, 2, (0..columns).map(u64::from))?;
             packed(&mut output, 3, (0..columns).map(u64::from))?;
             for index in 0..rows {
                 let uuid = encode_uuid(row_base + u64::from(index), row_upper)?;
-                append_length_delimited_field(&mut output, 4, &uuid).map_err(wire)?;
+                append_length_delimited_field(
+                    &mut output,
+                    4,
+                    &uuid,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(wire)?;
             }
             packed(&mut output, 5, (0..rows).map(u64::from))?;
             packed(&mut output, 6, (0..rows).map(u64::from))?;
@@ -410,8 +423,13 @@ fn packed(output: &mut Vec<u8>, number: u32, values: impl Iterator<Item = u64>) 
     if payload.is_empty() {
         return Ok(());
     }
-    append_length_delimited_field(output, number, &payload)
-        .map_err(|error| structure::map_wire(&error))
+    append_length_delimited_field(
+        output,
+        number,
+        &payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|error| structure::map_wire(&error))
 }
 
 /// The CalculationEngine root (component, object and message).
@@ -528,7 +546,13 @@ impl Geometry {
             for (number, value) in (1_u32..).zip(range) {
                 append_varint_field(&mut record, number, value).map_err(wire)?;
             }
-            append_length_delimited_field(&mut output, field, &record).map_err(wire)?;
+            append_length_delimited_field(
+                &mut output,
+                field,
+                &record,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(wire)?;
         }
         Ok(output)
     }
@@ -544,27 +568,78 @@ fn owner_payload(
 ) -> FaultResult<Vec<u8>> {
     let wire = |error: litchi_iwa_common::Error| structure::map_wire(&error);
     let mut output = Vec::new();
-    append_length_delimited_field(&mut output, 1, &encode_uuid(uid.0, uid.1)?).map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        1,
+        &encode_uuid(uid.0, uid.1)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     append_varint_field(&mut output, 2, u64::from(internal)).map_err(wire)?;
     append_varint_field(&mut output, 3, TABLE_FORMULA_OWNER_KIND).map_err(wire)?;
-    append_length_delimited_field(&mut output, 4, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 5, &[]).map_err(wire)?;
+    append_length_delimited_field(&mut output, 4, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(&mut output, 5, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
     let mut volatile = Vec::new();
     for field in [1, 2, 3, 4, 5, 7] {
-        append_length_delimited_field(&mut volatile, field, &[]).map_err(wire)?;
-    }
-    append_length_delimited_field(&mut output, 6, &volatile).map_err(wire)?;
-    let spanning = geometry.spanning()?;
-    append_length_delimited_field(&mut output, 7, &spanning).map_err(wire)?;
-    append_length_delimited_field(&mut output, 8, &spanning).map_err(wire)?;
-    let mut whole = Vec::new();
-    append_length_delimited_field(&mut whole, 1, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 9, &whole).map_err(wire)?;
-    append_length_delimited_field(&mut output, 10, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 11, &references::reference_payload(info)?)
+        append_length_delimited_field(
+            &mut volatile,
+            field,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
         .map_err(wire)?;
+    }
+    append_length_delimited_field(
+        &mut output,
+        6,
+        &volatile,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    let spanning = geometry.spanning()?;
+    append_length_delimited_field(
+        &mut output,
+        7,
+        &spanning,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        8,
+        &spanning,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    let mut whole = Vec::new();
+    append_length_delimited_field(&mut whole, 1, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        9,
+        &whole,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    append_length_delimited_field(&mut output, 10, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        11,
+        &references::reference_payload(info)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     for field in [13, 14, 15, 16] {
-        append_length_delimited_field(&mut output, field, &[]).map_err(wire)?;
+        append_length_delimited_field(
+            &mut output,
+            field,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(wire)?;
     }
     Ok(output)
 }
@@ -589,7 +664,13 @@ fn engine_payload(
     }
     let mut entry = Vec::new();
     append_varint_field(&mut entry, 1, u64::from(internal)).map_err(wire)?;
-    append_length_delimited_field(&mut entry, 2, &cfuuid).map_err(wire)?;
+    append_length_delimited_field(
+        &mut entry,
+        2,
+        &cfuuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     transform_length_delimited_field(engine, 2, |tracker| {
         let mut tracker = litchi_iwa_common::wire::append_repeated_length_delimited_field(
             tracker,
@@ -602,7 +683,12 @@ fn engine_payload(
             })?;
         } else {
             let mut map = Vec::new();
-            append_length_delimited_field(&mut map, 1, &entry)?;
+            append_length_delimited_field(
+                &mut map,
+                1,
+                &entry,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             tracker = structure::put_bytes(&tracker, 3, &map).map_err(WireFault)?;
         }
         Ok::<_, WireFault>(tracker)
@@ -786,6 +872,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             &mut data,
             TREE_OBJECT_FIELD,
             &references::reference_payload(new_info)?,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )
         .map_err(|error| structure::map_wire(&error))?;
         let template_node = working.object(parent)?.clone();
@@ -906,7 +993,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
 /// so a coincidental non-reference record is not a concern for correctness
 /// of the declared set.
 fn references_payload(data: &[u8], identifier: u64) -> bool {
-    let Ok(view) = parse_wire_view(data) else {
+    let Ok(view) = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     view.fields().any(|field| {

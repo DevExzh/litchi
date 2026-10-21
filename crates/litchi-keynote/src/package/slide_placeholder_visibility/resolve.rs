@@ -47,7 +47,7 @@ pub(super) fn focused_slide(
     let (show_index, show_payload) = selected_message(show, SHOW_MESSAGE_TYPE)?;
     budget.charge_work(show_payload.len())?;
     let tree = nested_unique_field(show_payload, &[3], limits)?.ok_or(Error::InvalidSource)?;
-    let tree_view = WireView::parse_with_limits(tree.payload(), limits).map_err(map_wire_error)?;
+    let tree_view = WireView::parse(tree.payload(), limits).map_err(map_wire_error)?;
     let count = tree_view
         .fields()
         .filter(|field| field.number() == 2)
@@ -176,7 +176,7 @@ pub(super) fn focused_slide(
 }
 
 fn slide_name(source: &[u8], limits: WireLimits) -> Result<Option<&str>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut name = None;
     for field in view.fields() {
         if field.number() == 10 {
