@@ -14,9 +14,11 @@ pub(super) fn stage(workspace: &mut Workspace<'_>, node: u64) -> Result<u64, Err
         || graph::member_kind(&member) != MemberKind::Other
         || graph::other_slides(workspace, &member, slide)?
     {
-        return Err(Error::UnsupportedContent {
-            reason: Unsupported::SharedComponent,
-        });
+        return Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::SharedComponent,
+            },
+        ));
     }
     let source = graph::registered(workspace, &member)?.clone();
     graph::check_external_references(workspace, &source)?;

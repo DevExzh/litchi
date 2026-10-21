@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let sheet_index: usize = arguments.next().ok_or("missing sheet index")?.parse()?;
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     editor.remove_sheet(SheetSelector::index(sheet_index))?;
     editor.save(output)?;
     Ok(())

@@ -260,7 +260,7 @@ fn charge(
 ) -> Result<usize, TransactionError> {
     let observed = current.checked_add(amount).unwrap_or(usize::MAX);
     if observed > maximum {
-        return Err(TransactionError::LimitExceeded {
+        return Err(TransactionError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -392,7 +392,9 @@ pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
         });
     }
     if !catalog.source_is_exact() {
-        return Err(TransactionError::UnsupportedSource);
+        return Err(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let selected = resolve_at(
         edit.source,
@@ -404,7 +406,9 @@ pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
         return Err(TransactionError::InvalidSource { path: edit.path() });
     }
     if selected.target.locked == LockState::Locked {
-        return Err(TransactionError::TableLocked { path: edit.path() });
+        return Err(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::TableLocked { path: edit.path() },
+        ));
     }
     let source = catalog.__source_owner();
     let previews = root_previews(catalog)?;
@@ -451,7 +455,9 @@ fn resolve<'sheet, 'table>(
         .map_err(|_| TransactionError::InvalidSource {
             path: Path::Package,
         })?
-        .ok_or(TransactionError::SheetNotFound)?;
+        .ok_or(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::SheetNotFound,
+        ))?;
     let table_position = match table.into() {
         TableSelector::Position(index) => {
             let index = index.get();
@@ -464,12 +470,16 @@ fn resolve<'sheet, 'table>(
                 .filter(|(_, candidate)| candidate.name() == name);
             let first = matches.next().map(|(index, _)| index);
             if matches.next().is_some() {
-                return Err(TransactionError::AmbiguousSelector);
+                return Err(TransactionError::Refused(
+                    crate::table::dimension::transaction::Refusal::AmbiguousSelector,
+                ));
             }
             first
         },
     }
-    .ok_or(TransactionError::TableNotFound)?;
+    .ok_or(TransactionError::Refused(
+        crate::table::dimension::transaction::Refusal::TableNotFound,
+    ))?;
     resolve_at(source, selected_sheet.index(), table_position, dimension)
 }
 
@@ -499,15 +509,19 @@ fn resolve_at(
         Dimension::Row(_) => target.rows,
         Dimension::Column(_) => target.columns,
     };
-    let index = u32::try_from(dimension.index()).map_err(|_| TransactionError::OutOfBounds {
-        path,
-        length: limit,
-    })?;
-    if index >= limit {
-        return Err(TransactionError::OutOfBounds {
+    let index = u32::try_from(dimension.index()).map_err(|_| {
+        TransactionError::Refused(crate::table::dimension::transaction::Refusal::OutOfBounds {
             path,
             length: limit,
-        });
+        })
+    })?;
+    if index >= limit {
+        return Err(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::OutOfBounds {
+                path,
+                length: limit,
+            },
+        ));
     }
     let ownership =
         table_headers::ownership::validate_selected_ownership_with_report(source, target)
@@ -872,7 +886,9 @@ fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(TransactionError::InvalidSource { path })?;
     if entry.is_opaque() {
-        return Err(TransactionError::UnsupportedSource);
+        return Err(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let physical_limits = catalog.limits();
     let archive_limits = physical_limits
@@ -1008,7 +1024,9 @@ fn physical_source(
         .state
         .components
         .physical()
-        .ok_or(TransactionError::UnsupportedSource)
+        .ok_or(TransactionError::Refused(
+            crate::table::dimension::transaction::Refusal::UnsupportedSource,
+        ))
 }
 
 fn root_previews(
@@ -1087,13 +1105,12 @@ fn maximum_snappy_output(input_bytes: usize) -> Result<usize, TransactionError> 
 }
 
 fn checked_add_work(left: usize, right: usize) -> Result<usize, TransactionError> {
-    left.checked_add(right)
-        .ok_or(TransactionError::LimitExceeded {
-            kind: LimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::MAX - 1,
-            path: Path::Package,
-        })
+    left.checked_add(right).ok_or(TransactionError::Limit {
+        kind: LimitKind::TransactionWork,
+        observed: u64::MAX,
+        maximum: u64::MAX - 1,
+        path: Path::Package,
+    })
 }
 
 fn verify_locality(
@@ -1220,15 +1237,25 @@ fn published(deleted_previews: usize) -> Diagnostics {
 
 fn map_header_error(error: table_headers::Error) -> TransactionError {
     match error {
-        table_headers::Error::SheetNotFound => TransactionError::SheetNotFound,
-        table_headers::Error::TableNotFound => TransactionError::TableNotFound,
-        table_headers::Error::UnsupportedSource => TransactionError::UnsupportedSource,
-        table_headers::Error::TableLocked { .. } => TransactionError::TableLocked {
-            path: Path::Package,
+        table_headers::Error::Refused(table_headers::Refusal::SheetNotFound) => {
+            TransactionError::Refused(crate::table::dimension::transaction::Refusal::SheetNotFound)
         },
-        table_headers::Error::LimitExceeded {
+        table_headers::Error::Refused(table_headers::Refusal::TableNotFound) => {
+            TransactionError::Refused(crate::table::dimension::transaction::Refusal::TableNotFound)
+        },
+        table_headers::Error::Refused(table_headers::Refusal::UnsupportedSource) => {
+            TransactionError::Refused(
+                crate::table::dimension::transaction::Refusal::UnsupportedSource,
+            )
+        },
+        table_headers::Error::Refused(table_headers::Refusal::TableLocked { .. }) => {
+            TransactionError::Refused(crate::table::dimension::transaction::Refusal::TableLocked {
+                path: Path::Package,
+            })
+        },
+        table_headers::Error::Limit {
             observed, maximum, ..
-        } => TransactionError::LimitExceeded {
+        } => TransactionError::Limit {
             kind: LimitKind::TransactionWork,
             observed,
             maximum,
@@ -1248,7 +1275,7 @@ fn map_read_error(error: super::Error) -> TransactionError {
     match error {
         super::Error::Archive(error) => map_archive_error(error),
         super::Error::Common(error) => map_common_error(error),
-        super::Error::InputTooLarge { observed, maximum } => TransactionError::LimitExceeded {
+        super::Error::InputTooLarge { observed, maximum } => TransactionError::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -1256,7 +1283,7 @@ fn map_read_error(error: super::Error) -> TransactionError {
         },
         super::Error::SemanticLimit {
             observed, maximum, ..
-        } => TransactionError::LimitExceeded {
+        } => TransactionError::Limit {
             kind: LimitKind::PayloadItems,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1276,7 +1303,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> TransactionError {
         },
         litchi_iwa_archive::Error::Limit {
             observed, maximum, ..
-        } => TransactionError::LimitExceeded {
+        } => TransactionError::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum,
@@ -1296,7 +1323,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> TransactionError {
         },
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => TransactionError::LimitExceeded {
+        } => TransactionError::Limit {
             kind: LimitKind::PayloadBytes,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1356,7 +1383,7 @@ fn map_codec_error_with_offsets(
             consumed_work.saturating_add(maximum),
         ),
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return TransactionError::LimitExceeded {
+            return TransactionError::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1371,7 +1398,7 @@ fn map_codec_error_with_offsets(
         },
         _ => return TransactionError::InvalidSource { path },
     };
-    TransactionError::LimitExceeded {
+    TransactionError::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1440,7 +1467,7 @@ mod tests {
             .expect_err("max-minus-one publication work must refuse before output phases");
         assert!(matches!(
             error,
-            TransactionError::LimitExceeded {
+            TransactionError::Limit {
                 kind: LimitKind::TransactionWork,
                 observed,
                 maximum,

@@ -17,6 +17,6 @@ pub use litchi_iwa_common::table::dimension::Size;
 /// Transaction types for persisted Keynote slide-table dimensions.
 pub mod transaction {
     pub use crate::package::slide_table_dimension::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

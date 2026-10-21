@@ -9,7 +9,7 @@
 
 use litchi_cfb::OleWriter;
 use litchi_ole_common::object::link::Kind;
-use litchi_ole_common::object::{Editor, Limits, Target, Targets};
+use litchi_ole_common::object::{Edit, Limits, Target, Targets};
 use std::io::Cursor;
 
 fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
@@ -62,7 +62,7 @@ fn package() -> Vec<u8> {
 
 #[test]
 fn selected_objects_expose_shared_link_metadata() {
-    let editor = Editor::open(package(), target(), Limits::default()).expect("editor should open");
+    let editor = Edit::open(package(), target(), Limits::default()).expect("editor should open");
     let link = editor
         .objects()
         .get("object")
@@ -73,14 +73,14 @@ fn selected_objects_expose_shared_link_metadata() {
     assert_eq!(link.kind(), Kind::Linked);
     assert_eq!(link.link_update_option(), 7);
     assert_eq!(link.unknown_tail(), &[0xAA, 0xBB, 0xCC]);
-    assert_eq!(editor.snapshot().link("object").unwrap().unwrap(), link);
+    assert_eq!(editor.staged().link("object").unwrap().unwrap(), link);
 }
 
 #[test]
 fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     let original = package();
     let mut editor =
-        Editor::open(original.clone(), target(), Limits::default()).expect("editor should open");
+        Edit::open(original.clone(), target(), Limits::default()).expect("editor should open");
     editor
         .update_link("object", |link| {
             link.set_cache_hint(false);
@@ -102,7 +102,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     assert_eq!(object.stream(&["Payload"]), Some(&b"opaque"[..]));
 
     let mut rejected =
-        Editor::open(original.clone(), target(), Limits::default()).expect("editor should reopen");
+        Edit::open(original.clone(), target(), Limits::default()).expect("editor should reopen");
     assert!(
         rejected
             .update_link("object", |_link| {
@@ -110,7 +110,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
             })
             .is_err()
     );
-    assert!(!rejected.is_changed());
+    assert!(!rejected.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
         rejected.finish().expect("rejected editor should finish"),
         original

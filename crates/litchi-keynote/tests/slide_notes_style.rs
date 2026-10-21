@@ -57,9 +57,9 @@ fn notes_spans_are_styled_read_back_and_inverted() -> TestResult {
             edit.set_notes_text_style(SlideSelector::index(slide), span, style.clone())?;
             let commit = match edit.commit() {
                 Ok(commit) => commit,
-                Err(Error::Unsupported {
+                Err(Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
                     reason: Unsupported::ForeignComponent | Unsupported::ExternalReferences,
-                }) => {
+                })) => {
                     refused += 1;
                     continue;
                 },
@@ -142,9 +142,11 @@ fn notes_styles_refuse_typed() -> TestResult {
     if let Some(notes) = notes.filter(|notes| !notes.is_empty()) {
         assert!(matches!(
             edit.set_notes_text_style(SlideSelector::index(0), TextSpan::new(0, 1), Style::new()),
-            Err(Error::Unsupported {
-                reason: Unsupported::TextStyling
-            })
+            Err(Error::Refused(
+                litchi_keynote::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::TextStyling
+                }
+            ))
         ));
         let past = notes.chars().count() + 1;
         assert!(matches!(
@@ -153,7 +155,9 @@ fn notes_styles_refuse_typed() -> TestResult {
                 TextSpan::new(0, past),
                 Style::new().with_bold(true)
             ),
-            Err(Error::InvalidSpan)
+            Err(Error::Refused(
+                litchi_keynote::slide::drawable::Refusal::InvalidSpan
+            ))
         ));
     }
     Ok(())

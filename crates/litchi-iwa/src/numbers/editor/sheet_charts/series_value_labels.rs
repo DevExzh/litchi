@@ -12,7 +12,7 @@ use crate::charts::series_value_labels::{
 };
 use crate::charts::{ChartSeriesValueLabelLocation, Index, Visibility};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label visibility in native series order.
     pub fn sheet_chart_series_value_label_visibilities(
         &self,
@@ -136,7 +136,7 @@ impl Editor {
 }
 
 fn sheet_chart_series_value_label_visibilities(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<Visibility>> {
@@ -159,7 +159,7 @@ fn sheet_chart_series_value_label_visibilities(
 }
 
 fn set_sheet_chart_series_value_label_visibilities(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     visibilities: &[Visibility],
@@ -199,7 +199,7 @@ fn set_sheet_chart_series_value_label_visibilities(
         graph.info.kind,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_value_label_visibilities(sheet_id, drawable_object_id)?
         != expected
     {
@@ -212,7 +212,7 @@ fn set_sheet_chart_series_value_label_visibilities(
 }
 
 fn sheet_chart_series_value_label_locations(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
@@ -235,7 +235,7 @@ fn sheet_chart_series_value_label_locations(
 }
 
 fn set_sheet_chart_series_value_label_locations(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     locations: &[ChartSeriesValueLabelLocation],
@@ -276,7 +276,7 @@ fn set_sheet_chart_series_value_label_locations(
         series_count,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_value_label_locations(sheet_id, drawable_object_id)? != expected
     {
         return Err(Error::InvalidFormat(

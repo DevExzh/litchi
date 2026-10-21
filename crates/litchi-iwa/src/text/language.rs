@@ -8,7 +8,7 @@ use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
@@ -23,7 +23,7 @@ const ENTRY_LANGUAGE_FIELD: u32 = 2;
 
 /// Read every explicit native language boundary.
 pub(crate) fn text_languages(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<TextLanguageRun>> {
     let location = locate_storage(package, storage_id)?;
@@ -42,7 +42,7 @@ pub(crate) fn text_languages(
 
 /// Read the effective language at one validated UTF-16 boundary.
 pub(crate) fn text_language(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     position: TextPosition,
 ) -> Result<TextLanguage> {
@@ -63,7 +63,7 @@ pub(crate) fn text_language(
 
 /// Set one language boundary while preserving unrelated native wire fields.
 pub(crate) fn set_text_language(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     position: TextPosition,
     language: &TextLanguage,
@@ -83,7 +83,7 @@ pub(crate) fn set_text_language(
 
 /// Remove one nonzero language boundary so it inherits the preceding run.
 pub(crate) fn remove_text_language_boundary(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     position: TextPosition,
 ) -> Result<bool> {
@@ -117,7 +117,7 @@ pub(crate) fn remove_text_language_boundary(
 }
 
 /// Remove the entire explicit language table.
-pub(crate) fn reset_text_languages(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(crate) fn reset_text_languages(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     let located = locate_storage_with_archive(package, storage_id)?;
     let location = &located.location;
     let entries = language_entries(storage_id, &location.storage, location.table_present)?;
@@ -134,7 +134,7 @@ pub(crate) fn reset_text_languages(package: &mut IWorkPackage, storage_id: u64) 
     Ok(true)
 }
 
-fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+fn locate_storage(package: &HostPackage, storage_id: u64) -> Result<StorageLocation> {
     let location = locate_native_storage(package, storage_id, LANGUAGE_TABLE_FIELD, "language")?;
     if location.storage.table_language.is_some() != location.table_present {
         return Err(Error::InvalidFormat(format!(
@@ -144,7 +144,7 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
     Ok(location)
 }
 
-fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+fn locate_storage_with_archive(package: &HostPackage, storage_id: u64) -> Result<LocatedStorage> {
     let located =
         locate_native_storage_with_archive(package, storage_id, LANGUAGE_TABLE_FIELD, "language")?;
     if located.location.storage.table_language.is_some() != located.location.table_present {
@@ -173,7 +173,7 @@ fn language_entries(
 }
 
 fn patch_language(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     position: TextPosition,
@@ -189,7 +189,7 @@ fn patch_language(
 }
 
 fn remove_boundary(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     position: TextPosition,
@@ -221,7 +221,7 @@ fn remove_boundary(
 }
 
 fn patch_language_table<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     transform: F,
@@ -382,8 +382,8 @@ mod tests {
     use crate::shapes::{DrawablePoint, DrawableSize};
     use crate::wire::{append_length_delimited_field, parse_wire_fields, patch_varint_field};
 
-    fn fixture() -> (IWorkPackage, u64, String) {
-        let mut pages = pages::Editor::create_with_text("Body").unwrap();
+    fn fixture() -> (HostPackage, u64, String) {
+        let mut pages = pages::Draft::create_with_text("Body").unwrap();
         let text_box = pages
             .add_text_box(
                 4,
@@ -402,7 +402,7 @@ mod tests {
         (pages.into_package(), storage_id, archive_name)
     }
 
-    fn storage_message_index(package: &IWorkPackage, storage_id: u64) -> usize {
+    fn storage_message_index(package: &HostPackage, storage_id: u64) -> usize {
         locate_storage(package, storage_id).unwrap().message_index
     }
 
@@ -455,7 +455,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut editor = super::super::IWorkTextEditor::from_package(package);
+        let mut editor = crate::text::Draft::from_package(package);
         editor
             .set_text_language(
                 crate::text::TextStorageId::try_from(storage_id).unwrap(),
@@ -507,7 +507,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut editor = super::super::IWorkTextEditor::from_package(package);
+        let mut editor = crate::text::Draft::from_package(package);
         editor
             .set_text_language(
                 crate::text::TextStorageId::try_from(storage_id).unwrap(),
@@ -554,7 +554,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut editor = super::super::IWorkTextEditor::from_package(package);
+        let mut editor = crate::text::Draft::from_package(package);
         let before = editor.to_bytes().unwrap();
         assert!(
             editor

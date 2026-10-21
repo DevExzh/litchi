@@ -234,7 +234,12 @@ fn cross_component_inbound_reference_refuses_before_publication() -> TestResult 
     let bytes = topology_package(128, 8, true)?;
     let package = Package::from_bytes(&bytes)?;
     let (attempt, report) = production_test_attempt(&package, Position::new(0), None);
-    assert!(matches!(attempt, Err(Error::AmbiguousOwnership)));
+    assert!(matches!(
+        attempt,
+        Err(Error::Refused(
+            crate::slide::delete::Refusal::AmbiguousOwnership
+        ))
+    ));
     assert_ne!(report.objects_scanned(), 0);
     assert_ne!(report.references_scanned(), 0);
     assert_eq!(report.component_deletions(), 0);
@@ -340,7 +345,7 @@ fn max_minus_one_refuses_before_deletion_output_or_reopen() -> TestResult {
     let (attempt, rejected) = production_test_attempt(&package, Position::new(0), Some(maximum));
     assert!(matches!(
         attempt,
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::Work,
             observed: attempted,
             maximum: reported_maximum,

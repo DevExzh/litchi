@@ -8,7 +8,7 @@ use crate::wire::{
     patch_length_delimited_field, patch_nested_length_delimited_field, patch_nested_varint_field,
     patch_varint_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::storage_wire::{LocatedStorage, update_parsed_archive};
 use litchi_iwa_text::number_attachment::{
@@ -109,7 +109,7 @@ pub(super) fn new_number_attachment_object(
 }
 
 pub(super) fn patch_number_attachment_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     identifier: u64,
     settings: &TextNumberAttachmentSettings,

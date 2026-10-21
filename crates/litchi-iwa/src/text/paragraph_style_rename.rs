@@ -2,7 +2,7 @@
 
 use crate::archive::RawMessage;
 use crate::wire::patch_nested_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::paragraph_alignment::native;
 use litchi_iwa_text::paragraph::style::{
@@ -13,7 +13,7 @@ const STYLE_SUPER_FIELD: u32 = 1;
 const STYLE_NAME_FIELD: u32 = 1;
 
 pub(super) fn rename_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     first_style_id: u64,
     target: ParagraphStyleId,
     name: ParagraphStyleName,
@@ -55,7 +55,7 @@ pub(super) fn rename_named_paragraph_style(
 }
 
 pub(super) fn rename_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &native::ParagraphStyleLocation,
     name: &str,
 ) -> Result<()> {

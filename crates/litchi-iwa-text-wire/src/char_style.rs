@@ -181,7 +181,8 @@ fn reference(identifier: u64) -> Vec<u8> {
 }
 
 fn view(data: &[u8]) -> Result<WireView<'_>> {
-    WireView::parse(data).map_err(|_error| CharStyleError::Invalid)
+    WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_error| CharStyleError::Invalid)
 }
 
 fn varint(payload: &[u8]) -> Result<u64> {

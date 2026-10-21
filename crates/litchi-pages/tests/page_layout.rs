@@ -480,11 +480,13 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn entry_names(package: &[u8]) -> TestResult<Vec<String>> {
@@ -779,12 +781,15 @@ fn shared_component_rooted_view_state_is_invalidated_but_detached_collision_is_p
 fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult {
     let bytes = synthetic_package(full_layout()?, true, true)?;
     let duplicate = rewrite_document(&bytes, |object, index| {
-        let field = WireView::parse(&object.messages[index].data)?
-            .fields()
-            .find(|field| field.number() == 30)
-            .ok_or_else(|| io::Error::other("synthetic page width is missing"))?
-            .raw()
-            .to_vec();
+        let field = WireView::parse(
+            &object.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        .find(|field| field.number() == 30)
+        .ok_or_else(|| io::Error::other("synthetic page width is missing"))?
+        .raw()
+        .to_vec();
         let mut payload = object.messages[index].data.clone();
         payload.extend_from_slice(&field);
         object.replace_message_preserving_header(
@@ -911,6 +916,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
             &mut payload,
             11,
             &reference(7_001).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -927,6 +933,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
             &mut payload,
             12,
             &reference(7_002).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -987,7 +994,9 @@ fn legacy_nested_source_allows_noop_but_refuses_changed_layout() -> TestResult {
     edit.set_layout(changed_layout(before)?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::UnsupportedSource)
+        Err(PageLayoutError::Refused(
+            litchi_pages::page_layout::transaction::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
@@ -1049,7 +1058,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     edit.set_layout(full_layout()?)?;
     assert!(matches!(
         edit.commit(),
-        Err(PageLayoutError::LimitExceeded {
+        Err(PageLayoutError::Limit {
             kind: PageLayoutLimitKind::OutputBytes,
             ..
         })

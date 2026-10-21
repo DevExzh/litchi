@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{CharacterGrid, CharacterType, Formatting, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{CharacterGrid, CharacterType, Formatting, RtfWriter};
 
-fn formatting_for<'a>(document: &'a RtfDocument<'a>, text: &str) -> Formatting {
+fn formatting_for<'a>(document: &'a Tree<'a>, text: &str) -> Formatting {
     document
         .blocks()
         .iter()
@@ -27,7 +28,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
         r#"{\hich\fcs0\cgrid-12 Nested}"#,
         r#"Tail{\dbch\cgrid0 Double}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
 
     let root = formatting_for(&document, "Root");
     assert_eq!(root.character_type, Some(CharacterType::LowAnsi));
@@ -53,7 +54,7 @@ fn character_type_complex_script_and_grid_scope_and_round_trip() {
     assert!(serialized.contains(r"\fcs0\hich\cgrid-12\fs24"));
     assert!(serialized.contains(r"\fcs1\dbch\cgrid0\fs24"));
 
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     for text in ["Root", "Nested", "Tail", "Double"] {
         assert_eq!(
             formatting_for(&reparsed, text),
@@ -98,7 +99,7 @@ fn rejects_invalid_parameters_and_duplicate_document_defaults() {
         r"{\rtf1{\*\defchp\cgrid\cgrid0}X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
@@ -106,7 +107,7 @@ fn rejects_invalid_parameters_and_duplicate_document_defaults() {
 
 #[test]
 fn keeps_selector_like_controls_in_field_instructions_inert() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\field{\*\fldinst TEST \fcs2\loch0\cgrid32768}"#,
         r#"{\fldrslt Result}}}"#,
     ))

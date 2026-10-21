@@ -914,7 +914,7 @@ mod tests {
             )
             .unwrap()
         };
-        let mut package = crate::IWorkPackage::new();
+        let mut package = crate::HostPackage::new();
         package
             .replace_archive(
                 "Index/Z.iwa",
@@ -1322,7 +1322,7 @@ mod tests {
                 .unwrap(),
             ],
         };
-        let mut package = crate::IWorkPackage::new();
+        let mut package = crate::HostPackage::new();
         package.replace_archive("Index/First.iwa", &first).unwrap();
         package
             .replace_archive("Index/Second.iwa", &second)
@@ -1378,7 +1378,7 @@ mod tests {
             objects: vec![object(first), object(second)],
         };
 
-        let mut source_package = crate::IWorkPackage::new();
+        let mut source_package = crate::HostPackage::new();
         source_package
             .replace_archive("Index/B.iwa", &archive(20, 21))
             .unwrap();
@@ -1388,7 +1388,7 @@ mod tests {
         let source_bundle = Bundle::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
         let index = ObjectIndex::from_bundle(&source_bundle).unwrap();
 
-        let mut stale_package = crate::IWorkPackage::new();
+        let mut stale_package = crate::HostPackage::new();
         stale_package
             .replace_archive("Index/B.iwa", &archive(21, 20))
             .unwrap();
@@ -1427,7 +1427,7 @@ mod tests {
             )
             .unwrap()
         };
-        let mut package = crate::IWorkPackage::new();
+        let mut package = crate::HostPackage::new();
         package
             .replace_archive(
                 "Index/B.iwa",
@@ -1458,7 +1458,7 @@ mod tests {
 
     #[test]
     fn typed_batch_resolution_rejects_unindexed_and_missing_objects() {
-        let empty_package = crate::IWorkPackage::new().to_bytes().unwrap();
+        let empty_package = crate::HostPackage::new().to_bytes().unwrap();
         let empty_bundle = Bundle::from_bytes(&empty_package).unwrap();
         let object_id = ObjectId::try_from(10).unwrap();
 

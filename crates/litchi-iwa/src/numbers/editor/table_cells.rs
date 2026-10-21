@@ -26,7 +26,7 @@ impl TableCellBatch {
         self.batch.len()
     }
 
-    pub(crate) fn apply_attached(self, package: &mut IWorkPackage, table_id: u64) -> Result<usize> {
+    pub(crate) fn apply_attached(self, package: &mut HostPackage, table_id: u64) -> Result<usize> {
         let (updates, coordinates) = self.batch.into_parts();
         let coordinates = into_formula_cache_coordinates(coordinates)?;
         let count = updates.len();

@@ -4,11 +4,10 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     cell::Value,
     table::cells::{Error as CellError, Input, Storage},
-    table::{At, Area, Dimensions},
+    table::{Area, At, Dimensions},
 };
 
 const MAX_INPUT_BYTES: u64 = 512 * 1024;
@@ -47,16 +46,29 @@ fuzz_target!(|data: &[u8]| {
 fn fuzz_options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| {
-                    unreachable!("valid Numbers fuzz projection limits: {error}")
-                });
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid Numbers fuzz projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -182,9 +194,7 @@ fn exercise_bounded_batch(package: &Package, data: &[u8], position: At, address:
                 source_bytes,
                 "table-cell inverse did not restore exact source bytes"
             );
-            if let (Some(before), Ok(position)) =
-                (before_state.as_ref(), At::from_a1(address))
-            {
+            if let (Some(before), Ok(position)) = (before_state.as_ref(), At::from_a1(address)) {
                 let after = restored
                     .package()
                     .table_cell(0usize, 0usize, position)
@@ -328,11 +338,8 @@ fn exercise_table_range_edges(package: &Package, data: &[u8]) {
         .unwrap_or_default();
     let table_name = table.name();
 
-    let empty = Area::new(
-        At::new(dimensions.rows(), 0),
-        At::new(dimensions.rows(), 0),
-    )
-    .unwrap_or_else(|error| panic!("empty table-cell range must construct: {error}"));
+    let empty = Area::new(At::new(dimensions.rows(), 0), At::new(dimensions.rows(), 0))
+        .unwrap_or_else(|error| panic!("empty table-cell range must construct: {error}"));
     let empty_states = package.table_cells(
         SheetSelector::name(sheet_name),
         TableSelector::name(table_name),
@@ -426,21 +433,77 @@ fn exercise_constructor_limits() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
         assert!(
-            litchi::numbers::SourceLimits::builder().max_input_bytes(0).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-            .is_err()
+            litchi::numbers::SourceLimits::builder()
+                .max_input_bytes(0)
+                .and_then(|b| b.max_members(MAX_ENTRIES))
+                .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                .and_then(|b| b.build())
+                .is_err()
         );
         assert!(
-            litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(0)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-            .is_err()
+            litchi::numbers::SourceLimits::builder()
+                .max_input_bytes(MAX_INPUT_BYTES)
+                .and_then(|b| b.max_members(0))
+                .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+                .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+                .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+                .and_then(|b| b.build())
+                .is_err()
         );
 
         let semantic = litchi::numbers::SemanticLimits::DEFAULT;
-        assert!(litchi::numbers::SemanticLimits::builder().max_objects(0).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build()).is_err());
-        assert!(litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(0)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build()).is_err());
-        assert!(semantic.to_builder().max_materialized_cells(0).and_then(|b| b.max_output_text_bytes(1)).and_then(|b| b.build()).is_err());
-        assert!(semantic.to_builder().max_materialized_cells(1).and_then(|b| b.max_output_text_bytes(0)).and_then(|b| b.build()).is_err());
-        assert!(semantic.to_builder().max_materialized_cells(usize::MAX).and_then(|b| b.max_output_text_bytes(1)).and_then(|b| b.build()).is_err());
-        assert!(semantic.to_builder().max_materialized_cells(1).and_then(|b| b.max_output_text_bytes(usize::MAX)).and_then(|b| b.build()).is_err());
+        assert!(
+            litchi::numbers::SemanticLimits::builder()
+                .max_objects(0)
+                .and_then(|b| b.max_sheets(MAX_SHEETS))
+                .and_then(|b| b.max_tables(MAX_TABLES))
+                .and_then(|b| b.max_references(MAX_REFERENCES))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            litchi::numbers::SemanticLimits::builder()
+                .max_objects(MAX_OBJECTS)
+                .and_then(|b| b.max_sheets(0))
+                .and_then(|b| b.max_tables(MAX_TABLES))
+                .and_then(|b| b.max_references(MAX_REFERENCES))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(0)
+                .and_then(|b| b.max_output_text_bytes(1))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(1)
+                .and_then(|b| b.max_output_text_bytes(0))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(usize::MAX)
+                .and_then(|b| b.max_output_text_bytes(1))
+                .and_then(|b| b.build())
+                .is_err()
+        );
+        assert!(
+            semantic
+                .to_builder()
+                .max_materialized_cells(1)
+                .and_then(|b| b.max_output_text_bytes(usize::MAX))
+                .and_then(|b| b.build())
+                .is_err()
+        );
 
         for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(Input::number(value).is_err());

@@ -331,7 +331,7 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         "{label} dimensions changed"
     );
 
-    let editor = pages::Editor::from_bytes(source).map_err(|error| {
+    let editor = pages::Draft::from_bytes(source).map_err(|error| {
         io::Error::other(format!("{label} legacy package parse failed: {error:?}"))
     })?;
     let body_text = editor
@@ -351,7 +351,7 @@ fn assert_native_stylesheet_fixture(source: &[u8], label: &str) -> TestResult<()
         "{label} legacy no-op changed bytes"
     );
 
-    let reopened = pages::Editor::from_bytes(source)?;
+    let reopened = pages::Draft::from_bytes(source)?;
     assert_eq!(
         reopened.body_text()?,
         body_text,
@@ -376,7 +376,7 @@ fn source_built_pages_table_retains_numbers_stylesheet_closure() -> TestResult {
         .body_table("Imported Numbers table", 5, 4)
         .build()?;
     let source = pages.to_bytes()?;
-    let model_object_id = pages::Editor::from_bytes(&source)?
+    let model_object_id = pages::Draft::from_bytes(&source)?
         .tables()?
         .first()
         .ok_or_else(|| io::Error::other("source-built table is missing after initial build"))?
@@ -384,7 +384,7 @@ fn source_built_pages_table_retains_numbers_stylesheet_closure() -> TestResult {
 
     assert_stylesheet_closure(&source, model_object_id)?;
 
-    let reopened = pages::Editor::from_bytes(&source)?;
+    let reopened = pages::Draft::from_bytes(&source)?;
     let reopened_model_object_id = reopened
         .tables()?
         .first()

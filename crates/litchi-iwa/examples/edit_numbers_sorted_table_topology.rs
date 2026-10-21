@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         numbers::TableSortDirection::Ascending,
     )])?;
 
-    let mut editor = numbers::Editor::open(&source)?;
+    let mut editor = numbers::Draft::open(&source)?;
     let table = TableSelector::index(0);
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     assert_eq!(
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     editor.save(inserted)?;
 
-    let mut editor = numbers::Editor::open(source)?;
+    let mut editor = numbers::Draft::open(source)?;
     let table = TableSelector::index(0);
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let body_sort_column = 1usize

@@ -15,13 +15,13 @@ use crate::charts::axis::{
 use crate::charts::{Axis, Kind};
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartaxisdefault3dlabelposition` in the generated axis non-style.
 const VALUE_AXIS_3D_LABEL_POSITION_FIELD: u32 = 1;
 /// Read one chart's effective 3D value-axis label position.
 pub(crate) fn chart_3d_value_axis_label_position(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -40,7 +40,7 @@ pub(crate) fn chart_3d_value_axis_label_position(
 
 /// Set one chart's 3D value-axis label position.
 pub(crate) fn set_chart_3d_value_axis_label_position(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

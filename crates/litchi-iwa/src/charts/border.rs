@@ -12,14 +12,14 @@ use crate::charts::style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultshowborder` in `TSCH.Generated.ChartStyleArchive`.
 const CHART_BORDER_VISIBLE_FIELD: u32 = 18;
 
 /// Read whether one native chart shows its chart-area border.
 pub(crate) fn chart_border_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -35,7 +35,7 @@ pub(crate) fn chart_border_visible(
 
 /// Set whether one native chart shows its chart-area border.
 pub(crate) fn set_chart_border_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
 use litchi_xls::cell_values::{Reference, Selector};
-use litchi_xls::comments::{Snapshot, Value};
+use litchi_xls::comments::Value;
 use litchi_xls::raw::Reader;
 use litchi_xls::writer::Builder;
 
@@ -94,25 +94,31 @@ fn every_writer_level_publishes_the_default_save_bytes() {
 fn every_source_backed_overlay_level_publishes_the_default_save_bytes() {
     let mut source = Cursor::new(Vec::new());
     builder().build().unwrap().write_to(&mut source).unwrap();
-    let mut edit = Snapshot::from_bytes(source.into_inner()).unwrap().edit();
+    let mut edit = litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(source.into_inner()),
+    ))
+    .unwrap()
+    .edit_comments()
+    .unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author", "edit").unwrap(),
     )
     .unwrap();
-    let commit = edit.commit_source_backed().unwrap();
-    assert!(!commit.is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_noop());
 
     let directory = scratch_directory();
     let reference = directory.join("reference.xls");
-    commit.save(&reference).unwrap();
+    commit.package().save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
 
     for durability in LEVELS {
         let destination = directory.join(format!("{}.xls", durability.as_str()));
         std::fs::write(&destination, b"old destination").unwrap();
         commit
+            .package()
             .save_with_durability(&destination, durability)
             .unwrap();
         assert_eq!(

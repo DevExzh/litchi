@@ -7,7 +7,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireView, append_length_delimited_field_with_limits},
+    wire::{WireView, append_length_delimited_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
@@ -94,6 +94,34 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote source cannot be deleted from safely")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-deletion {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+        path: Path,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-deletion transaction")]
+    Allocation { amount: usize },
+    #[error("the deleted Keynote candidate failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-deletion patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical edits")]
     UnsupportedSource,
     #[error("this Keynote slide topology is not supported for deletion")]
@@ -112,25 +140,38 @@ pub enum Error {
     OperationAlreadyStaged,
     #[error("the Keynote slide-deletion transaction has no staged operation")]
     NoStagedOperation,
-    #[error("the Keynote source cannot be deleted from safely")]
-    InvalidSource,
     #[error("the selected Keynote slide graph has another surviving owner")]
     AmbiguousOwnership,
-    #[error(
-        "Keynote slide-deletion {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-        path: Path,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-deletion transaction")]
-    Allocation { amount: usize },
-    #[error("the deleted Keynote candidate failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-deletion patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousOwnership { .. } => RefusalKind::UnsupportedContent,
+            Self::UnsupportedSource { .. } | Self::UnsupportedTopology { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::CannotDeleteFinalSlide { .. } => RefusalKind::UnsupportedTarget,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -396,7 +437,7 @@ fn select_metadata<'a>(
         return Err(Error::InvalidSource);
     }
     if facts.ambiguous {
-        return Err(Error::AmbiguousOwnership);
+        return Err(Error::Refused(Refusal::AmbiguousOwnership));
     }
     let node_selector = ComponentSelector::new(node_component_id, facts.node_locator);
     let slide_selector = ComponentSelector::new(slide_component_id, facts.slide_locator);
@@ -549,7 +590,7 @@ pub(super) fn production_test_attempt(
     let observed = budget.report.work;
     if let Some(maximum) = max_work {
         if observed > maximum {
-            let error = Error::LimitExceeded {
+            let error = Error::Limit {
                 kind: LimitKind::Work,
                 observed,
                 maximum,
@@ -620,7 +661,7 @@ impl Budget {
             .checked_add(amount as u64)
             .ok_or(Error::InvalidSource)?;
         if self.report.work > self.maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Work,
                 observed: self.report.work,
                 maximum: self.maximum,
@@ -636,7 +677,7 @@ impl Budget {
             .checked_add(1)
             .ok_or(Error::InvalidSource)?;
         if self.report.references_scanned > self.max_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed: self.report.references_scanned,
                 maximum: self.max_references,
@@ -652,7 +693,7 @@ impl Budget {
             .checked_add(1)
             .ok_or(Error::InvalidSource)?;
         if self.report.objects_scanned > self.max_objects {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Objects,
                 observed: self.report.objects_scanned,
                 maximum: self.max_objects,
@@ -681,7 +722,7 @@ impl Budget {
             .checked_add(report.references_scanned() as u64)
             .ok_or(Error::InvalidSource)?;
         if self.report.references_scanned > self.max_references {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed: self.report.references_scanned,
                 maximum: self.max_references,
@@ -729,19 +770,21 @@ impl<'a> Edit<'a> {
         selector: impl Into<SlideSelector<'s>>,
     ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let selector = selector.into();
         let show = self.source.show().map_err(map_read_error)?;
         if show.slides().len() <= 1 {
-            return Err(Error::CannotDeleteFinalSlide);
+            return Err(Error::Refused(Refusal::CannotDeleteFinalSlide));
         }
         let selected = show
             .select_slide(selector)
             .map_err(map_selector_error)?
             .ok_or(match selector {
-                SlideSelector::Name(_) => Error::SlideNameNotFound,
-                SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
+                SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+                SlideSelector::Position(position) => {
+                    Error::Refused(Refusal::SlidePositionNotFound { position })
+                },
             })?;
         self.intent = Some(Intent {
             position: Position::new(selected.index()),
@@ -751,7 +794,9 @@ impl<'a> Edit<'a> {
 
     /// Validate, rewrite, reopen, and publish the staged immutable candidate.
     pub fn commit(self) -> Result<Commit, Error> {
-        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         commit_deletion(self.source, intent)
     }
 }
@@ -789,6 +834,13 @@ impl Patch {
     #[must_use]
     pub const fn target_fingerprint(&self) -> u64 {
         self.artifacts.target_fingerprint()
+    }
+    /// Return whether this patch leaves the deck unchanged. A deletion (or its
+    /// inverse, a restoration) always changes the slide count, so a patch of
+    /// this family is never a no-op.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.source_slide_count == self.target_slide_count
     }
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -854,6 +906,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -982,13 +1040,13 @@ fn prepare_selection<'a>(
             .map_err(map_read_error)?;
     let nodes = snapshot.slide_node_identifiers();
     if nodes.len() <= 1 {
-        return Err(Error::CannotDeleteFinalSlide);
+        return Err(Error::Refused(Refusal::CannotDeleteFinalSlide));
     }
     if intent.position.get() >= nodes.len() {
         return Err(Error::InvalidSource);
     }
     if snapshot.has_deprecated_root_slide_node() || snapshot.has_slide_list() {
-        return Err(Error::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     budget.allocation(
         nodes
@@ -999,7 +1057,7 @@ fn prepare_selection<'a>(
     let mut sorted = nodes.to_vec();
     sorted.sort_unstable();
     if sorted.first() == Some(&0) || sorted.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Error::UnsupportedTopology);
+        return Err(Error::Refused(Refusal::UnsupportedTopology));
     }
     let node_identifier = nodes[intent.position.get()];
     validate_selected_reference_metadata(show, show_message_index, node_identifier, &[3, 2])?;
@@ -1059,13 +1117,13 @@ fn prepare_selection<'a>(
                     if *id == node_identifier {
                         node_owner += 1;
                         if owner != show_identifier || message_index != show_message_index {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                     if *id == slide_identifier {
                         slide_owner += 1;
                         if owner != node_identifier || message_index != node_message_index {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                 }
@@ -1084,14 +1142,14 @@ fn prepare_selection<'a>(
                                 || message_index != show_message_index
                                 || field.path.as_slice() != [3, 2])
                         {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                         if *id == slide_identifier
                             && (owner != node_identifier
                                 || message_index != node_message_index
                                 || field.path.as_slice() != [2])
                         {
-                            return Err(Error::AmbiguousOwnership);
+                            return Err(Error::Refused(Refusal::AmbiguousOwnership));
                         }
                     }
                     for id in &field.data_references {
@@ -1208,15 +1266,15 @@ fn one_message(object: &ArchiveObject, type_: u32) -> Result<(usize, &[u8]), Err
 }
 
 fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         match field.number() {
-            1 => return Err(Error::UnsupportedTopology),
+            1 => return Err(Error::Refused(Refusal::UnsupportedTopology)),
             2 => {
                 if selected.is_some() || field.wire_type() != 2 {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
                 selected = Some(
                     super::validate_reference_payload(
@@ -1229,7 +1287,7 @@ fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
             },
             21 => {
                 if field.wire_type() != 0 || strict_canonical_varint(field.payload())? != 1 {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
             },
             _ => {},
@@ -1237,7 +1295,7 @@ fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     }
     selected
         .filter(|id| *id != 0)
-        .ok_or(Error::UnsupportedTopology)
+        .ok_or(Error::Refused(Refusal::UnsupportedTopology))
 }
 
 fn strict_canonical_varint(payload: &[u8]) -> Result<u64, Error> {
@@ -1310,7 +1368,7 @@ fn validate_selected_reference_metadata(
 }
 
 fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Result<Vec<u8>, Error> {
-    let show = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let show = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut found_tree = false;
     let mut output = Vec::new();
     output
@@ -1327,7 +1385,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
             return Err(Error::InvalidSource);
         }
         found_tree = true;
-        let tree = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let tree = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         let mut retained = Vec::new();
         let mut removed = 0usize;
         for child in tree.fields() {
@@ -1356,8 +1414,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
         if removed != 1 {
             return Err(Error::InvalidSource);
         }
-        append_length_delimited_field_with_limits(&mut output, 3, &retained, limits)
-            .map_err(map_wire_error)?;
+        append_length_delimited_field(&mut output, 3, &retained, limits).map_err(map_wire_error)?;
     }
     if !found_tree {
         return Err(Error::InvalidSource);
@@ -1372,8 +1429,8 @@ fn publish_selection(
 ) -> Result<Package, Error> {
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
-        PhysicalSource::Package(_) => return Err(Error::UnsupportedSource),
-        PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
+        PhysicalSource::Semantic(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let limits = catalog
         .limits()
@@ -1709,14 +1766,16 @@ fn count_changed_components(before: &Package, after: &Package) -> usize {
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) if source.source_is_exact() => Ok(source.shared_source()),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
 fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -1727,7 +1786,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Objects,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1745,7 +1804,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1765,7 +1824,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::EntryBytes,
             observed,
             maximum,
@@ -1781,7 +1840,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1800,7 +1859,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1849,7 +1908,7 @@ fn map_metadata_error(error: RewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,

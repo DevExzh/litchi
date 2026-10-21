@@ -11,7 +11,7 @@ use crate::charts::series_symbol_fill::{
 use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
-impl Editor {
+impl Draft {
     pub fn body_chart_series_symbol_fills(
         &self,
         drawable_object_id: u64,
@@ -74,7 +74,7 @@ impl Editor {
             count,
             series.zero_based(),
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_series_symbol_fill(drawable_object_id, series)? != inherited {
             return Err(Error::InvalidFormat(
                 "Pages chart data-symbol fill reset failed validation".to_owned(),
@@ -116,7 +116,7 @@ impl Editor {
             fill_size,
             tint,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_series_symbol_fill(drawable_object_id, series)?
             != ChartSeriesSymbolFill::Custom(crate::shapes::ShapeFill::Image(image.clone()))
         {
@@ -129,7 +129,7 @@ impl Editor {
     }
 }
 
-fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ChartSeriesSymbolFill>> {
+fn read(editor: &Draft, drawable_object_id: u64) -> Result<Vec<ChartSeriesSymbolFill>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native(
         editor.package(),
@@ -141,11 +141,7 @@ fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ChartSeriesSymbo
     )
 }
 
-fn set(
-    editor: &mut Editor,
-    drawable_object_id: u64,
-    fills: &[ChartSeriesSymbolFill],
-) -> Result<()> {
+fn set(editor: &mut Draft, drawable_object_id: u64, fills: &[ChartSeriesSymbolFill]) -> Result<()> {
     if read(editor, drawable_object_id)? == fills {
         return Ok(());
     }
@@ -160,7 +156,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         fills,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_symbol_fills(drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Pages chart data-symbol fill update failed validation".to_owned(),

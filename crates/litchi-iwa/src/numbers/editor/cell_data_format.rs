@@ -35,7 +35,7 @@ mod pop_up_menu;
 use codec::*;
 
 pub(super) fn cell_data_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -156,7 +156,7 @@ pub(super) fn cell_data_format(
 }
 
 pub(super) fn cell_number_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -184,7 +184,7 @@ pub(super) fn cell_number_format(
 }
 
 pub(super) fn cell_custom_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -199,7 +199,7 @@ pub(super) fn cell_custom_format(
 }
 
 pub(super) fn reset_cell_custom_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -214,7 +214,7 @@ pub(super) fn reset_cell_custom_format(
 }
 
 pub(super) fn cell_currency_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -242,7 +242,7 @@ pub(super) fn cell_currency_format(
 }
 
 pub(super) fn reset_cell_currency_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -270,7 +270,7 @@ pub(super) fn reset_cell_currency_format(
 }
 
 pub(super) fn cell_percentage_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -298,7 +298,7 @@ pub(super) fn cell_percentage_format(
 }
 
 pub(super) fn cell_scientific_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -326,7 +326,7 @@ pub(super) fn cell_scientific_format(
 }
 
 pub(super) fn reset_cell_scientific_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -354,7 +354,7 @@ pub(super) fn reset_cell_scientific_format(
 }
 
 pub(super) fn cell_fraction_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -382,7 +382,7 @@ pub(super) fn cell_fraction_format(
 }
 
 pub(super) fn reset_cell_fraction_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -410,7 +410,7 @@ pub(super) fn reset_cell_fraction_format(
 }
 
 pub(super) fn cell_numeral_system_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -438,7 +438,7 @@ pub(super) fn cell_numeral_system_format(
 }
 
 pub(super) fn reset_cell_numeral_system_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -466,7 +466,7 @@ pub(super) fn reset_cell_numeral_system_format(
 }
 
 pub(super) fn cell_date_time_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -494,7 +494,7 @@ pub(super) fn cell_date_time_format(
 }
 
 pub(super) fn reset_cell_date_time_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -522,7 +522,7 @@ pub(super) fn reset_cell_date_time_format(
 }
 
 pub(super) fn cell_duration_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -550,7 +550,7 @@ pub(super) fn cell_duration_format(
 }
 
 pub(super) fn reset_cell_duration_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -581,7 +581,7 @@ pub(super) fn reset_cell_duration_format(
 // table hosts. Numbers' public control surface routes through the focused
 // selector-first litchi-numbers owner.
 pub(super) fn cell_checkbox_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -596,7 +596,7 @@ pub(super) fn cell_checkbox_format(
 }
 
 pub(super) fn reset_cell_checkbox_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -611,7 +611,7 @@ pub(super) fn reset_cell_checkbox_format(
 }
 
 pub(super) fn cell_star_rating_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -626,7 +626,7 @@ pub(super) fn cell_star_rating_format(
 }
 
 pub(super) fn reset_cell_star_rating_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -641,7 +641,7 @@ pub(super) fn reset_cell_star_rating_format(
 }
 
 pub(super) fn cell_slider_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -656,7 +656,7 @@ pub(super) fn cell_slider_format(
 }
 
 pub(super) fn reset_cell_slider_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -671,7 +671,7 @@ pub(super) fn reset_cell_slider_format(
 }
 
 pub(super) fn cell_stepper_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -686,7 +686,7 @@ pub(super) fn cell_stepper_format(
 }
 
 pub(super) fn reset_cell_stepper_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -701,7 +701,7 @@ pub(super) fn reset_cell_stepper_format(
 }
 
 pub(super) fn set_cell_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -711,7 +711,7 @@ pub(super) fn set_cell_number_format(
 }
 
 pub(super) fn set_cell_data_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -926,7 +926,7 @@ pub(super) fn set_cell_data_format(
 }
 
 pub(super) fn reset_cell_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -954,7 +954,7 @@ pub(super) fn reset_cell_number_format(
 }
 
 pub(super) fn reset_cell_percentage_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -982,7 +982,7 @@ pub(super) fn reset_cell_percentage_format(
 }
 
 pub(super) fn reset_cell_data_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1184,7 +1184,7 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
 }
 
 fn resolve_format_table(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &model::CellLocation,
 ) -> Result<storage::ResolvedTableDataList> {
     let identifier = location
@@ -1232,7 +1232,7 @@ fn required_format_entry(
 }
 
 fn ensure_current_format_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1322,7 +1322,7 @@ fn ensure_current_format_table(
 }
 
 fn append_format_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     resolved: &storage::ResolvedTableDataList,
     format: FormatStructArchive,
 ) -> Result<u32> {
@@ -1387,12 +1387,11 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<Number> {
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;
     use crate::numbers::editor::compatibility_document_from_bytes;
-    use crate::numbers::{self, Editor, SemanticTableCellAssertions};
+    use crate::numbers::{self, Draft, SemanticTableCellAssertions};
     use litchi_numbers::cell::data_format::control::Range;
     use litchi_numbers::cell::data_format::custom::{
         Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, Name,
@@ -1662,7 +1661,7 @@ mod tests {
         assert_eq!(controls.entries.len(), 1);
         assert_eq!(controls.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             cell_checkbox_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(Checkbox)
@@ -1754,7 +1753,7 @@ mod tests {
             })
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             cell_star_rating_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(StarRating)
@@ -1853,7 +1852,7 @@ mod tests {
             })
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             cell_slider_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(number_slider.clone())
@@ -1966,7 +1965,7 @@ mod tests {
             })
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             cell_stepper_format(&reopened.package, table_id, 1, 1).unwrap(),
             Some(number_stepper.clone())
@@ -2039,7 +2038,7 @@ mod tests {
             Some(text_format_to_native())
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Text(Text)
@@ -2171,7 +2170,7 @@ mod tests {
             2
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             number.clone().into()
@@ -2238,7 +2237,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Duration(duration)
@@ -2342,7 +2341,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::DateTime(date_time.clone())
@@ -2400,7 +2399,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .table_cell_numeral_system_format(table_id, 1, 1)
@@ -2461,7 +2460,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Scientific(scientific)
@@ -2520,7 +2519,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Currency(currency)
@@ -2584,7 +2583,7 @@ mod tests {
         assert_eq!(formats.entries.len(), 1);
         assert_eq!(formats.entries[0].entry.refcount, 2);
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Number(format)
@@ -2696,7 +2695,7 @@ mod tests {
             Some(NATIVE_PERCENTAGE_FORMAT_TYPE)
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Percentage(percentage)

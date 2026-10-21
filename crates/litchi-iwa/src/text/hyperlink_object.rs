@@ -2,7 +2,7 @@
 
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_protos::hyperlink_codec::{self, DecodeOptions as HyperlinkDecodeOptions};
 
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
@@ -82,7 +82,7 @@ pub(super) fn new_hyperlink_object(
 }
 
 pub(super) fn patch_hyperlink_target(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifier: u64,
     target: &TextHyperlinkTarget,

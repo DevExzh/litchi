@@ -27,7 +27,6 @@ const SUPPORTS_SECONDARY_FEATURE_FIELD: u32 = 10_002;
 const DEFAULT_RADAR_FILL_STROKE_ALPHA_MULTIPLIER: f32 = 0.15;
 
 /// Native graph differences that cannot be shared across iWork applications.
-#[allow(deprecated)]
 pub(crate) fn source_chart_objects(
     ids: SourceChartObjectIds,
     parent_id: u64,

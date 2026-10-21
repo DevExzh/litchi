@@ -9,7 +9,7 @@ use crate::image_caption::{
 };
 use crate::package::PackageLimits;
 
-impl Editor {
+impl Draft {
     /// Read the native caption attached to one body chart.
     pub fn body_chart_caption(&self, drawable_object_id: u64) -> Result<Option<String>> {
         body_chart_caption(self, drawable_object_id)
@@ -30,21 +30,18 @@ impl Editor {
     }
 }
 
-fn body_chart_caption(editor: &Editor, drawable_object_id: u64) -> Result<Option<String>> {
+fn body_chart_caption(editor: &Draft, drawable_object_id: u64) -> Result<Option<String>> {
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     slot.storage_id
         .map(|storage_id| {
-            IWorkTextEditor::from_package(editor.package().clone())
+            crate::text::Draft::from_package(editor.package().clone())
                 .storage(crate::text::native_storage_id(storage_id)?)
                 .map(|storage| storage.storage.into_text())
         })
         .transpose()
 }
 
-fn body_chart_caption_slot(
-    editor: &Editor,
-    drawable_object_id: u64,
-) -> Result<DrawableCaptionSlot> {
+fn body_chart_caption_slot(editor: &Draft, drawable_object_id: u64) -> Result<DrawableCaptionSlot> {
     let source = body_chart_graph(editor, drawable_object_id)?;
     let archive = editor.package().archive(&source.archive_name)?;
     let object = archive.object(drawable_object_id).ok_or_else(|| {
@@ -71,12 +68,12 @@ fn body_chart_caption_slot(
     )
 }
 
-fn set_body_chart_caption(editor: &mut Editor, drawable_object_id: u64, text: &str) -> Result<()> {
+fn set_body_chart_caption(editor: &mut Draft, drawable_object_id: u64, text: &str) -> Result<()> {
     let source = body_chart_graph(editor, drawable_object_id)?;
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     let expected = Some(text.to_owned());
     let staged = if let Some(storage_id) = slot.storage_id {
-        let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
+        let mut text_editor = crate::text::Draft::from_package(editor.package().clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
@@ -104,7 +101,7 @@ fn set_body_chart_caption(editor: &mut Editor, drawable_object_id: u64, text: &s
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_caption(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart caption update failed validation".to_owned(),
@@ -114,7 +111,7 @@ fn set_body_chart_caption(editor: &mut Editor, drawable_object_id: u64, text: &s
     Ok(())
 }
 
-fn remove_body_chart_caption(editor: &mut Editor, drawable_object_id: u64) -> Result<bool> {
+fn remove_body_chart_caption(editor: &mut Draft, drawable_object_id: u64) -> Result<bool> {
     let source = body_chart_graph(editor, drawable_object_id)?;
     let slot = body_chart_caption_slot(editor, drawable_object_id)?;
     if slot.storage_id.is_none() {
@@ -131,7 +128,7 @@ fn remove_body_chart_caption(editor: &mut Editor, drawable_object_id: u64) -> Re
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_caption(drawable_object_id)?.is_some() {
         return Err(Error::InvalidFormat(
             "Pages chart caption removal failed validation".to_owned(),
@@ -141,7 +138,7 @@ fn remove_body_chart_caption(editor: &mut Editor, drawable_object_id: u64) -> Re
     Ok(true)
 }
 
-fn body_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Option<String>)> {
+fn body_chart_caption_theme(editor: &Draft) -> Result<(CaptionThemeStyle, Option<String>)> {
     let root = pages_document_root_facts(editor.package())?;
     let theme_id = root
         .theme
@@ -190,7 +187,7 @@ fn body_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Optio
 }
 
 fn insert_body_chart_caption(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,
@@ -225,7 +222,7 @@ fn insert_body_chart_caption(
 }
 
 fn insert_body_chart_caption_standin(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,

@@ -669,5 +669,7 @@ mod tests {
 
 /// Exact-source transactions for the document page layout.
 pub mod transaction {
-    pub use crate::package::page_layout::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+    pub use crate::package::page_layout::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }

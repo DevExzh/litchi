@@ -8,6 +8,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(2)
         .unwrap_or_else(|| "Created from scratch with litchi-iwa".to_owned());
 
-    pages::Editor::create_with_text(body_text)?.save(output)?;
+    pages::Draft::create_with_text(body_text)?.save(output)?;
     Ok(())
 }

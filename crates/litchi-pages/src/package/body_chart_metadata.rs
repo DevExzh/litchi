@@ -98,7 +98,7 @@ pub enum Error {
     #[error(
         "Pages body-chart metadata {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -165,7 +165,7 @@ fn metadata_options(budget: &ArrangementBudget, source: &[u8]) -> Result<DecodeO
     let source_bytes = source.len().max(1).min(limits.max_input_bytes());
     let fields = limits.max_fields().max(1);
     let work = limits.max_rewrite_work().max(1);
-    let max_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::LimitExceeded {
+    let max_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::Limit {
         kind: LimitKind::WireNesting,
         observed: limits.max_nesting() as u64,
         maximum: u32::MAX as u64,
@@ -213,21 +213,21 @@ fn charge_metadata_report(
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
     if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > limits.max_nesting() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(report.max_depth()),
             maximum: limits.max_nesting() as u64,
         });
     }
     if report.label_count() > MAX_METADATA_LABEL_COUNT {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::LabelCount,
             observed: report.label_count() as u64,
             maximum: MAX_METADATA_LABEL_COUNT as u64,
         });
     }
     if report.text_bytes() > MAX_METADATA_TEXT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextBytes,
             observed: report.text_bytes() as u64,
             maximum: MAX_METADATA_TEXT_BYTES as u64,
@@ -242,7 +242,7 @@ fn own_labels(
 ) -> Result<Vec<String>, Error> {
     let count = labels.len();
     if count > MAX_METADATA_LABEL_COUNT {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::LabelCount,
             observed: count as u64,
             maximum: MAX_METADATA_LABEL_COUNT as u64,
@@ -363,7 +363,7 @@ fn decode_title(
     let limits = budget
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
-    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::LimitExceeded {
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::Limit {
         kind: LimitKind::WireNesting,
         observed: limits.max_nesting() as u64,
         maximum: u32::MAX as u64,
@@ -427,19 +427,23 @@ fn decode_title(
 
 fn map_arrangement_error(error: BodyChartArrangementError) -> Error {
     match error {
-        BodyChartArrangementError::ChartNotFound { position }
-        | BodyChartArrangementError::ChartPositionNotFound { position } => {
-            Error::ChartNotFound { position }
-        },
-        BodyChartArrangementError::UnsupportedSource => Error::UnsupportedSource,
+        BodyChartArrangementError::Refused(crate::chart::arrangement::Refusal::ChartNotFound {
+            position,
+        })
+        | BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::ChartPositionNotFound { position },
+        ) => Error::ChartNotFound { position },
+        BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::UnsupportedSource,
+        ) => Error::UnsupportedSource,
         BodyChartArrangementError::InvalidSource
         | BodyChartArrangementError::Verification
         | BodyChartArrangementError::PatchConflict => Error::InvalidSource,
-        BodyChartArrangementError::LimitExceeded {
+        BodyChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_arrangement_limit(kind),
             observed,
             maximum,
@@ -478,42 +482,42 @@ fn map_metadata_codec_error(error: chart_metadata_codec::DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.input_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.label_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::LabelCount,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.text_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::TextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.depth_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireNesting,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -528,28 +532,28 @@ fn map_title_codec_error(error: chart_title_codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            ChartTitleDecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            ChartTitleDecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Fields { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            ChartTitleDecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Work { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            ChartTitleDecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            ChartTitleDecodeLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             },
             ChartTitleDecodeLimit::Output { observed, maximum }
-            | ChartTitleDecodeLimit::Title { observed, maximum } => Error::LimitExceeded {
+            | ChartTitleDecodeLimit::Title { observed, maximum } => Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -590,7 +594,7 @@ mod tests {
     fn metadata_options_refuse_exhausted_aggregate_work_before_decode() {
         let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
         let mut budget = ArrangementBudget::new(&package).expect("arrangement budget");
-        let BodyChartArrangementError::LimitExceeded { maximum, .. } =
+        let BodyChartArrangementError::Limit { maximum, .. } =
             budget.work(usize::MAX).expect_err("finite work ceiling")
         else {
             panic!("expected a work limit");
@@ -601,7 +605,7 @@ mod tests {
         let result = metadata_options(&budget, b"chart");
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 ..
             })
@@ -625,13 +629,18 @@ mod tests {
             &mut source,
             GENERATED_CHART_NON_STYLE_EXTENSION_FIELD,
             &title,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )
         .expect("title extension framing");
-        let view = litchi_iwa_common::wire::WireView::parse(&source).expect("title field");
+        let view = litchi_iwa_common::wire::WireView::parse(
+            &source,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("title field");
         let result = decode_title(view.fields().next().expect("title extension"), &mut budget);
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireRetainedBytes,
                 ..
             })

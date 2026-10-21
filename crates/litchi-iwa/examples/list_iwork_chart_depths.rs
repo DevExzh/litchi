@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = numbers::Editor::open(input)?;
+    let editor = numbers::Draft::open(input)?;
     for sheet in editor.sheets()? {
         for chart in editor.sheet_charts(sheet.id())? {
             if chart.kind.supports_3d_depth() {
@@ -49,7 +49,7 @@ fn list_numbers(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_pages(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = pages::Editor::open(input)?;
+    let editor = pages::Draft::open(input)?;
     for chart in editor.body_charts()? {
         if chart.kind.supports_3d_depth() {
             println!(
@@ -66,7 +66,7 @@ fn list_pages(input: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn list_keynote(input: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let editor = keynote::Editor::open(input)?;
+    let editor = keynote::Draft::open(input)?;
     for slide in editor.slides()? {
         for chart in editor.slide_charts(slide.index)? {
             if chart.kind.supports_3d_depth() {

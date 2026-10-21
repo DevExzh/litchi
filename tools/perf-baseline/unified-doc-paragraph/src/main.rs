@@ -14,11 +14,8 @@
 
 use litchi_core::Position;
 use litchi_doc::Builder;
-use litchi_doc::body_text::{
-    OpenOptions as BodyOpenOptions, Projection, Snapshot,
-    TransactionLimits as BodyTransactionLimits,
-};
-use litchi_doc::tracked_revision::Limits;
+use litchi_doc::Package as Snapshot;
+use litchi_doc::body_text::{Projection, TransactionLimits as BodyTransactionLimits};
 use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{File, OpenOptions, SourceMode};
 use serde_json::{Value, json};
@@ -68,7 +65,9 @@ fn open_unified(bytes: &[u8]) -> Result<File> {
 /// publication.  `bytes.to_vec()` is prepared by the caller and cloned here,
 /// matching the unified source's materialization into an owned body snapshot.
 fn native_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snapshot> {
-    let snapshot = Snapshot::open(bytes.to_vec(), Limits::default())?;
+    // Record 0359a: the body-text engine is crate-private; the native leg is
+    // the `Package` route it backs.
+    let snapshot = Snapshot::from_bytes(bytes)?;
     let mut edit = snapshot.edit()?;
     edit.replace_paragraph(Position::new(position), replacement)?;
     let commit = edit.commit()?;
@@ -82,8 +81,10 @@ fn native_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snaps
 /// policy propagation and cross-crate option dispatch from path resolution
 /// and source-owner promotion.
 fn native_facade_policy_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snapshot> {
-    let snapshot = Snapshot::from_bytes_with_options(bytes.to_vec(), facade_body_open_options())?;
-    let mut edit = snapshot.edit_with_limits(facade_body_transaction_limits())?;
+    let snapshot = Snapshot::from_bytes_with_options(bytes, facade_body_open_options())?;
+    let mut edit = snapshot.edit_with_options(
+        litchi_doc::EditOptions::default().transaction_limits(facade_body_transaction_limits()),
+    )?;
     edit.replace_paragraph(Position::new(position), replacement)?;
     let commit = edit.commit()?;
     Ok(commit.into_parts().0)
@@ -97,7 +98,7 @@ fn native_explicit_default_once(
     position: usize,
     replacement: &str,
 ) -> Result<Snapshot> {
-    let snapshot = Snapshot::from_bytes_with_options(bytes.to_vec(), BodyOpenOptions::default())?;
+    let snapshot = Snapshot::from_bytes_with_options(bytes, litchi_doc::OpenOptions::default())?;
     let mut edit = snapshot.edit()?;
     edit.replace_paragraph(Position::new(position), replacement)?;
     let commit = edit.commit()?;
@@ -111,21 +112,16 @@ fn native_explicit_default_once(
 fn native_reader_context(
     bytes: &[u8],
 ) -> Result<(
-    litchi_doc::raw::Package<Cursor<Vec<u8>>>,
+    litchi_doc::raw::Reader<Cursor<Vec<u8>>>,
     litchi_doc::Document,
 )> {
-    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes.to_vec()))?;
     let document = package.document()?;
     Ok((package, document))
 }
 
-fn facade_body_open_options() -> BodyOpenOptions {
-    BodyOpenOptions::default()
-        .source_limits(litchi_doc::SourceLimits::default())
-        .with_transaction_limits(
-            BodyTransactionLimits::new(isize::MAX as usize, usize::MAX, usize::MAX)
-                .with_max_retained_render_bytes(usize::MAX),
-        )
+fn facade_body_open_options() -> litchi_doc::OpenOptions {
+    litchi_doc::OpenOptions::default().source_limits(litchi_doc::SourceLimits::default())
 }
 
 fn facade_body_transaction_limits() -> BodyTransactionLimits {
@@ -160,9 +156,9 @@ fn text_digest(texts: &[String]) -> String {
 }
 
 fn paragraph_texts(bytes: &[u8]) -> Result<Vec<String>> {
-    let snapshot = Snapshot::open(bytes.to_vec(), Limits::default())?;
+    let snapshot = Snapshot::from_bytes(bytes)?;
     Ok(snapshot
-        .paragraphs(Projection::All)?
+        .body_paragraphs(Projection::All)?
         .into_iter()
         .map(|paragraph| paragraph.text().to_owned())
         .collect())
@@ -241,15 +237,15 @@ fn measure(bytes: &[u8], count: usize, rounds: usize, diagnostic: bool) -> Resul
         let unified = open_unified(bytes)?;
         unified_once(&unified, &path, &replacement)?
     };
-    let native_warm_bytes = native_warm.bytes();
+    let native_warm_bytes = native_warm.to_bytes()?;
     let unified_warm_bytes = unified_warm.to_bytes()?;
-    let native_warm_texts = verify_output(native_warm_bytes, count, position, &replacement)?;
+    let native_warm_texts = verify_output(&native_warm_bytes, count, position, &replacement)?;
     let unified_warm_texts = verify_output(&unified_warm_bytes, count, position, &replacement)?;
     if native_warm_texts != unified_warm_texts {
         return Err("native and unified DOC paragraph text projections differ".into());
     }
-    let warm_equivalence = verify_exact(native_warm_bytes, &unified_warm_bytes)?;
-    let native_output_sha256 = sha256(native_warm_bytes);
+    let warm_equivalence = verify_exact(&native_warm_bytes, &unified_warm_bytes)?;
+    let native_output_sha256 = sha256(&native_warm_bytes);
     let unified_output_sha256 = sha256(&unified_warm_bytes);
     if native_warm_bytes == bytes || unified_warm_bytes == bytes {
         return Err("the warm-up paragraph replacement produced unchanged bytes".into());

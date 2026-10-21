@@ -108,6 +108,7 @@ fn sort_order(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult<V
                     &mut rewritten,
                     2,
                     if index == 0 { first.as_slice() } else { rule },
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             }
             payload = rewritten;
@@ -135,14 +136,24 @@ fn model_payload(
         append_varint_field(&mut payload, UNKNOWN_MODEL_FIELD, UNKNOWN_MODEL_VALUE)?;
     }
     if let Some(sort) = sort {
-        append_length_delimited_field(&mut payload, SORT_ORDER_FIELD, sort)?;
+        append_length_delimited_field(
+            &mut payload,
+            SORT_ORDER_FIELD,
+            sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_tracker {
         let tracker = tst::SortRuleReferenceTrackerArchive {
             reference_tracker: reference(TRACKER_TARGET_IDENTIFIER),
         }
         .encode_to_vec();
-        append_length_delimited_field(&mut payload, SORT_TRACKER_FIELD, &tracker)?;
+        append_length_delimited_field(
+            &mut payload,
+            SORT_TRACKER_FIELD,
+            &tracker,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -408,8 +419,18 @@ fn append_duplicate_sort_field(package: &[u8]) -> TestResult<Vec<u8>> {
         false,
     )?;
     rewrite_model(package, |model| {
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &sort)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &sort)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -431,7 +452,12 @@ fn append_noncanonical_nested_field(package: &[u8]) -> TestResult<Vec<u8>> {
     append_overlong_varint_field(&mut malformed, 1, 0);
     rewrite_model(package, |model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -459,14 +485,24 @@ fn tracker_reference_payload(
 
 fn tracker_payload(reference: &[u8]) -> TestResult<Vec<u8>> {
     let mut tracker = Vec::new();
-    append_length_delimited_field(&mut tracker, 1, reference)?;
+    append_length_delimited_field(
+        &mut tracker,
+        1,
+        reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(tracker)
 }
 
 fn replace_tracker_payload(package: &[u8], tracker: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_model(package, |model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_TRACKER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_TRACKER_FIELD, tracker)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_TRACKER_FIELD,
+            tracker,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -845,7 +881,12 @@ fn malformed_field45_reference_graph_is_rejected_atomically() -> TestResult {
     let valid_reference = tracker_reference_payload(TRACKER_TARGET_IDENTIFIER, None, None, false)?;
     let duplicate_outer = rewrite_model(&source, |model| {
         let tracker = tracker_payload(&valid_reference)?;
-        append_length_delimited_field(model, SORT_TRACKER_FIELD, &tracker)?;
+        append_length_delimited_field(
+            model,
+            SORT_TRACKER_FIELD,
+            &tracker,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let wrong_wire = rewrite_model(&source, |model| {

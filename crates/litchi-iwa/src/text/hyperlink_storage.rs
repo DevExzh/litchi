@@ -8,7 +8,7 @@ use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
@@ -59,7 +59,7 @@ impl RangedObjectTable {
 }
 
 pub(super) fn locate_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     kind: RangedObjectTable,
 ) -> Result<StorageLocation> {
@@ -74,7 +74,7 @@ pub(super) fn locate_storage(
 }
 
 pub(super) fn locate_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     kind: RangedObjectTable,
 ) -> Result<LocatedStorage> {
@@ -360,7 +360,7 @@ pub(super) fn encode_table(original: Option<&[u8]>, boundaries: Vec<Boundary>) -
 type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
 pub(super) fn patch_ranged_object_table<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     kind: RangedObjectTable,

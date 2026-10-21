@@ -7,7 +7,7 @@ use prost::Message;
 use crate::archive::{Archive, RawMessage};
 use crate::protobuf::tswp::StorageArchive;
 use crate::wire::repeated_length_delimited_payloads;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 pub(super) const STORAGE_MESSAGE_TYPES: &[u32] = &[2_001, 2_022];
 const PAGES_FOOTNOTE_TABLE_FIELD: u32 = 16;
@@ -31,7 +31,7 @@ pub(super) struct LocatedStorage {
 
 /// Locate one writable storage and validate one optional singular table field.
 pub(super) fn locate_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     table_field: u32,
     table_label: &str,
@@ -42,7 +42,7 @@ pub(super) fn locate_storage(
 
 /// Locate one writable storage and retain its already-parsed archive.
 pub(super) fn locate_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     table_field: u32,
     table_label: &str,
@@ -52,7 +52,7 @@ pub(super) fn locate_storage_with_archive(
 
 /// Locate one writable text storage without applying a table-specific policy.
 pub(super) fn locate_text_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<StorageLocation> {
     locate_text_storage_with_archive(package, storage_id).map(|located| located.location)
@@ -60,14 +60,14 @@ pub(super) fn locate_text_storage(
 
 /// Locate one writable text storage and retain its already-parsed archive.
 pub(super) fn locate_text_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedStorage> {
     locate_storage_in_package(package, storage_id, None)
 }
 
 /// Discover every writable text storage while validating each recognized payload.
-pub(super) fn locate_text_storages(package: &IWorkPackage) -> Result<Vec<StorageLocation>> {
+pub(super) fn locate_text_storages(package: &HostPackage) -> Result<Vec<StorageLocation>> {
     let mut locations = Vec::new();
     let mut seen = HashSet::new();
     for archive_name in package.iwa_entry_names() {
@@ -93,7 +93,7 @@ pub(super) fn locate_text_storages(package: &IWorkPackage) -> Result<Vec<Storage
 }
 
 fn locate_storage_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     table: Option<(u32, &str)>,
 ) -> Result<LocatedStorage> {
@@ -128,7 +128,7 @@ fn locate_storage_in_package(
 /// Apply a validated staged archive edit without parsing the target component
 /// a second time.
 pub(super) fn update_parsed_archive<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     mut archive: Archive,
     update: F,
@@ -313,7 +313,7 @@ mod tests {
         )
         .unwrap();
         let unrecognized = ArchiveObject::new(42, Vec::new()).unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/One.iwa",
@@ -349,7 +349,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/DocumentStylesheet.iwa",
@@ -376,7 +376,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/One.iwa",
@@ -403,7 +403,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/One.iwa",

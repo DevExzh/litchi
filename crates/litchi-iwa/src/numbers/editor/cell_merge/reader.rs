@@ -5,14 +5,14 @@ use std::sync::Arc;
 
 use litchi_numbers::{MergeReader, SheetSelector, TableSelector, table::merge::Region};
 
-use super::super::{Editor, selectors};
-use crate::{Error, IWorkPackage, Result};
+use super::super::{Draft, selectors};
+use crate::{Error, HostPackage, Result};
 use litchi_numbers::table::merge::transaction::Error as TableMergesError;
 use litchi_numbers::table::merge::transaction::LimitKind as TableMergesLimitKind;
 
 /// Source-built and explicitly unrooted/legacy tables retain the compatibility
 /// reader. Every failure after a rooted canonical selection remains terminal.
-pub(crate) fn regions_in_editor(editor: &Editor, table_id: u64) -> Result<Vec<Region>> {
+pub(crate) fn regions_in_editor(editor: &Draft, table_id: u64) -> Result<Vec<Region>> {
     if editor.package().exact_source_owner().is_none() {
         return super::regions_in_package(editor.package(), table_id);
     }
@@ -25,7 +25,7 @@ pub(crate) fn regions_in_editor(editor: &Editor, table_id: u64) -> Result<Vec<Re
         .map_err(Error::from)
 }
 
-fn cached_reader(package: &IWorkPackage) -> Result<MergeReader> {
+fn cached_reader(package: &HostPackage) -> Result<MergeReader> {
     let (components, limits) = package.shared_component_catalog(map_catalog_error)?;
     MergeReader::__from_shared_catalog(
         components,
@@ -61,7 +61,7 @@ fn map_catalog_error(error: litchi_iwa_archive::Error) -> Error {
                 LimitKind::IwaStreamBytes => TableMergesLimitKind::PayloadBytes,
                 LimitKind::IwaTotalBytes => TableMergesLimitKind::TotalPayloadBytes,
             };
-            TableMergesError::LimitExceeded {
+            TableMergesError::Limit {
                 kind,
                 observed,
                 maximum,
@@ -75,14 +75,14 @@ fn map_catalog_error(error: litchi_iwa_archive::Error) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::numbers::Editor;
+    use crate::numbers::Draft;
 
     const NATIVE_NUMBERS: &[u8] = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/iwork/numbers/table-merges-native.numbers"
     ));
 
-    fn canonical_model_id(editor: &Editor) -> Result<u64> {
+    fn canonical_model_id(editor: &Draft) -> Result<u64> {
         for name in editor.package().iwa_entry_names() {
             let archive = editor.package().archive(name)?;
             for object in archive.objects {
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn cached_reader_uses_shared_catalog_for_native_table_merges() -> Result<()> {
-        let editor = Editor::from_bytes(NATIVE_NUMBERS)?;
+        let editor = Draft::from_bytes(NATIVE_NUMBERS)?;
         let model_id = canonical_model_id(&editor)?;
         let (sheet, table) = selectors::focused_merge_table_indices(&editor, model_id)?
             .ok_or_else(|| Error::InvalidFormat("native table was not rooted".to_owned()))?;
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn cached_reader_does_not_require_exact_source_bytes() -> Result<()> {
-        let editor = Editor::from_bytes(NATIVE_NUMBERS)?;
+        let editor = Draft::from_bytes(NATIVE_NUMBERS)?;
         let model_id = canonical_model_id(&editor)?;
         let (sheet, table) = selectors::focused_merge_table_indices(&editor, model_id)?
             .ok_or_else(|| Error::InvalidFormat("native table was not rooted".to_owned()))?;

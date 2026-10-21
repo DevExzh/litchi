@@ -310,7 +310,12 @@ fn append_dependency_field(package: &[u8]) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or("missing model message")?;
         let mut data = model.messages[message_index].data.clone();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 83, b"dependency")?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut data,
+            83,
+            b"dependency",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
@@ -401,13 +406,20 @@ fn selectors_read_position_and_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, fixture_settings());
     assert!(matches!(
         package.body_table_header_settings(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::headers::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&synthetic_package(["Revenue", "Revenue"], None)?)?;
     assert!(matches!(
         ambiguous.body_table_header_settings(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::headers::transaction::Refusal::AmbiguousTableName)
+                | Error::Refused(
+                    litchi_pages::table::headers::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
     Ok(())
 }
@@ -485,7 +497,7 @@ fn changed_settings_preserve_unknowns_delete_previews_and_inverse_exactly() -> T
         b"untouched-sentinel"
     );
     let changed_model = model_payload(&commit.package().exact_bytes(), FIRST_MODEL_IDENTIFIER)?;
-    let unknown = WireView::parse(&changed_model)?
+    let unknown = WireView::parse(&changed_model, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
         .ok_or("unknown model field was dropped")?;
@@ -541,7 +553,7 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
         let before = malformed.exact_bytes();
         assert!(matches!(
             malformed.body_table_header_settings(0usize),
-            Err(Error::InvalidSource) | Err(Error::LimitExceeded { .. })
+            Err(Error::InvalidSource) | Err(Error::Limit { .. })
         ));
         assert_eq!(malformed.exact_bytes(), before.as_slice());
     }
@@ -557,7 +569,10 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         .set(changed_settings())
         .commit()
         .expect_err("a locked table must reject a changed header edit");
-    assert!(matches!(locked_error, Error::TableLocked));
+    assert!(matches!(
+        locked_error,
+        Error::Refused(litchi_pages::table::headers::transaction::Refusal::TableLocked)
+    ));
     assert_eq!(locked.exact_bytes(), locked_source.as_slice());
 
     let dependency_source =
@@ -596,11 +611,13 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
         &mut category_owner,
         2,
         &category_group,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     litchi_iwa_common::wire::append_length_delimited_field(
         &mut malformed_model_dependency,
         81,
         &category_owner,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     for malformed_source in [
         append_table_info_raw(&source, &[0x38, 0x01])?,
@@ -642,7 +659,7 @@ fn finite_limits_fail_closed_before_publication() -> TestResult<()> {
         let result = package
             .edit_body_table_header_settings(0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before.as_slice());
             transaction_rejected = true;
             break;

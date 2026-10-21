@@ -94,6 +94,33 @@ pub enum DependencyKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies
+    /// it (record 0351 §2.4, record 0361).
+    Refused(Refusal),
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+        path: Path,
+    },
+    Allocation {
+        kind: LimitKind,
+        amount: usize,
+    },
+    InvalidSource {
+        path: Path,
+    },
+    Verification {
+        path: Path,
+    },
+    PatchConflict,
+}
+
+/// A well-formed table-cell request this route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
     InvalidAddress,
     SheetNotFound,
     TableNotFound,
@@ -104,21 +131,8 @@ pub enum Error {
         position: At,
         dimensions: Dimensions,
     },
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-        path: Path,
-    },
-    Allocation {
-        kind: LimitKind,
-        amount: usize,
-    },
     DuplicatePosition {
         position: At,
-    },
-    InvalidSource {
-        path: Path,
     },
     TableLocked {
         path: Path,
@@ -130,13 +144,34 @@ pub enum Error {
         path: Path,
         kind: DependencyKind,
     },
-    Verification {
-        path: Path,
-    },
-    PatchConflict,
 }
 
-impl fmt::Display for Error {
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound | Self::TableNotFound => RefusalKind::NotFound,
+            Self::InvalidAddress
+            | Self::AmbiguousSource { .. }
+            | Self::OutOfBounds { .. }
+            | Self::DuplicatePosition { .. } => RefusalKind::InvalidValue,
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+impl fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidAddress => formatter.write_str("invalid Numbers cell address"),
@@ -148,7 +183,27 @@ impl fmt::Display for Error {
             Self::OutOfBounds { .. } => {
                 formatter.write_str("the Numbers cell coordinate is outside the selected table")
             },
-            Self::LimitExceeded {
+            Self::DuplicatePosition { .. } => {
+                formatter.write_str("the Numbers cell batch contains a duplicate coordinate")
+            },
+            Self::TableLocked { .. } => formatter.write_str("the selected Numbers table is locked"),
+            Self::UnsupportedSource { .. } => {
+                formatter.write_str("the Numbers table-cell source is not safely writable")
+            },
+            Self::UnsupportedDependency { .. } => {
+                formatter.write_str("the Numbers table-cell change has an unsupported dependency")
+            },
+        }
+    }
+}
+
+impl std::error::Error for Refusal {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Refused(refusal) => refusal.fmt(formatter),
+            Self::Limit {
                 observed, maximum, ..
             } => write!(
                 formatter,
@@ -158,18 +213,8 @@ impl fmt::Display for Error {
                 formatter,
                 "could not allocate {amount} units of {kind:?} for the Numbers table-cell operation"
             ),
-            Self::DuplicatePosition { .. } => {
-                formatter.write_str("the Numbers cell batch contains a duplicate coordinate")
-            },
             Self::InvalidSource { .. } => {
                 formatter.write_str("the Numbers table-cell source is malformed")
-            },
-            Self::TableLocked { .. } => formatter.write_str("the selected Numbers table is locked"),
-            Self::UnsupportedSource { .. } => {
-                formatter.write_str("the Numbers table-cell source is not safely writable")
-            },
-            Self::UnsupportedDependency { .. } => {
-                formatter.write_str("the Numbers table-cell change has an unsupported dependency")
             },
             Self::Verification { .. } => {
                 formatter.write_str("the Numbers table-cell operation failed verification")
@@ -210,7 +255,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidAddress`] for malformed A1 input. Other errors
+    /// Returns [`Refusal::InvalidAddress`] for malformed A1 input. Other errors
     /// are the same selector and bounds failures returned by
     /// [`Self::table_cell`].
     pub fn table_cell_a1<'sheet, 'table>(
@@ -219,7 +264,8 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<State, Error> {
-        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position =
+            At::from_a1(address).map_err(|_error| Error::Refused(Refusal::InvalidAddress))?;
         self.table_cell(sheet, table, position)
     }
 
@@ -253,7 +299,8 @@ impl Package {
         address: &str,
         input: Input,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position =
+            At::from_a1(address).map_err(|_error| Error::Refused(Refusal::InvalidAddress))?;
         self.set_table_cell(sheet, table, position, input)
     }
 
@@ -280,7 +327,8 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let position =
+            At::from_a1(address).map_err(|_error| Error::Refused(Refusal::InvalidAddress))?;
         self.clear_table_cell(sheet, table, position)
     }
 
@@ -301,7 +349,7 @@ impl Package {
     ) -> Result<Vec<State>, Error> {
         let selected = resolve_table(self, sheet.into(), table.into())?;
         ensure_range(selected.table.dimensions(), range, selected.path)?;
-        let requested = range.area().ok_or(Error::LimitExceeded {
+        let requested = range.area().ok_or(Error::Limit {
             kind: LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: usize_to_u64(self.state.options.semantic().max_materialized_cells()),
@@ -309,7 +357,7 @@ impl Package {
         })?;
         let maximum = self.state.options.semantic().max_materialized_cells();
         if requested > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::RetainedElements,
                 observed: usize_to_u64(requested),
                 maximum: usize_to_u64(maximum),
@@ -322,14 +370,14 @@ impl Package {
 
         let text_maximum = self.state.options.semantic().max_output_text_bytes();
         let selected_text_bytes =
-            selected_text_bytes(selected.table, range).ok_or(Error::LimitExceeded {
+            selected_text_bytes(selected.table, range).ok_or(Error::Limit {
                 kind: LimitKind::OwnedValueBytes,
                 observed: u64::MAX,
                 maximum: usize_to_u64(text_maximum),
                 path: selected.path,
             })?;
         if selected_text_bytes > text_maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OwnedValueBytes,
                 observed: usize_to_u64(selected_text_bytes),
                 maximum: usize_to_u64(text_maximum),
@@ -385,7 +433,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidAddress`] for malformed A1 input. Other errors
+    /// Returns [`Refusal::InvalidAddress`] for malformed A1 input. Other errors
     /// are the same selector, bounds, resource, and allocation failures
     /// returned by [`Self::table_cells`].
     pub fn table_cells_a1<'sheet, 'table>(
@@ -394,7 +442,8 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Vec<State>, Error> {
-        let range = Area::from_a1(address).map_err(|_error| Error::InvalidAddress)?;
+        let range =
+            Area::from_a1(address).map_err(|_error| Error::Refused(Refusal::InvalidAddress))?;
         self.table_cells(sheet, table, range)
     }
 }
@@ -419,7 +468,7 @@ pub(super) fn resolve_table<'package>(
                 .sheets()
                 .get(position)
                 .map(|sheet| (position, sheet))
-                .ok_or(Error::SheetNotFound)?
+                .ok_or(Error::Refused(Refusal::SheetNotFound))?
         },
         SheetSelector::Name(name) => {
             let mut matches = source
@@ -429,11 +478,13 @@ pub(super) fn resolve_table<'package>(
                 .iter()
                 .enumerate()
                 .filter(|(_position, sheet)| sheet.name() == name);
-            let first = matches.next().ok_or(Error::SheetNotFound)?;
+            let first = matches
+                .next()
+                .ok_or(Error::Refused(Refusal::SheetNotFound))?;
             if matches.next().is_some() {
-                return Err(Error::AmbiguousSource {
+                return Err(Error::Refused(Refusal::AmbiguousSource {
                     path: Path::Package,
-                });
+                }));
             }
             first
         },
@@ -447,21 +498,23 @@ pub(super) fn resolve_table<'package>(
                 .tables()
                 .nth(position)
                 .map(|table| (position, table))
-                .ok_or(Error::TableNotFound)?
+                .ok_or(Error::Refused(Refusal::TableNotFound))?
         },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()
                 .enumerate()
                 .filter(|(_position, table)| table.name() == name);
-            let first = matches.next().ok_or(Error::TableNotFound)?;
+            let first = matches
+                .next()
+                .ok_or(Error::Refused(Refusal::TableNotFound))?;
             if matches.next().is_some() {
-                return Err(Error::AmbiguousSource {
+                return Err(Error::Refused(Refusal::AmbiguousSource {
                     path: Path::Table {
                         sheet: compact_sheet,
                         table: compact_position(first.0, Path::Package)?,
                     },
-                });
+                }));
             }
             first
         },
@@ -532,10 +585,10 @@ fn try_clone_text(source: &str) -> Result<String, Error> {
 
 fn ensure_position(dimensions: Dimensions, position: At, _path: Path) -> Result<(), Error> {
     if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
-        return Err(Error::OutOfBounds {
+        return Err(Error::Refused(Refusal::OutOfBounds {
             position,
             dimensions,
-        });
+        }));
     }
     Ok(())
 }
@@ -543,16 +596,16 @@ fn ensure_position(dimensions: Dimensions, position: At, _path: Path) -> Result<
 fn ensure_range(dimensions: Dimensions, range: Area, _path: Path) -> Result<(), Error> {
     let (_start, end) = range.bounds();
     if end.row() > dimensions.rows() || end.column() > dimensions.columns() {
-        return Err(Error::OutOfBounds {
+        return Err(Error::Refused(Refusal::OutOfBounds {
             position: end,
             dimensions,
-        });
+        }));
     }
     Ok(())
 }
 
 fn compact_position(position: usize, path: Path) -> Result<u32, Error> {
-    u32::try_from(position).map_err(|_error| Error::LimitExceeded {
+    u32::try_from(position).map_err(|_error| Error::Limit {
         kind: LimitKind::RetainedElements,
         observed: usize_to_u64(position),
         maximum: u64::from(u32::MAX),

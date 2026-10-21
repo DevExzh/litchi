@@ -307,7 +307,7 @@ fn replace_length_delimited_field(
     number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(replacement.len()));
     let mut replaced = false;
     for field in view.fields() {
@@ -317,7 +317,7 @@ fn replace_length_delimited_field(
                     io::Error::other("native image fixture has duplicate mutation field").into(),
                 );
             }
-            append_length_delimited_field(&mut output, number, replacement)?;
+            append_length_delimited_field(&mut output, number, replacement, WireLimits::DEFAULT)?;
             replaced = true;
         } else {
             output.extend_from_slice(field.raw());
@@ -331,7 +331,7 @@ fn replace_length_delimited_field(
 
 fn with_data_reference_extension(source: &[u8]) -> TestResult<Vec<u8>> {
     let location = image_payload(source)?;
-    let image = WireView::parse(&location.bytes)?;
+    let image = WireView::parse(&location.bytes, WireLimits::DEFAULT)?;
     let data = image
         .fields()
         .find(|field| field.number() == IMAGE_DATA_FIELD)
@@ -345,7 +345,7 @@ fn with_data_reference_extension(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_wrong_image_parent(source: &[u8]) -> TestResult<Vec<u8>> {
     let location = image_payload(source)?;
-    let image = WireView::parse(&location.bytes)?;
+    let image = WireView::parse(&location.bytes, WireLimits::DEFAULT)?;
     let drawable = image
         .fields()
         .find(|field| field.number() == 1)
@@ -362,12 +362,12 @@ fn with_duplicate_body_attachment(source: &[u8]) -> TestResult<Vec<u8>> {
     let attachment = image_attachment_location(source, image.object_id)?;
     let attachment_identifier = attachment.object_id;
     let body = body_storage_location(source, attachment_identifier)?;
-    let body_view = WireView::parse(&body.bytes)?;
+    let body_view = WireView::parse(&body.bytes, WireLimits::DEFAULT)?;
     let table = body_view
         .fields()
         .find(|field| field.number() == BODY_ATTACHMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native body attachment table is missing"))?;
-    let table_view = WireView::parse(table.payload())?;
+    let table_view = WireView::parse(table.payload(), WireLimits::DEFAULT)?;
     let mut table_payload = Vec::with_capacity(table.payload().len());
     let mut duplicated = false;
     for field in table_view.fields() {
@@ -375,12 +375,12 @@ fn with_duplicate_body_attachment(source: &[u8]) -> TestResult<Vec<u8>> {
         if field.number() != 1 || duplicated {
             continue;
         }
-        let entry = WireView::parse(field.payload())?;
+        let entry = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let object = entry
             .fields()
             .find(|entry_field| entry_field.number() == 2)
             .ok_or_else(|| io::Error::other("native body attachment object is missing"))?;
-        let reference = WireView::parse(object.payload())?;
+        let reference = WireView::parse(object.payload(), WireLimits::DEFAULT)?;
         let identifier = reference
             .fields()
             .find(|reference_field| reference_field.number() == 1)
@@ -464,7 +464,7 @@ fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
@@ -475,7 +475,7 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(adjustments.payload())?
+        WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
             .fields()
             .filter(|field| !ADJUSTMENT_FIELDS.contains(&field.number()))
             .map(|field| field.raw().to_vec()),
@@ -484,12 +484,12 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native image-adjustments field is missing"))?;
-    Ok(WireView::parse(adjustments.payload())?
+    Ok(WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == SHARPNESS_FIELD)
         .map(|field| field.raw().to_vec())

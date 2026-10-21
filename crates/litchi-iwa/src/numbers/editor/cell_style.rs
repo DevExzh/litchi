@@ -143,7 +143,7 @@ impl CellStyleOverrides {
 }
 
 pub(super) fn effective_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -158,7 +158,7 @@ pub(super) fn effective_property(
 }
 
 pub(super) fn set_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -174,7 +174,7 @@ pub(super) fn set_property(
 }
 
 pub(super) fn set_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -318,7 +318,7 @@ pub(super) fn set_properties(
 }
 
 pub(super) fn reset_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -454,7 +454,7 @@ fn base_style_id(descriptor: &model::TableDescriptor, row: usize, column: usize)
 }
 
 fn cell_style_key(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &model::TableDescriptor,
     _locations: &HashMap<u64, String>,
     row: usize,
@@ -475,7 +475,7 @@ fn cell_style_key(
 }
 
 fn local_style_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &model::TableDescriptor,
     locations: &HashMap<u64, String>,
     row: usize,
@@ -522,7 +522,7 @@ fn style_entry(
 }
 
 fn cell_style_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     style_id: u64,
 ) -> Result<CellStyleLocation> {
@@ -552,7 +552,7 @@ fn cell_style_location(
 }
 
 fn effective_property_from(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     first_style_id: u64,
     kind: CellStylePropertyKind,
@@ -585,7 +585,7 @@ fn effective_property_from(
 }
 
 fn direct_supported_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     style_id: u64,
 ) -> Result<Option<CellStyleOverrides>> {
@@ -706,7 +706,7 @@ fn cell_style_variation(
 }
 
 fn replace_supported_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     overrides: CellStyleOverrides,
 ) -> Result<()> {
@@ -772,7 +772,7 @@ fn replace_supported_style(
 }
 
 fn register_style_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     style_id: u64,
     data_identifier: Option<u64>,
@@ -792,7 +792,7 @@ fn register_style_object(
 }
 
 fn adjust_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     style_id: u64,
     old: Option<u64>,
@@ -813,7 +813,7 @@ fn adjust_data_reference(
 }
 
 fn insert_style_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     style_id: u64,
@@ -880,7 +880,7 @@ fn insert_style_entry(
 }
 
 fn read_bnc(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &model::CellLocation,
     column: usize,
 ) -> Result<BncCell> {
@@ -896,7 +896,7 @@ fn read_bnc(
 }
 
 fn write_style_key(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &model::CellLocation,
     row: usize,
     column: usize,
@@ -913,7 +913,7 @@ fn write_style_key(
     )
 }
 
-fn style_has_children(package: &IWorkPackage, archive_name: &str, style_id: u64) -> Result<bool> {
+fn style_has_children(package: &HostPackage, archive_name: &str, style_id: u64) -> Result<bool> {
     let archive = package.archive(archive_name)?;
     Ok(archive.objects.iter().any(|object| {
         object.messages.iter().any(|message| {
@@ -930,7 +930,7 @@ fn style_has_children(package: &IWorkPackage, archive_name: &str, style_id: u64)
 }
 
 fn remove_disposable_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     style_id: u64,
     parent_id: u64,
@@ -1042,7 +1042,7 @@ fn padding_values(padding: &tswp::PaddingArchive) -> [f32; 4] {
 }
 
 fn verify_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,

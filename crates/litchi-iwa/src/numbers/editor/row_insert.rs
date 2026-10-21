@@ -12,7 +12,7 @@ use table_headers::set_attached_table_header_settings;
 use table_sort::validate_table_sort_order_for_topology;
 use table_topology::{category_grouping_is_enabled, filter_has_row_state};
 
-impl Editor {
+impl Draft {
     /// Insert one blank row at a section-relative position in a table.
     ///
     /// Stored cells, row metadata, stable row UIDs, header/footer counts, and
@@ -30,7 +30,7 @@ impl Editor {
         let source_built = !self.package.source_is_exact();
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let table = verified
             .tables()?
             .into_iter()
@@ -49,7 +49,7 @@ impl Editor {
 }
 
 pub(super) fn insert_attached_table_row(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     insertion: RowInsertion,
 ) -> Result<usize> {
@@ -167,7 +167,7 @@ fn validate_section_insertion(index: usize, length: usize, section: &str) -> Res
 }
 
 fn validate_row_insertion_features(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
 ) -> Result<()> {

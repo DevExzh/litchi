@@ -58,6 +58,42 @@ const MAX_STYLE_DEPTH: usize = 16;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted cell text-style source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} cell text-style items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested state.
+    #[error("cell text-style candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("cell text-style patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The sheet selector did not resolve one sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -84,40 +120,46 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support cell text styles")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted cell text-style source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} cell text-style items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested state.
-    #[error("cell text-style candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("cell text-style patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::EmptyCell { .. } => RefusalKind::UnsupportedOperation,
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } | Self::CellNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::EmptyStyle { .. } => RefusalKind::InvalidValue,
+            Self::NoStagedOperation { .. } => RefusalKind::UnsupportedOperation,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 fn from_topology(error: topology::Error) -> Error {
     use topology::Error as E;
     match error {
-        E::SheetNotFound => Error::SheetNotFound,
-        E::TableNotFound => Error::TableNotFound,
+        E::Refused(crate::package::table_topology::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
+        },
+        E::Refused(crate::package::table_topology::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
         E::Allocation { amount } => Error::Allocation { amount },
-        E::UnsupportedSource => Error::UnsupportedSource,
+        E::Refused(crate::package::table_topology::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         _ => Error::InvalidSource,
     }
 }
@@ -155,13 +197,13 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::CellNotFound`] outside the table, [`Error::EmptyStyle`].
+    /// [`Refusal::CellNotFound`] outside the table, [`Refusal::EmptyStyle`].
     pub fn set(mut self, position: At, properties: CharacterProperties) -> Result<Self, Error> {
         if properties.is_empty() {
-            return Err(Error::EmptyStyle);
+            return Err(Error::Refused(Refusal::EmptyStyle));
         }
         if position.row() >= self.rows || position.column() >= self.columns {
-            return Err(Error::CellNotFound);
+            return Err(Error::Refused(Refusal::CellNotFound));
         }
         if let Some((_, staged)) = self.cells.iter_mut().find(|(cell, _)| *cell == position) {
             let mut merged = properties;
@@ -180,13 +222,13 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`]; [`Error::EmptyCell`] for a cell that
-    /// stores nothing; [`Error::UnsupportedDependency`] for a style graph
+    /// [`Refusal::NoStagedOperation`]; [`Refusal::EmptyCell`] for a cell that
+    /// stores nothing; [`Refusal::UnsupportedDependency`] for a style graph
     /// this transaction does not rewrite; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
         if self.cells.is_empty() {
-            return Err(Error::NoStagedOperation);
+            return Err(Error::Refused(Refusal::NoStagedOperation));
         }
         let published = publish(self.source, self.sheet, self.table, &self.cells)?;
         for (position, properties) in &self.cells {
@@ -293,7 +335,7 @@ fn base_style(model: &[u8], geometry: topology::Geometry, position: At) -> Resul
     } else {
         24
     };
-    single_reference(model, field)?.ok_or(Error::UnsupportedDependency)
+    single_reference(model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
 /// The current text style object of the stored cell at `position` (its
@@ -308,7 +350,7 @@ fn current_style(
     let (_, model) = topology::message(working, target.model, &[6_001]).map_err(Error::from)?;
     let geometry = topology::geometry(model).map_err(from_topology)?;
     if position.row() >= geometry.rows || position.column() >= geometry.columns {
-        return Err(Error::CellNotFound);
+        return Err(Error::Refused(Refusal::CellNotFound));
     }
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
     let base = base_style(model, geometry, position)?;
@@ -367,7 +409,7 @@ fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
     let (_, data) =
         topology::message(working, style, &[PARAGRAPH_STYLE_MESSAGE_TYPE]).map_err(Error::from)?;
     let base = single_bytes(data, 1)?.ok_or(Error::InvalidSource)?;
-    single_reference(base, 5)?.ok_or(Error::UnsupportedDependency)
+    single_reference(base, 5)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
 /// Replace one message, transitioning its aggregate object references.
@@ -422,9 +464,11 @@ fn publish(
     let store = single_bytes(model, 4)?
         .ok_or(Error::InvalidSource)?
         .to_vec();
-    let list = single_reference(&store, STYLE_LIST_FIELD)?.ok_or(Error::UnsupportedDependency)?;
+    let list = single_reference(&store, STYLE_LIST_FIELD)?
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let list_member = working.locate(list)?.ok_or(Error::InvalidSource)?;
-    let registry = metadata::registry(&working)?.ok_or(Error::UnsupportedSource)?;
+    let registry =
+        metadata::registry(&working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let mut transition = Transition::default();
 
     // One variation per (current style, properties).
@@ -440,7 +484,8 @@ fn publish(
     let mut appended: Vec<u64> = Vec::new();
     let mut cell_updates: Vec<(At, u32)> = Vec::new();
     for (position, properties) in cells {
-        let located = locate_cell(&working, &store, *position)?.ok_or(Error::EmptyCell)?;
+        let located =
+            locate_cell(&working, &store, *position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
         let cell = litchi_numbers_wire::BncCell::parse(&located.bytes)
             .map_err(|_error| Error::InvalidSource)?;
         let current = current_style(&working, sheet, table, *position)?;
@@ -453,7 +498,7 @@ fn publish(
             let stylesheet = stylesheet_of(&working, current)?;
             let sheet_member = working.locate(stylesheet)?.ok_or(Error::InvalidSource)?;
             if working.locate(current)?.as_deref() != Some(sheet_member.as_str()) {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             let identifier = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
             let data = litchi_iwa_text_wire::character_style_variation(
@@ -551,7 +596,7 @@ fn publish(
     let mut remaining = releases;
     let (released, pruned) = lists::release(&list_data, &mut remaining)?;
     if !remaining.is_empty() {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if let Some(released) = released {
         list_data = released;
@@ -567,7 +612,8 @@ fn publish(
 
     // Point each cell at its new key.
     for (position, key) in cell_updates {
-        let located = locate_cell(&working, &store, position)?.ok_or(Error::EmptyCell)?;
+        let located =
+            locate_cell(&working, &store, position)?.ok_or(Error::Refused(Refusal::EmptyCell))?;
         let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes)
             .map_err(|_error| Error::InvalidSource)?;
         cell.set_text_style_identifier(Some(key));
@@ -603,7 +649,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Selector errors, [`Error::CellNotFound`], source errors.
+    /// Selector errors, [`Refusal::CellNotFound`], source errors.
     pub fn table_cell_text_style<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -648,7 +694,7 @@ impl Package {
         let leaf = self.workbook_ref().sheets()[sheet]
             .tables()
             .nth(table)
-            .ok_or(Error::TableNotFound)?;
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
         Ok(Edit {
             source: self,
             sheet,
@@ -678,7 +724,7 @@ impl Package {
             .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?
             .index();
         let table = topology::table_position(self, sheet, table).map_err(from_topology)?;
         Ok((sheet, table))

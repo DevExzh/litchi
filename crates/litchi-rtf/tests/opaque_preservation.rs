@@ -8,8 +8,9 @@
 )]
 
 use litchi_rtf::opaque::{Anchor, Context, Kind};
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    DefaultTabWidthPolicy, OpenOptions, Package, RtfDocument, RtfError, RtfWriter, SourceLimitKind,
+    DefaultTabWidthPolicy, OpenOptions, Package, RtfError, RtfWriter, SourceLimitKind,
     SourceLimits, WriterOptions,
 };
 use std::io::{self, Write};
@@ -47,7 +48,7 @@ fn immutable_snapshot_preserves_unknown_syntax_byte_for_byte() {
 #[test]
 fn canonical_writer_reinserts_inert_nodes_at_their_body_anchor() {
     let source = br"{\rtf1\ansi A\future42 {\*\vendor opaque}B}";
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
@@ -57,7 +58,7 @@ fn canonical_writer_reinserts_inert_nodes_at_their_body_anchor() {
     let control = serialized.find("\\future42 ").unwrap();
     let destination = serialized.find("{\\*\\vendor opaque}").unwrap();
     assert!(control < destination);
-    assert_eq!(RtfDocument::parse_bytes(&output).unwrap().text(), "AB");
+    assert_eq!(Tree::parse_bytes(&output).unwrap().text(), "AB");
 }
 
 #[test]
@@ -69,7 +70,7 @@ fn opaque_limits_are_typed_and_exact() {
         .build()
         .expect("opaque-node profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_options(control, OpenOptions::new().source_limits(limits)),
+        Tree::parse_with_options(control, OpenOptions::new().source_limits(limits)),
         Err(RtfError::Limit {
             kind: SourceLimitKind::OpaqueNodes,
             observed: 1,
@@ -85,7 +86,7 @@ fn opaque_limits_are_typed_and_exact() {
         .build()
         .expect("opaque-node byte profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_options(
+        Tree::parse_with_options(
             destination,
             OpenOptions::new().source_limits(limits)
         ),
@@ -102,7 +103,7 @@ fn opaque_limits_are_typed_and_exact() {
         .build()
         .expect("aggregate opaque-byte profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_options(
+        Tree::parse_with_options(
             destination,
             OpenOptions::new().source_limits(limits)
         ),
@@ -116,7 +117,7 @@ fn opaque_limits_are_typed_and_exact() {
 
 #[test]
 fn malformed_unknown_destination_is_not_silently_preserved() {
-    assert!(RtfDocument::parse(r"{\rtf1{\*\vendor unterminated}").is_err());
+    assert!(Tree::parse(r"{\rtf1{\*\vendor unterminated}").is_err());
 }
 
 #[test]
@@ -146,7 +147,7 @@ fn nested_header_syntax_keeps_its_owner_and_refuses_reparenting() {
     };
     assert!(first < second);
 
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     let mut output = Vec::new();
     let error = RtfWriter::new(&mut output)
         .write_document(&document)
@@ -170,7 +171,7 @@ fn nested_table_syntax_keeps_table_context_and_refuses_reparenting() {
         }
     )));
 
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     let mut output = Vec::new();
     assert!(
         RtfWriter::new(&mut output)
@@ -204,7 +205,7 @@ fn field_and_note_syntax_retain_their_structural_contexts() {
             } if actual == context
         )));
 
-        let document = RtfDocument::parse_bytes(source).unwrap();
+        let document = Tree::parse_bytes(source).unwrap();
         let mut output = Vec::new();
         assert!(
             RtfWriter::new(&mut output)

@@ -325,8 +325,8 @@ impl Snapshot {
 
     /// Starts an isolated typed edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             candidate: self.graph.clone(),
         }
@@ -371,12 +371,12 @@ impl Snapshot {
 
 /// A failure-atomic typed `DataSpaces` edit.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Graph,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrows the source snapshot used by this transaction.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -535,23 +535,8 @@ impl Transaction {
 
     /// Whether a semantic field differs from the source graph.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.candidate != self.source.graph
-    }
-
-    /// Validates and materializes the current candidate snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Invalid`] when the candidate graph fails validation.
-    pub fn snapshot(&self) -> Result<Snapshot, Error> {
-        self.materialize()
-    }
-
-    /// Abandons the edit and returns the original snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible patch.
@@ -562,11 +547,12 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = self.source.patch_to(&snapshot)?;
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn materialize(&self) -> Result<Snapshot, Error> {
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         let mut graph = self.candidate.clone();
@@ -583,44 +569,12 @@ impl Transaction {
     }
 }
 
-/// A successful `DataSpaces` publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether any `DataSpaces` stream changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Moves the published snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Moves the patch out of the commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// One source-checked replacement of a `DataSpaces` stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1014,7 +968,7 @@ impl<'a> SliceReader<'a> {
 /// Returns [`Error`] when `edit` fails or the edited graph cannot be validated and published.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), Error>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;
@@ -1952,8 +1906,9 @@ fn inspect_inner<R: Read + Seek>(
     ole: &mut OleFile<R>,
     allow_ooxml_encryption_compatibility: bool,
 ) -> Result<Option<Graph>, Error> {
-    let custom_xml_data_store = inspect_custom_xml(ole)
-        .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
+    let custom_xml_data_store =
+        inspect_custom_xml(ole, litchi_ole_common::custom_xml::Limits::default())
+            .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
     if !ole.exists(&[STORAGE]) {
         validate_custom_xml_promotion(custom_xml_data_store.as_ref(), None)?;
         return Ok(None);
@@ -3170,9 +3125,9 @@ mod tests {
         let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
         let commit = snapshot.edit().commit().unwrap();
 
-        assert!(!commit.changed());
+        assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
-        assert_eq!(commit.snapshot(), &snapshot);
+        assert_eq!(commit.package(), &snapshot);
         assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
     }
 
@@ -3206,7 +3161,7 @@ mod tests {
             .unwrap();
         let commit = transaction.commit().unwrap();
 
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         assert_eq!(commit.patch().changes().len(), 1);
         assert_eq!(
             commit.patch().changes()[0].path(),
@@ -3216,8 +3171,8 @@ mod tests {
                 "DataSpace".to_string()
             ]
         );
-        assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.snapshot());
-        assert!(commit.patch().apply(commit.snapshot()).is_err());
+        assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.package());
+        assert!(commit.patch().apply(commit.package()).is_err());
     }
 
     #[test]

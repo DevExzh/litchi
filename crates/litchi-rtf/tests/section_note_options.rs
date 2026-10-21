@@ -7,9 +7,10 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, RtfDocument, RtfWriter,
-    SectionFootnotePlacement, SectionNoteOptions,
+    EndnoteRestart, FootnoteRestart, NoteNumberingStyle, RtfWriter, SectionFootnotePlacement,
+    SectionNoteOptions,
 };
 
 #[test]
@@ -19,7 +20,7 @@ fn parses_last_wins_section_note_options_and_round_trips_stably() {
         r#"\sftnrstpg\sftnrestart\sftnnalc\sftnnchi"#,
         r#"\saftnstart3\saftnrestart\saftnnar\saftnnruc Body}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert_eq!(document.text(), "Body");
     assert_eq!(
         document.sections()[0].properties.note_options,
@@ -39,7 +40,7 @@ fn parses_last_wins_section_note_options_and_round_trips_stably() {
     RtfWriter::new(&mut first)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(
         reparsed.sections()[0].properties.note_options,
@@ -120,7 +121,7 @@ fn supports_all_42_section_numbering_control_spellings() {
 
     for (footnote, endnote, style) in cases {
         let source = format!(r"{{\rtf1\sectd\{footnote}\{endnote} X}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source).unwrap();
         let options = document.sections()[0].properties.note_options;
         assert_eq!(options.footnote_numbering, Some(style));
         assert_eq!(options.endnote_numbering, Some(style));
@@ -138,7 +139,7 @@ fn supports_all_42_section_numbering_control_spellings() {
 #[test]
 fn preserves_inheritance_and_sectd_reset() {
     let inherited =
-        RtfDocument::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}").unwrap();
+        Tree::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sftnstart2 Second}").unwrap();
     assert_eq!(inherited.sections().len(), 2);
     let first = inherited.sections()[0].properties.note_options;
     let second = inherited.sections()[1].properties.note_options;
@@ -146,8 +147,7 @@ fn preserves_inheritance_and_sectd_reset() {
     assert_eq!(second.footnote_numbering, first.footnote_numbering);
     assert_eq!(second.footnote_start, Some(2));
 
-    let reset =
-        RtfDocument::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}").unwrap();
+    let reset = Tree::parse(r"{\rtf1\sectd\sftnbj\sftnnchi First\sect\sectd Second}").unwrap();
     assert_eq!(reset.sections().len(), 2);
     assert!(reset.sections()[1].properties.note_options.is_empty());
 }
@@ -176,7 +176,7 @@ fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted malformed section note options: {source}"
         );
     }
@@ -194,7 +194,7 @@ fn rejects_invalid_values_and_non_root_or_late_section_note_options() {
 
 #[test]
 fn document_note_options_do_not_materialize_section_overrides() {
-    let document = RtfDocument::parse(r"{\rtf1\ftnnar\aftnnruc\sectd Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ftnnar\aftnnruc\sectd Body}").unwrap();
     assert!(document.sections()[0].properties.note_options.is_empty());
 }
 
@@ -205,7 +205,7 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
         r#"{\field{\*\fldinst PAGEREF mark}{\fldrslt 1\sectd\sftnbj}}"#,
         r#"\sectd\sftnnar}}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert_eq!(document.fields().len(), 2);
     assert!(
         document
@@ -226,7 +226,7 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted section note control in a non-body field result: {source}"
         );
     }
@@ -235,8 +235,7 @@ fn permits_inert_section_note_controls_only_in_body_field_results() {
 #[test]
 fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
     let document =
-        RtfDocument::parse(r"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}")
-            .unwrap();
+        Tree::parse(r"{\rtf1\sectd\sftnnar Before{\sectd\sftnbj{\b snapshot}}After}").unwrap();
     assert_eq!(document.text(), "BeforesnapshotAfter");
 
     for source in [
@@ -246,7 +245,7 @@ fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
         r"{\rtf1\sectd{\object{\sectd\sftnbj}}Body}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted non-body section-format snapshot: {source}"
         );
     }
@@ -254,7 +253,7 @@ fn permits_section_note_controls_in_explicit_body_section_format_snapshots() {
 
 #[test]
 fn permits_section_note_controls_in_explicit_root_section_format_runs() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\sectd Before\sectd\ltrsect\psz9\linex0\headery0"#,
         r#"\footery454\colsx708\endnhere\sectlinegrid360\sectdefaultcl"#,
         r#"\sftnbj After}"#,
@@ -275,7 +274,7 @@ fn permits_section_note_controls_in_explicit_root_section_format_runs() {
         r"{\rtf1\sectd Before\sectd\sbk\sftnbj}",
     ] {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted section note control after a root section-format run closed: {source}"
         );
     }
@@ -283,7 +282,7 @@ fn permits_section_note_controls_in_explicit_root_section_format_runs() {
 
 #[test]
 fn permits_inert_section_format_runs_at_direct_header_footer_level() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\sectd\sftntj"#,
         r#"{\headerr Header{\field{\*\fldinst PAGE}{\fldrslt 2}}"#,
         r#"\sectd\ltrsect\linex0\endnhere\sectdefaultcl\sftnbj{\b -}}"#,
@@ -302,7 +301,7 @@ fn permits_inert_section_format_runs_at_direct_header_footer_level() {
 
 #[test]
 fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\field{\*\fldinst IF {\b nested}"#,
         r#"\sectd\ltrsect\psz9\linex0\sectdefaultcl\sftnbj "x"}"#,
         r#"{\fldrslt value}}}"#,
@@ -317,14 +316,14 @@ fn permits_inert_section_format_runs_at_direct_field_instruction_level() {
     );
 
     let nested = r"{\rtf1{\field{\*\fldinst IF {\sectd\sftnbj} x}{\fldrslt value}}}";
-    assert!(RtfDocument::parse(nested).is_err());
+    assert!(Tree::parse(nested).is_err());
 }
 
 #[test]
 fn rejects_section_note_controls_after_the_parsed_document_group() {
     // Controls after the root group are ignored (and recorded), so they
     // cannot set the document's note options.
-    let trailing = RtfDocument::parse(r"{\rtf1 Body}\sectd\sftnbj").unwrap();
+    let trailing = Tree::parse(r"{\rtf1 Body}\sectd\sftnbj").unwrap();
     assert_eq!(trailing.text(), "Body");
     assert!(
         trailing
@@ -334,7 +333,7 @@ fn rejects_section_note_controls_after_the_parsed_document_group() {
     );
     assert_eq!(trailing.tolerance_report().total(), 1);
 
-    let document = RtfDocument::parse(r"{\rtf1\sectd\sftnbj Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1\sectd\sftnbj Body}").unwrap();
     assert_eq!(document.text(), "Body");
     assert_eq!(
         document.sections()[0]
@@ -350,7 +349,7 @@ fn parses_named_libreoffice_section_note_option_fixtures() {
     let uiwriter = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/uiwriter/data/tdf147006.rtf"
     );
-    let document = RtfDocument::parse_bytes(uiwriter).unwrap();
+    let document = Tree::parse_bytes(uiwriter).unwrap();
     let options = document.sections()[0].properties.note_options;
     assert_eq!(options.footnote_numbering, Some(NoteNumberingStyle::Arabic));
     assert_eq!(
@@ -361,7 +360,7 @@ fn parses_named_libreoffice_section_note_option_fixtures() {
     let tracking = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-change-tracking.rtf"
     );
-    let document = RtfDocument::parse_bytes(tracking).unwrap();
+    let document = Tree::parse_bytes(tracking).unwrap();
     let options = document.sections()[0].properties.note_options;
     assert_eq!(options.footnote_numbering, Some(NoteNumberingStyle::Arabic));
     assert_eq!(
@@ -372,7 +371,7 @@ fn parses_named_libreoffice_section_note_option_fixtures() {
     let header = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/NoFirstPageHeadFooter.rtf"
     );
-    let document = RtfDocument::parse_bytes(header).unwrap();
+    let document = Tree::parse_bytes(header).unwrap();
     assert!(document.sections().iter().any(|section| {
         section.properties.note_options.footnote_placement
             == Some(SectionFootnotePlacement::BottomOfPage)

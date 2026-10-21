@@ -31,15 +31,13 @@ const FIXED_CASES: &[&[u8]] = &[
     // spans are interleaved with selected fields.  The overlong unknown
     // scalar value is intentionally source-authoritative.
     &[
-        0x08, 0x83, 0x02, 0xa0, 0x06, 0x81, 0x00, 0x10, 0x0a, 0xa1, 0x06, 0x01, 0x02, 0x03,
-        0x04, 0x05, 0x06, 0x07, 0x08, 0xa2, 0x06, 0x04, 0x01, 0x02, 0x03, 0x04, 0xa5, 0x06,
-        0xde, 0xad, 0xbe, 0xef, 0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06, 0x20, 0x00, 0x28,
-        0x00,
+        0x08, 0x83, 0x02, 0xa0, 0x06, 0x81, 0x00, 0x10, 0x0a, 0xa1, 0x06, 0x01, 0x02, 0x03, 0x04,
+        0x05, 0x06, 0x07, 0x08, 0xa2, 0x06, 0x04, 0x01, 0x02, 0x03, 0x04, 0xa5, 0x06, 0xde, 0xad,
+        0xbe, 0xef, 0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06, 0x20, 0x00, 0x28, 0x00,
     ],
     // An unknown length-delimited extension after the selected fields.
     &[
-        0x08, 0x83, 0x02, 0x10, 0x0f, 0x20, 0x00, 0x28, 0x00, 0xaa, 0x06, 0x03, 0x01, 0x7f,
-        0x00,
+        0x08, 0x83, 0x02, 0x10, 0x0f, 0x20, 0x00, 0x28, 0x00, 0xaa, 0x06, 0x03, 0x01, 0x7f, 0x00,
     ],
     // Missing one selected field in each case.
     &[0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
@@ -47,10 +45,18 @@ const FIXED_CASES: &[&[u8]] = &[
     &[0x08, 0x83, 0x02, 0x10, 0x00, 0x28, 0x00],
     &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00],
     // Duplicate selected fields, one fixture for each selected slot.
-    &[0x08, 0x83, 0x02, 0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x10, 0x01, 0x20, 0x00, 0x28, 0x00],
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x20, 0x01, 0x28, 0x00],
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0x28, 0x00],
+    &[
+        0x08, 0x83, 0x02, 0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00,
+    ],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x10, 0x01, 0x20, 0x00, 0x28, 0x00,
+    ],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x20, 0x01, 0x28, 0x00,
+    ],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0x28, 0x00,
+    ],
     // Wrong wire types for every selected field.
     &[0x0a, 0x01, 0x00, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
     &[0x08, 0x83, 0x02, 0x12, 0x01, 0x00, 0x20, 0x00, 0x28, 0x00],
@@ -69,16 +75,24 @@ const FIXED_CASES: &[&[u8]] = &[
     &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x01],
     // Known fields belonging to other FormatStructArchive families cannot be
     // hidden behind the scientific route.
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x1a, 0x03, b'U', b'S', b'D', 0x20, 0x00, 0x28, 0x00],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x1a, 0x03, b'U', b'S', b'D', 0x20, 0x00, 0x28, 0x00,
+    ],
     // Number, Percentage, and Currency discriminators are all wrong-family
     // payloads even when the rest of the four-field shape looks valid.
     &[0x08, 0x80, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
     &[0x08, 0x82, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
     &[0x08, 0x81, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00],
     // Unterminated, mismatched, and truncated groups remain malformed.
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa3, 0x06, 0x08, 0x01],
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa4, 0x06],
-    &[0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa3, 0x06, 0xa5, 0x06],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa3, 0x06, 0x08, 0x01,
+    ],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa4, 0x06,
+    ],
+    &[
+        0x08, 0x83, 0x02, 0x10, 0x00, 0x20, 0x00, 0x28, 0x00, 0xa3, 0x06, 0xa5, 0x06,
+    ],
 ];
 
 fuzz_target!(|data: &[u8]| {
@@ -156,7 +170,11 @@ fn exercise_source(source: &[u8], data: &[u8]) {
     let before = source.to_vec();
     let decode_options = options(source);
     let scalar = codec::decode_scientific_format(source, decode_options);
-    assert_eq!(source, before.as_slice(), "scalar decode modified its source");
+    assert_eq!(
+        source,
+        before.as_slice(),
+        "scalar decode modified its source"
+    );
     let reported = codec::decode_scientific_format_with_report(source, decode_options);
     assert_eq!(
         source,
@@ -252,14 +270,14 @@ fn exercise_rewrites(
     let preserved = codec::ScientificFormatWrite::from_snapshot(snapshot);
     let requested = requested_write(data, snapshot);
     for write in [preserved, requested] {
-        let prepared = match codec::prepare_scientific_format_rewrite(source, write, options(source))
-        {
-            Ok(prepared) => prepared,
-            Err(error) => {
-                observe_error(error);
-                continue;
-            },
-        };
+        let prepared =
+            match codec::prepare_scientific_format_rewrite(source, write, options(source)) {
+                Ok(prepared) => prepared,
+                Err(error) => {
+                    observe_error(error);
+                    continue;
+                },
+            };
         let requirements = prepared.execution_requirements();
         let preparation = prepared.prepare_report();
         assert_eq!(preparation.output_bytes(), requirements.output_bytes());
@@ -281,8 +299,14 @@ fn exercise_rewrites(
         assert_eq!(output.report().work_bytes(), requirements.work_bytes());
         assert_eq!(output.report().max_depth(), requirements.max_depth());
         assert_eq!(output.report().allocations(), requirements.allocations());
-        assert_eq!(output.report().retained_bytes(), requirements.retained_bytes());
-        assert_eq!(output.report().scratch_bytes(), requirements.scratch_bytes());
+        assert_eq!(
+            output.report().retained_bytes(),
+            requirements.retained_bytes()
+        );
+        assert_eq!(
+            output.report().scratch_bytes(),
+            requirements.scratch_bytes()
+        );
 
         let readback = codec::decode_scientific_format(output.bytes(), options(output.bytes()))
             .unwrap_or_else(|error| panic!("Scientific-format candidate readback failed: {error}"));
@@ -309,10 +333,9 @@ fn requested_write(
         0 => snapshot.decimal_places(),
         1 => 0,
         2 => codec::MAX_SCIENTIFIC_DECIMAL_PLACES,
-        _ => data
-            .get(1)
-            .copied()
-            .map_or(0, |value| u32::from(value) % (codec::MAX_SCIENTIFIC_DECIMAL_PLACES + 1)),
+        _ => data.get(1).copied().map_or(0, |value| {
+            u32::from(value) % (codec::MAX_SCIENTIFIC_DECIMAL_PLACES + 1)
+        }),
     };
     codec::ScientificFormatWrite::new(decimal_places)
 }
@@ -562,8 +585,10 @@ fn exercise_limit_profiles(source: &[u8], report: codec::DecodeReport) {
 fn exercise_all_precisions() {
     for decimal_places in 0..=codec::MAX_SCIENTIFIC_DECIMAL_PLACES {
         let write = codec::ScientificFormatWrite::new(decimal_places);
-        let output = codec::canonical_scientific_format(write, options(&[]))
-            .unwrap_or_else(|error| panic!("precision {decimal_places} canonical write failed: {error}"));
+        let output =
+            codec::canonical_scientific_format(write, options(&[])).unwrap_or_else(|error| {
+                panic!("precision {decimal_places} canonical write failed: {error}")
+            });
         let readback = codec::decode_scientific_format(output.bytes(), options(output.bytes()))
             .unwrap_or_else(|error| panic!("precision {decimal_places} readback failed: {error}"));
         assert_eq!(readback.decimal_places(), decimal_places);

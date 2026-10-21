@@ -109,6 +109,41 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected native payload is malformed.
+    #[error("the Keynote chart value-axis source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote chart value-axis settings {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart value-axis transaction")]
+    Allocation { amount: usize },
+    /// Full candidate reopening did not reproduce the requested settings.
+    #[error("the edited Keynote chart value-axis settings failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart value-axis patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart value-axis edits")]
     UnsupportedSource,
@@ -136,30 +171,31 @@ pub enum Error {
     /// The semantic aggregate is unsuitable for native Keynote settings.
     #[error("the Keynote chart value-axis settings are invalid")]
     InvalidSettings,
-    /// The source graph or selected native payload is malformed.
-    #[error("the Keynote chart value-axis source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote chart value-axis settings {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its ceiling.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart value-axis transaction")]
-    Allocation { amount: usize },
-    /// Full candidate reopening did not reproduce the requested settings.
-    #[error("the edited Keynote chart value-axis settings failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart value-axis patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. }
+            | Self::InvalidSettings { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A checked envelope for heap-owned vectors used by the lower layers.
@@ -456,7 +492,7 @@ fn snappy_output_plan(
     limits: SnappyLimits,
 ) -> Result<(usize, usize, usize), Error> {
     if input_len > limits.max_decompressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: usize_to_u64(input_len),
             maximum: usize_to_u64(limits.max_decompressed_stream()),
@@ -466,7 +502,7 @@ fn snappy_output_plan(
         .checked_add(SnappyStream::WRITE_CHUNK_SIZE - 1)
         .map_or(0, |length| length / SnappyStream::WRITE_CHUNK_SIZE);
     if frame_count > limits.max_frames() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(frame_count),
             maximum: usize_to_u64(limits.max_frames()),
@@ -479,7 +515,7 @@ fn snappy_output_plan(
     while remaining != 0 {
         let chunk = remaining.min(SnappyStream::WRITE_CHUNK_SIZE);
         if chunk > limits.max_uncompressed_chunk() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(chunk),
                 maximum: usize_to_u64(limits.max_uncompressed_chunk()),
@@ -490,7 +526,7 @@ fn snappy_output_plan(
             .checked_sub(SNAPPY_FRAME_HEADER_BYTES)
             .ok_or(Error::InvalidSource)?;
         if compressed_chunk > limits.max_compressed_chunk() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed_chunk),
                 maximum: usize_to_u64(limits.max_compressed_chunk()),
@@ -501,7 +537,7 @@ fn snappy_output_plan(
         remaining -= chunk;
     }
     if compressed > limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: usize_to_u64(compressed),
             maximum: usize_to_u64(limits.max_compressed_stream()),
@@ -601,7 +637,7 @@ impl ValueAxisBudget {
             PhysicalSource::Semantic(_) => 0,
         };
         if source_bytes > MAX_VALUE_AXIS_TRANSACTION_BYTES {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_bytes),
                 maximum: usize_to_u64(MAX_VALUE_AXIS_TRANSACTION_BYTES),
@@ -621,7 +657,7 @@ impl ValueAxisBudget {
             .map(|value| value.min(MAX_VALUE_AXIS_TRANSACTION_BYTES))
             .ok_or(Error::InvalidSource)?;
         if source_bytes > aggregate {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_bytes),
                 maximum: usize_to_u64(aggregate),
@@ -693,7 +729,7 @@ impl ValueAxisBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -799,7 +835,7 @@ impl ValueAxisBudget {
 
         let wire_capacity = header.max(1);
         // One field vector for the outer ArchiveInfo and one for its nested
-        // MessageInfo are grown by parse_wire_fields_with_limits.
+        // MessageInfo are grown by parse_wire_fields.
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         // rewritten_message, rewritten_header, and canonical/header copies.
@@ -841,7 +877,7 @@ impl ValueAxisBudget {
             .map(|value| value.min(self.limits.max_rewrite_work()))
             .ok_or(Error::InvalidSource)?;
         if input < source_len || input == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: usize_to_u64(source_len.max(1)),
                 maximum: usize_to_u64(input),
@@ -895,7 +931,7 @@ impl ValueAxisBudget {
         self.max_depth = self.max_depth.max(depth);
         let maximum = u32::try_from(self.limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
         if self.max_depth > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(self.max_depth),
                 maximum: u64::from(maximum),
@@ -917,7 +953,7 @@ impl ValueAxisBudget {
         <Self as super::chart_axis_support::AxisSupportBudget>::charge_input(self, compressed)
             .map_err(map_support_error)?;
         if compressed > snappy_limits.max_compressed_stream() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed),
                 maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
@@ -1243,7 +1279,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.scan_pass(self.source, 0)?;
         self.source.validate().map_err(map_read_error)?;
@@ -1472,6 +1508,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.
@@ -1726,13 +1768,13 @@ fn validate_settings(settings: ValueAxisSettings) -> Result<ValueAxisSettings, E
         || maximum.is_some_and(|bound| !bound.value().is_finite())
         || matches!((minimum, maximum), (Some(low), Some(high)) if low.value() > high.value())
     {
-        return Err(Error::InvalidSettings);
+        return Err(Error::Refused(Refusal::InvalidSettings));
     }
     if settings.scale() == Scale::Logarithmic
         && (minimum.is_some_and(|bound| bound.value() <= 0.0)
             || maximum.is_some_and(|bound| bound.value() <= 0.0))
     {
-        return Err(Error::InvalidSettings);
+        return Err(Error::Refused(Refusal::InvalidSettings));
     }
     // Values 1 and 2 are canonicalized so a caller cannot stage an
     // Unsupported variant which the native reader necessarily maps back to a
@@ -1771,19 +1813,20 @@ fn codec_settings(
         .minimum()
         .map(|bound| CodecBound::new(bound.value()))
         .transpose()
-        .map_err(|_| Error::InvalidSettings)?;
+        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
     let maximum = bounds
         .maximum()
         .map(|bound| CodecBound::new(bound.value()))
         .transpose()
-        .map_err(|_| Error::InvalidSettings)?;
-    let bounds = CodecBounds::new(minimum, maximum).map_err(|_| Error::InvalidSettings)?;
+        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
+    let bounds =
+        CodecBounds::new(minimum, maximum).map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
     let steps = settings.steps();
     let steps = CodecSteps::new(
         steps.major().map(|value| value.value()),
         steps.minor().map(|value| value.value()),
     )
-    .map_err(|_| Error::InvalidSettings)?;
+    .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
     let scale = CodecScale::from_native(settings.scale().native_value());
     Ok(
         litchi_iwa_protos::keynote_chart_axis_value_settings_codec::AxisValueSettings::new(
@@ -1813,25 +1856,33 @@ fn map_support_error(error: super::chart_axis_support::AxisSupportError) -> Erro
     };
     match error {
         AxisSupportError::Selector(selector) => match selector {
-            AxisSupportSelectorError::UnsupportedSource => Error::UnsupportedSource,
-            AxisSupportSelectorError::AmbiguousSelector => Error::AmbiguousSelector,
-            AxisSupportSelectorError::EmptySlideName => Error::EmptySlideName,
-            AxisSupportSelectorError::SlideNameNotFound => Error::SlideNameNotFound,
+            AxisSupportSelectorError::UnsupportedSource => {
+                Error::Refused(Refusal::UnsupportedSource)
+            },
+            AxisSupportSelectorError::AmbiguousSelector => {
+                Error::Refused(Refusal::AmbiguousSelector)
+            },
+            AxisSupportSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+            AxisSupportSelectorError::SlideNameNotFound => {
+                Error::Refused(Refusal::SlideNameNotFound)
+            },
             AxisSupportSelectorError::SlidePositionNotFound { position } => {
-                Error::SlidePositionNotFound { position }
+                Error::Refused(Refusal::SlidePositionNotFound { position })
             },
-            AxisSupportSelectorError::ChartNameNotFound => Error::ChartNameNotFound,
+            AxisSupportSelectorError::ChartNameNotFound => {
+                Error::Refused(Refusal::ChartNameNotFound)
+            },
             AxisSupportSelectorError::ChartPositionNotFound { position } => {
-                Error::ChartPositionNotFound { position }
+                Error::Refused(Refusal::ChartPositionNotFound { position })
             },
-            AxisSupportSelectorError::EmptyChartName => Error::EmptyChartName,
+            AxisSupportSelectorError::EmptyChartName => Error::Refused(Refusal::EmptyChartName),
         },
         AxisSupportError::InvalidSource => Error::InvalidSource,
         AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
                 AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1859,7 +1910,7 @@ fn map_support_error(error: super::chart_axis_support::AxisSupportError) -> Erro
 fn map_budget_error(error: Error) -> super::chart_axis_support::AxisSupportError {
     use super::chart_axis_support::{AxisSupportError, AxisSupportLimitKind};
     match error {
-        Error::LimitExceeded {
+        Error::Limit {
             kind,
             observed,
             maximum,
@@ -2110,7 +2161,7 @@ fn rewrite_chart_axis_extension(
         )
         .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() || output_length > MAX_VALUE_AXIS_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes().min(MAX_VALUE_AXIS_BYTES)),
@@ -2150,38 +2201,38 @@ fn rewrite_chart_axis_extension(
 fn map_codec_error(error: CodecError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            CodecLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Fields { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Work { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Work { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Output { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Output { observed, maximum } => Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            CodecLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
             },
-            CodecLimit::Allocations { observed, maximum } => Error::LimitExceeded {
+            CodecLimit::Allocations { observed, maximum } => Error::Limit {
                 kind: LimitKind::Entries,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
             CodecLimit::Retained { observed, maximum }
-            | CodecLimit::Scratch { observed, maximum } => Error::LimitExceeded {
+            | CodecLimit::Scratch { observed, maximum } => Error::Limit {
                 kind: LimitKind::TotalBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -2202,7 +2253,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -2219,7 +2270,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -2247,7 +2298,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2270,7 +2321,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
@@ -2305,7 +2356,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2364,7 +2415,7 @@ impl super::chart_axis_support::AxisSupportBudget for ValueAxisBudget {
             .ok_or(AxisSupportError::InvalidSource)?;
         self.input(payload).map_err(map_budget_error)?;
         self.work(payload).map_err(map_budget_error)?;
-        // parse_wire_fields_with_limits grows this vector one element at a
+        // parse_wire_fields grows this vector one element at a
         // time. Charge a conservative event per payload-sized capacity while
         // retaining the exposed WireField byte shape.
         self.allocations(payload.max(1), bytes, bytes)

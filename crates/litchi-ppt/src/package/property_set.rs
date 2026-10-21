@@ -107,27 +107,27 @@ impl Snapshot {
 /// An isolated PPT property-set transaction over owned CFB bytes.
 pub(crate) struct Transaction {
     source: Snapshot,
-    editor: property_set::Editor,
+    editor: property_set::Edit,
     changed: bool,
 }
 
 impl Transaction {
     fn new(source: Snapshot) -> Result<Self> {
         Ok(Self {
-            editor: property_set::Editor::new(source.bytes.to_vec())?,
+            editor: property_set::Edit::new(source.bytes.to_vec())?,
             source,
             changed: false,
         })
     }
 
     /// The shared property-set editor, for the package metadata transaction.
-    pub(crate) const fn editor(&self) -> &property_set::Editor {
+    pub(crate) const fn editor(&self) -> &property_set::Edit {
         &self.editor
     }
 
     /// Mutable access to the shared editor; staging through it marks the
     /// transaction changed.
-    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Editor {
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Edit {
         self.changed = true;
         &mut self.editor
     }
@@ -206,17 +206,14 @@ impl Transaction {
             },
             _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::SummaryInformation, commit.into_section())?;
+            .replace(Binding::SummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }
@@ -249,17 +246,14 @@ impl Transaction {
             },
             _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
         };
-        let mut transaction = snapshot.transaction()?;
-        {
-            let mut draft = transaction.edit();
-            edit(&mut draft)?;
-        }
-        let commit = transaction.commit()?;
-        if !commit.changed() {
+        let mut draft = snapshot.edit()?;
+        edit(&mut draft)?;
+        let commit = draft.commit()?;
+        if !commit.diagnostics().changed() {
             return Ok(false);
         }
         self.editor
-            .replace(Binding::DocumentSummaryInformation, commit.into_section())?;
+            .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         self.changed = true;
         Ok(true)
     }

@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     editor.insert_table_column(
         TableSelector::index(table_index),
         ColumnInsertion::body(column),

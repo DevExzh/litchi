@@ -122,7 +122,7 @@ fn map_metadata_limit(limit: metadata_codec::DecodeLimit) -> Error {
 }
 
 fn limit_exceeded(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -130,7 +130,7 @@ fn limit_exceeded(kind: LimitKind, observed: usize, maximum: usize) -> Error {
 }
 
 fn limit_exceeded_u32(kind: LimitKind, observed: u32, maximum: u32) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::from(observed),
         maximum: u64::from(maximum),
@@ -200,6 +200,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph or package-media closure is unsafe to edit.
+    #[error("the Keynote slide-media source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote slide-media {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// The bounded resource category.
+        kind: LimitKind,
+        /// The checked observed value.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// A bounded operation-local allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-media transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the requested replacement.
+    #[error("the edited Keynote slide-media candidate failed semantic verification")]
+    Verification,
+    /// The patch was created from a different exact source artifact.
+    #[error("the Keynote slide-media patch does not match the exact source package")]
+    PatchConflict,
+    /// A lower-level read failed without exposing raw archive details.
+    #[error("could not read the Keynote package for slide-media access")]
+    Read,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package was created from semantic components without exact ZIP bytes.
     #[error("this Keynote source does not support physical slide-media edits")]
     UnsupportedSource,
@@ -221,22 +257,6 @@ pub enum Error {
     /// Poster selection on an audio-only drawable is unsupported.
     #[error("Keynote audio media has no poster part")]
     AudioPoster,
-    /// The selected graph or package-media closure is unsafe to edit.
-    #[error("the Keynote slide-media source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote slide-media {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// The bounded resource category.
-        kind: LimitKind,
-        /// The checked observed value.
-        observed: u64,
-        /// The configured maximum.
-        maximum: u64,
-    },
-    /// A bounded operation-local allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-media transaction")]
-    Allocation { amount: usize },
     /// Empty replacement data is never a materialized asset.
     #[error("Keynote media replacement data cannot be empty")]
     EmptyReplacement,
@@ -246,15 +266,32 @@ pub enum Error {
     /// Replacement bytes do not retain the selected media family.
     #[error("Keynote media replacement has an incompatible media type")]
     ReplacementType,
-    /// Candidate reopening did not reproduce the requested replacement.
-    #[error("the edited Keynote slide-media candidate failed semantic verification")]
-    Verification,
-    /// The patch was created from a different exact source artifact.
-    #[error("the Keynote slide-media patch does not match the exact source package")]
-    PatchConflict,
-    /// A lower-level read failed without exposing raw archive details.
-    #[error("could not read the Keynote package for slide-media access")]
-    Read,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::AudioPoster { .. }
+            | Self::ReplacementType { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::EmptyReplacement { .. }
+            | Self::ReplacementTooLarge { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A borrowed existing media payload.
@@ -671,6 +708,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -840,7 +883,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         before: expected_before,
         after,
     } = edit;
-    let replacement = after.as_deref().ok_or(Error::EmptyReplacement)?;
+    let replacement = after
+        .as_deref()
+        .ok_or(Error::Refused(Refusal::EmptyReplacement))?;
     let catalog = physical_catalog(source)?;
     let mut budget = MediaBudget::for_package(source)?;
     budget.charge_catalog(catalog)?;
@@ -880,7 +925,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let record = selection.record.as_ref().ok_or(Error::InvalidSource)?;
     let data_name = copy_data_path(record.current_name.as_ref(), &mut budget)?;
@@ -951,11 +996,11 @@ fn validate_replacement(
     limits: litchi_iwa_archive::Limits,
 ) -> Result<(), Error> {
     if replacement.is_empty() {
-        return Err(Error::EmptyReplacement);
+        return Err(Error::Refused(Refusal::EmptyReplacement));
     }
     let replacement_length = u64::try_from(replacement.len()).unwrap_or(u64::MAX);
     if replacement.len() > MAX_REPLACEMENT_BYTES || replacement_length > limits.max_entry_bytes() {
-        return Err(Error::ReplacementTooLarge);
+        return Err(Error::Refused(Refusal::ReplacementTooLarge));
     }
     let before_type = MediaType::from_bytes(before);
     let after_type = MediaType::from_bytes(replacement);
@@ -963,10 +1008,10 @@ fn validate_replacement(
         && after_type != MediaType::Unknown
         && before_type != after_type
     {
-        return Err(Error::ReplacementType);
+        return Err(Error::Refused(Refusal::ReplacementType));
     }
     if part == MediaPart::Poster && before_type == MediaType::Audio {
-        return Err(Error::AudioPoster);
+        return Err(Error::Refused(Refusal::AudioPoster));
     }
     Ok(())
 }
@@ -1029,10 +1074,10 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(|_| Error::Read)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             let selected = package
                 .show()
@@ -1040,13 +1085,15 @@ fn resolve_slide_position(
                 .select_slide(SlideSelector::name(name))
                 .map_err(|error| match error {
                     crate::SlideSelectorError::DuplicateSlideName { .. } => {
-                        Error::AmbiguousSelector
+                        Error::Refused(Refusal::AmbiguousSelector)
                     },
-                    crate::SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+                    crate::SlideSelectorError::EmptySlideName => {
+                        Error::Refused(Refusal::EmptySlideName)
+                    },
                 })?;
             selected
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1210,9 +1257,9 @@ fn select_media_graph(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(|_| Error::Read)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1255,12 +1302,11 @@ fn select_media_graph(
         movies.push(identifier);
     }
     let movie_position = movie_selector.as_position();
-    let movie_identifier =
-        *movies
-            .get(movie_position.get())
-            .ok_or(Error::MoviePositionNotFound {
-                position: movie_position,
-            })?;
+    let movie_identifier = *movies.get(movie_position.get()).ok_or(Error::Refused(
+        Refusal::MoviePositionNotFound {
+            position: movie_position,
+        },
+    ))?;
     let (movie_component, movie) = package
         .object_with_component(movie_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1288,7 +1334,7 @@ fn select_media_graph(
     budget.references(movie_references)?;
     let kind = movie_info.kind();
     if part == MediaPart::Poster && kind == MovieKind::Audio {
-        return Err(Error::AudioPoster);
+        return Err(Error::Refused(Refusal::AudioPoster));
     }
     let parent = movie_parent_identifier(movie_payload, limits, budget)?;
     if parent != record.slide_identifier {
@@ -1327,7 +1373,7 @@ fn repeated_drawable_references(
 ) -> Result<Vec<u64>, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let reference_capacity = fields
@@ -1376,7 +1422,7 @@ fn unique_movie_data_identifier(
 ) -> Result<Option<u64>, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let mut identifier = None;
@@ -1407,7 +1453,7 @@ fn movie_parent_identifier(
 ) -> Result<u64, Error> {
     budget.input_bytes(payload.len())?;
     budget.wire_work(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.wire_fields(fields.len())?;
     budget.wire_nesting(1)?;
     let mut parent = None;
@@ -1421,8 +1467,8 @@ fn movie_parent_identifier(
         field
             .validate_canonical_framing()
             .map_err(|_| Error::InvalidSource)?;
-        let super_fields = WireView::parse_with_limits(field.payload(), limits)
-            .map_err(|_| Error::InvalidSource)?;
+        let super_fields =
+            WireView::parse(field.payload(), limits).map_err(|_| Error::InvalidSource)?;
         budget.input_bytes(field.payload().len())?;
         budget.wire_work(field.payload().len())?;
         budget.wire_fields(super_fields.len())?;
@@ -1491,7 +1537,7 @@ pub(super) fn validate_selected_message_metadata(
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1555,7 +1601,7 @@ fn validated_media_record(
 ) -> Result<MediaRecord, Error> {
     let identifier = selection.identifier(part).ok_or_else(|| {
         if selection.kind == MovieKind::Audio && part == MediaPart::Poster {
-            Error::AudioPoster
+            Error::Refused(Refusal::AudioPoster)
         } else {
             Error::InvalidSource
         }

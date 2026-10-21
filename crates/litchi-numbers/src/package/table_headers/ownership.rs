@@ -346,14 +346,14 @@ fn charge_unbounded_work(total: &mut usize, amount: usize) -> Result<(), Error> 
 }
 
 pub(super) fn charge_work(total: &mut usize, amount: usize, maximum: usize) -> Result<(), Error> {
-    *total = total.checked_add(amount).ok_or(Error::LimitExceeded {
+    *total = total.checked_add(amount).ok_or(Error::Limit {
         kind: LimitKind::TransactionWork,
         observed: u64::MAX,
         maximum: usize_as_u64(maximum),
         path: Path::Package,
     })?;
     if *total > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: usize_as_u64(*total),
             maximum: usize_as_u64(maximum),

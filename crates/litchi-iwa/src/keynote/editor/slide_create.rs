@@ -14,7 +14,7 @@ use wire::{clear_user_guides, insert_slide_node, materialize_slide_object, prepa
 
 const SLIDE_MESSAGE_TYPE: u32 = 5;
 
-impl Editor {
+impl Draft {
     /// List the slide layouts stored by the presentation theme.
     pub fn slide_layouts(&self) -> Result<Vec<SlideLayoutInfo>> {
         let graph = ObjectGraph::read(self.package())?;
@@ -191,7 +191,7 @@ impl Editor {
         }
         set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
 
-        let preview = Editor::from_package(staged.clone())?;
+        let preview = Draft::from_package(staged.clone())?;
         let mut text_storage_ids = preview
             .slide_text_storages(index)?
             .into_iter()
@@ -209,13 +209,13 @@ impl Editor {
                 text_storage_ids.insert(crate::text::native_storage_id(storage_id)?);
             }
         }
-        let mut text = IWorkTextEditor::from_package(staged);
+        let mut text = crate::text::Draft::from_package(staged);
         for storage_id in text_storage_ids {
             text.set_text(storage_id, "")?;
         }
         text.set_text(crate::text::native_storage_id(new_note_storage_id)?, "")?;
         let staged = text.into_package();
-        let verified = Editor::from_package(staged)?;
+        let verified = Draft::from_package(staged)?;
         let created = verified.slides()?.get(index).cloned().ok_or_else(|| {
             Error::InvalidFormat(
                 "Created Keynote slide is missing from its insertion point".to_owned(),

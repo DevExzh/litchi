@@ -112,7 +112,7 @@ pub struct RemovedNumbersSheetChart {
     pub chart: SheetChartInfo,
 }
 
-impl Editor {
+impl Draft {
     /// List charts owned directly by one reachable sheet.
     pub fn sheet_charts(&self, sheet_id: u64) -> Result<Vec<SheetChartInfo>> {
         let (_, _, sheet) = numbers_sheet(self.package(), sheet_id)?;
@@ -597,7 +597,6 @@ impl Editor {
     }
 
     /// Remove a standalone chart and its private caption, title, and mediator objects.
-    #[allow(deprecated)]
     pub fn remove_sheet_chart(
         &mut self,
         sheet_id: u64,
@@ -612,7 +611,7 @@ impl Editor {
         source.info.arrangement = source_arrangement;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -738,7 +737,7 @@ fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> b
 }
 
 fn set_focused_sheet_chart_data(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_index: usize,
     chart_position: usize,
     data: ChartData,
@@ -759,7 +758,9 @@ fn set_focused_sheet_chart_data(
         Err(error) => {
             if matches!(
                 &error,
-                litchi_numbers::sheet::chart::data::Error::UnsupportedDependency
+                litchi_numbers::sheet::chart::data::Error::Refused(
+                    litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
+                )
             ) {
                 return Err(FocusedSheetChartDataError::UnsupportedDependency(data));
             }
@@ -771,7 +772,9 @@ fn set_focused_sheet_chart_data(
     let committed = edit.set(data).commit().map_err(|error| {
         if matches!(
             &error,
-            litchi_numbers::sheet::chart::data::Error::UnsupportedDependency
+            litchi_numbers::sheet::chart::data::Error::Refused(
+                litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
+            )
         ) {
             FocusedSheetChartDataError::Host(Error::InvalidFormat(
                 "focused Numbers chart data commit rejected a previously admitted dependency"
@@ -792,7 +795,7 @@ fn set_focused_sheet_chart_data(
                 "focused Numbers chart data package write failed: {error}"
             )))
         })?;
-    let verified = Editor::from_bytes(&target_bytes).map_err(FocusedSheetChartDataError::Host)?;
+    let verified = Draft::from_bytes(&target_bytes).map_err(FocusedSheetChartDataError::Host)?;
     *editor = verified;
     Ok(())
 }
@@ -803,7 +806,7 @@ enum FocusedSheetChartDataError {
 }
 
 fn update_chart_payload(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
@@ -831,7 +834,7 @@ fn update_chart_payload(
 }
 
 fn update_chart_payload_with_grid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     encoded_grid: &litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput,
@@ -962,7 +965,7 @@ mod tests {
     }
 
     fn numbers_chart_caption_data(
-        editor: &Editor,
+        editor: &Draft,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Vec<u8> {
@@ -982,7 +985,7 @@ mod tests {
     }
 
     fn numbers_chart_caption_reference(
-        editor: &Editor,
+        editor: &Draft,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> u64 {
@@ -1002,7 +1005,7 @@ mod tests {
     }
 
     fn numbers_chart_caption_reference_in_archive(
-        editor: &Editor,
+        editor: &Draft,
         archive_name: &str,
         drawable_object_id: u64,
     ) -> u64 {
@@ -1020,7 +1023,7 @@ mod tests {
     }
 
     fn numbers_chart_message_info(
-        editor: &Editor,
+        editor: &Draft,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> crate::archive::MessageInfo {
@@ -1036,7 +1039,7 @@ mod tests {
     }
 
     fn numbers_archive_header(
-        editor: &Editor,
+        editor: &Draft,
         archive_name: &str,
         object_identifier: u64,
     ) -> Vec<u8> {
@@ -1054,7 +1057,7 @@ mod tests {
     }
 
     fn inject_numbers_archive_unknown_header(
-        editor: &mut Editor,
+        editor: &mut Draft,
         archive_name: &str,
         object_identifier: u64,
     ) -> Vec<u8> {
@@ -1088,11 +1091,11 @@ mod tests {
                 crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
             )
             .unwrap();
-        *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
         unknown
     }
 
-    fn reserve_numbers_three_byte_caption_identifier(editor: &mut Editor, archive_name: &str) {
+    fn reserve_numbers_three_byte_caption_identifier(editor: &mut Draft, archive_name: &str) {
         let next = crate::package_metadata::next_object_identifier(&editor.package).unwrap();
         if next < 16_383 {
             let mut package = editor.package.clone();
@@ -1108,7 +1111,7 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
-            *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+            *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
         }
     }
 
@@ -1125,7 +1128,7 @@ mod tests {
     }
 
     fn mutate_numbers_caption_metadata(
-        editor: &mut Editor,
+        editor: &mut Draft,
         sheet_id: u64,
         drawable_object_id: u64,
         old_reference_id: u64,
@@ -1201,10 +1204,10 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
     }
 
-    fn numbers_caption_storage_id(editor: &Editor, sheet_id: u64, drawable_object_id: u64) -> u64 {
+    fn numbers_caption_storage_id(editor: &Draft, sheet_id: u64, drawable_object_id: u64) -> u64 {
         let reference_id = numbers_chart_caption_reference(editor, sheet_id, drawable_object_id);
         let graph = chart_graph(editor, sheet_id, drawable_object_id).unwrap();
         let archive = editor.package.archive(&graph.archive_name).unwrap();
@@ -1229,7 +1232,7 @@ mod tests {
     }
 
     fn make_numbers_caption_storage_shared(
-        editor: &mut Editor,
+        editor: &mut Draft,
         sheet_id: u64,
         source_drawable_object_id: u64,
         shared_drawable_object_id: u64,
@@ -1284,11 +1287,11 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
     }
 
     fn make_numbers_caption_info_shared(
-        editor: &mut Editor,
+        editor: &mut Draft,
         sheet_id: u64,
         source_drawable_object_id: u64,
         shared_drawable_object_id: u64,
@@ -1337,11 +1340,11 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
     }
 
     fn move_numbers_caption_aggregate_owner_to_unrelated_object(
-        editor: &mut Editor,
+        editor: &mut Draft,
         sheet_id: u64,
         drawable_object_id: u64,
         unrelated_object_id: u64,
@@ -1373,11 +1376,11 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        *editor = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
     }
 
     fn assert_series_non_styles_are_unstyled(
-        editor: &Editor,
+        editor: &Draft,
         sheet_id: u64,
         drawable_object_id: u64,
         expected_count: usize,
@@ -1433,7 +1436,7 @@ mod tests {
     }
 
     fn assert_series_non_styles_are_styled(
-        editor: &Editor,
+        editor: &Draft,
         sheet_id: u64,
         drawable_object_id: u64,
         expected_count: usize,
@@ -1615,7 +1618,7 @@ mod tests {
             .set_sheet_chart_geometry(sheet_id, created.drawable_object_id, changed_geometry)
             .unwrap();
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let chart = &reopened.sheet_charts(sheet_id).unwrap()[0];
         assert_eq!(chart.kind, Kind::Bar2d);
         assert_eq!(chart.direction, Direction::Columns);
@@ -1831,7 +1834,7 @@ mod tests {
             None
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_caption(sheet_id, duplicate.drawable_object_id)
@@ -2250,7 +2253,7 @@ mod tests {
             None
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_title(sheet_id, duplicate.drawable_object_id)
@@ -2375,7 +2378,7 @@ mod tests {
             );
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_title(sheet_id, duplicate.drawable_object_id, Axis::Category)
@@ -2448,7 +2451,7 @@ mod tests {
             minimum_only
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_value_axis_bounds(sheet_id, source.drawable_object_id)
@@ -2527,7 +2530,7 @@ mod tests {
             major_only
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_value_axis_steps(sheet_id, source.drawable_object_id)
@@ -2615,7 +2618,7 @@ mod tests {
                 AxisVisibility::Visible,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reopened
                 .sheet_chart_value_axis_minimum_label_visible(sheet_id, source.drawable_object_id)
@@ -2703,7 +2706,7 @@ mod tests {
                 false,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             !reopened
                 .sheet_chart_category_axis_series_names_visible(sheet_id, source.drawable_object_id)
@@ -2795,7 +2798,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
@@ -2877,7 +2880,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
@@ -2987,7 +2990,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         for axis in [Axis::Category, Axis::Value] {
             assert_eq!(
                 reopened
@@ -3082,7 +3085,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         for axis in [Axis::Category, Axis::Value] {
             assert!(
                 !reopened
@@ -3186,7 +3189,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         for axis in [Axis::Category, Axis::Value] {
             assert!(
                 reopened
@@ -3337,7 +3340,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_tick_mark_location(
@@ -3433,7 +3436,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reopened
                 .sheet_chart_legend_visible(sheet_id, source.drawable_object_id)
@@ -3483,7 +3486,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_legend_fill(sheet_id, object_id)
@@ -3524,7 +3527,7 @@ mod tests {
             frame
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_legend_frame(sheet_id, object_id)
@@ -3662,7 +3665,7 @@ mod tests {
             eighteen
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_legend_font(sheet_id, object_id)
@@ -3738,7 +3741,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         reopened
             .set_sheet_chart_legend_stroke(sheet_id, object_id, ChartLegendStroke::Inherited)
             .unwrap();
@@ -3785,7 +3788,7 @@ mod tests {
                 .unwrap()
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         reopened
             .set_sheet_chart_legend_shadow(sheet_id, object_id, ChartLegendShadow::Inherited)
             .unwrap();
@@ -3844,7 +3847,7 @@ mod tests {
         editor
             .set_sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id, true)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             reopened
                 .sheet_chart_includes_hidden_data(sheet_id, source.drawable_object_id)
@@ -3890,7 +3893,7 @@ mod tests {
         remove_component_object_uuids(&mut editor.package, graph.component_id, &caption.object_ids)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_caption(sheet_id, source.drawable_object_id)
@@ -3963,7 +3966,7 @@ mod tests {
             .set_sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id, Scale::Linear)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_value_axis_scale(sheet_id, source.drawable_object_id)
@@ -4024,7 +4027,7 @@ mod tests {
             .set_sheet_chart_border_visible(sheet_id, source.drawable_object_id, false)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             !reopened
                 .sheet_chart_border_visible(sheet_id, source.drawable_object_id)
@@ -4093,7 +4096,7 @@ mod tests {
             .set_sheet_chart_rounded_corners(sheet_id, source.drawable_object_id, changed)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_rounded_corners(sheet_id, source.drawable_object_id)
@@ -4153,7 +4156,7 @@ mod tests {
             .set_sheet_chart_gap_spacing(sheet_id, source.drawable_object_id, changed)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_gap_spacing(sheet_id, source.drawable_object_id)
@@ -4217,7 +4220,7 @@ mod tests {
             .set_sheet_chart_border_stroke(sheet_id, duplicate.drawable_object_id, None)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_border_stroke(sheet_id, source.drawable_object_id)
@@ -4281,7 +4284,7 @@ mod tests {
             .set_sheet_chart_background_fill(sheet_id, source.drawable_object_id, &customized)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_background_fill(sheet_id, source.drawable_object_id)
@@ -4373,7 +4376,7 @@ mod tests {
             defaults[0]
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_fill(sheet_id, source.drawable_object_id, first)
@@ -4454,7 +4457,7 @@ mod tests {
             None
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_stroke(sheet_id, source.drawable_object_id, first)
@@ -4512,7 +4515,7 @@ mod tests {
             .set_sheet_chart_shadow(sheet_id, source.drawable_object_id, ChartShadow::None)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_shadow(sheet_id, source.drawable_object_id)
@@ -4584,7 +4587,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_pie_start_angle(sheet_id, source.drawable_object_id)
@@ -4703,7 +4706,7 @@ mod tests {
                 ChartDonutInnerRadius::MINIMUM,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_donut_inner_radius(sheet_id, source.drawable_object_id)
@@ -4806,7 +4809,7 @@ mod tests {
             )
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_pie_wedge_explosion(
@@ -4973,7 +4976,7 @@ mod tests {
                 LabelVisibility::VALUES_ONLY,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_pie_label_visibilities(sheet_id, duplicate.drawable_object_id)
@@ -5160,7 +5163,7 @@ mod tests {
                 LeaderLineVisibility::Visible,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_pie_label_distances(sheet_id, duplicate.drawable_object_id)
@@ -5300,7 +5303,7 @@ mod tests {
                 Visibility::Hidden,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_value_label_visibilities(sheet_id, source.drawable_object_id,)
@@ -5419,7 +5422,7 @@ mod tests {
                 ChartSeriesValueLabelLocation::Top,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_value_label_locations(sheet_id, source.drawable_object_id)
@@ -5523,7 +5526,7 @@ mod tests {
                 .unwrap();
         }
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_value_label_affixes(sheet_id, source.drawable_object_id)
@@ -5625,7 +5628,7 @@ mod tests {
                 NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_value_label_number_formats(sheet_id, source.drawable_object_id,)
@@ -5728,7 +5731,7 @@ mod tests {
                 ChartSeriesValueLabelAutoFit::Enabled,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_value_label_auto_fits(sheet_id, source.drawable_object_id)
@@ -5832,7 +5835,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_trendlines(sheet_id, source.drawable_object_id)
@@ -5969,7 +5972,7 @@ mod tests {
                 &default_auto_fits,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_series_error_bars(sheet_id, source.drawable_object_id)

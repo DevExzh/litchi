@@ -10,7 +10,7 @@ use std::sync::Arc;
 use litchi_cfb::OleFile;
 use litchi_core::{FileFormat, Metadata, Position};
 use litchi_doc::body_text::TransactionLimits as BodyTransactionLimits;
-use litchi_doc::body_text::source::SourceSnapshot;
+use litchi_doc::source_backed::Package as SourcePackage;
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
@@ -342,7 +342,7 @@ impl Doc {
             reason = "the narrow equal-width source route is retained for native regression tests"
         )
     )]
-    pub(crate) fn body_text_editor(&self) -> Result<Option<SourceSnapshot>> {
+    pub(crate) fn body_text_editor(&self) -> Result<Option<SourcePackage>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Doc));
         }
@@ -354,9 +354,9 @@ impl Doc {
                 package.to_bytes()?,
                 litchi_sign::cfb::Format::Doc,
             )?;
-            return Ok(Some(SourceSnapshot::from_bytes(bytes)?));
+            return Ok(Some(SourcePackage::from_bytes(bytes)?));
         }
-        Ok(Some(SourceSnapshot::from_shared(package.shared_source())?))
+        Ok(Some(SourcePackage::from_shared(package.shared_source())?))
     }
 
     /// Return the retained native owner under the explicit signature disposition.
@@ -443,7 +443,7 @@ pub(crate) struct WriteCommit {
 }
 
 fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOptions {
-    litchi_doc::EditOptions::default().with_transaction_limits(transaction_limits)
+    litchi_doc::EditOptions::default().transaction_limits(transaction_limits)
 }
 
 fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
@@ -496,7 +496,7 @@ mod tests {
     use super::*;
     use crate::detect::{DetectedFormat, detect_format_smart};
     use crate::{Code, DocOptions};
-    use litchi_doc::{Leniency, raw::Package};
+    use litchi_doc::{Leniency, raw::Reader};
     use litchi_ole_common::property_set::PropertySetReader;
     use std::path::PathBuf;
 
@@ -565,7 +565,7 @@ mod tests {
     fn path_and_byte_routes_match_the_leaf_reader() {
         let mut opened = 0_usize;
         for name in corpus() {
-            let mut package = match Package::from_reader(Cursor::new(fixture(&name))) {
+            let mut package = match Reader::from_reader(Cursor::new(fixture(&name))) {
                 Ok(package) => package,
                 Err(_) => continue,
             };
@@ -633,7 +633,7 @@ mod tests {
         let options = OpenOptions::default()
             .doc(DocOptions::new().leniency(Leniency::TolerateStylesheetDefects));
         let name = "duplicate-style-names.doc";
-        let mut package = Package::from_reader(Cursor::new(fixture(name))).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(fixture(name))).unwrap();
         let document = package
             .document_with_options(
                 litchi_doc::OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects),
@@ -679,7 +679,7 @@ mod tests {
         let bytes = fixture("documentProperties.doc");
         let doc = open_bytes(bytes.clone(), &OpenOptions::default()).unwrap();
         let editor = doc.body_text_editor().unwrap().expect("retained source");
-        let oracle = SourceSnapshot::from_bytes(bytes).unwrap();
+        let oracle = SourcePackage::from_bytes(bytes).unwrap();
         assert_eq!(editor.fingerprint(), oracle.fingerprint());
         let first = Position::new(0);
         assert_eq!(

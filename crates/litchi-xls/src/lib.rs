@@ -112,7 +112,14 @@ mod cell;
 )]
 pub mod cell_values;
 /// Lossless, source-backed BIFF8 worksheet visibility transactions.
+mod scoped;
+
+#[cfg(test)]
+extern crate self as litchi_xls;
+#[cfg(test)]
+mod internal_tests;
 pub mod sheet_visibility;
+pub mod source_backed;
 /// Finite physical source limits shared by the eager XLS owners.
 pub mod source_limits;
 
@@ -553,13 +560,11 @@ mod pivot_olap;
 )]
 mod user_routing;
 
-#[forbid(unsafe_code)]
 #[allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    reason = "pivot editing indexes only validated owner and stream structures"
+    clippy::wildcard_enum_match_arm,
+    reason = "OLE semantic projections preserve unrelated and unknown Obj variants inertly"
 )]
-mod pivot_editor;
+pub mod ole_object;
 /// Pivot table parsing (SXVIEW, SXVD, SXVI, SXDI, SXVS, SXPI)
 #[forbid(unsafe_code)]
 #[allow(
@@ -569,14 +574,15 @@ mod pivot_editor;
     reason = "pivot codecs retain bounded legacy invariants and inert unmatched variants"
 )]
 pub mod pivot_table;
-pub use pivot_editor::PivotViewEditor;
+#[forbid(unsafe_code)]
 #[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "OLE semantic projections preserve unrelated and unknown Obj variants inertly"
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "pivot editing indexes only validated owner and stream structures"
 )]
-pub mod ole_object;
+pub mod pivot_view;
 pub use ole_object::{
-    CheckState, DropDownStyle, EditBoxValidation, Editor, EmbeddedObjectDraft, EmbeddedPayload,
+    CheckState, DropDownStyle, EditBoxValidation, EmbeddedObjectDraft, EmbeddedPayload,
     FormControl, FtCblsData, FtCf, FtCmo, FtEdoData, FtGboData, FtLbsData, FtPictFmla, FtPioGrbit,
     FtRboData, FtSbs, LbsDropData, LbsItem, ListBehaviorClass, ListSelectionType, ObjSubrecord,
     ObjectType, OleObjectRecord,
@@ -753,11 +759,7 @@ pub use table_styles::{
 pub use theme::Theme;
 pub use toolbar::{Control, Toolbar, ToolbarSet, VisualData, Wrapper};
 pub use user_names::{
-    Commit as UserNamesCommit, Edit as UserNamesEdit, Limits as UserNamesLimits,
-    PackageCommit as UserNamesPackageCommit, PackageEdit as UserNamesPackageEdit,
-    PackagePatch as UserNamesPackagePatch, PackageSnapshot as UserNamesPackageSnapshot,
-    Patch as UserNamesPatch, Snapshot as UserNamesSnapshot, USER_NAMES_STREAM_NAME, UserCheck,
-    UserEntry, UserGuid, UserNames,
+    Limits as UserNamesLimits, USER_NAMES_STREAM_NAME, UserCheck, UserEntry, UserGuid, UserNames,
 };
 pub use user_routing::{CUsr, CbUsr, DocRoute, RecipName, RoutingDelivery, UsrInfo};
 pub use uses_elfs::UsesElfs;

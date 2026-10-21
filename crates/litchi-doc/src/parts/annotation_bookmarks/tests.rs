@@ -1,8 +1,8 @@
 //! Focused regression tests for the inert annotation-bookmark owner.
 
-use super::{
-    Editor, MAX_ENTRIES, Snapshot, Tag, TagId, Tags, TransactionError, parse, parse_bytes, to_bytes,
-};
+use super::package::Editor;
+use super::record::{Error as TransactionError, Snapshot};
+use super::{MAX_ENTRIES, Tag, TagId, Tags, parse, parse_bytes, to_bytes};
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
@@ -105,7 +105,7 @@ fn transaction_is_atomic_and_reversible() {
         transaction.replace_entry(99, Tag::new(TagId::new(9))),
         Err(TransactionError::Invalid(_))
     ));
-    assert_eq!(transaction.snapshot(), &source);
+    assert_eq!(transaction.staged(), &source);
 
     transaction
         .replace_entry(0, Tag::new(TagId::new(0x1234)))
@@ -113,7 +113,7 @@ fn transaction_is_atomic_and_reversible() {
     let commit = transaction.commit().unwrap();
     assert!(!commit.patch().is_noop());
     assert_eq!(
-        commit.patch().inverse().apply(commit.snapshot()).unwrap(),
+        commit.patch().inverse().apply(commit.package()).unwrap(),
         source
     );
     assert!(matches!(

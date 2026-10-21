@@ -84,9 +84,21 @@ fn movie_payload_reference_missing_from_header_is_rejected_atomically() {
     let mut drawable = Vec::new();
     let mut reference = Vec::new();
     append_varint_field(&mut reference, 1, COMMENT_STORAGE).expect("comment identifier");
-    append_length_delimited_field(&mut drawable, 6, &reference).expect("comment edge");
+    append_length_delimited_field(
+        &mut drawable,
+        6,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("comment edge");
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable).expect("movie drawable");
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("movie drawable");
 
     let package = native_package();
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
@@ -127,9 +139,21 @@ fn movie_comment_target_must_be_a_same_component_comment_storage() {
     let mut drawable = Vec::new();
     let mut reference = Vec::new();
     append_varint_field(&mut reference, 1, WRONG_TYPE_TARGET).expect("target identifier");
-    append_length_delimited_field(&mut drawable, 6, &reference).expect("comment edge");
+    append_length_delimited_field(
+        &mut drawable,
+        6,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("comment edge");
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable).expect("movie drawable");
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("movie drawable");
 
     let package = native_package();
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
@@ -158,7 +182,13 @@ fn comment_reply_reference_missing_from_header_is_rejected() {
     let mut reply = Vec::new();
     append_varint_field(&mut reply, 1, 9_001).expect("reply identifier");
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 4, &reply).expect("reply edge");
+    append_length_delimited_field(
+        &mut payload,
+        4,
+        &reply,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("reply edge");
 
     let package = native_package();
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
@@ -197,8 +227,13 @@ fn comment_reply_reference_missing_from_header_is_rejected() {
 #[test]
 fn opaque_comment_root_extension_is_preserved_by_relationship_census() {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, b"opaque-extension")
-        .expect("opaque root extension");
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        b"opaque-extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("opaque root extension");
 
     let package = native_package();
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");

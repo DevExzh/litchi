@@ -325,7 +325,9 @@ fn resolve_target_with_remaining(
     validate_positions(positions, native.rows, native.columns, path)?;
     validate_header_counts(native, path)?;
     if native.locked == LockState::Locked && !permit_locked_read {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::TableLocked { path },
+        ));
     }
 
     let ownership =
@@ -487,10 +489,12 @@ fn resolve_target_with_remaining(
             .as_ref()
             .is_some_and(|route| route.entries != 0)
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::ConditionalStyle,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::ConditionalStyle,
+            },
+        ));
     }
     let rich = lists
         .rich_text
@@ -551,16 +555,20 @@ fn validate_positions(positions: &[At], rows: u32, columns: u32, path: Path) -> 
     for &position in positions {
         if previous.is_some_and(|prior| prior >= position) {
             return if previous == Some(position) {
-                Err(Error::DuplicatePosition { position })
+                Err(Error::Refused(
+                    crate::package::table_cells::Refusal::DuplicatePosition { position },
+                ))
             } else {
                 Err(Error::InvalidSource { path })
             };
         }
         if position.row() >= rows || position.column() >= columns {
-            return Err(Error::OutOfBounds {
-                position,
-                dimensions,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::OutOfBounds {
+                    position,
+                    dimensions,
+                },
+            ));
         }
         previous = Some(position);
     }
@@ -611,8 +619,9 @@ fn validate_model_owners(
     payload: &[u8],
     path: Path,
 ) -> Result<ModelOwnerMarkers, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut category_reference = None;
     let mut filter_reference = None;
     let mut haunted = None;
@@ -625,10 +634,12 @@ fn validate_model_owners(
                     .validate_canonical_framing()
                     .map_err(|_error| Error::InvalidSource { path })?;
                 if !inert_sort_order(field.payload()) {
-                    return Err(Error::UnsupportedDependency {
-                        path,
-                        kind: DependencyKind::FormulaCache,
-                    });
+                    return Err(Error::Refused(
+                        crate::package::table_cells::Refusal::UnsupportedDependency {
+                            path,
+                            kind: DependencyKind::FormulaCache,
+                        },
+                    ));
                 }
                 None
             },
@@ -637,12 +648,12 @@ fn validate_model_owners(
                 field
                     .validate_canonical_framing()
                     .map_err(|_error| Error::InvalidSource { path })?;
-                let id = parse_sort_rule_tracker(field.payload()).ok_or(
-                    Error::UnsupportedDependency {
+                let id = parse_sort_rule_tracker(field.payload()).ok_or(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
                         path,
                         kind: DependencyKind::FormulaCache,
                     },
-                )?;
+                ))?;
                 if sort_rule_tracker.replace(id).is_some() {
                     return Err(Error::InvalidSource { path });
                 }
@@ -664,10 +675,12 @@ fn validate_model_owners(
                     .validate_canonical_framing()
                     .map_err(|_error| Error::InvalidSource { path })?;
                 if !inert_merge_owner(field.payload()) {
-                    return Err(Error::UnsupportedDependency {
-                        path,
-                        kind: DependencyKind::Merge,
-                    });
+                    return Err(Error::Refused(
+                        crate::package::table_cells::Refusal::UnsupportedDependency {
+                            path,
+                            kind: DependencyKind::Merge,
+                        },
+                    ));
                 }
                 None
             },
@@ -685,10 +698,12 @@ fn validate_model_owners(
                     .validate_canonical_framing()
                     .map_err(|_error| Error::InvalidSource { path })?;
                 if !inactive_deprecated_category_owner(field.payload(), path)? {
-                    return Err(Error::UnsupportedDependency {
-                        path,
-                        kind: DependencyKind::Category,
-                    });
+                    return Err(Error::Refused(
+                        crate::package::table_cells::Refusal::UnsupportedDependency {
+                            path,
+                            kind: DependencyKind::Category,
+                        },
+                    ));
                 }
                 None
             },
@@ -722,14 +737,18 @@ fn validate_model_owners(
             _ => None,
         };
         if let Some(kind) = kind {
-            return Err(Error::UnsupportedDependency { path, kind });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+            ));
         }
     }
     if model.pivot_owner().is_some() {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::Pivot,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::Pivot,
+            },
+        ));
     }
     if let Some(reference) = filter_reference {
         validate_inert_filter_set(
@@ -746,10 +765,12 @@ fn validate_model_owners(
             table_headers::dependencies::category_owner_reference_active(source, native, reference)
                 .map_err(map_header_failure)?;
         if active {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::Category,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::Category,
+                },
+            ));
         }
     } else if model.category_owner().is_some() {
         return Err(Error::InvalidSource { path });
@@ -780,8 +801,9 @@ fn validate_model_owners(
 }
 
 fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner = None;
     for field in view.fields() {
         if field.wire_type() != 2 || field.validate_canonical_framing().is_err() {
@@ -802,7 +824,9 @@ fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool,
 }
 
 fn parse_single_uuid_owner(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let owner = fields.next()?;
     if fields.next().is_some()
@@ -853,8 +877,9 @@ fn validate_inert_filter_payload(
     kind: DependencyKind,
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut seen = [false; 4];
     for field in view.fields() {
         field
@@ -866,7 +891,9 @@ fn validate_inert_filter_payload(
             4 if field.wire_type() == 0 => 2,
             5 if field.wire_type() == 0 => 3,
             _ => {
-                return Err(Error::UnsupportedDependency { path, kind });
+                return Err(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+                ));
             },
         };
         if seen[slot] {
@@ -884,7 +911,9 @@ fn validate_inert_filter_payload(
         }
     }
     if !seen[0] || !seen[1] || !seen[3] {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+        ));
     }
     Ok(())
 }
@@ -903,8 +932,9 @@ fn validate_inert_hidden_states_owner(
     payload: &[u8],
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner_uid = false;
     let mut hidden_states = 0usize;
     for field in view.fields() {
@@ -934,8 +964,9 @@ fn validate_inert_hidden_states_owner(
 }
 
 fn validate_inert_hidden_states(source: &Package, payload: &[u8], path: Path) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut uid = false;
     let mut column = false;
     let mut row = false;
@@ -973,8 +1004,9 @@ fn validate_inert_hidden_extent(
     expected_direction: u64,
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut uid = false;
     let mut direction = false;
     let mut import_flag = false;
@@ -999,10 +1031,12 @@ fn validate_inert_hidden_extent(
             6 if field.wire_type() == 0 && !import_flag => {
                 import_flag = true;
                 if canonical_u64(field.payload(), path)? != 0 {
-                    return Err(Error::UnsupportedDependency {
-                        path,
-                        kind: DependencyKind::HiddenState,
-                    });
+                    return Err(Error::Refused(
+                        crate::package::table_cells::Refusal::UnsupportedDependency {
+                            path,
+                            kind: DependencyKind::HiddenState,
+                        },
+                    ));
                 }
             },
             8 if field.wire_type() == 2 && !filter => {
@@ -1010,10 +1044,12 @@ fn validate_inert_hidden_extent(
                 validate_inert_filter_reference(source, field.payload(), path)?;
             },
             _ => {
-                return Err(Error::UnsupportedDependency {
-                    path,
-                    kind: DependencyKind::HiddenState,
-                });
+                return Err(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
+                        path,
+                        kind: DependencyKind::HiddenState,
+                    },
+                ));
             },
         }
     }
@@ -1024,7 +1060,9 @@ fn validate_inert_hidden_extent(
 }
 
 fn inert_merge_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1048,7 +1086,10 @@ fn inert_merge_owner(source: &[u8]) -> bool {
     {
         return false;
     }
-    let Ok(store_view) = litchi_iwa_common::wire::WireView::parse(store.payload()) else {
+    let Ok(store_view) = litchi_iwa_common::wire::WireView::parse(
+        store.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    ) else {
         return false;
     };
     let mut store_fields = store_view.fields();
@@ -1069,7 +1110,9 @@ fn inert_merge_owner(source: &[u8]) -> bool {
 }
 
 fn inert_single_uuid_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1084,7 +1127,9 @@ fn inert_single_uuid_owner(source: &[u8]) -> bool {
 }
 
 fn inert_sort_order(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1105,7 +1150,9 @@ fn inert_sort_order(source: &[u8]) -> bool {
 }
 
 fn parse_sort_rule_tracker(source: &[u8]) -> Option<u64> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let reference = fields.next()?;
     if reference.number() != 1
@@ -1123,11 +1170,15 @@ fn require_owner_marker(
     kind: DependencyKind,
     path: Path,
 ) -> Result<UuidKey, Error> {
-    marker.ok_or(Error::UnsupportedDependency { path, kind })
+    marker.ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+    ))
 }
 
 fn parse_spill_owner(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let owner = fields.next()?;
     if fields.next().is_some()
@@ -1149,7 +1200,9 @@ fn parse_uuid(source: &[u8]) -> Option<UuidKey> {
 }
 
 fn parse_cfuuid(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let first = fields.next()?;
     if first.number() == 1 {
@@ -1181,7 +1234,9 @@ fn parse_cfuuid(source: &[u8]) -> Option<UuidKey> {
 }
 
 fn parse_varint_fields<const N: usize>(source: &[u8], expected: [u32; N]) -> Option<[u64; N]> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let first = fields.next()?;
     parse_varint_field_iter(first, fields, expected)
@@ -1219,8 +1274,9 @@ fn parse_owner_id_map(
     budget: &mut ResolutionBudget,
     path: Path,
 ) -> Result<(Vec<OwnerIdentity>, usize), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let count = view.fields().try_fold(0usize, |count, field| {
         if field.number() != 1
             || field.wire_type() != 2
@@ -1233,8 +1289,11 @@ fn parse_owner_id_map(
     let mut identities = budget.reserve_scratch(count, LimitKind::References)?;
     let mut fields = count;
     for field in view.fields() {
-        let entry = litchi_iwa_common::wire::WireView::parse(field.payload())
-            .map_err(|_error| Error::InvalidSource { path })?;
+        let entry = litchi_iwa_common::wire::WireView::parse(
+            field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_error| Error::InvalidSource { path })?;
         let mut entry_fields = entry.fields();
         let internal_field = entry_fields.next().ok_or(Error::InvalidSource { path })?;
         let uid_field = entry_fields.next().ok_or(Error::InvalidSource { path })?;
@@ -1275,29 +1334,37 @@ fn reject_unresolved_owner_markers(markers: ModelOwnerMarkers, path: Path) -> Re
         (markers.haunted.is_some(), DependencyKind::FormulaCache),
     ] {
         if present {
-            return Err(Error::UnsupportedDependency { path, kind });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+            ));
         }
     }
     Ok(())
 }
 
 fn spill_sizes_active(payload: &[u8], path: Path) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| {
-        Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::Spill,
-        }
-    })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| {
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::Spill,
+                },
+            )
+        })?;
     let mut active = false;
     for field in view.fields() {
         if field.number() != 1
             || field.wire_type() != 2
             || field.validate_canonical_framing().is_err()
         {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::Spill,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::Spill,
+                },
+            ));
         }
         active = true;
     }
@@ -1339,7 +1406,9 @@ fn validate_empty_formula_owner_closure(
             .spill_range_sizes()
             .is_none_or(|payload| spill_sizes_active(payload, path).is_ok_and(|active| !active));
     if !empty {
-        return Err(Error::UnsupportedDependency { path, kind });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency { path, kind },
+        ));
     }
     Ok(())
 }
@@ -1382,10 +1451,12 @@ fn validate_selected_formula_owner_closure(
             .spill_range_sizes()
             .is_none_or(|payload| spill_sizes_active(payload, path).is_ok_and(|active| !active));
     if !envelope {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::FormulaCache,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::FormulaCache,
+            },
+        ));
     }
     validate_selected_cell_dependencies(owner.cell_dependencies(), stage, native, path)?;
     budget.charge_auxiliary_work(
@@ -1501,8 +1572,9 @@ fn validate_selected_cell_dependency_wire(
     records: &[SelectedCellRecord],
     path: Path,
 ) -> Result<usize, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut count = 0usize;
     for (field, record) in view.fields().zip(records.iter()) {
         if field.number() != 1
@@ -1525,8 +1597,9 @@ fn selected_cell_record_wire(
     record: SelectedCellRecord,
     path: Path,
 ) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut column = false;
     let mut row = false;
     let mut edges = false;
@@ -1548,7 +1621,9 @@ fn selected_cell_record_wire(
 }
 
 fn selected_expanded_edges_wire(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     view.fields().all(|field| {
@@ -1613,7 +1688,9 @@ fn selected_spanning_dependencies(
     else {
         return false;
     };
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut total = false;
@@ -1647,12 +1724,14 @@ fn selected_spanning_dependencies(
 }
 
 fn empty_message(payload: &[u8]) -> bool {
-    litchi_iwa_common::wire::WireView::parse(payload)
+    litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
         .is_ok_and(|view| view.fields().next().is_none())
 }
 
 fn empty_volatile_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut seen = [false; 7];
@@ -1674,7 +1753,9 @@ fn empty_volatile_dependencies(payload: &[u8]) -> bool {
 }
 
 fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1689,7 +1770,9 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
 }
 
 fn empty_spanning_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut total = false;
@@ -1743,10 +1826,12 @@ fn validate_dormant_hidden_owner(
     let (resolved, index, payload) =
         resolve_exact_message(source, id, &[HIDDEN_STATE_OWNER_MESSAGE_TYPE], path)?;
     if !inert_hidden_state_owner(payload) {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::HiddenState,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::HiddenState,
+            },
+        ));
     }
     budget.charge_wire_scan(payload.len(), 6, 2)?;
     Ok(Some(MessageRoute::new(
@@ -1780,10 +1865,12 @@ fn resolve_sort_rule_tracker(
     let (resolved, index, payload) =
         resolve_exact_message(source, identifier, &[REFERENCE_TRACKER_MESSAGE_TYPE], path)?;
     if !inert_single_uuid_owner(payload) {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::FormulaCache,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::FormulaCache,
+            },
+        ));
     }
     budget.charge_wire_scan(payload.len(), 6, 2)?;
     Ok(Some(MessageRoute::new(
@@ -1794,7 +1881,9 @@ fn resolve_sort_rule_tracker(
 }
 
 fn inert_hidden_state_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1840,8 +1929,9 @@ fn resolve_merge_map(
     require_declared(model_object, model_message, id, &[4, 13], path)?;
     let (resolved, index, payload) =
         resolve_exact_message(source, id, &DATA_LIST_MESSAGE_TYPES, path)?;
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut active = false;
     let mut field_count = 0usize;
     for field in view.fields() {
@@ -1860,10 +1950,12 @@ fn resolve_merge_map(
     }
     budget.charge_wire_scan(payload.len(), field_count, 1)?;
     if active {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::Merge,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::Merge,
+            },
+        ));
     }
     Ok(Some(MessageRoute::new(
         resolved,
@@ -2971,7 +3063,7 @@ fn resolve_rich_route_index(
         .last()
         .map_or(Some(1), |entry| entry.key.checked_add(1))
         .map(|minimum| minimum.max(root_snapshot.next_list_id()).max(1))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::RetainedElements,
             observed: u64::from(u32::MAX),
             maximum: u64::from(u32::MAX - 1),
@@ -3066,8 +3158,9 @@ fn resolve_rich_payload(
     if resolved.messages.len() != 1 {
         return Err(Error::InvalidSource { path });
     }
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut storage = None;
     let mut cell_id = false;
     for field in view.fields() {
@@ -3425,10 +3518,12 @@ fn resolve_dependencies(
         rooted_engine_reference(source, path)?
     else {
         reject_unresolved_owner_markers(owner_markers, path)?;
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::FormulaCache,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::FormulaCache,
+            },
+        ));
     };
     identities.claim(engine_id, Role::CalculationEngine, false, budget, path)?;
     require_declared(document, document_message, engine_id, engine_path, path)?;
@@ -3532,10 +3627,12 @@ fn resolve_dependencies(
         },
     };
     if header_name_manager.is_some() && touches_header_coordinate(native, positions, path)? {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::HeaderNameIndex,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::HeaderNameIndex,
+            },
+        ));
     }
 
     let mut owner_routes =
@@ -3807,10 +3904,12 @@ fn resolve_dependencies(
         path,
     )?;
     if selected_owner_count != 1 {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::FormulaCache,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::FormulaCache,
+            },
+        ));
     }
     stage.release_scratch(budget)?;
     budget.release_scratch(&owner_identities)?;
@@ -4083,10 +4182,12 @@ fn resolve_empty_cell_dependency_tiles(
         if records.validate(path)? != 0
             || snapshot.internal_owner_id() != expected_internal_owner_id
         {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::FormulaCache,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::FormulaCache,
+                },
+            ));
         }
         routes.push(MessageRoute::new(
             resolved,
@@ -4167,8 +4268,9 @@ fn validate_selected_cell_tile_wire(
     records: &[SelectedCellRecord],
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner = false;
     let mut column = false;
     let mut row = false;
@@ -4822,14 +4924,14 @@ impl ResolutionBudget {
     ) -> Result<Self, Error> {
         let maximum_bytes = source.state.options.archive().max_iwa_stream_bytes();
         if maximum_bytes == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 0,
                 maximum: 0,
                 path,
             });
         }
-        let maximum_work = maximum_bytes.checked_mul(32).ok_or(Error::LimitExceeded {
+        let maximum_work = maximum_bytes.checked_mul(32).ok_or(Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: usize_u64(maximum_bytes),
@@ -4886,7 +4988,7 @@ impl ResolutionBudget {
 
     fn options(&self, payload_bytes: usize) -> Result<storage_codec::DecodeOptions, Error> {
         if payload_bytes > self.maximum_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_u64(payload_bytes),
                 maximum: usize_u64(self.maximum_bytes),
@@ -4900,7 +5002,7 @@ impl ResolutionBudget {
             self.path,
         )?;
         if payload_bytes > remaining_source {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_u64(
                     self.usage
@@ -5034,14 +5136,12 @@ impl ResolutionBudget {
         amount: usize,
         allocation_kind: LimitKind,
     ) -> Result<Vec<T>, Error> {
-        let bytes = amount
-            .checked_mul(size_of::<T>())
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::RetainedBytes,
-                observed: u64::MAX,
-                maximum: usize_u64(self.maximum_retained_bytes),
-                path: self.path,
-            })?;
+        let bytes = amount.checked_mul(size_of::<T>()).ok_or(Error::Limit {
+            kind: LimitKind::RetainedBytes,
+            observed: u64::MAX,
+            maximum: usize_u64(self.maximum_retained_bytes),
+            path: self.path,
+        })?;
         let next_elements = checked_limit_add(
             self.retained_elements,
             amount,
@@ -5085,14 +5185,12 @@ impl ResolutionBudget {
         amount: usize,
         allocation_kind: LimitKind,
     ) -> Result<Vec<T>, Error> {
-        let bytes = amount
-            .checked_mul(size_of::<T>())
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::PeakScratchBytes,
-                observed: u64::MAX,
-                maximum: usize_u64(self.maximum_scratch_bytes),
-                path: self.path,
-            })?;
+        let bytes = amount.checked_mul(size_of::<T>()).ok_or(Error::Limit {
+            kind: LimitKind::PeakScratchBytes,
+            observed: u64::MAX,
+            maximum: usize_u64(self.maximum_scratch_bytes),
+            path: self.path,
+        })?;
         let next_scratch = checked_limit_add(
             self.current_scratch_bytes,
             bytes,
@@ -5272,7 +5370,7 @@ impl ResolutionBudget {
 }
 
 fn remaining_usize(value: u64, kind: LimitKind, path: Path) -> Result<usize, Error> {
-    usize::try_from(value).map_err(|_error| Error::LimitExceeded {
+    usize::try_from(value).map_err(|_error| Error::Limit {
         kind,
         observed: value,
         maximum: usize_u64(usize::MAX),
@@ -5286,14 +5384,14 @@ fn remaining_budget(
     kind: LimitKind,
     path: Path,
 ) -> Result<usize, Error> {
-    let remaining = maximum.checked_sub(used).ok_or(Error::LimitExceeded {
+    let remaining = maximum.checked_sub(used).ok_or(Error::Limit {
         kind,
         observed: usize_u64(used),
         maximum: usize_u64(maximum),
         path,
     })?;
     if remaining == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_u64(used),
             maximum: usize_u64(maximum),
@@ -5304,7 +5402,7 @@ fn remaining_budget(
 }
 
 fn checked_add(left: usize, right: usize, path: Path) -> Result<usize, Error> {
-    left.checked_add(right).ok_or(Error::LimitExceeded {
+    left.checked_add(right).ok_or(Error::Limit {
         kind: LimitKind::TransactionWork,
         observed: u64::MAX,
         maximum: u64::MAX - 1,
@@ -5314,7 +5412,7 @@ fn checked_add(left: usize, right: usize, path: Path) -> Result<usize, Error> {
 
 fn count_not_overflowed(overflowed: bool, path: Path) -> Result<(), Error> {
     if overflowed {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
@@ -5331,14 +5429,14 @@ fn checked_limit_add(
     kind: LimitKind,
     path: Path,
 ) -> Result<usize, Error> {
-    let value = left.checked_add(right).ok_or(Error::LimitExceeded {
+    let value = left.checked_add(right).ok_or(Error::Limit {
         kind,
         observed: u64::MAX,
         maximum: usize_u64(maximum),
         path,
     })?;
     if value > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_u64(value),
             maximum: usize_u64(maximum),
@@ -5383,7 +5481,7 @@ fn map_codec_failure(error: storage_codec::DecodeError, path: Path) -> Error {
                 },
                 _ => (LimitKind::WireWork, u64::MAX, u64::MAX - 1),
             };
-            Error::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed,
                 maximum,
@@ -5398,31 +5496,39 @@ fn map_header_failure(error: table_headers::Error) -> Error {
     use table_headers::Error as HeaderError;
 
     match error {
-        HeaderError::SheetNotFound => Error::SheetNotFound,
-        HeaderError::TableNotFound => Error::TableNotFound,
-        HeaderError::TableLocked { path } => Error::TableLocked {
-            path: map_header_path(path),
+        HeaderError::Refused(table_headers::Refusal::SheetNotFound) => {
+            Error::Refused(crate::package::table_cells::Refusal::SheetNotFound)
         },
-        HeaderError::UnsupportedSource => Error::UnsupportedSource {
-            path: Path::Package,
+        HeaderError::Refused(table_headers::Refusal::TableNotFound) => {
+            Error::Refused(crate::package::table_cells::Refusal::TableNotFound)
+        },
+        HeaderError::Refused(table_headers::Refusal::TableLocked { path }) => {
+            Error::Refused(crate::package::table_cells::Refusal::TableLocked {
+                path: map_header_path(path),
+            })
+        },
+        HeaderError::Refused(table_headers::Refusal::UnsupportedSource) => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource {
+                path: Path::Package,
+            })
         },
         HeaderError::Allocation { amount, .. } => Error::Allocation {
             kind: LimitKind::RetainedElements,
             amount,
         },
-        HeaderError::LimitExceeded {
+        HeaderError::Limit {
             observed,
             maximum,
             path,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::TransactionWork,
             observed,
             maximum,
             path: map_header_path(path),
         },
-        HeaderError::InvalidSettings { path, .. }
-        | HeaderError::UnsupportedDependency { path }
+        HeaderError::Refused(table_headers::Refusal::InvalidSettings { path, .. })
+        | HeaderError::Refused(table_headers::Refusal::UnsupportedDependency { path })
         | HeaderError::InvalidSource { path } => Error::InvalidSource {
             path: map_header_path(path),
         },
@@ -5451,28 +5557,36 @@ fn validate_deferred_owner_closure(
     path: Path,
 ) -> Result<(), Error> {
     if markers.conditional_style.is_some() && conditional_owner_matches != 1 {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::ConditionalStyle,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::ConditionalStyle,
+            },
+        ));
     }
     if markers.spill.is_some() && active_spill_owner {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::Spill,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::Spill,
+            },
+        ));
     }
     if markers.spill.is_some() && spill_owner_matches != 1 {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::Spill,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::Spill,
+            },
+        ));
     }
     if markers.haunted.is_some() && haunted_owner_matches != 1 {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: DependencyKind::FormulaCache,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: DependencyKind::FormulaCache,
+            },
+        ));
     }
     Ok(())
 }
@@ -5494,10 +5608,12 @@ mod tests {
         let header = At::from_a1("A1").expect("valid header coordinate");
         assert!(matches!(
             resolve_changed_target(&source, 0, 0, &[header]),
-            Err(Error::UnsupportedDependency {
-                kind: DependencyKind::HeaderNameIndex,
-                ..
-            })
+            Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::HeaderNameIndex,
+                    ..
+                }
+            ))
         ));
     }
 
@@ -5520,7 +5636,7 @@ mod tests {
         assert!(validate_positions(&[a, b], 2, 1, path).is_ok());
         assert!(matches!(
             validate_positions(&[a, a], 2, 1, path),
-            Err(Error::DuplicatePosition { position }) if position == a
+            Err(Error::Refused(crate::package::table_cells::Refusal::DuplicatePosition { position })) if position == a
         ));
         assert!(matches!(
             validate_positions(&[b, a], 2, 1, path),
@@ -5528,7 +5644,9 @@ mod tests {
         ));
         assert!(matches!(
             validate_positions(&[At::new(2, 0)], 2, 1, path),
-            Err(Error::OutOfBounds { .. })
+            Err(Error::Refused(
+                crate::package::table_cells::Refusal::OutOfBounds { .. }
+            ))
         ));
     }
 
@@ -5677,7 +5795,7 @@ mod tests {
 
         assert!(matches!(
             identities.finish(&mut budget, path),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 ..
             })
@@ -5780,7 +5898,7 @@ mod tests {
         );
         assert!(matches!(
             checked_limit_add(4, 6, 9, LimitKind::WireWork, path),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 10,
                 maximum: 9,
@@ -5798,7 +5916,7 @@ mod tests {
         retained.maximum_retained_bytes = bytes - 1;
         assert!(matches!(
             retained.reserve_retained::<RichFieldRefs>(1, LimitKind::RetainedElements),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::RetainedBytes,
                 ..
             })
@@ -5810,7 +5928,7 @@ mod tests {
         scratch.maximum_scratch_bytes = bytes - 1;
         assert!(matches!(
             scratch.reserve_scratch::<RichFieldRefs>(1, LimitKind::RetainedElements),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PeakScratchBytes,
                 ..
             })
@@ -5841,7 +5959,7 @@ mod tests {
         let probe = Probe::default();
         assert!(matches!(
             budget.options(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 ..
             })
@@ -5887,7 +6005,9 @@ mod tests {
         ] {
             assert!(matches!(
                 reject_unresolved_owner_markers(markers, path),
-                Err(Error::UnsupportedDependency { .. })
+                Err(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency { .. }
+                ))
             ));
         }
     }
@@ -5899,10 +6019,12 @@ mod tests {
         assert!(spill_sizes_active(&[0x0a, 0x00], path).expect("one canonical empty record"));
         assert!(matches!(
             spill_sizes_active(&[0x12, 0x00], path),
-            Err(Error::UnsupportedDependency {
-                kind: DependencyKind::Spill,
-                ..
-            })
+            Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::Spill,
+                    ..
+                }
+            ))
         ));
     }
 

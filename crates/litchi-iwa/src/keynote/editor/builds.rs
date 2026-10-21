@@ -1140,7 +1140,6 @@ pub(super) fn validate_typed_action_wire(original: &[u8], build: &kn::BuildArchi
     Ok(())
 }
 
-#[allow(deprecated)]
 pub(super) fn validate_keyboard_build_wire(
     original: &[u8],
     build: &kn::BuildArchive,
@@ -2238,7 +2237,7 @@ pub(super) fn patch_build_chunk_object(
 }
 
 pub(super) fn patch_slide_build_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     slide_id: u64,
     remove_builds: &[u64],
@@ -2348,7 +2347,7 @@ pub(super) fn patch_slide_build_references(
 }
 
 pub(super) fn patch_slide_build_cache(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &ObjectGraph,
     node_id: u64,
     event_count: usize,

@@ -22,11 +22,11 @@ use crate::limits::as_u64;
 use crate::{Error, Limits, Result};
 
 pub use model::{
-    Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, GraphFamily, Group,
-    GroupId, Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source,
-    Value, ValueRef, XlValue,
+    Ai, Binding, Cache, CellRef, Context, Count, DataKind, Family, GraphFamily, Group, GroupId,
+    ItemsMut, Label, Legend, Link, Model, Order, Owner, Props, Raw, Rect, Role, RowCol, Series,
+    Source, Value, ValueRef, XlValue,
 };
-pub use transaction::{CacheValue, Change, Commit, Editor, Identity, Patch};
+pub use transaction::{CacheValue, Change, Commit, Diagnostics, Edit, Identity, Patch};
 
 const BOF: RecordKind = RecordKind::from_wire(0x0809);
 const EOF: RecordKind = RecordKind::from_wire(0x000A);

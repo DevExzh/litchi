@@ -11,13 +11,14 @@ mod repair_support;
 
 use std::borrow::Cow;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     Cell, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
     ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
-    ParagraphFrameWrap, RtfDocument, RtfWriter, StyleBlock,
+    ParagraphFrameWrap, RtfWriter, StyleBlock,
 };
 
-fn block<'a>(document: &'a RtfDocument<'a>, needle: &str) -> &'a StyleBlock<'a> {
+fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
         .blocks()
         .iter()
@@ -32,7 +33,7 @@ fn parses_positioned_paragraph_frame_controls() {
         r#"\pvpg\posy240\abslock1\nowrap\dxfrtext90\dfrmtxtx10\dfrmtxty20"#,
         r#"\wrapthrough\overlay\absnoovrlp1\frmtxtbrlv Framed\par}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let frame = block(&document, "Framed").paragraph.frame.unwrap();
     assert_eq!(frame.width_twips, Some(1440));
     assert_eq!(frame.height_twips, Some(-720));
@@ -69,14 +70,14 @@ fn parses_positioned_paragraph_frame_controls() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     assert_eq!(block(&reparsed, "Framed").paragraph.frame, Some(frame));
     assert!(String::from_utf8(bytes).unwrap().contains(r"\absw1440"));
 }
 
 #[test]
 fn framed_drop_cap_is_written_before_text_flow_controls() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r#"{\rtf1\dropcapli2\dropcapt1\absw720\phmrg\posxl\pvmrg\posyt\frmtxtbrl Framed}"#,
     )
     .unwrap();
@@ -90,7 +91,7 @@ fn framed_drop_cap_is_written_before_text_flow_controls() {
         .unwrap();
     let text = String::from_utf8(bytes.clone()).unwrap();
     assert!(text.find(r"\dropcapli2").unwrap() < text.find(r"\frmtxtbrl").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_paragraph = block(&reparsed, "Framed").paragraph;
     assert_eq!(reparsed_paragraph.drop_cap, paragraph.drop_cap);
     assert_eq!(reparsed_paragraph.frame, paragraph.frame);
@@ -98,7 +99,7 @@ fn framed_drop_cap_is_written_before_text_flow_controls() {
 
 #[test]
 fn frame_state_inherits_scopes_and_pard_resets_it() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r#"{\rtf1\ansi\absw720 Outer\par {\absw1440 Inner\par }Tail\par {\pard Reset\par }}"#,
     )
     .unwrap();
@@ -131,7 +132,7 @@ fn frame_state_inherits_scopes_and_pard_resets_it() {
 
 #[test]
 fn frame_controls_are_retained_in_styles_and_default_paragraphs() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\stylesheet{\s7\absw960\phcol\posxc\pvpara\posyc"#,
         r#"\wraparound\frmtxlrtb Style;}}"#,
         r#"{\*\defpap\absw480\phmrg\posxr\pvmrg\posyb\wraptight\frmtxtbrl}"#,
@@ -167,7 +168,7 @@ fn frame_controls_are_retained_in_styles_and_default_paragraphs() {
 
 #[test]
 fn header_and_footer_paragraph_frames_round_trip() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\header\absw720\pvpara\posyt Header\par}"#,
         r#"{\footer\absw960\phmrg\posyb Footer\par}Body}"#,
     ))
@@ -189,7 +190,7 @@ fn header_and_footer_paragraph_frames_round_trip() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     assert_eq!(
         reparsed.sections()[0].headers_footers[0].paragraphs[0]
             .paragraph
@@ -206,7 +207,7 @@ fn header_and_footer_paragraph_frames_round_trip() {
 
 #[test]
 fn zero_frame_toggle_values_are_retained_in_paragraph_and_style() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\ansi{\stylesheet{\s9\absw960\abslock0\absnoovrlp0 Style;}}"#,
         r#"\absw720\abslock0\absnoovrlp0 Paragraph}"#,
     ))
@@ -246,7 +247,7 @@ fn rejects_missing_or_oversized_frame_parameters() {
         r#"{\rtf1{\stylesheet{\s7\absnoovrlp2 Bad;}}Text}"#,
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
@@ -255,7 +256,7 @@ fn rejects_missing_or_oversized_frame_parameters() {
 #[test]
 fn table_cell_frames_round_trip_and_preserve_style_frames() {
     let source = r#"{\rtf1\trowd\cellx1000\intbl\absw720\phmrg\posxl\pvmrg\posyt Cell\cell\row}"#;
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let paragraph = &document.tables()[0].rows()[0].cells()[0].paragraphs()[0];
     assert_eq!(paragraph.text_range(), 0..4);
     assert_eq!(paragraph.frame().unwrap().width_twips, Some(720));
@@ -265,7 +266,7 @@ fn table_cell_frames_round_trip_and_preserve_style_frames() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     assert_eq!(
         reparsed.tables()[0].rows()[0].cells()[0].paragraphs()[0]
             .frame()
@@ -274,7 +275,7 @@ fn table_cell_frames_round_trip_and_preserve_style_frames() {
         Some(720)
     );
 
-    let styled = RtfDocument::parse(
+    let styled = Tree::parse(
         r#"{\rtf1{\stylesheet{\s7\absw720\phmrg\posxl\pvmrg\posyt Framed;}}\trowd\cellx1000\intbl\s7 Cell\cell\row}"#,
     )
     .unwrap();
@@ -289,8 +290,7 @@ fn table_cell_frames_round_trip_and_preserve_style_frames() {
 
 #[test]
 fn table_cell_frames_inherit_controls_before_intbl_and_itap() {
-    let outer =
-        RtfDocument::parse(r#"{\rtf1\absw720\trowd\cellx1000\intbl Cell\cell\row}"#).unwrap();
+    let outer = Tree::parse(r#"{\rtf1\absw720\trowd\cellx1000\intbl Cell\cell\row}"#).unwrap();
     assert_eq!(
         outer.tables()[0].rows()[0].cells()[0].paragraphs()[0]
             .frame()
@@ -299,7 +299,7 @@ fn table_cell_frames_inherit_controls_before_intbl_and_itap() {
         Some(720)
     );
 
-    let nested = RtfDocument::parse(
+    let nested = Tree::parse(
         r#"{\rtf1\absw960\trowd\cellx5000\intbl\itap1 Outer \intbl\itap2 Inner\nestcell{\*\nesttableprops\trowd\cellx1000\nestrow}\intbl\itap1\cell\row}"#,
     )
     .unwrap();
@@ -316,7 +316,7 @@ fn table_cell_frames_inherit_controls_before_intbl_and_itap() {
     );
     let mut bytes = Vec::new();
     RtfWriter::new(&mut bytes).write_document(&nested).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let outer_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(
         outer_cell.paragraphs()[0].frame().unwrap().width_twips,
@@ -336,7 +336,7 @@ fn table_wrapdefault_keeps_default_line_breaking_without_creating_a_frame() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/165717.rtf");
     let source = std::fs::read_to_string(path).unwrap();
-    let document = RtfDocument::parse(&source).unwrap();
+    let document = Tree::parse(&source).unwrap();
     let paragraphs = document
         .tables()
         .iter()
@@ -358,7 +358,7 @@ fn table_row_frame_controls_must_be_consistent() {
         r#"{\rtf1\trowd\cellx1000\cellx2000\intbl\absw720 A\cell\pard\intbl B\cell\row}"#,
         r#"{\rtf1\trowd\cellx1000\cellx2000\intbl\absw720 A\cell\intbl\absw960 B\cell\row}"#,
     ] {
-        let error = match RtfDocument::parse(source) {
+        let error = match Tree::parse(source) {
             Ok(_) => String::new(),
             Err(error) => error.to_string(),
         };
@@ -373,7 +373,7 @@ fn table_row_frame_controls_must_be_consistent() {
 fn constructed_implicit_unframed_cells_cannot_join_a_framed_row() {
     for text in ["plain", ""] {
         let mut document =
-            RtfDocument::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Framed\cell\row}"#).unwrap();
+            Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Framed\cell\row}"#).unwrap();
         document.tables_mut()[0].rows_mut()[0].add_cell(Cell::new(Cow::Borrowed(text)));
 
         let mut bytes = Vec::new();
@@ -390,7 +390,7 @@ fn constructed_implicit_unframed_cells_cannot_join_a_framed_row() {
 
 #[test]
 fn constructed_implicit_unframed_nested_cells_obey_the_row_rule() {
-    let mut document = RtfDocument::parse(
+    let mut document = Tree::parse(
         r#"{\rtf1\absw720\trowd\cellx5000\intbl Outer\intbl\itap2\absw720 Inner\nestcell{\*\nesttableprops\trowd\cellx1000\nestrow}\intbl\itap1\cell\row}"#,
     )
     .unwrap();
@@ -414,7 +414,7 @@ fn constructed_implicit_unframed_nested_cells_obey_the_row_rule() {
 #[test]
 fn table_cell_multiple_paragraph_frames_round_trip() {
     let source = r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\par B\cell\row}"#;
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let paragraphs = document.tables()[0].rows()[0].cells()[0].paragraphs();
     assert_eq!(paragraphs.len(), 2);
     assert_eq!(paragraphs[0].text_range(), 0..1);
@@ -426,7 +426,7 @@ fn table_cell_multiple_paragraph_frames_round_trip() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_paragraphs = reparsed.tables()[0].rows()[0].cells()[0].paragraphs();
     assert_eq!(reparsed_paragraphs.len(), 2);
     assert_eq!(
@@ -442,7 +442,7 @@ fn table_cell_multiple_paragraph_frames_round_trip() {
 #[test]
 fn table_cell_text_edits_remap_frame_spans() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Cell\cell\row}"#).unwrap();
+        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 Cell\cell\row}"#).unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     cell.set_text(Cow::Borrowed("Changed")).unwrap();
     assert_eq!(cell.paragraphs()[0].text_range(), 0..7);
@@ -452,7 +452,7 @@ fn table_cell_text_edits_remap_frame_spans() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "Changed");
     assert_eq!(
@@ -464,7 +464,7 @@ fn table_cell_text_edits_remap_frame_spans() {
 #[test]
 fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\cell\row}"#).unwrap();
+        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\cell\row}"#).unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     let before = cell.paragraphs().to_vec();
     let text = cell.text().to_owned();
@@ -477,7 +477,7 @@ fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
         .unwrap();
     let written = String::from_utf8(bytes.clone()).unwrap();
     assert!(written.contains(r"\line "));
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "A\nB");
     assert_eq!(reparsed_cell.paragraphs(), before.as_slice());
@@ -486,8 +486,7 @@ fn table_cell_soft_line_noop_preserves_one_framed_paragraph() {
 #[test]
 fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#)
-            .unwrap();
+        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#).unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     assert_eq!(cell.paragraphs().len(), 2);
     assert!(cell.paragraphs()[0].has_paragraph_break());
@@ -499,7 +498,7 @@ fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "A\nB\nC");
     assert_eq!(reparsed_cell.paragraphs().len(), 2);
@@ -510,8 +509,7 @@ fn table_cell_soft_line_and_paragraph_boundaries_round_trip() {
 #[test]
 fn changed_table_cell_text_remaps_soft_and_paragraph_break_kinds() {
     let mut document =
-        RtfDocument::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#)
-            .unwrap();
+        Tree::parse(r#"{\rtf1\trowd\cellx1000\intbl\absw720 A\line B\par C\cell\row}"#).unwrap();
     let cell = &mut document.tables_mut()[0].rows_mut()[0].cells_mut()[0];
     cell.set_text(Cow::Owned("Changed\nB\nTail".to_string()))
         .unwrap();
@@ -524,7 +522,7 @@ fn changed_table_cell_text_remaps_soft_and_paragraph_break_kinds() {
     RtfWriter::new(&mut bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&bytes).unwrap();
     let reparsed_cell = &reparsed.tables()[0].rows()[0].cells()[0];
     assert_eq!(reparsed_cell.text(), "Changed\nB\nTail");
     assert_eq!(reparsed_cell.paragraphs().len(), 2);

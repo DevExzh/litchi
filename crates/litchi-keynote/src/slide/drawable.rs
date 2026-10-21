@@ -37,12 +37,12 @@
 //! shapes and PNG / JPEG / GIF images styled from the theme as the legacy
 //! host does; new tables cloned from the deck's first slide table
 //! ([`Edit::add_table`], record 0329); table cell values; character runs. Refused with
-//! [`Error::Unsupported`]: removing tables, charts, groups, movies, audio
+//! [`Refusal::Unsupported`]: removing tables, charts, groups, movies, audio
 //! and placeholders, removing drawables referenced by builds or other
 //! objects, geometry of tables, charts, groups, lines and movies, and
 //! character-style writes ([`Unsupported::TextStyling`]).
 
 pub use crate::package::slide_drawable::{
     Commit, Created, Diagnostics, Drawable, Edit, Error, Geometry, ImageFormat, Kind, LimitKind,
-    NewTable, Patch, Preset, Style, TableCellValue, TextRun, TextSpan, Unsupported,
+    NewTable, Patch, Preset, Refusal, Style, TableCellValue, TextRun, TextSpan, Unsupported,
 };

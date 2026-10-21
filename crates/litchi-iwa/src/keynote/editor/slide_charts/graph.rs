@@ -16,7 +16,7 @@ pub(super) struct SlideChartGraph {
 }
 
 pub(super) fn chart_graph(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideChartGraph> {
@@ -387,7 +387,7 @@ mod tests {
     use crate::protobuf::tsp::{ObjectUuidMapEntry, PackageMetadata};
     use crate::shapes::{DrawablePoint, DrawableSize};
 
-    fn chart_editor() -> (Editor, u64) {
+    fn chart_editor() -> (Draft, u64) {
         let mut editor = keynote::Builder::new().build().unwrap();
         let data = ChartData::new(
             vec!["Series".to_owned()],
@@ -411,7 +411,7 @@ mod tests {
     }
 
     fn rewrite_metadata(
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         rewrite: impl FnOnce(&mut PackageMetadata),
     ) -> Result<()> {
         package.update_archive(PACKAGE_METADATA_ENTRY, |archive| {
@@ -442,7 +442,7 @@ mod tests {
         })
     }
 
-    fn graph_objects(editor: &Editor, drawable_object_id: u64) -> (u64, Vec<u64>) {
+    fn graph_objects(editor: &Draft, drawable_object_id: u64) -> (u64, Vec<u64>) {
         let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
         (graph.component_id, graph.object_ids)
     }
@@ -463,7 +463,7 @@ mod tests {
         })
         .unwrap();
 
-        let malformed = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let malformed = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
     }
 
@@ -494,7 +494,7 @@ mod tests {
         })
         .unwrap();
 
-        let malformed = Editor::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let malformed = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert!(chart_graph(&malformed, 0, drawable_object_id).is_err());
     }
 }

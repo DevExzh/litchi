@@ -135,11 +135,11 @@ fn snapshot_no_op_commit_replays_exact_source_bytes() {
     let source = Snapshot::parse_shared(Arc::clone(&shared)).expect("link snapshot should parse");
     let commit = source.edit().commit().expect("no-op should commit");
 
-    assert_eq!(commit.snapshot().bytes(), bytes);
-    assert_eq!(commit.snapshot().fingerprint(), source.fingerprint());
+    assert_eq!(commit.package().bytes(), bytes);
+    assert_eq!(commit.package().fingerprint(), source.fingerprint());
     assert!(Arc::ptr_eq(
         &source.bytes_shared(),
-        &commit.snapshot().bytes_shared()
+        &commit.package().bytes_shared()
     ));
     assert!(commit.patch().is_noop());
     assert!(commit.patch().change().is_none());
@@ -157,7 +157,7 @@ fn transaction_publishes_typed_edits_and_preserves_unknown_tail() {
         .expect("linked timestamps should be editable");
 
     let commit = transaction.commit().expect("typed link edit should commit");
-    let edited = commit.snapshot();
+    let edited = commit.package();
     assert!(!edited.cache_hint());
     assert_eq!(edited.link_update_option(), 19);
     assert_eq!(edited.class_id(), Some(Guid::from_bytes([0x44; 16])));
@@ -187,7 +187,7 @@ fn patch_checks_fingerprint_and_exact_source_range() {
     assert_eq!(commit.patch().source_fingerprint(), source.fingerprint());
     assert_eq!(
         commit.patch().target_fingerprint(),
-        commit.snapshot().fingerprint()
+        commit.package().fingerprint()
     );
 }
 
@@ -209,9 +209,16 @@ fn invalid_typed_edits_leave_the_transaction_unchanged() {
             .is_err()
     );
     assert!(transaction.set_flags(1).is_err());
-    assert!(!transaction.is_changed());
+    assert!(
+        !transaction
+            .clone()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
     assert_eq!(transaction.link().bytes(), original);
-    assert_eq!(transaction.commit().unwrap().snapshot().bytes(), original);
+    assert_eq!(transaction.commit().unwrap().package().bytes(), original);
 
     let linked = Snapshot::parse(&linked_wire()).expect("linked snapshot should parse");
     let mut linked_transaction = linked.edit();

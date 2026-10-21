@@ -275,24 +275,28 @@ fn native_transition(
         return Ok(canonical);
     }
     if matches!(malformation, Malformation::None) {
-        let root = WireView::parse(&canonical)?;
+        let root = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
         let envelope_attributes = root
             .fields()
             .find(|field| field.number() == 2)
             .ok_or_else(|| io::Error::other("transition has no attributes"))?;
         return transition_with_unknown_records(envelope_attributes.payload());
     }
-    let root = WireView::parse(&canonical)?;
+    let root = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let envelope_attributes = root
         .fields()
         .find(|field| field.number() == 2)
         .ok_or_else(|| io::Error::other("transition has no attributes"))?;
-    let view = WireView::parse(envelope_attributes.payload())?;
+    let view = WireView::parse(
+        envelope_attributes.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let animation = view
         .fields()
         .find(|field| field.number() == 8)
         .ok_or_else(|| io::Error::other("transition has no animation"))?;
-    let animation_view = WireView::parse(animation.payload())?;
+    let animation_view =
+        WireView::parse(animation.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_animation = Vec::new();
     for field in animation_view.fields() {
         if field.number() == 2 {
@@ -331,7 +335,7 @@ fn native_transition(
 }
 
 fn transition_with_unknown_records(attributes: &[u8]) -> TestResult<Vec<u8>> {
-    let attributes_view = WireView::parse(attributes)?;
+    let attributes_view = WireView::parse(attributes, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_attributes = Vec::with_capacity(attributes.len().saturating_add(16));
     for field in attributes_view.fields() {
         if field.number() == 8 {
@@ -363,7 +367,7 @@ fn slide(
     }
     .encode_to_vec();
     let transition = native_transition(settings, malformation)?;
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut payload = Vec::with_capacity(canonical.len().saturating_add(transition.len()));
     for field in view.fields() {
         if field.number() == 4 {
@@ -588,7 +592,7 @@ fn malformed_node_package(source: &[u8], malformation: NodeMalformation) -> Test
                 .iter_mut()
                 .find(|message| message.type_ == 4)
                 .ok_or_else(|| io::Error::other("synthetic node payload is missing"))?;
-            let view = WireView::parse(&message.data)?;
+            let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut output = Vec::with_capacity(message.data.len().saturating_add(8));
             for field in view.fields() {
                 if field.number() != 7 {
@@ -667,14 +671,15 @@ fn mixed_modern_legacy_package(source: &[u8]) -> TestResult<Vec<u8>> {
             .iter_mut()
             .find(|message| message.type_ == SLIDE_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("synthetic slide payload is missing"))?;
-        let root = WireView::parse(&message.data)?;
+        let root = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_slide = Vec::with_capacity(message.data.len().saturating_add(16));
         for field in root.fields() {
             if field.number() != 4 {
                 rewritten_slide.extend_from_slice(field.raw());
                 continue;
             }
-            let transition = WireView::parse(field.payload())?;
+            let transition =
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut rewritten_transition = Vec::with_capacity(field.payload().len() + 16);
             for nested in transition.fields() {
                 if nested.number() == 2 {
@@ -873,7 +878,10 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
             if header_end != data_offset {
                 return Err(io::Error::other("test header offsets disagree").into());
             }
-            let archive_info = WireView::parse(&stream.as_bytes()[header_start..header_end])?;
+            let archive_info = WireView::parse(
+                &stream.as_bytes()[header_start..header_end],
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut rewritten_header = Vec::with_capacity(header_end - header_start);
             let mut changed = false;
             for field in archive_info.fields() {
@@ -881,7 +889,8 @@ fn wrong_message_info_type_package(source: &[u8]) -> TestResult<Vec<u8>> {
                     rewritten_header.extend_from_slice(field.raw());
                     continue;
                 }
-                let message_info = WireView::parse(field.payload())?;
+                let message_info =
+                    WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
                 let is_selected = message_info.fields().any(|nested| {
                     nested.number() == 1 && nested.payload() == [SLIDE_MESSAGE_TYPE as u8]
                 });
@@ -1004,7 +1013,7 @@ fn raw_node_has_transition(package: &[u8], identifier: u64) -> TestResult<bool> 
 }
 
 fn normalize_message_length(header: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     for field in view.fields() {
         if field.number() != 2 || field.wire_type() != 2 {
@@ -1013,7 +1022,7 @@ fn normalize_message_length(header: &[u8]) -> TestResult<Vec<u8>> {
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         for nested in message.fields() {
             output.extend_from_slice(nested.key());
             if nested.number() == 3 && nested.wire_type() == 0 {
@@ -1377,14 +1386,18 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     )?)?;
     assert!(matches!(
         duplicate_names.edit_slide_transition("Missing"),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(
-        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::SlidePositionNotFound { position }) if position == Position::new(99))
+        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::Refused(litchi_keynote::transition::Refusal::SlidePositionNotFound { position })) if position == Position::new(99))
     );
     assert!(matches!(
         duplicate_names.edit_slide_transition("Same"),
-        Err(Error::AmbiguousSelector)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::AmbiguousSelector
+        ))
     ));
 
     let flat = package_bytes(
@@ -1399,7 +1412,9 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     assert_eq!(no_modern_edit.settings(), None);
     assert!(matches!(
         no_modern_edit.set(full_settings()?),
-        Err(Error::UnsupportedTransition)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedTransition
+        ))
     ));
 
     for malformed in [
@@ -1454,7 +1469,12 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let changed = legacy
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(changed.commit(), Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        changed.commit(),
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedSource
+        ))
+    ));
 
     let unrestricted = Package::from_bytes(&flat)?;
     let target_len = unrestricted
@@ -1476,10 +1496,7 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let limited_edit = limited
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(
-        limited_edit.commit(),
-        Err(Error::LimitExceeded { .. })
-    ));
+    assert!(matches!(limited_edit.commit(), Err(Error::Limit { .. })));
     Ok(())
 }
 

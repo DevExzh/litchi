@@ -87,21 +87,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// The selected sheet does not exist in the rooted workbook.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// The selected sheet has no table matching the requested selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// The package source cannot publish a preservation-safe changed edit.
-    #[error("the Numbers package source does not support exact table-lock editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted semantic selection did not resolve to one supported native payload.
     #[error("the selected Numbers table has no unambiguous editable lock payload")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Numbers table-lock {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested resource amount.
@@ -121,6 +116,40 @@ pub enum Error {
     /// The supplied patch was not created from this exact package artifact.
     #[error("the Numbers table-lock patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The selected sheet does not exist in the rooted workbook.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// The selected sheet has no table matching the requested selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// The package source cannot publish a preservation-safe changed edit.
+    #[error("the Numbers package source does not support exact table-lock editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A mutable semantic setting staged against one immutable package snapshot.
@@ -193,7 +222,7 @@ impl Edit<'_> {
             });
         }
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_lock_state(
@@ -353,6 +382,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -494,11 +529,11 @@ impl Package {
             .document
             .sheet(sheet)
             .map_err(|error| map_read_error(ReadError::Semantic(error)))?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let selected = selected_sheet
             .select(table.into())
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::TableNotFound)?;
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
         let table_position = selected_sheet
             .tables()
             .position(|candidate| std::ptr::eq(candidate, selected))
@@ -520,7 +555,7 @@ impl Package {
         let sheet_reference = document
             .sheet_references()
             .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let sheet_object = self
             .state
             .index
@@ -571,7 +606,7 @@ impl Package {
             }
             table_index = table_index.checked_add(1).ok_or(Error::InvalidSource)?;
         }
-        Err(Error::TableNotFound)
+        Err(Error::Refused(Refusal::TableNotFound))
     }
 }
 
@@ -613,14 +648,14 @@ fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapsho
     table_info_codec::decode_table_info(source, table_info_decode_options(source)).map_err(
         |error| {
             if let Some((observed, maximum)) = error.field_limit_values() {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: LimitKind::WireFields,
                     observed: usize_as_u64(observed),
                     maximum: usize_as_u64(maximum),
                 };
             }
             if let Some((observed, maximum)) = error.work_limit_values() {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: LimitKind::WireWork,
                     observed: usize_as_u64(observed),
                     maximum: usize_as_u64(maximum),
@@ -630,7 +665,7 @@ fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapsho
                 Some(WireResourceLimit::Bytes {
                     observed,
                     maximum: Some(maximum),
-                }) => Error::LimitExceeded {
+                }) => Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: usize_as_u64(observed.unwrap_or_else(|| maximum.saturating_add(1))),
                     maximum: usize_as_u64(maximum),
@@ -638,7 +673,7 @@ fn decode_table_info(source: &[u8]) -> Result<table_info_codec::TableInfoSnapsho
                 Some(WireResourceLimit::Nesting {
                     observed,
                     maximum: Some(maximum),
-                }) => Error::LimitExceeded {
+                }) => Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed.unwrap_or_else(|| maximum.saturating_add(1))),
                     maximum: u64::from(maximum),
@@ -675,7 +710,7 @@ fn rewrite_lock_state(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source_catalog.limits();
     let archive_limits = physical_limits
@@ -764,7 +799,7 @@ fn physical_source(package: &Package) -> Result<&litchi_iwa_archive::SourceCatal
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn fingerprint(bytes: &[u8]) -> u64 {
@@ -912,7 +947,7 @@ fn map_candidate_read_error(error: ReadError) -> Error {
             kind: litchi_iwa_archive::LimitKind::InputBytes,
             observed,
             maximum,
-        }) => Error::LimitExceeded {
+        }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed,
             maximum,
@@ -940,7 +975,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 super::SemanticLimitKind::References => LimitKind::PayloadReferences,
@@ -958,7 +993,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        ReadError::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        ReadError::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -980,7 +1015,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -997,7 +1032,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
@@ -1019,7 +1054,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1064,7 +1099,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

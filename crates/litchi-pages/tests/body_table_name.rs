@@ -185,7 +185,7 @@ fn append_unknown_model_group(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn model_field_varint(package: &[u8], field_number: u32) -> TestResult<u64> {
     let payload = model_payload(package, FIRST_MODEL_IDENTIFIER)?;
-    let field = WireView::parse(&payload)?
+    let field = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .ok_or("missing model field")?;
@@ -435,13 +435,20 @@ fn selectors_read_current_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, by_name);
     assert!(matches!(
         package.body_table_name(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::name::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&source_package(["Revenue", "Revenue"])?)?;
     assert!(matches!(
         ambiguous.body_table_name(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::name::transaction::Refusal::AmbiguousTableName)
+                | Error::Refused(
+                    litchi_pages::table::name::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
     Ok(())
 }
@@ -556,7 +563,7 @@ fn empty_utf8_and_bounded_name_semantics_are_explicit() -> TestResult {
         .set_name(&replacement)?
         .commit()
         .expect_err("output growth must be rejected at the physical ceiling");
-    assert!(matches!(error, Error::LimitExceeded { .. }));
+    assert!(matches!(error, Error::Limit { .. }));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -761,7 +768,10 @@ fn rename_to_existing_sibling_name_is_rejected_atomically() -> TestResult {
         .commit();
     assert!(matches!(
         result,
-        Err(Error::AmbiguousTableName | Error::InvalidSource)
+        Err(
+            Error::Refused(litchi_pages::table::name::transaction::Refusal::AmbiguousTableName)
+                | Error::InvalidSource
+        )
     ));
     assert_eq!(package.exact_bytes(), source);
     Ok(())

@@ -5,7 +5,7 @@
 //! user-defined section, [`Edit::commit`] publishes a new [`Package`], and
 //! [`Package::apply_metadata`] replays a [`Patch`] onto the exact source it
 //! was made from. The source package is never mutated; dropping an [`Edit`]
-//! is the rollback.
+//! discards it.
 //!
 //! The edit reads the three sections into the shared
 //! [`SummaryProperties`] model and stages back only the sections that
@@ -32,9 +32,9 @@
 //! assert_eq!(edited.metadata().title.as_deref(), Some("Quarterly report"));
 //!
 //! // The patch replays onto its source and reverts through its inverse.
-//! let replayed = package.apply_metadata(&patch)?;
+//! let replayed = package.apply_metadata(&patch)?.into_package();
 //! assert_eq!(replayed.to_bytes()?, edited.to_bytes()?);
-//! let reverted = edited.apply_metadata(&patch.inverse())?;
+//! let reverted = edited.apply_metadata(&patch.inverse())?.into_package();
 //! assert_eq!(reverted.to_bytes()?, package.to_bytes()?);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -130,19 +130,8 @@ impl From<OleError> for Error {
 /// A metadata transaction result.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// What a metadata commit did.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the committed package differs from its source.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
+/// Content-free diagnostics of one metadata commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// An exact-source, reversible metadata patch.
 #[derive(Clone, PartialEq, Eq)]
@@ -190,60 +179,16 @@ impl Patch {
     }
 }
 
-/// A published metadata transaction.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Commit {
-    /// The published package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// The reversible patch from the source package.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit did.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit into its package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
+/// A published metadata edit: the new package, its exact reversible patch
+/// and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
     base: Package,
-    transaction: property_set::Transaction,
+    before: Arc<[u8]>,
+    options: super::EditOptions,
+    transaction: property_set::Staging,
     initial: SummaryProperties,
     properties: SummaryProperties,
 }
@@ -258,15 +203,21 @@ impl fmt::Debug for Edit {
 }
 
 impl Edit {
-    fn new(base: &Package) -> Result<Self> {
+    fn new(base: &Package, options: super::EditOptions) -> Result<Self> {
         let bytes = base.to_bytes()?;
         if is_encrypted(&bytes)? {
             return Err(Error::Encrypted);
         }
-        let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
+        let before: Arc<[u8]> = Arc::from(bytes.as_slice());
+        let transaction = property_set::Staging::new(
+            property_set::Snapshot::from_bytes(bytes)?,
+            options.protection_policy_value(),
+        )?;
         let initial = SummaryProperties::from_editor(transaction.editor())?;
         Ok(Self {
             base: base.clone(),
+            before,
+            options,
             transaction,
             properties: initial.clone(),
             initial,
@@ -308,30 +259,26 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let Self {
             base,
+            before,
+            options,
             mut transaction,
             initial,
             properties,
         } = self;
         if properties == initial {
-            return Ok(unchanged(base)?);
+            return Ok(unchanged(base, before));
         }
         properties.stage_changes(&initial, transaction.editor_mut())?;
-        let (snapshot, patch) = transaction.commit()?.into_parts();
-        let before: Arc<[u8]> = Arc::from(patch.source());
-        let after: Arc<[u8]> = Arc::from(patch.replacement());
-        drop(snapshot);
-        let package = if before == after {
-            base
-        } else {
-            reopen(&base, &after)?
-        };
-        Ok(Commit {
+        let after: Arc<[u8]> = Arc::from(transaction.finish()?);
+        if before == after {
+            return Ok(unchanged(base, before));
+        }
+        let package = reopen(&base, &after)?.with_edit_options(&options);
+        Ok(Commit::new(
             package,
-            diagnostics: Diagnostics {
-                changed: before != after,
-            },
-            patch: Patch { before, after },
-        })
+            Patch { before, after },
+            Diagnostics::CHANGED,
+        ))
     }
 }
 
@@ -343,7 +290,17 @@ impl Package {
     /// Returns [`Error::Encrypted`] for an encrypted document, and an error
     /// when the property streams cannot be read or are invalid.
     pub fn edit_metadata(&self) -> Result<Edit> {
-        Edit::new(self)
+        Edit::new(self, self.retained_edit_options())
+    }
+
+    /// Start a metadata edit of this package under explicit edit options
+    /// (their protection policy authorizes a changed write).
+    ///
+    /// # Errors
+    ///
+    /// As [`Package::edit_metadata`].
+    pub fn edit_metadata_with_options(&self, options: super::EditOptions) -> Result<Edit> {
+        Edit::new(self, self.constrained_edit_options(options))
     }
 
     /// Apply a metadata patch to the exact package it was made from.
@@ -352,28 +309,37 @@ impl Package {
     ///
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// source, and [`Error::Package`] when its result cannot be republished.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let bytes = self.to_bytes()?;
         if bytes.as_slice() != patch.before_bytes() {
             return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(self.clone());
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                Diagnostics::UNCHANGED,
+            ));
         }
-        reopen(self, patch.after_bytes())
+        let protection = property_set::classify_host(&bytes)?;
+        self.retained_edit_options()
+            .protection_policy_value()
+            .authorize(protection)?;
+        let package =
+            reopen(self, patch.after_bytes())?.with_edit_options(&self.retained_edit_options());
+        Ok(Commit::new(package, patch.clone(), Diagnostics::CHANGED))
     }
 }
 
-fn unchanged(base: Package) -> std::result::Result<Commit, PackageError> {
-    let bytes: Arc<[u8]> = Arc::from(base.to_bytes()?);
-    Ok(Commit {
-        package: base,
-        diagnostics: Diagnostics { changed: false },
-        patch: Patch {
+fn unchanged(base: Package, bytes: Arc<[u8]>) -> Commit {
+    Commit::new(
+        base,
+        Patch {
             before: Arc::clone(&bytes),
             after: bytes,
         },
-    })
+        Diagnostics::UNCHANGED,
+    )
 }
 
 fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {

@@ -41,7 +41,7 @@ mod chpx_position_hresi_effect_writer_tests {
         let mut output = Cursor::new(Vec::new());
         writer.build().unwrap().write_to(&mut output).unwrap();
         let mut package =
-            crate::raw::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+            crate::raw::Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
         let document = package.document().unwrap();
         let paragraphs = document.paragraphs().unwrap();
         let runs = paragraphs[0].runs().unwrap();

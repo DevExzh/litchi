@@ -128,8 +128,8 @@ fn package(workbook: Option<&[u8]>, extras: &[(&str, &[u8])]) -> Vec<u8> {
     output.into_inner()
 }
 
-fn authored_graph_chart() -> chart::Chart {
-    let mut chart = chart::Chart::new_graph_authoring(chart::GraphFamily::Pie, Limits::default())
+fn authored_graph_chart() -> chart::Model {
+    let mut chart = chart::Model::new_graph_authoring(chart::GraphFamily::Pie, Limits::default())
         .expect("Graph scaffold");
     let count = chart::Count::new(2).expect("count");
     let row = chart::RowCol::new(1).expect("row");
@@ -201,13 +201,14 @@ fn authored_graph_chart() -> chart::Chart {
 
 #[test]
 fn authored_graph_package_reopens_as_owned_graph_chart() {
-    let package = Package::from_chart(authored_graph_chart()).expect("Graph package");
+    let package =
+        Package::from_chart(authored_graph_chart(), Limits::default()).expect("Graph package");
     assert_eq!(package.topology().stream_count(), 1);
     let bytes = package.finish().into_bytes();
     let reopened = Package::open(bytes).expect("reopen Graph package");
     let workbook = reopened.workbook().expect("Workbook");
     let parsed =
-        chart::Chart::parse(workbook.chart(), chart::Context::graph()).expect("typed Graph chart");
+        chart::Model::parse(workbook.chart(), chart::Context::graph()).expect("typed Graph chart");
     assert_eq!(parsed.groups().len(), 1);
     assert!(parsed.axes().is_empty());
     assert_eq!(parsed.series().len(), 1);
@@ -375,7 +376,7 @@ fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
         Some(&editable_workbook(true)),
         &[(COMP_OBJ, &[0xCA, 0xFE]), (OLE, &[0xBA, 0xBE, 0x01])],
     );
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
+    let snapshot = Snapshot::from_bytes(source.clone(), Limits::default()).expect("snapshot");
     let before = snapshot.chart().expect("typed chart");
     assert_eq!(before.rect(), chart::Rect::default());
     assert_eq!(before.caches()[0].value(), chart::ValueRef::Number(1.25));
@@ -399,10 +400,10 @@ fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
         .set_cache_value(0, chart::Value::Number(2.5))
         .expect("cache value");
     let commit = transaction.commit().expect("package commit");
-    assert!(commit.changed());
-    assert_eq!(commit.patch().chart().len(), 3);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().chart().change_count(), 3);
 
-    let output = commit.snapshot();
+    let output = commit.package();
     let after = output.chart().expect("reparsed chart");
     assert_eq!(after.rect(), target);
     assert_eq!(after.props().flags, 2 | (1 << 16));
@@ -418,15 +419,15 @@ fn package_snapshot_edit_replays_typed_graph_metadata_and_opaque_streams() {
 #[test]
 fn package_no_op_is_exact_and_inverse_patch_restores_source() {
     let source = package(Some(&editable_workbook(false)), &[(COMP_OBJ, &[1, 2, 3])]);
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
+    let snapshot = Snapshot::from_bytes(source.clone(), Limits::default()).expect("snapshot");
     let no_op = snapshot
         .edit()
         .expect("transaction")
         .commit()
         .expect("commit");
-    assert!(!no_op.changed());
+    assert!(!no_op.diagnostics().changed());
     assert!(no_op.patch().is_empty());
-    assert_eq!(no_op.snapshot().bytes(), source.as_slice());
+    assert_eq!(no_op.package().bytes(), source.as_slice());
 
     let mut edit = snapshot.edit().expect("transaction");
     edit.set_rect(chart::Rect {
@@ -440,7 +441,7 @@ fn package_no_op_is_exact_and_inverse_patch_restores_source() {
     let restored = commit
         .patch()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("inverse");
     assert_eq!(restored.bytes(), source.as_slice());
 }
@@ -448,7 +449,7 @@ fn package_no_op_is_exact_and_inverse_patch_restores_source() {
 #[test]
 fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
     let source = package(Some(&editable_workbook(false)), &[]);
-    let snapshot = Snapshot::from_bytes(source.clone()).expect("snapshot");
+    let snapshot = Snapshot::from_bytes(source.clone(), Limits::default()).expect("snapshot");
 
     let mut invalid = snapshot.edit().expect("transaction");
     assert!(matches!(
@@ -464,8 +465,8 @@ fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
         })
     ));
     let invalid_commit = invalid.commit().expect("atomic no-op");
-    assert!(!invalid_commit.changed());
-    assert_eq!(invalid_commit.snapshot().bytes(), source.as_slice());
+    assert!(!invalid_commit.diagnostics().changed());
+    assert_eq!(invalid_commit.package().bytes(), source.as_slice());
 
     let mut edit = snapshot.edit().expect("transaction");
     edit.set_props(chart::Props {
@@ -476,10 +477,10 @@ fn package_patch_rejects_stale_sources_and_invalid_edits_atomically() {
     let commit = edit.commit().expect("commit");
     let patch = commit.patch().clone();
     let stale_bytes = package(Some(&editable_workbook(false)), &[(COMP_OBJ, &[9])]);
-    let stale = Snapshot::from_bytes(stale_bytes).expect("stale package");
+    let stale = Snapshot::from_bytes(stale_bytes, Limits::default()).expect("stale package");
     assert!(matches!(
         patch.apply(&stale),
-        Err(Error::UnsupportedMutation {
+        Err(Error::PatchConflict {
             operation: "package-patch",
             ..
         })

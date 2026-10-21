@@ -12,7 +12,10 @@ use crate::Result;
 pub(crate) use common_wire::WireField;
 
 pub(crate) fn parse_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
-    Ok(common_wire::parse_wire_fields(data)?)
+    Ok(common_wire::parse_wire_fields(
+        data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?)
 }
 
 pub(crate) fn overlay_singular_wire_fields(base: &[u8], overlay: &[u8]) -> Result<Vec<u8>> {
@@ -136,7 +139,12 @@ pub(crate) fn append_length_delimited_field(
     field_number: u32,
     payload: &[u8],
 ) -> Result<()> {
-    common_wire::append_length_delimited_field(output, field_number, payload)?;
+    common_wire::append_length_delimited_field(
+        output,
+        field_number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(())
 }
 

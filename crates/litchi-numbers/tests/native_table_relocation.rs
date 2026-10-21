@@ -11,9 +11,7 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_core::{Archive, ArchiveInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{
-    ImageSelector, Package, SheetSelector, Table, table::relocation::transaction::Path,
-};
+use litchi_numbers::{ImageSelector, Package, SheetSelector, Table, table::relocation::Path};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

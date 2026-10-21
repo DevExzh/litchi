@@ -13,9 +13,7 @@ use std::{hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_numbers::table::merge::Region;
-use litchi_numbers::{
-    Package, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 const MAX_DESCRIPTOR_BYTES: usize = 64 * 1024;
 const MAX_PACKAGE_BYTES: u64 = 512 * 1024;
@@ -60,13 +58,29 @@ fuzz_target!(|data: &[u8]| {
 });
 
 fn bounded_options() -> litchi_numbers::OpenOptions {
-    let physical = litchi_numbers::SourceLimits::builder().max_input_bytes(MAX_PACKAGE_BYTES).and_then(|b| b.max_members(MAX_PACKAGE_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_PACKAGE_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_PACKAGE_TOTAL_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-    .expect("fuzz physical profile is valid");
-    let semantic = litchi_numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
+    let physical = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(MAX_PACKAGE_BYTES)
+        .and_then(|b| b.max_members(MAX_PACKAGE_ENTRIES))
+        .and_then(|b| b.max_entry_bytes(MAX_PACKAGE_ENTRY_BYTES))
+        .and_then(|b| b.max_aggregate_bytes(MAX_PACKAGE_TOTAL_BYTES))
+        .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|b| b.build())
+        .expect("fuzz physical profile is valid");
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(MAX_OBJECTS)
+        .and_then(|b| b.max_sheets(MAX_SHEETS))
+        .and_then(|b| b.max_tables(MAX_TABLES))
+        .and_then(|b| b.max_references(MAX_REFERENCES))
+        .and_then(|b| b.build())
         .expect("fuzz semantic profile is valid")
-        .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_OUTPUT_TEXT_BYTES)).and_then(|b| b.build())
+        .to_builder()
+        .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+        .and_then(|b| b.max_output_text_bytes(MAX_OUTPUT_TEXT_BYTES))
+        .and_then(|b| b.build())
         .expect("fuzz projection profile is valid");
-    litchi_numbers::OpenOptions::new().source_limits(physical).semantic_limits(semantic)
+    litchi_numbers::OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(semantic)
 }
 
 fn normalize_input(data: &[u8]) -> Option<Vec<u8>> {

@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn delete_row_uid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     old_rows: usize,
@@ -22,7 +22,7 @@ pub(super) fn delete_row_uid(
 }
 
 pub(super) fn delete_column_uid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     old_columns: usize,
@@ -41,7 +41,7 @@ pub(super) fn delete_column_uid(
 }
 
 fn update_uid_map(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     update: impl FnOnce(&mut tst::ColumnRowUidMapArchive) -> Result<()>,

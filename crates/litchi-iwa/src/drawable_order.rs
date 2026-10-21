@@ -129,7 +129,8 @@ pub(crate) fn reorder_reference_field(
 /// the last production Prost decode leaves. Common wire parsing validates the
 /// envelope and known scalar wire kinds without retaining generated state.
 fn decode_reference_identifier(source: &[u8]) -> Result<u64> {
-    let fields = litchi_iwa_common::wire::parse_wire_fields(source)?;
+    let fields =
+        litchi_iwa_common::wire::parse_wire_fields(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut identifier = None;
     for field in fields {
         if matches!(

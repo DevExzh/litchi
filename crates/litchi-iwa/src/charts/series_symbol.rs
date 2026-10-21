@@ -17,7 +17,7 @@ use crate::charts::series_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_fixed32_field, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AREA_SHOW_FIELD: u32 = 32;
 const LINE_SHOW_FIELD: u32 = 33;
@@ -179,7 +179,7 @@ impl ChartSeriesSymbolKind {
 }
 
 pub(crate) fn chart_series_symbols(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -225,7 +225,7 @@ pub(crate) fn chart_series_symbols(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_chart_series_symbols(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

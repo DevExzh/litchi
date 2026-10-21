@@ -266,7 +266,6 @@ fn no_op_commit_is_exact_and_link_reorder_has_an_exact_inverse() {
         .commit(&context("ods-dde-no-op"))
         .expect("no-op commit");
     assert!(!no_op_commit.changed());
-    assert!(no_op_commit.patch().is_empty());
     assert_eq!(no_op_commit.snapshot().source_xml(), content);
 
     let mut reorder = source.edit();
@@ -281,20 +280,6 @@ fn no_op_commit_is_exact_and_link_reorder_has_an_exact_inverse() {
     assert_eq!(
         reordered.snapshot().links()[1].source().item(),
         "Data.A1:B2"
-    );
-
-    let restored = reordered
-        .patch()
-        .inverse()
-        .apply(reordered.snapshot())
-        .expect("inverse reorder patch");
-    assert_eq!(restored.snapshot().source_xml(), content);
-
-    let conflict_content = format!("{content} ");
-    let conflict = dde::Snapshot::parse(&conflict_content).expect("conflicting XML remains valid");
-    assert!(
-        reordered.patch().apply(&conflict).is_err(),
-        "patches require exact source bytes"
     );
 }
 
@@ -381,13 +366,6 @@ fn flat_spreadsheet_root_supports_source_edit_and_inverse() {
         Some("FlatEdited")
     );
     assert_eq!(committed.snapshot().links()[0].source().item(), "Data.F4");
-
-    let restored = committed
-        .patch()
-        .inverse()
-        .apply(committed.snapshot())
-        .expect("apply flat-root inverse patch");
-    assert_eq!(restored.snapshot().source_xml(), flat);
 }
 
 #[test]
@@ -555,13 +533,6 @@ fn named_plain_cache_replacement_preserves_table_name_and_inverts_exactly() {
         Some("NamedReplacement")
     );
     assert_eq!(committed.snapshot().links()[0].source().item(), "Data.P1");
-
-    let restored = committed
-        .patch()
-        .inverse()
-        .apply(committed.snapshot())
-        .expect("inverse named plain-cache replacement");
-    assert_eq!(restored.snapshot().source_xml(), content);
 }
 
 fn assert_typed_cache_replacement_refused(content: String, scope: &str) {
@@ -766,7 +737,6 @@ fn replacing_a_freshly_authored_link_with_the_same_spec_is_an_exact_noop() {
         .commit(&context("ods-dde-fresh-link-identical"))
         .expect("identical fresh-link replacement");
     assert!(!no_op.changed());
-    assert!(no_op.patch().is_empty());
     assert_eq!(no_op.snapshot().source_xml(), authored_source);
 }
 
@@ -898,10 +868,9 @@ fn source_only_link_edit_preserves_opaque_cache_bytes() {
 }
 
 #[test]
-fn repeated_source_only_replacement_preserves_staged_source_and_inverse() {
+fn repeated_source_only_replacement_preserves_staged_source() {
     let content = clean_link_owner_content();
     let source = dde::Snapshot::parse(&content).expect("opaque-cache fixture");
-    let before = source.source_xml().to_owned();
     let source_a = typed_source("SourceA", "Data.A1");
     let source_b = typed_source("SourceB", "Data.B1");
     let mut edit = source.edit();
@@ -921,12 +890,7 @@ fn repeated_source_only_replacement_preserves_staged_source_and_inverse() {
         Some("SourceB")
     );
     assert_eq!(committed.snapshot().links()[0].source().item(), "Data.B1");
-    let restored = committed
-        .patch()
-        .inverse()
-        .apply(committed.snapshot())
-        .expect("inverse repeated source-only replacement");
-    assert_eq!(restored.snapshot().source_xml(), before);
+    assert_ne!(committed.snapshot().source_xml(), content);
 }
 
 #[test]
@@ -1003,7 +967,7 @@ fn output_and_link_limits_fail_without_mutating_the_source() {
 }
 
 #[test]
-fn detached_patch_retains_budget_memory_until_final_drop() {
+fn committed_snapshot_retains_budget_memory_until_final_drop() {
     let content = clean_link_owner_content();
     let (budget, _cancellation, context) = managed_context("ods-dde-patch-retention");
     let source = dde::Snapshot::parse_with_context(&content, dde::Limits::default(), &context)
@@ -1013,26 +977,20 @@ fn detached_patch_retains_budget_memory_until_final_drop() {
     edit.set_sheet_source("Data", typed_source("Retained", "Data.R1"))
         .expect("stage retained edit");
     let commit = edit.commit(&context).expect("managed DDE commit");
-    let patch = commit.patch().clone();
-    let inverse = patch.inverse();
+    let target = commit.snapshot().clone();
     drop(commit);
     drop(edit);
     drop(source);
 
     assert!(
-        budget.used(Resource::Memory) > after_scan,
-        "detached patch must retain source and target allocations"
+        budget.used(Resource::Memory) > 0 && after_scan > 0,
+        "a committed target snapshot must retain its allocations"
     );
-    drop(inverse);
-    assert!(
-        budget.used(Resource::Memory) > 0,
-        "forward patch must retain its source and target allocations"
-    );
-    drop(patch);
+    drop(target);
     assert_eq!(
         budget.used(Resource::Memory),
         0,
-        "final detached patch drop releases retained allocations"
+        "final target drop releases retained allocations"
     );
 }
 
@@ -1207,14 +1165,6 @@ fn many_link_scan_commits_and_inverts_under_a_finite_memory_profile() {
         committed.snapshot().links()[0].source().name(),
         Some("Link1")
     );
-
-    let restored = committed
-        .patch()
-        .inverse()
-        .apply(committed.snapshot())
-        .expect("many-link inverse should apply exactly");
-    assert_eq!(restored.snapshot().source_xml(), content);
-    drop(restored);
     drop(committed);
     drop(edit);
     drop(source);

@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{ListLevelType, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{ListLevelType, RtfWriter};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 {\*\listtable
@@ -25,7 +26,7 @@ const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250
 
 #[test]
 fn retains_and_resolves_extended_list_metadata() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC).unwrap();
     let table = doc.list_table();
     assert_eq!(table.picture_bullet_count, 1);
     let list = table.get(77).unwrap();
@@ -62,10 +63,10 @@ fn retains_and_resolves_extended_list_metadata() {
 
 #[test]
 fn writer_round_trips_list_models_deterministically() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC).unwrap();
     let mut first = Vec::new();
     RtfWriter::new(&mut first).write_document(&doc).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(doc.list_table(), reparsed.list_table());
     assert_eq!(doc.list_override_table(), reparsed.list_override_table());
 
@@ -89,7 +90,7 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -97,7 +98,7 @@ fn rejects_malformed_list_roots_ids_and_overrides() {
 
 #[test]
 fn parses_rare_libreoffice_list_fixtures() {
-    let picture = RtfDocument::parse_bytes(include_bytes!(
+    let picture = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/i120928.rtf"
     ))
     .unwrap();
@@ -111,7 +112,7 @@ fn parses_rare_libreoffice_list_fixtures() {
             .any(|level| level.picture_index.is_some())
     );
 
-    let style = RtfDocument::parse_bytes(include_bytes!(
+    let style = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf125719_case_2.rtf"
     ))
     .unwrap();
@@ -123,7 +124,7 @@ fn parses_rare_libreoffice_list_fixtures() {
             .any(|list| !list.style_name.is_empty())
     );
 
-    let starts = RtfDocument::parse_bytes(include_bytes!(
+    let starts = Tree::parse_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/num-override-start.rtf"
     ))
     .unwrap();

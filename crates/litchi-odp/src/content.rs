@@ -3620,9 +3620,11 @@ fn inject_automatic_styles(content: &str, fragments: &str) -> Result<String> {
             &format!("<office:automatic-styles>{fragments}</office:automatic-styles>"),
         );
     }
-    Err(Error::Unsupported(
-        "ODP content has no transferable automatic-style owner".to_string(),
-    ))
+    Err(Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.content",
+        "ODP content has no transferable automatic-style owner",
+    )))
 }
 
 fn rewrite_known_attributes(

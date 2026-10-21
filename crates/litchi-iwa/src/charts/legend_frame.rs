@@ -11,7 +11,7 @@ use crate::archive::RawMessage;
 use crate::charts::source::CHART_MESSAGE_TYPE;
 use crate::protobuf::{tsch, tsp};
 use crate::wire::{parse_wire_fields, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const CHART_ARCHIVE_EXTENSION_FIELD: u32 = 10_000;
 const CHART_LEGEND_FRAME_FIELD: u32 = 3;
@@ -163,7 +163,7 @@ pub enum ChartLegendFrame {
 
 /// Read one chart's exact native legend-frame state.
 pub(crate) fn chart_legend_frame(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -179,7 +179,7 @@ pub(crate) fn chart_legend_frame(
 
 /// Set or remove one chart's native legend rectangle.
 pub(crate) fn set_chart_legend_frame(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -331,7 +331,7 @@ fn strict_required_fixed32(data: &[u8], field_number: u32, label: &str) -> Resul
 }
 
 fn chart_message(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

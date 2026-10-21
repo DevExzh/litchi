@@ -8,7 +8,7 @@ use crate::charts::series_value_label_number_format::{
 };
 use crate::charts::{Index, NumberFormat};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label number format in native series order.
     pub fn body_chart_series_value_label_number_formats(
         &self,
@@ -60,7 +60,7 @@ impl Editor {
 }
 
 fn body_chart_series_value_label_number_formats(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<NumberFormat>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -82,7 +82,7 @@ fn body_chart_series_value_label_number_formats(
 }
 
 fn set_body_chart_series_value_label_number_formats(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     formats: &[NumberFormat],
 ) -> Result<()> {
@@ -121,7 +121,7 @@ fn set_body_chart_series_value_label_number_formats(
         graph.info.kind,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_value_label_number_formats(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series value-label number-format update failed validation".to_owned(),

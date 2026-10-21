@@ -500,7 +500,7 @@ fn native_hidden_axes_resource_limits_are_atomic() -> TestResult {
         .set(requested)
         .commit();
     assert!(
-        matches!(result, Err(BodyTableHiddenAxesError::LimitExceeded { .. })),
+        matches!(result, Err(BodyTableHiddenAxesError::Limit { .. })),
         "native output overrun was accepted: {result:?}"
     );
     assert_eq!(exact_bytes(&package)?, before);

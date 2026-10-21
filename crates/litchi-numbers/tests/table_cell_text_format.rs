@@ -375,11 +375,15 @@ fn text_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_text_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_text_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -590,7 +594,12 @@ fn text_converted_live_generic_number_payload_is_preserved_with_locality() -> Te
 
     let mut generic_payload = fixture::format_payload_by_key(&source, fixture::SECOND_FORMAT_KEY)?;
     append_varint_field(&mut generic_payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut generic_payload, 47, b"converted generic extension")?;
+    append_length_delimited_field(
+        &mut generic_payload,
+        47,
+        b"converted generic extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile = fixture::rewrite_format_payload_by_key(
         &source,
         fixture::SECOND_FORMAT_KEY,
@@ -785,7 +794,12 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"text extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"text extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile =
         fixture::rewrite_format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY, &payload)?;
     let root_before = fixture::format_list_payload(&hostile)?;
@@ -808,7 +822,7 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     );
     for field_number in [46, 47] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -885,7 +899,9 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
     let b3 = At::from_a1("B3")?;
     assert!(matches!(
         package.table_cell_text_format(0usize, 0usize, b3),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -939,11 +955,15 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_text_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_text_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+            ))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -952,23 +972,29 @@ fn text_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(currency_transaction::Error::WrongFormatFamily { .. })
+        Err(currency_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-        Err(scientific_transaction::Error::WrongFormatFamily { .. })
+        Err(scientific_transaction::Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_fraction_format(0usize, 0usize, selected_position()),
-        Err(fraction_transaction::Error::WrongFormatFamily { .. })
+        Err(fraction_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -980,11 +1006,15 @@ fn text_coordinate_boundaries_return_cell_not_found_without_mutation() -> TestRe
     for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_text_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_text_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::text::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -1157,7 +1187,7 @@ fn text_input_and_operation_budgets_reject_before_publication() -> TestResult {
         .set(Text)
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected Text operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);

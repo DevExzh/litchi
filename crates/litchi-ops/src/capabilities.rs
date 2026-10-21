@@ -971,7 +971,7 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             // Every edit verb dispatches to the object format's leaf; what
             // a format cannot do is an element-level gap (record 0292).
             if self
@@ -2979,7 +2979,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && crate::format::odp::SETTABLE.contains(&self.data().canonical)
                 && readable);
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         let settable = settable
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
@@ -3102,7 +3102,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && crate::format::odp::ADDABLE.contains(&self.data().canonical)
                 && readable);
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         let add = add
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
@@ -3188,7 +3188,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && crate::format::odp::REMOVABLE.contains(&self.data().canonical)
                 && readable);
-        #[cfg(feature = "odf-objects")]
+        #[cfg(odf_objects)]
         let remove = remove
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
@@ -3624,7 +3624,7 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     if adapter == Adapter::Odp {
         return crate::format::odp::WRITE_GAPS.get(index).map(Some);
     }
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     if let Some(writes) = crate::format::odf_tree::writes(adapter) {
         return writes.gaps.get(index).map(Some);
     }

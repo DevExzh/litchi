@@ -4,7 +4,7 @@ use litchi_ograph::chart::Rect;
 
 use crate::Result;
 
-use super::model::{Change, Commit, Patch, Snapshot};
+use super::model::{Change, Commit, Diagnostics, Patch, Snapshot};
 use super::validation;
 
 /// A bounded editor that can replace only the existing chart-area geometry.
@@ -23,9 +23,9 @@ impl Edit {
         })
     }
 
-    /// Returns the current transaction snapshot.
+    /// The staged snapshot, not yet committed.
     #[must_use]
-    pub const fn snapshot(&self) -> Snapshot {
+    pub const fn staged(&self) -> Snapshot {
         self.working
     }
 
@@ -46,6 +46,11 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         validation::ensure_pair(self.base.rect(), self.working.rect())?;
         let change = (self.base != self.working).then(|| Change::new(self.base, self.working));
-        Ok(Commit::new(self.working, Patch::new(change)))
+        let patch = Patch::new(change);
+        Ok(Commit::new(
+            self.working,
+            patch,
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

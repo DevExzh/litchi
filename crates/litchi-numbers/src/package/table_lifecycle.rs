@@ -44,6 +44,42 @@ structure::structural_family!("table-lifecycle");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted table-lifecycle source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} table-lifecycle items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested state.
+    #[error("table-lifecycle candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("table-lifecycle patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The sheet selector did not resolve one sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -82,31 +118,30 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support table lifecycle changes")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted table-lifecycle source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} table-lifecycle items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested state.
-    #[error("table-lifecycle candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("table-lifecycle patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidName { .. } | Self::InvalidSize { .. } => RefusalKind::InvalidValue,
+            Self::NoTemplate { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,12 +183,12 @@ fn table_position(
         .workbook_ref()
         .sheets()
         .get(sheet)
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     match selector {
         TableSelector::Position(position) => {
             let position = position.get();
             if position >= sheet.table_count() {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(Refusal::TableNotFound));
             }
             Ok(position)
         },
@@ -162,7 +197,9 @@ fn table_position(
                 .tables()
                 .enumerate()
                 .filter(|(_, table)| table.name() == name);
-            let (position, _) = matches.next().ok_or(Error::TableNotFound)?;
+            let (position, _) = matches
+                .next()
+                .ok_or(Error::Refused(Refusal::TableNotFound))?;
             if matches.next().is_some() {
                 return Err(Error::InvalidSource);
             }
@@ -179,20 +216,20 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidName`] for an empty name, a name containing NUL, or
-    /// the name of another table of the sheet; [`Error::InvalidSize`];
-    /// [`Error::OperationAlreadyStaged`].
+    /// [`Refusal::InvalidName`] for an empty name, a name containing NUL, or
+    /// the name of another table of the sheet; [`Refusal::InvalidSize`];
+    /// [`Refusal::OperationAlreadyStaged`].
     pub fn add(mut self, name: &str, rows: u32, columns: u32) -> Result<Self, Error> {
         use crate::sheet::lifecycle::InvalidName;
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let sheet = self
             .source
             .workbook_ref()
             .sheets()
             .get(self.sheet)
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let reason = if name.is_empty() {
             Some(InvalidName::Empty)
         } else if name.contains('\0') {
@@ -203,7 +240,7 @@ impl Edit<'_> {
             None
         };
         if let Some(reason) = reason {
-            return Err(Error::InvalidName { reason });
+            return Err(Error::Refused(Refusal::InvalidName { reason }));
         }
         add::check_size(rows, columns)?;
         let mut owned = String::new();
@@ -223,13 +260,13 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::TableNotFound`], [`Error::OperationAlreadyStaged`].
+    /// [`Refusal::TableNotFound`], [`Refusal::OperationAlreadyStaged`].
     pub fn remove<'selector>(
         mut self,
         selector: impl Into<TableSelector<'selector>>,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let position = table_position(self.source, self.sheet, selector.into())?;
         self.operation = Some(Operation::Remove(position));
@@ -240,12 +277,14 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit;
-    /// [`Error::UnsupportedDependency`] when a surviving formula or object
+    /// [`Refusal::NoStagedOperation`] for an empty edit;
+    /// [`Refusal::UnsupportedDependency`] when a surviving formula or object
     /// depends on the removed graph; source, resource and verification
     /// errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self
+            .operation
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let sheet = &self.source.workbook_ref().sheets()[self.sheet];
         let mut expected: Vec<String> = sheet
             .tables()
@@ -534,7 +573,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::SheetNotFound`] when the selector resolves no sheet.
+    /// [`Refusal::SheetNotFound`] when the selector resolves no sheet.
     pub fn edit_table_lifecycle<'selector>(
         &self,
         sheet: impl Into<SheetSelector<'selector>>,
@@ -543,7 +582,7 @@ impl Package {
             .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?
             .index();
         Ok(Edit {
             source: self,

@@ -7,7 +7,7 @@ use crate::charts::axis_number_format::{
 };
 use crate::charts::{Axis, NumberFormat};
 
-impl Editor {
+impl Draft {
     /// Read the decimal-number format of one native slide-chart axis.
     pub fn slide_chart_axis_number_format(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn slide_chart_axis_number_format(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn slide_chart_axis_number_format(
 }
 
 fn set_slide_chart_axis_number_format(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_slide_chart_axis_number_format(
         axis,
         format,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_axis_number_format(slide_index, drawable_object_id, axis)? != format {
         return Err(Error::InvalidFormat(
             "Keynote chart axis number-format update failed validation".to_owned(),
@@ -98,7 +98,7 @@ mod tests {
         exercise(&mut editor, chart.drawable_object_id);
     }
 
-    fn exercise(editor: &mut Editor, chart_id: u64) {
+    fn exercise(editor: &mut Draft, chart_id: u64) {
         let expected = NumberFormat::new(
             DecimalPlaces::fixed(2).unwrap(),
             NegativeStyle::Parentheses,
@@ -114,7 +114,7 @@ mod tests {
         editor
             .set_slide_chart_axis_number_format(0, chart_id, Axis::Value, expected)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_axis_number_format(0, chart_id, Axis::Value)

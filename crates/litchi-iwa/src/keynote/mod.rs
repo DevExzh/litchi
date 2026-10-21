@@ -31,20 +31,21 @@
 //! ```
 
 pub mod creation;
-pub mod editor;
+pub(crate) mod editor;
 
 pub use creation::Builder;
 pub use editor::Effect;
 pub use editor::{
     BuildAcceleration, BuildChunkInfo, BuildCustomParameters, BuildInfo, BuildSettings, BuildStart,
-    BuildTimingCurve, Editor, EmphasisAction, FlipDirection, HorizontalBuildDirection,
+    BuildTimingCurve, Draft, EmphasisAction, FlipDirection, HorizontalBuildDirection,
     JiggleIntensity, KeyboardBuild, KeyboardDirection, MotionPath, MotionPathNode,
     MotionPathNodeType, MotionPathPoint, MotionSubpath, MoveAction, MovieKind, ObjectBuildEffect,
     OpacityAction, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideShape,
     RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RotationAction, RotationDirection,
     ScaleAction, SlideChartInfo, SlideImageInfo, SlideImageKind, SlideInfo, SlideLayoutId,
     SlideLayoutInfo, SlideShapeInfo, SlideTable, SlideTableInfo, SlideTextInfo, SlideTextRole,
-    SwooshDirection, TableCellParagraphList, TableCellParagraphListBullet,
+    SwooshDirection, TableCellConditionalHighlightInfo, TableCellInset, TableCellInsets,
+    TableCellLayout, TableCellParagraphList, TableCellParagraphListBullet,
     TableCellParagraphListBulletGeometry, TableCellParagraphListIndentation,
     TableCellParagraphListLabelColor, TableCellParagraphListLevel,
     TableCellParagraphListLevelPlacement, TableCellParagraphListNumberFormat,
@@ -53,8 +54,8 @@ pub use editor::{
     TableCellTextBackground, TableCellTextBaselineShift, TableCellTextCapitalization,
     TableCellTextCharacterSpacing, TableCellTextColor, TableCellTextDecorations, TableCellTextFont,
     TableCellTextLigatures, TableCellTextOutline, TableCellTextScript, TableCellTextShadow,
-    TableCellTextStyle, TableCellUpdate, TableCellValue, TableDimension, TableDimensionSize,
-    TablePoints,
+    TableCellTextStyle, TableCellTextWrap, TableCellUpdate, TableCellValue,
+    TableCellVerticalAlignment, TableDimension, TableDimensionSize, TablePoints,
 };
 pub use litchi_keynote::build::{AnimationType, Build};
 pub use litchi_keynote::show::{Mode, Settings, Show, Size};

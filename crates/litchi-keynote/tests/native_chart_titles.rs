@@ -127,7 +127,7 @@ fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
                 if message.type_ != CHART_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == GENERATED_EXTENSION_FIELD && field.wire_type() == 2
                 }) {
@@ -196,7 +196,7 @@ fn title_owner_member(source: &[u8], expected: &str) -> TestResult<String> {
                 if message.type_ != CHART_NON_STYLE_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == GENERATED_EXTENSION_FIELD && field.wire_type() == 2
                 }) {
@@ -240,7 +240,7 @@ fn axis_owner_member(source: &[u8], axis: Axis, expected: &str) -> TestResult<St
                 if message.type_ != CHART_AXIS_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == GENERATED_EXTENSION_FIELD && field.wire_type() == 2
                 }) {

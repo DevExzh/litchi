@@ -2057,15 +2057,25 @@ fn append_comment_entry(source: &[u8], key: u32, identifier: u64) -> Result<Vec<
     let mut reference = Vec::new();
     append_varint_field(&mut reference, 1, identifier)
         .map_err(|_| NativeReplyError::InvalidSource)?;
-    append_length_delimited_field(&mut entry, 10, &reference)
-        .map_err(|_| NativeReplyError::InvalidSource)?;
+    append_length_delimited_field(
+        &mut entry,
+        10,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|_| NativeReplyError::InvalidSource)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(source.len().saturating_add(entry.len()).saturating_add(8))
         .map_err(|_| NativeReplyError::Allocation)?;
     output.extend_from_slice(source);
-    append_length_delimited_field(&mut output, 3, &entry)
-        .map_err(|_| NativeReplyError::InvalidSource)?;
+    append_length_delimited_field(
+        &mut output,
+        3,
+        &entry,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|_| NativeReplyError::InvalidSource)?;
     Ok(output)
 }
 

@@ -13,7 +13,7 @@ use crate::wire::{
     patch_length_delimited_field, patch_varint_field, rewrite_repeated_fixed32_fields,
     rewrite_repeated_length_delimited_fields, rewrite_repeated_varint_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListLabelColor, ParagraphListNumberFormat,
@@ -59,12 +59,12 @@ pub(super) struct LocatedListStyle {
     package_revision: u64,
 }
 
-pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<ListStyleLocation> {
+pub(super) fn locate_style(package: &HostPackage, style_id: u64) -> Result<ListStyleLocation> {
     locate_style_with_archive(package, style_id).map(|located| located.location)
 }
 
 pub(super) fn locate_style_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<LocatedListStyle> {
     let mut found = None;
@@ -108,7 +108,7 @@ pub(super) fn locate_style_with_archive(
 }
 
 pub(super) fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style: &tswp::ListStyleArchive,
     style_id: u64,
 ) -> Result<u64> {
@@ -161,7 +161,7 @@ pub(super) fn paragraph_list(style: &tswp::ListStyleArchive) -> Result<Paragraph
 }
 
 pub(super) fn resolved_paragraph_list(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<ParagraphList> {
     let mut current_id = style_id;
@@ -181,7 +181,7 @@ pub(super) fn resolved_paragraph_list(
 }
 
 pub(super) fn effective_bullet_strings(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<Vec<String>> {
     if resolved_paragraph_list(package, style_id)? != ParagraphList::Bullet {
@@ -207,7 +207,7 @@ pub(super) fn effective_bullet_strings(
 }
 
 pub(super) fn effective_bullet_geometries(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<Vec<LabelGeometry>> {
     if resolved_paragraph_list(package, style_id)? != ParagraphList::Bullet {
@@ -219,7 +219,7 @@ pub(super) fn effective_bullet_geometries(
 }
 
 pub(super) fn effective_label_geometries(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<Vec<LabelGeometry>> {
     if resolved_paragraph_list(package, style_id)? == ParagraphList::None {
@@ -244,19 +244,19 @@ pub(super) fn effective_label_geometries(
     }
 }
 
-pub(super) fn effective_list_indents(package: &IWorkPackage, style_id: u64) -> Result<Vec<f32>> {
+pub(super) fn effective_list_indents(package: &HostPackage, style_id: u64) -> Result<Vec<f32>> {
     effective_list_float_array(package, style_id, ListFloatArray::LabelIndents)
 }
 
 pub(super) fn effective_list_text_indents(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<Vec<f32>> {
     effective_list_float_array(package, style_id, ListFloatArray::TextGaps)
 }
 
 pub(super) fn effective_label_color(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
 ) -> Result<ParagraphListLabelColor> {
     if resolved_paragraph_list(package, style_id)? == ParagraphList::None {
@@ -299,7 +299,7 @@ pub(super) fn effective_label_color(
     }
 }
 
-pub(super) fn effective_number_types(package: &IWorkPackage, style_id: u64) -> Result<Vec<i32>> {
+pub(super) fn effective_number_types(package: &HostPackage, style_id: u64) -> Result<Vec<i32>> {
     if resolved_paragraph_list(package, style_id)? != ParagraphList::Numbered {
         return Err(Error::InvalidFormat(format!(
             "iWork list style {style_id} is not a numbered list"
@@ -322,7 +322,7 @@ pub(super) fn effective_number_types(package: &IWorkPackage, style_id: u64) -> R
     }
 }
 
-pub(super) fn effective_tiered_numbers(package: &IWorkPackage, style_id: u64) -> Result<Vec<bool>> {
+pub(super) fn effective_tiered_numbers(package: &HostPackage, style_id: u64) -> Result<Vec<bool>> {
     if resolved_paragraph_list(package, style_id)? != ParagraphList::Numbered {
         return Err(Error::InvalidFormat(format!(
             "iWork list style {style_id} is not a numbered list"
@@ -352,7 +352,7 @@ enum ListFloatArray {
 }
 
 fn effective_list_float_array(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
     array: ListFloatArray,
 ) -> Result<Vec<f32>> {
@@ -602,7 +602,7 @@ pub(super) fn number_tiering_variation_object(
 }
 
 fn patch_style_message<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
     patch: F,
 ) -> Result<()>
@@ -616,7 +616,7 @@ where
 }
 
 fn patch_style_message_with_archive<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     patch: F,
 ) -> Result<()>
@@ -702,7 +702,7 @@ where
 }
 
 pub(super) fn replace_direct_number_types_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     number_types: &[i32],
 ) -> Result<()> {
@@ -718,7 +718,7 @@ pub(super) fn replace_direct_number_types_with_archive(
 }
 
 pub(super) fn remove_direct_number_types(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
 ) -> Result<()> {
     patch_style_message(package, location, |data, style_id| {
@@ -798,7 +798,7 @@ fn patch_direct_number_types(data: &[u8], style_id: u64, number_types: &[i32]) -
 }
 
 pub(super) fn replace_direct_tiered_numbers_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     tiered_numbers: &[bool],
 ) -> Result<()> {
@@ -814,7 +814,7 @@ pub(super) fn replace_direct_tiered_numbers_with_archive(
 }
 
 pub(super) fn remove_direct_tiered_numbers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
 ) -> Result<()> {
     patch_style_message(package, location, |data, style_id| {
@@ -893,7 +893,7 @@ fn patch_direct_tiered_numbers(
 }
 
 pub(super) fn replace_direct_label_color_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     color: ParagraphListLabelColor,
 ) -> Result<()> {
@@ -903,7 +903,7 @@ pub(super) fn replace_direct_label_color_with_archive(
 }
 
 pub(super) fn remove_direct_label_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
 ) -> Result<()> {
     patch_style_message(package, location, |data, style_id| {
@@ -1009,7 +1009,7 @@ fn native_label_color(color: ParagraphListLabelColor) -> (Option<bool>, Option<t
 }
 
 pub(super) fn replace_direct_bullet_strings_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     strings: &[String],
 ) -> Result<()> {
@@ -1021,7 +1021,7 @@ pub(super) fn replace_direct_bullet_strings_with_archive(
 }
 
 pub(super) fn replace_direct_bullet_geometries_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     geometries: &[LabelGeometry],
 ) -> Result<()> {
@@ -1035,7 +1035,7 @@ pub(super) fn replace_direct_bullet_geometries_with_archive(
 }
 
 pub(super) fn remove_direct_bullet_geometries(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
 ) -> Result<()> {
     patch_style_message(package, location, |data, style_id| {
@@ -1112,7 +1112,7 @@ fn patch_direct_bullet_geometries(
 }
 
 pub(super) fn replace_direct_list_indentation_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListStyle,
     indents: &[f32],
     text_indents: &[f32],
@@ -1184,7 +1184,7 @@ fn patch_direct_list_indentation(
 }
 
 pub(super) fn remove_direct_list_indentation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStyleLocation,
 ) -> Result<()> {
     patch_style_message(package, location, |data, style_id| {
@@ -1262,7 +1262,7 @@ fn patch_direct_bullet_strings(data: &[u8], style_id: u64, strings: &[String]) -
     Ok(patched)
 }
 
-pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(super) fn is_exclusive(package: &HostPackage, style_id: u64) -> Result<bool> {
     let storage_references = locate_text_storages(package)?
         .into_iter()
         .map(|location| {
@@ -1476,7 +1476,7 @@ pub(super) fn number_format_from_native(value: i32) -> Result<ParagraphListNumbe
 }
 
 pub(super) fn find_preset_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     preset: ParagraphList,
@@ -1734,7 +1734,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/One.iwa",
@@ -2019,7 +2019,7 @@ mod tests {
         let archive = crate::archive::Archive {
             objects: vec![object],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package.replace_archive("Index/One.iwa", &archive).unwrap();
 
         let location = locate_style(&package, style_id).unwrap();

@@ -260,25 +260,30 @@ fn semantic_patch_is_clone_first_reversible_and_source_checked() {
         .unwrap();
     let committed = transaction.commit().unwrap();
     assert_eq!(
-        committed.snapshot().message().unwrap().subject,
+        committed.package().message().unwrap().subject,
         unicode("edited")
     );
     assert_eq!(
         committed
             .patch()
             .inverse()
-            .apply(committed.snapshot())
+            .apply(committed.package())
             .unwrap(),
         source
     );
-    assert!(committed.patch().apply(&super::Snapshot::empty()).is_err());
+    assert!(
+        committed
+            .patch()
+            .apply(&super::record::Snapshot::empty())
+            .is_err()
+    );
 }
 
 #[test]
 fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() {
     let prefix = b"opaque table bytes";
     let original = write_doc(prefix, None);
-    let mut editor = super::Editor::open(original.clone()).unwrap();
+    let mut editor = super::package::Editor::open(original.clone()).unwrap();
     let committed = editor.set(sample()).unwrap();
     let written = committed.snapshot().finish().unwrap();
     assert_eq!(
@@ -292,7 +297,7 @@ fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() 
     drop(table);
     drop(ole);
 
-    let mut reopened = super::Editor::open(written.clone()).unwrap();
+    let mut reopened = super::package::Editor::open(written.clone()).unwrap();
     assert_eq!(reopened.value(), Some(&sample()));
     let edited = reopened
         .update_message(|message| message.subject = unicode("edited"))
@@ -302,7 +307,7 @@ fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() 
         &[0xFA, 0xCE]
     );
 
-    let cleared = super::Editor::open(edited.snapshot().finish().unwrap())
+    let cleared = super::package::Editor::open(edited.snapshot().finish().unwrap())
         .unwrap()
         .clear()
         .unwrap();

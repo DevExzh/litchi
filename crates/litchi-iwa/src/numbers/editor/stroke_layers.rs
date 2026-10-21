@@ -180,7 +180,7 @@ struct PlannedLayer {
 }
 
 pub(crate) fn cell_borders(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -252,7 +252,7 @@ pub(crate) fn cell_borders(
 }
 
 pub(crate) fn set_cell_border(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -402,7 +402,7 @@ fn validated_cell_coordinates(
 }
 
 fn decoded_sidecar(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
 ) -> Result<tst::StrokeSidecarArchive> {
@@ -413,7 +413,7 @@ fn decoded_sidecar(
 }
 
 fn decoded_sidecar_with_index(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     sidecar_id: u64,
 ) -> Result<(usize, tst::StrokeSidecarArchive)> {
@@ -434,7 +434,7 @@ fn decoded_sidecar_with_index(
 }
 
 fn decoded_layer(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<tst::StrokeLayerArchive> {
@@ -455,7 +455,7 @@ fn decoded_layer(
 }
 
 fn highest_order(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     sidecar: &tst::StrokeSidecarArchive,
 ) -> Result<u32> {
@@ -478,7 +478,7 @@ fn highest_order(
 }
 
 fn find_layer_at_index(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     references: &[tsp::Reference],
     fixed_index: u32,
@@ -528,7 +528,7 @@ fn find_layer_at_index(
 
 /// Shift explicit border layers for one inserted table axis.
 pub(super) fn insert(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     axis: StrokeAxis,
@@ -560,7 +560,7 @@ pub(super) fn insert(
 
 /// Shift explicit border layers for one deleted table axis.
 pub(super) fn delete(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     axis: StrokeAxis,
@@ -592,7 +592,7 @@ pub(super) fn delete(
 
 /// Validate every explicit border layer before a table row permutation.
 pub(super) fn validate_row_reorder(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     rows: u32,
@@ -613,7 +613,7 @@ pub(super) fn validate_row_reorder(
 
 /// Keep explicit cell borders attached to their cells during a row permutation.
 pub(super) fn reorder_rows(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     rows: u32,
@@ -633,7 +633,7 @@ pub(super) fn reorder_rows(
 }
 
 fn planned_row_reorder(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     dimensions: TableDimensions,
@@ -684,7 +684,7 @@ fn planned_row_reorder(
 }
 
 fn plan_reordered_layer(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     side: LayerSide,
@@ -839,7 +839,7 @@ fn relocated_row(row: u32, body_start: usize, destinations_by_source: &[usize]) 
 }
 
 fn mutate(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     sidecar_id: u64,
     mutation: StrokeLayerMutation,
@@ -934,7 +934,7 @@ fn mutate(
     })
 }
 
-fn apply_layer_updates(package: &mut IWorkPackage, updates: &[LayerUpdate]) -> Result<()> {
+fn apply_layer_updates(package: &mut HostPackage, updates: &[LayerUpdate]) -> Result<()> {
     for update in updates {
         package.update_archive(&update.archive_name, |archive| {
             let object = archive.object_mut(update.identifier).ok_or_else(|| {
@@ -976,7 +976,7 @@ fn apply_layer_updates(package: &mut IWorkPackage, updates: &[LayerUpdate]) -> R
 }
 
 fn plan_layer(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     side: LayerSide,

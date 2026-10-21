@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_numbers_movies <input.numbers>")?;
-    let editor = numbers::Editor::open(input)?;
+    let editor = numbers::Draft::open(input)?;
     for sheet in editor.sheets()? {
         for (movie_index, movie) in editor.sheet_movies(sheet.id())?.iter().enumerate() {
             println!(

@@ -101,7 +101,7 @@ fn flat_changed_publication_refuses_formatted_source_xml() {
         .unwrap();
     assert!(matches!(
         transaction.commit(),
-        Err(litchi_odp::flat::Error::Core(Error::Unsupported(message))) if message.contains("not compact")
+        Err(litchi_odp::flat::Error::Refused(refusal)) if refusal.reason().contains("not compact")
     ));
 }
 
@@ -123,7 +123,7 @@ fn flat_rejects_wrong_family_packaged_garbage_and_unsafe_rewrite() {
     let mut transaction = source.edit();
     assert!(matches!(
         transaction.replace(0, "title", "body"),
-        Err(Error::Unsupported(_))
+        Err(Error::Unsupported(_) | Error::Refused(_))
     ));
 
     let self_closing_unmodeled = FLAT.replace("</draw:page>", "<draw:image/></draw:page>");
@@ -131,7 +131,7 @@ fn flat_rejects_wrong_family_packaged_garbage_and_unsafe_rewrite() {
     let mut transaction = source.edit();
     assert!(matches!(
         transaction.replace(0, "title", "body"),
-        Err(Error::Unsupported(_))
+        Err(Error::Unsupported(_) | Error::Refused(_))
     ));
 }
 

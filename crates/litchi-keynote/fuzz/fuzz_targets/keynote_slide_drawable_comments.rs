@@ -1168,8 +1168,13 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
         let message = object.messages.get_mut(message_index)?;
         let mut payload = message.data.clone();
         if matches!(mutation, HostileMutation::UnknownPayload) {
-            append_length_delimited_field(&mut payload, 9_001, b"fuzz unknown comment metadata")
-                .ok()?;
+            append_length_delimited_field(
+                &mut payload,
+                9_001,
+                b"fuzz unknown comment metadata",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .ok()?;
         } else {
             let reference = tsp::Reference {
                 identifier: reference_identifier,
@@ -1178,7 +1183,13 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
             .encode_to_vec();
             let copies = usize::from(matches!(mutation, HostileMutation::DuplicateReply)) + 1;
             for _ in 0..copies {
-                append_length_delimited_field(&mut payload, 4, &reference).ok()?;
+                append_length_delimited_field(
+                    &mut payload,
+                    4,
+                    &reference,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .ok()?;
                 object
                     .archive_info
                     .message_infos

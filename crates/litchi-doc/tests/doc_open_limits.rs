@@ -36,7 +36,7 @@ use litchi_cfb::consts::STGTY_STREAM;
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::Picture;
-use litchi_doc::{Error, OpenOptions, Password, SourceLimitKind, SourceLimits, raw::Package};
+use litchi_doc::{Error, OpenOptions, Password, SourceLimitKind, SourceLimits, raw::Reader};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -178,9 +178,9 @@ fn package_limit_accepts_exact_size_and_rejects_one_less() {
     std::fs::write(&path, &bytes).unwrap();
 
     let mut package =
-        Package::open_with_options(&path, OpenOptions::default().source_limits(exact)).unwrap();
+        Reader::open_with_options(&path, OpenOptions::default().source_limits(exact)).unwrap();
     assert!(package.document().is_ok());
-    let error = Package::open_with_options(
+    let error = Reader::open_with_options(
         &path,
         OpenOptions::default().source_limits(limits(
             exact.max_input_bytes() - 1,
@@ -204,13 +204,13 @@ fn package_limit_accepts_exact_size_and_rejects_one_less() {
     assert_eq!(observed, u64::try_from(bytes.len()).unwrap());
     assert_eq!(maximum, u64::try_from(bytes.len() - 1).unwrap());
 
-    let core_error: litchi_core::Error = Package::from_reader_with_limits(
+    let core_error: litchi_core::Error = Reader::from_reader_with_options(
         Cursor::new(bytes),
-        limits(
+        OpenOptions::default().source_limits(limits(
             exact.max_input_bytes() - 1,
             exact.max_entry_bytes(),
             exact.max_aggregate_bytes(),
-        ),
+        )),
     )
     .err()
     .unwrap()
@@ -263,14 +263,14 @@ fn typed_password_is_redacted_and_moves_into_open_options() {
 fn stream_limit_accepts_exact_size_and_failed_read_is_retryable() {
     let bytes = document_bytes();
     let exact = exact_limits(&bytes);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
 
     let error = package
-        .document_with_limits(limits(
+        .document_with_options(OpenOptions::default().source_limits(limits(
             exact.max_input_bytes(),
             exact.max_entry_bytes() - 1,
             exact.max_aggregate_bytes(),
-        ))
+        )))
         .err()
         .unwrap();
     let Error::Limit {
@@ -286,7 +286,7 @@ fn stream_limit_accepts_exact_size_and_failed_read_is_retryable() {
     assert_eq!(maximum, u64::try_from(exact.max_entry_bytes() - 1).unwrap());
 
     let document = package
-        .document_with_options_and_limits(OpenOptions::default(), exact)
+        .document_with_options(OpenOptions::default().source_limits(exact))
         .unwrap();
     assert!(document.text().unwrap().contains("bounded DOC read"));
 }
@@ -295,14 +295,14 @@ fn stream_limit_accepts_exact_size_and_failed_read_is_retryable() {
 fn aggregate_limit_accepts_exact_size_and_failed_read_is_atomic() {
     let bytes = document_bytes();
     let exact = exact_limits(&bytes);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
 
     let error = package
-        .document_with_limits(limits(
+        .document_with_options(OpenOptions::default().source_limits(limits(
             exact.max_input_bytes(),
             exact.max_entry_bytes(),
             exact.max_aggregate_bytes() - 1,
-        ))
+        )))
         .err()
         .unwrap();
     let Error::Limit {
@@ -323,7 +323,9 @@ fn aggregate_limit_accepts_exact_size_and_failed_read_is_atomic() {
         u64::try_from(exact.max_aggregate_bytes() - 1).unwrap()
     );
 
-    let document = package.document_with_limits(exact).unwrap();
+    let document = package
+        .document_with_options(OpenOptions::default().source_limits(exact))
+        .unwrap();
     assert!(document.text().unwrap().contains("bounded DOC read"));
 }
 
@@ -332,14 +334,18 @@ fn per_read_limits_cannot_widen_package_limits() {
     let bytes = document_bytes();
     let exact = exact_limits(&bytes);
     let package_limits = exact;
-    let mut package = Package::from_reader_with_limits(Cursor::new(bytes), package_limits).unwrap();
+    let mut package = Reader::from_reader_with_options(
+        Cursor::new(bytes),
+        OpenOptions::default().source_limits(package_limits),
+    )
+    .unwrap();
 
     let error = package
-        .document_with_limits(limits(
+        .document_with_options(OpenOptions::default().source_limits(limits(
             exact.max_input_bytes(),
             exact.max_entry_bytes(),
             exact.max_aggregate_bytes() - 1,
-        ))
+        )))
         .err()
         .unwrap();
     assert!(matches!(
@@ -359,7 +365,7 @@ fn payload_io_failure_after_preflight_is_not_reported_as_a_missing_stream() {
         inner: Cursor::new(document_bytes()),
         fail_reads: Arc::clone(&fail_reads),
     };
-    let mut package = Package::from_reader(reader).unwrap();
+    let mut package = Reader::from_reader(reader).unwrap();
     fail_reads.store(true, Ordering::Relaxed);
 
     let error = package.document().err().unwrap();
@@ -454,9 +460,9 @@ fn opaque_and_metadata_streams_are_bounded_before_materialization() {
                 OpenOptions::default().source_limits(selected),
             )
             .unwrap_err(),
-            Package::from_ole_file_with_limits(
+            Reader::from_ole_file_with_options(
                 OleFile::open(Cursor::new(bytes)).unwrap(),
-                selected,
+                OpenOptions::default().source_limits(selected),
             )
             .unwrap_err(),
         ];
@@ -474,16 +480,19 @@ fn already_parsed_ole_enforces_exact_package_limit() {
     let bytes = document_bytes();
     let exact = exact_limits(&bytes);
     let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
-    assert!(Package::from_ole_file_with_limits(ole, exact).is_ok());
+    assert!(
+        Reader::from_ole_file_with_options(ole, OpenOptions::default().source_limits(exact))
+            .is_ok()
+    );
 
     let ole = OleFile::open(Cursor::new(&bytes)).unwrap();
-    let error = Package::from_ole_file_with_limits(
+    let error = Reader::from_ole_file_with_options(
         ole,
-        limits(
+        OpenOptions::default().source_limits(limits(
             exact.max_input_bytes() - 1,
             exact.max_entry_bytes(),
             exact.max_aggregate_bytes(),
-        ),
+        )),
     )
     .err()
     .unwrap();
@@ -508,7 +517,10 @@ fn fixed_buffer_counting_fallback_accepts_n_and_rejects_n_plus_one() {
         inner: Cursor::new(bytes.clone()),
         reject_next_end_seek: true,
     };
-    assert!(Package::from_reader_with_limits(exact_reader, exact).is_ok());
+    assert!(
+        Reader::from_reader_with_options(exact_reader, OpenOptions::default().source_limits(exact))
+            .is_ok()
+    );
 
     let limited = limits(
         exact.max_input_bytes() - 1,
@@ -519,9 +531,12 @@ fn fixed_buffer_counting_fallback_accepts_n_and_rejects_n_plus_one() {
         inner: Cursor::new(bytes),
         reject_next_end_seek: true,
     };
-    let error = Package::from_reader_with_limits(oversized_reader, limited)
-        .err()
-        .unwrap();
+    let error = Reader::from_reader_with_options(
+        oversized_reader,
+        OpenOptions::default().source_limits(limited),
+    )
+    .err()
+    .unwrap();
     let Error::Limit {
         kind,
         observed,
@@ -544,7 +559,7 @@ fn aggregate_refusal_precedes_any_document_payload_read() {
         inner: Cursor::new(bytes),
         fail_reads: Arc::clone(&fail_reads),
     };
-    let mut package = Package::from_reader(reader).unwrap();
+    let mut package = Reader::from_reader(reader).unwrap();
     fail_reads.store(true, Ordering::Relaxed);
     let error = package
         .document_with_options(OpenOptions::default().source_limits(limits(

@@ -120,7 +120,7 @@ fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
                 if message.type_ != CHART_MESSAGE_TYPE {
                     continue;
                 }
-                let outer = WireView::parse(&message.data)?;
+                let outer = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
                 for field in outer.fields().filter(|field| {
                     field.number() == CHART_EXTENSION_FIELD && field.wire_type() == 2
                 }) {

@@ -34,7 +34,7 @@
 
 use litchi_doc::{
     Builder, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable, ProofingStatus,
-    ProofingTables, raw::Package,
+    ProofingTables, raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -105,7 +105,7 @@ fn proofing_tables() -> ProofingTables {
     ProofingTables::try_new(Some(spelling), Some(grammar)).unwrap()
 }
 
-fn assert_authored_tables(package: &mut Package<Cursor<Vec<u8>>>, expected: &ProofingTables) {
+fn assert_authored_tables(package: &mut Reader<Cursor<Vec<u8>>>, expected: &ProofingTables) {
     let document = package.document().unwrap();
     assert_eq!(document.proofing_tables().unwrap(), expected);
     assert!(
@@ -137,7 +137,7 @@ fn spelling_and_grammar_tables_round_trip_through_write_to() {
 
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_authored_tables(&mut package, &expected);
 }
 
@@ -157,7 +157,7 @@ fn proofing_tables_round_trip_through_file_save_and_can_be_cleared() {
     writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(path).unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     assert_authored_tables(&mut package, &expected);
 }
 

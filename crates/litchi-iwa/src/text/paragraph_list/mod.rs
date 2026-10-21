@@ -18,7 +18,7 @@ use crate::text::style_registry::{
     insert_private_style, object_archive, object_archive_name, register_private_style,
     register_style_reference, unregister_owner_reference_if_unused,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_text::position::TextPosition;
 
 pub use litchi_iwa_text::paragraph::list::{
@@ -69,7 +69,7 @@ pub(crate) fn preset_style_object(
 
 /// Locate a canonical list preset owned by one stylesheet.
 pub(crate) fn preset_style_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     stylesheet_id: u64,
     preset: ParagraphList,
 ) -> Result<Option<u64>> {
@@ -77,13 +77,13 @@ pub(crate) fn preset_style_id(
     native::find_preset_style_in_archive(&archive, stylesheet_id, preset)
 }
 
-pub(crate) fn paragraph_list(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphList> {
+pub(crate) fn paragraph_list(package: &HostPackage, storage_id: u64) -> Result<ParagraphList> {
     let storage = storage::locate(package, storage_id)?;
     native::resolved_paragraph_list(package, storage.style_id)
 }
 
 pub(crate) fn paragraph_lists(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<ParagraphListPlacement>> {
     let storage = storage::locate_boundaries(package, storage_id)?;
@@ -100,7 +100,7 @@ pub(crate) fn paragraph_lists(
 }
 
 pub(super) fn set_paragraph_lists(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     placements: &[ParagraphListPlacement],
 ) -> Result<()> {
@@ -270,7 +270,7 @@ fn normalize_placements(
 }
 
 pub(super) fn set_paragraph_list(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     list: ParagraphList,
 ) -> Result<()> {
@@ -340,7 +340,7 @@ pub(super) fn set_paragraph_list(
     Ok(())
 }
 
-pub(super) fn reset_paragraph_list(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_paragraph_list(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     let storage = storage::locate(package, storage_id)?;
     if native::resolved_paragraph_list(package, storage.style_id).ok() == Some(ParagraphList::None)
     {

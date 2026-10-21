@@ -1,8 +1,5 @@
-#![allow(deprecated)]
-
 use std::env;
 
-use litchi_iwa::IWorkDrawableCommentEditor;
 use litchi_iwa_common::comment::DrawableId;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkDrawableCommentEditor::open(&input)?;
+    let mut editor = litchi_iwa::comments::Draft::open(&input)?;
     let old = editor.comment(drawable_id)?;
     if replacement == "--clear" {
         editor.clear_comment(drawable_id)?;

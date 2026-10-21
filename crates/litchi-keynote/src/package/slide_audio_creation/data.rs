@@ -96,7 +96,7 @@ fn read_part<'a>(
 
 fn map_error(error: SlideMediaDataError) -> SlideAudioCreationError {
     match error {
-        SlideMediaDataError::LimitExceeded {
+        SlideMediaDataError::Limit {
             kind,
             observed,
             maximum,
@@ -115,7 +115,7 @@ fn map_error(error: SlideMediaDataError) -> SlideAudioCreationError {
                 SlideMediaDataLimitKind::WireWork => SlideAudioCreationLimitKind::WireWork,
                 SlideMediaDataLimitKind::Allocations => SlideAudioCreationLimitKind::Allocations,
             };
-            SlideAudioCreationError::LimitExceeded {
+            SlideAudioCreationError::Limit {
                 kind,
                 observed,
                 maximum,

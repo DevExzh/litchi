@@ -118,27 +118,21 @@ pub enum Error {
         reason: &'static str,
     },
 
-    /// Re-encoding a parsed chart would risk losing opaque source data.
-    #[error("unsafe parsed-chart edit refused: {reason}")]
-    UnsafeEdit {
-        /// Why a byte-preserving rewrite cannot be guaranteed.
-        reason: &'static str,
-    },
+    /// A well-formed request this route refuses (a parsed chart whose
+    /// opaque records cannot be re-encoded losslessly, a fresh value outside
+    /// the authoring profile, a mutation whose host ownership is not
+    /// modeled), classified by [`litchi_core::edit::RefusalKind`]. The
+    /// refusal is content-free: its operation and reason are static.
+    #[error("{0}")]
+    Refused(litchi_core::edit::Refusal),
 
-    /// A fresh semantic request is outside the supported authoring profile.
-    #[error("unsupported chart authoring: {reason}")]
-    UnsupportedAuthoring {
-        /// Static explanation of the unsupported proof boundary.
-        reason: &'static str,
-    },
-
-    /// A mutation is well-formed at the API boundary but its complete host
-    /// ownership graph is not yet modeled safely.
-    #[error("unsupported chart mutation {operation}: {reason}")]
-    UnsupportedMutation {
+    /// A patch or staged edit was made against another source than the one
+    /// receiving it.
+    #[error("{operation} patch conflict: {reason}")]
+    PatchConflict {
         /// Concise operation name.
         operation: &'static str,
-        /// Static explanation of the missing proof boundary.
+        /// Static explanation of the mismatch.
         reason: &'static str,
     },
 

@@ -247,11 +247,13 @@ fn metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn metadata_root_field(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn data_metadata_map_payload(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
@@ -418,7 +420,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(0),
             MediaPart::Poster,
         ),
-        Err(litchi_keynote::slide::media::data::Error::AudioPoster)
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
     assert!(matches!(
         removed.slide_media_data(
@@ -426,7 +430,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(2),
             MediaPart::Content,
         ),
-        Err(litchi_keynote::slide::media::data::Error::MoviePositionNotFound { .. })
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     Ok(())
 }

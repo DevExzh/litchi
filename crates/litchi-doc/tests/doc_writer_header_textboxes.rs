@@ -45,7 +45,7 @@ use litchi_doc::writer::FloatingPosition;
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     HeaderFooterParagraph, HeaderKind, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin,
-    raw::Package,
+    raw::Reader,
 };
 use litchi_odraw::{Record, shape::Kind};
 use std::io::Cursor;
@@ -96,7 +96,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
 fn header_text_box_round_trips_through_doc_reader() {
     let doc_bytes = write_doc_with_header_text_box();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Main story intact.
@@ -217,7 +217,7 @@ fn document_with_header_but_no_boxes_has_empty_header_story_tables() {
     writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.header_text_boxes().is_empty());
     assert!(document.header_shape_positions().is_empty());

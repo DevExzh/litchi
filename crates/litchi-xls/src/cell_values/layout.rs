@@ -12,6 +12,7 @@
 use super::{Error, Result};
 use litchi_biff::Records;
 use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000a;
@@ -329,7 +330,13 @@ pub(super) fn apply_columns(between: &[u8], changes: &[&LayoutChange]) -> Result
     let def = frames
         .iter()
         .position(|frame| frame.kind == DEF_COL_WIDTH)
-        .ok_or_else(|| Error::UnsafeEdit("worksheet has no DefColWidth record".into()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "worksheet has no DefColWidth record",
+            )
+        })?;
     let run_end = frames[def + 1..]
         .iter()
         .position(|frame| frame.kind != COL_INFO)
@@ -337,8 +344,10 @@ pub(super) fn apply_columns(between: &[u8], changes: &[&LayoutChange]) -> Result
     if frames[run_end..].iter().any(|frame| frame.kind == COL_INFO)
         || frames[..def].iter().any(|frame| frame.kind == COL_INFO)
     {
-        return Err(Error::UnsafeEdit(
-            "ColInfo records outside the DefColWidth run are not rewritten".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "ColInfo records outside the DefColWidth run are not rewritten",
         ));
     }
     let mut infos = frames[def + 1..run_end]
@@ -360,9 +369,10 @@ pub(super) fn apply_columns(between: &[u8], changes: &[&LayoutChange]) -> Result
             |index| infos[index].state(),
         );
         if observed != before {
-            return Err(Error::UnsafeEdit(
-                "column layout precondition is stale".into(),
-            ));
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "column layout precondition is stale",
+            });
         }
         let mut replacement = Vec::new();
         match covering {

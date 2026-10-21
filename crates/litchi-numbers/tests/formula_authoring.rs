@@ -807,7 +807,7 @@ fn literals_and_caches_reject_nonfinite_and_oversized_values() -> TestResult {
     ] {
         assert!(matches!(
             error,
-            FormulaError::LimitExceeded {
+            FormulaError::Limit {
                 kind: FormulaLimitKind::OwnedBytes,
                 observed,
                 maximum: actual,
@@ -829,7 +829,7 @@ fn composition_charges_literal_bytes_and_depth_aggregately() -> TestResult {
         .expect_err("function name plus literals must exceed the aggregate byte limit");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::OwnedBytes,
             observed,
             maximum,
@@ -844,7 +844,7 @@ fn composition_charges_literal_bytes_and_depth_aggregately() -> TestResult {
         .expect_err("one node beyond the maximum formula depth must fail");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::Depth,
             observed,
             maximum,
@@ -870,7 +870,7 @@ fn node_limit_accepts_the_exact_maximum_and_refuses_the_next_parent() -> TestRes
         .expect_err("a unary parent above the exact node maximum must fail");
     assert!(matches!(
         error,
-        FormulaError::LimitExceeded {
+        FormulaError::Limit {
             kind: FormulaLimitKind::Nodes,
             observed,
             maximum,
@@ -913,7 +913,7 @@ fn functions_unary_binary_ranges_and_whole_axes_are_checked() -> TestResult {
     );
     assert!(matches!(
         Expression::function("TOO-LONG", [Expression::number(1.0)?]),
-        Err(FormulaError::LimitExceeded {
+        Err(FormulaError::Limit {
             kind: FormulaLimitKind::OwnedBytes,
             observed: 8,
             maximum: 7,
@@ -960,7 +960,7 @@ fn functions_unary_binary_ranges_and_whole_axes_are_checked() -> TestResult {
             (0..=litchi_numbers::formula::MAX_FUNCTION_ARGUMENTS)
                 .map(|_| Expression::boolean(true)),
         ),
-        Err(FormulaError::LimitExceeded {
+        Err(FormulaError::Limit {
             kind: FormulaLimitKind::FunctionArguments,
             observed,
             maximum,
@@ -980,11 +980,15 @@ fn selector_derived_table_handles_are_source_bound() -> TestResult {
     assert!(!format!("{by_name:?}").contains("Table 1"));
     assert!(matches!(
         edit.formula_table("missing sheet", 0usize),
-        Err(CellError::SheetNotFound)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         edit.formula_table(0usize, "missing table"),
-        Err(CellError::TableNotFound)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::TableNotFound
+        ))
     ));
 
     let local = Expression::function(
@@ -1051,19 +1055,25 @@ fn formula_staging_checks_addresses_bounds_and_all_cache_kinds() -> TestResult {
         package
             .edit_table_cells(0usize, 0usize)?
             .set_formula_a1("private invalid address", expression()),
-        Err(CellError::InvalidAddress)
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::InvalidAddress
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
             .set_formula(At::new(22, 0), Expression::number(1.0)?,),
-        Err(CellError::OutOfBounds { .. })
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::OutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cells(0usize, 0usize)?
             .set_formula_a1("C3", Expression::cell(CellReference::relative(22, 0)),),
-        Err(CellError::OutOfBounds { .. })
+        Err(CellError::Refused(
+            litchi_numbers::table::cells::Refusal::OutOfBounds { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&package), source);
     Ok(())
@@ -1100,10 +1110,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
     assert!(
         matches!(
             poisoned,
-            CellError::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            CellError::Refused(
+                litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ),
         "unexpected poisoned-cache error: {poisoned:?}"
     );
@@ -1117,10 +1129,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
         .expect_err("an authored dependency cycle must refuse atomically");
     assert!(matches!(
         cycle,
-        CellError::UnsupportedDependency {
-            kind: DependencyKind::FormulaCache,
-            ..
-        }
+        CellError::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                kind: DependencyKind::FormulaCache,
+                ..
+            }
+        )
     ));
     assert_eq!(exact_bytes(&package), source);
 
@@ -1150,10 +1164,12 @@ fn cache_poison_cycles_and_unsupported_descendants_refuse_atomically() -> TestRe
         .expect_err("an impacted descendant cannot consume an unevaluated authored leaf");
     assert!(matches!(
         unsupported_descendant,
-        CellError::UnsupportedDependency {
-            kind: DependencyKind::FormulaCache,
-            ..
-        }
+        CellError::Refused(
+            litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                kind: DependencyKind::FormulaCache,
+                ..
+            }
+        )
     ));
     assert_eq!(exact_bytes(&package), source);
 
@@ -1449,7 +1465,10 @@ fn locked_table_allows_formula_noop_and_refuses_formula_change() -> TestResult {
         )?
         .commit()
         .expect_err("a changed authored formula must respect the table lock");
-    assert!(matches!(error, CellError::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        CellError::Refused(litchi_numbers::table::cells::Refusal::TableLocked { .. })
+    ));
     assert_eq!(exact_bytes(&locked), source);
     Ok(())
 }
@@ -1478,10 +1497,12 @@ fn native_basic_formula_is_exact_reversible_noop_replaceable_and_clearable() -> 
     assert!(
         matches!(
             mismatch,
-            CellError::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            CellError::Refused(
+                litchi_numbers::table::cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ),
         "unexpected cache-mismatch error: {mismatch:?}"
     );

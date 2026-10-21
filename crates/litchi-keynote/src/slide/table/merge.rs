@@ -12,6 +12,6 @@ pub use litchi_iwa_common::table::merge::{
 /// Exact-source transactions and the lazy merge reader for slide-table merged cells.
 pub mod transaction {
     pub use crate::package::slide_table_merges::{
-        Commit, Diagnostics, Edit, Error, LimitKind, MergeReader, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, MergeReader, Patch, Path, Refusal,
     };
 }

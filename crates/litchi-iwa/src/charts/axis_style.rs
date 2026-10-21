@@ -16,7 +16,7 @@ use crate::charts::source::{AXIS_STYLE_MESSAGE_TYPE, CHART_MESSAGE_TYPE};
 use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding the generated chart-axis style properties.
 pub(crate) const GENERATED_CHART_AXIS_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -172,7 +172,7 @@ pub(crate) struct AxisStyleSlot {
 
 /// Read whether iWork shows one native chart-axis line.
 pub(crate) fn chart_axis_line_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -190,7 +190,7 @@ pub(crate) fn chart_axis_line_visible(
 
 /// Set whether iWork shows one native chart-axis line.
 pub(crate) fn set_chart_axis_line_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -210,7 +210,7 @@ pub(crate) fn set_chart_axis_line_visible(
 
 /// Read whether iWork shows major gridlines for one native chart axis.
 pub(crate) fn chart_axis_major_gridlines_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -228,7 +228,7 @@ pub(crate) fn chart_axis_major_gridlines_visible(
 
 /// Set whether iWork shows major gridlines for one native chart axis.
 pub(crate) fn set_chart_axis_major_gridlines_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -248,7 +248,7 @@ pub(crate) fn set_chart_axis_major_gridlines_visible(
 
 /// Read whether iWork shows minor gridlines for one native chart axis.
 pub(crate) fn chart_axis_minor_gridlines_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -266,7 +266,7 @@ pub(crate) fn chart_axis_minor_gridlines_visible(
 
 /// Set whether iWork shows minor gridlines for one native chart axis.
 pub(crate) fn set_chart_axis_minor_gridlines_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -286,7 +286,7 @@ pub(crate) fn set_chart_axis_minor_gridlines_visible(
 
 /// Read whether iWork shows minor tick marks for one native chart axis.
 pub(crate) fn chart_axis_minor_tick_marks_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -304,7 +304,7 @@ pub(crate) fn chart_axis_minor_tick_marks_visible(
 
 /// Set whether iWork shows minor tick marks for one native chart axis.
 pub(crate) fn set_chart_axis_minor_tick_marks_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -324,7 +324,7 @@ pub(crate) fn set_chart_axis_minor_tick_marks_visible(
 
 /// Read where iWork draws major tick marks for one native chart axis.
 pub(crate) fn chart_axis_tick_mark_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -342,7 +342,7 @@ pub(crate) fn chart_axis_tick_mark_location(
 
 /// Set where iWork draws major tick marks for one native chart axis.
 pub(crate) fn set_chart_axis_tick_mark_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -374,7 +374,7 @@ pub(crate) fn set_chart_axis_tick_mark_location(
 
 /// Read whether iWork shows the minimum label on a native chart value axis.
 pub(crate) fn chart_value_axis_minimum_label_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -391,7 +391,7 @@ pub(crate) fn chart_value_axis_minimum_label_visible(
 
 /// Set whether iWork shows the minimum label on a native chart value axis.
 pub(crate) fn set_chart_value_axis_minimum_label_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -409,7 +409,7 @@ pub(crate) fn set_chart_value_axis_minimum_label_visible(
 }
 
 fn chart_axis_style_switch_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -431,7 +431,7 @@ fn chart_axis_style_switch_visible(
 }
 
 fn set_chart_axis_style_switch_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -515,7 +515,7 @@ fn axis_tick_mark_location(
 }
 
 pub(crate) fn axis_style_slot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -590,7 +590,7 @@ pub(crate) fn axis_style_slot(
 impl AxisStyleSlot {
     pub(crate) fn read<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
         let archive = package.archive(&self.archive_name)?;
@@ -614,7 +614,7 @@ impl AxisStyleSlot {
 
     pub(crate) fn ensure_exclusive(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         drawable_object_id: u64,
         drawable_label: &str,
     ) -> Result<()> {
@@ -658,7 +658,7 @@ impl AxisStyleSlot {
 
     pub(crate) fn update(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {

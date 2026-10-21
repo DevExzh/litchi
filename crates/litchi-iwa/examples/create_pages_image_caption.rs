@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or("image path has no UTF-8 filename")?;
-    let mut editor = pages::Editor::create_with_text(&body_text)?;
+    let mut editor = pages::Draft::create_with_text(&body_text)?;
     let created = editor.add_body_image(
         body_text.encode_utf16().count(),
         filename,

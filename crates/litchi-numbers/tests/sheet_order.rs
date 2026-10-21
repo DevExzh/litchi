@@ -24,7 +24,9 @@ fn native_single_sheet_noop_and_typed_staging_errors_are_exact() -> TestResult<(
     let source = bytes(&package)?;
     assert!(matches!(
         package.edit_sheet_order().commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_numbers::sheet::order::Refusal::NoStagedOperation
+        ))
     ));
     let commit = package.edit_sheet_order().move_sheet(0usize, 0)?.commit()?;
     assert!(commit.patch().is_noop());
@@ -34,14 +36,18 @@ fn native_single_sheet_noop_and_typed_staging_errors_are_exact() -> TestResult<(
     assert_eq!(bytes(commit.package())?, source);
     assert!(matches!(
         package.edit_sheet_order().move_sheet(0usize, 1),
-        Err(Error::DestinationOutOfRange {
-            position: 1,
-            sheet_count: 1
-        })
+        Err(Error::Refused(
+            litchi_numbers::sheet::order::Refusal::DestinationOutOfRange {
+                position: 1,
+                sheet_count: 1
+            }
+        ))
     ));
     assert!(matches!(
         package.edit_sheet_order().move_sheet("missing", 0),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::sheet::order::Refusal::SheetNotFound
+        ))
     ));
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<LimitKind>();

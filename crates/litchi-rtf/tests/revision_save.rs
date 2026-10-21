@@ -7,10 +7,11 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{RevisionSaveMetadata, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{RevisionSaveMetadata, RtfWriter};
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -20,7 +21,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn preserves_ordered_revision_save_table_and_root_round_trip() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1\ansi{\*\rsidtbl \rsid7564464\rsid8398352\rsid9049968}\rsidroot9049968 Body}",
     )
     .unwrap();
@@ -29,20 +30,20 @@ fn preserves_ordered_revision_save_table_and_root_round_trip() {
     assert_eq!(metadata.ids(), [7_564_464, 8_398_352, 9_049_968]);
     assert_eq!(metadata.root(), Some(9_049_968));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.revision_save_metadata(), Some(metadata));
 }
 
 #[test]
 fn preserves_valid_empty_revision_save_table() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\rsidtbl}\rsidroot7 Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\rsidtbl}\rsidroot7 Body}").unwrap();
     let metadata = document.revision_save_metadata().unwrap();
     assert!(metadata.ids().is_empty());
     assert_eq!(metadata.root(), Some(7));
     assert_eq!(document.text(), "Body");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.revision_save_metadata(), Some(metadata));
     assert_eq!(reparsed.text(), "Body");
     assert!(RevisionSaveMetadata::new(Vec::new(), None).is_ok());
@@ -57,11 +58,11 @@ fn mutation_validates_membership_uniqueness_and_preserves_body() {
     assert!(metadata.push_id(22).is_err());
     assert!(metadata.set_root(Some(44)).is_err());
 
-    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Text}").unwrap();
     document
         .set_revision_save_metadata(metadata.clone())
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), "Text");
     assert_eq!(reparsed.revision_save_metadata(), Some(&metadata));
 
@@ -86,7 +87,7 @@ fn rejects_malformed_revision_save_metadata() {
         r"{\rtf1{\*\rsidtbl \b\rsid1}}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 }
 
@@ -104,7 +105,7 @@ fn parses_bundled_libreoffice_revision_save_fixtures() {
     );
     for fixture in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let metadata = document
             .revision_save_metadata()

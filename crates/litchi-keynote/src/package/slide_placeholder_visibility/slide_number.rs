@@ -58,7 +58,7 @@ impl TransactionBudget {
     fn map_decode_error(&self, error: keynote_slide_number_codec::DecodeError) -> Error {
         match error.resource_limit() {
             Some(keynote_slide_number_codec::DecodeLimit::Bytes { observed, maximum }) => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: observed as u64,
                     maximum: maximum as u64,
@@ -67,7 +67,7 @@ impl TransactionBudget {
             Some(keynote_slide_number_codec::DecodeLimit::Fields {
                 observed,
                 maximum: _,
-            }) => Error::LimitExceeded {
+            }) => Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.fields.saturating_add(observed) as u64,
                 maximum: self.maximum_fields as u64,
@@ -75,13 +75,13 @@ impl TransactionBudget {
             Some(keynote_slide_number_codec::DecodeLimit::Work {
                 observed,
                 maximum: _,
-            }) => Error::LimitExceeded {
+            }) => Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: self.work.saturating_add(observed) as u64,
                 maximum: self.maximum_work as u64,
             },
             Some(keynote_slide_number_codec::DecodeLimit::Nesting { observed, maximum }) => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -130,7 +130,7 @@ pub(super) fn validate_node_references(
     let scan_work = payload.len().checked_mul(2).ok_or(Error::InvalidSource)?;
     budget.charge_work(scan_work)?;
     charge_reference_metadata_scan(node, message_index, budget)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let relevant_count = view
         .fields()
         .filter(|field| matches!(field.number(), 1 | 3 | 9))
@@ -202,8 +202,7 @@ pub(super) fn validate_global_ownership(
                     continue;
                 }
                 budget.charge_work(message.data.len())?;
-                let view =
-                    WireView::parse_with_limits(&message.data, limits).map_err(map_wire_error)?;
+                let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
                 let mut slide_number = None;
                 for field in view.fields() {
                     field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -272,7 +271,7 @@ fn visit_storage_dependencies(
 ) -> Result<(), Error> {
     const ATTRIBUTE_TABLE_FIELDS: [u32; 10] = [5, 7, 8, 11, 12, 15, 16, 17, 18, 21];
 
-    let storage = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let storage = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in storage.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if matches!(field.wire_type(), 3 | 4) {
@@ -291,7 +290,7 @@ fn visit_storage_dependencies(
         if field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let table = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let table = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         for entry in table.fields() {
             entry.validate_canonical_framing().map_err(map_wire_error)?;
             if matches!(entry.wire_type(), 3 | 4) {
@@ -303,8 +302,7 @@ fn visit_storage_dependencies(
             if entry.wire_type() != 2 {
                 return Err(Error::InvalidSource);
             }
-            let members =
-                WireView::parse_with_limits(entry.payload(), limits).map_err(map_wire_error)?;
+            let members = WireView::parse(entry.payload(), limits).map_err(map_wire_error)?;
             for member in members.fields() {
                 member
                     .validate_canonical_framing()
@@ -395,7 +393,9 @@ pub(super) fn validate_storage(
         || storage.archive_info.message_infos.len() != 1
         || storage.messages[0].type_ != STORAGE_MESSAGE_TYPE
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     validate_merge_metadata(storage, &storage.archive_info.message_infos[0])?;
     let payload = storage.messages[0].data.as_slice();
@@ -409,7 +409,9 @@ pub(super) fn validate_storage(
     if !matches!(storage_projection.kind(), None | Some(3))
         || storage_projection.in_document() != Some(true)
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     reject_groups(payload, limits)?;
     let dependency_scan_work = payload.len().checked_mul(6).ok_or(Error::InvalidSource)?;
@@ -450,8 +452,7 @@ pub(super) fn validate_storage(
     if table.wire_type() != 2 || storage_projection.attachment_table() != Some(table.payload()) {
         return Err(Error::InvalidSource);
     }
-    let table_view =
-        WireView::parse_with_limits(table.payload(), limits).map_err(map_wire_error)?;
+    let table_view = WireView::parse(table.payload(), limits).map_err(map_wire_error)?;
     let mut entry = None;
     for field in table_view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -459,15 +460,17 @@ pub(super) fn validate_storage(
             return Err(Error::InvalidSource);
         }
         if field.number() == 1 && entry.replace(field).is_some() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::slide::placeholder::Refusal::UnsupportedSource,
+            ));
         }
     }
     let attachment_entry_field = entry.ok_or(Error::InvalidSource)?;
     if attachment_entry_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let entry_view = WireView::parse_with_limits(attachment_entry_field.payload(), limits)
-        .map_err(map_wire_error)?;
+    let entry_view =
+        WireView::parse(attachment_entry_field.payload(), limits).map_err(map_wire_error)?;
     let mut character_index = None;
     let mut attachment_identifier = None;
     for field in entry_view.fields() {
@@ -510,7 +513,9 @@ pub(super) fn validate_storage(
         || attachment.archive_info.message_infos.len() != 1
         || attachment.messages[0].type_ != ATTACHMENT_MESSAGE_TYPE
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     validate_merge_metadata(attachment, &attachment.archive_info.message_infos[0])?;
     charge_reference_metadata_scan(attachment, 0, budget)?;
@@ -540,7 +545,9 @@ pub(super) fn validate_storage(
             .string_equivalent()
             .is_some_and(|value| !value.is_empty())
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     let attachment_scan_work = attachment_payload
         .len()
@@ -553,8 +560,7 @@ pub(super) fn validate_storage(
     if super_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let super_view =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut attachment_kind = None;
     for field in super_view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;

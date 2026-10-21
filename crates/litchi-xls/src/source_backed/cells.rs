@@ -1,0 +1,113 @@
+//! The source-backed fixed-width cell-value family: number edits of existing
+//! `Number`, `RK` and `MulRk` value fields published as same-length splices
+//! (the former `cell_values::Edit::commit_source_backed_plan`).
+
+use crate::Result;
+use crate::SourceBackedWorkbook;
+use crate::cell_values::{Reference, Selector, Value};
+
+source_family!("cell", "edit cells");
+
+/// Content-free source-backed cell publication diagnostics.
+pub use crate::cell_values::source_diagnostics::Diagnostics;
+
+/// A staged source-backed cell edit. Dropping it discards it.
+#[derive(Clone)]
+pub struct Edit {
+    source: SourceBackedWorkbook,
+    inner: crate::cell_values::Edit,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Edit").finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    /// Stage a number into an existing numeric cell.
+    ///
+    /// # Errors
+    ///
+    /// Returns a selector or cell refusal; the staged state is unchanged.
+    pub fn set_number<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        reference: Reference,
+        value: f64,
+    ) -> Result<()> {
+        self.inner.set_number(selector.into(), reference, value)?;
+        Ok(())
+    }
+
+    /// Stage a numeric value, choosing the record form the cell holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns a selector or cell refusal; the staged state is unchanged.
+    pub fn set_numeric<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        reference: Reference,
+        value: f64,
+    ) -> Result<()> {
+        self.inner.set_numeric(selector.into(), reference, value)?;
+        Ok(())
+    }
+
+    /// Stage a typed value; only numbers into existing numeric fields
+    /// publish source-backed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a selector or cell refusal; the staged state is unchanged.
+    pub fn set_value<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        reference: Reference,
+        value: Value,
+    ) -> Result<()> {
+        self.inner.set_value(selector.into(), reference, value)?;
+        Ok(())
+    }
+
+    /// Validate the staged edits and commit them as a workbook that writes
+    /// the checked overlay plan. Nothing is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns a refusal for an unsupported, protected, signed, encrypted,
+    /// macro-bearing, stale or length-changing edit, or a failed readback.
+    pub fn commit(self) -> Result<Commit> {
+        let (plan, diagnostics) = self.inner.commit_source_backed_plan()?.into_plan();
+        published(&self.source, plan, diagnostics)
+    }
+}
+
+impl SourceBackedWorkbook {
+    /// Start a source-backed cell edit of this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the workbook cannot be read as cell values.
+    pub fn edit_cells(&self) -> Result<Edit> {
+        let snapshot = self
+            .staging_package()?
+            .cell_values()
+            .map_err(crate::scoped::package_error)?;
+        Ok(Edit {
+            source: self.clone(),
+            inner: snapshot.edit(),
+        })
+    }
+
+    /// Replay a source-backed cell patch onto the exact workbook it was made
+    /// from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] for another workbook.
+    pub fn apply_cells(&self, patch: &Patch) -> Result<Commit> {
+        replay(self, patch)
+    }
+}

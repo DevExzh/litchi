@@ -20,7 +20,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschlegendmodeldefaultfill` in `TSCH.Generated.LegendStyleArchive`.
 const LEGEND_FILL_FIELD: u32 = 1;
@@ -37,7 +37,7 @@ pub enum ChartLegendFill {
 
 /// Read the exact direct legend-fill state of one native chart.
 pub(crate) fn chart_legend_fill(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -53,7 +53,7 @@ pub(crate) fn chart_legend_fill(
 
 /// Set or remove the direct legend-fill override of one native chart.
 pub(crate) fn set_chart_legend_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -154,7 +154,7 @@ fn patch_legend_fill(data: &[u8], fill: &ChartLegendFill) -> Result<Vec<u8>> {
 }
 
 fn adjust_legend_style_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slot: &LegendStyleSlot,
     old_data_identifier: Option<u64>,
     new_data_identifier: Option<u64>,

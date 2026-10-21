@@ -385,7 +385,7 @@ fn parse_wire<'a>(
     }
     budget.charge_wire_work(payload.len().max(1))?;
     budget.charge_nesting(nesting.max(1))?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }

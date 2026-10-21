@@ -4,9 +4,7 @@
 //! private.  The deprecated generic editor is used here only as a migration
 //! oracle: it exposes the native storage IDs needed to prove COW, physical
 //! component ownership, archive census, and PackageMetadata behavior.  The
-//! test never calls the seven keynote::Editor drawable-comment wrappers.
-
-#![allow(deprecated)]
+//! test never calls the seven keynote::Draft drawable-comment wrappers.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -24,7 +22,6 @@ use std::io;
 mod fixtures;
 
 use fixtures::{DrawableTarget, RelocatedFixture};
-use litchi_iwa::comments::IWorkDrawableCommentEditor;
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
@@ -222,7 +219,9 @@ fn annotation_author_storage_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
                 if message.type_ != 213 {
                     continue;
                 }
-                for field in WireView::parse(&message.data)?.fields() {
+                for field in
+                    WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?.fields()
+                {
                     if field.number() != 1 {
                         continue;
                     }
@@ -262,7 +261,7 @@ fn selected_thread_author_payloads(
     source: &[u8],
     target: &DrawableTarget,
 ) -> TestResult<Vec<Vec<u8>>> {
-    let editor = IWorkDrawableCommentEditor::from_bytes(source)?;
+    let editor = litchi_iwa::comments::Draft::from_bytes(source)?;
     let mut identifiers = Vec::new();
     if let Some(comment) = editor.comment(DrawableId::from_raw(target.identifier)?)?
         && let Some(identifier) = comment.comment.author_id
@@ -1037,7 +1036,7 @@ fn focused_thread(package: &Package, target: &DrawableTarget) -> TestResult<Thre
 }
 
 fn generic_thread(
-    editor: &IWorkDrawableCommentEditor,
+    editor: &litchi_iwa::comments::Draft,
     target: &DrawableTarget,
 ) -> TestResult<ThreadSnapshot> {
     let drawable = DrawableId::from_raw(target.identifier)?;
@@ -1138,7 +1137,7 @@ fn assert_backend_parity(
     targets: &[&DrawableTarget],
 ) -> TestResult<()> {
     let focused_package = Package::from_bytes(focused_bytes)?;
-    let generic_editor = IWorkDrawableCommentEditor::from_bytes(generic_bytes)?;
+    let generic_editor = litchi_iwa::comments::Draft::from_bytes(generic_bytes)?;
     for target in targets {
         assert_eq!(
             focused_thread(&focused_package, target)?,
@@ -1159,7 +1158,7 @@ fn assert_backend_parity_with_legacy_author(
     author_identifier: u64,
 ) -> TestResult<()> {
     let focused_package = Package::from_bytes(focused_bytes)?;
-    let generic_editor = IWorkDrawableCommentEditor::from_bytes(generic_bytes)?;
+    let generic_editor = litchi_iwa::comments::Draft::from_bytes(generic_bytes)?;
     assert_eq!(
         focused_thread(&focused_package, target)?,
         generic_thread(&generic_editor, target)?,
@@ -1195,7 +1194,7 @@ fn assert_backend_parity_with_generated_root(
 ) -> TestResult<()> {
     let focused = focused_thread(&Package::from_bytes(focused_bytes)?, target)?;
     let generic = generic_thread(
-        &IWorkDrawableCommentEditor::from_bytes(generic_bytes)?,
+        &litchi_iwa::comments::Draft::from_bytes(generic_bytes)?,
         target,
     )?;
     let focused_root = focused
@@ -1215,7 +1214,7 @@ fn assert_backend_parity_with_generated_root(
 }
 
 fn generic_set(source: &[u8], target: &DrawableTarget, text: &str) -> TestResult<Vec<u8>> {
-    let mut editor = IWorkDrawableCommentEditor::from_bytes(source)?;
+    let mut editor = litchi_iwa::comments::Draft::from_bytes(source)?;
     editor.set_comment(DrawableId::from_raw(target.identifier)?, text)?;
     Ok(editor.to_bytes()?)
 }
@@ -1233,7 +1232,7 @@ fn focused_set(source: &[u8], target: &DrawableTarget, text: &str) -> TestResult
 }
 
 fn generic_clear(source: &[u8], target: &DrawableTarget) -> TestResult<Vec<u8>> {
-    let mut editor = IWorkDrawableCommentEditor::from_bytes(source)?;
+    let mut editor = litchi_iwa::comments::Draft::from_bytes(source)?;
     editor.clear_comment(DrawableId::from_raw(target.identifier)?)?;
     Ok(editor.to_bytes()?)
 }
@@ -1258,7 +1257,7 @@ fn generic_set_reply(
 ) -> TestResult<Vec<u8>> {
     let mut editor = with_context(
         "generic_set_reply: parse",
-        IWorkDrawableCommentEditor::from_bytes(source),
+        litchi_iwa::comments::Draft::from_bytes(source),
     )?;
     with_context(
         "generic_set_reply: edit",
@@ -1296,7 +1295,7 @@ fn generic_remove_reply(
     target: &DrawableTarget,
     reply_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let mut editor = IWorkDrawableCommentEditor::from_bytes(source)?;
+    let mut editor = litchi_iwa::comments::Draft::from_bytes(source)?;
     editor.remove_reply(
         DrawableId::from_raw(target.identifier)?,
         StorageId::from_raw(reply_identifier)?,
@@ -1622,7 +1621,7 @@ fn assert_root_component(
     target: &DrawableTarget,
     expected: &str,
 ) -> TestResult<u64> {
-    let comment = IWorkDrawableCommentEditor::from_bytes(source)?
+    let comment = litchi_iwa::comments::Draft::from_bytes(source)?
         .comment(DrawableId::from_raw(target.identifier)?)?
         .ok_or_else(|| io::Error::other("drawable has no root comment"))?;
     let identifier = comment.storage_id.get();
@@ -1636,7 +1635,7 @@ fn assert_reply_component(
     position: usize,
     expected: &str,
 ) -> TestResult<u64> {
-    let reply = IWorkDrawableCommentEditor::from_bytes(source)?
+    let reply = litchi_iwa::comments::Draft::from_bytes(source)?
         .replies(DrawableId::from_raw(target.identifier)?)?
         .into_iter()
         .nth(position)
@@ -1666,8 +1665,8 @@ fn assert_shared_cow_parity(
         generic_bytes,
         &[&fixture.target, sibling],
     )?;
-    let focused_oracle = IWorkDrawableCommentEditor::from_bytes(focused_bytes)?;
-    let generic_oracle = IWorkDrawableCommentEditor::from_bytes(generic_bytes)?;
+    let focused_oracle = litchi_iwa::comments::Draft::from_bytes(focused_bytes)?;
+    let generic_oracle = litchi_iwa::comments::Draft::from_bytes(generic_bytes)?;
     let selected = DrawableId::from_raw(fixture.target.identifier)?;
     let sibling_id = DrawableId::from_raw(sibling.identifier)?;
     let focused_selected = focused_oracle.comment(selected)?;
@@ -1714,7 +1713,7 @@ fn foreign_root_read_and_set_match_generic_backend() -> TestResult {
     assert_foreign_component(&fixture.bytes, root, fixtures::AUTHOR_STORAGE_COMPONENT)?;
 
     let focused = Package::from_bytes(&fixture.bytes)?;
-    let generic = IWorkDrawableCommentEditor::from_bytes(&fixture.bytes)?;
+    let generic = litchi_iwa::comments::Draft::from_bytes(&fixture.bytes)?;
     assert_eq!(
         focused_thread(&focused, &fixture.target)?,
         generic_thread(&generic, &fixture.target)?
@@ -1935,7 +1934,7 @@ fn foreign_reply_set_and_remove_match_generic_backend() -> TestResult {
 #[test]
 fn shared_foreign_root_cow_and_clear_match_generic_backend() -> TestResult {
     let fixture = fixtures::shared_foreign_root_fixture()?;
-    let baseline = IWorkDrawableCommentEditor::from_bytes(&fixture.bytes)?;
+    let baseline = litchi_iwa::comments::Draft::from_bytes(&fixture.bytes)?;
     let sibling = fixture
         .sibling
         .as_ref()
@@ -2004,7 +2003,7 @@ fn shared_foreign_root_cow_and_clear_match_generic_backend() -> TestResult {
             .commit()?
             .package(),
     )?;
-    let mut generic_clear = IWorkDrawableCommentEditor::from_bytes(&fixture.bytes)?;
+    let mut generic_clear = litchi_iwa::comments::Draft::from_bytes(&fixture.bytes)?;
     generic_clear.clear_comment(DrawableId::from_raw(fixture.target.identifier)?)?;
     let generic_clear_bytes = generic_clear.to_bytes()?;
     assert_shared_cow_parity(
@@ -2041,7 +2040,7 @@ fn shared_foreign_reply_clear_preserves_sibling_branch_in_both_backends() -> Tes
             .commit()?
             .package(),
     )?;
-    let mut generic = IWorkDrawableCommentEditor::from_bytes(&fixture.bytes)?;
+    let mut generic = litchi_iwa::comments::Draft::from_bytes(&fixture.bytes)?;
     generic.clear_comment(DrawableId::from_raw(fixture.target.identifier)?)?;
     let generic_bytes = generic.to_bytes()?;
     assert_backend_parity(
@@ -2051,8 +2050,8 @@ fn shared_foreign_reply_clear_preserves_sibling_branch_in_both_backends() -> Tes
         &generic_bytes,
         &[&fixture.target, sibling],
     )?;
-    let focused_oracle = IWorkDrawableCommentEditor::from_bytes(&focused_bytes)?;
-    let generic_oracle = IWorkDrawableCommentEditor::from_bytes(&generic_bytes)?;
+    let focused_oracle = litchi_iwa::comments::Draft::from_bytes(&focused_bytes)?;
+    let generic_oracle = litchi_iwa::comments::Draft::from_bytes(&generic_bytes)?;
     assert!(
         focused_oracle
             .comment(DrawableId::from_raw(fixture.target.identifier)?)?
@@ -2106,7 +2105,7 @@ fn shared_foreign_reply_clear_preserves_sibling_branch_in_both_backends() -> Tes
 fn foreign_drawable_read_and_create_match_generic_backend() -> TestResult {
     let fixture = fixtures::foreign_drawable_fixture()?;
     let focused = Package::from_bytes(&fixture.bytes)?;
-    let generic = IWorkDrawableCommentEditor::from_bytes(&fixture.bytes)?;
+    let generic = litchi_iwa::comments::Draft::from_bytes(&fixture.bytes)?;
     assert_eq!(
         focused_thread(&focused, &fixture.target)?,
         generic_thread(&generic, &fixture.target)?
@@ -2122,12 +2121,12 @@ fn foreign_drawable_read_and_create_match_generic_backend() -> TestResult {
         &generic_bytes,
         &fixture.target,
     )?;
-    let focused_root = IWorkDrawableCommentEditor::from_bytes(&focused_bytes)?
+    let focused_root = litchi_iwa::comments::Draft::from_bytes(&focused_bytes)?
         .comment(DrawableId::from_raw(fixture.target.identifier)?)?
         .ok_or_else(|| io::Error::other("focused writer produced no root"))?
         .storage_id
         .get();
-    let generic_root = IWorkDrawableCommentEditor::from_bytes(&generic_bytes)?
+    let generic_root = litchi_iwa::comments::Draft::from_bytes(&generic_bytes)?
         .comment(DrawableId::from_raw(fixture.target.identifier)?)?
         .ok_or_else(|| io::Error::other("generic writer produced no root"))?
         .storage_id

@@ -17,7 +17,7 @@ use crate::package_metadata::{
     remove_component_registration,
 };
 use crate::protobuf::tsp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
 const OBJECT_CONTAINER_LOCATOR: &str = "ObjectContainer";
@@ -33,7 +33,7 @@ pub(crate) struct ObjectContainerAllocation {
 }
 
 pub(crate) fn reserve_object_container(
-    package: &IWorkPackage,
+    package: &HostPackage,
     next_identifier: &mut u64,
 ) -> Result<ObjectContainerAllocation> {
     let component_id = *next_identifier;
@@ -66,7 +66,7 @@ pub(crate) fn reserve_object_container(
 }
 
 pub(crate) fn insert_object_container(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_archive_name: &str,
     allocation: ObjectContainerAllocation,
     objects: Vec<ArchiveObject>,
@@ -154,7 +154,7 @@ pub(crate) fn insert_object_container(
 
 /// Remove owned objects and return the container identifier when it became empty.
 pub(crate) fn remove_object_container_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifiers: &[u64],
 ) -> Result<Option<u64>> {
@@ -242,7 +242,7 @@ pub(crate) fn remove_object_container_objects(
 }
 
 pub(crate) fn is_object_container_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
 ) -> Result<bool> {
     Ok(object_container(&package.archive(archive_name)?, archive_name)?.is_some())

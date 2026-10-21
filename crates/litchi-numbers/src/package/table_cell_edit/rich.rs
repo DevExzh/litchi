@@ -10,7 +10,7 @@ use core::{fmt, mem::size_of, ops::Range};
 use litchi_iwa_common::{
     WireLimits,
     varint::{decode_varint_from_bytes, encoded_len},
-    wire::{WireField, parse_wire_fields_with_limits},
+    wire::{WireField, parse_wire_fields},
 };
 use litchi_iwa_text_wire::{
     PreparedStorageRewrite, RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite,
@@ -553,14 +553,14 @@ fn validate_payload(
     local: &[u64],
     limits: WireLimits,
 ) -> Result<usize, Error> {
-    let fields = parse_wire_fields_with_limits(source.payload, limits).map_err(map_wire)?;
+    let fields = parse_wire_fields(source.payload, limits).map_err(map_wire)?;
     let storage = singular(&fields, 1, 2, source.payload)?;
     let _cell = singular(&fields, 3, 2, source.payload)?;
     if fields.iter().filter(|field| field.number() == 2).count() > 1 {
         return Err(Error::InvalidSource);
     }
     let reference = storage.payload(source.payload).map_err(map_wire)?;
-    let nested = parse_wire_fields_with_limits(reference, limits).map_err(map_wire)?;
+    let nested = parse_wire_fields(reference, limits).map_err(map_wire)?;
     let identifier = singular(&nested, 1, 0, reference)?;
     let value = canonical_varint(identifier.payload(reference).map_err(map_wire)?)?;
     if value != storage_id {

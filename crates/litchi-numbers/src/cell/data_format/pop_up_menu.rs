@@ -118,7 +118,7 @@ pub struct PopUpMenu {
 /// payloads never cross this boundary.
 pub mod transaction {
     pub use crate::package::table_cell_pop_up_menu::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

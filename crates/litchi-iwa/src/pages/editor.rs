@@ -33,8 +33,6 @@ use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{ArchiveObject, RawMessage};
-#[allow(deprecated)]
-use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::{MediaAssetId, reachable_embedded_assets};
 use crate::package::PackageLimits;
 use crate::package_metadata::{
@@ -56,19 +54,18 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use crate::text::{
-    Alignment, AppliedParagraphStyle, Background as TextAppearanceBackground, Borders,
-    IWorkTextEditor, Indents, LineSpacing, NamedParagraphStyle, Outline, ParagraphBackground,
-    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
-    ParagraphFollowingStyle, ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry,
-    ParagraphListIndentation, ParagraphListLabelColor, ParagraphListLevel,
-    ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberScale,
-    ParagraphListNumberTiering, ParagraphListNumbering, ParagraphTabStops,
-    ParagraphWritingDirection, Shadow, Spacing, TextBaselineShift, TextCapitalization,
-    TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId, TextCommentReply,
-    TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont, TextHighlight,
-    TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget, TextLanguage,
-    TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId, TextStorageInfo,
-    TextStyle,
+    Alignment, AppliedParagraphStyle, Background as TextAppearanceBackground, Borders, Indents,
+    LineSpacing, NamedParagraphStyle, Outline, ParagraphBackground, ParagraphDecimalTabCharacter,
+    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphFollowingStyle, ParagraphList,
+    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
+    TextStorageInfo, TextStyle,
 };
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_length_delimited_field,
@@ -76,7 +73,7 @@ use crate::wire::{
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
-use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{EmbeddedMediaAsset, Error, HostPackage, Result};
 
 const DOCUMENT_ARCHIVE_NAME: &str = "Index/Document.iwa";
 const DOCUMENT_OBJECT_ID: u64 = 1;
@@ -119,14 +116,14 @@ struct HeaderFooterLocation {
 
 /// Transactional editor for a Pages package.
 #[derive(Debug, Clone)]
-pub struct Editor {
-    text: IWorkTextEditor,
+pub struct Draft {
+    text: crate::text::Draft,
     body_storage_id: TextStorageId,
     sections: Vec<SectionInfo>,
     header_footers: Vec<HeaderFooterLocation>,
 }
 
-impl Editor {
+impl Draft {
     /// Start configuring a new Pages package built from typed IWA objects.
     pub fn builder() -> crate::pages::Builder {
         crate::pages::Builder::new()
@@ -143,14 +140,14 @@ impl Editor {
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(IWorkPackage::open(path)?)
+        Self::from_package(HostPackage::open(path)?)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_package(HostPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub fn from_package(package: HostPackage) -> Result<Self> {
         // Decode the focused root-body projection once.  Structure discovery
         // also needs the initial section edge, so passing this value through
         // avoids a second bounded wire scan during package ingress.
@@ -163,7 +160,7 @@ impl Editor {
             .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))?;
         let (sections, header_footers) =
             discover_structure(&package, body_storage_id.get(), document)?;
-        let text = IWorkTextEditor::from_package(package);
+        let text = crate::text::Draft::from_package(package);
         Ok(Self {
             text,
             body_storage_id,
@@ -186,10 +183,9 @@ impl Editor {
     }
 
     /// List supported direct-comment drawables reachable from the Pages root.
-    #[allow(deprecated)]
     pub fn drawables(&self) -> Result<Vec<DrawableInfo>> {
         let reachable = self.reachable_drawable_ids()?;
-        let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
+        let mut drawables = crate::comments::Draft::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
             .filter(|drawable| reachable.contains(&drawable.id.get()))
@@ -2204,7 +2200,7 @@ impl Editor {
             new_attachment_id,
             BODY_DRAWABLE_DUPLICATE_OFFSET,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.set_text(new_storage_id, text)?;
         text_editor.replace_text(
             self.body_storage_id,
@@ -2254,7 +2250,6 @@ impl Editor {
     }
 
     /// Remove a body-anchored Pages text box and its private object graph.
-    #[allow(deprecated)]
     pub fn remove_text_box(&mut self, drawable_object_id: u64) -> Result<RemovedPagesTextBox> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let text = self
@@ -2267,9 +2262,9 @@ impl Editor {
                 ))
             })?;
 
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
-        let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
+        let mut text_editor = crate::text::Draft::from_package(comments.into_package());
         let anchor = graph.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
@@ -2316,76 +2311,69 @@ impl Editor {
     }
 
     /// Read a comment attached directly to a reachable Pages drawable.
-    #[allow(deprecated)]
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
-    )]
+    ///
+    /// Native-ID host API (record 0361): the drawable is addressed by its
+    /// native object identifier. `litchi-pages` has no selector-first
+    /// drawable-comment owner yet, so this host draft keeps the capability.
     pub fn drawable_comment(&self, drawable_object_id: u64) -> Result<Option<DrawableComment>> {
         self.require_drawable(drawable_object_id)?;
-        IWorkDrawableCommentEditor::from_package(self.package().clone())?
+        crate::comments::Draft::from_package(self.package().clone())?
             .comment(DrawableId::from_raw(drawable_object_id)?)
     }
 
     /// Create or replace a direct comment on a reachable Pages drawable.
-    #[allow(deprecated)]
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
-    )]
+    ///
+    /// Native-ID host API (record 0361): the drawable is addressed by its
+    /// native object identifier. `litchi-pages` has no selector-first
+    /// drawable-comment owner yet, so this host draft keeps the capability.
     pub fn set_drawable_comment(
         &mut self,
         drawable_object_id: u64,
         text: impl Into<String>,
     ) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.set_comment(DrawableId::from_raw(drawable_object_id)?, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
 
     /// Delete a direct comment from a reachable Pages drawable.
-    #[allow(deprecated)]
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility while direct-drawable comments move to a focused semantic owner"
-    )]
+    ///
+    /// Native-ID host API (record 0361): the drawable is addressed by its
+    /// native object identifier. `litchi-pages` has no selector-first
+    /// drawable-comment owner yet, so this host draft keeps the capability.
     pub fn clear_drawable_comment(&mut self, drawable_object_id: u64) -> Result<()> {
         self.require_drawable(drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
     }
 
     /// Read the direct replies in a reachable Pages drawable comment thread.
-    #[allow(deprecated)]
     pub fn drawable_comment_replies(
         &self,
         drawable_object_id: DrawableId,
     ) -> Result<Vec<DrawableReply>> {
         self.require_drawable(drawable_object_id.get())?;
-        IWorkDrawableCommentEditor::from_package(self.package().clone())?
-            .replies(drawable_object_id)
+        crate::comments::Draft::from_package(self.package().clone())?.replies(drawable_object_id)
     }
 
     /// Add a reply to a reachable Pages drawable comment.
-    #[allow(deprecated)]
     pub fn add_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,
         text: impl Into<String>,
     ) -> Result<StorageId> {
         self.require_drawable(drawable_object_id.get())?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         let reply_id = comments.add_reply(drawable_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(reply_id)
     }
 
     /// Update a direct reply, returning its current storage identifier.
-    #[allow(deprecated)]
     pub fn set_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,
@@ -2393,21 +2381,20 @@ impl Editor {
         text: impl Into<String>,
     ) -> Result<StorageId> {
         self.require_drawable(drawable_object_id.get())?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         let reply_id = comments.set_reply(drawable_object_id, reply_storage_object_id, text)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(reply_id)
     }
 
     /// Remove a direct reply from a reachable Pages drawable comment.
-    #[allow(deprecated)]
     pub fn remove_drawable_comment_reply(
         &mut self,
         drawable_object_id: DrawableId,
         reply_storage_object_id: StorageId,
     ) -> Result<()> {
         self.require_drawable(drawable_object_id.get())?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.remove_reply(drawable_object_id, reply_storage_object_id)?;
         *self = Self::from_package(comments.into_package())?;
         Ok(())
@@ -2511,7 +2498,7 @@ impl Editor {
             .collect::<Vec<_>>();
         add_component_object_uuids(&mut staged, 1, &new_uuid_object_ids)?;
 
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             character_index..character_index,
@@ -2637,7 +2624,7 @@ impl Editor {
             removed_object_ids.push(identifier);
         }
         if remove_marker {
-            let mut text_editor = IWorkTextEditor::from_package(staged);
+            let mut text_editor = crate::text::Draft::from_package(staged);
             text_editor.replace_text(self.body_storage_id, marker_index..marker_index + 1, "")?;
             staged = text_editor.into_package();
         }
@@ -2665,7 +2652,7 @@ impl Editor {
         Ok(removed)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub fn package(&self) -> &HostPackage {
         self.text.package()
     }
 
@@ -2698,7 +2685,7 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Pages object graph"
             )));
         }
-        IWorkMediaEditor::from_package(self.package().clone())?.extract(data_identifier)
+        crate::media::Draft::from_package(self.package().clone())?.extract(data_identifier)
     }
 
     /// Replace a referenced materialized asset without changing its data identifier.
@@ -2716,15 +2703,15 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Pages object graph"
             )));
         }
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
+        let mut media = crate::media::Draft::from_package(self.package().clone())?;
         let old = media.replace(data_identifier, replacement)?;
         let staged = media.into_package();
         Self::from_package(staged.clone())?;
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(old)
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub fn into_package(self) -> HostPackage {
         self.text.into_package()
     }
 
@@ -3086,7 +3073,7 @@ impl PagesSectionGraph {
 }
 
 fn decode_typed_package_object<T: Message + Default>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
     type_name: &str,
@@ -3130,7 +3117,7 @@ const PAGES_DRAWABLE_ORDER_WORK_MULTIPLIER: usize = 64;
 /// generated `TP.DrawablesZOrderArchive`; the payload remains borrowed from
 /// the archive for the duration of the identifier scan.
 fn extend_reachable_drawable_order(
-    package: &IWorkPackage,
+    package: &HostPackage,
     object_identifier: u64,
     reachable: &mut HashSet<u64>,
 ) -> Result<()> {
@@ -3152,7 +3139,7 @@ fn extend_reachable_drawable_order(
 /// the payload without cloning the complete `Archive` or generated protobuf.
 /// Object and payload multiplicity are checked before the callback runs.
 fn with_pages_drawable_order_source<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     object_identifier: u64,
     read: impl FnOnce(&[u8]) -> Result<T>,
 ) -> Result<T> {
@@ -3217,7 +3204,7 @@ fn with_pages_drawable_order_source<T>(
 /// projection here lets every media graph share the same bounded Buffa codec
 /// and avoids materializing `TP.DrawablesZOrderArchive` for each read.
 fn pages_drawable_z_order_count(
-    package: &IWorkPackage,
+    package: &HostPackage,
     object_identifier: u64,
     drawable_identifier: u64,
 ) -> Result<usize> {
@@ -3333,7 +3320,7 @@ fn map_pages_drawable_order_error(error: PagesDrawableOrderDecodeError) -> Error
 }
 
 fn decode_optional_typed_package_object<T: Message + Default>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
 ) -> Result<Option<T>> {
@@ -3387,7 +3374,6 @@ fn remap_pages_reference_paths(
     })
 }
 
-#[allow(deprecated)]
 fn remap_pages_shape_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 1, 2],
@@ -3524,7 +3510,6 @@ fn remap_pages_attachment_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result
     Ok(data)
 }
 
-#[allow(deprecated)]
 fn remap_pages_caption_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     let pairs = remap
         .iter()
@@ -3654,7 +3639,7 @@ fn clone_pages_object_metadata(
 }
 
 fn offset_pages_body_drawable_clone(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_id: u64,
     attachment_id: u64,
     offset: f32,
@@ -3758,7 +3743,7 @@ fn offset_pages_body_drawable_clone(
 }
 
 pub(super) fn offset_pages_body_drawable_attachment_clone(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     attachment_id: u64,
     offset: f32,
 ) -> Result<()> {
@@ -3900,7 +3885,7 @@ fn remap_pages_storage(storage: &mut StorageArchive, remap: &HashMap<u64, u64>) 
 }
 
 fn add_body_drawable_attachment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     body_storage_id: u64,
     anchor_character_index: usize,
     attachment_id: u64,
@@ -4016,7 +4001,7 @@ fn add_body_drawable_attachment(
 }
 
 fn patch_pages_zorder(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     removed: Option<u64>,
     added: Option<u64>,
 ) -> Result<()> {
@@ -4119,7 +4104,7 @@ fn patch_pages_zorder(
 }
 
 fn drawable_owned_text_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     drawable: &DrawableInfo,
 ) -> Result<Option<u64>> {
     if !matches!(
@@ -4172,7 +4157,7 @@ fn drawable_owned_text_storage(
 }
 
 fn decode_package_object<T: Message + Default>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     type_name: &str,
 ) -> Result<T> {
@@ -4200,7 +4185,7 @@ fn decode_package_object<T: Message + Default>(
 }
 
 fn metadata_reachable_objects(
-    package: &IWorkPackage,
+    package: &HostPackage,
     roots: impl IntoIterator<Item = u64>,
 ) -> Result<HashSet<u64>> {
     let mut references = HashMap::<u64, Vec<u64>>::new();
@@ -4247,7 +4232,7 @@ fn cloned_optional_identifier(source: Option<u64>, cloned: Option<u64>) -> bool 
     }
 }
 
-fn pages_section_graph(package: &IWorkPackage, section_id: u64) -> Result<PagesSectionGraph> {
+fn pages_section_graph(package: &HostPackage, section_id: u64) -> Result<PagesSectionGraph> {
     let archive_name = find_section_archive(package, section_id)?;
     let section: SectionArchive = decode_typed_package_object(
         package,
@@ -4637,7 +4622,7 @@ fn insert_section_table_entry(table: &[u8], entry: ObjectAttribute) -> Result<Ve
 }
 
 fn patch_body_section_table<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     body_storage_id: u64,
     removed: Option<u64>,
     added: Option<u64>,
@@ -4791,7 +4776,7 @@ impl PagesObjectIndex {
     /// Only requested identifiers are cataloged.  This keeps unrelated
     /// duplicate object IDs compatible with the old per-identifier lookup and
     /// bounds retained location storage by the graph under deletion.
-    fn build(package: &IWorkPackage, object_ids: &[u64]) -> Result<Self> {
+    fn build(package: &HostPackage, object_ids: &[u64]) -> Result<Self> {
         let mut budget = PagesObjectIndexBudget::default();
         budget.charge(object_ids.len())?;
         let mut objects = HashMap::new();
@@ -4939,7 +4924,7 @@ fn pages_object_index_allocation(resource: &'static str, amount: usize) -> Error
     Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
 }
 
-fn find_object_archive(package: &IWorkPackage, identifier: u64) -> Result<String> {
+fn find_object_archive(package: &HostPackage, identifier: u64) -> Result<String> {
     let mut found = None;
     for name in package.iwa_entry_names() {
         if package.archive(name)?.object(identifier).is_none() {
@@ -4954,7 +4939,7 @@ fn find_object_archive(package: &IWorkPackage, identifier: u64) -> Result<String
     found.ok_or_else(|| Error::InvalidFormat(format!("Object {identifier} is missing")))
 }
 
-fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<bool> {
+fn package_references_object(package: &HostPackage, identifier: u64) -> Result<bool> {
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
         if archive.objects.iter().any(|object| {
@@ -4972,7 +4957,7 @@ fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<
     Ok(false)
 }
 
-fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
+fn root_document_body(package: &HostPackage) -> Result<DocumentBodySnapshot> {
     let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
     let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages root object {DOCUMENT_OBJECT_ID} is missing"))
@@ -5008,7 +4993,7 @@ fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
 /// function. This avoids allocating a generated `DocumentArchive` on every
 /// image, audio, movie, chart, or shape graph read while retaining the
 /// complete Prost route for mutation and broader reachability operations.
-fn pages_document_root_facts(package: &IWorkPackage) -> Result<PagesDocumentRootFacts> {
+fn pages_document_root_facts(package: &HostPackage) -> Result<PagesDocumentRootFacts> {
     with_pages_document_root(package, pages_document_root_facts_from_snapshot)
 }
 
@@ -5063,7 +5048,7 @@ fn pages_document_root_facts_from_snapshot(
 /// caller can inspect streamed repeated references without cloning the root or
 /// constructing the generated `TP.DocumentArchive` message.
 fn with_pages_document_root<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     read: impl for<'source> FnOnce(DocumentRootSnapshot<'source>) -> Result<T>,
 ) -> Result<T> {
     let limits = package.limits();
@@ -5091,7 +5076,7 @@ fn with_pages_document_root<T>(
 }
 
 fn pages_document_root_with_templates(
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<(PagesDocumentRootFacts, Vec<u64>)> {
     with_pages_document_root(package, |snapshot| {
         let template_count = snapshot.page_template_count();
@@ -5148,7 +5133,7 @@ fn pages_document_root_decode_options(
 }
 
 fn discover_structure(
-    package: &IWorkPackage,
+    package: &HostPackage,
     body_storage_id: u64,
     document: DocumentBodySnapshot,
 ) -> Result<(Vec<SectionInfo>, Vec<HeaderFooterLocation>)> {
@@ -5331,7 +5316,7 @@ fn discover_structure(
     Ok((section_infos, locations))
 }
 
-fn find_section_archive(package: &IWorkPackage, section_id: u64) -> Result<String> {
+fn find_section_archive(package: &HostPackage, section_id: u64) -> Result<String> {
     let mut found = None;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
@@ -5423,14 +5408,14 @@ mod strict_selector_tests {
         assert_eq!(DrawableId::new(0), None);
         assert_eq!(StorageId::new(0), None);
 
-        let _: fn(&Editor, DrawableId) -> Result<Vec<DrawableReply>> =
-            Editor::drawable_comment_replies;
-        let _: fn(&mut Editor, DrawableId, String) -> Result<StorageId> =
-            Editor::add_drawable_comment_reply;
-        let _: fn(&mut Editor, DrawableId, StorageId, String) -> Result<StorageId> =
-            Editor::set_drawable_comment_reply;
-        let _: fn(&mut Editor, DrawableId, StorageId) -> Result<()> =
-            Editor::remove_drawable_comment_reply;
+        let _: fn(&Draft, DrawableId) -> Result<Vec<DrawableReply>> =
+            Draft::drawable_comment_replies;
+        let _: fn(&mut Draft, DrawableId, String) -> Result<StorageId> =
+            Draft::add_drawable_comment_reply;
+        let _: fn(&mut Draft, DrawableId, StorageId, String) -> Result<StorageId> =
+            Draft::set_drawable_comment_reply;
+        let _: fn(&mut Draft, DrawableId, StorageId) -> Result<()> =
+            Draft::remove_drawable_comment_reply;
     }
 }
 
@@ -5712,7 +5697,7 @@ mod drawable_order_projection_tests {
         source.extend(litchi_iwa_common::varint::encode_varint(value));
     }
 
-    fn package_with_payloads(payloads: Vec<Vec<u8>>) -> IWorkPackage {
+    fn package_with_payloads(payloads: Vec<Vec<u8>>) -> HostPackage {
         let object = ArchiveObject::new(
             7,
             payloads
@@ -5724,7 +5709,7 @@ mod drawable_order_projection_tests {
                 .collect(),
         )
         .expect("drawable-order test object");
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/DrawableOrder.iwa",
@@ -5800,7 +5785,7 @@ mod drawable_order_projection_tests {
             }],
         )
         .expect("duplicate component object");
-        let mut duplicate_components = IWorkPackage::new();
+        let mut duplicate_components = HostPackage::new();
         duplicate_components
             .replace_archive(
                 "Index/A.iwa",
@@ -5841,7 +5826,7 @@ mod pages_object_index_tests {
                 ..Default::default()
             });
         let target = index_test_object(20);
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/A.iwa",
@@ -5870,7 +5855,7 @@ mod pages_object_index_tests {
 
     #[test]
     fn reports_missing_and_duplicate_requested_locations() {
-        let mut missing_package = IWorkPackage::new();
+        let mut missing_package = HostPackage::new();
         missing_package
             .replace_archive(
                 "Index/A.iwa",
@@ -5885,7 +5870,7 @@ mod pages_object_index_tests {
             matches!(missing, Error::InvalidFormat(message) if message.contains("Object 20 is missing"))
         );
 
-        let mut duplicate_package = IWorkPackage::new();
+        let mut duplicate_package = HostPackage::new();
         duplicate_package
             .replace_archive(
                 "Index/A.iwa",

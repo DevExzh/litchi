@@ -112,14 +112,13 @@ pub(crate) fn body_discovery(source: &[u8]) -> PackageResult<BodyStorageDiscover
             limits.with_rewrite_work(profile.rewrite_work.min(WireLimits::MAX_REWRITE_WORK))
         })
         .map_err(discovery_error)?;
-    let view = WireView::parse_with_limits(source, wire_limits).map_err(discovery_error)?;
+    let view = WireView::parse(source, wire_limits).map_err(discovery_error)?;
     let mut section_references = Vec::new();
     // Full text-wire qualification above proves singularity, framing, entry
     // order/bounds, and reference validity. Repeated tables stay outside the
     // generated representation; only each selected entry forces a Buffa view.
     if let Some(table) = view.fields().find(|field| field.number() == 17) {
-        let table =
-            WireView::parse_with_limits(table.payload(), wire_limits).map_err(discovery_error)?;
+        let table = WireView::parse(table.payload(), wire_limits).map_err(discovery_error)?;
         for field in table.fields().filter(|field| field.number() == 1) {
             let payload = field.payload();
             let options = DecodeOptions::new(

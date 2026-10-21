@@ -17,7 +17,7 @@
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects",
+        odf_objects,
         feature = "iwork-adapter"
     )),
     allow(
@@ -114,7 +114,7 @@ enum Inner<'f, 'q> {
     Ods(Walk<'q, 'f, crate::format::ods::Nav<'f>>),
     #[cfg(feature = "odp")]
     Odp(Walk<'q, 'f, crate::format::odp::Nav<'f>>),
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(crate::format::odf_tree::Walks<'q, 'f>),
     #[cfg(feature = "iwork-adapter")]
     Iwork(crate::format::iwork::Walks<'q, 'f>),
@@ -214,7 +214,7 @@ impl<'f, 'q> Matches<'f, 'q> {
     }
 
     /// The matches of an object-tree walk (ODG, ODC, ODI, ODB, ODF formula).
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     pub(crate) fn object(walks: crate::format::odf_tree::Walks<'q, 'f>) -> Self {
         Self {
             inner: Inner::Object(walks),
@@ -292,7 +292,7 @@ impl<'f, 'q> Matches<'f, 'q> {
                 inner: Inner::Odp(walk.limit(n)),
                 fast: self.fast,
             },
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(walks) => Self {
                 inner: Inner::Object(walks.limit(n)),
                 fast: self.fast,
@@ -342,7 +342,7 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Ods(walk) => walk.plan(),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.plan(),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(walks) => walks.plan(),
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(walks) => walks.plan(),
@@ -388,7 +388,7 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Ods(walk) => walk.next_map(Node::Ods),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.next_map(Node::Odp),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(walks) => walks.next(),
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(walks) => walks.next(),
@@ -423,7 +423,7 @@ impl<'f> Matches<'f, '_> {
             Inner::Ods(walk) => walk.next_fast_map(Node::Ods),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.next_fast_map(Node::Odp),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(walks) => walks.next(),
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(walks) => walks.next(),

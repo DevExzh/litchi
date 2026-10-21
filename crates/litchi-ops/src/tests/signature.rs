@@ -421,20 +421,21 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                 .find_map(|index| {
                     let position = Position::new(index);
                     let text = same_width(snapshot.paragraph(position).ok()?.text())?;
-                    let mut transaction = snapshot.edit(position).ok()?;
+                    let mut transaction = snapshot.edit_paragraph(position).ok()?;
                     transaction.set_text(text.clone()).ok()?;
                     Some((transaction.commit().ok()?, text))
                 })
                 .expect("an editable DOC paragraph");
             let mut output = Vec::new();
-            commit.write_to(&mut output).unwrap();
+            commit.package().write_to(&mut output).unwrap();
             (output, text.trim().to_owned())
         },
         #[cfg(feature = "xls")]
         File::Xls(handle) => {
             use litchi_xls::cell_values::{Selector, Value};
 
-            let snapshot = handle.cell_values_editor().unwrap();
+            let package = handle.cell_values_editor().unwrap();
+            let snapshot = package.cell_values().unwrap();
             let (sheet, reference) = snapshot
                 .worksheets()
                 .find_map(|sheet| {
@@ -444,7 +445,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                         .map(|cell| (sheet.position(), cell.reference()))
                 })
                 .expect("a numeric XLS cell");
-            let mut edit = snapshot.edit();
+            let mut edit = package.edit().unwrap();
             edit.set_value(
                 Selector::Position(Position::new(sheet)),
                 reference,
@@ -452,7 +453,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             )
             .unwrap();
             let commit = edit.commit().unwrap();
-            (commit.snapshot().bytes().to_vec(), "4242".to_owned())
+            (commit.package().to_bytes().unwrap(), "4242".to_owned())
         },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
@@ -610,12 +611,15 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "doc")]
         FileFormat::Doc => assert!(
-            litchi_doc::body_text::source::SourceSnapshot::from_bytes(bytes.clone()).is_err(),
+            litchi_doc::source_backed::Package::from_bytes(bytes.clone()).is_err(),
             "{label}: the DOC editor admitted a signed container"
         ),
         #[cfg(feature = "xls")]
         FileFormat::Xls => assert!(
-            litchi_xls::cell_values::Snapshot::from_bytes(bytes.clone()).is_err(),
+            litchi_xls::Package::from_bytes(bytes)
+                .unwrap()
+                .edit()
+                .is_err(),
             "{label}: the XLS editor admitted a signed container"
         ),
         #[cfg(feature = "ppt")]

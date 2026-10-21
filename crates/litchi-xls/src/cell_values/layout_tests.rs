@@ -57,7 +57,7 @@ fn cells(snapshot: &Snapshot) -> Vec<String> {
 #[test]
 fn row_heights_and_hidden_flags_round_trip() {
     let bytes = fixture();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let mut edit = source.edit();
     // A row with cells, the custom row, and an empty row without a record.
     edit.set_row_height(Selector::Position(Position::new(0)), 0, 500)
@@ -94,7 +94,7 @@ fn row_heights_and_hidden_flags_round_trip() {
 #[test]
 fn column_widths_split_ranges_and_create_ranges() {
     let bytes = fixture();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let original = column(&source, 2).unwrap();
     let mut edit = source.edit();
     // Inside an existing range, then an uncovered column, then hide one.
@@ -132,7 +132,7 @@ fn column_widths_split_ranges_and_create_ranges() {
 
 #[test]
 fn layout_composes_with_cells_but_not_axis_shifts() {
-    let source = Snapshot::from_bytes(fixture()).unwrap();
+    let source = Snapshot::from_bytes(fixture(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.insert_cell(
         Selector::Position(Position::new(0)),

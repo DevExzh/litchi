@@ -4,7 +4,8 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    HeaderFooterSelector, header_footer::text::Error as HeaderFooterTextError, Kind, Package, SectionSelector, Template,
+    HeaderFooterSelector, Kind, Package, SectionSelector, Template,
+    header_footer::text::Error as HeaderFooterTextError,
 };
 use litchi_iwa_archive::Limits;
 
@@ -18,7 +19,10 @@ const PRIVATE_SECTION: &str = "__litchi_private_header_footer_section_78__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_options(data, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => exercise_package(&package, data),
         Err(error) => observe_error(error),
     }
@@ -49,8 +53,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()))
-            .unwrap_or_else(|error| panic!("native Pages header/footer seed must open: {error}"))
+        Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages header/footer seed must open: {error}"))
     })
 }
 
@@ -227,7 +234,10 @@ fn exercise_redacted_selectors(package: &Package) {
 
 fn exercise_input_limit() {
     let oversized = vec![0_u8; OVERSIZED_INPUT_BYTES];
-    match Package::from_bytes_with_options(&oversized, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        &oversized,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(_) => panic!("oversized Pages header/footer input was accepted"),
         Err(error) => observe_error(error),
     }

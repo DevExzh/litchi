@@ -24,11 +24,11 @@ fn settings(seconds: f64) -> Settings {
     .unwrap()
 }
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = pages::Editor::create_with_text("Friday, July 17, 2026").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId) {
+    let pages = pages::Draft::create_with_text("Friday, July 17, 2026").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         storage_id,
     )
 }
@@ -37,7 +37,7 @@ fn whole_range() -> TextRange {
     TextRange::from_utf16_indexes(0, "Friday, July 17, 2026".encode_utf16().count()).unwrap()
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: TextStorageId) -> usize {
+fn storage_message_index(package: &crate::HostPackage, storage_id: TextStorageId) -> usize {
     locate_storage(package, storage_id.get(), SMART_FIELD_TABLE)
         .unwrap()
         .message_index
@@ -86,7 +86,7 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_date_time_field(storage_id, field.id, whole_range(), settings(900_000_000.5))
         .unwrap();
@@ -142,7 +142,7 @@ fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let field = editor
         .add_text_date_time_field(storage_id, whole_range(), settings(805_965_335.0))
         .unwrap();
@@ -196,7 +196,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
             Ok(())
         })
         .unwrap();
-    let editor = super::super::IWorkTextEditor::from_package(package);
+    let editor = crate::text::Draft::from_package(package);
     assert!(editor.text_date_time_fields(storage_id).is_err());
 
     let (mut editor, storage_id) = fixture();
@@ -223,7 +223,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

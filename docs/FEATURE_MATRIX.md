@@ -88,7 +88,7 @@ candidate-reopened, local to the selected component, invalidate the three canoni
 and provide exact source-bound apply/inverse patches. This remains visibility metadata, not
 cell/formula, filter/pivot, sorting, or row/column topology support.
 
-The Pages raw-ID `litchi_iwa::pages::Editor` hidden-axis route and the shared Numbers/Keynote adapter remain
+The Pages raw-ID `litchi_iwa::pages::Draft` hidden-axis route and the shared Numbers/Keynote adapter remain
 migration-host compatibility until creation parity and native mutation gates pass. Focused Pages
 graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
@@ -147,7 +147,7 @@ producer parity, native byte parity, or package-wide performance.
 
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
 source-built or cross-format `DataFormat` mutation remains host-owned. The
-dedicated raw-ID `litchi_iwa::numbers::Editor` routes for Number, Percentage, Currency,
+dedicated raw-ID `litchi_iwa::numbers::Draft` routes for Number, Percentage, Currency,
 Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
 host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the

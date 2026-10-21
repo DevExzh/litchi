@@ -5,6 +5,7 @@
 //! edits atomically through Editor.
 
 mod codec;
+mod family;
 mod model;
 mod storage;
 mod transaction;
@@ -12,13 +13,13 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub use family::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Result};
 pub use litchi_ole_common::object::Limits;
 pub use litchi_ole_common::object::link::{Link, Moniker, Times};
-pub use litchi_ole_common::ole_streams::{
-    Limits as OleStreamLimits, NativePatch, NativeSnapshot, PresentationPatch, PresentationSnapshot,
-};
+pub use litchi_ole_common::ole_streams::{Limits as OleStreamLimits, native, presentation};
+pub(crate) use model::Editor;
 pub use model::{
-    Clipboard, CompObj, Editor, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,
+    Clipboard, CompObj, Entry, Info, Inventory, Kind, Metadata, Ole, Reference, Unknown,
     WriteOptions,
 };
-pub use transaction::{Commit, Patch, Snapshot, Transaction, TransactionError};
+pub use transaction::Snapshot;

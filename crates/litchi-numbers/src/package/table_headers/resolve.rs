@@ -39,11 +39,9 @@ pub(in crate::package) fn resolve_target(
         path: Path::Package,
     })?;
     let sheet_payloads = repeated_length_payloads(&document_message.data, 1)?;
-    let sheet_identifier = local_reference_identifier(
-        sheet_payloads
-            .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?,
-    )?;
+    let sheet_identifier = local_reference_identifier(sheet_payloads.get(sheet_position).ok_or(
+        Error::Refused(crate::package::table_headers::Refusal::SheetNotFound),
+    )?)?;
     let sheet = source
         .state
         .index
@@ -131,7 +129,9 @@ pub(in crate::package) fn resolve_target(
             locked: LockState::from_locked(info_snapshot.locked().unwrap_or(false)),
         });
     }
-    Err(Error::TableNotFound)
+    Err(Error::Refused(
+        crate::package::table_headers::Refusal::TableNotFound,
+    ))
 }
 
 /// Resolve rooted table topology without decoding the table-storage payload.
@@ -162,11 +162,9 @@ pub(in crate::package) fn resolve_target_physical(
         path: Path::Package,
     })?;
     let sheet_payloads = repeated_length_payloads(&document_message.data, 1)?;
-    let sheet_identifier = local_reference_identifier(
-        sheet_payloads
-            .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?,
-    )?;
+    let sheet_identifier = local_reference_identifier(sheet_payloads.get(sheet_position).ok_or(
+        Error::Refused(crate::package::table_headers::Refusal::SheetNotFound),
+    )?)?;
     let sheet = source
         .state
         .index
@@ -281,7 +279,9 @@ pub(in crate::package) fn resolve_target_physical(
             locked: LockState::from_locked(info_snapshot.locked().unwrap_or(false)),
         });
     }
-    Err(Error::TableNotFound)
+    Err(Error::Refused(
+        crate::package::table_headers::Refusal::TableNotFound,
+    ))
 }
 
 pub(super) fn settings_at_target(source: &Package, target: Target) -> Result<Settings, Error> {
@@ -438,24 +438,28 @@ pub(super) fn validate_requested(
     if u16::from(header_rows).saturating_add(u16::from(footer_rows))
         > u16::try_from(rows).unwrap_or(u16::MAX)
     {
-        return Err(Error::InvalidSettings {
-            path,
-            reason: InvalidReason::RowSectionsExceedTable {
-                header_rows,
-                footer_rows,
-                table_rows: rows,
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::InvalidSettings {
+                path,
+                reason: InvalidReason::RowSectionsExceedTable {
+                    header_rows,
+                    footer_rows,
+                    table_rows: rows,
+                },
             },
-        });
+        ));
     }
     let header_columns = u8::try_from(settings.header_column_count()).unwrap_or(u8::MAX);
     if u32::from(header_columns) > columns {
-        return Err(Error::InvalidSettings {
-            path,
-            reason: InvalidReason::HeaderColumnsExceedTable {
-                header_columns,
-                table_columns: columns,
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::InvalidSettings {
+                path,
+                reason: InvalidReason::HeaderColumnsExceedTable {
+                    header_columns,
+                    table_columns: columns,
+                },
             },
-        });
+        ));
     }
     Ok(())
 }
@@ -555,7 +559,7 @@ pub(in crate::package) fn repeated_length_payloads(
     source: &[u8],
     field_number: u32,
 ) -> Result<Vec<&[u8]>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)
@@ -633,7 +637,7 @@ pub(in crate::package) fn require_local_reference(
 }
 
 pub(in crate::package) fn local_reference_identifier(source: &[u8]) -> Result<u64, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type = None;
     let mut external = None;

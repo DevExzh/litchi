@@ -542,9 +542,19 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
@@ -953,9 +963,19 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     for component in [document, calculation, tile, format, control, popup, view] {
-        append_length_delimited_field(&mut data, 3, &component)?;
+        append_length_delimited_field(
+            &mut data,
+            3,
+            &component,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
@@ -2886,7 +2906,7 @@ fn unknown_control_and_metadata_framing_survives_admitted_rewrite() -> TestResul
     let target = commit.package().exact_bytes();
     let payloads = object_messages(&target, DOCUMENT_MEMBER, SIDECAR_ID)?;
     assert!(payloads.iter().any(|(_, payload)| {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));

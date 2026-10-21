@@ -2,7 +2,7 @@
 
 use litchi_core::Position;
 use litchi_doc::builder::Builder;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::CharacterFormatting;
 use std::io::Cursor;
 
@@ -35,7 +35,7 @@ fn paragraph_at_matches_materialized_paragraphs_and_preserves_runs() {
 
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let materialized = document.paragraphs().unwrap();
 

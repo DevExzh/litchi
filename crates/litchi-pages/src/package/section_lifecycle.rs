@@ -109,6 +109,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted section-lifecycle source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} section-lifecycle items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested state.
+    #[error("section-lifecycle candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("section-lifecycle patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The selector did not resolve one section.
     #[error("section selector did not resolve")]
     SectionNotFound,
@@ -138,44 +174,46 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support section lifecycle changes")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted section-lifecycle source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} section-lifecycle items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested state.
-    #[error("section-lifecycle candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("section-lifecycle patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SectionNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidName { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+            Self::InitialSection { .. } | Self::EmptySection { .. } => {
+                RefusalKind::UnsupportedTarget
+            },
+            Self::UnsupportedContent { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<Fault> for Error {
     fn from(fault: Fault) -> Self {
         match fault {
-            Fault::Unsupported => Self::UnsupportedSource,
+            Fault::Unsupported => Self::Refused(Refusal::UnsupportedSource),
             Fault::Invalid => Self::InvalidSource,
-            Fault::Dependency => Self::UnsupportedDependency,
+            Fault::Dependency => Self::Refused(Refusal::UnsupportedDependency),
             Fault::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
                     FaultLimit::PackageBytes => LimitKind::PackageBytes,
                     FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
@@ -326,9 +364,9 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::SectionNotFound`] when the selector resolves no section,
-    /// [`Error::InvalidName`] for a name containing NUL,
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::SectionNotFound`] when the selector resolves no section,
+    /// [`Refusal::InvalidName`] for a name containing NUL,
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     #[allow(
         clippy::should_implement_trait,
         reason = "`add` is the glossary verb for staging a new element, not arithmetic"
@@ -339,10 +377,10 @@ impl Edit<'_> {
         name: Option<&str>,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         if name.is_some_and(|name| name.contains('\0')) {
-            return Err(Error::InvalidName);
+            return Err(Error::Refused(Refusal::InvalidName));
         }
         let after = resolve(self.source, after.into())?;
         let name = match name {
@@ -365,19 +403,19 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::SectionNotFound`] when the selector resolves no section,
-    /// [`Error::InitialSection`] for the first section,
-    /// [`Error::OperationAlreadyStaged`] after one operation.
+    /// [`Refusal::SectionNotFound`] when the selector resolves no section,
+    /// [`Refusal::InitialSection`] for the first section,
+    /// [`Refusal::OperationAlreadyStaged`] after one operation.
     pub fn remove<'selector>(
         mut self,
         section: impl Into<SectionSelector<'selector>>,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let position = resolve(self.source, section.into())?;
         if position == 0 {
-            return Err(Error::InitialSection);
+            return Err(Error::Refused(Refusal::InitialSection));
         }
         self.operation = Some(Operation::Remove(position));
         Ok(self)
@@ -387,12 +425,14 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit;
-    /// [`Error::EmptySection`], [`Error::UnsupportedContent`],
-    /// [`Error::UnsupportedDependency`]; source, resource and verification
+    /// [`Refusal::NoStagedOperation`] for an empty edit;
+    /// [`Refusal::EmptySection`], [`Refusal::UnsupportedContent`],
+    /// [`Refusal::UnsupportedDependency`]; source, resource and verification
     /// errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self
+            .operation
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let (package, touched_components, objects) = match &operation {
             Operation::Add { after, name } => add_section(self.source, *after, name.as_deref())?,
             Operation::Remove(position) => remove_section(self.source, *position)?,
@@ -415,8 +455,8 @@ fn resolve(package: &Package, selector: SectionSelector<'_>) -> Result<usize, Er
     Ok(package
         .document_ref()
         .select_section(selector)
-        .map_err(|_error| Error::SectionNotFound)?
-        .ok_or(Error::SectionNotFound)?
+        .map_err(|_error| Error::Refused(Refusal::SectionNotFound))?
+        .ok_or(Error::Refused(Refusal::SectionNotFound))?
         .index())
 }
 
@@ -448,7 +488,7 @@ fn section_entries(payload: &[u8]) -> FaultResult<Vec<(u64, u64, Vec<u8>)>> {
 
 /// The body payload with its section table holding exactly `entries`.
 fn with_section_entries(payload: &[u8], entries: &[Vec<u8>]) -> FaultResult<Vec<u8>> {
-    let present = parse_wire_view(payload)
+    let present = parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT)
         .map_err(|error| map_wire(&error))?
         .fields()
         .any(|field| field.number() == SECTION_TABLE_FIELD);
@@ -461,8 +501,13 @@ fn with_section_entries(payload: &[u8], entries: &[Vec<u8>]) -> FaultResult<Vec<
     }
     let mut table = Vec::new();
     for entry in entries {
-        append_length_delimited_field(&mut table, TABLE_ENTRY_FIELD, entry)
-            .map_err(|error| map_wire(&error))?;
+        append_length_delimited_field(
+            &mut table,
+            TABLE_ENTRY_FIELD,
+            entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|error| map_wire(&error))?;
     }
     patch_length_delimited_field(payload, SECTION_TABLE_FIELD, false, Some(&table))
         .map_err(|error| map_wire(&error))
@@ -473,8 +518,13 @@ fn section_entry(boundary: u64, section: u64) -> FaultResult<Vec<u8>> {
     let mut entry = Vec::new();
     append_varint_field(&mut entry, ENTRY_INDEX_FIELD, boundary)
         .map_err(|error| map_wire(&error))?;
-    append_length_delimited_field(&mut entry, ENTRY_OBJECT_FIELD, &reference_payload(section)?)
-        .map_err(|error| map_wire(&error))?;
+    append_length_delimited_field(
+        &mut entry,
+        ENTRY_OBJECT_FIELD,
+        &reference_payload(section)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|error| map_wire(&error))?;
     Ok(entry)
 }
 
@@ -489,12 +539,12 @@ fn rewrite_body_text(
         .map_err(|_error| Error::InvalidSource)?;
     let rewritten =
         litchi_iwa_text_wire::rewrite_storage_text_with_limits(payload, range, replacement, limits)
-            .map_err(|_error| Error::UnsupportedSource)?;
+            .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     if !rewritten.removed_object_references().is_empty()
         || !rewritten.removed_object_references_by_field().is_empty()
         || !rewritten.changed()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(rewritten.into_bytes())
 }
@@ -528,15 +578,15 @@ fn add_section(
     let range = native_section_range(source, &body, Position::new(after))
         .map_err(|_error| Error::InvalidSource)?;
     if range.is_empty() {
-        return Err(Error::EmptySection);
+        return Err(Error::Refused(Refusal::EmptySection));
     }
     let section = body
         .section_identifier(after)
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let mut working = Working::new(source)?;
     let (component, storage_index) = body_storage(&working, body.identifier.get())?;
     if working.locate(section)?.as_deref() != Some(component.as_str()) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
 
     // The source section's private graph and what of it is copied: every
@@ -547,7 +597,7 @@ fn add_section(
     for member in &closure {
         let object = working.object(*member)?;
         if object.messages.len() != 1 {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
         let info = object
             .archive_info
@@ -555,10 +605,10 @@ fn add_section(
             .first()
             .ok_or(Error::InvalidSource)?;
         if !info.data_references.is_empty() {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
         if working.locate(*member)?.as_deref() != Some(component.as_str()) {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         if object.messages[0].type_ == GUIDE_MAP_MESSAGE_TYPE {
             let entries =
@@ -600,7 +650,7 @@ fn add_section(
                     | GUIDE_STORAGE_MESSAGE_TYPE
             ))
         {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
         // A header or footer storage owning records of its own (inline
         // drawables, fields) would need them copied too.
@@ -610,10 +660,10 @@ fn add_section(
                 .iter()
                 .any(|target| closure.contains(target))
         {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
         if *member != section && message_type == SECTION_MESSAGE_TYPE {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
         // The section's page templates, a template's headers and footers
         // and the guide map's storages are private to the section: a copy
@@ -625,7 +675,7 @@ fn add_section(
                 .iter()
                 .any(|target| !closure.contains(target))
         {
-            return Err(Error::UnsupportedContent);
+            return Err(Error::Refused(Refusal::UnsupportedContent));
         }
     }
 
@@ -644,7 +694,7 @@ fn add_section(
                 for path in SECTION_REFERENCE_PATHS {
                     data = remap_at(&data, path, &remap)?;
                 }
-                let present = parse_wire_view(&data)
+                let present = parse_wire_view(&data, litchi_iwa_common::WireLimits::DEFAULT)
                     .map_err(|error| map_wire(&error))?
                     .fields()
                     .any(|field| field.number() == SECTION_NAME_FIELD);
@@ -671,7 +721,7 @@ fn add_section(
                         .map_err(|error| map_wire(&error))?;
                 let mut replacements = Vec::new();
                 if let Some(entry) = entries.first() {
-                    let present = parse_wire_view(entry)
+                    let present = parse_wire_view(entry, litchi_iwa_common::WireLimits::DEFAULT)
                         .map_err(|error| map_wire(&error))?
                         .fields()
                         .any(|field| field.number() == GUIDE_ENTRY_PAGE_FIELD);
@@ -787,12 +837,12 @@ fn remove_section(source: &Package, position: usize) -> Result<(Package, usize, 
     let body = native_body(source).map_err(|_error| Error::InvalidSource)?;
     let section = body
         .section_identifier(position)
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let boundary = body
         .section_boundary(position)
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     if boundary == 0 {
-        return Err(Error::InitialSection);
+        return Err(Error::Refused(Refusal::InitialSection));
     }
     let mut working = Working::new(source)?;
     let (_, storage_index) = body_storage(&working, body.identifier.get())?;
@@ -806,7 +856,7 @@ fn remove_section(source: &Package, position: usize) -> Result<(Package, usize, 
         transition
             .remove_objects(&registry, &removed)
             .map_err(|fault| match fault {
-                Fault::Unsupported => Error::UnsupportedContent,
+                Fault::Unsupported => Error::Refused(Refusal::UnsupportedContent),
                 other => other.into(),
             })?;
     }
@@ -820,7 +870,7 @@ fn remove_section(source: &Package, position: usize) -> Result<(Package, usize, 
         .count()
         != 1
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let records: Vec<Vec<u8>> = entries
         .into_iter()

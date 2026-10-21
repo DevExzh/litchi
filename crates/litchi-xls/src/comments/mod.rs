@@ -9,6 +9,9 @@ mod model;
 mod tests;
 mod transaction;
 
+/// The comments family error: the workbook error of the source or
+/// republished package.
+pub use crate::Error;
 pub(crate) use codec::CommentCollector;
 pub use model::{CONTINUE_TYPE, MSODRAWING_TYPE, OBJ_TYPE, RECORD_TYPE, TXO_TYPE};
 pub use model::{
@@ -16,7 +19,7 @@ pub use model::{
     ObjectProperties, ObjectSubrecord, RecordKind, TextOrientation, TextProperties, TextRun,
     VerticalAlignment, Visibility,
 };
+pub(crate) use transaction::source_diagnostics;
 pub use transaction::{
-    Commit, Diagnostics, Edit, Operation, Patch, Snapshot, SourceBackedCommit,
-    SourceBackedDiagnostics, Update, Value, Worksheet,
+    Commit, Diagnostics, Edit, LimitKind, Operation, Patch, Snapshot, Update, Value, Worksheet,
 };

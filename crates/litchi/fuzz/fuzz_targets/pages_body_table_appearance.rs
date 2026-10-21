@@ -27,7 +27,10 @@ const PRIVATE_INPUT: &[u8] = b"__litchi_private_pages_appearance_input_104__";
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_options(data, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        data,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Ok(package) => exercise_package(&package, &command_input(data)),
         Err(error) => observe_error(error),
     }
@@ -59,8 +62,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()))
-            .unwrap_or_else(|error| panic!("native Pages appearance seed must open: {error}"))
+        Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages appearance seed must open: {error}"))
     })
 }
 
@@ -313,7 +319,10 @@ fn exercise_selector_failures(package: &Package, source_before: &[u8]) {
 }
 
 fn exercise_redacted_ingress() {
-    match Package::from_bytes_with_options(PRIVATE_INPUT, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        PRIVATE_INPUT,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_redacted(error, PRIVATE_INPUT),
         Ok(_) => panic!("a private malformed Pages appearance sentinel must not parse"),
     }
@@ -322,7 +331,10 @@ fn exercise_redacted_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_options(bytes, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages appearance input must be rejected"),
     }
@@ -337,7 +349,10 @@ fn exercise_archive_limit() {
         MAX_IWA_STREAM_BYTES,
     )
     .unwrap_or_else(|error| unreachable!("valid Pages appearance entry limits: {error}"));
-    match Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(limits)) {
+    match Package::from_bytes_with_options(
+        NATIVE_PAGES,
+        litchi::pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("a one-entry Pages appearance limit accepted the package"),
     }

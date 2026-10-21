@@ -1,6 +1,6 @@
 //! Native ranged text-comment CRUD for TSWP text storages.
 
-use crate::{IWorkPackage, Result};
+use crate::{HostPackage, Result};
 
 use super::annotation::{
     AnnotationKind, AnnotationRecord, add_annotation, annotations, remove_annotation,
@@ -20,7 +20,7 @@ use litchi_iwa_text::date_time::Instant;
 use litchi_iwa_text::position::TextRange;
 
 /// Read every native ranged text comment in a storage, ordered by position.
-pub(crate) fn text_comments(package: &IWorkPackage, storage_id: u64) -> Result<Vec<TextComment>> {
+pub(crate) fn text_comments(package: &HostPackage, storage_id: u64) -> Result<Vec<TextComment>> {
     annotations(package, storage_id)?
         .into_iter()
         .filter(|annotation| !annotation.graph.is_plain_highlight())
@@ -30,7 +30,7 @@ pub(crate) fn text_comments(package: &IWorkPackage, storage_id: u64) -> Result<V
 
 /// Create a native ranged comment over an unoccupied annotation range.
 pub(crate) fn add_text_comment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     body: TextCommentBody,
@@ -46,7 +46,7 @@ pub(crate) fn add_text_comment(
 
 /// Atomically update a comment body and range while retaining its identity.
 pub(crate) fn update_text_comment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextCommentId,
     range: TextRange,
@@ -64,7 +64,7 @@ pub(crate) fn update_text_comment(
 
 /// Delete one ranged comment and its owned root/reply annotation graph.
 pub(crate) fn remove_text_comment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextCommentId,
 ) -> Result<TextComment> {
@@ -78,7 +78,7 @@ pub(crate) fn remove_text_comment(
 
 /// Read every direct reply in stored order.
 pub(crate) fn text_comment_replies(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     comment_id: TextCommentId,
 ) -> Result<Vec<TextCommentReply>> {
@@ -90,7 +90,7 @@ pub(crate) fn text_comment_replies(
 
 /// Append one direct reply to a ranged comment.
 pub(crate) fn add_text_comment_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     comment_id: TextCommentId,
     body: TextCommentReplyBody,
@@ -108,7 +108,7 @@ pub(crate) fn add_text_comment_reply(
 
 /// Update a direct reply while retaining its identity and metadata.
 pub(crate) fn update_text_comment_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     comment_id: TextCommentId,
     reply_id: TextCommentReplyId,
@@ -128,7 +128,7 @@ pub(crate) fn update_text_comment_reply(
 
 /// Delete one direct reply and its owned comment storage.
 pub(crate) fn remove_text_comment_reply(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     comment_id: TextCommentId,
     reply_id: TextCommentReplyId,

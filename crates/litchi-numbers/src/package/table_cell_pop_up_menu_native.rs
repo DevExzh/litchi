@@ -2082,7 +2082,8 @@ fn table_data_list_type(
 }
 
 fn advance_table_data_list_next_id(source: &[u8], appended_key: u32) -> Result<Vec<u8>> {
-    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| NativePopUpError::InvalidSource)?;
     let mut next = None;
     for field in view.fields() {
         if field.number() != 2 {
@@ -2951,7 +2952,8 @@ fn duplicate_entry_keys<T>(values: &[(u32, T)]) -> bool {
 }
 
 pub(super) fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
-    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| NativePopUpError::InvalidSource)?;
     let mut selected = None;
     for field in view.fields() {
         if field.number() != 5 {
@@ -2960,7 +2962,8 @@ pub(super) fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8]> {
         let payload = field
             .canonical_payload()
             .map_err(|_| NativePopUpError::InvalidSource)?;
-        let row_view = WireView::parse(payload).map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| NativePopUpError::InvalidSource)?;
         let row_index = row_view
             .fields()
             .find(|field| field.number() == 1)
@@ -3003,7 +3006,8 @@ pub(super) fn patch_tile_cell(
     column: u32,
     replacement: &[u8],
 ) -> Result<Vec<u8>> {
-    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| NativePopUpError::InvalidSource)?;
     let mut output = Vec::new();
     let mut selected = false;
     for field in view.fields() {
@@ -3014,7 +3018,8 @@ pub(super) fn patch_tile_cell(
         let payload = field
             .canonical_payload()
             .map_err(|_| NativePopUpError::InvalidSource)?;
-        let row_view = WireView::parse(payload).map_err(|_| NativePopUpError::InvalidSource)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| NativePopUpError::InvalidSource)?;
         let row_index = row_view
             .fields()
             .find(|candidate| candidate.number() == 1)
@@ -3033,8 +3038,13 @@ pub(super) fn patch_tile_cell(
             return Err(NativePopUpError::InvalidSource);
         }
         let patched_row = patch_row_cell(payload, column, replacement)?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut output, 5, &patched_row)
-            .map_err(|_| NativePopUpError::InvalidSource)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut output,
+            5,
+            &patched_row,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_| NativePopUpError::InvalidSource)?;
         selected = true;
     }
     if !selected {
@@ -3044,7 +3054,8 @@ pub(super) fn patch_tile_cell(
 }
 
 fn patch_row_cell(source: &[u8], column: u32, replacement: &[u8]) -> Result<Vec<u8>> {
-    let view = WireView::parse(source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| NativePopUpError::InvalidSource)?;
     let cell_count = view
         .fields()
         .find(|field| field.number() == 2)
@@ -3069,13 +3080,23 @@ fn patch_row_cell(source: &[u8], column: u32, replacement: &[u8]) -> Result<Vec<
             if replaced {
                 return Err(NativePopUpError::InvalidSource);
             }
-            litchi_iwa_common::wire::append_length_delimited_field(&mut output, 6, &patched_buffer)
-                .map_err(|_| NativePopUpError::InvalidSource)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut output,
+                6,
+                &patched_buffer,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(|_| NativePopUpError::InvalidSource)?;
             replaced = true;
         } else if field.number() == 7 {
             if let Some(offsets) = patched_offsets.as_deref() {
-                litchi_iwa_common::wire::append_length_delimited_field(&mut output, 7, offsets)
-                    .map_err(|_| NativePopUpError::InvalidSource)?;
+                litchi_iwa_common::wire::append_length_delimited_field(
+                    &mut output,
+                    7,
+                    offsets,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(|_| NativePopUpError::InvalidSource)?;
             } else {
                 output.extend_from_slice(field.raw());
             }

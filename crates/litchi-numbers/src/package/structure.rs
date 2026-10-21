@@ -193,7 +193,9 @@ pub(super) fn root_previews(catalog: &SourceCatalog) -> FaultResult<Vec<&'static
 
 /// Copy `data` without the fields in `excluded`.
 pub(super) fn strip_fields(data: &[u8], excluded: &[u32]) -> FaultResult<Vec<u8>> {
-    let view = litchi_iwa_common::wire::parse_wire_view(data).map_err(|error| map_wire(&error))?;
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|error| map_wire(&error))?;
     let mut output = Vec::new();
     reserve(&mut output, data.len())?;
     for field in view.fields() {
@@ -206,7 +208,9 @@ pub(super) fn strip_fields(data: &[u8], excluded: &[u32]) -> FaultResult<Vec<u8>
 
 /// Whether `data` holds field `number`.
 pub(super) fn has_field(data: &[u8], number: u32) -> FaultResult<bool> {
-    let view = litchi_iwa_common::wire::parse_wire_view(data).map_err(|error| map_wire(&error))?;
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|error| map_wire(&error))?;
     Ok(view.fields().any(|field| field.number() == number))
 }
 
@@ -668,14 +672,14 @@ macro_rules! structural_family {
             fn from(fault: $crate::package::structure::Fault) -> Self {
                 use $crate::package::structure::{Fault, FaultLimit};
                 match fault {
-                    Fault::Unsupported => Self::UnsupportedSource,
+                    Fault::Unsupported => Self::Refused(Refusal::UnsupportedSource),
                     Fault::Invalid => Self::InvalidSource,
-                    Fault::Dependency => Self::UnsupportedDependency,
+                    Fault::Dependency => Self::Refused(Refusal::UnsupportedDependency),
                     Fault::Limit {
                         kind,
                         observed,
                         maximum,
-                    } => Self::LimitExceeded {
+                    } => Self::Limit {
                         kind: match kind {
                             FaultLimit::PackageBytes => LimitKind::PackageBytes,
                             FaultLimit::PayloadBytes => LimitKind::PayloadBytes,

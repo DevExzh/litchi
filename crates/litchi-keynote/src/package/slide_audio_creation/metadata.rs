@@ -340,7 +340,9 @@ pub(in crate::package) fn plan_and_rewrite_media(
     let catalog = match &source.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => catalog,
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-            return Err(SlideAudioCreationError::UnsupportedSource);
+            return Err(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedSource,
+            ));
         },
     };
 
@@ -713,31 +715,41 @@ fn validate_media_input(
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
     {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     let extension = asset
         .filename
         .rsplit_once('.')
         .map(|(_, extension)| extension)
         .filter(|extension| !extension.is_empty())
-        .ok_or(SlideAudioCreationError::InvalidFilename)?;
+        .ok_or(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ))?;
     if MediaType::from_extension(extension) != asset.media_type {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::InvalidFilename
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
     }
     if asset.bytes.is_empty() {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::UnsupportedAudio
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
     }
     if MediaType::from_bytes(asset.bytes) != asset.media_type {
         return Err(if asset.media_type == MediaType::Audio {
-            SlideAudioCreationError::UnsupportedAudio
+            SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedAudio,
+            )
         } else {
             SlideAudioCreationError::InvalidSource
         });
@@ -860,7 +872,7 @@ fn residual_wire_allowances(
 ) -> Result<(usize, usize, usize), SlideAudioCreationError> {
     let fields = wire.max_fields().min(budget.remaining_wire_fields());
     if fields == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -868,7 +880,7 @@ fn residual_wire_allowances(
     }
     let work = wire.max_rewrite_work().min(budget.remaining_work());
     if work == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -876,7 +888,7 @@ fn residual_wire_allowances(
     }
     let output = wire.max_output_bytes().min(budget.remaining_output());
     if output == 0 {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::OutputBytes,
             observed: 1,
             maximum: 0,
@@ -1273,9 +1285,12 @@ fn generated_name(
     planned_names: &[Box<str>],
     budget: &mut CreationBudget,
 ) -> Result<String, SlideAudioCreationError> {
-    let (stem, extension) = source_name
-        .rsplit_once('.')
-        .ok_or(SlideAudioCreationError::InvalidFilename)?;
+    let (stem, extension) =
+        source_name
+            .rsplit_once('.')
+            .ok_or(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::InvalidFilename,
+            ))?;
     let identifier_digits = decimal_len(identifier);
     let normal_length = stem
         .len()
@@ -1412,7 +1427,7 @@ pub(super) fn map_identity_error(error: identity_codec::RewriteError) -> SlideAu
             },
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1455,7 +1470,7 @@ pub(super) fn map_media_error(
             },
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -1499,7 +1514,7 @@ fn map_media_rewrite_error(error: media_codec::RewriteError) -> SlideAudioCreati
             ),
             _ => return SlideAudioCreationError::InvalidSource,
         };
-        return SlideAudioCreationError::LimitExceeded {
+        return SlideAudioCreationError::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

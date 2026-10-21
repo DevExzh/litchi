@@ -5,8 +5,9 @@ use std::sync::Arc;
 
 use sha1::{Digest, Sha1};
 
+use crate::HostPackage;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
-use crate::package::{IWorkPackage, PackageLimits};
+use crate::package::PackageLimits;
 use litchi_iwa_common::varint::encode_varint;
 
 use super::*;
@@ -46,7 +47,7 @@ fn synthetic_metadata(data_bytes: &[u8]) -> Vec<u8> {
     metadata
 }
 
-fn synthetic_package() -> IWorkPackage {
+fn synthetic_package() -> HostPackage {
     let original = b"\x89PNG\r\n\x1a\noriginal";
     let mut metadata_object = ArchiveObject::new(
         2,
@@ -74,7 +75,7 @@ fn synthetic_package() -> IWorkPackage {
         objects: vec![document_object],
     };
 
-    let mut package = IWorkPackage::new();
+    let mut package = HostPackage::new();
     package
         .replace_archive(PACKAGE_METADATA_ENTRY, &metadata_archive)
         .unwrap();
@@ -88,13 +89,13 @@ fn synthetic_package() -> IWorkPackage {
 }
 
 fn nested_field_bytes(metadata: &[u8], field_number: u32) -> Vec<u8> {
-    let outer = parse_wire_fields(metadata).unwrap();
+    let outer = parse_wire_fields(metadata, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
     let data_info = outer
         .iter()
         .find(|field| field.number() == 4)
         .map(|field| field_payload(metadata, field).unwrap())
         .unwrap();
-    let nested = parse_wire_fields(data_info).unwrap();
+    let nested = parse_wire_fields(data_info, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
     let field = nested
         .iter()
         .find(|field| field.number() == field_number)
@@ -116,7 +117,7 @@ fn manager_reads_single_file_and_memory_packages() {
 
     let file = tempfile::NamedTempFile::new().unwrap();
     fs::write(file.path(), bytes).unwrap();
-    let disk = MediaManager::new(file.path()).unwrap();
+    let disk = MediaManager::open(file.path()).unwrap();
     assert_eq!(
         disk.extract("image-7.png").unwrap(),
         memory.extract("image-7.png").unwrap()
@@ -193,7 +194,9 @@ fn directory_media_streaming_rechecks_growth() -> std::io::Result<()> {
     fs::write(&asset_path, b"small")?;
 
     let limits = MediaLimits::new(1, 5, 5).unwrap();
-    let manager = MediaManager::new_with_limits(bundle.path(), limits).unwrap();
+    let manager =
+        MediaManager::open_with_options(bundle.path(), OpenOptions::new().media_limits(limits))
+            .unwrap();
     fs::write(&asset_path, b"larger")?;
 
     let mut streamed = Vec::new();
@@ -280,10 +283,15 @@ fn media_limits_bound_discovery_and_extraction() {
     let package = synthetic_package();
     let bytes = package.to_bytes().unwrap();
     let tight = MediaLimits::new(1, 1, 1).unwrap();
-    assert!(MediaManager::from_bytes_with_limits(&bytes, tight).is_err());
+    assert!(
+        MediaManager::from_bytes_with_options(&bytes, OpenOptions::new().media_limits(tight))
+            .is_err()
+    );
 
     let limits = MediaLimits::new(1, PNG.len() as u64, PNG.len() as u64).unwrap();
-    let manager = MediaManager::from_package_with_limits(package, limits).unwrap();
+    let manager =
+        MediaManager::from_package_with_options(package, OpenOptions::new().media_limits(limits))
+            .unwrap();
     assert_eq!(manager.limits().max_assets(), 1);
     assert_eq!(manager.limits().max_asset_bytes(), PNG.len() as u64);
     assert_eq!(manager.limits().max_total_bytes(), PNG.len() as u64);
@@ -312,9 +320,12 @@ fn package_limits_are_reused_for_media_discovery_and_later_file_reads() {
 
     let file = tempfile::NamedTempFile::new().unwrap();
     fs::write(file.path(), &bytes).unwrap();
-    let manager =
-        MediaManager::new_with_limits_and_package_limits(file.path(), media_limits, package_limits)
-            .unwrap();
+    let manager = MediaManager::open_with_limits_and_package_limits(
+        file.path(),
+        media_limits,
+        package_limits,
+    )
+    .unwrap();
     assert_eq!(manager.package_limits(), package_limits);
 
     let mut grown = bytes;
@@ -336,21 +347,21 @@ fn directory_media_rejects_symbolic_links() -> std::io::Result<()> {
     fs::write(&outside, PNG)?;
     symlink(&outside, data.join("linked.png"))?;
 
-    assert!(MediaManager::new(bundle.path()).is_err());
+    assert!(MediaManager::open(bundle.path()).is_err());
 
     let source_link = bundle.path().with_extension("-link");
     symlink(bundle.path(), &source_link)?;
-    assert!(MediaManager::new(&source_link).is_err());
+    assert!(MediaManager::open(&source_link).is_err());
     Ok(())
 }
 
 #[test]
 fn replaces_asset_and_preserves_unknown_metadata_fields() {
-    let mut editor = IWorkMediaEditor::from_package(synthetic_package()).unwrap();
+    let mut editor = crate::media::Draft::from_package(synthetic_package()).unwrap();
     let before_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let before = &before_archive.object(2).unwrap().messages[0].data;
     let attributes_before = nested_field_bytes(before, 10);
-    let outer_unknown_before = parse_wire_fields(before)
+    let outer_unknown_before = parse_wire_fields(before, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -368,7 +379,7 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
     let after_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let after = &after_archive.object(2).unwrap().messages[0].data;
     assert_eq!(nested_field_bytes(after, 10), attributes_before);
-    let outer_unknown_after = parse_wire_fields(after)
+    let outer_unknown_after = parse_wire_fields(after, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -379,7 +390,7 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
 
 #[test]
 fn rejects_type_mismatch_transactionally() {
-    let mut editor = IWorkMediaEditor::from_package(synthetic_package()).unwrap();
+    let mut editor = crate::media::Draft::from_package(synthetic_package()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -391,7 +402,7 @@ fn rejects_type_mismatch_transactionally() {
 
 #[test]
 fn removes_only_unreferenced_assets_transactionally() {
-    let mut referenced = IWorkMediaEditor::from_package(synthetic_package()).unwrap();
+    let mut referenced = crate::media::Draft::from_package(synthetic_package()).unwrap();
     assert!(referenced.remove_unreferenced(asset_id(7)).is_err());
     assert!(referenced.asset(asset_id(7)).is_some());
 
@@ -406,14 +417,14 @@ fn removes_only_unreferenced_assets_transactionally() {
         .unwrap();
     let before_archive = package.archive(PACKAGE_METADATA_ENTRY).unwrap();
     let before = &before_archive.object(2).unwrap().messages[0].data;
-    let outer_unknown_before = parse_wire_fields(before)
+    let outer_unknown_before = parse_wire_fields(before, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
         .map(|field| before[field.start()..field.end()].to_vec())
         .unwrap();
 
-    let mut editor = IWorkMediaEditor::from_package(package).unwrap();
+    let mut editor = crate::media::Draft::from_package(package).unwrap();
     let removed = editor.remove_unreferenced(asset_id(7)).unwrap().unwrap();
     assert_eq!(removed, b"\x89PNG\r\n\x1a\noriginal");
     assert!(editor.asset(asset_id(7)).is_none());
@@ -421,7 +432,7 @@ fn removes_only_unreferenced_assets_transactionally() {
 
     let after_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let after = &after_archive.object(2).unwrap().messages[0].data;
-    let outer_unknown_after = parse_wire_fields(after)
+    let outer_unknown_after = parse_wire_fields(after, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -441,7 +452,7 @@ fn inserts_and_removes_unreferenced_asset_without_metadata_drift() {
         .messages[0]
         .data
         .clone();
-    let mut editor = IWorkMediaEditor::from_package(package).unwrap();
+    let mut editor = crate::media::Draft::from_package(package).unwrap();
     let inserted = editor.insert_unreferenced("new.png", PNG).unwrap();
     assert_eq!(inserted.data_identifier, asset_id(8));
     assert_eq!(inserted.package_path.as_deref(), Some("Data/new-8.png"));
@@ -467,9 +478,9 @@ fn inserts_and_removes_unreferenced_asset_without_metadata_drift() {
 
 #[test]
 fn wire_parser_rejects_truncation_and_groups() {
-    assert!(parse_wire_fields(&[0x12, 0x05, 1]).is_err());
-    assert!(parse_wire_fields(&[0x0b]).is_err());
-    assert!(parse_wire_fields(&[0x80]).is_err());
+    assert!(parse_wire_fields(&[0x12, 0x05, 1], litchi_iwa_common::WireLimits::DEFAULT).is_err());
+    assert!(parse_wire_fields(&[0x0b], litchi_iwa_common::WireLimits::DEFAULT).is_err());
+    assert!(parse_wire_fields(&[0x80], litchi_iwa_common::WireLimits::DEFAULT).is_err());
 }
 
 #[test]

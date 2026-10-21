@@ -280,33 +280,45 @@ fn selectors_and_destinations_are_checked() -> TestResult {
     let mut edit = package.edit_slide_creation();
     assert!(matches!(
         edit.duplicate_slide(SlideSelector::index(1), Position::new(0)),
-        Err(Error::SlidePositionNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         edit.duplicate_slide(SlideSelector::name("missing"), Position::new(0)),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         edit.duplicate_slide(SlideSelector::index(0), Position::new(2)),
-        Err(Error::PositionOutOfRange { count: 1, .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::PositionOutOfRange { count: 1, .. }
+        ))
     ));
     assert!(matches!(
         edit.add_slide("No such layout", Position::new(0)),
-        Err(Error::LayoutNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::LayoutNameNotFound
+        ))
     ));
     assert!(matches!(
         edit.add_slide(
             LayoutSelector::Position(Position::new(17)),
             Position::new(0)
         ),
-        Err(Error::LayoutPositionNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::LayoutPositionNotFound { .. }
+        ))
     ));
     // A staged operation extends the destination range of the next one.
     edit.duplicate_slide(SlideSelector::index(0), Position::new(1))?;
     edit.add_slide("Blank", Position::new(2))?;
     assert!(matches!(
         edit.add_slide("Blank", Position::new(4)),
-        Err(Error::PositionOutOfRange { count: 3, .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::creation::Refusal::PositionOutOfRange { count: 3, .. }
+        ))
     ));
     assert_eq!(edit.commit()?.package().slides()?.len(), 3);
     Ok(())
@@ -349,9 +361,11 @@ fn table_and_chart_slides_are_typed_refusals() -> TestResult {
         assert!(
             matches!(
                 error,
-                Error::UnsupportedContent {
-                    reason: Unsupported::ExternalContent | Unsupported::UnmodelledContent
-                }
+                Error::Refused(
+                    litchi_keynote::slide::creation::Refusal::UnsupportedContent {
+                        reason: Unsupported::ExternalContent | Unsupported::UnmodelledContent
+                    }
+                )
             ),
             "{name}: {error:?}"
         );
@@ -393,7 +407,12 @@ fn corpus_duplication_succeeds_or_refuses_typed() -> TestResult {
                 assert_eq!(texts(&reopened, 1)?, texts(&package, 0)?, "{path:?}");
                 succeeded += 1;
             },
-            Err(Error::UnsupportedContent { .. } | Error::UnsupportedTopology) => refused += 1,
+            Err(
+                Error::Refused(litchi_keynote::slide::creation::Refusal::UnsupportedContent {
+                    ..
+                })
+                | Error::Refused(litchi_keynote::slide::creation::Refusal::UnsupportedTopology),
+            ) => refused += 1,
             Err(error) => return Err(format!("{path:?}: untyped refusal {error:?}").into()),
         }
     }

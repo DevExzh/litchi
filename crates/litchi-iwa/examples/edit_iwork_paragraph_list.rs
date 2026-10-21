@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, ParagraphList};
+use litchi_iwa::text::ParagraphList;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     editor.set_paragraph_list(storage_id, list)?;
     editor.save(output)?;
     Ok(())

@@ -221,8 +221,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -247,7 +257,12 @@ fn bucket_payload(headers: &[(u32, f32)], with_unknowns: bool) -> TestResult<Vec
     append_varint_field(&mut payload, 1, 1)?;
     for &(index, size) in headers {
         let header = bucket_header(index, size, with_unknowns)?;
-        append_length_delimited_field(&mut payload, 2, &header)?;
+        append_length_delimited_field(
+            &mut payload,
+            2,
+            &header,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknowns {
         append_varint_field(&mut payload, UNKNOWN_BUCKET_FIELD, UNKNOWN_BUCKET_VALUE)?;
@@ -821,10 +836,16 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
         matches!(
             read,
             Err(SlideTableNameError::InvalidSource)
-                | Err(SlideTableNameError::UnsupportedSource)
-                | Err(SlideTableNameError::UnsupportedDependency)
-                | Err(SlideTableNameError::UnsupportedTopology)
-                | Err(SlideTableNameError::LimitExceeded { .. })
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedDependency
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedTopology
+                ))
+                | Err(SlideTableNameError::Limit { .. })
         ),
         "malformed name read was unexpectedly accepted: {read:?}"
     );
@@ -832,10 +853,16 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
         matches!(
             edit,
             Err(SlideTableNameError::InvalidSource)
-                | Err(SlideTableNameError::UnsupportedSource)
-                | Err(SlideTableNameError::UnsupportedDependency)
-                | Err(SlideTableNameError::UnsupportedTopology)
-                | Err(SlideTableNameError::LimitExceeded { .. })
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedDependency
+                ))
+                | Err(SlideTableNameError::Refused(
+                    litchi_keynote::slide::table::name::transaction::Refusal::UnsupportedTopology
+                ))
+                | Err(SlideTableNameError::Limit { .. })
         ),
         "malformed name edit was unexpectedly accepted: {edit:?}"
     );
@@ -884,15 +911,21 @@ fn positional_selectors_read_names_through_interleaved_z_order() -> TestResult {
     );
     assert!(matches!(
         package.slide_table_name("Missing", 0usize),
-        Err(SlideTableNameError::SlideNameNotFound)
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_table_name("Tables", 2usize),
-        Err(SlideTableNameError::TablePositionNotFound { .. })
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::TablePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_table_name("", 0usize),
-        Err(SlideTableNameError::EmptySlideName)
+        Err(SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::EmptySlideName
+        ))
     ));
     Ok(())
 }
@@ -947,11 +980,13 @@ fn exact_no_op_is_source_bound_and_apply_is_idempotent() -> TestResult {
 }
 
 fn non_name_fields(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() != 8)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() != 8)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn contains_raw(payload: &[u8], raw: &[u8]) -> bool {
@@ -1104,7 +1139,12 @@ fn locked_table_allows_no_op_but_rejects_changed_name() -> TestResult {
         .expect("valid replacement name")
         .commit()
         .expect_err("locked table must reject changed name");
-    assert!(matches!(error, SlideTableNameError::Locked));
+    assert!(matches!(
+        error,
+        SlideTableNameError::Refused(
+            litchi_keynote::slide::table::name::transaction::Refusal::Locked
+        )
+    ));
     assert_eq!(exact_bytes(&package)?, before);
 
     let unlocked = package
@@ -1137,7 +1177,7 @@ fn malformed_field8_wire_is_rejected_without_mutation() -> TestResult {
     }
 
     let payload = model_member_payload(&source, MODELS[0])?;
-    let without_name = WireView::parse(&payload)?
+    let without_name = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() != 8)
         .flat_map(|field| field.raw().iter().copied())
@@ -1533,10 +1573,10 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
         };
         let before = exact_bytes(&restricted)?;
         let read = restricted.slide_table_name("Tables", 0usize);
-        if matches!(read, Err(SlideTableNameError::LimitExceeded { .. })) {
+        if matches!(read, Err(SlideTableNameError::Limit { .. })) {
             assert!(matches!(
                 restricted.edit_slide_table_name("Tables", 0usize),
-                Err(SlideTableNameError::LimitExceeded { .. })
+                Err(SlideTableNameError::Limit { .. })
             ));
             assert_eq!(exact_bytes(&restricted)?, before);
             found_semantic_limit = true;
@@ -1573,7 +1613,7 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
         let before = exact_bytes(&package)?;
         assert!(matches!(
             package.slide_table_name("Tables", 0usize),
-            Err(SlideTableNameError::LimitExceeded { .. })
+            Err(SlideTableNameError::Limit { .. })
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }

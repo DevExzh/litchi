@@ -178,7 +178,12 @@ fn bucket_payload(headers: &[(u32, f32)], unknown_header: bool) -> TestResult<Ve
     let mut payload = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut payload, 1, 1)?;
     for raw in raw_headers {
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 2, &raw)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            2,
+            &raw,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     litchi_iwa_common::wire::append_varint_field(
         &mut payload,
@@ -424,13 +429,18 @@ fn append_duplicate_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8
             .iter_mut()
             .find(|message| message.type_ == HEADER_BUCKET_MESSAGE_TYPE)
             .ok_or("missing bucket message")?;
-        let headers = WireView::parse(&message.data)?
+        let headers = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == 2)
             .map(|field| field.payload().to_vec())
             .next()
             .ok_or("missing header")?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut message.data, 2, &headers)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut message.data,
+            2,
+            &headers,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })
 }
@@ -638,7 +648,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .set(points(31.0)?)
         .commit()?;
     let after = bucket_bytes(&commit.package().exact_bytes(), ROW_BUCKET_IDENTIFIER)?;
-    let bucket_view = WireView::parse(&after)?;
+    let bucket_view = WireView::parse(&after, litchi_iwa_common::WireLimits::DEFAULT)?;
     let bucket_unknown = bucket_view
         .fields()
         .find(|field| field.number() == UNKNOWN_BUCKET_FIELD)
@@ -651,7 +661,7 @@ fn unknown_bucket_and_header_fields_survive_size_rewrite() -> TestResult {
         .fields()
         .find(|field| field.number() == 2)
         .ok_or("header was dropped")?;
-    let header_view = WireView::parse(header.payload())?;
+    let header_view = WireView::parse(header.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
     let header_unknown = header_view
         .fields()
         .find(|field| field.number() == UNKNOWN_HEADER_FIELD)
@@ -694,7 +704,7 @@ fn output_limit_rejects_growth_before_publication() -> TestResult {
         .set(points(32.0)?)
         .commit()
         .expect_err("output growth must be rejected at the physical ceiling");
-    assert!(matches!(error, Error::LimitExceeded { .. }));
+    assert!(matches!(error, Error::Limit { .. }));
     assert_eq!(bounded.exact_bytes(), before);
     Ok(())
 }
@@ -733,7 +743,7 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
         let result = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(1))
             .and_then(|edit| edit.set(requested).commit());
-        assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+        assert!(matches!(result, Err(Error::Limit { .. })));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -756,8 +766,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         assert!(matches!(
             result,
             Err(Error::InvalidSource)
-                | Err(Error::UnsupportedSource)
-                | Err(Error::LimitExceeded { .. })
+                | Err(Error::Refused(
+                    litchi_pages::table::dimension::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(Error::Limit { .. })
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -770,7 +782,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         .set(requested)
         .commit()
         .expect_err("locked table dimension must refuse");
-    assert!(matches!(error, Error::TableLocked));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_pages::table::dimension::transaction::Refusal::TableLocked)
+    ));
     Ok(())
 }
 
@@ -799,10 +814,7 @@ fn limits_and_public_values_are_typed_and_redacted() -> TestResult {
             .set_points(Points::new(31.0)?)
             .commit()
             .expect_err("tight header limits must reject before publication");
-        assert!(matches!(
-            error,
-            Error::LimitExceeded { .. } | Error::InvalidSource
-        ));
+        assert!(matches!(error, Error::Limit { .. } | Error::InvalidSource));
     }
     let package = Package::from_bytes(&source)?;
     let edit = package.edit_body_table_dimension_size(0usize, Dimension::Row(0))?;

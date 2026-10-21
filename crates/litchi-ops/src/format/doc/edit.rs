@@ -211,6 +211,32 @@ fn invalid(message: &'static str, key: &'static str) -> Error {
         .with_format(FileFormat::Doc)
 }
 
+/// A direct paragraph `bold` or `italic` assignment a coalesced body run
+/// stages (record 0359a): the leaf property, the requested value, and
+/// whether every run of the resolved paragraph already reads as it (the
+/// isolated setter's no-op test).
+pub(super) fn paragraph_toggle(
+    node: &Node<'_>,
+    key: &str,
+    value: &PropValue<'_>,
+) -> Result<Option<(CharacterProperty, bool, bool)>> {
+    let (property, format) = if key.eq_ignore_ascii_case("bold") {
+        let enabled = boolean(value, "bold")?;
+        (CharacterProperty::Bold, Format::Bold(enabled))
+    } else if key.eq_ignore_ascii_case("italic") {
+        let enabled = boolean(value, "italic")?;
+        (CharacterProperty::Italic, Format::Italic(enabled))
+    } else {
+        return Ok(None);
+    };
+    let enabled = matches!(format, Format::Bold(true) | Format::Italic(true));
+    let Target::Paragraph { .. } = Target::of(node, false)? else {
+        return Ok(None);
+    };
+    let holds = Target::of(node, true)?.holds(&format);
+    Ok(Some((property, enabled, holds)))
+}
+
 fn boolean(value: &PropValue<'_>, key: &'static str) -> Result<bool> {
     value
         .with_coerced(ValueType::Bool, |value| match value {

@@ -81,7 +81,7 @@ enum ImageClonePlacement {
     Preserve,
 }
 
-impl Editor {
+impl Draft {
     /// List ordinary image drawables owned directly by one reachable sheet.
     pub fn sheet_images(&self, sheet_id: u64) -> Result<Vec<SheetImageInfo>> {
         image_infos(self, sheet_id)
@@ -103,7 +103,7 @@ impl Editor {
         let context = image_creation_context(self, sheet_id)?;
         let ids = ImageObjectIds::allocate(next_object_identifier(&self.package)?)?;
 
-        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let mut media = crate::media::Draft::from_package(self.package.clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
         if asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
@@ -571,14 +571,13 @@ impl Editor {
     }
 
     /// Remove an ordinary image, its private graph, and unshared assets.
-    #[allow(deprecated)]
     pub fn remove_sheet_image(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetImage> {
         let source = image_graph(self, sheet_id, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -624,7 +623,7 @@ impl Editor {
         remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
-        let mut media = IWorkMediaEditor::from_package(staged)?;
+        let mut media = crate::media::Draft::from_package(staged)?;
         let mut removed_data_identifiers = Vec::new();
         let data_identifiers = source
             .data_references
@@ -668,7 +667,7 @@ impl Editor {
 }
 
 fn set_sheet_image_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     text: &str,
@@ -678,7 +677,7 @@ fn set_sheet_image_caption(
     let slot = image_caption_slot(editor, sheet_id, drawable_object_id, kind)?;
     let before = image_title_caption(editor, sheet_id, drawable_object_id)?;
     let staged = if let Some(storage_id) = slot.storage_id {
-        let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
+        let mut text_editor = crate::text::Draft::from_package(editor.package.clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
@@ -707,7 +706,7 @@ fn set_sheet_image_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.sheet_image_title_caption(sheet_id, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -729,7 +728,7 @@ fn set_sheet_image_caption(
 }
 
 fn remove_sheet_image_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -752,7 +751,7 @@ fn remove_sheet_image_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.sheet_image_title_caption(sheet_id, drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -809,7 +808,7 @@ mod tests {
         DrawableId::from_raw(raw).expect("fixture drawable identifiers are non-zero")
     }
 
-    fn focused_image_adjustments(editor: &Editor, image_position: usize) -> ImageAdjustments {
+    fn focused_image_adjustments(editor: &Draft, image_position: usize) -> ImageAdjustments {
         let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         package
             .sheet_image_adjustments(
@@ -820,7 +819,7 @@ mod tests {
     }
 
     fn set_focused_image_adjustments(
-        editor: &mut Editor,
+        editor: &mut Draft,
         image_position: usize,
         adjustments: ImageAdjustments,
     ) {
@@ -837,7 +836,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = Editor::from_bytes(&bytes).unwrap();
+        *editor = Draft::from_bytes(&bytes).unwrap();
     }
 
     #[test]
@@ -848,7 +847,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
@@ -869,7 +867,7 @@ mod tests {
             original
         );
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_images(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -1021,7 +1019,7 @@ mod tests {
         );
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -1083,7 +1081,7 @@ mod tests {
         editor
             .set_sheet_image_caption(sheet_id, image.drawable_object_id, "Recreated caption")
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_image_title_caption(sheet_id, image.drawable_object_id)
@@ -1239,7 +1237,7 @@ mod tests {
             editor.extract_media(source.image_data_identifier).unwrap(),
             replacement
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_images(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1266,13 +1264,13 @@ mod tests {
         );
         assert!(editor.sheet_images(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let baseline = editor.to_bytes().unwrap();
 

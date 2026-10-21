@@ -13,7 +13,7 @@ use std::ops::Deref;
 
 use litchi_core::Position;
 use litchi_ops::{Code, File, OpenOptions, SourceMode, props};
-use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Snapshot, Storage, Value};
+use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Storage, Value};
 
 fn fixture() -> Vec<u8> {
     let mut builder = litchi_xls::Builder::new();
@@ -90,7 +90,9 @@ fn text(file: &File, path: &str) -> String {
 }
 
 fn native_cell(bytes: &[u8], row: u32, column: u32) -> Option<(Storage, u16)> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).unwrap();
+    let snapshot = litchi_xls::Package::from_bytes(bytes)
+        .and_then(|package| package.cell_values())
+        .unwrap();
     snapshot
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()

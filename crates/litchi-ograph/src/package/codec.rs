@@ -26,10 +26,10 @@ pub(super) fn read_workbook(
     Ok(bytes)
 }
 
-pub(super) fn read_chart(source: &Snapshot) -> Result<chart::Chart> {
+pub(super) fn read_chart(source: &Snapshot) -> Result<chart::Model> {
     let bytes = read_workbook(source.source_bytes(), source.workbook, source.limits)?;
     let workbook = super::semantic::Workbook::with_limits(bytes, source.limits)?;
-    chart::Chart::parse(workbook.chart(), chart::Context::graph())
+    chart::Model::parse(workbook.chart(), chart::Context::graph())
 }
 
 pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec<u8>> {
@@ -37,24 +37,26 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
     let chart_range = source.workbook.chart_start..source.workbook.chart_end;
     let chart = workbook
         .get(chart_range.clone())
-        .ok_or(crate::Error::UnsupportedMutation {
+        .ok_or(crate::Error::PatchConflict {
             operation: "package-chart-patch",
             reason: "validated chart range falls outside the Workbook stream",
         })?;
     if chart.len() != replacement.len() {
-        return Err(crate::Error::UnsupportedMutation {
-            operation: "package-chart-patch",
-            reason: "typed chart replacement changes the Workbook envelope length",
-        });
+        return Err(crate::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "package-chart-patch",
+            "typed chart replacement changes the Workbook envelope length",
+        )));
     }
 
     let mut workbook = workbook;
     workbook
         .get_mut(chart_range)
-        .ok_or(crate::Error::UnsupportedMutation {
-            operation: "package-chart-patch",
-            reason: "validated chart range cannot be mutated",
-        })?
+        .ok_or(crate::Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "package-chart-patch",
+            "validated chart range cannot be mutated",
+        )))?
         .copy_from_slice(replacement);
 
     let mut cfb = OleFile::open(Cursor::new(source.source_bytes()))?;
@@ -73,10 +75,11 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
         Some([0x09, 0x00]) => 512,
         Some([0x0C, 0x00]) => 4096,
         _ => {
-            return Err(crate::Error::UnsupportedMutation {
-                operation: "package-chart-patch",
-                reason: "source CFB sector size is not supported by the package writer",
-            });
+            return Err(crate::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "package-chart-patch",
+                "source CFB sector size is not supported by the package writer",
+            )));
         },
     };
     let mut writer = OleWriter::with_sector_size(sector_size)?;

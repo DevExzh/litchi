@@ -1,8 +1,8 @@
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::{Builder, SignatureName};
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use std::io::Cursor;
 
 fn word_blob() -> Vec<u8> {
@@ -71,7 +71,7 @@ fn malformed_stw_user_error_is_deferred_and_cached() {
         .expect("malformed StwUser pointer");
     let bytes = package.finish().expect("fixture package finish");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let first = document
         .vba_signatures()
@@ -127,7 +127,7 @@ fn document_facade_defers_and_reads_stw_user_signature_bytes() {
         .expect("StwUser pointer");
     let bytes = package.finish().expect("fixture package finish");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
     let signatures = document
         .vba_signatures()

@@ -127,7 +127,7 @@ pub(super) fn audio_creation_values(options: PagesAudioOptions) -> Result<(Drawa
     Ok((geometry, options.duration_seconds()))
 }
 
-pub(super) fn audio_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
+pub(super) fn audio_style_id(package: &HostPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
@@ -154,7 +154,7 @@ pub(super) fn audio_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no media style preset".to_owned()))
 }
 
-pub(super) fn body_audio_infos(editor: &Editor) -> Result<Vec<AudioInfo>> {
+pub(super) fn body_audio_infos(editor: &Draft) -> Result<Vec<AudioInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -244,12 +244,12 @@ fn audio_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool>
     Ok(flags.audio_only() == Some(true) && flags.is_live_video() != Some(true))
 }
 
-pub(super) fn body_audio_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyAudioGraph> {
+pub(super) fn body_audio_graph(editor: &Draft, drawable_object_id: u64) -> Result<BodyAudioGraph> {
     body_audio_graph_with_validation(editor, drawable_object_id, AudioGraphValidation::Spatial)
 }
 
 pub(super) fn body_audio_playback_target(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<BodyAudioPlaybackTarget> {
     let graph = body_audio_graph_with_validation(
@@ -264,7 +264,7 @@ pub(super) fn body_audio_playback_target(
 }
 
 fn body_audio_graph_with_validation(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     validation: AudioGraphValidation,
 ) -> Result<BodyAudioGraph> {
@@ -502,7 +502,7 @@ fn body_audio_graph_with_validation(
 }
 
 fn validate_drawable_z_order(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     z_order_id: Option<u64>,
 ) -> Result<()> {
@@ -520,7 +520,7 @@ fn validate_drawable_z_order(
 }
 
 fn audio_info(
-    package: &IWorkPackage,
+    package: &HostPackage,
     body_storage_id: u64,
     archive_name: &str,
     identifier: u64,
@@ -561,7 +561,6 @@ fn audio_info(
     })
 }
 
-#[allow(deprecated)]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn audio_objects(
     ids: AudioObjectIds,
@@ -676,7 +675,7 @@ pub(super) fn audio_objects(
 }
 
 pub(super) fn set_audio_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     audio_id: u64,
     geometry: DrawableGeometry,
@@ -715,7 +714,7 @@ pub(super) fn set_audio_geometry(
 }
 
 pub(super) fn set_audio_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     audio_id: u64,
     properties: &DrawableProperties,
@@ -757,7 +756,7 @@ pub(super) fn set_audio_properties(
 }
 
 pub(super) fn set_audio_attachment_position(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     attachment_id: u64,
     position: DrawablePoint,
@@ -841,7 +840,7 @@ fn pages_audio_object(
 }
 
 fn object_has_message_type(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
 ) -> Result<bool> {

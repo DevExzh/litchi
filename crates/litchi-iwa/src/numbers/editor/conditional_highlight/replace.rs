@@ -9,7 +9,7 @@ use super::*;
 const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
 
 pub(super) fn try_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -126,7 +126,7 @@ pub(super) fn try_at_location(
 }
 
 fn copy_on_write(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -162,7 +162,7 @@ struct ReplacementIdentifiers {
 }
 
 fn replacement_identifiers(
-    package: &IWorkPackage,
+    package: &HostPackage,
     existing: &[write::RuleStyleIdentifiers],
     rule_count: usize,
 ) -> Result<ReplacementIdentifiers> {
@@ -206,7 +206,7 @@ fn has_duplicate_identifiers(identifiers: &[write::RuleStyleIdentifiers]) -> boo
 }
 
 pub(super) fn conditional_style_rule_identifiers(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     style_set_id: u64,
 ) -> Result<Vec<write::RuleStyleIdentifiers>> {
@@ -278,7 +278,7 @@ fn rule_style_identifiers(
 }
 
 fn register_added_children(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_archive: &str,
     added: &[u64],
     identifiers: &[write::RuleStyleIdentifiers],
@@ -335,7 +335,7 @@ fn register_added_children(
 }
 
 fn advance_replacement_save_tokens(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     list_archive: &str,
     style_archive: &str,

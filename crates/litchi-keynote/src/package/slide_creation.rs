@@ -229,6 +229,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The package cannot be edited safely (malformed or inconsistent).
+    #[error("the Keynote source cannot be edited safely")]
+    InvalidSource,
+    /// A resource limit was exceeded.
+    #[error("Keynote slide-creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// The exceeded resource.
+        kind: LimitKind,
+        /// The observed amount.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// An allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-creation transaction")]
+    Allocation {
+        /// The requested amount.
+        amount: usize,
+    },
+    /// The published candidate did not verify.
+    #[error("the Keynote slide-creation candidate failed semantic verification")]
+    Verification,
+    /// The patch does not match the exact source package.
+    #[error("the Keynote slide-creation patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package was not opened from an exact physical source.
     #[error("this Keynote source does not support structural edits")]
     UnsupportedSource,
@@ -276,31 +312,34 @@ pub enum Error {
         /// The slide count when the operation runs.
         count: usize,
     },
-    /// The package cannot be edited safely (malformed or inconsistent).
-    #[error("the Keynote source cannot be edited safely")]
-    InvalidSource,
-    /// A resource limit was exceeded.
-    #[error("Keynote slide-creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// The exceeded resource.
-        kind: LimitKind,
-        /// The observed amount.
-        observed: u64,
-        /// The configured maximum.
-        maximum: u64,
-    },
-    /// An allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-creation transaction")]
-    Allocation {
-        /// The requested amount.
-        amount: usize,
-    },
-    /// The published candidate did not verify.
-    #[error("the Keynote slide-creation candidate failed semantic verification")]
-    Verification,
-    /// The patch does not match the exact source package.
-    #[error("the Keynote slide-creation patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::LayoutPositionNotFound { .. } => RefusalKind::InvalidValue,
+            Self::LayoutNameNotFound { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedTopology { .. }
+            | Self::UnsupportedContent { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::AmbiguousLayout { .. }
+            | Self::PositionOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One staged operation, with privately remembered native identity.
@@ -378,14 +417,14 @@ impl<'a> Edit<'a> {
             .checked_add(self.operations.len())
             .ok_or(Error::InvalidSource)?;
         if destination.get() > count {
-            return Err(Error::PositionOutOfRange {
+            return Err(Error::Refused(Refusal::PositionOutOfRange {
                 position: destination,
                 count,
-            });
+            }));
         }
         let maximum = self.source.semantic_limits().max_slides();
         if count >= maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Slides,
                 observed: count as u64 + 1,
                 maximum: maximum as u64,
@@ -403,8 +442,8 @@ impl<'a> Edit<'a> {
     /// # Errors
     ///
     /// Returns a typed selector error when no single slide matches,
-    /// [`Error::PositionOutOfRange`] for a destination past the end, and
-    /// [`Error::LimitExceeded`] when the semantic slide limit would be
+    /// [`Refusal::PositionOutOfRange`] for a destination past the end, and
+    /// [`Error::Limit`] when the semantic slide limit would be
     /// exceeded. Unsupported slide content is reported by [`Self::commit`].
     ///
     /// ```no_run
@@ -433,8 +472,10 @@ impl<'a> Edit<'a> {
             .select_slide(selector)
             .map_err(map_selector_error)?
             .ok_or(match selector {
-                SlideSelector::Name(_) => Error::SlideNameNotFound,
-                SlideSelector::Position(position) => Error::SlidePositionNotFound { position },
+                SlideSelector::Name(_) => Error::Refused(Refusal::SlideNameNotFound),
+                SlideSelector::Position(position) => {
+                    Error::Refused(Refusal::SlidePositionNotFound { position })
+                },
             })?;
         let source = selected.position();
         let nodes = self
@@ -455,13 +496,13 @@ impl<'a> Edit<'a> {
     ///
     /// The fresh slide's title, body and speaker notes are empty. Layouts
     /// with live-slide state or media that cannot be materialized are
-    /// refused by [`Self::commit`] with [`Error::UnsupportedContent`].
+    /// refused by [`Self::commit`] with [`Refusal::UnsupportedContent`].
     ///
     /// # Errors
     ///
     /// Returns a typed layout-selector error when no single layout matches,
-    /// [`Error::PositionOutOfRange`] for a destination past the end, and
-    /// [`Error::LimitExceeded`] when the semantic slide limit would be
+    /// [`Refusal::PositionOutOfRange`] for a destination past the end, and
+    /// [`Error::Limit`] when the semantic slide limit would be
     /// exceeded.
     ///
     /// ```no_run
@@ -505,12 +546,12 @@ impl<'a> Edit<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsupportedContent`] for slides or layouts this
+    /// Returns [`Refusal::UnsupportedContent`] for slides or layouts this
     /// transaction cannot clone, [`Error::Verification`] when the candidate
     /// does not verify, and typed source, limit and allocation errors.
     ///
     /// ```no_run
-    /// use litchi_keynote::slide::creation::{Error, Unsupported};
+    /// use litchi_keynote::slide::creation::{Error, Refusal, Unsupported};
     /// use litchi_keynote::{Package, Position, SlideSelector};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -519,7 +560,7 @@ impl<'a> Edit<'a> {
     /// edit.duplicate_slide(SlideSelector::index(0), Position::new(1))?;
     /// match edit.commit() {
     ///     Ok(commit) => println!("{} slides", commit.package().slides()?.len()),
-    ///     Err(Error::UnsupportedContent { reason }) => println!("refused: {reason}"),
+    ///     Err(Error::Refused(Refusal::UnsupportedContent { reason })) => println!("refused: {reason}"),
     ///     Err(error) => return Err(error.into()),
     /// }
     /// # Ok(())
@@ -980,7 +1021,7 @@ fn check_object_limit(source: &Package, workspace: &Workspace<'_>) -> Result<(),
         .structure_object_count()
         .saturating_add(workspace.created_objects());
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::Objects,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1080,7 +1121,9 @@ fn verify(
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) if source.source_is_exact() => Ok(source.shared_source()),
-        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
+            Err(Error::Refused(Refusal::UnsupportedSource))
+        },
     }
 }
 
@@ -1097,13 +1140,13 @@ impl<T> Lift<T> for Result<T, StructureError> {
 
 fn map_structure_error(error: StructureError) -> Error {
     match error {
-        StructureError::UnsupportedContent(_) => Error::UnsupportedContent {
+        StructureError::UnsupportedContent(_) => Error::Refused(Refusal::UnsupportedContent {
             reason: Unsupported::UnmodelledContent,
-        },
-        StructureError::UnsupportedRegistry => Error::UnsupportedContent {
+        }),
+        StructureError::UnsupportedRegistry => Error::Refused(Refusal::UnsupportedContent {
             reason: Unsupported::RegistryShape,
-        },
-        StructureError::IdentifierOverflow => Error::LimitExceeded {
+        }),
+        StructureError::IdentifierOverflow => Error::Limit {
             kind: LimitKind::Identifiers,
             observed: u64::MAX,
             maximum: u64::MAX,
@@ -1112,7 +1155,7 @@ fn map_structure_error(error: StructureError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 StructureLimit::WireBytes => LimitKind::WireBytes,
                 StructureLimit::WireFields => LimitKind::WireFields,
@@ -1135,8 +1178,8 @@ fn map_structure_error(error: StructureError) -> Error {
 
 fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -1147,7 +1190,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Objects,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1164,7 +1207,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             path: _,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

@@ -148,7 +148,10 @@ fn exercise_package(package: &Package, data: &[u8]) {
     let empty_name = package
         .slide_chart_title(0usize, ChartSelector::name(""))
         .expect_err("empty chart selector name was accepted");
-    assert!(matches!(empty_name, ChartTitleError::EmptyChartName));
+    assert!(matches!(
+        empty_name,
+        ChartTitleError::Refused(litchi::keynote::chart::title::Refusal::EmptyChartName)
+    ));
     observe_error(empty_name);
     assert_eq!(package_bytes(package), source_bytes);
 
@@ -332,7 +335,10 @@ fn exercise_ambiguous_name(package: &Package, chart_position: usize, data: &[u8]
         .package()
         .slide_chart_title(0usize, ChartSelector::name(name))
         .expect_err("duplicate chart title selector was accepted");
-    assert!(matches!(ambiguous, ChartTitleError::AmbiguousSelector));
+    assert!(matches!(
+        ambiguous,
+        ChartTitleError::Refused(litchi::keynote::chart::title::Refusal::AmbiguousSelector)
+    ));
     observe_redacted(ambiguous, name);
     let restored = commit
         .package()

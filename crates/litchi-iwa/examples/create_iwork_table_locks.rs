@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let locked_keynote = lock.commit()?;
     let mut keynote_bytes = Vec::new();
     locked_keynote.package().write_to(&mut keynote_bytes)?;
-    keynote = keynote::Editor::from_bytes(&keynote_bytes)?;
+    keynote = keynote::Draft::from_bytes(&keynote_bytes)?;
     keynote.save(&keynote_path)?;
     assert_eq!(
         litchi_keynote::Package::open(&keynote_path)?.slide_table_lock_state(

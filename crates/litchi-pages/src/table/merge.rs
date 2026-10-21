@@ -14,6 +14,6 @@ pub use litchi_iwa_common::table::merge::{
 /// Exact-source transactions for one rooted Pages body table's merged cells.
 pub mod transaction {
     pub use crate::package::body_table_merges::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }

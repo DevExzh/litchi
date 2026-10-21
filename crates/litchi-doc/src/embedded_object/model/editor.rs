@@ -2,7 +2,7 @@
 
 use super::super::Limits;
 use crate::parts::protection::{EditProtection, ProtectionPolicy};
-use litchi_ole_common::object::Editor as ObjectEditor;
+use litchi_ole_common::object::Edit as ObjectEditor;
 
 #[derive(Clone, Debug)]
 pub(in crate::embedded_object) struct RawPiece {
@@ -22,7 +22,7 @@ pub(in crate::embedded_object) struct FieldMarker {
 
 /// Transactional editor for the DOC field and `ObjectPool` owner.
 #[derive(Clone)]
-pub struct Editor {
+pub(crate) struct Editor {
     pub(in crate::embedded_object) package: ObjectEditor,
     pub(in crate::embedded_object) object_pool_exists: bool,
     pub(in crate::embedded_object) limits: Limits,

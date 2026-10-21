@@ -1,6 +1,7 @@
 //! Framing and resource validation for source-preserving external-link edits.
 
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 /// The maximum payload carried by one BIFF8 record.
 pub(super) const MAX_RECORD_PAYLOAD: usize = 8_224;
@@ -25,16 +26,20 @@ impl RecordSpan {
 
 pub(super) fn scan_records(bytes: &[u8]) -> Result<Vec<RecordSpan>> {
     if bytes.len() > MAX_STREAM_BYTES {
-        return Err(Error::UnsafeEdit(format!(
-            "external-link stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit external links",
+            "the external-link stream exceeds its byte bound",
+        ));
     }
     let mut records = Vec::new();
     let mut offset = 0usize;
     while offset < bytes.len() {
         if records.len() >= MAX_RECORDS {
-            return Err(Error::UnsafeEdit(
-                "external-link stream record count exceeds the resource bound".to_string(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit external links",
+                "external-link stream record count exceeds the resource bound",
             ));
         }
         let header_end = offset
@@ -83,12 +88,18 @@ pub(super) fn replace_record(
     replacement: &[u8],
 ) -> Result<Vec<u8>> {
     if replacement.len() > MAX_RECORD_PAYLOAD {
-        return Err(Error::UnsafeEdit(format!(
-            "replacement BIFF8 payload exceeds {MAX_RECORD_PAYLOAD} bytes"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit external links",
+            "a replacement BIFF8 payload exceeds the record limit",
+        ));
     }
     let replacement_len = u16::try_from(replacement.len()).map_err(|_error| {
-        Error::UnsafeEdit("replacement BIFF8 payload length exceeds u16".to_string())
+        Error::refused(
+            RefusalKind::InvalidValue,
+            "edit external links",
+            "replacement BIFF8 payload length exceeds u16",
+        )
     })?;
     let old_end = span.payload_end;
     let mut output = Vec::with_capacity(
@@ -103,9 +114,11 @@ pub(super) fn replace_record(
     output.extend_from_slice(replacement);
     output.extend_from_slice(&bytes[old_end..]);
     if output.len() > MAX_STREAM_BYTES {
-        return Err(Error::UnsafeEdit(format!(
-            "edited external-link stream exceeds the {MAX_STREAM_BYTES}-byte resource bound"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit external links",
+            "the edited external-link stream exceeds its byte bound",
+        ));
     }
     Ok(output)
 }

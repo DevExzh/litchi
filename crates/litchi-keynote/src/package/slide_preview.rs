@@ -285,7 +285,7 @@ impl ScanBudget {
         // of trying to preserve an unbounded group subtree whose schema and
         // cache ownership cannot be proven here.
         self.report.charge_scan(source.len(), self.limits)?;
-        let view = WireView::parse_with_limits(source, self.limits)?;
+        let view = WireView::parse(source, self.limits)?;
         let observed = self.report.fields.saturating_add(view.len());
         if observed > self.limits.max_fields() {
             return Err(WireError::LimitExceeded {

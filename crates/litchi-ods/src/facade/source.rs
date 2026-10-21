@@ -56,9 +56,9 @@ const FAMILY_NAME: &str = "ODS";
 /// snapshot. [`Self::edit_cells`] adds a narrow existing-cell transaction
 /// without materializing the complete package.
 pub struct SourceBackedSpreadsheet {
-    pub(super) package: SourceBackedPackage,
+    pub(crate) package: Arc<SourceBackedPackage>,
     source: Arc<dyn ReadAt>,
-    pub(super) source_version: SourceVersion,
+    pub(crate) source_version: SourceVersion,
     pub(super) content_xml: Arc<str>,
     pub(super) styles_xml: Option<Arc<str>>,
     definitions: Vec<Definition>,
@@ -71,6 +71,18 @@ pub struct SourceBackedSpreadsheet {
     content_layout: OnceLock<crate::worksheet::package::ContentLayout>,
     /// Package repairs followed by the content repairs of the open parse.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// Whether `content_xml` is a committed replacement of the source's
+    /// `content.xml` member rather than the member itself.
+    replaced: bool,
+    /// The committed `content.xml` of a source-backed edit, published when
+    /// this spreadsheet is written; reads parse it once (record 0358a).
+    deferred: Option<Arc<Deferred>>,
+}
+
+/// The pending `content.xml` of a committed source-backed spreadsheet.
+pub(crate) struct Deferred {
+    content_xml: Arc<str>,
+    projection: OnceLock<SourceBackedSpreadsheet>,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheet {
@@ -303,7 +315,7 @@ impl SourceBackedSpreadsheet {
         tolerance.append(&content_tolerance);
 
         Ok(Self {
-            package,
+            package: Arc::new(package),
             source,
             source_version,
             content_xml: Arc::from(content_xml),
@@ -317,7 +329,187 @@ impl SourceBackedSpreadsheet {
             edit_protection: OnceLock::new(),
             content_layout: OnceLock::new(),
             tolerance,
+            replaced: false,
+            deferred: None,
         })
+    }
+
+    /// A share of this spreadsheet's source, retained parts and projection,
+    /// with fresh caches.
+    pub(crate) fn share(&self) -> Self {
+        Self {
+            package: Arc::clone(&self.package),
+            source: Arc::clone(&self.source),
+            source_version: self.source_version,
+            content_xml: Arc::clone(&self.content_xml),
+            styles_xml: self.styles_xml.clone(),
+            definitions: self.definitions.clone(),
+            sheets: Arc::clone(&self.sheets),
+            metadata: self.metadata.clone(),
+            settings: self.settings.clone(),
+            cell_queries: AtomicUsize::new(0),
+            cell_locator: OnceLock::new(),
+            edit_protection: OnceLock::new(),
+            content_layout: OnceLock::new(),
+            tolerance: self.tolerance.clone(),
+            replaced: self.replaced,
+            deferred: self.deferred.clone(),
+        }
+    }
+
+    /// The spreadsheet that serves reads and edits: the parsed projection of
+    /// a committed `content.xml`, or `self`.
+    ///
+    /// A committed spreadsheet parses its `content.xml` on first use, once;
+    /// a caller that only writes it never pays the parse.
+    pub(crate) fn effective(&self) -> Result<&Self> {
+        let Some(deferred) = &self.deferred else {
+            return Ok(self);
+        };
+        if let Some(projection) = deferred.projection.get() {
+            return Ok(projection);
+        }
+        let projection = self.reparsed(Arc::clone(&deferred.content_xml))?;
+        Ok(deferred.projection.get_or_init(|| projection))
+    }
+
+    /// The `content.xml` this spreadsheet writes.
+    pub(crate) fn written_content_xml(&self) -> &Arc<str> {
+        match &self.deferred {
+            Some(deferred) => &deferred.content_xml,
+            None => &self.content_xml,
+        }
+    }
+
+    /// Whether this spreadsheet writes the source's own `content.xml` member.
+    fn is_pristine(&self) -> bool {
+        self.deferred.is_none() && !self.replaced
+    }
+
+    /// The same source with `content_xml` as its committed `content.xml`,
+    /// validated by the caller; its projection is parsed on first read.
+    pub(crate) fn with_content(&self, content_xml: Arc<str>) -> Self {
+        let mut committed = self.share();
+        committed.deferred = Some(Arc::new(Deferred {
+            content_xml,
+            projection: OnceLock::new(),
+        }));
+        committed
+    }
+
+    /// The projection of `content_xml` over this spreadsheet's source and
+    /// its retained `styles.xml` and `meta.xml`.
+    fn reparsed(&self, content_xml: Arc<str>) -> Result<Self> {
+        self.check_source()?;
+        let parsed = (|| {
+            validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
+            let (settings, outputs) = open_parse.finish()?;
+            let crate::open_parse::OpenOutputs {
+                location: _location,
+                definitions,
+                mut sheets,
+                tolerance: content_tolerance,
+            } = outputs;
+            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
+            Ok((definitions, sheets, settings, content_tolerance))
+        })();
+        let (definitions, sheets, settings, content_tolerance) =
+            prefer_current(self.source.as_ref(), self.source_version, parsed)?;
+        let mut tolerance = self.package.tolerance_report().clone();
+        tolerance.append(&content_tolerance);
+        Ok(Self {
+            content_xml,
+            definitions,
+            sheets: Arc::from(sheets),
+            settings,
+            tolerance,
+            replaced: true,
+            deferred: None,
+            ..self.share()
+        })
+    }
+
+    /// Write this spreadsheet as a complete ODS package: the source archive
+    /// with only `content.xml` replaced by the committed content (an
+    /// unedited spreadsheet writes its source; record 0358a).
+    ///
+    /// Every other member is copied raw from the retained source, so memory
+    /// stays bounded by `content.xml`. A source that changed since open is
+    /// refused before any byte is written.
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed publication failure with the sink progress it
+    /// observed.
+    pub fn write_to<W: Write>(
+        &self,
+        writer: W,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        self.write_to_with_options(writer, SourceContentPublicationOptions::default())
+    }
+
+    /// [`Self::write_to`] under explicit replacement and output ceilings,
+    /// cancellation, payload verification and execution policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`].
+    pub fn write_to_with_options<W: Write>(
+        &self,
+        writer: W,
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
+        if let Err(error) = self.check_source() {
+            return Err(match error {
+                Error::SourceChanged { expected, observed } => {
+                    SourceContentPublicationError::SourceChanged {
+                        expected,
+                        observed,
+                        progress:
+                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
+                    }
+                },
+                other => SourceContentPublicationError::Core(other),
+            });
+        }
+        self.package.write_content_xml_to_stream_with_options(
+            writer,
+            self.written_content_xml().as_bytes(),
+            options,
+        )
+    }
+
+    /// Atomically replace `path` with this spreadsheet (full durability).
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication or I/O failure; the destination is unchanged
+    /// unless the error is a committed-I/O payload.
+    #[cfg(any(unix, windows))]
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), OdfError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this spreadsheet under explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    #[cfg(any(unix, windows))]
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), OdfError> {
+        litchi_core::atomic::save(
+            path.as_ref(),
+            durability,
+            litchi_core::atomic::Overwrite::Replace,
+            |writer| self.write_to(writer).map(drop).map_err(OdfError::from),
+            || self.check_source().map_err(OdfError::from),
+        )
     }
 
     /// Return the cached row-edit layout of the retained `content.xml`.
@@ -349,6 +541,9 @@ impl SourceBackedSpreadsheet {
     /// owner. Parse failures are not cached: every failed call re-runs the
     /// same validation and returns the same error.
     pub(crate) fn edit_protection(&self) -> Result<&(bool, Vec<String>)> {
+        if self.deferred.is_some() {
+            return self.effective()?.edit_protection();
+        }
         if let Some(protection) = self.edit_protection.get() {
             return Ok(protection);
         }
@@ -371,7 +566,10 @@ impl SourceBackedSpreadsheet {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        &self.tolerance
+        match self.effective() {
+            Ok(projection) => &projection.tolerance,
+            Err(_) => &self.tolerance,
+        }
     }
 
     /// Return the source identity captured during open.
@@ -394,14 +592,14 @@ impl SourceBackedSpreadsheet {
     /// Borrow the validated `content.xml` snapshot.
     pub fn content_xml(&self) -> Result<&str> {
         self.check_source()?;
-        let value = self.content_xml.as_ref();
+        let value = self.written_content_xml().as_ref();
         self.check_source()?;
         Ok(value)
     }
 
     pub(crate) fn content_xml_arc(&self) -> Result<Arc<str>> {
         self.check_source()?;
-        let value = Arc::clone(&self.content_xml);
+        let value = Arc::clone(self.written_content_xml());
         self.check_source()?;
         Ok(value)
     }
@@ -415,29 +613,6 @@ impl SourceBackedSpreadsheet {
             .any(|path| litchi_odf_common::core::package::is_signature_owner_path(&path));
         self.check_source()?;
         Ok(signed)
-    }
-
-    pub(crate) fn write_sheet_metadata_content<W: Write>(
-        &self,
-        writer: W,
-        replacement: &[u8],
-        options: SourceContentPublicationOptions,
-    ) -> std::result::Result<SourceContentPublicationReport, SourceContentPublicationError> {
-        if let Err(error) = self.check_source() {
-            return Err(match error {
-                Error::SourceChanged { expected, observed } => {
-                    SourceContentPublicationError::SourceChanged {
-                        expected,
-                        observed,
-                        progress:
-                            litchi_odf_common::core::SourceContentPublicationProgress::Untouched,
-                    }
-                },
-                other => SourceContentPublicationError::Core(other),
-            });
-        }
-        self.package
-            .write_content_xml_to_stream_with_options(writer, replacement, options)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot.
@@ -456,46 +631,12 @@ impl SourceBackedSpreadsheet {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
-    /// Capture inert DDE metadata bound to this live source owner.
-    ///
-    /// The returned snapshot supports exact-source edits and sequential package
-    /// publication. DDE declarations and cached data are never refreshed.
-    pub fn dde(&self) -> Result<crate::dde::SourceSnapshot<'_>> {
-        crate::dde::SourceSnapshot::from_owner(
-            self,
-            crate::dde::Limits::default(),
-            &crate::dde::default_context(),
-            false,
-        )
-    }
-
-    /// Capture source-bound DDE metadata under explicit limits and context.
-    pub fn dde_with(
-        &self,
-        limits: crate::dde::Limits,
-        context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::dde::SourceSnapshot<'_>> {
-        crate::dde::SourceSnapshot::from_owner(self, limits, context, true)
-    }
-
-    /// Begin an inert DDE metadata edit against this live source.
-    pub fn edit_dde(&self) -> Result<crate::dde::SourceEdit<'_>> {
-        self.dde()?.edit()
-    }
-
-    /// Apply a DDE patch against this owner's current metadata snapshot.
-    ///
-    /// The patch must belong to this live owner and match its exact source XML.
-    pub fn apply_dde_patch<'source>(
-        &'source self,
-        patch: &crate::dde::SourcePatch<'source>,
-    ) -> Result<crate::dde::SourceCommit<'source>> {
-        patch.apply(&self.dde()?)
-    }
-
     /// Capture source-bound, inert scenario declarations without applying
     /// values, evaluating formulas, or refreshing external data.
     pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        if self.deferred.is_some() {
+            return self.effective()?.scenarios();
+        }
         self.check_source()?;
         let result = crate::scenario::Snapshot::parse(&self.content_xml);
         prefer_current(
@@ -533,6 +674,9 @@ impl SourceBackedSpreadsheet {
 
     /// Return spreadsheet calculation settings, if declared.
     pub fn settings(&self) -> Result<Option<&Settings>> {
+        if self.deferred.is_some() {
+            return self.effective()?.settings();
+        }
         self.check_source()?;
         let value = self.settings.as_ref();
         self.check_source()?;
@@ -546,6 +690,9 @@ impl SourceBackedSpreadsheet {
 
     /// Return named definitions in document order.
     pub fn definitions(&self) -> Result<&[Definition]> {
+        if self.deferred.is_some() {
+            return self.effective()?.definitions();
+        }
         self.check_source()?;
         let value = self.definitions.as_slice();
         self.check_source()?;
@@ -554,6 +701,9 @@ impl SourceBackedSpreadsheet {
 
     /// Return typed worksheets in document order.
     pub fn sheets(&self) -> Result<&[Sheet]> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheets();
+        }
         self.check_source()?;
         let value = self.sheets.as_ref();
         self.check_source()?;
@@ -562,6 +712,9 @@ impl SourceBackedSpreadsheet {
 
     /// Return the number of worksheets.
     pub fn sheet_count(&self) -> Result<usize> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_count();
+        }
         self.check_source()?;
         let value = self.sheets.len();
         self.check_source()?;
@@ -570,6 +723,9 @@ impl SourceBackedSpreadsheet {
 
     /// Return worksheet names in document order.
     pub fn sheet_names(&self) -> Result<Vec<String>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_names();
+        }
         self.check_source()?;
         let result = (|| {
             let mut names = Vec::new();
@@ -587,6 +743,9 @@ impl SourceBackedSpreadsheet {
 
     /// Select one worksheet by exact ODF name.
     pub fn sheet(&self, name: &str) -> Result<Option<&Sheet>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet(name);
+        }
         self.check_source()?;
         let value = self.sheets.iter().find(|sheet| sheet.name == name);
         self.check_source()?;
@@ -595,6 +754,9 @@ impl SourceBackedSpreadsheet {
 
     /// Select one worksheet by checked zero-based position.
     pub fn sheet_at(&self, index: usize) -> Result<Option<&Sheet>> {
+        if self.deferred.is_some() {
+            return self.effective()?.sheet_at(index);
+        }
         self.check_source()?;
         let value = self.sheets.get(index);
         self.check_source()?;
@@ -608,6 +770,9 @@ impl SourceBackedSpreadsheet {
         row: usize,
         column: usize,
     ) -> Result<Option<CellView<'_>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.cell(sheet_name, row, column);
+        }
         self.check_source()?;
         let value = self.cell_unchecked(CellSelector::new(sheet_name, row, column));
         self.check_source()?;
@@ -662,6 +827,9 @@ impl SourceBackedSpreadsheet {
     /// exceeded.  A stale source takes precedence over an operation error
     /// observed while finalizing the batch.
     pub fn cell_batch(&self, selectors: &[CellSelector<'_>]) -> Result<Vec<Option<CellView<'_>>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.cell_batch(selectors);
+        }
         self.check_source()?;
         let result = self.cell_batch_unchecked(selectors);
         let final_check = self.check_source();
@@ -697,6 +865,9 @@ impl SourceBackedSpreadsheet {
     /// Extract displayed worksheet text using tab-separated cells and
     /// newline-separated rows, preserving sheet order.
     pub fn text(&self) -> Result<String> {
+        if self.deferred.is_some() {
+            return self.effective()?.text();
+        }
         self.check_source()?;
         let result = project_text(&self.sheets);
         prefer_current(self.source.as_ref(), self.source_version, result)
@@ -724,6 +895,15 @@ impl SourceBackedSpreadsheet {
         output: &mut W,
         options: TextOutputOptions<'_>,
     ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        if self.deferred.is_some() {
+            match self.effective() {
+                Ok(projection) => return projection.write_text_to(output, options),
+                Err(error) => {
+                    let writer = SequentialTextWriter::new(output, options);
+                    return Err(writer.document_error(error));
+                },
+            }
+        }
         let mut writer = SequentialTextWriter::new(output, options);
         let conversion = match self.check_source() {
             Ok(()) => write_text_to_sheets(&self.sheets, &mut writer, options),
@@ -757,6 +937,9 @@ impl SourceBackedSpreadsheet {
             let path = resolve_package_path(path)?;
             if !self.package.has_file(&path)? {
                 return Ok(None);
+            }
+            if !self.is_pristine() && path == "content.xml" {
+                return copy_member(self.written_content_xml().as_bytes()).map(Some);
             }
             self.package.get_file(&path).map(Some)
         })();
@@ -801,10 +984,31 @@ impl SourceBackedSpreadsheet {
         self.check_source()?;
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;
+        if !self.is_pristine() {
+            // A committed spreadsheet materializes the package it writes.
+            let mut bytes = Vec::new();
+            self.write_to(&mut bytes).map_err(|error| match error {
+                SourceContentPublicationError::Core(error) => error,
+                other => Error::from(OdfError::from(other)),
+            })?;
+            let result = crate::Package::from_bytes(&bytes).map_err(Error::from);
+            return prefer_current(source.as_ref(), source_version, result);
+        }
         let package = prefer_current(source.as_ref(), source_version, self.package.materialize())?;
         let result = crate::Package::from_materialized(package);
         prefer_current(source.as_ref(), source_version, result)
     }
+}
+
+fn copy_member(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODS committed content.xml copy",
+            source,
+        })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
 }
 
 #[cfg(any(unix, windows))]
@@ -1373,8 +1577,14 @@ mod tests {
             )
             .expect("first set_cell");
         let first_commit = first.commit().expect("first commit");
-        assert!(first_commit.changed());
-        assert!(first_commit.snapshot().content_xml().contains("one"));
+        assert!(first_commit.diagnostics().changed());
+        assert!(
+            first_commit
+                .package()
+                .content_xml()
+                .unwrap()
+                .contains("one")
+        );
         let cached = spreadsheet
             .content_layout
             .get()
@@ -1391,8 +1601,14 @@ mod tests {
             )
             .expect("second set_cell");
         let second_commit = second.commit().expect("second commit");
-        assert!(second_commit.changed());
-        assert!(second_commit.snapshot().content_xml().contains("two"));
+        assert!(second_commit.diagnostics().changed());
+        assert!(
+            second_commit
+                .package()
+                .content_xml()
+                .unwrap()
+                .contains("two")
+        );
         let reused = spreadsheet
             .content_layout
             .get()

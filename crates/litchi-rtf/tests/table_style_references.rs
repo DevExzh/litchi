@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{Row, RtfDocument, RtfWriter, StyleType};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Row, RtfWriter, StyleType};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn retains_group_scope_row_inheritance_last_wins_and_trowd_reset() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\stylesheet{\*\ts5 Declared Table;}}"#,
         r#"\trowd\ts4\ts5{\ts6}\cellx1000\intbl A\cell\row"#,
         r#"\intbl B\cell\row"#,
@@ -43,7 +44,7 @@ fn retains_group_scope_row_inheritance_last_wins_and_trowd_reset() {
 
 #[test]
 fn preserves_zero_maximum_omission_and_public_mutation() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\trowd\ts0\cellx1000\intbl A\cell\row"#,
         r#"\trowd\ts65535\cellx1000\intbl B\cell\row"#,
         r#"\trowd\cellx1000\intbl C\cell\row}"#,
@@ -75,14 +76,13 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
         r"{\rtf1{\stylesheet{\*\ts1\ts2 Duplicate;}}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
 
     let inert =
-        RtfDocument::parse(r"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}")
-            .unwrap();
+        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}").unwrap();
     assert!(
         inert
             .tables()
@@ -94,7 +94,7 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
 
 #[test]
 fn canonical_writer_round_trips_outer_and_nested_row_references_stably() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\stylesheet{\*\ts3 Declared Table;}}"#,
         r#"\trowd\ts3\cellx5000\intbl\itap2 Inner\nestcell"#,
         r#"{\*\nesttableprops\itap2\trowd\ts4\cellx1000\nestrow}"#,
@@ -110,7 +110,7 @@ fn canonical_writer_round_trips_outer_and_nested_row_references_stably() {
     let serialized = String::from_utf8(first.clone()).unwrap();
     assert!(serialized.contains(r"\trowd\ts3"));
     assert!(serialized.contains(r"\trowd\ts4"));
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.stylesheet(), document.stylesheet());
     assert_eq!(reparsed.tables()[0].rows()[0].table_style(), Some(3));
     assert_eq!(
@@ -128,7 +128,7 @@ fn parses_libreoffice_table_style_declaration_and_body_references() {
     let source = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf"
     );
-    let document = RtfDocument::parse_bytes(source).unwrap();
+    let document = Tree::parse_bytes(source).unwrap();
     assert!(
         document
             .stylesheet()

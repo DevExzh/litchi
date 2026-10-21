@@ -22,8 +22,6 @@ use prost::Message;
 
 use super::super::formula::{FormulaCachedValue, FormulaExpression, FormulaPivotCategoryReference};
 use crate::archive::RawMessage;
-#[allow(deprecated)]
-use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
     component_identifier_for_entry, component_uuid_identifiers, release_package_identifier_suffix,
@@ -37,9 +35,9 @@ use crate::shapes::{
     set_shape_text_layout, shape_geometry, shape_properties, shape_text_columns, shape_text_layout,
 };
 use crate::text::{
-    Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
-    ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    Alignment, Background, Borders, Indents, LineSpacing, Outline, ParagraphBackground,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow, ParagraphList,
+    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphListPlacement, ParagraphTabStops, ParagraphWritingDirection,
@@ -49,7 +47,7 @@ use crate::text::{
     TextHyperlinkTarget, TextLanguage, TextLanguageRun, TextLigatures, TextPosition, TextRange,
     TextScript, TextStorageInfo, TextStyle,
 };
-use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{EmbeddedMediaAsset, Error, HostPackage, Result};
 use litchi_iwa_common::comment::{
     Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, TableCellComment,
     TableCellReply,

@@ -8,7 +8,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl Editor {
+impl Draft {
     /// Read whether Numbers shows the line for one native sheet-chart axis.
     pub fn sheet_chart_axis_line_visible(
         &self,
@@ -32,7 +32,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_line_visible(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -48,7 +48,7 @@ fn sheet_chart_axis_line_visible(
 }
 
 fn set_sheet_chart_axis_line_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -64,7 +64,7 @@ fn set_sheet_chart_axis_line_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_line_visible(sheet_id, drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Numbers chart axis-line update failed validation".to_owned(),

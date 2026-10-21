@@ -163,14 +163,14 @@ fn semantic_replacement_refuses_unproven_authoring_atomically() {
     let before = editor.view().expect("before snapshot");
     let before_workbook = before.workbook().to_vec();
 
-    let candidate = litchi_ograph::chart::Chart::new(litchi_ograph::chart::Context::graph())
+    let candidate = litchi_ograph::chart::Model::new(litchi_ograph::chart::Context::graph())
         .expect("fresh semantic chart");
     let error = editor
         .replace_semantic_chart(candidate)
         .expect_err("fresh chart authoring is not proven");
     assert!(matches!(
         error,
-        crate::package::Error::Graph(litchi_ograph::Error::UnsupportedAuthoring { .. })
+        crate::package::Error::Graph(litchi_ograph::Error::Refused(_))
     ));
     assert!(!editor.is_dirty());
     assert_eq!(

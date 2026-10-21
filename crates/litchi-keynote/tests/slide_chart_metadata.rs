@@ -85,8 +85,18 @@ fn chart_payload(non_style: u64) -> TestResult<Vec<u8>> {
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
-    append_length_delimited_field(&mut payload, 10_000, &chart.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -155,10 +165,20 @@ fn non_style_payload(visible: Option<bool>, title: Option<&str>) -> TestResult<V
         litchi_iwa_common::wire::append_varint_field(&mut extension, 21, u64::from(visible))?;
     }
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 

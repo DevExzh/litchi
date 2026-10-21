@@ -299,8 +299,8 @@ impl Snapshot {
 
     /// Starts an isolated source-bound edit.
     #[must_use]
-    pub fn edit(&self) -> crate::property_set::non_simple::Editor {
-        crate::property_set::non_simple::Editor::new(self.clone())
+    pub fn edit(&self) -> crate::property_set::non_simple::Edit {
+        crate::property_set::non_simple::Edit::new(self.clone())
     }
 }
 

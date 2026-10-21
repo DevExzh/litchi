@@ -52,7 +52,7 @@ const BATCH: usize = 64;
 ///
 /// ```no_run
 /// use litchi_xls::SourceBackedWorkbook;
-/// let workbook = SourceBackedWorkbook::from_path("book.xls")?;
+/// let workbook = SourceBackedWorkbook::open("book.xls")?;
 /// let sheet = workbook.worksheet_by_index(0)?.expect("worksheet");
 /// if let Some(mut cursor) = sheet.cell_cursor()? {
 ///     let first = cursor.next().transpose()?;
@@ -363,7 +363,7 @@ mod tests {
         files.sort();
         let (mut sheets, mut cells, mut batched, mut unordered) = (0, 0, 0, 0);
         for path in files {
-            let Ok(workbook) = SourceBackedWorkbook::from_path(&path) else {
+            let Ok(workbook) = SourceBackedWorkbook::open(&path) else {
                 continue;
             };
             let Ok(worksheets) = workbook.worksheets() else {

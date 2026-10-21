@@ -9,9 +9,10 @@
 
 mod support;
 
+use litchi_rtf::raw::Tree;
 use litchi_rtf::{
     EndnoteRestart, FootnoteRestart, NoteNumberingStyle, NoteOptions, NotePlacement,
-    PresentNoteKinds, RtfDocument, RtfWriter,
+    PresentNoteKinds, RtfWriter,
 };
 
 #[test]
@@ -21,7 +22,7 @@ fn parses_last_wins_note_options_and_round_trips_stably() {
         r#"\ftnrstpg\ftnrestart\ftnnalc\ftnnchi"#,
         r#"\aendnotes\aenddoc\aftnstart3\aftnrestart\aftnnruc Body}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert_eq!(document.text(), "Body");
     assert_eq!(
         *document.note_options(),
@@ -42,7 +43,7 @@ fn parses_last_wins_note_options_and_round_trips_stably() {
     RtfWriter::new(&mut first)
         .write_document(&document)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first).unwrap();
+    let reparsed = Tree::parse_bytes(&first).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.note_options(), document.note_options());
     let mut second = Vec::new();
@@ -104,7 +105,7 @@ fn supports_all_42_note_numbering_control_spellings() {
 
     for (footnote, endnote, style) in cases {
         let source = format!(r"{{\rtf1\{footnote}\{endnote} X}}");
-        let document = RtfDocument::parse(&source).unwrap();
+        let document = Tree::parse(&source).unwrap();
         assert_eq!(document.note_options().footnote_numbering, Some(style));
         assert_eq!(document.note_options().endnote_numbering, Some(style));
 
@@ -144,7 +145,7 @@ fn rejects_invalid_values_and_non_root_or_late_note_options() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted malformed note options: {source}"
         );
     }
@@ -162,7 +163,7 @@ fn rejects_invalid_values_and_non_root_or_late_note_options() {
 
 #[test]
 fn omission_stays_empty_and_note_bodies_do_not_infer_options() {
-    let document = RtfDocument::parse(r"{\rtf1 A{\footnote Note}B}").unwrap();
+    let document = Tree::parse(r"{\rtf1 A{\footnote Note}B}").unwrap();
     assert!(document.note_options().is_empty());
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
@@ -176,7 +177,7 @@ fn handles_named_libreoffice_note_option_fixtures() {
     let section_end = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf"
     );
-    let document = RtfDocument::parse_bytes(section_end).unwrap();
+    let document = Tree::parse_bytes(section_end).unwrap();
     assert_eq!(
         document.note_options().present_kinds,
         Some(PresentNoteKinds::EndnotesOnly)
@@ -189,7 +190,7 @@ fn handles_named_libreoffice_note_option_fixtures() {
     let restart = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf"
     );
-    let document = RtfDocument::parse_bytes(restart).unwrap();
+    let document = Tree::parse_bytes(restart).unwrap();
     let options = document.note_options();
     assert_eq!(
         options.present_kinds,
@@ -214,7 +215,7 @@ fn handles_named_libreoffice_note_option_fixtures() {
     // root group. Keep the vendored bytes untouched.
     // Word and LibreOffice stop reading at the root group's closing brace,
     // so the trailing content is ignored and recorded.
-    let full = RtfDocument::parse_bytes(arabic)
+    let full = Tree::parse_bytes(arabic)
         .unwrap_or_else(|error| panic!("failed to parse tdf108947.rtf: {error}"));
     assert_eq!(
         full.tolerance_report()
@@ -228,7 +229,7 @@ fn handles_named_libreoffice_note_option_fixtures() {
     );
     let prefix = support::first_balanced_rtf_root_prefix(arabic)
         .expect("tdf108947.rtf should have a balanced first root group");
-    let document = RtfDocument::parse_bytes(prefix).unwrap();
+    let document = Tree::parse_bytes(prefix).unwrap();
     let options = document.note_options();
     assert_eq!(
         options.present_kinds,

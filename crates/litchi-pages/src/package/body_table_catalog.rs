@@ -93,7 +93,7 @@ pub enum Error {
     #[error(
         "Pages body-table catalog {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -328,20 +328,22 @@ impl Package {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::AmbiguousTableName
+        },
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
         table_lock::Error::Allocation { amount } => Error::Allocation { amount },
-        table_lock::Error::TableNotFound
-        | table_lock::Error::AmbiguousSelector
-        | table_lock::Error::UnsupportedSource
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound)
+        | table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector)
+        | table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource)
         | table_lock::Error::InvalidSource
         | table_lock::Error::Verification
         | table_lock::Error::PatchConflict => Error::InvalidSource,

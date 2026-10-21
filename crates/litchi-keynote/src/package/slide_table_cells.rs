@@ -19,7 +19,7 @@ use litchi_iwa_common::table::model::{Cell, Dimensions};
 use litchi_iwa_common::table::read::{
     CellComment, Comment, CommentAuthor, CommentReply, TableRead,
 };
-use litchi_iwa_common::wire::{WireDescent, WireView, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, WireView, preflight_wire_tree};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
@@ -379,7 +379,7 @@ pub enum Error {
     #[error(
         "Keynote slide-table cells {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed resource count.
@@ -1600,7 +1600,7 @@ fn preflight_rich_text_payload(
     }
     let mut storage_identifier = None;
     let mut has_cell_owner = false;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {
@@ -1636,7 +1636,7 @@ fn parse_local_reference(
     source: &[u8],
     limits: WireLimits,
 ) -> Result<u64, litchi_iwa_common::Error> {
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?;
     let mut identifier = None;
     for field in view.fields() {
@@ -1707,7 +1707,7 @@ impl Package {
 }
 
 fn limit_error(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: usize_as_u64(observed),
         maximum: usize_as_u64(maximum),
@@ -1732,7 +1732,7 @@ fn map_core_error(error: core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_core_limit(kind),
             observed,
             maximum,
@@ -1937,7 +1937,7 @@ mod tests {
             .expect_err("the next cumulative cell must be refused");
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
                 maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),

@@ -2145,7 +2145,7 @@ fn parse_physical_model_fields(
     PhysicalUnsupportedFeatures,
 )> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut seen = [false; 94];
     let mut header_rows = 0;
     let mut header_columns = 0;
@@ -2333,7 +2333,7 @@ fn validated_wire_view<'a>(
     budget: &mut Budget,
 ) -> Result<WireView<'a>> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
     for field in fields.fields() {
@@ -3674,7 +3674,7 @@ fn validate_row_uid_map(
     )?;
     validate_physical_uid_map_wire(payload, package, budget)?;
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut sorted_columns = Vec::new();
     let mut column_index_for_uid = Vec::new();
     let mut column_uid_for_index = Vec::new();
@@ -4007,7 +4007,7 @@ fn parse_model_uid_reference(
     budget: &mut Budget,
 ) -> Result<Option<u64>> {
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -4026,7 +4026,7 @@ fn parse_model_uid_reference(
 }
 
 fn parse_uuid(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<(u64, u64)> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut lower = None;
     let mut upper = None;
     for field in fields.fields() {
@@ -4153,7 +4153,7 @@ fn validate_empty_stroke_sidecar(
     let object = object_at(package, location)?;
     let (_, payload) = unique_mutable_message(object, &[STROKE_SIDECAR_MESSAGE_TYPE], budget)?;
     let limits = budget.residual(package)?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut dimensions = [None; 3];
     let mut nonempty_layers = false;
     for field in fields.fields() {
@@ -4346,8 +4346,7 @@ fn validate_exclusive_model_reference(
                 if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
                     continue;
                 }
-                let view = WireView::parse_with_limits(&message.data, wire_limits)
-                    .map_err(|_| Error::Wire)?;
+                let view = WireView::parse(&message.data, wire_limits).map_err(|_| Error::Wire)?;
                 for field in view.fields() {
                     if field.number() != MODEL_BASE_COLUMN_ROW_UIDS_FIELD {
                         continue;
@@ -5939,7 +5938,7 @@ fn repeated_references(
     budget: &mut Budget,
 ) -> Result<Vec<u64>> {
     budget.input(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let all_fields = fields.fields().count();
     let count = fields
         .fields()
@@ -5967,7 +5966,7 @@ fn repeated_references(
 
 fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<u64> {
     budget.input(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut super_field = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -5981,8 +5980,7 @@ fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Resu
         }
     }
     let super_field = super_field.ok_or(Error::InvalidSource)?;
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(|_| Error::Wire)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(|_| Error::Wire)?;
     let mut parent_field = None;
     for field in drawable.fields() {
         budget.fields(1)?;
@@ -6000,7 +5998,7 @@ fn table_parent(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Resu
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<u64> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let fields = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     let mut identifier = None;
     for field in fields.fields() {
         budget.fields(1)?;
@@ -6250,7 +6248,7 @@ fn decode_table_info(
     .with_max_scratch_bytes(budget.remaining_scratch()?);
     let snapshot =
         table_info_codec::decode_table_info(payload, options).map_err(|_| Error::Codec)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::Wire)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len())?;
     Ok(snapshot)
@@ -6307,8 +6305,7 @@ fn validate_model_storage(
     budget.storage_codec_report(store_report)?;
 
     let row_limits = budget.residual(package)?;
-    let row_view =
-        WireView::parse_with_limits(store.row_headers(), row_limits).map_err(|_| Error::Wire)?;
+    let row_view = WireView::parse(store.row_headers(), row_limits).map_err(|_| Error::Wire)?;
     let row_reference_count = row_view
         .fields()
         .filter(|field| field.number() == 2)

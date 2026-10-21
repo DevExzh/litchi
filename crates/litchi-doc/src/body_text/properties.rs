@@ -436,7 +436,7 @@ impl Edit {
     /// Returns [`Refusal::StyleNotFound`] for an empty or non-paragraph
     /// style slot, and a typed refusal for an absent, tracked or huge-PAPX
     /// paragraph.
-    pub fn set_paragraph_style(&mut self, position: Position, istd: u16) -> Result<()> {
+    pub(crate) fn set_paragraph_style(&mut self, position: Position, istd: u16) -> Result<()> {
         let sheet = self.editor.stylesheet().map_err(Error::Invalid)?;
         if sheet
             .get(istd)
@@ -465,7 +465,7 @@ impl Edit {
 
     /// The effective tab stops of the paragraph at `position`: its style's
     /// stops changed by its own.
-    pub fn paragraph_tabs(&self, position: Position) -> Result<Vec<TabStop>> {
+    pub(crate) fn paragraph_tabs(&self, position: Position) -> Result<Vec<TabStop>> {
         let (_, _, grpprl) = self.untracked_paragraph(position)?;
         self.effective_tabs(&grpprl)
     }
@@ -494,7 +494,11 @@ impl Edit {
     /// twips, duplicate positions or more than 64 stops, and a typed refusal
     /// for an absent or tracked paragraph or one whose direct properties use
     /// the style-only `sprmPChgTabs`.
-    pub fn set_paragraph_tabs(&mut self, position: Position, stops: &[TabStop]) -> Result<()> {
+    pub(crate) fn set_paragraph_tabs(
+        &mut self,
+        position: Position,
+        stops: &[TabStop],
+    ) -> Result<()> {
         let mut wanted = stops.to_vec();
         wanted.sort_by_key(|stop| stop.position);
         if wanted.len() > 64
@@ -612,7 +616,7 @@ impl Edit {
     /// Returns a typed refusal when the paragraph is absent, the offset is
     /// past its text or inside another field, the text there is tracked, or
     /// the instruction or text holds structural characters.
-    pub fn insert_hyperlink(
+    pub(crate) fn insert_hyperlink(
         &mut self,
         position: Position,
         offset: u32,
@@ -738,7 +742,7 @@ impl Edit {
     /// Returns [`Refusal::FieldNotFound`] when no field begins there, and a
     /// typed refusal when the field holds tracked text, a paragraph mark or
     /// another anchored range.
-    pub fn remove_field(&mut self, start_cp: u32) -> Result<()> {
+    pub(crate) fn remove_field(&mut self, start_cp: u32) -> Result<()> {
         let (_, _, end) = self
             .main_fields()?
             .into_iter()
@@ -769,7 +773,7 @@ impl Edit {
     }
 
     /// The standard bookmarks, as (name, start CP, end CP) in start order.
-    pub fn bookmarks(&self) -> Result<Vec<(String, u32, u32)>> {
+    pub(crate) fn bookmarks(&self) -> Result<Vec<(String, u32, u32)>> {
         Ok(self
             .editor
             .bookmark_ranges()
@@ -788,7 +792,7 @@ impl Edit {
     /// than 39 UTF-16 units, holds characters other than letters, digits,
     /// `_`, `.` and `-`, or is already used (names compare ASCII
     /// case-insensitively, as Word compares them).
-    pub fn add_bookmark(
+    pub(crate) fn add_bookmark(
         &mut self,
         name: &str,
         position: Position,
@@ -856,7 +860,7 @@ impl Edit {
     ///
     /// Returns [`Refusal::BookmarkNotFound`] when no bookmark is named
     /// `from`, and [`Refusal::BookmarkName`] for an invalid or used `to`.
-    pub fn rename_bookmark(&mut self, from: &str, to: &str) -> Result<()> {
+    pub(crate) fn rename_bookmark(&mut self, from: &str, to: &str) -> Result<()> {
         if from == to {
             let exists = self
                 .editor
@@ -886,7 +890,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns [`Refusal::BookmarkNotFound`] when no bookmark has the name.
-    pub fn remove_bookmark(&mut self, name: &str) -> Result<()> {
+    pub(crate) fn remove_bookmark(&mut self, name: &str) -> Result<()> {
         let mut bookmarks = self.editor.bookmark_ranges().map_err(Error::Invalid)?;
         let index = bookmarks
             .iter()
@@ -912,7 +916,11 @@ impl Edit {
     ///
     /// Returns [`Refusal::SectionNotFound`] for a section past the last and
     /// [`Refusal::InvalidProperty`] for an out-of-range value.
-    pub fn set_section_values(&mut self, section: Position, values: &[SectionValue]) -> Result<()> {
+    pub(crate) fn set_section_values(
+        &mut self,
+        section: Position,
+        values: &[SectionValue],
+    ) -> Result<()> {
         let sections = self.editor.sections().map_err(Error::Invalid)?;
         let (_, _, before) = sections
             .get(section.get())

@@ -678,7 +678,13 @@ fn array_formula_staging_is_atomic_complete_and_protected() {
 
     let range = FormulaRange::try_new(3, 2, 4, 3).unwrap();
     writer
-        .write_array_formula_with_format(sheet, range, "A1+1", 0)
+        .write_array_formula_with_format(
+            sheet,
+            range,
+            "A1+1",
+            0,
+            crate::formula_metadata::array::Limits::default(),
+        )
         .unwrap();
     assert_eq!(writer.worksheets[sheet].cells.len(), 5);
     let owners: Vec<_> = [(3, 2), (3, 3), (4, 2), (4, 3)]
@@ -776,14 +782,14 @@ fn array_formula_explicit_limits_fail_without_mutation_and_can_retry() {
         .with_max_cells(1)
         .unwrap();
     assert!(matches!(
-        writer.write_array_formula_with_limits(sheet, range, "A1+1", one_cell),
+        writer.write_array_formula_with_format(sheet, range, "A1+1", 0, one_cell),
         Err(Error::InvalidFormula(_))
     ));
     assert!(writer.worksheets[sheet].cells.is_empty());
 
     let two_cells = one_cell.with_max_cells(2).unwrap();
     writer
-        .write_array_formula_with_format_and_limits(sheet, range, "A1+1", 0, two_cells)
+        .write_array_formula_with_format(sheet, range, "A1+1", 0, two_cells)
         .unwrap();
     assert_eq!(writer.worksheets[sheet].cells.len(), 2);
 }

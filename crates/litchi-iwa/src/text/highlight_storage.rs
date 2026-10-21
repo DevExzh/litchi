@@ -8,7 +8,7 @@ use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
@@ -28,7 +28,7 @@ pub(super) struct Boundary {
     raw: Vec<u8>,
 }
 
-pub(super) fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+pub(super) fn locate_storage(package: &HostPackage, storage_id: u64) -> Result<StorageLocation> {
     let location = locate_native_storage(package, storage_id, HIGHLIGHT_TABLE_FIELD, "highlight")?;
     if location.storage.table_highlight.is_some() != location.table_present {
         return Err(Error::InvalidFormat(format!(
@@ -39,7 +39,7 @@ pub(super) fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<
 }
 
 pub(super) fn locate_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedStorage> {
     let located = locate_native_storage_with_archive(
@@ -306,7 +306,7 @@ pub(super) fn encode_table(original: Option<&[u8]>, boundaries: Vec<Boundary>) -
 type TablePatch = (Option<Vec<u8>>, Option<u64>, Option<u64>);
 
 pub(super) fn patch_highlight_table<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     transform: F,
 ) -> Result<()>

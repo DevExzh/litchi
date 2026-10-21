@@ -16,9 +16,9 @@
 /// replayed losslessly.
 pub mod semantic {
     pub use litchi_ograph::chart::{
-        Ai, Binding, Cache, CellRef, Chart, Context, Count, DataKind, Edit, Family, Group, GroupId,
-        Label, Legend, Link, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source, Value,
-        ValueRef, XlValue, axis, cache, format, group, layout,
+        Ai, Binding, Cache, CellRef, Context, Count, DataKind, Family, Group, GroupId, ItemsMut,
+        Label, Legend, Link, Model, Order, Owner, Props, Raw, Rect, Role, RowCol, Series, Source,
+        Value, ValueRef, XlValue, axis, cache, format, group, layout,
     };
 }
 

@@ -125,6 +125,35 @@ impl fmt::Display for Path {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote table-cell Number-format source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote table-cell Number format {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error(
+        "could not allocate {amount} units for the Keynote table-cell Number-format transaction"
+    )]
+    Allocation { amount: usize },
+    #[error("the edited Keynote table-cell Number format failed semantic verification")]
+    Verification,
+    #[error("the Keynote table-cell Number-format patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical table-cell Number-format edits")]
     UnsupportedSource,
     #[error("the requested Keynote table-cell Number-format graph is outside the supported scope")]
@@ -147,24 +176,34 @@ pub enum Error {
     Locked,
     #[error("the selected Keynote table-cell Number format is not a Number format")]
     WrongFormatFamily,
-    #[error("the selected Keynote table-cell Number-format source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote table-cell Number format {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error(
-        "could not allocate {amount} units for the Keynote table-cell Number-format transaction"
-    )]
-    Allocation { amount: usize },
-    #[error("the edited Keynote table-cell Number format failed semantic verification")]
-    Verification,
-    #[error("the Keynote table-cell Number-format patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. }
+            | Self::CellNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+            Self::WrongFormatFamily { .. } => RefusalKind::UnsupportedTarget,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable Number-format edit staged against an immutable package
@@ -359,6 +398,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -400,7 +445,7 @@ impl Package {
     /// Read one existing slide-table cell's explicit Number format.
     ///
     /// `None` is the automatic/no-explicit-Number state. Other native format
-    /// families fail with [`Error::WrongFormatFamily`].
+    /// families fail with [`Refusal::WrongFormatFamily`].
     pub fn slide_table_cell_number_format<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
@@ -486,7 +531,7 @@ fn select_cell(
 ) -> Result<CellSelection, Error> {
     let target = core::select_table(package, slide, table, budget).map_err(map_core_error)?;
     if position.row() >= target.rows || position.column() >= target.columns {
-        return Err(Error::CellNotFound { position });
+        return Err(Error::Refused(Refusal::CellNotFound { position }));
     }
 
     let model_payload = core::model_payload(package, &target).map_err(map_core_error)?;
@@ -514,7 +559,7 @@ fn select_cell(
     let tile_identifier = tile_matches
         .next()
         .map(|(_, identifier)| *identifier)
-        .ok_or(Error::CellNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::CellNotFound { position }))?;
     if tile_matches.next().is_some() || tile_identifier == target.model.identifier {
         return Err(Error::InvalidSource);
     }
@@ -539,7 +584,7 @@ fn select_cell(
         .ok_or(Error::InvalidSource)?;
     let format = core::locate_object(package, format_identifier).map_err(map_core_error)?;
     if format.identifier == target.model.identifier || format.identifier == tile_identifier {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let format_object = core::object_at(package, &format).map_err(map_core_error)?;
     let (format_message_index, format_payload) = core::unique_message_any(
@@ -565,7 +610,7 @@ fn select_cell(
             }
             let format_type = format_type(&entry.payload, package, budget)?;
             if format_type != number_codec::NATIVE_NUMBER_FORMAT_TYPE {
-                return Err(Error::WrongFormatFamily);
+                return Err(Error::Refused(Refusal::WrongFormatFamily));
             }
             let number = decode_number(&entry.payload, package, budget)?;
             if cell.explicit_format_flags() == 0 {
@@ -755,7 +800,7 @@ fn decode_format_facts(
             .map_err(map_storage_error)?;
     charge_storage_report(budget, report).map_err(map_core_error)?;
     if snapshot.list_type() != FORMAT_LIST_TYPE || collector.segments != 0 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if snapshot.next_list_id() == 0
         || collector
@@ -793,7 +838,7 @@ fn decode_format_facts(
 fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
     if cell.control_cell_spec_identifier().is_some() || cell.secondary_format_identifier().is_some()
     {
-        return Err(Error::WrongFormatFamily);
+        return Err(Error::Refused(Refusal::WrongFormatFamily));
     }
     match cell.cell_format_kind() {
         Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND) => {
@@ -801,7 +846,7 @@ fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
                 || (cell.explicit_format_flags() != 0
                     && cell.explicit_format_flags() != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT)
             {
-                return Err(Error::WrongFormatFamily);
+                return Err(Error::Refused(Refusal::WrongFormatFamily));
             }
             let key = cell.format_identifier().ok_or(Error::InvalidSource)?;
             if key == 0 {
@@ -809,9 +854,9 @@ fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
             }
             Ok(Some(key))
         },
-        Some(_) => Err(Error::WrongFormatFamily),
+        Some(_) => Err(Error::Refused(Refusal::WrongFormatFamily)),
         None if cell.format_identifier().is_some() || cell.explicit_format_flags() != 0 => {
-            Err(Error::WrongFormatFamily)
+            Err(Error::Refused(Refusal::WrongFormatFamily))
         },
         None => Ok(None),
     }
@@ -819,7 +864,7 @@ fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
 
 fn format_type(source: &[u8], package: &Package, budget: &mut core::Budget) -> Result<u32, Error> {
     let limits = budget.residual(package).map_err(map_core_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut selected = None;
     for field in view.fields() {
         budget.fields(1).map_err(map_core_error)?;
@@ -1218,7 +1263,7 @@ fn validate_current_entry(
     if entry.ref_count == 0
         || format_type(&entry.payload, package, budget)? != number_codec::NATIVE_NUMBER_FORMAT_TYPE
     {
-        return Err(Error::WrongFormatFamily);
+        return Err(Error::Refused(Refusal::WrongFormatFamily));
     }
     let current = decode_number(&entry.payload, package, budget)?;
     if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
@@ -1281,7 +1326,7 @@ fn mutate_format_list(
         let replacement = entry
             .ref_count
             .checked_add(1)
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         storage_codec::TableDataListEntryMutation::RefCount(
             storage_codec::TableDataListEntryRefCountEdit::new(
                 desired_key,
@@ -1292,11 +1337,11 @@ fn mutate_format_list(
     } else {
         let payload = desired_payload.ok_or(Error::InvalidSource)?;
         if desired_key != facts.next_list_id {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let replacement = desired_key
             .checked_add(1)
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         storage_codec::TableDataListEntryMutation::Append(
             storage_codec::TableDataListEntryAppend::format(desired_key, 1, payload)
                 .advance_next_list_id(desired_key, replacement),
@@ -1380,7 +1425,7 @@ fn commit_edit(
         });
     }
     if selection.target.locked {
-        return Err(Error::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let (candidate, touched_components) =
         rewrite(source, selection.path, selection.before, after, &mut budget)?;
@@ -1447,7 +1492,7 @@ fn rewrite(
         return Err(Error::PatchConflict);
     }
     if selection.target.locked {
-        return Err(Error::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let tile_object = core::object_at(source, &selection.tile).map_err(map_core_error)?;
     let (_, tile_payload) =
@@ -1494,7 +1539,7 @@ fn rewrite(
         facts
             .next_list_id
             .checked_add(1)
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     }
     let desired_payload = match (after, desired_key == Some(facts.next_list_id)) {
         (Some(value), true) => Some(prepare_number_append(
@@ -1649,7 +1694,7 @@ fn rewrite(
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1692,27 +1737,31 @@ fn same_target(left: &CellSelection, right: &CellSelection) -> bool {
 
 fn map_cell_wire_error(error: CellWireError, position: At) -> Error {
     match error {
-        CellWireError::Missing => Error::CellNotFound { position },
-        CellWireError::Unsupported => Error::UnsupportedDependency,
+        CellWireError::Missing => Error::Refused(Refusal::CellNotFound { position }),
+        CellWireError::Unsupported => Error::Refused(Refusal::UnsupportedDependency),
         CellWireError::Invalid => Error::InvalidSource,
     }
 }
 
 fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => Error::UnsupportedSource,
-        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
-        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
-        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        core::Error::EmptySlideName => Error::EmptySlideName,
-        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
-        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
+        core::Error::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+        core::Error::UnsupportedDependency => Error::Refused(Refusal::UnsupportedDependency),
+        core::Error::UnsupportedTopology => Error::Refused(Refusal::UnsupportedTopology),
+        core::Error::AmbiguousSelector => Error::Refused(Refusal::AmbiguousSelector),
+        core::Error::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        core::Error::SlideNameNotFound => Error::Refused(Refusal::SlideNameNotFound),
+        core::Error::SlidePositionNotFound(position) => {
+            Error::Refused(Refusal::SlidePositionNotFound { position })
+        },
+        core::Error::TablePositionNotFound(position) => {
+            Error::Refused(Refusal::TablePositionNotFound { position })
+        },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -1754,7 +1803,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -1767,7 +1816,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 PayloadLimitKind::Bytes => LimitKind::InputBytes,
                 PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1788,32 +1837,32 @@ fn map_storage_error(error: storage_codec::DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: LimitKind::References,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -1821,7 +1870,7 @@ fn map_storage_error(error: storage_codec::DecodeError) -> Error {
         storage_codec::DecodeLimit::Allocation { requested } => {
             Error::Allocation { amount: requested }
         },
-        storage_codec::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: LimitKind::Retained,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1835,34 +1884,34 @@ fn map_number_codec_error(error: number_codec::DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        number_codec::DecodeLimit::InputBytes { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::InputBytes { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
         number_codec::DecodeLimit::Work { observed, maximum }
         | number_codec::DecodeLimit::Items { observed, maximum }
-        | number_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        | number_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        number_codec::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: LimitKind::References,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1870,12 +1919,12 @@ fn map_number_codec_error(error: number_codec::DecodeError) -> Error {
         number_codec::DecodeLimit::Allocation { requested } => {
             Error::Allocation { amount: requested }
         },
-        number_codec::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: LimitKind::Retained,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        number_codec::DecodeLimit::Scratch { observed, maximum } => Error::LimitExceeded {
+        number_codec::DecodeLimit::Scratch { observed, maximum } => Error::Limit {
             kind: LimitKind::Scratch,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1890,7 +1939,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1915,7 +1964,7 @@ fn map_core_native_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1975,7 +2024,8 @@ fn field_bytes<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>,
 }
 
 fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8], CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 5) {
         if field.wire_type() != 2 {
@@ -1984,7 +2034,8 @@ fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8], CellWireErro
         let payload = field
             .canonical_payload()
             .map_err(|_| CellWireError::Invalid)?;
-        let row_view = WireView::parse(payload).map_err(|_| CellWireError::Invalid)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| CellWireError::Invalid)?;
         let Some(row_index) = field_varint(&row_view, 1)? else {
             return Err(CellWireError::Invalid);
         };
@@ -2008,7 +2059,8 @@ fn patch_tile_cell(
     column: u32,
     replacement: &[u8],
 ) -> Result<Vec<u8>, CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let mut output = Vec::new();
     output
         .try_reserve(source.len().saturating_add(replacement.len()))
@@ -2025,7 +2077,8 @@ fn patch_tile_cell(
         let payload = field
             .canonical_payload()
             .map_err(|_| CellWireError::Invalid)?;
-        let row_view = WireView::parse(payload).map_err(|_| CellWireError::Invalid)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| CellWireError::Invalid)?;
         let row_index = field_varint(&row_view, 1)?
             .ok_or(CellWireError::Invalid)
             .and_then(|value| u32::try_from(value).map_err(|_| CellWireError::Invalid))?;
@@ -2037,8 +2090,13 @@ fn patch_tile_cell(
             return Err(CellWireError::Invalid);
         }
         let patched_row = patch_row_cell(payload, column, replacement)?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut output, 5, &patched_row)
-            .map_err(|_| CellWireError::Invalid)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut output,
+            5,
+            &patched_row,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_| CellWireError::Invalid)?;
         selected = true;
     }
     if !selected {
@@ -2139,7 +2197,8 @@ fn patch_row_cell(
     column: u32,
     replacement: &[u8],
 ) -> Result<Vec<u8>, CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let cell_count = field_varint(&view, 2)?.ok_or(CellWireError::Invalid)?;
     let buffer = field_bytes(&view, 6)?.ok_or(CellWireError::Invalid)?;
     let (patched_buffer, patched_offsets) =
@@ -2155,16 +2214,26 @@ fn patch_row_cell(
             if replaced {
                 return Err(CellWireError::Invalid);
             }
-            litchi_iwa_common::wire::append_length_delimited_field(&mut output, 6, &patched_buffer)
-                .map_err(|_| CellWireError::Invalid)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut output,
+                6,
+                &patched_buffer,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(|_| CellWireError::Invalid)?;
             replaced = true;
         } else if field.number() == 7 {
             if let Some(offsets) = patched_offsets.as_deref() {
                 if offsets_replaced {
                     return Err(CellWireError::Invalid);
                 }
-                litchi_iwa_common::wire::append_length_delimited_field(&mut output, 7, offsets)
-                    .map_err(|_| CellWireError::Invalid)?;
+                litchi_iwa_common::wire::append_length_delimited_field(
+                    &mut output,
+                    7,
+                    offsets,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(|_| CellWireError::Invalid)?;
                 offsets_replaced = true;
             } else {
                 output.extend_from_slice(field.raw());

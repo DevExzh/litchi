@@ -7,7 +7,7 @@ use crate::shapes::{insert_style_variation, remove_style_variation};
 use crate::text::style_registry::{
     object_archive_name, register_private_style, unregister_private_style,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::variation::{
     effective_style_id, paragraph_boundaries_with_style, style_isolated_to_paragraph,
@@ -29,7 +29,7 @@ const fn tiering_to_native(value: ParagraphListNumberTiering) -> bool {
 }
 
 pub(crate) fn paragraph_list_number_tiering(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<ParagraphListNumberTiering> {
@@ -47,7 +47,7 @@ pub(crate) fn paragraph_list_number_tiering(
 }
 
 pub(in crate::text) fn set_paragraph_list_number_tiering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     tiering: ParagraphListNumberTiering,
@@ -126,7 +126,7 @@ pub(in crate::text) fn set_paragraph_list_number_tiering(
 }
 
 pub(in crate::text) fn reset_paragraph_list_number_tiering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<bool> {
@@ -146,7 +146,7 @@ pub(in crate::text) fn reset_paragraph_list_number_tiering(
 }
 
 fn collapse_or_clear_redundant_tiering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<()> {

@@ -6,7 +6,7 @@ use crate::charts::shadow::{
     chart_shadow as read_native_chart_shadow, set_chart_shadow as set_native_chart_shadow,
 };
 
-impl Editor {
+impl Draft {
     /// Read the native shadow scope and drop-shadow appearance of one chart.
     pub fn sheet_chart_shadow(
         &self,
@@ -28,7 +28,7 @@ impl Editor {
 }
 
 fn sheet_chart_shadow(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<ChartShadow> {
@@ -42,7 +42,7 @@ fn sheet_chart_shadow(
 }
 
 fn set_sheet_chart_shadow(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     shadow: ChartShadow,
@@ -59,7 +59,7 @@ fn set_sheet_chart_shadow(
         "Numbers",
         shadow,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_shadow(sheet_id, drawable_object_id)? != shadow {
         return Err(Error::InvalidFormat(
             "Numbers chart shadow update failed validation".to_owned(),

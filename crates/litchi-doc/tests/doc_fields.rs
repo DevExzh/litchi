@@ -34,7 +34,7 @@
 
 use litchi_doc::builder::Builder;
 use litchi_doc::{
-    FieldStory, FieldType, IndexEntryOption, TableOfAuthoritiesEntryOption, raw::Package,
+    FieldStory, FieldType, IndexEntryOption, TableOfAuthoritiesEntryOption, raw::Reader,
 };
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -146,7 +146,7 @@ fn apache_poi_reference_plcfs_cover_all_seven_story_tables() {
 
 #[test]
 fn poi_hyperlink_fixture_retains_inert_hyperlink_field() {
-    let mut package = Package::open(fixture("hyperlink.doc")).unwrap();
+    let mut package = Reader::open(fixture("hyperlink.doc")).unwrap();
     let document = package.document().unwrap();
     let fields = document.fields_table().expect("fields table");
     assert!(
@@ -169,7 +169,7 @@ fn generated_tc_document_discovers_table_of_contents_entries() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
     let entries = document.table_of_contents_entries().unwrap();
     assert_eq!(entries.len(), 1);
@@ -194,7 +194,7 @@ fn generated_ta_document_discovers_table_of_authorities_entries() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
     let entries = document.table_of_authorities_entries().unwrap();
     assert_eq!(entries.len(), 1);
@@ -229,7 +229,7 @@ fn generated_xe_document_discovers_index_entries() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
     let entries = document.index_entries().unwrap();
     assert_eq!(entries.len(), 1);
@@ -262,7 +262,7 @@ fn generated_rd_document_discovers_referenced_documents() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
     let references = document.referenced_documents().unwrap();
     assert_eq!(references.len(), 1);
@@ -290,7 +290,7 @@ fn generated_private_document_discovers_private_fields() {
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
     let private_fields = document.private_fields().unwrap();
     assert_eq!(private_fields.len(), 1);

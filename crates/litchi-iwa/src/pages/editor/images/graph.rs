@@ -117,7 +117,7 @@ pub(super) fn image_creation_values(options: PagesImageOptions) -> Result<Drawab
     .validate()
 }
 
-pub(super) fn image_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
+pub(super) fn image_style_id(package: &HostPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
@@ -142,7 +142,7 @@ pub(super) fn image_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
 }
 
 pub(super) fn image_caption_theme(
-    package: &IWorkPackage,
+    package: &HostPackage,
     root: &PagesDocumentRootFacts,
 ) -> Result<(CaptionThemeStyle, Option<String>)> {
     let theme_id = root
@@ -188,7 +188,7 @@ pub(super) fn image_caption_theme(
     ))
 }
 
-pub(super) fn body_image_infos(editor: &Editor) -> Result<Vec<ImageInfo>> {
+pub(super) fn body_image_infos(editor: &Draft) -> Result<Vec<ImageInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -252,7 +252,7 @@ pub(super) fn body_image_infos(editor: &Editor) -> Result<Vec<ImageInfo>> {
     Ok(images)
 }
 
-pub(super) fn body_image_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyImageGraph> {
+pub(super) fn body_image_graph(editor: &Draft, drawable_object_id: u64) -> Result<BodyImageGraph> {
     let info = body_image_infos(editor)?
         .into_iter()
         .find(|image| image.drawable_object_id == drawable_object_id)
@@ -400,7 +400,7 @@ pub(super) fn body_image_graph(editor: &Editor, drawable_object_id: u64) -> Resu
 }
 
 pub(super) fn image_title_caption(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
     body_image_graph(editor, drawable_object_id)?;
@@ -420,7 +420,7 @@ pub(super) fn image_title_caption(
         image.super_.caption,
         DrawableCaptionKind::Caption,
     )?;
-    let text_editor = IWorkTextEditor::from_package(editor.package().clone());
+    let text_editor = crate::text::Draft::from_package(editor.package().clone());
     Ok(DrawableTitleCaption {
         title: title
             .storage_id
@@ -442,7 +442,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
 ) -> Result<ImageCaptionSlot> {
@@ -461,7 +461,7 @@ pub(super) fn image_caption_slot(
 }
 
 fn image_caption_slot_from_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     reference: Option<tsp::Reference>,
     kind: DrawableCaptionKind,
 ) -> Result<ImageCaptionSlot> {
@@ -544,7 +544,7 @@ fn image_caption_slot_from_reference(
 }
 
 pub(super) fn insert_image_caption(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -565,7 +565,7 @@ pub(super) fn insert_image_caption(
 }
 
 pub(super) fn insert_image_caption_standin(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -632,7 +632,7 @@ fn replace_image_caption_reference(
 }
 
 fn image_info(
-    package: &IWorkPackage,
+    package: &HostPackage,
     payload: &[u8],
     identifier: u64,
     anchor_character_index: u32,
@@ -777,7 +777,7 @@ pub(super) fn image_objects(
 }
 
 pub(super) fn set_image_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     geometry: DrawableGeometry,
@@ -816,7 +816,7 @@ pub(super) fn set_image_geometry(
 }
 
 pub(super) fn set_image_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     properties: &DrawableProperties,
@@ -887,7 +887,7 @@ fn drawable_size(size: tsp::Size) -> DrawableSize {
 }
 
 fn object_has_message_type(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
 ) -> Result<bool> {

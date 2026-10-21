@@ -140,7 +140,7 @@ fn compare_finite_numbers(left: f64, right: f64) -> Ordering {
 }
 
 pub(super) fn apply_attached_table_sort_order(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     order: &Order,
 ) -> Result<bool> {
@@ -156,7 +156,7 @@ pub(super) fn apply_attached_table_sort_order(
 }
 
 pub(super) fn apply_attached_table_sort_order_to_rows(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     order: &Order,
     rows: RowRange,
@@ -194,7 +194,7 @@ pub(super) fn apply_attached_table_sort_order_to_rows(
 }
 
 fn apply_attached_table_sort_range(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     descriptor: &TableDescriptor,
     order: &Order,
@@ -338,7 +338,7 @@ fn table_body_bounds(model: &TableModelArchive) -> Result<(usize, usize)> {
 }
 
 fn validate_sort_features(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     descriptor: &TableDescriptor,
 ) -> Result<HiddenAxes> {
@@ -403,7 +403,7 @@ fn validate_sort_features(
 }
 
 fn plan_body_sort(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     body_start: usize,

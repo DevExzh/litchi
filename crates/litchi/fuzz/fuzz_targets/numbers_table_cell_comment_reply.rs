@@ -17,8 +17,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    At, Package, SheetSelector,
-    TableSelector,
+    At, Package, SheetSelector, TableSelector,
     cell::comment::{CommentReply, CommentReplyIndex, transaction::Error},
 };
 
@@ -114,14 +113,29 @@ fn command_prefix(data: &[u8]) -> (u8, &[u8]) {
 fn options() -> litchi::numbers::OpenOptions {
     static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| unreachable!("valid reply archive limits: {error}"));
-        let semantic =
-            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid reply semantic limits: {error}"))
-                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
-                .unwrap_or_else(|error| unreachable!("valid reply projection limits: {error}"));
-        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
+        let archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(MAX_INPUT_BYTES)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply archive limits: {error}"));
+        let semantic = litchi::numbers::SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|b| b.max_sheets(MAX_SHEETS))
+            .and_then(|b| b.max_tables(MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply semantic limits: {error}"))
+            .to_builder()
+            .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| unreachable!("valid reply projection limits: {error}"));
+        litchi::numbers::OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -443,12 +457,7 @@ fn exercise_missing_thread(
     assert_eq!(package_bytes(package), source_bytes);
 }
 
-fn exercise_thread(
-    package: &Package,
-    position: At,
-    replies: &[CommentReply],
-    data: &[u8],
-) {
+fn exercise_thread(package: &Package, position: At, replies: &[CommentReply], data: &[u8]) {
     let sheet = SheetSelector::index(0);
     let table = TableSelector::index(0);
     let source_bytes = package_bytes(package);
@@ -655,22 +664,38 @@ fn exercise_ingress_limits(source_bytes: &[u8]) {
     if source_len == 0 || source_len > MAX_INPUT_BYTES {
         return;
     }
-    let exact_archive = litchi::numbers::SourceLimits::builder().max_input_bytes(source_len).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-    .unwrap_or_else(|error| panic!("exact reply limits invalid: {error}"));
+    let exact_archive = litchi::numbers::SourceLimits::builder()
+        .max_input_bytes(source_len)
+        .and_then(|b| b.max_members(MAX_ENTRIES))
+        .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+        .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+        .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+        .and_then(|b| b.build())
+        .unwrap_or_else(|error| panic!("exact reply limits invalid: {error}"));
     let exact = Package::from_bytes_with_options(
         source_bytes,
-        litchi::numbers::OpenOptions::new().source_limits(exact_archive).semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
+        litchi::numbers::OpenOptions::new()
+            .source_limits(exact_archive)
+            .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
     );
     if let Err(error) = exact {
         observe_error(error);
         return;
     }
     if source_len > 1 {
-        let tight_archive = litchi::numbers::SourceLimits::builder().max_input_bytes(source_len - 1).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
-        .unwrap_or_else(|error| panic!("tight reply limits invalid: {error}"));
+        let tight_archive = litchi::numbers::SourceLimits::builder()
+            .max_input_bytes(source_len - 1)
+            .and_then(|b| b.max_members(MAX_ENTRIES))
+            .and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|b| b.build())
+            .unwrap_or_else(|error| panic!("tight reply limits invalid: {error}"));
         let tight = Package::from_bytes_with_options(
             source_bytes,
-            litchi::numbers::OpenOptions::new().source_limits(tight_archive).semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
+            litchi::numbers::OpenOptions::new()
+                .source_limits(tight_archive)
+                .semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         );
         assert!(tight.is_err(), "reply input-minus-one was admitted");
         black_box(tight.err().map(|error| error.to_string()));

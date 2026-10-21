@@ -28,7 +28,7 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::{
     decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{
     ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
@@ -183,6 +183,41 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected media graph or payload was malformed.
+    #[error("the Keynote media-properties source is invalid")]
+    InvalidSource,
+    /// A finite operation resource ceiling was exceeded.
+    #[error(
+        "Keynote media properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote media-properties transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the staged properties and locality.
+    #[error("the edited Keynote media properties failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote media-properties patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was not retained as an exact physical package.
     #[error("this Keynote source does not support physical media-property edits")]
     UnsupportedSource,
@@ -207,30 +242,32 @@ pub enum Error {
     /// The selected media is not supported by the mutation path.
     #[error("the selected Keynote media kind is unsupported for properties")]
     WrongMediaKind,
-    /// The selected media graph or payload was malformed.
-    #[error("the Keynote media-properties source is invalid")]
-    InvalidSource,
-    /// A finite operation resource ceiling was exceeded.
-    #[error(
-        "Keynote media properties {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote media-properties transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the staged properties and locality.
-    #[error("the edited Keynote media properties failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote media-properties patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::WrongMediaKind { .. } => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable media-properties value staged against an immutable package
@@ -484,6 +521,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -606,7 +649,7 @@ impl Package {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         reopen_target_patch(self, patch, &mut budget)
     }
@@ -643,7 +686,7 @@ fn commit_edit(
     }
     let catalog = physical_catalog(source)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let current = select_media_properties(
         source,
@@ -777,7 +820,7 @@ fn select_media_properties(
     // or camera subsystem. Keep their read path available while refusing to
     // route those records through a file/audio asset rewrite transaction.
     if !matches!(selection.kind, MovieKind::File | MovieKind::Audio) {
-        return Err(Error::WrongMediaKind);
+        return Err(Error::Refused(Refusal::WrongMediaKind));
     }
     let assets = data::validate_selected_media_assets(
         package,
@@ -786,7 +829,7 @@ fn select_media_properties(
         budget,
     )?;
     if assets.content.is_empty() || assets.poster.is_some_and(|poster| poster.is_empty()) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(selection)
 }
@@ -801,9 +844,9 @@ fn select_media_property_fields(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -836,7 +879,7 @@ fn select_media_property_fields(
             continue;
         }
         if movie_component != component_name {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if object.archive_info.identifier != Some(identifier) {
             return Err(Error::InvalidSource);
@@ -866,9 +909,9 @@ fn select_media_property_fields(
     }
     let (movie_identifier, message_index, kind, before) = selected.ok_or_else(|| {
         if requested_movie_position.get() >= movie_position {
-            Error::MoviePositionNotFound {
+            Error::Refused(Refusal::MoviePositionNotFound {
                 position: requested_movie_position,
-            }
+            })
         } else {
             Error::InvalidSource
         }
@@ -917,10 +960,10 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             let maximum = package.semantic_limits().max_slides();
             let mut match_position = None;
@@ -936,11 +979,11 @@ fn resolve_slide_position(
                 let limits = package.semantic_wire_limits().map_err(map_read_error)?;
                 if slide_name(payload, limits, budget)?.is_some_and(|value| value == name) {
                     if match_position.replace(position).is_some() {
-                        return Err(Error::AmbiguousSelector);
+                        return Err(Error::Refused(Refusal::AmbiguousSelector));
                     }
                 }
             }
-            match_position.ok_or(Error::SlideNameNotFound)
+            match_position.ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -975,7 +1018,7 @@ fn parse_wire<'a>(
     // Skip visits inspect this payload once without descending into opaque
     // length-delimited fields. Reserve that work before the preflight.
     budget.work(payload.len())?;
-    let report = preflight_wire_tree_with_limits(payload, limits, |_visit| Ok(WireDescent::Skip))
+    let report = preflight_wire_tree(payload, limits, |_visit| Ok(WireDescent::Skip))
         .map_err(|_| Error::InvalidSource)?;
     budget.fields(report.fields())?;
     budget.nesting(report.max_depth())?;
@@ -990,7 +1033,7 @@ fn parse_wire<'a>(
     budget.scratch(field_storage)?;
     budget.fields(report.fields())?;
     budget.work(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     Ok(view)
 }
 
@@ -1070,7 +1113,7 @@ fn validate_slide_header(
         })?;
     for identifier in &info.object_references {
         if !seen.insert(*identifier) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     for identifier in drawable_ids {
@@ -1081,7 +1124,7 @@ fn validate_slide_header(
             .count()
             != 1
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     for field in &info.field_infos {
@@ -1402,9 +1445,9 @@ fn validate_selected_movie_references(
     for (identifier, field_number) in references {
         let (reference_component, referenced) = package
             .object_with_component(identifier)
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if reference_component != component_name && field_number != MOVIE_STYLE_FIELD {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let allowed = match field_number {
             MOVIE_TITLE_FIELD | MOVIE_CAPTION_FIELD => {
@@ -1415,19 +1458,19 @@ fn validate_selected_movie_references(
             _ => return Err(Error::InvalidSource),
         };
         let Some(_) = reference_message_type(referenced, allowed, budget)? else {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
     }
     for &identifier in &transitive_style_ids[..transitive_style_count] {
         let (reference_component, referenced) = package
             .object_with_component(identifier)
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         if reference_component != component_name {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let Some(_) = reference_message_type(referenced, &[MOVIE_STYLE_MESSAGE_TYPE], budget)?
         else {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
     }
     Ok(())
@@ -1761,7 +1804,7 @@ fn validate_single_drawable_ownership(
                             .ok_or(Error::InvalidSource)?;
                     }
                     if total_references > 1 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
@@ -1775,7 +1818,7 @@ fn validate_single_drawable_ownership(
         || metadata_census.invalid
         || metadata_census.selected_references != expected_metadata_references
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1859,7 +1902,7 @@ fn validate_properties(properties: &MediaProperties) -> Result<(), Error> {
         .checked_add(properties.accessibility_description().map_or(0, str::len))
         .ok_or(Error::InvalidSource)?;
     if bytes > MAX_PROPERTY_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::PropertyBytes,
             observed: bytes as u64,
             maximum: MAX_PROPERTY_BYTES as u64,
@@ -1997,7 +2040,7 @@ fn map_properties_codec_error(error: keynote_media_properties_codec::DecodeError
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2011,25 +2054,38 @@ fn to_geometry_error(error: Error) -> super::slide_movie_geometry::Error {
         Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
     };
     match error {
-        Error::UnsupportedSource => SlideMovieGeometryError::UnsupportedSource,
-        Error::UnsupportedDependency | Error::WrongMediaKind => {
-            SlideMovieGeometryError::UnsupportedDependency
+        Error::Refused(Refusal::UnsupportedSource) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::UnsupportedSource,
+        ),
+        Error::Refused(Refusal::UnsupportedDependency)
+        | Error::Refused(Refusal::WrongMediaKind) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+        ),
+        Error::Refused(Refusal::AmbiguousSelector) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+        ),
+        Error::Refused(Refusal::EmptySlideName) => {
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::EmptySlideName)
         },
-        Error::AmbiguousSelector => SlideMovieGeometryError::AmbiguousSelector,
-        Error::EmptySlideName => SlideMovieGeometryError::EmptySlideName,
-        Error::SlideNameNotFound => SlideMovieGeometryError::SlideNameNotFound,
-        Error::SlidePositionNotFound { position } => {
-            SlideMovieGeometryError::SlidePositionNotFound { position }
+        Error::Refused(Refusal::SlideNameNotFound) => SlideMovieGeometryError::Refused(
+            crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+        ),
+        Error::Refused(Refusal::SlidePositionNotFound { position }) => {
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            )
         },
-        Error::MoviePositionNotFound { position } => {
-            SlideMovieGeometryError::MoviePositionNotFound { position }
+        Error::Refused(Refusal::MoviePositionNotFound { position }) => {
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            )
         },
         Error::InvalidSource => SlideMovieGeometryError::InvalidSource,
-        Error::LimitExceeded {
+        Error::Limit {
             kind,
             observed,
             maximum,
-        } => SlideMovieGeometryError::LimitExceeded {
+        } => SlideMovieGeometryError::Limit {
             kind: match kind {
                 LimitKind::InputBytes => SlideMovieGeometryLimitKind::InputBytes,
                 LimitKind::OutputBytes => SlideMovieGeometryLimitKind::OutputBytes,
@@ -2063,23 +2119,33 @@ impl From<super::slide_movie_geometry::Error> for Error {
             Error as SlideMovieGeometryError, LimitKind as SlideMovieGeometryLimitKind,
         };
         match error {
-            SlideMovieGeometryError::UnsupportedSource => Self::UnsupportedSource,
-            SlideMovieGeometryError::UnsupportedDependency => Self::UnsupportedDependency,
-            SlideMovieGeometryError::AmbiguousSelector => Self::AmbiguousSelector,
-            SlideMovieGeometryError::EmptySlideName => Self::EmptySlideName,
-            SlideMovieGeometryError::SlideNameNotFound => Self::SlideNameNotFound,
-            SlideMovieGeometryError::SlidePositionNotFound { position } => {
-                Self::SlidePositionNotFound { position }
-            },
-            SlideMovieGeometryError::MoviePositionNotFound { position } => {
-                Self::MoviePositionNotFound { position }
-            },
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedSource,
+            ) => Self::Refused(Refusal::UnsupportedSource),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::UnsupportedDependency,
+            ) => Self::Refused(Refusal::UnsupportedDependency),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::AmbiguousSelector,
+            ) => Self::Refused(Refusal::AmbiguousSelector),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::EmptySlideName,
+            ) => Self::Refused(Refusal::EmptySlideName),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlideNameNotFound,
+            ) => Self::Refused(Refusal::SlideNameNotFound),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::SlidePositionNotFound { position },
+            ) => Self::Refused(Refusal::SlidePositionNotFound { position }),
+            SlideMovieGeometryError::Refused(
+                crate::slide::movie::geometry::Refusal::MoviePositionNotFound { position },
+            ) => Self::Refused(Refusal::MoviePositionNotFound { position }),
             SlideMovieGeometryError::InvalidSource => Self::InvalidSource,
-            SlideMovieGeometryError::LimitExceeded {
+            SlideMovieGeometryError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
                     SlideMovieGeometryLimitKind::InputBytes => LimitKind::InputBytes,
                     SlideMovieGeometryLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2104,7 +2170,9 @@ impl From<super::slide_movie_geometry::Error> for Error {
             SlideMovieGeometryError::Allocation { amount } => Self::Allocation { amount },
             SlideMovieGeometryError::Verification => Self::Verification,
             SlideMovieGeometryError::PatchConflict => Self::PatchConflict,
-            SlideMovieGeometryError::Locked => Self::UnsupportedDependency,
+            SlideMovieGeometryError::Refused(crate::slide::movie::geometry::Refusal::Locked) => {
+                Self::Refused(Refusal::UnsupportedDependency)
+            },
         }
     }
 }
@@ -2130,7 +2198,7 @@ fn map_read_error(error: ReadError) -> Error {
 
 impl Error {
     fn limit_from_semantic(kind: SemanticLimitKind, observed: usize, maximum: usize) -> Self {
-        Self::LimitExceeded {
+        Self::Limit {
             kind: match kind {
                 SemanticLimitKind::Slides => LimitKind::Slides,
                 SemanticLimitKind::References => LimitKind::References,
@@ -2142,7 +2210,7 @@ impl Error {
     }
 
     fn limit_from_payload(kind: super::PayloadLimitKind, observed: usize, maximum: usize) -> Self {
-        Self::LimitExceeded {
+        Self::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,

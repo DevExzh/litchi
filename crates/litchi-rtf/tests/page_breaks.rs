@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfDocument, RtfWriter, StoryEvent};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{BodyStoryEvent, CellStoryEvent, RtfWriter, StoryEvent};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -27,7 +28,7 @@ fn has_page(events: &[StoryEvent], position: usize) -> bool {
 
 #[test]
 fn body_page_is_zero_width_ordered_and_round_trips_canonically() {
-    let document = RtfDocument::parse(r"{\rtf1\ansi A\page B}").unwrap();
+    let document = Tree::parse(r"{\rtf1\ansi A\page B}").unwrap();
     assert_eq!(document.text(), "AB");
     assert!(matches!(
         document.body_story_events(),
@@ -38,7 +39,7 @@ fn body_page_is_zero_width_ordered_and_round_trips_canonically() {
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains("\\page "));
     assert!(!serialized.contains("A\\par B"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.body_story_events(), document.body_story_events());
 }
@@ -53,7 +54,7 @@ fn visible_story_owners_preserve_page_events() {
         r#"{\*\atnid I}{\*\atnauthor A}\chatn{\*\annotation C\page D}"#,
         r#"{\*\do\dptxbx{\dptxbxtext L\page M}}}"#,
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert!(has_page(
         &document.sections()[0].headers_footers[0].story_events,
         1
@@ -65,7 +66,7 @@ fn visible_story_owners_preserve_page_events() {
     assert!(has_page(&document.legacy_text_boxes()[0].story_events, 1));
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert!(has_page(
         &reparsed.sections()[0].headers_footers[0].story_events,
         1
@@ -80,7 +81,7 @@ fn visible_story_owners_preserve_page_events() {
 #[test]
 fn table_and_nested_table_page_events_round_trip_in_place() {
     let source = r"{\rtf1\trowd\cellx5000\intbl\itap1 Before\page After \intbl\itap2 Inner\page Tail\nestcell{\*\nesttableprops\itap2\trowd\cellx1000\nestrow}{\nonesttables\par}\intbl\itap1 End\cell\row}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let outer = &document.tables()[0].rows()[0].cells()[0];
     assert!(
         outer
@@ -97,7 +98,7 @@ fn table_and_nested_table_page_events_round_trip_in_place() {
     );
 
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     let outer = &reparsed.tables()[0].rows()[0].cells()[0];
     let inner = &outer.nested_tables()[0].table.rows()[0].cells()[0];
     assert!(
@@ -123,12 +124,12 @@ fn rejects_parameters_and_non_story_destinations_but_skips_unknown_groups() {
         r"{\rtf1{\*\defchp\page}x}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted {source}"
         );
     }
 
-    let document = RtfDocument::parse(r"{\rtf1 A{\*\unknown\page1 ignored}B}").unwrap();
+    let document = Tree::parse(r"{\rtf1 A{\*\unknown\page1 ignored}B}").unwrap();
     assert_eq!(document.text(), "AB");
     assert!(document.page_breaks().next().is_none());
 }

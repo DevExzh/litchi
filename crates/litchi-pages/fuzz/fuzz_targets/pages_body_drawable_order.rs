@@ -12,12 +12,12 @@
 use std::{hint::black_box, io, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{pages_drawable_order_codec, tp, tsa, tsp};
 use litchi_pages::{BodyDrawableSelector, DrawableLayerMove, Package, Position};
-use litchi_iwa_archive::Limits;
 use prost::Message as _;
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
@@ -68,7 +68,10 @@ fuzz_target!(|data: &[u8]| {
     // to produce a package-shaped input.  Most inputs are descriptors below,
     // so this path is deliberately best-effort and never retains them.
     if descriptor.starts_with(b"PK") {
-        let _ = black_box(Package::from_bytes_with_options(&descriptor, litchi_pages::OpenOptions::new().__archive_limits(Limits::default())));
+        let _ = black_box(Package::from_bytes_with_options(
+            &descriptor,
+            litchi_pages::OpenOptions::new().__archive_limits(Limits::default()),
+        ));
     }
 
     exercise_descriptor(&descriptor);
@@ -152,7 +155,10 @@ fn exercise_known_descriptors() {
 }
 
 fn exercise_package(package_bytes: &[u8], descriptor: &[u8], mode: u8) {
-    let parsed = Package::from_bytes_with_options(package_bytes, litchi_pages::OpenOptions::new().__archive_limits(Limits::default()));
+    let parsed = Package::from_bytes_with_options(
+        package_bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(Limits::default()),
+    );
     let Ok(package) = parsed else {
         return;
     };
@@ -443,6 +449,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
             &mut root,
             20,
             &reference(ZORDER_IDENTIFIER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if mode == MODE_DUPLICATE_BODY_REFERENCE && with_body {
@@ -450,6 +457,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
             &mut root,
             4,
             &reference(BODY_STORAGE_IDENTIFIER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if mode == MODE_WRONG_ORDER_WIRE {
@@ -534,7 +542,12 @@ fn order_payload(native_order: &[u64], descriptor: &[u8], mode: u8) -> BuildResu
         if position == 0 && mode == MODE_EXTERNAL_REFERENCE {
             append_varint_field(&mut nested, 3, 1)?;
         }
-        append_length_delimited_field(&mut payload, 1, &nested)?;
+        append_length_delimited_field(
+            &mut payload,
+            1,
+            &nested,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if mode == MODE_DUPLICATE_ORDER_REFERENCE {
         let duplicate = native_order
@@ -542,7 +555,12 @@ fn order_payload(native_order: &[u64], descriptor: &[u8], mode: u8) -> BuildResu
             .copied()
             .map(reference_bytes)
             .unwrap_or_default();
-        append_length_delimited_field(&mut payload, 1, &duplicate)?;
+        append_length_delimited_field(
+            &mut payload,
+            1,
+            &duplicate,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     append_varint_field(&mut payload, 77, descriptor_value(descriptor, 24))?;
     Ok(payload)

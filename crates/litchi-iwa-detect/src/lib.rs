@@ -1847,7 +1847,7 @@ fn valid_shared_document(payload: &[u8]) -> Result<bool> {
 }
 
 fn parse_canonical_wire_fields(payload: &[u8]) -> Result<Vec<WireField>> {
-    let fields = parse_wire_fields(payload)?;
+    let fields = parse_wire_fields(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     for field in &fields {
         field.validate_canonical_framing(payload)?;
     }

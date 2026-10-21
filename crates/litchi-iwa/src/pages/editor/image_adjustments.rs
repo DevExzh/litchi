@@ -8,7 +8,7 @@ use super::*;
 
 use litchi_iwa_common::shape::image::ImageAdjustments;
 
-pub(super) fn image_adjustment_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+pub(super) fn image_adjustment_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -38,7 +38,7 @@ pub(super) fn image_adjustment_wire_limits(package: &IWorkPackage) -> Result<Wir
 }
 
 pub(super) fn image_adjustments_from_payload(
-    package: &IWorkPackage,
+    package: &HostPackage,
     payload: &[u8],
     image_id: u64,
     context: &str,

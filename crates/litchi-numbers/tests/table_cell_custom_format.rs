@@ -172,11 +172,12 @@ fn rewrite_first_custom_archive(
     mutate: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
     let registry_payload = fixture::custom_registry_payload_bytes(source)?;
-    let archive_payload = WireView::parse(&registry_payload)?
-        .fields()
-        .find(|field| field.number() == 2)
-        .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
-        .payload();
+    let archive_payload =
+        WireView::parse(&registry_payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 2)
+            .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
+            .payload();
     let archive_payload = mutate(archive_payload)?;
     let registry_payload =
         patch_length_delimited_field(&registry_payload, 2, true, Some(&archive_payload))?;
@@ -198,20 +199,31 @@ fn rewrite_custom_registry_with_entries(
     additional_entries: usize,
 ) -> TestResult<Vec<u8>> {
     let registry_payload = fixture::custom_registry_payload_bytes(source)?;
-    let archive_payload = WireView::parse(&registry_payload)?
-        .fields()
-        .find(|field| field.number() == 2)
-        .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
-        .payload()
-        .to_vec();
+    let archive_payload =
+        WireView::parse(&registry_payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 2)
+            .ok_or_else(|| io::Error::other("custom registry archive is missing"))?
+            .payload()
+            .to_vec();
     let mut registry_payload = registry_payload;
     for index in 0..additional_entries {
         let index = u64::try_from(index)?;
         let mut uuid_payload = Vec::new();
         append_varint_field(&mut uuid_payload, 1, 0x1000_0000_0000_0000 + index)?;
         append_varint_field(&mut uuid_payload, 2, 0x2000_0000_0000_0000 + index)?;
-        append_length_delimited_field(&mut registry_payload, 1, &uuid_payload)?;
-        append_length_delimited_field(&mut registry_payload, 2, &archive_payload)?;
+        append_length_delimited_field(
+            &mut registry_payload,
+            1,
+            &uuid_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut registry_payload,
+            2,
+            &archive_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     fixture::rewrite_member(source, fixture::CUSTOM_MEMBER, |archive| {
         let registry = archive
@@ -314,23 +326,23 @@ fn custom_transaction_debug_redacts_semantic_content() -> TestResult {
         format!("{:?}", changed.diagnostics()),
         format!(
             "{:?}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
         format!(
             "{}",
-            Error::WrongFormatFamily {
+            Error::Refused(litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily {
                 path: Path::Cell {
                     sheet: 3,
                     table: 5,
                     position: selected_position(),
                 },
-            }
+            })
         ),
     ];
 
@@ -660,19 +672,21 @@ fn custom_rewrite_preserves_unknown_registry_order_and_nested_spans() -> TestRes
     let root_90 = fixture::custom_registry_field_record(&bytes, 90)?;
     let nested_94 = fixture::custom_archive_field_record(&bytes, "Accounting", 94)?;
     let unknown_records = |payload: &[u8]| -> TestResult<Vec<(usize, Vec<u8>)>> {
-        Ok(WireView::parse(payload)?
-            .fields()
-            .enumerate()
-            .filter(|(_, field)| field.number() > 5)
-            .map(|(index, field)| (index, field.raw().to_vec()))
-            .collect())
+        Ok(
+            WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .enumerate()
+                .filter(|(_, field)| field.number() > 5)
+                .map(|(index, field)| (index, field.raw().to_vec()))
+                .collect(),
+        )
     };
 
     // Add an additional unknown record between two known custom archive
     // fields.  The owner must preserve its raw record and source span while
     // changing the selected custom semantic value.
     let mut hostile_registry = Vec::new();
-    let view = WireView::parse(&root_before)?;
+    let view = WireView::parse(&root_before, litchi_iwa_common::WireLimits::DEFAULT)?;
     for (index, field) in view.fields().enumerate() {
         hostile_registry.extend_from_slice(field.raw());
         if index == 0 {
@@ -731,11 +745,15 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     );
     assert!(matches!(
         package.table_cell_custom_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_custom_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ordinary = Package::from_bytes(&fixture::synthetic_package_for(
@@ -744,7 +762,9 @@ fn custom_selectors_wrong_family_and_missing_selection_are_typed() -> TestResult
     )?)?;
     assert!(matches!(
         ordinary.table_cell_custom_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::custom::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     let text = Package::from_bytes(&source(fixture::CustomFamily::Text)?)?;
     assert!(matches!(
@@ -849,7 +869,12 @@ fn custom_locked_changed_edit_refuses_publication_but_reads() -> TestResult {
             .set(replacement)
             .commit()
             .expect_err("a changed custom edit must refuse a locked table");
-        assert!(matches!(error, Error::TableLocked { .. }));
+        assert!(matches!(
+            error,
+            Error::Refused(
+                litchi_numbers::cell::data_format::custom::transaction::Refusal::TableLocked { .. }
+            )
+        ));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -952,9 +977,7 @@ fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> 
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded { .. })
-                | Err(Error::Allocation { .. })
-                | Err(Error::Verification)
+            Err(Error::Limit { .. }) | Err(Error::Allocation { .. }) | Err(Error::Verification)
         ),
         "unexpected custom operation-budget result: {result:?}"
     );
@@ -973,7 +996,7 @@ fn custom_registry_oversized_name_and_pattern_refuse_atomically() -> TestResult 
     assert_owner_rejects(&oversized_name, fixture::CustomFamily::Number)?;
 
     let oversized_pattern = rewrite_first_custom_archive(&source, |archive| {
-        let default_pattern = WireView::parse(archive)?
+        let default_pattern = WireView::parse(archive, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == 3)
             .ok_or_else(|| io::Error::other("custom default pattern is missing"))?

@@ -18,7 +18,7 @@ use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::table_header_settings_codec::{
@@ -149,38 +149,18 @@ impl fmt::Display for InvalidReason {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted body table matched the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// A name selector matched more than one rooted table.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// The selector or rooted graph is ambiguous.
-    #[error("the Pages body-table header selector is ambiguous")]
-    AmbiguousSelector,
-    /// Requested settings violate table dimensions.
-    #[error("the requested Pages body-table header settings are invalid: {reason}")]
-    InvalidSettings {
-        /// Content-free reason.
-        reason: InvalidReason,
-    },
-    /// The source has no exact physical provenance.
-    #[error("the Pages package source does not support exact body-table header editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// A rooted graph or selected payload is malformed.
     #[error("the selected Pages body-table header source is invalid")]
     InvalidSource,
-    /// A supported dependency would become stale.
-    #[error("the selected Pages body table has a dependent header topology")]
-    UnsupportedDependency,
-    /// The selected table is protected from editing.
-    #[error("the selected Pages body table is locked")]
-    TableLocked,
     /// A finite resource ceiling was exceeded.
     #[error(
         "Pages body-table headers {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed amount.
@@ -200,6 +180,61 @@ pub enum Error {
     /// The patch was created from another exact source artifact.
     #[error("the Pages body-table header patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body table matched the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// A name selector matched more than one rooted table.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// The selector or rooted graph is ambiguous.
+    #[error("the Pages body-table header selector is ambiguous")]
+    AmbiguousSelector,
+    /// Requested settings violate table dimensions.
+    #[error("the requested Pages body-table header settings are invalid: {reason}")]
+    InvalidSettings {
+        /// Content-free reason.
+        reason: InvalidReason,
+    },
+    /// The source has no exact physical provenance.
+    #[error("the Pages package source does not support exact body-table header editing")]
+    UnsupportedSource,
+    /// A supported dependency would become stale.
+    #[error("the selected Pages body table has a dependent header topology")]
+    UnsupportedDependency,
+    /// The selected table is protected from editing.
+    #[error("the selected Pages body table is locked")]
+    TableLocked,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::InvalidSettings { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Mutable semantic header settings staged against one immutable package.
@@ -387,6 +422,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -496,7 +537,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let package = rewrite_headers(
         source,
@@ -590,7 +631,7 @@ fn decode_snapshot(
     budget: &mut table_lock::WireBudget,
 ) -> Result<TableHeaderSettingsSnapshot, Error> {
     let limits = budget.wire_limits();
-    let preflight = preflight_wire_tree_with_limits(source, limits, |_| Ok(WireDescent::Skip))
+    let preflight = preflight_wire_tree(source, limits, |_| Ok(WireDescent::Skip))
         .map_err(map_common_wire_error)?;
     budget
         .charge_codec_report(
@@ -641,22 +682,22 @@ fn validate_requested(settings: Settings, rows: u32, columns: u32) -> Result<(),
     if u16::from(header_rows).saturating_add(u16::from(footer_rows))
         > u16::try_from(rows).unwrap_or(u16::MAX)
     {
-        return Err(Error::InvalidSettings {
+        return Err(Error::Refused(Refusal::InvalidSettings {
             reason: InvalidReason::RowSectionsExceedTable {
                 header_rows,
                 footer_rows,
                 table_rows: rows,
             },
-        });
+        }));
     }
     let header_columns = u8::try_from(settings.header_column_count()).unwrap_or(u8::MAX);
     if u32::from(header_columns) > columns {
-        return Err(Error::InvalidSettings {
+        return Err(Error::Refused(Refusal::InvalidSettings {
             reason: InvalidReason::HeaderColumnsExceedTable {
                 header_columns,
                 table_columns: columns,
             },
-        });
+        }));
     }
     Ok(())
 }
@@ -681,7 +722,7 @@ fn rewrite_headers(
     }
     validate_requested(after, snapshot.rows(), snapshot.columns())?;
     if target.explicit_locked == Some(true) {
-        return Err(Error::TableLocked);
+        return Err(Error::Refused(Refusal::TableLocked));
     }
     validate_dependencies(source, target, before, after, budget)?;
     let (component_name, stream_length) =
@@ -700,7 +741,7 @@ fn rewrite_headers(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget
         .charge_payload_work(entry.data().len())
@@ -733,7 +774,7 @@ fn rewrite_headers(
     let compressed_bound =
         table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_entry_bytes(),
@@ -741,7 +782,7 @@ fn rewrite_headers(
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
         8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::InvalidSource)?,
-        _ => return Err(Error::UnsupportedSource),
+        _ => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let package_output_bound = source_catalog
         .source_bytes()
@@ -978,7 +1019,8 @@ fn validate_dependencies(
         != after.repeating_header_rows_enabled
         || before.repeating_header_columns_enabled != after.repeating_header_columns_enabled;
     let model = model_message(package, target)?;
-    let model_view = WireView::parse(&model.data).map_err(|_| Error::InvalidSource)?;
+    let model_view =
+        WireView::parse(&model.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(model.data.len())
         .map_err(map_lock_error)?;
@@ -1024,7 +1066,8 @@ fn validate_dependencies(
         .get(target.info_message_index)
         .filter(|message| TABLE_INFO_MESSAGE_TYPES.contains(&message.type_))
         .ok_or(Error::InvalidSource)?;
-    let info_view = WireView::parse(&info_message.data).map_err(|_| Error::InvalidSource)?;
+    let info_view = WireView::parse(&info_message.data, WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?;
     budget
         .charge_payload_work(info_message.data.len())
         .map_err(map_lock_error)?;
@@ -1065,12 +1108,13 @@ fn validate_dependencies(
             .and_then(|object| object.messages.get(target.sheet_message_index))
             .filter(|message| message.type_ == target.sheet_message_type)
             .ok_or(Error::InvalidSource)?;
-        let view = WireView::parse(&sheet.data).map_err(|_| Error::InvalidSource)?;
+        let view =
+            WireView::parse(&sheet.data, WireLimits::DEFAULT).map_err(|_| Error::InvalidSource)?;
         budget
             .charge_payload_work(sheet.data.len())
             .map_err(map_lock_error)?;
         if view.fields().any(|field| field.number() == 4) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         reject_unsupported_metadata(
             package,
@@ -1133,7 +1177,7 @@ fn validate_known_dependency_fields(
         || header_counts_changed && header_count_dependency
         || section_counts_changed && active_pivot_or_group
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1142,8 +1186,7 @@ fn category_owner_grouping_active(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, budget.wire_limits())
-        .map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, budget.wire_limits()).map_err(|_| Error::InvalidSource)?;
     budget
         .charge_codec_report(view.len(), source.len().saturating_mul(2), 1, 0)
         .map_err(map_lock_error)?;
@@ -1160,7 +1203,7 @@ fn category_owner_grouping_active(
             return Err(Error::InvalidSource);
         }
         seen = true;
-        let group = WireView::parse_with_limits(field.payload(), budget.wire_limits())
+        let group = WireView::parse(field.payload(), budget.wire_limits())
             .map_err(|_| Error::InvalidSource)?;
         budget
             .charge_codec_report(group.len(), field.payload().len().saturating_mul(2), 2, 0)
@@ -1239,7 +1282,7 @@ fn validate_table_info_dependency_fields(
             _ => false,
         };
         if active {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -1307,7 +1350,7 @@ fn reject_unsupported_metadata(
     }
     for field in &info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -1479,16 +1522,24 @@ fn reopen_target(
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         table_lock::Error::InvalidSource => Error::InvalidSource,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
@@ -1527,7 +1578,7 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -1550,21 +1601,21 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn map_codec_error(error: DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1574,12 +1625,12 @@ fn map_codec_error(error: DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     match error.wire_resource_limit() {
-        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -1591,11 +1642,13 @@ fn map_codec_error(error: DecodeError) -> Error {
 
 fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         page_layout::Error::InvalidSource => Error::InvalidSource,
-        page_layout::Error::LimitExceeded {
+        page_layout::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed,
             maximum,
@@ -1611,7 +1664,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1637,7 +1690,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1653,12 +1706,12 @@ fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,

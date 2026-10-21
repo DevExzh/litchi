@@ -15,9 +15,9 @@
 
 use super::{Error as PackageError, OpenOptions, Package, model::EditProfile};
 use crate::body_text;
-use crate::parts::dofr::DofrPatch;
+use crate::parts::dofr::Patch as DofrPatch;
 use crate::parts::protection::ProtectionPolicy;
-use crate::parts::saved_selection::{SavedSelectionPatch, SavedSelectionTransaction};
+use crate::parts::saved_selection::{Edit as SavedSelectionEdit, Patch as SavedSelectionPatch};
 use crate::tracked_revision::Limits;
 use litchi_core::Position;
 use std::fmt;
@@ -58,40 +58,40 @@ impl EditOptions {
 
     /// Select strict tracked-revision parsing limits.
     #[must_use]
-    pub const fn with_revision_limits(mut self, limits: Limits) -> Self {
+    pub const fn revision_limits(mut self, limits: Limits) -> Self {
         self.revision_limits = limits;
         self
     }
 
     /// Select finite staged-operation and replacement limits.
     #[must_use]
-    pub const fn with_transaction_limits(mut self, limits: body_text::TransactionLimits) -> Self {
+    pub const fn transaction_limits(mut self, limits: body_text::TransactionLimits) -> Self {
         self.transaction_limits = limits;
         self
     }
 
     /// Select the explicit policy for changed protected-source publication.
     #[must_use]
-    pub fn with_protection_policy(mut self, policy: ProtectionPolicy) -> Self {
+    pub fn protection_policy(mut self, policy: ProtectionPolicy) -> Self {
         self.protection_policy = policy;
         self
     }
 
     /// Return the tracked-revision limits.
     #[must_use]
-    pub const fn revision_limits(&self) -> Limits {
+    pub const fn revision_limits_value(&self) -> Limits {
         self.revision_limits
     }
 
     /// Return the transaction limits.
     #[must_use]
-    pub const fn transaction_limits(&self) -> body_text::TransactionLimits {
+    pub const fn transaction_limits_value(&self) -> body_text::TransactionLimits {
         self.transaction_limits
     }
 
     /// Return the protected-publication policy.
     #[must_use]
-    pub fn protection_policy(&self) -> ProtectionPolicy {
+    pub fn protection_policy_value(&self) -> ProtectionPolicy {
         self.protection_policy.clone()
     }
 }
@@ -272,7 +272,7 @@ impl Diagnostics {
 /// Reversible exact-source package patch produced by a primary [`Edit`].
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    inner: body_text::Patch,
+    pub(super) inner: body_text::Patch,
 }
 
 impl fmt::Debug for Patch {
@@ -300,7 +300,7 @@ impl Patch {
 
     /// Effective body transaction limits retained by this edit.
     #[must_use]
-    pub const fn transaction_limits(&self) -> body_text::TransactionLimits {
+    pub const fn transaction_limits_value(&self) -> body_text::TransactionLimits {
         self.inner.before().transaction_limits()
     }
 
@@ -362,82 +362,35 @@ impl Patch {
     }
 }
 
-/// A package-owned commit carrying the canonical publication triad.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
+/// A package-owned commit carrying the canonical publication triad: the
+/// published package, its reversible exact-source patch and content-free
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch, Diagnostics>;
+
+fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> Result<Commit> {
+    let body_text::PackageCommit {
+        snapshot,
+        patch: body_patch,
+        validated,
+    } = body_commit;
+    let patch = Patch::from_body(body_patch);
+    let diagnostics = Diagnostics::from_patch(&patch.inner);
+    let package = match validated {
+        None => source,
+        Some(validated) => Package::from_validated_ole(
+            validated.ole,
+            validated.document,
+            snapshot.source_limits(),
+            source.leniency(),
+        )
+        .map_err(Error::Package)?,
+    };
+    Ok(Commit::new(
+        package.with_edit_profile(EditProfile::from_snapshot(&snapshot)),
+        patch,
+        diagnostics,
+    ))
 }
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("package", &self.package)
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish()
-    }
-}
-
-impl Commit {
-    fn from_body(source: Package, body_commit: body_text::PackageCommit) -> Result<Self> {
-        let body_text::PackageCommit {
-            snapshot,
-            patch: body_patch,
-            validated,
-        } = body_commit;
-        let patch = Patch::from_body(body_patch);
-        let diagnostics = Diagnostics::from_patch(&patch.inner);
-        let package = match validated {
-            None => source,
-            Some(validated) => Package::from_validated_ole(
-                validated.ole,
-                validated.document,
-                snapshot.source_limits(),
-                source.leniency(),
-            )
-            .map_err(Error::Package)?,
-        };
-        Ok(Self {
-            package: package.with_edit_profile(EditProfile::from_snapshot(&snapshot)),
-            patch,
-            diagnostics,
-        })
-    }
-
-    /// Published immutable package snapshot.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit and return its package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
-
 /// Primary immutable DOC package transaction.
 pub struct Edit {
     package: Package,
@@ -464,15 +417,15 @@ impl Edit {
                 body_text::Refusal::Encrypted,
             )));
         }
-        let source = package.body_source(
-            body_text::OpenOptions::default()
-                .source_limits(package.source_limits())
-                .with_revision_limits(options.revision_limits)
-                .with_transaction_limits(options.transaction_limits)
-                .with_protection_policy(options.protection_policy),
-        )?;
+        let source = package.body_snapshot(&options)?;
         let inner = source.edit().map_err(Error::from)?;
         Ok(Self { package, inner })
+    }
+
+    /// A primary edit of `package` over a body edit already staged from its
+    /// body snapshot (a composition, a merge plan or a durable replay).
+    pub(crate) fn from_body(package: Package, inner: body_text::Edit) -> Self {
+        Self { package, inner }
     }
 
     /// Immutable package snapshot that authorizes this transaction.
@@ -514,7 +467,7 @@ impl Edit {
     /// Edit the optional `Selsf` record through its typed transaction.
     pub fn edit_saved_selection(
         &mut self,
-        edit: impl FnOnce(&mut SavedSelectionTransaction) -> crate::package::Result<()>,
+        edit: impl FnOnce(&mut SavedSelectionEdit) -> crate::package::Result<()>,
     ) -> Result<bool> {
         self.inner.edit_saved_selection(edit).map_err(Error::from)
     }
@@ -733,7 +686,60 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let package = self.package;
         let body_commit = self.inner.commit_with_package().map_err(Error::from)?;
-        Commit::from_body(package, body_commit)
+        commit_from_body(package, body_commit)
+    }
+
+    /// Publish the checked package commit while reporting deterministic,
+    /// content-free phase boundaries to `observer` (the opt-in profiling
+    /// equivalent of [`Self::commit`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::commit`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled(
+        self,
+        observer: impl FnMut(body_text::DiagnosticEvent),
+    ) -> Result<Commit> {
+        self.commit_profiled_with_cfb_observer(observer, |_| {})
+    }
+
+    /// [`Self::commit_profiled`] with a separate in-memory CFB observer.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::commit`].
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn commit_profiled_with_cfb_observer(
+        self,
+        observer: impl FnMut(body_text::DiagnosticEvent),
+        cfb_observer: impl FnMut(body_text::CfbParseEvent),
+    ) -> Result<Commit> {
+        let source = self.package;
+        let (snapshot, body_patch) = self
+            .inner
+            .commit_profiled_with_cfb_observer(observer, cfb_observer)
+            .map_err(Error::from)?
+            .into_parts();
+        let patch = Patch::from_body(body_patch);
+        let diagnostics = Diagnostics::from_patch(&patch.inner);
+        let profile = EditProfile::from_snapshot(&snapshot);
+        let package = if snapshot.bytes() == source.to_bytes().map_err(Error::Package)?.as_slice() {
+            source
+        } else {
+            Package::from_bytes_with_options(
+                snapshot.bytes(),
+                OpenOptions::default()
+                    .source_limits(snapshot.source_limits())
+                    .leniency(source.leniency()),
+            )
+            .map_err(Error::Package)?
+        };
+        Ok(Commit::new(
+            package.with_edit_profile(profile),
+            patch,
+            diagnostics,
+        ))
     }
 }
 
@@ -745,6 +751,17 @@ impl Package {
     /// the same options is the value a fresh open returns, and every edit
     /// starts from its own transaction over it. A memo hit still checks that
     /// the retained source has its captured version, as the copy does.
+    /// The body-text snapshot of this package under the edit `options`.
+    pub(crate) fn body_snapshot(&self, options: &EditOptions) -> Result<body_text::Snapshot> {
+        self.body_source(
+            body_text::OpenOptions::default()
+                .source_limits(self.source_limits())
+                .revision_limits(options.revision_limits)
+                .transaction_limits(options.transaction_limits)
+                .protection_policy(options.protection_policy.clone()),
+        )
+    }
+
     fn body_source(&self, options: body_text::OpenOptions) -> Result<body_text::Snapshot> {
         let memo = || {
             self.body_source
@@ -777,25 +794,43 @@ impl Package {
     /// exact bytes through the existing body-text owner; dropping the returned
     /// edit is the rollback operation.
     pub fn edit(&self) -> Result<Edit> {
-        let options = self
-            .edit_profile
+        Edit::from_package_with_options(self.clone(), self.retained_edit_options())
+    }
+
+    /// The edit options this package retains from the edit that produced it
+    /// (the defaults for a freshly opened package).
+    pub(crate) fn retained_edit_options(&self) -> EditOptions {
+        self.edit_profile
             .as_ref()
             .map(EditProfile::options)
-            .unwrap_or_default();
-        Edit::from_package_with_options(self.clone(), options)
+            .unwrap_or_default()
+    }
+
+    /// This package retaining `options` as its edit profile, as a scoped
+    /// family commit publishes it.
+    pub(crate) fn with_edit_options(self, options: &EditOptions) -> Self {
+        self.with_edit_profile(EditProfile {
+            revision_limits: options.revision_limits,
+            transaction_limits: options.transaction_limits,
+            protection_policy: options.protection_policy.clone(),
+        })
+    }
+
+    /// `options` constrained by the edit profile this package retains.
+    pub(crate) fn constrained_edit_options(&self, options: EditOptions) -> EditOptions {
+        match self.edit_profile.as_ref() {
+            Some(profile) => profile.constrain_options(options),
+            None => options,
+        }
     }
 
     /// Start a primary transaction under one explicit edit profile.
     pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let options = match self.edit_profile.as_ref() {
-            Some(profile) => profile.constrain_options(options),
-            None => options,
-        };
-        Edit::from_package_with_options(self.clone(), options)
+        Edit::from_package_with_options(self.clone(), self.constrained_edit_options(options))
     }
 
     /// Apply a canonical exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         let bytes = self.to_bytes().map_err(Error::Package)?;
         let profile = self.edit_profile.clone().unwrap_or_else(|| {
             let mut profile = EditProfile::from_patch(&patch.inner);
@@ -810,24 +845,30 @@ impl Package {
             bytes,
             body_text::OpenOptions::default()
                 .source_limits(self.source_limits())
-                .with_revision_limits(profile.revision_limits)
-                .with_transaction_limits(profile.transaction_limits)
-                .with_protection_policy(profile.protection_policy),
+                .revision_limits(profile.revision_limits)
+                .transaction_limits(profile.transaction_limits)
+                .protection_policy(profile.protection_policy),
         )
         .map_err(Error::from)?;
         let next = patch.inner.apply(&source).map_err(Error::from)?;
         let next_profile = EditProfile::from_snapshot(&next);
+        let diagnostics = Diagnostics::from_patch(&patch.inner);
         if next.bytes() == source.bytes() {
-            return Ok(self.clone().with_edit_profile(next_profile));
+            return Ok(Commit::new(
+                self.clone().with_edit_profile(next_profile),
+                patch.clone(),
+                diagnostics,
+            ));
         }
-        Package::from_bytes_with_options(
+        let package = Package::from_bytes_with_options(
             next.bytes(),
             OpenOptions::default()
                 .source_limits(next.source_limits())
                 .leniency(self.leniency()),
         )
-        .map_err(Error::Package)
-        .map(|package| package.with_edit_profile(next_profile))
+        .map_err(Error::Package)?
+        .with_edit_profile(next_profile);
+        Ok(Commit::new(package, patch.clone(), diagnostics))
     }
 }
 
@@ -840,7 +881,7 @@ mod tests {
     use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
     use crate::tracked_revision::Limits as RevisionLimits;
     use litchi_core::Position;
-    use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
     use std::io::Cursor;
 
     fn package() -> crate::Package {
@@ -942,7 +983,7 @@ mod tests {
             .package()
             .apply(&commit.patch().inverse())
             .expect("inverse");
-        assert_eq!(restored.to_bytes().unwrap(), source_bytes);
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
     }
 
     #[test]
@@ -953,7 +994,7 @@ mod tests {
             .expect("no-op");
         let commit = edit.commit().expect("commit");
         assert_eq!(
-            commit.diagnostics(),
+            *commit.diagnostics(),
             Diagnostics {
                 changed: false,
                 operation_count: 0,
@@ -1017,7 +1058,7 @@ mod tests {
         assert_eq!(commit(&source.clone(), EditOptions::default()), first);
         assert!(std::sync::Arc::ptr_eq(&shared, &held(&source).unwrap()));
         // Other options open their own snapshot.
-        let wide = EditOptions::default().with_transaction_limits(TransactionLimits::new(
+        let wide = EditOptions::default().transaction_limits(TransactionLimits::new(
             300,
             1024 * 1024,
             4 * 1024 * 1024,
@@ -1034,7 +1075,7 @@ mod tests {
         let source = package_with_paragraphs(257);
         let transaction_limits = TransactionLimits::new(300, 1024 * 1024, 4 * 1024 * 1024);
         let mut edit = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(transaction_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(transaction_limits))
             .expect("wide edit");
         for position in 0..257 {
             edit.replace_paragraph(Position::new(position), "after")
@@ -1046,9 +1087,12 @@ mod tests {
         let restored = changed
             .apply(&patch.inverse())
             .expect("inverse with retained profile");
-        assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+        assert_eq!(
+            restored.package().to_bytes().unwrap(),
+            source.to_bytes().unwrap()
+        );
 
-        let mut follow_up = restored.edit().expect("retained profile edit");
+        let mut follow_up = restored.package().edit().expect("retained profile edit");
         for position in 0..257 {
             follow_up
                 .replace_paragraph(Position::new(position), "again")
@@ -1061,7 +1105,7 @@ mod tests {
         let source = package_with_paragraphs(3);
         let wide_limits = TransactionLimits::new(3, 1024 * 1024, 4 * 1024 * 1024);
         let mut wide_edit = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(wide_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(wide_limits))
             .expect("wide edit");
         for position in 0..3 {
             wide_edit
@@ -1073,7 +1117,7 @@ mod tests {
         let narrow_limits = TransactionLimits::new(2, 1024 * 1024, 4 * 1024 * 1024)
             .with_max_retained_render_bytes(1);
         let narrow = source
-            .edit_with_options(EditOptions::default().with_transaction_limits(narrow_limits))
+            .edit_with_options(EditOptions::default().transaction_limits(narrow_limits))
             .expect("narrow edit")
             .commit()
             .expect("narrow no-op commit")
@@ -1081,11 +1125,12 @@ mod tests {
         let applied = narrow
             .apply(&wide_patch)
             .expect("wide patch on narrow source");
-        let wider_options = EditOptions::default().with_transaction_limits(
+        let wider_options = EditOptions::default().transaction_limits(
             TransactionLimits::new(99, 4 * 1024 * 1024, 16 * 1024 * 1024)
                 .with_max_retained_render_bytes(4 * 1024 * 1024),
         );
         let mut follow_up = applied
+            .package()
             .edit_with_options(wider_options)
             .expect("narrow retained profile edit");
         follow_up
@@ -1119,7 +1164,7 @@ mod tests {
         let reopened = crate::Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
         let applied = reopened.apply(&patch).expect("equal fresh source");
         assert_eq!(
-            applied.to_bytes().unwrap(),
+            applied.package().to_bytes().unwrap(),
             patch.after_bytes(),
             "exact bytes authorize a separately reopened source"
         );
@@ -1136,7 +1181,7 @@ mod tests {
         .expect("authorization");
         let policy = ProtectionPolicy::allow_protected(authorization);
         let mut edit = source
-            .edit_with_options(EditOptions::default().with_protection_policy(policy))
+            .edit_with_options(EditOptions::default().protection_policy(policy))
             .expect("authorized edit");
         edit.replace_paragraph(Position::new(0), "after")
             .expect("protected replacement");
@@ -1146,7 +1191,7 @@ mod tests {
             .package()
             .apply(&patch.inverse())
             .expect("authorized package can apply its inverse");
-        assert_eq!(restored.to_bytes().unwrap(), source_bytes);
+        assert_eq!(restored.package().to_bytes().unwrap(), source_bytes);
 
         let reopened = crate::Package::from_bytes(&source_bytes).expect("fresh source");
         let error = reopened

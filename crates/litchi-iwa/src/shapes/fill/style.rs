@@ -15,7 +15,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -30,7 +30,7 @@ use super::{ShapeFill, ShapeImageDataIdentifier, ShapeImageFill, ShapeImageFillT
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_fill(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<ShapeFill> {
@@ -45,7 +45,7 @@ pub(crate) fn shape_fill(
 }
 
 pub(crate) fn set_shape_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     fill: &ShapeFill,
@@ -118,7 +118,7 @@ pub(crate) fn set_shape_fill(
 
 /// Embed image bytes and attach them as one shape's native image fill.
 pub(crate) fn set_shape_image_fill_data(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     preferred_filename: &str,
@@ -127,7 +127,7 @@ pub(crate) fn set_shape_image_fill_data(
     fill_size: DrawableSize,
     tint: Option<RgbaColor>,
 ) -> Result<ShapeImageFill> {
-    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    let mut media = crate::media::Draft::from_package(package.clone())?;
     let asset = media.insert_unreferenced(preferred_filename, data)?;
     if asset.media_type != MediaType::Image {
         return Err(Error::Bundle(format!(
@@ -164,7 +164,7 @@ pub(crate) fn set_shape_image_fill_data(
 
 /// Remove a direct fill override and restore the inherited appearance.
 pub(crate) fn reset_shape_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<bool> {
@@ -257,7 +257,7 @@ pub(crate) fn reset_shape_fill(
 }
 
 fn insert_fill_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_archive_name: &str,
     drawable_id: u64,
     style_archive_name: &str,
@@ -320,7 +320,7 @@ fn insert_fill_variation(
     Ok(())
 }
 
-pub(crate) fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> Result<()> {
+pub(crate) fn validate_image_asset(package: &HostPackage, fill: &ShapeFill) -> Result<()> {
     let Some(data_identifier) = image_data_identifier(fill)
         .map(MediaAssetId::try_from)
         .transpose()?
@@ -345,7 +345,7 @@ pub(crate) fn validate_image_asset(package: &IWorkPackage, fill: &ShapeFill) -> 
 }
 
 fn adjust_style_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_archive_name: &str,
     style_id: u64,
     old_data_identifier: Option<MediaAssetId>,
@@ -366,7 +366,7 @@ fn adjust_style_data_reference(
 }
 
 fn remove_style_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_archive_name: &str,
     style_id: u64,
     data_identifier: Option<MediaAssetId>,
@@ -380,13 +380,13 @@ fn remove_style_data_reference(
 }
 
 pub(crate) fn remove_orphaned_image_asset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     data_identifier: Option<u64>,
 ) -> Result<()> {
     let Some(data_identifier) = data_identifier.map(MediaAssetId::try_from).transpose()? else {
         return Ok(());
     };
-    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    let mut media = crate::media::Draft::from_package(package.clone())?;
     if media
         .asset(data_identifier)
         .is_some_and(|asset| !asset.is_referenced())
@@ -398,7 +398,7 @@ pub(crate) fn remove_orphaned_image_asset(
 }
 
 fn validate_fill(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: &ShapeFill,
@@ -412,7 +412,7 @@ fn validate_fill(
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -448,7 +448,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_fill(package: &IWorkPackage, first_style_id: u64) -> Result<ShapeFill> {
+fn inherited_shape_fill(package: &HostPackage, first_style_id: u64) -> Result<ShapeFill> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     for _ in 0..MAX_STYLE_INHERITANCE_DEPTH {

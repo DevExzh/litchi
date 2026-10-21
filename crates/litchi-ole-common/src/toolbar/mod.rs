@@ -33,4 +33,4 @@ pub use self::model::{
 };
 pub use self::patch::{Change, Patch};
 pub use self::snapshot::{Revision, Snapshot};
-pub use self::transaction::{Commit, Transaction};
+pub use self::transaction::{Commit, Diagnostics, Edit};

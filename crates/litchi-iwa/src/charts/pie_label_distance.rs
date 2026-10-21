@@ -9,7 +9,7 @@ use crate::charts::series_non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_fixed32_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Legacy `tschchartseriespie2_3labelexplosion`.
 const LEGACY_PIE_LABEL_DISTANCE_FIELD: u32 = 16;
@@ -72,7 +72,7 @@ impl TryFrom<f32> for ChartPieLabelDistance {
 
 /// Read every wedge's label distance in chart-series order.
 pub(crate) fn chart_pie_label_distances(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -91,7 +91,7 @@ pub(crate) fn chart_pie_label_distances(
 
 /// Set every wedge's label distance in chart-series order.
 pub(crate) fn set_chart_pie_label_distances(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

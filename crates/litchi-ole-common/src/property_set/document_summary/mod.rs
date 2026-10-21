@@ -4,7 +4,7 @@
 //! [`Section`](super::Section) model.  The complete section remains attached
 //! to every [`Snapshot`], so unrecognized properties and unsupported wire
 //! payloads are retained while known fields receive checked, contextual
-//! accessors.  [`Transaction`] produces a source-checked [`Patch`] and never
+//! accessors.  [`Edit`] produces a source-checked [`Patch`] and never
 //! activates links, signatures, or other OLE behaviors.
 
 mod codec;
@@ -29,4 +29,4 @@ pub use model::{
     MAX_TEXT_BYTES, MULTIMEDIA_CLIP_COUNT, NOTE_COUNT, PARAGRAPH_COUNT, PRESENTATION_FORMAT, SCALE,
     SHARED_DOCUMENT, SLIDE_COUNT, Snapshot, VERSION, Version,
 };
-pub use transaction::{Commit, Edit, Patch, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};

@@ -7,7 +7,7 @@ use crate::charts::rounded_corners::{
     set_chart_rounded_corners as set_native_chart_rounded_corners,
 };
 
-impl Editor {
+impl Draft {
     /// Read the rounded-corner settings for one native Pages body chart.
     pub fn body_chart_rounded_corners(
         &self,
@@ -27,7 +27,7 @@ impl Editor {
 }
 
 fn body_chart_rounded_corners(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<ChartRoundedCorners> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -40,7 +40,7 @@ fn body_chart_rounded_corners(
 }
 
 fn set_body_chart_rounded_corners(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     rounded_corners: ChartRoundedCorners,
 ) -> Result<()> {
@@ -56,7 +56,7 @@ fn set_body_chart_rounded_corners(
         "Pages",
         rounded_corners,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_rounded_corners(drawable_object_id)? != rounded_corners {
         return Err(Error::InvalidFormat(
             "Pages chart rounded-corner update failed validation".to_owned(),

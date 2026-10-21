@@ -28,7 +28,7 @@ fn preserves_ordered_character_property_revision_state() {
         .unwrap();
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let paragraphs = document.paragraphs().unwrap();
     let runs = paragraphs[0].runs().unwrap();

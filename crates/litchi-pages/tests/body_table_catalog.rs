@@ -474,7 +474,7 @@ fn catalog_resource_limit_is_reported_after_successful_package_ingress() -> Test
     )?;
     let before = exact_bytes(&package)?;
     match package.body_tables() {
-        Err(BodyTableCatalogError::LimitExceeded {
+        Err(BodyTableCatalogError::Limit {
             kind: BodyTableCatalogLimitKind::PayloadObjects,
             observed,
             maximum: reported_maximum,

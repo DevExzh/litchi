@@ -1,14 +1,13 @@
 //! Named paragraph-style lifecycle for sheet-owned text boxes.
 
-use super::{Editor, numbers_text_box_graph};
+use super::{Draft, numbers_text_box_graph};
 use crate::text::{
-    AppliedParagraphStyle, IWorkTextEditor, NamedParagraphStyle, ParagraphStyleId,
-    ParagraphStyleName, applied_named_paragraph_style_in_storage,
-    named_paragraph_styles_in_storage,
+    AppliedParagraphStyle, NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    applied_named_paragraph_style_in_storage, named_paragraph_styles_in_storage,
 };
 use crate::{Error, Result};
 
-impl Editor {
+impl Draft {
     /// List named paragraph styles selectable for a sheet-owned text box.
     pub fn sheet_text_box_named_paragraph_styles(
         &self,
@@ -36,7 +35,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let redefined = text.redefine_applied_named_paragraph_style(graph.storage_id)?;
         let verified = Self::from_package(text.into_package())?;
         let selection =
@@ -59,7 +58,7 @@ impl Editor {
         name: ParagraphStyleName,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let created = text.create_named_paragraph_style(graph.storage_id, source, name)?;
         let verified = Self::from_package(text.into_package())?;
         if !verified
@@ -83,7 +82,7 @@ impl Editor {
         name: ParagraphStyleName,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let renamed = text.rename_named_paragraph_style(graph.storage_id, target, name)?;
         let verified = Self::from_package(text.into_package())?;
         if !verified
@@ -106,7 +105,7 @@ impl Editor {
         target: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let applied = text.apply_named_paragraph_style(graph.storage_id, target)?;
         let verified = Self::from_package(text.into_package())?;
         let selection =
@@ -128,7 +127,7 @@ impl Editor {
         target: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let deleted = text.delete_named_paragraph_style(graph.storage_id, target)?;
         let verified = Self::from_package(text.into_package())?;
         if verified
@@ -153,7 +152,7 @@ impl Editor {
         replacement: ParagraphStyleId,
     ) -> Result<NamedParagraphStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let deleted = text.delete_applied_named_paragraph_style_with_replacement(
             graph.storage_id,
             target,

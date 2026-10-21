@@ -14,7 +14,7 @@ use crate::wire::{
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::{
     Endpoint, Endpoints, SHAPE_INFO_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE, reference,
@@ -244,7 +244,7 @@ fn required_length_delimited_payload<'a>(
     Ok(payload)
 }
 
-pub(crate) fn shape_style_is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(crate) fn shape_style_is_exclusive(package: &HostPackage, style_id: u64) -> Result<bool> {
     let mut shape_count = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
@@ -374,7 +374,7 @@ pub(crate) fn shape_style_variation_object(
 }
 
 pub(crate) fn patch_shape_style_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     old_style_id: u64,
@@ -441,7 +441,7 @@ pub(crate) fn patch_shape_style_reference(
 }
 
 pub(crate) fn insert_style_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     parent_style_id: u64,
@@ -486,7 +486,7 @@ pub(crate) fn insert_style_variation(
 }
 
 pub(crate) fn replace_style_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     style_id: u64,
     mut replacement: ArchiveObject,
@@ -541,7 +541,7 @@ pub(crate) struct ShapeStyleVariationLocation<'a> {
 }
 
 pub(crate) fn collapse_line_end_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: ShapeStyleVariationLocation<'_>,
 ) -> Result<()> {
     let drawable_archive_name = location.drawable_archive_name.to_owned();
@@ -558,7 +558,7 @@ pub(crate) fn collapse_line_end_variation(
 }
 
 pub(crate) fn collapse_style_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: ShapeStyleVariationLocation<'_>,
 ) -> Result<()> {
     let ShapeStyleVariationLocation {
@@ -605,7 +605,7 @@ pub(crate) fn collapse_style_variation(
 }
 
 pub(crate) fn remove_style_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     parent_style_id: u64,

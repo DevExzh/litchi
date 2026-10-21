@@ -8,7 +8,7 @@ use crate::package_metadata::{
     release_package_identifier_suffix, remove_component_external_references_to_object,
     remove_component_object_uuids, set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::date_time_field::{TextDateTimeField, TextDateTimeFieldId};
 use super::date_time_object::{
@@ -30,7 +30,7 @@ use litchi_iwa_text::position::{TextPosition, TextRange};
 const SMART_FIELD_TABLE: RangedObjectTable = RangedObjectTable::SmartField;
 
 pub(crate) fn text_date_time_fields(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<TextDateTimeField>> {
     let located = locate_storage_with_archive(package, storage_id, SMART_FIELD_TABLE)?;
@@ -40,7 +40,7 @@ pub(crate) fn text_date_time_fields(
 }
 
 pub(crate) fn add_text_date_time_field(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     settings: &Settings,
@@ -59,7 +59,7 @@ pub(crate) fn add_text_date_time_field(
 }
 
 pub(crate) fn insert_text_date_time_field(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     position: TextPosition,
     display_text: &DisplayText,
@@ -90,7 +90,7 @@ pub(crate) fn insert_text_date_time_field(
 }
 
 fn add_date_time_field_in_place(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     settings: &Settings,
@@ -135,7 +135,7 @@ fn add_date_time_field_in_place(
 }
 
 pub(crate) fn update_text_date_time_field(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextDateTimeFieldId,
     range: TextRange,
@@ -194,7 +194,7 @@ pub(crate) fn update_text_date_time_field(
 }
 
 pub(crate) fn remove_text_date_time_field(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextDateTimeFieldId,
 ) -> Result<TextDateTimeField> {
@@ -257,7 +257,7 @@ pub(crate) fn remove_text_date_time_field(
 }
 
 pub(crate) fn remove_unreferenced_date_time_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {
@@ -312,7 +312,7 @@ pub(crate) fn remove_unreferenced_date_time_objects(
 }
 
 fn date_time_field_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     id: TextDateTimeFieldId,
 ) -> Result<TextDateTimeField> {
@@ -374,7 +374,7 @@ fn collect_date_time_fields(
     Ok(fields)
 }
 
-fn text_in_range(package: &IWorkPackage, storage_id: u64, range: TextRange) -> Result<String> {
+fn text_in_range(package: &HostPackage, storage_id: u64, range: TextRange) -> Result<String> {
     let location = locate_storage(package, storage_id, SMART_FIELD_TABLE)?;
     let units = location
         .storage
@@ -396,8 +396,8 @@ fn text_in_range(package: &IWorkPackage, storage_id: u64, range: TextRange) -> R
     })
 }
 
-fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
-    IWorkPackage::from_bytes(&package.to_bytes()?)
+fn roundtrip(package: &HostPackage) -> Result<HostPackage> {
+    HostPackage::from_bytes(&package.to_bytes()?)
 }
 
 #[cfg(test)]

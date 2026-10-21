@@ -1,11 +1,11 @@
 //! Date & Time smart-field CRUD for Keynote text boxes.
 
-use super::Editor;
+use super::Draft;
 use crate::Result;
 use crate::text::{TextDateTimeField, TextDateTimeFieldId, TextPosition, TextRange};
 use litchi_iwa_text::date_time::{DisplayText, Settings};
 
-impl Editor {
+impl Draft {
     /// Read every native Date & Time field in one Keynote text box.
     pub fn slide_text_box_date_time_fields(
         &self,

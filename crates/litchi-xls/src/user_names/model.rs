@@ -2,6 +2,7 @@
 
 use crate::revision_records::ShortDtr;
 use crate::{Error, Result};
+use litchi_core::edit::RefusalKind;
 
 /// A GUID-sized revision-log identity used by `UsrInfo.guid`.
 pub type UserGuid = [u8; 16];
@@ -315,9 +316,11 @@ impl Default for Limits {
 pub(crate) fn validate_user_name(user_name: &str) -> Result<()> {
     let utf16_len = user_name.encode_utf16().count();
     if !(1..=54).contains(&utf16_len) {
-        return Err(Error::UnsafeEdit(format!(
-            "UsrInfo user name has {utf16_len} UTF-16 code units; expected 1..=54"
-        )));
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit user names",
+            "UsrInfo user name has UTF-16 code units; expected 1..=54",
+        ));
     }
     Ok(())
 }

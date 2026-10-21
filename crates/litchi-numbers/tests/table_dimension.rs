@@ -563,23 +563,27 @@ fn selector_bounds_locking_and_public_values_are_typed_and_redacted() -> TestRes
     let package = Package::open(fixture_path())?;
     assert!(matches!(
         package.table_dimension_size("private missing sheet", 0usize, Dimension::Row(0)),
-        Err(TransactionError::SheetNotFound)
+        Err(TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_dimension_size(0usize, "private missing table", Dimension::Row(0)),
-        Err(TransactionError::TableNotFound)
+        Err(TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::TableNotFound
+        ))
     ));
     for (dimension, length) in [(Dimension::Row(22), 22), (Dimension::Column(7), 7)] {
         assert!(matches!(
             package.table_dimension_size(0usize, 0usize, dimension),
-            Err(TransactionError::OutOfBounds {
+            Err(TransactionError::Refused(litchi_numbers::table::dimension::transaction::Refusal::OutOfBounds {
                 path: Path::Dimension {
                     sheet: 0,
                     table: 0,
                     dimension: actual,
                 },
                 length: actual_length,
-            }) if actual == dimension && actual_length == length
+            })) if actual == dimension && actual_length == length
         ));
     }
     for invalid in [0.0, -1.0, f32::INFINITY, f32::NEG_INFINITY, f32::NAN] {
@@ -603,13 +607,15 @@ fn selector_bounds_locking_and_public_values_are_typed_and_redacted() -> TestRes
         .expect_err("changed locked dimension must refuse");
     assert!(matches!(
         error,
-        TransactionError::TableLocked {
-            path: Path::Dimension {
-                sheet: 0,
-                table: 0,
-                dimension: Dimension::Row(0),
+        TransactionError::Refused(
+            litchi_numbers::table::dimension::transaction::Refusal::TableLocked {
+                path: Path::Dimension {
+                    sheet: 0,
+                    table: 0,
+                    dimension: Dimension::Row(0),
+                }
             }
-        }
+        )
     ));
     for rendered in [format!("{error:?}"), error.to_string()] {
         assert!(!rendered.contains(FIXTURE_MARKER));
@@ -1237,7 +1243,7 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
         .expect_err("max-minus-one transaction work must refuse before reopen");
     assert!(matches!(
         error,
-        TransactionError::LimitExceeded {
+        TransactionError::Limit {
             kind: LimitKind::TransactionWork,
             observed: actual,
             maximum: actual_maximum,
@@ -1279,7 +1285,7 @@ fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResul
     let read_before = read_restricted.exact_bytes();
     assert!(matches!(
         read_restricted.table_dimension_size(0usize, 0usize, Dimension::Column(2)),
-        Err(TransactionError::LimitExceeded {
+        Err(TransactionError::Limit {
             kind: LimitKind::PayloadReferences,
             observed,
             maximum,
@@ -1318,7 +1324,7 @@ fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResul
         .expect_err("cumulative max-minus-one commit must refuse atomically");
     assert!(matches!(
         error,
-        TransactionError::LimitExceeded {
+        TransactionError::Limit {
             kind: LimitKind::PayloadReferences,
             observed,
             maximum,

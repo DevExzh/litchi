@@ -210,7 +210,7 @@ fn assert_image_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
@@ -221,7 +221,7 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(adjustments.payload())?
+        WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
             .fields()
             .filter(|field| !ADJUSTMENT_FIELDS.contains(&field.number()))
             .map(|field| field.raw().to_vec()),
@@ -230,12 +230,12 @@ fn unknown_image_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn sharpness_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let adjustments = root
         .fields()
         .find(|field| field.number() == IMAGE_ADJUSTMENTS_FIELD)
         .ok_or_else(|| io::Error::other("native image-adjustments field is missing"))?;
-    Ok(WireView::parse(adjustments.payload())?
+    Ok(WireView::parse(adjustments.payload(), WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == SHARPNESS_FIELD)
         .map(|field| field.raw().to_vec())

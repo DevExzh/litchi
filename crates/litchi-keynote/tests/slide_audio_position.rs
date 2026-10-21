@@ -599,7 +599,7 @@ fn replace_unique_length_field(
     number: u32,
     replacement: Option<&[u8]>,
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len());
     let mut found = false;
     for field in view.fields() {
@@ -612,7 +612,12 @@ fn replace_unique_length_field(
         }
         found = true;
         if let Some(replacement) = replacement {
-            append_length_delimited_field(&mut output, number, replacement)?;
+            append_length_delimited_field(
+                &mut output,
+                number,
+                replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
     }
     if !found {
@@ -622,7 +627,7 @@ fn replace_unique_length_field(
 }
 
 fn remove_optional_length_field(payload: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     if !view.fields().any(|field| field.number() == number) {
         return Ok(payload.to_vec());
     }
@@ -645,12 +650,15 @@ fn without_geometry_size(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter_mut()
         .find(|message| message.type_ == MOVIE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("first audio movie message is missing"))?;
-    let root = WireView::parse(&message.data)?;
+    let root = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("audio drawable envelope is missing"))?;
-    let super_view = WireView::parse(super_field.payload())?;
+    let super_view = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let geometry_field = super_view
         .fields()
         .find(|field| field.number() == 1)
@@ -1070,17 +1078,17 @@ fn native_audio_position_accepts_absent_size_and_keeps_it_absent() -> TestResult
         &exact_bytes(commit.package())?,
         *native_audio_ids(&source)?.first().unwrap(),
     )?;
-    let geometry = WireView::parse(&target)?
+    let geometry = WireView::parse(&target, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing audio super envelope"))?;
-    let geometry = WireView::parse(geometry.payload())?
+    let geometry = WireView::parse(geometry.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing audio geometry"))?;
     assert!(
         geometry.payload().is_empty()
-            || !WireView::parse(geometry.payload())?
+            || !WireView::parse(geometry.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == 2)
     );

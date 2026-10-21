@@ -6,7 +6,7 @@ use litchi_cfb::OleFile;
 
 use super::codec;
 use super::model::{Limits, Result, Store};
-use super::transaction::Transaction;
+use super::transaction::Edit;
 
 /// A deterministic identity for one validated Custom XML store source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,55 +53,29 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Validates a store with the default resource profile.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `store` violates the default Custom XML limits.
-    pub fn from_store(store: Store) -> Result<Self> {
-        Self::from_store_with_limits(store, Limits::default())
-    }
-
-    /// Validates a store with caller-selected bounded resource limits.
+    /// Validates a store with bounded resource limits
+    /// ([`Limits::default`] is the default profile).
     ///
     /// # Errors
     ///
     /// Returns an error if `store` violates `limits`.
-    pub fn from_store_with_limits(store: Store, limits: Limits) -> Result<Self> {
+    pub fn from_store(store: Store, limits: Limits) -> Result<Self> {
         codec::validate_store(&store, &limits)?;
         Ok(Self::from_validated(store, limits))
     }
 
-    /// Inspects a complete OLE file and captures its Custom XML store.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the OLE file or its Custom XML store is malformed.
-    pub fn load<R: std::io::Read + std::io::Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>> {
-        Self::load_with_limits(ole, Limits::default())
-    }
-
-    /// Inspects a complete OLE file with caller-selected resource limits.
+    /// Inspects a complete OLE file and captures its Custom XML store under
+    /// bounded resource limits ([`Limits::default`] is the default profile).
     ///
     /// # Errors
     ///
     /// Returns an error if the OLE file or Custom XML store is malformed, or
     /// if it exceeds `limits`.
-    pub fn load_with_limits<R: std::io::Read + std::io::Seek>(
+    pub fn load<R: std::io::Read + std::io::Seek>(
         ole: &mut OleFile<R>,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        Ok(codec::inspect_with_limits(ole, limits)?
-            .map(|store| Self::from_validated(store, limits)))
-    }
-
-    /// Alias for [`Self::load`] that emphasizes source-bound parsing.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::load`].
-    pub fn read<R: std::io::Read + std::io::Seek>(ole: &mut OleFile<R>) -> Result<Option<Self>> {
-        Self::load(ole)
+        Ok(codec::inspect(ole, limits)?.map(|store| Self::from_validated(store, limits)))
     }
 
     /// Borrow the complete typed store projection.
@@ -154,14 +128,8 @@ impl Snapshot {
 
     /// Start an isolated bounded edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`] for transaction-oriented callers.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Consume the snapshot into its typed store projection.

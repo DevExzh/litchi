@@ -20,7 +20,7 @@ use litchi_core::FileFormat;
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects",
+        odf_objects,
         feature = "iwork-adapter"
     )),
     allow(
@@ -139,7 +139,7 @@ impl File {
                 crate::path::resolve::get(&crate::format::odp::Nav::new(handle), &path)
                     .map(Node::Odp)
             },
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -233,7 +233,7 @@ impl File {
                 crate::path::resolve::find(&crate::format::odp::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Odp))
             },
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -322,7 +322,7 @@ impl File {
             Self::Odp(handle) => {
                 crate::query::run(crate::format::odp::Nav::new(handle), selector).map(Matches::odp)
             },
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -414,7 +414,7 @@ impl File {
                 &crate::view::mode::Options::default(),
             )
             .map(crate::view::Json::odp),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)
@@ -502,7 +502,7 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Self::Odg(handle)
             | Self::Odc(handle)
             | Self::Odi(handle)

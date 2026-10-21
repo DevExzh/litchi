@@ -5,7 +5,7 @@ use super::{Error, Result};
 
 /// A reversible replacement of a complete validated DOC artifact.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
     before_fingerprint: u64,
@@ -24,36 +24,36 @@ impl Patch {
 
     /// Returns the exact source snapshot required by this patch.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Returns the exact replacement snapshot produced by this patch.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Returns the source fingerprint used as a fast conflict precheck.
     #[must_use]
-    pub const fn source_fingerprint(&self) -> u64 {
+    pub(crate) const fn source_fingerprint(&self) -> u64 {
         self.before_fingerprint
     }
 
     /// Returns the replacement fingerprint.
     #[must_use]
-    pub const fn target_fingerprint(&self) -> u64 {
+    pub(crate) const fn target_fingerprint(&self) -> u64 {
         self.after_fingerprint
     }
 
     /// Whether the complete DOC artifact is byte-for-byte unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.bytes() == self.after.bytes()
     }
 
     /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.fingerprint() != self.before_fingerprint || source.bytes() != self.before.bytes()
         {
             return Err(Error::Conflict);
@@ -70,7 +70,7 @@ impl Patch {
 
     /// Returns the exact inverse replacement.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),

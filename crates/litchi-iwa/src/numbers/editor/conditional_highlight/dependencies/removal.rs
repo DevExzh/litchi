@@ -5,7 +5,7 @@ use prost::Message;
 use super::*;
 
 pub(in crate::numbers::editor::conditional_highlight) fn remove_volatile_host(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     conditional_owner_uid: tsp::Uuid,
     row: usize,
     column: usize,

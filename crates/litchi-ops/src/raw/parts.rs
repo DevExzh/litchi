@@ -344,12 +344,7 @@ fn opc(file: &File, operation: &str) -> Result<(FileFormat, OpcPackage)> {
     writable(file)?;
     match Container::of(file) {
         Ok(Container::Opc { format, package }) => Ok((format, *package)),
-        #[cfg(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ))]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         Ok(Container::Odf { .. }) => Err(no_raw_write(file, operation)),
         Err(error) if error.code() == Code::UnsupportedCapability => {
             Err(no_raw_write(file, operation))

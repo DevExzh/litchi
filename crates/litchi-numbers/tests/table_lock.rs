@@ -119,11 +119,17 @@ fn table_info_payload(model: u64, locked: Option<bool>, unknowns: bool) -> TestR
         litchi_iwa_common::wire::append_varint_field(&mut drawable, 97, 9_997)?;
     }
     let mut payload = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 1, &drawable)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     litchi_iwa_common::wire::append_length_delimited_field(
         &mut payload,
         2,
         &reference(model).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     if unknowns {
         litchi_iwa_common::wire::append_varint_field(&mut payload, 98, 9_998)?;
@@ -373,7 +379,12 @@ fn with_selected_unknown_padding(package: &[u8], length: usize) -> TestResult<Ve
                 value.wrapping_mul(0x9e37_79b9_7f4a_7c15).rotate_left(17) as u8
             })
             .collect::<Vec<_>>();
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 96, &padding)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            96,
+            &padding,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         object.replace_message_preserving_header(
             index,
             RawMessage {
@@ -547,11 +558,13 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_only_tables_component_changed(before: &[u8], after: &[u8]) -> TestResult {
@@ -617,7 +630,9 @@ fn semantic_sheet_and_table_selectors_distinguish_absent_false_and_true() -> Tes
     );
     assert!(matches!(
         dense.table_lock(SheetSelector::index(0), TableSelector::index(35)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }
@@ -628,19 +643,27 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.table_lock("Missing sheet", ABSENT_TABLE_NAME),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(2), TableSelector::index(0)),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(FIRST_SHEET_NAME, "Missing table"),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(0), TableSelector::index(3)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
 
     let duplicate_name = rewrite_component(&bytes, TABLES_MEMBER, |archive| {
@@ -772,12 +795,12 @@ fn changed_lock_preserves_locality_unknowns_headers_and_exact_inverse() -> TestR
         raw_fields(&target_payload, 98)?,
         raw_fields(&source_payload, 98)?
     );
-    let source_drawable = WireView::parse(&source_payload)?
+    let source_drawable = WireView::parse(&source_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("source drawable field is missing"))?
         .canonical_payload()?;
-    let target_drawable = WireView::parse(&target_payload)?
+    let target_drawable = WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("target drawable field is missing"))?
@@ -849,12 +872,12 @@ fn flat_legacy_table_info_edits_preserve_presence_locality_and_exact_inverse() -
     );
     let absent_payload = message_payload(&bytes, ABSENT_INFO, LEGACY_TABLE_INFO_MESSAGE_TYPE)?;
     let false_payload = message_payload(&bytes, FALSE_INFO, LEGACY_TABLE_INFO_MESSAGE_TYPE)?;
-    let absent_drawable = WireView::parse(&absent_payload)?
+    let absent_drawable = WireView::parse(&absent_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("legacy absent drawable is missing"))?
         .canonical_payload()?;
-    let false_drawable = WireView::parse(&false_payload)?
+    let false_drawable = WireView::parse(&false_payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("legacy false drawable is missing"))?
@@ -1136,7 +1159,9 @@ fn legacy_nested_index_reads_and_noops_but_refuses_changed_publication() -> Test
     changed.lock();
     assert!(matches!(
         changed.commit(),
-        Err(TableLockError::UnsupportedSource)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(package.exact_bytes(), legacy);
     Ok(())
@@ -1174,7 +1199,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     edit.lock();
     match edit.commit() {
-        Err(TableLockError::LimitExceeded {
+        Err(TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             ..
         }) => {},
@@ -1245,10 +1270,10 @@ fn debug_and_error_text_are_redacted_from_authored_and_physical_names() -> TestR
         assert!(!patch_debug.contains(redacted));
     }
     for error in [
-        TableLockError::SheetNotFound,
-        TableLockError::TableNotFound,
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::SheetNotFound),
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::TableNotFound),
         TableLockError::PatchConflict,
-        TableLockError::LimitExceeded {
+        TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             observed: 11,
             maximum: 10,

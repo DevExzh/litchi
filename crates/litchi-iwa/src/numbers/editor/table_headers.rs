@@ -46,7 +46,7 @@ pub(super) fn settings_from_model(model: &TableModelArchive) -> Result<Settings>
 }
 
 fn read_table_header_settings(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &TableDescriptor,
 ) -> Result<Settings> {
     let locations = object_locations(package)?;
@@ -78,7 +78,7 @@ fn read_table_header_settings(
 }
 
 pub(super) fn set_attached_table_header_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     settings: Settings,
 ) -> Result<()> {

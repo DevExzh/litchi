@@ -284,10 +284,25 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &stylesheet)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 900)?;
     Ok(data)
 }
@@ -327,7 +342,7 @@ fn metadata_components(
     field_number: u32,
 ) -> TestResult<Vec<(tsp::ComponentInfo, Vec<u8>)>> {
     let payload = metadata_payload_from_bytes(source)?;
-    WireView::parse(&payload)?
+    WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == field_number)
         .map(|field| {
@@ -536,8 +551,14 @@ fn assert_appearance_read_rejects(source: &[u8]) -> TestResult {
         Err(_) => Ok(()),
         Ok(package) => match package.table_appearance(0usize, 0usize) {
             Err(Error::InvalidSource { .. })
-            | Err(Error::UnsupportedDependency { .. })
-            | Err(Error::UnsupportedSource) => Ok(()),
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedDependency {
+                    ..
+                },
+            ))
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedSource,
+            )) => Ok(()),
             Ok(_) => Err(io::Error::other("malformed appearance graph was accepted").into()),
             Err(error) => Err(io::Error::other(format!("unexpected error: {error}")).into()),
         },
@@ -600,11 +621,14 @@ fn assert_reserved_identifier_is_not_reused(source: &[u8]) -> TestResult {
 }
 
 fn raw_fields(source: &[u8], field_number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(&metadata_payload_from_bytes(source)?)?
-        .fields()
-        .filter(|field| field.number() == field_number)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(WireView::parse(
+        &metadata_payload_from_bytes(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == field_number)
+    .map(|field| field.raw().to_owned())
+    .collect())
 }
 
 fn without_wire_field(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
@@ -612,7 +636,7 @@ fn without_wire_field(source: &[u8], field_number: u32) -> TestResult<Vec<u8>> {
 }
 
 fn without_wire_fields(source: &[u8], field_numbers: &[u32]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     for field in view
         .fields()
@@ -628,7 +652,7 @@ fn append_nested_wire_field(
     outer_field: u32,
     nested_field: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     let mut appended = false;
     for field in view.fields() {
@@ -636,13 +660,18 @@ fn append_nested_wire_field(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut payload = Vec::new();
         for child in nested.fields() {
             payload.extend_from_slice(child.raw());
         }
         payload.extend_from_slice(nested_field);
-        append_length_delimited_field(&mut output, outer_field, &payload)?;
+        append_length_delimited_field(
+            &mut output,
+            outer_field,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         appended = true;
     }
     if !appended {
@@ -657,7 +686,7 @@ fn replace_nested_wire_field(
     nested_field: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     let mut replaced = false;
     for field in view.fields() {
@@ -665,7 +694,7 @@ fn replace_nested_wire_field(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut payload = Vec::new();
         for child in nested.fields() {
             if child.number() == nested_field && !replaced {
@@ -675,7 +704,12 @@ fn replace_nested_wire_field(
                 payload.extend_from_slice(child.raw());
             }
         }
-        append_length_delimited_field(&mut output, outer_field, &payload)?;
+        append_length_delimited_field(
+            &mut output,
+            outer_field,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if !replaced {
         return Err(io::Error::other("nested protobuf field is missing").into());
@@ -684,19 +718,23 @@ fn replace_nested_wire_field(
 }
 
 fn unknown_component_fields(raw: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(raw)?
-        .fields()
-        .filter(|field| field.number() == 90)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(
+        WireView::parse(raw, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == 90)
+            .map(|field| field.raw().to_owned())
+            .collect(),
+    )
 }
 
 fn wire_fields(source: &[u8], field_number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(source)?
-        .fields()
-        .filter(|field| field.number() == field_number)
-        .map(|field| field.raw().to_owned())
-        .collect())
+    Ok(
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == field_number)
+            .map(|field| field.raw().to_owned())
+            .collect(),
+    )
 }
 
 fn metadata_transition_assertions(source: &[u8], target: &[u8]) -> TestResult {
@@ -1216,7 +1254,10 @@ fn missing_metadata_and_locked_table_fail_atomically() -> TestResult {
         .set(custom_appearance())
         .commit()
         .expect_err("locked table must refuse changed appearance");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::appearance::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }
@@ -1231,6 +1272,7 @@ fn duplicate_edges_missing_stylesheet_and_inheritance_cycle_fail_closed() -> Tes
                 &mut message.data,
                 3,
                 &reference(PARENT_STYLE_ID).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(())
         })?;
@@ -1257,6 +1299,7 @@ fn duplicate_edges_missing_stylesheet_and_inheritance_cycle_fail_closed() -> Tes
                 &mut duplicate,
                 5,
                 &reference(STYLESHEET_ID).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             message.data = append_nested_wire_field(&message.data, 1, &duplicate)?;
             Ok(())

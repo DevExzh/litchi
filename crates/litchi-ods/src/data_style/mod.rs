@@ -2689,9 +2689,13 @@ pub fn parse_integer(value: &str, label: &str) -> Result<i64> {
     normalized
         .parse::<i64>()
         .map_err(|error| match error.kind() {
-            IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => Error::Unsupported(format!(
-                "ODF {label} integer is outside the bounded i64 model"
-            )),
+            IntErrorKind::PosOverflow | IntErrorKind::NegOverflow => {
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "ods.data_style",
+                    "ODF integer is outside the bounded i64 model",
+                ))
+            },
             _ => invalid_error(format!("invalid ODF integer for {label}")),
         })
 }
@@ -2702,8 +2706,10 @@ pub fn parse_positive(value: &str, label: &str) -> Result<u64> {
     let parsed = normalized
         .parse::<u64>()
         .map_err(|error| match error.kind() {
-            IntErrorKind::PosOverflow => Error::Unsupported(format!(
-                "ODF {label} positive integer is outside the bounded u64 model"
+            IntErrorKind::PosOverflow => Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "ods.data_style",
+                "ODF positive integer is outside the bounded u64 model",
             )),
             _ => invalid_error(format!("invalid ODF positive integer for {label}")),
         })?;
@@ -4214,11 +4220,11 @@ mod tests {
         assert!(parse_boolean("0", "boolean").is_err());
         assert!(matches!(
             parse_integer("9223372036854775808", "integer"),
-            Err(Error::Unsupported(_))
+            Err(Error::Unsupported(_) | Error::Refused(_))
         ));
         assert!(matches!(
             parse_positive("18446744073709551616", "positive"),
-            Err(Error::Unsupported(_))
+            Err(Error::Unsupported(_) | Error::Refused(_))
         ));
         assert!(matches!(
             parse_integer("1.0", "integer"),

@@ -7,7 +7,7 @@ use std::path::Path;
 use crate::archive::RawMessage;
 use crate::protobuf::tswp::StorageArchive;
 use crate::shapes::RgbaColor;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::TextStorageId;
 use super::bookmark::{
@@ -138,24 +138,24 @@ pub struct TextStorageInfo {
 
 /// Mutable editor for the TSWP text layer shared by Pages, Numbers, and Keynote.
 #[derive(Debug, Clone)]
-pub struct IWorkTextEditor {
-    package: IWorkPackage,
+pub struct Draft {
+    package: HostPackage,
 }
 
-impl IWorkTextEditor {
+impl Draft {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
-            package: IWorkPackage::open(path)?,
+            package: HostPackage::open(path)?,
         })
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Ok(Self {
-            package: IWorkPackage::from_bytes(bytes)?,
+            package: HostPackage::from_bytes(bytes)?,
         })
     }
 
-    pub(crate) fn from_package(package: IWorkPackage) -> Self {
+    pub(crate) fn from_package(package: HostPackage) -> Self {
         Self { package }
     }
 
@@ -203,7 +203,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         replace_storage_text(&mut staged, object_id, range, replacement)?;
         let bytes = staged.to_bytes()?;
-        IWorkPackage::from_bytes(&bytes)?;
+        HostPackage::from_bytes(&bytes)?;
         self.package = staged;
         Ok(())
     }
@@ -232,7 +232,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_style(&mut staged, object_id, style)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_style(&verified, object_id)? != style {
             return Err(Error::InvalidFormat(
                 "iWork text-style update failed round-trip validation".to_owned(),
@@ -249,7 +249,7 @@ impl IWorkTextEditor {
         let changed = reset_text_style(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -270,7 +270,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_font(&mut staged, object_id, font.clone())?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_font(&verified, object_id)? != font {
             return Err(Error::InvalidFormat(
                 "iWork text font update failed round-trip validation".to_owned(),
@@ -287,7 +287,7 @@ impl IWorkTextEditor {
         let changed = reset_text_font(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -320,7 +320,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_language(&mut staged, object_id, position, &language)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_language(&verified, object_id, position)? != language {
             return Err(Error::InvalidFormat(
                 "iWork text-language update failed round-trip validation".to_owned(),
@@ -341,7 +341,7 @@ impl IWorkTextEditor {
         let changed = remove_text_language_boundary(&mut staged, object_id, position)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if text_languages(&verified, object_id)?
                 .iter()
                 .any(|run| run.position == position)
@@ -362,7 +362,7 @@ impl IWorkTextEditor {
         let changed = reset_text_languages(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if !text_languages(&verified, object_id)?.is_empty() {
                 return Err(Error::InvalidFormat(
                     "iWork text-language reset failed round-trip validation".to_owned(),
@@ -694,7 +694,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list(&mut staged, object_id, list)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list(&verified, object_id)? != list {
             return Err(Error::InvalidFormat(
                 "iWork paragraph-list update failed round-trip validation".to_owned(),
@@ -711,7 +711,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list(&verified, object_id)? != ParagraphList::None {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph-list reset failed round-trip validation".to_owned(),
@@ -742,7 +742,7 @@ impl IWorkTextEditor {
         set_paragraph_lists(&mut staged, object_id, placements)?;
         let expected = paragraph_lists(&staged, object_id)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_lists(&verified, object_id)? != expected {
             return Err(Error::InvalidFormat(
                 "iWork paragraph-list placements failed round-trip validation".to_owned(),
@@ -782,7 +782,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_level(&mut staged, object_id, paragraph, level)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_level(&verified, object_id, paragraph)? != level {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-level update failed round-trip validation".to_owned(),
@@ -803,7 +803,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_level(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_level(&verified, object_id, paragraph)? != ParagraphListLevel::ZERO {
                 return Err(Error::InvalidFormat(
                     "iWork paragraph list-level reset failed round-trip validation".to_owned(),
@@ -835,7 +835,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_numbering(&mut staged, object_id, paragraph, numbering)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_numbering(&verified, object_id, paragraph)? != numbering {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-numbering update failed round-trip validation".to_owned(),
@@ -866,7 +866,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_number_format(&mut staged, object_id, paragraph, format)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_number_format(&verified, object_id, paragraph)? != format {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-number format update failed round-trip validation".to_owned(),
@@ -887,7 +887,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_number_format(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_number_format(&verified, object_id, paragraph)?
                 != ParagraphListNumberFormat::DECIMAL
             {
@@ -922,7 +922,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_number_tiering(&mut staged, object_id, paragraph, tiering)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_number_tiering(&verified, object_id, paragraph)? != tiering {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-number tiering update failed round-trip validation"
@@ -944,7 +944,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_number_tiering(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_number_tiering(&verified, object_id, paragraph)?
                 != ParagraphListNumberTiering::Flat
             {
@@ -979,7 +979,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_number_scale(&mut staged, object_id, paragraph, scale)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_number_scale(&verified, object_id, paragraph)? != scale {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-number scale update failed round-trip validation".to_owned(),
@@ -1000,7 +1000,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_number_scale(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_number_scale(&verified, object_id, paragraph)?
                 != ParagraphListNumberScale::ONE
             {
@@ -1035,7 +1035,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_bullet(&mut staged, object_id, paragraph, bullet)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_bullet(&verified, object_id, paragraph)? != *bullet {
             return Err(Error::InvalidFormat(
                 "iWork paragraph text-bullet update failed round-trip validation".to_owned(),
@@ -1056,7 +1056,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_bullet(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_bullet(&verified, object_id, paragraph)?.as_str()
                 != ParagraphListBullet::STANDARD
             {
@@ -1090,7 +1090,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph, geometry)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_bullet_geometry(&verified, object_id, paragraph)? != geometry {
             return Err(Error::InvalidFormat(
                 "iWork paragraph text-bullet geometry update failed round-trip validation"
@@ -1112,7 +1112,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_bullet_geometry(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             let level = paragraph_list_level(&verified, object_id, paragraph)?;
             if paragraph_list_bullet_geometry(&verified, object_id, paragraph)?
                 != ParagraphListBulletGeometry::standard(level)
@@ -1148,7 +1148,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_indentation(&mut staged, object_id, paragraph, indentation)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_indentation(&verified, object_id, paragraph)? != indentation {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-indentation update failed round-trip validation".to_owned(),
@@ -1169,7 +1169,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_indentation(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             let list = paragraph_lists(&verified, object_id)?
                 .into_iter()
                 .take_while(|placement| placement.paragraph <= paragraph)
@@ -1215,7 +1215,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_list_label_color(&mut staged, object_id, paragraph, color)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_list_label_color(&verified, object_id, paragraph)? != color {
             return Err(Error::InvalidFormat(
                 "iWork paragraph list-label color update failed round-trip validation".to_owned(),
@@ -1236,7 +1236,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_list_label_color(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_list_label_color(&verified, object_id, paragraph)?
                 != ParagraphListLabelColor::Automatic
             {
@@ -1269,7 +1269,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_decorations(&mut staged, object_id, decorations)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_decorations(&verified, object_id)? != decorations {
             return Err(Error::InvalidFormat(
                 "iWork text-decoration update failed round-trip validation".to_owned(),
@@ -1286,7 +1286,7 @@ impl IWorkTextEditor {
         let changed = reset_text_decorations(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1307,7 +1307,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_color(&mut staged, object_id, color)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_color(&verified, object_id)? != color {
             return Err(Error::InvalidFormat(
                 "iWork text-color update failed round-trip validation".to_owned(),
@@ -1324,7 +1324,7 @@ impl IWorkTextEditor {
         let changed = reset_text_color(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1349,7 +1349,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_capitalization(&mut staged, object_id, capitalization)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_capitalization(&verified, object_id)? != capitalization {
             return Err(Error::InvalidFormat(
                 "iWork text-capitalization update failed round-trip validation".to_owned(),
@@ -1366,7 +1366,7 @@ impl IWorkTextEditor {
         let changed = reset_text_capitalization(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1387,7 +1387,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_script(&mut staged, object_id, script)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_script(&verified, object_id)? != script {
             return Err(Error::InvalidFormat(
                 "iWork text-script update failed round-trip validation".to_owned(),
@@ -1404,7 +1404,7 @@ impl IWorkTextEditor {
         let changed = reset_text_script(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1429,7 +1429,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_baseline_shift(&mut staged, object_id, shift)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_baseline_shift(&verified, object_id)? != shift {
             return Err(Error::InvalidFormat(
                 "iWork text baseline-shift update failed round-trip validation".to_owned(),
@@ -1446,7 +1446,7 @@ impl IWorkTextEditor {
         let changed = reset_text_baseline_shift(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1471,7 +1471,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_character_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_character_spacing(&verified, object_id)? != spacing {
             return Err(Error::InvalidFormat(
                 "iWork text character-spacing update failed round-trip validation".to_owned(),
@@ -1488,7 +1488,7 @@ impl IWorkTextEditor {
         let changed = reset_text_character_spacing(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1513,7 +1513,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_ligatures(&mut staged, object_id, ligatures)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_ligatures(&verified, object_id)? != ligatures {
             return Err(Error::InvalidFormat(
                 "iWork text ligature update failed round-trip validation".to_owned(),
@@ -1530,7 +1530,7 @@ impl IWorkTextEditor {
         let changed = reset_text_ligatures(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1551,7 +1551,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_outline(&mut staged, object_id, outline)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_outline(&verified, object_id)? != outline {
             return Err(Error::InvalidFormat(
                 "iWork text outline update failed round-trip validation".to_owned(),
@@ -1568,7 +1568,7 @@ impl IWorkTextEditor {
         let changed = reset_text_outline(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1589,7 +1589,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_shadow(&mut staged, object_id, shadow)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_shadow(&verified, object_id)? != shadow {
             return Err(Error::InvalidFormat(
                 "iWork text shadow update failed round-trip validation".to_owned(),
@@ -1606,7 +1606,7 @@ impl IWorkTextEditor {
         let changed = reset_text_shadow(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1631,7 +1631,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_text_background(&mut staged, object_id, background)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if text_background(&verified, object_id)? != background {
             return Err(Error::InvalidFormat(
                 "iWork text background update failed round-trip validation".to_owned(),
@@ -1648,7 +1648,7 @@ impl IWorkTextEditor {
         let changed = reset_text_background(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1673,7 +1673,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_background(&mut staged, object_id, background)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_background(&verified, object_id)? != background {
             return Err(Error::InvalidFormat(
                 "iWork paragraph background update failed round-trip validation".to_owned(),
@@ -1690,7 +1690,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_background(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1712,7 +1712,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_borders(&mut staged, object_id, borders)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_borders(&verified, object_id)? != borders {
             return Err(Error::InvalidFormat(
                 "iWork paragraph border update failed round-trip validation".to_owned(),
@@ -1729,7 +1729,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_borders(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1751,7 +1751,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_flow(&mut staged, object_id, flow)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_flow(&verified, object_id)? != flow {
             return Err(Error::InvalidFormat(
                 "iWork paragraph flow update failed round-trip validation".to_owned(),
@@ -1768,7 +1768,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_flow(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1793,7 +1793,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_writing_direction(&mut staged, object_id, direction)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_writing_direction(&verified, object_id)? != direction {
             return Err(Error::InvalidFormat(
                 "iWork paragraph writing-direction update failed round-trip validation".to_owned(),
@@ -1810,7 +1810,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_writing_direction(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -1846,7 +1846,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         let redefined = redefine_applied_named_paragraph_style(&mut staged, object_id)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         let selection = applied_named_paragraph_style(&verified, object_id)?;
         if selection.style() != &redefined || selection.has_overrides() {
             return Err(Error::InvalidFormat(
@@ -1867,7 +1867,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         let applied = apply_named_paragraph_style(&mut staged, object_id, target)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         let selection = applied_named_paragraph_style(&verified, object_id)?;
         if selection.style() != &applied || selection.has_overrides() {
             return Err(Error::InvalidFormat(
@@ -1889,7 +1889,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         let created = create_named_paragraph_style(&mut staged, object_id, source, name)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if !named_paragraph_styles(&verified, object_id)?.contains(&created) {
             return Err(Error::InvalidFormat(
                 "iWork named paragraph-style creation failed round-trip validation".to_owned(),
@@ -1910,7 +1910,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         let renamed = rename_named_paragraph_style(&mut staged, object_id, target, name)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if !named_paragraph_styles(&verified, object_id)?.contains(&renamed) {
             return Err(Error::InvalidFormat(
                 "iWork named paragraph-style rename failed round-trip validation".to_owned(),
@@ -1934,7 +1934,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         let deleted = delete_named_paragraph_style(&mut staged, object_id, target)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if named_paragraph_styles(&verified, object_id)?
             .iter()
             .any(|style| style.id() == target)
@@ -1976,7 +1976,7 @@ impl IWorkTextEditor {
         apply_named_paragraph_style(&mut staged, object_id, replacement)?;
         let deleted = delete_named_paragraph_style(&mut staged, object_id, target)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         let selection = applied_named_paragraph_style(&verified, object_id)?;
         if selection.style().id() != replacement
             || selection.has_overrides()
@@ -2012,7 +2012,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_following_style(&mut staged, object_id, following_style)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_following_style(&verified, object_id)? != following_style {
             return Err(Error::InvalidFormat(
                 "iWork following paragraph-style update failed round-trip validation".to_owned(),
@@ -2029,7 +2029,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_following_style(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2054,7 +2054,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_alignment(&mut staged, object_id, alignment)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_alignment(&verified, object_id)? != alignment {
             return Err(Error::InvalidFormat(
                 "iWork paragraph-alignment update failed round-trip validation".to_owned(),
@@ -2071,7 +2071,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_alignment(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2093,7 +2093,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_line_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_line_spacing(&verified, object_id)? != spacing {
             return Err(Error::InvalidFormat(
                 "iWork paragraph line-spacing update failed round-trip validation".to_owned(),
@@ -2110,7 +2110,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_line_spacing(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2132,7 +2132,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_spacing(&mut staged, object_id, spacing)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_spacing(&verified, object_id)? != spacing {
             return Err(Error::InvalidFormat(
                 "iWork paragraph spacing update failed round-trip validation".to_owned(),
@@ -2149,7 +2149,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_spacing(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2171,7 +2171,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_indents(&mut staged, object_id, indents)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_indents(&verified, object_id)? != indents {
             return Err(Error::InvalidFormat(
                 "iWork paragraph indentation update failed round-trip validation".to_owned(),
@@ -2188,7 +2188,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_indents(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2213,7 +2213,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_decimal_tab_character(&mut staged, object_id, character)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_decimal_tab_character(&verified, object_id)? != character {
             return Err(Error::InvalidFormat(
                 "iWork paragraph decimal-tab character update failed round-trip validation"
@@ -2234,7 +2234,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_decimal_tab_character(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2259,7 +2259,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_default_tab_interval(&mut staged, object_id, interval)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_default_tab_interval(&verified, object_id)? != interval {
             return Err(Error::InvalidFormat(
                 "iWork paragraph default-tab interval update failed round-trip validation"
@@ -2280,7 +2280,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_default_tab_interval(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2302,7 +2302,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_tab_stops(&mut staged, object_id, &stops)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_tab_stops(&verified, object_id)? != stops {
             return Err(Error::InvalidFormat(
                 "iWork paragraph tab-stop update failed round-trip validation".to_owned(),
@@ -2319,7 +2319,7 @@ impl IWorkTextEditor {
         let changed = reset_paragraph_tab_stops(&mut staged, object_id)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            IWorkPackage::from_bytes(&bytes)?;
+            HostPackage::from_bytes(&bytes)?;
             self.package = staged;
         }
         Ok(changed)
@@ -2352,7 +2352,7 @@ impl IWorkTextEditor {
         let mut staged = self.package.clone();
         set_paragraph_drop_cap(&mut staged, object_id, paragraph, drop_cap)?;
         let bytes = staged.to_bytes()?;
-        let verified = IWorkPackage::from_bytes(&bytes)?;
+        let verified = HostPackage::from_bytes(&bytes)?;
         if paragraph_drop_cap(&verified, object_id, paragraph)? != Some(drop_cap) {
             return Err(Error::InvalidFormat(
                 "iWork Drop Cap update failed round-trip validation".to_owned(),
@@ -2373,7 +2373,7 @@ impl IWorkTextEditor {
         let changed = remove_paragraph_drop_cap(&mut staged, object_id, paragraph)?;
         if changed {
             let bytes = staged.to_bytes()?;
-            let verified = IWorkPackage::from_bytes(&bytes)?;
+            let verified = HostPackage::from_bytes(&bytes)?;
             if paragraph_drop_cap(&verified, object_id, paragraph)?.is_some() {
                 return Err(Error::InvalidFormat(
                     "iWork Drop Cap removal failed round-trip validation".to_owned(),
@@ -2384,11 +2384,11 @@ impl IWorkTextEditor {
         Ok(changed)
     }
 
-    pub(crate) fn package(&self) -> &IWorkPackage {
+    pub(crate) fn package(&self) -> &HostPackage {
         &self.package
     }
 
-    pub(crate) fn into_package(self) -> IWorkPackage {
+    pub(crate) fn into_package(self) -> HostPackage {
         self.package
     }
 
@@ -2402,7 +2402,7 @@ impl IWorkTextEditor {
 }
 
 pub(super) fn replace_storage_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     object_id: u64,
     range: Range<usize>,
     replacement: &str,
@@ -2565,7 +2565,7 @@ fn exact_storage_table_reference_path(path: &[u32]) -> Option<u32> {
 }
 
 fn metadata_unreferenced_candidates(
-    package: &IWorkPackage,
+    package: &HostPackage,
     candidates: &HashSet<u64>,
 ) -> Result<HashSet<u64>> {
     if candidates.is_empty() {
@@ -2657,7 +2657,7 @@ mod tests {
 
     #[test]
     fn storage_discovery_rejects_malformed_recognized_payload() {
-        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![RawMessage {
+        let editor = Draft::from_package(test_package_with_messages(vec![RawMessage {
             type_: 2001,
             data: vec![0x80],
         }]));
@@ -2671,7 +2671,7 @@ mod tests {
             text: vec!["valid sibling".to_owned()],
             ..Default::default()
         };
-        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+        let editor = Draft::from_package(test_package_with_messages(vec![
             RawMessage {
                 type_: 2001,
                 data: vec![0x80],
@@ -2699,7 +2699,7 @@ mod tests {
             text: vec!["second".to_owned()],
             ..Default::default()
         };
-        let editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+        let editor = Draft::from_package(test_package_with_messages(vec![
             RawMessage {
                 type_: 2001,
                 data: first.encode_to_vec(),
@@ -2735,7 +2735,7 @@ mod tests {
         let archive = Archive {
             objects: vec![object],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/Document.iwa", &archive)
             .unwrap();
@@ -2743,7 +2743,7 @@ mod tests {
             .replace_archive("Index/Other.iwa", &archive)
             .unwrap();
 
-        let editor = IWorkTextEditor::from_package(package);
+        let editor = Draft::from_package(package);
         assert!(
             editor
                 .storage(TextStorageId::new(42).expect("valid test storage ID"))
@@ -2753,11 +2753,10 @@ mod tests {
 
     #[test]
     fn storage_replacement_is_atomic_when_resolution_fails() {
-        let mut editor =
-            IWorkTextEditor::from_package(test_package_with_messages(vec![RawMessage {
-                type_: 2001,
-                data: vec![0x80],
-            }]));
+        let mut editor = Draft::from_package(test_package_with_messages(vec![RawMessage {
+            type_: 2001,
+            data: vec![0x80],
+        }]));
         let before = editor.to_bytes().unwrap();
 
         assert!(
@@ -2782,7 +2781,7 @@ mod tests {
             text: vec!["Source".to_owned()],
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_messages(vec![
+        let mut editor = Draft::from_package(test_package_with_messages(vec![
             unknown.clone(),
             RawMessage {
                 type_: 2001,
@@ -2822,7 +2821,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+        let mut editor = Draft::from_package(test_package(storage));
         let baseline = editor.to_bytes().unwrap();
         editor
             .set_text(
@@ -2856,7 +2855,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+        let mut editor = Draft::from_package(test_package(storage));
         editor
             .replace_text(
                 TextStorageId::new(42).expect("valid test storage ID"),
@@ -2890,7 +2889,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_reference_metadata(
             storage,
             Vec::new(),
             vec![reference_field(vec![9, 1, 2], 91)],
@@ -2927,7 +2926,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_reference_metadata(
             storage,
             Vec::new(),
             vec![
@@ -2964,7 +2963,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_reference_metadata(
             storage,
             vec![91],
             Vec::new(),
@@ -3002,7 +3001,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_reference_metadata(
             storage,
             vec![91, 91],
             Vec::new(),
@@ -3042,7 +3041,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package_with_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_reference_metadata(
             storage,
             vec![91],
             Vec::new(),
@@ -3078,7 +3077,7 @@ mod tests {
         };
         let mut data = storage.encode_to_vec();
         append_unknown_varint(&mut data, 99, 91);
-        let mut editor = IWorkTextEditor::from_package(test_package_with_raw_reference_metadata(
+        let mut editor = Draft::from_package(test_package_with_raw_reference_metadata(
             data,
             vec![91],
             vec![reference_field(vec![9, 1, 2], 91)],
@@ -3104,7 +3103,7 @@ mod tests {
             text: vec!["🚀".to_string()],
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+        let mut editor = Draft::from_package(test_package(storage));
         let before = editor.to_bytes().unwrap();
         assert!(
             editor
@@ -3124,7 +3123,7 @@ mod tests {
             text: vec!["AB".to_owned()],
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+        let mut editor = Draft::from_package(test_package(storage));
 
         editor
             .replace_text(
@@ -3150,7 +3149,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut editor = IWorkTextEditor::from_package(test_package(storage));
+        let mut editor = Draft::from_package(test_package(storage));
         editor
             .replace_text(
                 TextStorageId::new(42).expect("valid test storage ID"),
@@ -3271,7 +3270,7 @@ mod tests {
             .unwrap()
             .to_bytes()
             .unwrap();
-        let mut editor = IWorkTextEditor::from_package(package);
+        let mut editor = Draft::from_package(package);
         editor
             .replace_text(
                 TextStorageId::new(42).expect("valid test storage ID"),
@@ -3329,7 +3328,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let mut editor = IWorkTextEditor::from_package(package);
+        let mut editor = Draft::from_package(package);
         let before = editor.to_bytes().unwrap();
         assert!(
             editor
@@ -3389,14 +3388,14 @@ mod tests {
         rewritten
     }
 
-    fn test_package(storage: StorageArchive) -> IWorkPackage {
+    fn test_package(storage: StorageArchive) -> HostPackage {
         test_package_with_messages(vec![RawMessage {
             type_: 2001,
             data: storage.encode_to_vec(),
         }])
     }
 
-    fn test_package_with_messages(messages: Vec<RawMessage>) -> IWorkPackage {
+    fn test_package_with_messages(messages: Vec<RawMessage>) -> HostPackage {
         let object = ArchiveObject::new(42, messages).unwrap();
         test_package_with_object(object)
     }
@@ -3405,7 +3404,7 @@ mod tests {
         storage: StorageArchive,
         object_references: Vec<u64>,
         field_infos: Vec<FieldInfo>,
-    ) -> IWorkPackage {
+    ) -> HostPackage {
         test_package_with_raw_reference_metadata(
             storage.encode_to_vec(),
             object_references,
@@ -3417,7 +3416,7 @@ mod tests {
         data: Vec<u8>,
         object_references: Vec<u64>,
         field_infos: Vec<FieldInfo>,
-    ) -> IWorkPackage {
+    ) -> HostPackage {
         let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2001, data }]).unwrap();
         object.archive_info.message_infos[0].object_references = object_references;
         object.archive_info.message_infos[0].field_infos = field_infos;
@@ -3431,14 +3430,14 @@ mod tests {
         test_package_with_archive(archive)
     }
 
-    fn test_package_with_object(object: ArchiveObject) -> IWorkPackage {
+    fn test_package_with_object(object: ArchiveObject) -> HostPackage {
         test_package_with_archive(Archive {
             objects: vec![object],
         })
     }
 
-    fn test_package_with_archive(archive: Archive) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn test_package_with_archive(archive: Archive) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/Document.iwa", &archive)
             .unwrap();

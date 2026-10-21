@@ -10,7 +10,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject};
-use crate::{Error, IWorkPackage};
+use crate::{Error, HostPackage};
 
 const DEFAULT_MAX_ARCHIVES: usize = 1_024;
 const DEFAULT_MAX_ARCHIVE_READS: usize = 2_048;
@@ -257,12 +257,12 @@ pub(super) struct KeynoteObjectCatalog {
 }
 
 impl KeynoteObjectCatalog {
-    pub(super) fn build(package: &IWorkPackage) -> CatalogResult<Self> {
+    pub(super) fn build(package: &HostPackage) -> CatalogResult<Self> {
         Self::build_with_limits(package, KeynoteObjectCatalogLimits::default())
     }
 
     pub(super) fn build_with_limits(
-        package: &IWorkPackage,
+        package: &HostPackage,
         limits: KeynoteObjectCatalogLimits,
     ) -> CatalogResult<Self> {
         limits.validate()?;
@@ -572,7 +572,7 @@ impl KeynoteObjectCatalog {
 
     fn scan_archive<T, F>(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         archive_name: &str,
         read: F,
     ) -> CatalogResult<T>
@@ -597,7 +597,7 @@ impl KeynoteObjectCatalog {
 
     fn with_archive<T, F>(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         archive_name: &str,
         read: F,
     ) -> CatalogResult<T>
@@ -672,7 +672,7 @@ impl KeynoteObjectCatalog {
     }
 
     /// Reject use of a catalog after the package revision has changed.
-    pub(super) fn ensure_current(&self, package: &IWorkPackage) -> CatalogResult<()> {
+    pub(super) fn ensure_current(&self, package: &HostPackage) -> CatalogResult<()> {
         if package.mutation_revision() != self.package_revision {
             return Err(KeynoteObjectCatalogError::InvalidSource(
                 "catalog is stale after package mutation".to_owned(),
@@ -780,7 +780,7 @@ impl KeynoteObjectCatalog {
     /// semantic decode and one archive read are charged before callback use.
     pub(super) fn with_object<T, F>(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         identifier: u64,
         read: F,
     ) -> CatalogResult<T>
@@ -835,7 +835,7 @@ impl KeynoteObjectCatalog {
     /// Borrow exactly one payload of `message_type` for a bounded callback.
     pub(super) fn with_message_data_type<T, F>(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         identifier: u64,
         message_type: u32,
         type_name: &str,
@@ -946,8 +946,8 @@ mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
 
-    fn package_with_archives(archives: &[(&str, Vec<ArchiveObject>)]) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn package_with_archives(archives: &[(&str, Vec<ArchiveObject>)]) -> HostPackage {
+        let mut package = HostPackage::new();
         for (name, objects) in archives {
             package
                 .replace_archive(
@@ -972,7 +972,7 @@ mod tests {
         .expect("synthetic object is valid")
     }
 
-    fn one_object_package() -> IWorkPackage {
+    fn one_object_package() -> HostPackage {
         package_with_archives(&[(
             "Index/Document.iwa",
             vec![object(42, vec![(2_011, vec![1, 2, 3])])],
@@ -1203,7 +1203,7 @@ mod tests {
         ));
     }
 
-    fn multi_object_package() -> IWorkPackage {
+    fn multi_object_package() -> HostPackage {
         let mut first = object(101, vec![(6_001, vec![0x01, 0x02]), (6_002, vec![0x03])]);
         first.archive_info.message_infos[0]
             .object_references

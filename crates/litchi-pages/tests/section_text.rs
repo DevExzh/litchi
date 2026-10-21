@@ -166,7 +166,7 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
     // Interleave an unknown field between the two repeated text records so a
     // changed splice must preserve both the record ordering and raw unknown
     // bytes rather than normalize the complete message.
-    let encoded_view = WireView::parse(&encoded_body)?;
+    let encoded_view = WireView::parse(&encoded_body, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut body_payload = Vec::with_capacity(encoded_body.len().saturating_add(8));
     let mut text_fields = 0usize;
     for field in encoded_view.fields() {
@@ -344,8 +344,18 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
         .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing synthetic body message"))?;
     let mut payload = body.messages[message_index].data.clone();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     body.replace_message(
         message_index,
         RawMessage {
@@ -546,7 +556,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -561,7 +571,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -585,26 +595,32 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn body_fields_except_text_and_sections(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| !matches!(field.number(), 3 | 17))
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| !matches!(field.number(), 3 | 17))
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn text_field_raw(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == 3)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == 3)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn field_numbers(payload: &[u8]) -> TestResult<Vec<u32>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .map(litchi_iwa_common::wire::WireFieldView::number)
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(litchi_iwa_common::wire::WireFieldView::number)
+            .collect(),
+    )
 }
 
 fn section_snapshot(package: &Package) -> TestResult<Vec<(Option<String>, String)>> {
@@ -674,7 +690,9 @@ fn selector_first_astral_edit_shifts_only_following_boundaries() -> TestResult<(
     );
     assert!(matches!(
         package.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 3 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 3 }
+        ))
     ));
 
     let span = TextSpan::from_utf16_indexes(1, 1)?;
@@ -747,7 +765,9 @@ fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     changed.set("Changed")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -788,7 +808,9 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     changed.set("replacement")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
 
@@ -798,11 +820,13 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     assert_eq!(empty.text()?, "");
     assert!(matches!(
         empty.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 0 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 0 }
+        ))
     ));
     assert!(matches!(
         empty.section_text(SectionSelector::index(0)),
-        Err(SectionTextError::PositionNotFound { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position }))
             if position == Position::new(0)
     ));
     Ok(())
@@ -839,7 +863,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     );
     assert_eq!(field_numbers(&target_body)?, field_numbers(&source_body)?);
     assert!(
-        WireView::parse(&target_body)?
+        WireView::parse(&target_body, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -848,7 +872,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
         normalize_message_length(&source_header, 1)?
     );
     assert!(
-        WireView::parse(&target_header)?
+        WireView::parse(&target_header, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -1065,39 +1089,51 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.edit_section_text(SectionSelector::name("Missing")),
-        Err(SectionTextError::NameNotFound)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_text(SectionSelector::index(3)),
-        Err(SectionTextError::PositionNotFound { position }) if position == Position::new(3)
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position })) if position == Position::new(3)
     ));
 
     let mut edit = package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{0004}break"),
-        Err(SectionTextError::SectionBreakReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SectionBreakReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{000e}footnote"),
-        Err(SectionTextError::FootnoteAnchorReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::FootnoteAnchorReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{fffc}object"),
-        Err(SectionTextError::ObjectMarkerReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::ObjectMarkerReplacement
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(100, 100)?),
-        Err(SectionTextError::SpanOutOfBounds { .. })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SpanOutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(6, 6)?),
-        Err(SectionTextError::SurrogateBoundary { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(6)
     ));
     edit.insert(TextPosition::ZERO, "valid")?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "second"),
-        Err(SectionTextError::OperationAlreadyStaged)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     let dependent_bytes =
@@ -1106,12 +1142,16 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let mut dependent_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         dependent_edit.delete(TextSpan::from_utf16_indexes(5, 6)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     let mut object_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         object_edit.delete(TextSpan::from_utf16_indexes(6, 7)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
 
     let referenced_bytes = package_with_hidden_bookmark_reference()?;
@@ -1121,7 +1161,9 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     referenced_edit.delete(TextSpan::from_utf16_indexes(2, 3)?)?;
     assert!(matches!(
         referenced_edit.commit(),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(exact_bytes(&referenced_package)?, referenced_source);
 
@@ -1156,7 +1198,7 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let duplicate_name_package = Package::from_bytes(&duplicate_name_bytes)?;
     assert!(matches!(
         duplicate_name_package.edit_section_text(SectionSelector::name("First")),
-        Err(SectionTextError::AmbiguousSelector { first, duplicate })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     Ok(())
@@ -1243,7 +1285,7 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
         edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })
@@ -1294,7 +1336,7 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
     limited_edit.set(replacement)?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })

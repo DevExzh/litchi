@@ -5,7 +5,7 @@
 //! - [`litchi_biff`] provides bounded borrowed and move-owned BIFF record framing;
 //! - [`record`] contains small typed record codecs;
 //! - [`chart`] discovers standalone and Excel-hosted chart substreams;
-//! - [`chart::Editor`] provides bounded, source-checked cache, chart-area, and
+//! - [`chart::Edit`] provides bounded, source-checked cache, chart-area, and
 //!   fixed-metadata patches;
 //! - [`PackageRef`] and [`Package`] validate standalone `OGraph` compound files.
 //!
@@ -34,6 +34,6 @@ pub mod record;
 pub use error::{Error, Result};
 pub use limits::Limits;
 pub use package::{
-    Commit, Package, PackageRef, Patch, Payload, Snapshot, Topology, Transaction, Workbook,
+    Commit, Diagnostics, Edit, Package, PackageRef, Patch, Payload, Snapshot, Topology, Workbook,
     WorkbookRef,
 };

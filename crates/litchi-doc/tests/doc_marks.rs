@@ -29,7 +29,7 @@ fn fixture(name: &str) -> Package {
 
 fn reopen(package: &Package) -> litchi_doc::Document {
     let bytes = package.to_bytes().unwrap();
-    let mut raw = litchi_doc::raw::Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut raw = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes)).unwrap();
     raw.document().unwrap()
 }
 
@@ -40,7 +40,10 @@ fn commit(source: &Package, edit: litchi_doc::Edit) -> Package {
     assert!(commit.diagnostics().changed());
     let (package, patch) = commit.into_parts();
     let restored = package.apply(&patch.inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+    assert_eq!(
+        restored.package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
     package
 }
 

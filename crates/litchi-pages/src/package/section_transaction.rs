@@ -277,7 +277,7 @@ impl TransactionBudget {
             .ok_or_else(|| derived_limit_overflow(kind))?;
         let maximum = self.maximum_limit(kind);
         if amount > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind,
                 observed: usize_to_u64(amount),
@@ -419,7 +419,7 @@ impl TransactionBudget {
         let residual = |kind: LimitKind, required: usize| {
             let maximum = self.remaining_limit(kind);
             if maximum < required {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     path,
                     kind,
                     observed: usize_to_u64(required),
@@ -444,7 +444,7 @@ impl TransactionBudget {
                 field,
                 value,
                 maximum,
-            } => Error::LimitExceeded {
+            } => Error::Limit {
                 path,
                 kind: match field {
                     "message bytes" => LimitKind::WireInputBytes,
@@ -664,7 +664,7 @@ impl TransactionBudget {
             .checked_add(amount)
             .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind: LimitKind::TransactionWork,
                 observed: usize_to_u64(observed),
@@ -688,7 +688,7 @@ impl TransactionBudget {
             .and_then(|value| value.checked_add(amount))
             .ok_or_else(|| derived_limit_overflow(LimitKind::TransactionWork))?;
         if observed > self.maximum_transaction_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 path,
                 kind: LimitKind::TransactionWork,
                 observed: usize_to_u64(observed),
@@ -762,7 +762,7 @@ fn charge(
         .checked_add(amount)
         .ok_or_else(|| derived_limit_overflow(kind))?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             path,
             kind,
             observed: usize_to_u64(observed),
@@ -780,7 +780,7 @@ fn checked_derived_mul(value: usize, multiplier: usize, kind: LimitKind) -> Resu
 }
 
 const fn derived_limit_overflow(kind: LimitKind) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         path: Path::Package,
         kind,
         observed: u64::MAX,
@@ -797,17 +797,23 @@ pub(super) fn resolve_position<'selector>(
         .document_ref()
         .select_section(selector)
         .map_err(|selection_error| match selection_error {
-            crate::SelectorError::EmptySectionName => Error::NameNotFound,
+            crate::SelectorError::EmptySectionName => {
+                Error::Refused(crate::section::settings::Refusal::NameNotFound)
+            },
             crate::SelectorError::AmbiguousSectionName {
                 first, duplicate, ..
-            } => Error::AmbiguousSelector {
+            } => Error::Refused(crate::section::settings::Refusal::AmbiguousSelector {
                 first: Position::new(first),
                 duplicate: Position::new(duplicate),
-            },
+            }),
         })?
         .ok_or(match selector {
-            SectionSelector::Name(_) => Error::NameNotFound,
-            SectionSelector::Position(position) => Error::PositionNotFound { position },
+            SectionSelector::Name(_) => {
+                Error::Refused(crate::section::settings::Refusal::NameNotFound)
+            },
+            SectionSelector::Position(position) => {
+                Error::Refused(crate::section::settings::Refusal::PositionNotFound { position })
+            },
         })?;
     Ok(Position::new(selected.index()))
 }
@@ -822,9 +828,11 @@ pub(super) fn resolve_target(
     let limits = package.state.source.limits();
     budget.charge_transaction_work(components.len(), Path::Package)?;
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let body_identifier = root.body.ok_or(Error::UnsupportedSource {
-        path: Path::Package,
-    })?;
+    let body_identifier = root.body.ok_or(Error::Refused(
+        crate::section::settings::Refusal::UnsupportedSource {
+            path: Path::Package,
+        },
+    ))?;
     let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource {
         path: Path::Package,
     })?;
@@ -849,7 +857,9 @@ pub(super) fn resolve_target(
         .get(position.get())
         .copied()
         .map(|NativeSectionReference { identifier, .. }| identifier)
-        .ok_or(Error::PositionNotFound { position })?;
+        .ok_or(Error::Refused(
+            crate::section::settings::Refusal::PositionNotFound { position },
+        ))?;
 
     let mut found = None;
     for (component_index, component) in components.iter().enumerate() {
@@ -886,7 +896,7 @@ pub(super) fn resolve_target(
 }
 
 fn message_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    WireView::parse_with_limits(payload, limits)
+    WireView::parse(payload, limits)
         .map(|view| view.len())
         .map_err(map_wire_error)
 }
@@ -912,9 +922,11 @@ pub(super) fn resolve_body_target(
     let limits = package.state.source.limits();
     budget.charge_transaction_work(components.len(), Path::Package)?;
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let identifier = root.body.ok_or(Error::UnsupportedSource {
-        path: Path::Package,
-    })?;
+    let identifier = root.body.ok_or(Error::Refused(
+        crate::section::settings::Refusal::UnsupportedSource {
+            path: Path::Package,
+        },
+    ))?;
 
     let mut found = None;
     for (component_index, component) in components.iter().enumerate() {
@@ -1272,7 +1284,7 @@ pub(super) fn strict_reference(
     limits: WireLimits,
     path: Path,
 ) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut type_seen = false;
     let mut external_seen = false;
@@ -1353,7 +1365,7 @@ pub(super) fn fingerprint(bytes: &[u8]) -> u64 {
 pub(super) fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::RetainedBytes,
             observed: usize_to_u64(observed),
@@ -1363,16 +1375,18 @@ pub(super) fn map_package_error(error: PackageError) -> Error {
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
         | PackageError::InvalidLimit { .. }
-        | PackageError::Limit { .. } => Error::UnsupportedSource {
-            path: Path::Package,
+        | PackageError::Limit { .. } => {
+            Error::Refused(crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::Package,
+            })
         },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
@@ -1394,7 +1408,7 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
@@ -1413,8 +1427,10 @@ pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource {
-            path: Path::Package,
+        litchi_iwa_archive::Error::Reassembly(_) => {
+            Error::Refused(crate::section::settings::Refusal::UnsupportedSource {
+                path: Path::Package,
+            })
         },
         _ => Error::InvalidSource {
             path: Path::Package,
@@ -1428,7 +1444,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
@@ -1458,7 +1474,7 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireInputBytes,
@@ -1479,14 +1495,16 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::Error::UnsupportedSource => Error::UnsupportedDependency {
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(crate::section::settings::Refusal::UnsupportedDependency {
             path: Path::Package,
             kind: DependencyKind::LayoutCache,
-        },
+        }),
         page_layout::Error::Allocation { amount } => Error::Allocation { amount },
-        page_layout::Error::LimitExceeded {
+        page_layout::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             path: Path::Package,
             kind: LimitKind::TransactionWork,
             observed,
@@ -1724,7 +1742,7 @@ mod tests {
         );
         assert!(matches!(
             attempt,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 ..
             })

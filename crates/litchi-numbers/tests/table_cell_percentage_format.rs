@@ -272,11 +272,15 @@ fn percentage_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_percentage_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::percentage::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::percentage::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -327,11 +331,15 @@ fn percentage_coordinate_boundaries_return_cell_not_found_without_mutation() -> 
     for position in out_of_bounds {
         assert!(matches!(
             package.table_cell_percentage_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::percentage::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_percentage_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::percentage::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -362,13 +370,13 @@ fn percentage_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Percentage edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -474,11 +482,11 @@ fn percentage_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let number_before = number_package.exact_bytes();
     assert!(matches!(
         number_package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         number_package.edit_table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert_eq!(number_package.exact_bytes(), number_before);
 
@@ -487,11 +495,15 @@ fn percentage_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let percentage_before = percentage_package.exact_bytes();
     assert!(matches!(
         percentage_package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         percentage_package.edit_table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(percentage_package.exact_bytes(), percentage_before);
 
@@ -509,7 +521,7 @@ fn percentage_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     );
     assert!(matches!(
         mixed.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     Ok(())
 }
@@ -763,7 +775,12 @@ fn percentage_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"percentage extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"percentage extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -793,7 +810,7 @@ fn percentage_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -887,7 +904,12 @@ fn percentage_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() ->
     assert_rejected_or_owner(&rewrite_payload(&source, &duplicate)?)?;
 
     let mut wrong_wire = Vec::new();
-    append_length_delimited_field(&mut wrong_wire, 1, &[0x82, 0x02])?;
+    append_length_delimited_field(
+        &mut wrong_wire,
+        1,
+        &[0x82, 0x02],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut wrong_wire, 2, 2)?;
     append_varint_field(&mut wrong_wire, 4, 2)?;
     append_varint_field(&mut wrong_wire, 5, 1)?;
@@ -1035,7 +1057,7 @@ fn percentage_input_and_operation_budgets_reject_before_publication() -> TestRes
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TransactionWork | LimitKind::OutputBytes,
                 ..
             })
@@ -1152,7 +1174,7 @@ fn percentage_checked_native_fixture_selects_by_name_and_refuses_number_family()
         position,
     );
     assert_eq!(by_name, by_index);
-    assert!(matches!(by_index, Err(Error::WrongFormatFamily { .. })));
+    assert!(matches!(by_index, Err(Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))));
     Ok(())
 }
 

@@ -161,7 +161,7 @@ fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
     let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("Ti\u{fffd}"));
-    let mut editor = Editor::new(bytes).unwrap();
+    let mut editor = Edit::new(bytes).unwrap();
     assert!(
         editor
             .property_set(Binding::SummaryInformation)
@@ -173,7 +173,7 @@ fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
             .update(Binding::SummaryInformation, |_| Ok(()))
             .is_err()
     );
-    let mut clean_editor = Editor::new(compound_file(&clean)).unwrap();
+    let mut clean_editor = Edit::new(compound_file(&clean)).unwrap();
     clean_editor
         .update(Binding::SummaryInformation, |_| Ok(()))
         .unwrap();
@@ -203,7 +203,7 @@ fn unsupported_codepage_falls_back_to_windows_1252_and_is_recorded() {
             Some(&Value::Lpstr("Caf\u{e9}".into()))
         );
 
-        let mut editor = Editor::new(compound_file(&faulted)).unwrap();
+        let mut editor = Edit::new(compound_file(&faulted)).unwrap();
         assert!(
             editor
                 .update(Binding::SummaryInformation, |_| Ok(()))
@@ -241,7 +241,7 @@ fn unterminated_strings_are_read_to_their_declared_size_and_recorded() {
 
     // The repair keeps the content, so the editor may rewrite the stream;
     // the rewrite is canonical and therefore conformant.
-    let mut editor = Editor::new(compound_file(&faulted)).unwrap();
+    let mut editor = Edit::new(compound_file(&faulted)).unwrap();
     editor
         .update(Binding::SummaryInformation, |_| Ok(()))
         .unwrap();
@@ -388,7 +388,7 @@ fn one_malformed_property_is_dropped_and_the_rest_stay_readable() {
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("kept"));
     assert_eq!(metadata.subject, None);
-    let mut editor = Editor::new(compound_file(&summary)).unwrap();
+    let mut editor = Edit::new(compound_file(&summary)).unwrap();
     assert!(
         editor
             .update(Binding::SummaryInformation, |_| Ok(()))

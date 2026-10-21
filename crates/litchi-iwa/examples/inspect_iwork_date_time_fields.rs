@@ -1,10 +1,8 @@
-use litchi_iwa::text::IWorkTextEditor;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = std::env::args()
         .nth(1)
         .ok_or("usage: inspect_iwork_date_time_fields <input.pages|input.numbers|input.key>")?;
-    let editor = IWorkTextEditor::open(input)?;
+    let editor = litchi_iwa::text::Draft::open(input)?;
     for storage in editor.storages()? {
         for field in editor.text_date_time_fields(storage.id)? {
             println!(

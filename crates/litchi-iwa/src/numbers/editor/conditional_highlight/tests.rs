@@ -9,7 +9,7 @@ fn rule(condition: Condition, color: RgbaColor) -> Rule {
     Rule::new(condition, Style::with_fill(color))
 }
 
-fn applied_rule(editor: &Editor, table_id: u64, row: usize, column: usize) -> Option<u32> {
+fn applied_rule(editor: &Draft, table_id: u64, row: usize, column: usize) -> Option<u32> {
     let location = locate_cell(&editor.package, table_id, row, column).unwrap();
     let cell = read_tile_cell(
         &editor.package,
@@ -26,7 +26,7 @@ fn applied_rule(editor: &Editor, table_id: u64, row: usize, column: usize) -> Op
 }
 
 fn share_conditional_highlight(
-    editor: &mut Editor,
+    editor: &mut Draft,
     table_id: u64,
     row: usize,
     source_column: usize,

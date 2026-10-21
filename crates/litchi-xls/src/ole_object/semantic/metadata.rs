@@ -10,13 +10,13 @@ use super::{FtCmo, FtPioGrbit, OleObjectRecord};
 /// storage reference. Unset fields retain their source values, including
 /// undefined/reserved bits in the supplied flag words.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ObjectMetadataEdit {
+pub struct ObjectMetadataChange {
     object_id: Option<u16>,
     common_flags: Option<u16>,
     picture_flags: Option<FtPioGrbit>,
 }
 
-impl ObjectMetadataEdit {
+impl ObjectMetadataChange {
     /// Starts an edit that leaves every metadata field unchanged.
     #[must_use]
     pub const fn new() -> Self {

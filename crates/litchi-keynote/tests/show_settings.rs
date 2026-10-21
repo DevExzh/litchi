@@ -152,7 +152,7 @@ fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
 
 fn adversarial_size(width: f32, height: f32) -> TestResult<Vec<u8>> {
     let canonical = tsp::Size { width, height }.encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let width_record = view
         .fields()
         .find(|field| field.number() == 1)
@@ -202,7 +202,7 @@ fn raw_show_with_slide_nodes(
         ..Default::default()
     }
     .encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(canonical.len().saturating_add(100));
     append_varint_field(&mut output, 90, unknown_sentinel)?;
     for field in view.fields() {
@@ -648,7 +648,7 @@ fn rewrite_object_header(
     let header = stream
         .get(header_start..header_end)
         .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten = Vec::with_capacity(header.len().saturating_add(64));
     rewritten.extend_from_slice(&fixed64_field(90, 0x1020_3040_5060_7080));
     let mut message_index = 0usize;
@@ -692,7 +692,7 @@ fn rewrite_object_header(
 }
 
 fn adversarial_message_info(source: &[u8]) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(32));
     output.extend_from_slice(&fixed32_field(90, 0xa1b2_c3d4));
     for field in view.fields() {
@@ -769,7 +769,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -785,7 +785,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -826,10 +826,12 @@ fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .iter()
         .find_map(|(type_, data)| (*type_ == 2).then_some(data.as_slice()))
         .ok_or_else(|| io::Error::other("missing synthetic show message"))?;
-    Ok(WireView::parse(payload)?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn size_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
@@ -838,14 +840,16 @@ fn size_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .iter()
         .find_map(|(number, raw)| (*number == 4).then_some(raw.as_slice()))
         .ok_or_else(|| io::Error::other("missing synthetic show size"))?;
-    let size_field = WireView::parse(size)?
+    let size_field = WireView::parse(size, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .next()
         .ok_or_else(|| io::Error::other("malformed synthetic show size record"))?;
-    Ok(WireView::parse(size_field.payload())?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(size_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn rewrite_root(
@@ -870,7 +874,10 @@ fn rewrite_root_reference(
     mutate: impl Fn(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     rewrite_root(package, |root, index| {
-        let document = WireView::parse(&root.messages[index].data)?;
+        let document = WireView::parse(
+            &root.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut rewritten = Vec::new();
         let mut selected = false;
         for field in document.fields() {
@@ -883,7 +890,12 @@ fn rewrite_root_reference(
             }
             let mut reference = field.payload().to_vec();
             mutate(&mut reference)?;
-            litchi_iwa_common::wire::append_length_delimited_field(&mut rewritten, 2, &reference)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut rewritten,
+                2,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         if !selected {
             return Err(io::Error::other("missing root show reference").into());
@@ -1479,7 +1491,7 @@ fn focused_reader_reports_typed_slide_limit_before_publication() -> TestResult<(
     let package =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
 
-    let expected = ShowSettingsError::LimitExceeded {
+    let expected = ShowSettingsError::Limit {
         kind: ShowSettingsLimitKind::Slides,
         observed: 2,
         maximum: 1,
@@ -1579,17 +1591,22 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         Ok(())
     })?;
     let wrong_wire = rewrite_root_reference(&bytes, |reference| {
-        let view = WireView::parse(reference)?;
+        let view = WireView::parse(reference, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten = Vec::new();
         for field in view.fields().filter(|field| field.number() != 3) {
             rewritten.extend_from_slice(field.raw());
         }
-        litchi_iwa_common::wire::append_length_delimited_field(&mut rewritten, 3, &[0])?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut rewritten,
+            3,
+            &[0],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *reference = rewritten;
         Ok(())
     })?;
     let noncanonical = rewrite_root_reference(&bytes, |reference| {
-        let view = WireView::parse(reference)?;
+        let view = WireView::parse(reference, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten = Vec::new();
         for field in view.fields().filter(|field| field.number() != 3) {
             rewritten.extend_from_slice(field.raw());
@@ -1910,7 +1927,10 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
             .iter()
             .position(|message| message.type_ == 2)
             .ok_or_else(|| io::Error::other("missing show message"))?;
-        let source = WireView::parse(&show.messages[index].data)?;
+        let source = WireView::parse(
+            &show.messages[index].data,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut payload = Vec::new();
         let mut selected_size = false;
         for field in source.fields() {
@@ -1926,8 +1946,14 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
                 &mut size,
                 199,
                 &vec![0xa5; 16_100_000],
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
-            litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 4, &size)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut payload,
+                4,
+                &size,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         if !selected_size {
             return Err(io::Error::other("missing show size field").into());
@@ -1946,7 +1972,7 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
     assert!(field_count < 100);
     assert!(matches!(
         package.edit_show_settings(),
-        Err(ShowSettingsError::LimitExceeded {
+        Err(ShowSettingsError::Limit {
             kind: ShowSettingsLimitKind::WireWork,
             ..
         })
@@ -1973,7 +1999,9 @@ fn legacy_source_accepts_exact_noop_and_refuses_changed_reassembly() -> TestResu
     settings.set_automatically_plays_upon_open(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -2002,7 +2030,9 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     settings.set_loop_presentation(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }

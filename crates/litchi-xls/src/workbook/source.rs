@@ -270,26 +270,26 @@ impl SourceBackedOptions {
 
     /// Current finite scan limits.
     #[must_use]
-    pub const fn limits(&self) -> SourceBackedLimits {
+    pub const fn limits_value(&self) -> SourceBackedLimits {
         self.limits
     }
 
     /// Sets the finite scan limits.
     #[must_use]
-    pub const fn with_limits(mut self, limits: SourceBackedLimits) -> Self {
+    pub const fn limits(mut self, limits: SourceBackedLimits) -> Self {
         self.limits = limits;
         self
     }
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn leniency(&self) -> Leniency {
+    pub const fn leniency_value(&self) -> Leniency {
         self.leniency
     }
 
     /// Sets the formatting-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
@@ -484,6 +484,9 @@ struct SourceInner {
     /// Per sheet, what the cell cursor's validating scan found, kept so a
     /// later cursor over the same immutable snapshot skips it (record 0267).
     cursor_checks: Box<[std::sync::OnceLock<cursor::Check>]>,
+    /// The checked overlay plan a committed source-backed family edit
+    /// (`crate::source_backed`) writes; reads go through its composed source.
+    pending: Option<Arc<litchi_cfb::ValidatedOverlayPlan>>,
 }
 
 impl SourceInner {
@@ -924,20 +927,12 @@ impl SourceBackedWorkbook {
         Self::from_read_at_with_options(source, SourceBackedOptions::default())
     }
 
-    /// Opens a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_options(source, SourceBackedOptions::default().with_limits(limits))
-    }
-
     /// Opens a positional source with explicit options.
     pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let cfb_limits =
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
@@ -948,26 +943,14 @@ impl SourceBackedWorkbook {
 
     /// Opens a filesystem path through the positional `FileSource` adapter.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at(source)
     }
 
-    /// Opens a filesystem path with explicit finite limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(
-        path: impl AsRef<Path>,
-        limits: SourceBackedLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_options(path, SourceBackedOptions::default().with_limits(limits))
-    }
-
     /// Opens a filesystem path with explicit options.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_options(
-        path: impl AsRef<Path>,
-        options: SourceBackedOptions,
-    ) -> Result<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: SourceBackedOptions) -> Result<Self> {
         let source = Arc::new(FileSource::open(path).map_err(SourceBackedError::Io)?);
         Self::from_read_at_with_options(source, options)
     }
@@ -1234,7 +1217,7 @@ impl SourceBackedWorkbook {
         cfb: Arc<SharedOleFile>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let limits = options.limits_value();
         limits.validate()?;
         let source = cfb.source_arc();
         // `SharedOleFile::source_version` already observes the source this view
@@ -1260,7 +1243,7 @@ impl SourceBackedWorkbook {
             &workbook_path,
             workbook_stream_len,
             limits,
-            options.leniency(),
+            options.leniency_value(),
         )?;
         validate_sheet_offsets(workbook_stream_len, parsed.global_end, &mut parsed.sheets)?;
         let mut worksheet_names = Vec::new();
@@ -1295,7 +1278,7 @@ impl SourceBackedWorkbook {
             styles: parsed.styles.map(Arc::new),
             encoding: parsed.encoding,
             limits,
-            leniency: options.leniency(),
+            leniency: options.leniency_value(),
             query_cache: Arc::new(QueryIndexCache::new(
                 limits.max_query_index_bytes,
                 cache_sheet_count,
@@ -1304,9 +1287,96 @@ impl SourceBackedWorkbook {
             cursor_checks: (0..cache_sheet_count)
                 .map(|_| std::sync::OnceLock::new())
                 .collect(),
+            pending: None,
         });
         inner.ensure_current()?;
         Ok(Self { inner })
+    }
+
+    /// The options this workbook was opened with.
+    pub(crate) fn options(&self) -> SourceBackedOptions {
+        SourceBackedOptions::new()
+            .limits(self.inner.limits)
+            .leniency(self.inner.leniency)
+    }
+
+    /// The workbook a source-backed family commit publishes: opened under
+    /// this workbook's options over the composed source of `plan`, writing
+    /// `plan` on output. Nothing is written here.
+    pub(crate) fn committed(&self, plan: litchi_cfb::ValidatedOverlayPlan) -> Result<Self> {
+        if plan.is_noop() {
+            return Ok(self.clone());
+        }
+        let composed = plan
+            .composed_source()
+            .map_err(|error| SourceBackedError::Parse(error.into()))?;
+        let mut workbook = Self::from_read_at_with_options(Arc::new(composed), self.options())?;
+        let inner = Arc::get_mut(&mut workbook.inner).ok_or(SourceBackedError::Parse(
+            Error::Internal("a freshly opened source-backed workbook is already shared"),
+        ))?;
+        inner.pending = Some(Arc::new(plan));
+        Ok(workbook)
+    }
+
+    /// Whether two handles are shares of one opened (or committed) workbook.
+    pub(crate) fn same_workbook(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Streams this workbook's exact bytes: the source for an opened
+    /// workbook, the checked overlay output for a committed one. A committed
+    /// workbook returns the overlay publication report.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, overlay or sink error; a sink failure may
+    /// leave a prefix in the sink.
+    pub fn write_to<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        match &self.inner.pending {
+            Some(plan) => Ok(Some(plan.write_to(writer)?)),
+            None => {
+                crate::Package::from_source(self.clone())?.write_to(writer)?;
+                Ok(None)
+            },
+        }
+    }
+
+    /// Atomically replaces `path` with this workbook's exact bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`], plus the atomic-rename errors.
+    pub fn save<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// [`Self::save`] at a caller-chosen durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
+    {
+        match &self.inner.pending {
+            Some(plan) => Ok(Some(plan.save_with_durability(path, durability)?)),
+            None => {
+                crate::Package::from_source(self.clone())?
+                    .save_with_durability(path, durability)?;
+                Ok(None)
+            },
+        }
     }
 
     /// Repairs this owner has applied so far, in discovery order.

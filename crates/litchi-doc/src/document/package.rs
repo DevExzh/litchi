@@ -64,7 +64,7 @@ impl Document {
         ole: &mut OleFile<R>,
         options: OpenOptions,
     ) -> Result<Self> {
-        let source_limits = options.get_source_limits();
+        let source_limits = options.source_limits_value();
         // Charge every declared CFB stream before any DOC-owned payload is
         // materialized. This covers metadata, Equation Native, embedded
         // objects, VBA, and opaque streams that format-specific readers may
@@ -341,7 +341,7 @@ impl Document {
         // Word 97+ files are required to carry a stylesheet. Older Word files use
         // a different FIB and stylesheet representation that is not interpreted here.
         let mut stylesheet = (fib.version() >= 0x00C1)
-            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.get_leniency()))
+            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.leniency_value()))
             .transpose()?;
         if let Some(stylesheet) = &mut stylesheet {
             stylesheet.resolve_revision_authors(&revision_authors);

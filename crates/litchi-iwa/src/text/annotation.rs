@@ -10,7 +10,7 @@ use crate::package_metadata::{
     release_package_identifier_suffix, remove_component_external_references_to_object,
     remove_component_object_uuids, set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::highlight_object::{
     AnnotationGraph, ensure_no_metadata_reference, insert_annotation_comment_storage,
@@ -53,10 +53,7 @@ pub(super) struct AnnotationRecord {
     pub(super) graph: AnnotationGraph,
 }
 
-pub(super) fn annotations(
-    package: &IWorkPackage,
-    storage_id: u64,
-) -> Result<Vec<AnnotationRecord>> {
+pub(super) fn annotations(package: &HostPackage, storage_id: u64) -> Result<Vec<AnnotationRecord>> {
     let located = locate_storage_with_archive(package, storage_id)?;
     let location = &located.location;
     let boundaries = decoded_boundaries(storage_id, location)?;
@@ -64,7 +61,7 @@ pub(super) fn annotations(
 }
 
 pub(super) fn annotation_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     object_id: u64,
     kind: AnnotationKind,
@@ -88,7 +85,7 @@ pub(super) fn annotation_by_id(
 }
 
 pub(super) fn add_annotation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     kind: AnnotationKind,
@@ -144,7 +141,7 @@ pub(super) fn add_annotation(
 }
 
 pub(super) fn update_annotation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     object_id: u64,
     range: TextRange,
@@ -209,7 +206,7 @@ pub(super) fn update_annotation(
 }
 
 pub(super) fn remove_annotation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     object_id: u64,
     kind: AnnotationKind,
@@ -249,7 +246,7 @@ pub(super) fn remove_annotation(
 }
 
 pub(super) fn remove_unreferenced_annotation_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {
@@ -311,7 +308,7 @@ fn ensure_no_overlapping_highlight_table(
 }
 
 pub(super) fn add_author_external_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_entry: &str,
     author_entry: Option<&str>,
     author_id: Option<u64>,
@@ -330,7 +327,7 @@ pub(super) fn add_author_external_reference(
 }
 
 fn remove_detached_annotations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifiers: &[u64],
     expected_kind: Option<AnnotationKind>,
@@ -420,7 +417,7 @@ fn remove_detached_annotations(
 }
 
 pub(super) fn remove_registered_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owning_component: Option<u64>,
     identifier: u64,
 ) -> Result<()> {
@@ -474,6 +471,6 @@ fn collect_annotations(
     Ok(annotations)
 }
 
-pub(super) fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
-    IWorkPackage::from_bytes(&package.to_bytes()?)
+pub(super) fn roundtrip(package: &HostPackage) -> Result<HostPackage> {
+    HostPackage::from_bytes(&package.to_bytes()?)
 }

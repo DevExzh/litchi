@@ -6,7 +6,7 @@ use crate::charts::options::{
     set_chart_title as set_native_chart_title,
 };
 
-impl Editor {
+impl Draft {
     /// Read the chart title shown by Numbers for one sheet chart.
     pub fn sheet_chart_title(
         &self,
@@ -39,7 +39,7 @@ impl Editor {
 }
 
 fn sheet_chart_title(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Option<String>> {
@@ -53,7 +53,7 @@ fn sheet_chart_title(
 }
 
 fn set_sheet_chart_title(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     title: &str,
@@ -67,7 +67,7 @@ fn set_sheet_chart_title(
         "Numbers",
         title,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_title(sheet_id, drawable_object_id)?
         .as_deref()
@@ -82,7 +82,7 @@ fn set_sheet_chart_title(
 }
 
 fn remove_sheet_chart_title(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -97,7 +97,7 @@ fn remove_sheet_chart_title(
     if !removed {
         return Ok(false);
     }
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_title(sheet_id, drawable_object_id)?
         .is_some()

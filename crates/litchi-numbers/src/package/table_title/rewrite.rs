@@ -2,8 +2,8 @@ use litchi_iwa_archive::package::EntryEdit;
 use litchi_iwa_common::{
     WireLimits,
     wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireDescent,
-        patch_nested_fields_batched_with_limits, preflight_wire_tree_with_limits,
+        NestedFieldEdit, NestedFieldReplacement, WireDescent, patch_nested_fields_batched,
+        preflight_wire_tree,
     },
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
@@ -89,10 +89,8 @@ fn rewritten_payload(
         .with_rewrite_work(source.len().saturating_mul(4).max(1))
         .map_err(map_wire_error)?;
     budget.charge_transaction_work(source.len().saturating_mul(4))?;
-    preflight_wire_tree_with_limits(source, limits, |_visit| Ok(WireDescent::Skip))
-        .map_err(map_wire_error)?;
-    let output =
-        patch_nested_fields_batched_with_limits(source, &edits, limits).map_err(map_wire_error)?;
+    preflight_wire_tree(source, limits, |_visit| Ok(WireDescent::Skip)).map_err(map_wire_error)?;
+    let output = patch_nested_fields_batched(source, &edits, limits).map_err(map_wire_error)?;
     let decoded = decode_title_with_budget(&output, budget)?;
     if decoded.settings != after {
         return Err(Error::Verification);
@@ -127,7 +125,9 @@ pub(super) fn rewrite(
             path: Path::Package,
         })?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_title::Refusal::UnsupportedSource,
+        ));
     }
     budget.charge_transaction_work(
         entry
@@ -242,7 +242,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimit::InputBytes => super::LimitKind::InputBytes,
                 ArchiveLimit::OutputBytes => super::LimitKind::OutputBytes,
@@ -265,7 +265,9 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             amount,
             path: Path::Package,
         },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => {
+            Error::Refused(crate::package::table_title::Refusal::UnsupportedSource)
+        },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
         _ => Error::InvalidSource {
             path: Path::Package,
@@ -279,7 +281,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => super::LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -308,7 +310,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
 
 fn map_candidate_read_error(error: super::super::Error) -> Error {
     match error {
-        super::super::Error::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        super::super::Error::InputTooLarge { observed, maximum } => Error::Limit {
             kind: super::LimitKind::OutputBytes,
             observed,
             maximum,
@@ -379,7 +381,7 @@ mod tests {
         };
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 ..
             }

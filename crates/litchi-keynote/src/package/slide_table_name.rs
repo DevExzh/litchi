@@ -97,6 +97,35 @@ impl fmt::Display for Path {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table name source is invalid")]
+    InvalidSource,
+    #[error("invalid Keynote slide-table name: {0}")]
+    InvalidName(#[source] name::Error),
+    #[error(
+        "Keynote slide-table name {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table name transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table name failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table name patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical slide-table name edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table name graph is outside the supported scope")]
@@ -115,24 +144,32 @@ pub enum Error {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table name source is invalid")]
-    InvalidSource,
-    #[error("invalid Keynote slide-table name: {0}")]
-    InvalidName(#[source] name::Error),
-    #[error(
-        "Keynote slide-table name {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table name transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table name failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table name patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedTopology { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable name staged against an immutable package snapshot.
@@ -338,6 +375,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -482,7 +525,7 @@ fn commit_edit(
         });
     }
     if selection.target.locked {
-        return Err(Error::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let source_previews_absent = previews_absent(source, &mut budget)?;
     let (candidate, deleted_previews) = rewrite_name(source, selection, &after, &mut budget)?;
@@ -573,7 +616,7 @@ fn rewrite_name(
         .find(|entry| entry.name() == selection.target.model.component.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
     let archive_limits = physical_limits
@@ -798,7 +841,7 @@ fn same_selection(left: &NameSelection, right: &NameSelection) -> bool {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -810,19 +853,23 @@ fn previews_absent(package: &Package, budget: &mut core::Budget) -> Result<bool,
 
 fn map_core_error(error: core::Error) -> Error {
     match error {
-        core::Error::UnsupportedSource => Error::UnsupportedSource,
-        core::Error::UnsupportedDependency => Error::UnsupportedDependency,
-        core::Error::UnsupportedTopology => Error::UnsupportedTopology,
-        core::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        core::Error::EmptySlideName => Error::EmptySlideName,
-        core::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        core::Error::SlidePositionNotFound(position) => Error::SlidePositionNotFound { position },
-        core::Error::TablePositionNotFound(position) => Error::TablePositionNotFound { position },
+        core::Error::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+        core::Error::UnsupportedDependency => Error::Refused(Refusal::UnsupportedDependency),
+        core::Error::UnsupportedTopology => Error::Refused(Refusal::UnsupportedTopology),
+        core::Error::AmbiguousSelector => Error::Refused(Refusal::AmbiguousSelector),
+        core::Error::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        core::Error::SlideNameNotFound => Error::Refused(Refusal::SlideNameNotFound),
+        core::Error::SlidePositionNotFound(position) => {
+            Error::Refused(Refusal::SlidePositionNotFound { position })
+        },
+        core::Error::TablePositionNotFound(position) => {
+            Error::Refused(Refusal::TablePositionNotFound { position })
+        },
         core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
@@ -864,7 +911,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -877,7 +924,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 PayloadLimitKind::Bytes => LimitKind::InputBytes,
                 PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -929,7 +976,7 @@ fn map_codec_error(error: table_model_discovery_codec::DecodeError) -> Error {
         ),
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -942,7 +989,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -967,7 +1014,7 @@ fn map_core_native_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

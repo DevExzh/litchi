@@ -11,7 +11,7 @@ use litchi_iwa_archive::package::ExactArtifacts;
 use thiserror::Error as ThisError;
 
 use super::Options;
-use crate::Package;
+use crate::{Package, SlideSelector};
 
 /// Finite resources consumed by one audio-creation transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -69,6 +69,36 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or metadata cannot safely admit creation.
+    #[error("the Keynote source graph cannot safely admit slide audio creation")]
+    InvalidSource,
+    /// A configured finite resource ceiling was exceeded.
+    #[error("slide audio creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// An allocation failed before publication.
+    #[error("could not allocate {amount} units for slide audio creation")]
+    Allocation { amount: usize },
+    /// The reopened candidate did not reproduce the planned graph and audio.
+    #[error("the created slide audio failed verification")]
+    Verification,
+    /// The patch is not authorized for this exact source snapshot.
+    #[error("the slide audio creation patch does not match this exact source")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package has no exact physical source suitable for this transaction.
     #[error("this Keynote source does not support slide audio creation")]
     UnsupportedSource,
@@ -84,31 +114,46 @@ pub enum Error {
     /// The requested slide position is absent.
     #[error("Keynote slide position {position:?} was not found")]
     SlidePositionNotFound { position: Position },
-    /// The source graph or metadata cannot safely admit creation.
-    #[error("the Keynote source graph cannot safely admit slide audio creation")]
-    InvalidSource,
     /// The filename is not a bounded safe audio filename.
     #[error("slide audio requires one safe recognized audio filename")]
     InvalidFilename,
     /// The payload is empty or has no recognized audio signature.
     #[error("slide audio requires a nonempty recognized audio payload")]
     UnsupportedAudio,
-    /// A configured finite resource ceiling was exceeded.
-    #[error("slide audio creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// An allocation failed before publication.
-    #[error("could not allocate {amount} units for slide audio creation")]
-    Allocation { amount: usize },
-    /// The reopened candidate did not reproduce the planned graph and audio.
-    #[error("the created slide audio failed verification")]
-    Verification,
-    /// The patch is not authorized for this exact source snapshot.
-    #[error("the slide audio creation patch does not match this exact source")]
-    PatchConflict,
+    /// The edit already stages its one creation.
+    #[error("the slide audio creation edit already stages an audio")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged creation.
+    #[error("the slide audio creation edit stages no audio")]
+    NoStagedOperation,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedAudio { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::EmptySlideName { .. }
+            | Self::AmbiguousSelector { .. }
+            | Self::InvalidFilename { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Exact source and target artifacts for creating one slide-owned audio clip.
@@ -377,6 +422,11 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source patch.
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -386,5 +436,95 @@ impl Commit {
     #[must_use]
     pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
+    }
+}
+
+/// One staged slide audio creation.
+#[derive(Debug, Clone, Copy)]
+struct Staged<'a> {
+    slide: SlideSelector<'a>,
+    preferred_filename: &'a str,
+    data: &'a [u8],
+    options: Options,
+}
+
+/// One immutable edit that stages exactly one independently positioned,
+/// slide-owned audio control.
+///
+/// Start it with [`Package::edit_slide_audio_creation`]; the source package is
+/// never changed, and dropping the edit discards the staged audio. The audio
+/// bytes stay borrowed until the commit has assembled and reopened the
+/// candidate.
+pub struct Edit<'a> {
+    source: &'a Package,
+    staged: Option<Staged<'a>>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("slide", &self.staged.as_ref().map(|staged| staged.slide))
+            .field(
+                "data_len",
+                &self.staged.as_ref().map(|staged| staged.data.len()),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    pub(crate) const fn new(source: &'a Package) -> Self {
+        Self {
+            source,
+            staged: None,
+        }
+    }
+
+    /// Stage one audio control on the selected slide, playing `data` (named
+    /// after `preferred_filename`) with `options`. Identical materialized
+    /// audio is reused when its metadata is unambiguous.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::OperationAlreadyStaged`] after one creation.
+    pub fn add(
+        mut self,
+        slide: impl Into<SlideSelector<'a>>,
+        preferred_filename: &'a str,
+        data: &'a [u8],
+        options: Options,
+    ) -> Result<Self, Error> {
+        if self.staged.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        self.staged = Some(Staged {
+            slide: slide.into(),
+            preferred_filename,
+            data,
+            options,
+        });
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged audio as one exact-source
+    /// transaction. The returned commit contains the candidate package and an
+    /// exact patch whose inverse restores the original bytes.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NoStagedOperation`] for an empty edit; selector, input,
+    /// source, resource and verification errors. Failure never publishes a
+    /// partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let staged = self
+            .staged
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
+        self.source.create_slide_audio(
+            staged.slide,
+            staged.preferred_filename,
+            staged.data,
+            staged.options,
+        )
     }
 }

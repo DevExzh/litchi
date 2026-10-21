@@ -64,7 +64,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = numbers::Editor::open(output)?;
+    let reopened = numbers::Draft::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.cell_conditional_highlight_rules(table_id, BOOLEAN_ROW, column)?,
@@ -75,7 +75,7 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_numbers_cell(
-    editor: &mut numbers::Editor,
+    editor: &mut numbers::Draft,
     row: usize,
     column: usize,
     value: CellValue,
@@ -87,7 +87,7 @@ fn set_numbers_cell(
 }
 
 fn set_numbers_cells(
-    editor: &mut numbers::Editor,
+    editor: &mut numbers::Draft,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -104,7 +104,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = numbers::Editor::from_bytes(&bytes)?;
+    *editor = numbers::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
@@ -165,7 +165,7 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = pages::Editor::open(output)?;
+    let reopened = pages::Draft::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.table_cell_conditional_highlight_rules(table_id, BOOLEAN_ROW, column)?,
@@ -216,7 +216,7 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     editor.save(output)?;
 
-    let reopened = keynote::Editor::open(output)?;
+    let reopened = keynote::Draft::open(output)?;
     for (column, rule) in [TRUE_COLUMN, FALSE_COLUMN].into_iter().zip(&rules) {
         assert_eq!(
             reopened.slide_table_cell_conditional_highlight_rules(

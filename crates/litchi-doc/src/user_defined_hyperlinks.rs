@@ -274,16 +274,9 @@ pub(crate) fn remove(
     Ok(user_defined::Edit::with_limits(section, limits)?.remove_hyperlinks())
 }
 
-/// Reads contextualized `_PID_HLINKS` metadata with default overlay limits.
-pub fn from_user_defined_section(
-    section: &Section,
-    fields: Option<&FieldsTable>,
-) -> Result<Option<UserDefinedHyperlinks>> {
-    from_user_defined_section_with_limits(section, fields, Limits::default())
-}
 /// Reads contextualized `_PID_HLINKS` metadata with explicit overlay limits.
 /// Limits apply after generic property-set parsing to the reserved BLOB overlay.
-pub fn from_user_defined_section_with_limits(
+pub fn from_user_defined_section(
     section: &Section,
     fields: Option<&FieldsTable>,
     limits: Limits,

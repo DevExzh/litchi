@@ -31,7 +31,7 @@ pub(super) fn validate(
 }
 
 pub(super) fn patch(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     slide_id: u64,
     reference_field: u32,

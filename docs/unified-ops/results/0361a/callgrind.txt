@@ -1,0 +1,4 @@
+Record 0361a callgrind (Ir), one process each, base 7138746bb7 vs after:
+keynote_bench base 6648186935 after 6648204410
+pages_bench base 8054687783 after 8063973443
+numbers_unified_bench base 3122279206 after 3122438790

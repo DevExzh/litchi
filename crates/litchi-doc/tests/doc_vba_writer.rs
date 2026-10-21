@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::{Builder, EncryptionProfile, OpenOptions, raw::Package};
+use litchi_doc::{Builder, EncryptionProfile, OpenOptions, raw::Reader};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
@@ -62,7 +62,7 @@ fn complete_project_round_trips_from_the_macros_storage() {
     writer.set_vba(project).unwrap();
     assert!(writer.has_vba());
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let storage = package.vba_project_storage().unwrap();
     assert_eq!(storage.project_root_path(), ["Macros"]);
     assert_eq!(storage.vba_storage_path(), ["Macros", "VBA"]);
@@ -102,7 +102,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
         .set_password("secret", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let project = package.vba().unwrap().unwrap();
     assert_eq!(project.name(), "EncryptedDocument");
     assert_eq!(project.modules()[0].name(), "Module1");
@@ -129,13 +129,13 @@ fn failed_build_is_atomic_and_project_can_be_cleared() {
     };
     assert!(writer.set_vba_with(replacement, &limits).is_err());
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let project = package.vba().unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
     assert!(project.modules().is_empty());
 
     writer.clear_vba();
     assert!(!writer.has_vba());
-    let package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     assert!(package.vba_project_storage().is_none());
 }

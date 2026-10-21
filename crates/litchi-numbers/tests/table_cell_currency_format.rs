@@ -209,7 +209,12 @@ fn native_payload(
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, u64::from(format_type))?;
     append_varint_field(&mut payload, 2, u64::from(decimal_places))?;
-    append_length_delimited_field(&mut payload, 3, currency_code.as_bytes())?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        currency_code.as_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 4, u64::from(negative_style))?;
     append_varint_field(&mut payload, 5, u64::from(show_thousands_separator))?;
     append_varint_field(&mut payload, 6, u64::from(use_accounting_style))?;
@@ -307,11 +312,15 @@ fn currency_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_currency_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -363,11 +372,15 @@ fn currency_coordinate_boundaries_return_cell_not_found_without_mutation() -> Te
     for position in out_of_bounds {
         assert!(matches!(
             package.table_cell_currency_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::currency::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_currency_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::currency::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -397,13 +410,13 @@ fn currency_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Currency edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::currency::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -615,11 +628,15 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let number_before = number_package.exact_bytes();
     assert!(matches!(
         number_package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         number_package.edit_table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(number_package.exact_bytes(), number_before);
 
@@ -631,11 +648,15 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let percentage_before = percentage_package.exact_bytes();
     assert!(matches!(
         percentage_package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         percentage_package.edit_table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(percentage_package.exact_bytes(), percentage_before);
 
@@ -644,19 +665,23 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let currency_before = currency_package.exact_bytes();
     assert!(matches!(
         currency_package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number::transaction::Error::WrongFormatFamily { .. })
+        Err(number::transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         currency_package.edit_table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number::transaction::Error::WrongFormatFamily { .. })
+        Err(number::transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         currency_package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         currency_package.edit_table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert_eq!(currency_package.exact_bytes(), currency_before);
     Ok(())
@@ -1044,7 +1069,12 @@ fn currency_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"currency extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"currency extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -1077,7 +1107,7 @@ fn currency_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -1175,10 +1205,16 @@ fn currency_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
             // The common loop intentionally has no string field.  Add it for
             // every case except the one testing a missing currency code.
             let mut with_code = Vec::new();
-            for field in WireView::parse(&payload)?.fields() {
+            for field in WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields()
+            {
                 with_code.extend_from_slice(field.raw());
             }
-            append_length_delimited_field(&mut with_code, 3, b"USD")?;
+            append_length_delimited_field(
+                &mut with_code,
+                3,
+                b"USD",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             payload = with_code;
         }
         assert_rejected_or_owner(&rewrite_payload(&source, &payload)?)?;
@@ -1188,13 +1224,28 @@ fn currency_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
     append_varint_field(&mut duplicate, 1, 257)?;
     assert_rejected_or_owner(&rewrite_payload(&source, &duplicate)?)?;
     let mut duplicate_code = native_payload(257, 2, 2, true, "USD", false)?;
-    append_length_delimited_field(&mut duplicate_code, 3, b"EUR")?;
+    append_length_delimited_field(
+        &mut duplicate_code,
+        3,
+        b"EUR",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     assert_rejected_or_owner(&rewrite_payload(&source, &duplicate_code)?)?;
 
     let mut wrong_wire = Vec::new();
-    append_length_delimited_field(&mut wrong_wire, 1, &[0x81, 0x82])?;
+    append_length_delimited_field(
+        &mut wrong_wire,
+        1,
+        &[0x81, 0x82],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut wrong_wire, 2, 2)?;
-    append_length_delimited_field(&mut wrong_wire, 3, b"USD")?;
+    append_length_delimited_field(
+        &mut wrong_wire,
+        3,
+        b"USD",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut wrong_wire, 4, 2)?;
     append_varint_field(&mut wrong_wire, 5, 1)?;
     append_varint_field(&mut wrong_wire, 6, 0)?;
@@ -1202,7 +1253,12 @@ fn currency_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
 
     let mut noncanonical = vec![0x08, 0x81, 0x82, 0x00]; // 257 encoded non-canonically
     append_varint_field(&mut noncanonical, 2, 2)?;
-    append_length_delimited_field(&mut noncanonical, 3, b"USD")?;
+    append_length_delimited_field(
+        &mut noncanonical,
+        3,
+        b"USD",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut noncanonical, 4, 2)?;
     append_varint_field(&mut noncanonical, 5, 1)?;
     append_varint_field(&mut noncanonical, 6, 0)?;
@@ -1367,9 +1423,7 @@ fn currency_input_and_operation_budgets_reject_before_publication() -> TestResul
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded { .. })
-                | Err(Error::Allocation { .. })
-                | Err(Error::Verification)
+            Err(Error::Limit { .. }) | Err(Error::Allocation { .. }) | Err(Error::Verification)
         ),
         "unexpected operation-budget result: {result:?}"
     );
@@ -1499,7 +1553,12 @@ fn currency_checked_native_fixture_selects_by_name_and_refuses_number_family() -
         position,
     );
     assert_eq!(by_name, by_index);
-    assert!(matches!(by_index, Err(Error::WrongFormatFamily { .. })));
+    assert!(matches!(
+        by_index,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
+    ));
     Ok(())
 }
 

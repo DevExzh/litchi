@@ -1521,7 +1521,11 @@ fn materialize_eager_returns_typed_semantic_workbook_with_matching_values() {
 fn materialize_eager_limit_is_typed_and_independent() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_materialize_bytes(1);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     assert!(matches!(
         owner.materialize_eager(),
         Err(SourceBackedError::ResourceLimit {
@@ -1601,9 +1605,10 @@ fn exact_sst_entry_limit_is_allowed_and_one_over_is_rejected() {
     let maximum = usize::try_from(total.max(unique)).unwrap();
     let exact = cfb_with_streams(&[("Workbook", &original)]);
     assert!(
-        SourceBackedWorkbook::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(CountingSource::new(exact)),
-            SourceBackedLimits::default().with_max_sst_entries(maximum),
+            SourceBackedOptions::new()
+                .limits(SourceBackedLimits::default().with_max_sst_entries(maximum),)
         )
         .is_ok()
     );
@@ -1616,9 +1621,10 @@ fn exact_sst_entry_limit_is_allowed_and_one_over_is_rejected() {
         &over_stream,
     )])));
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             source,
-            SourceBackedLimits::default().with_max_sst_entries(maximum),
+            SourceBackedOptions::new()
+                .limits(SourceBackedLimits::default().with_max_sst_entries(maximum),)
         ),
         Err(SourceBackedError::ResourceLimit {
             resource: "SST entries",
@@ -1759,12 +1765,20 @@ fn selected_scan_limits_are_enforced_incrementally() {
     let bytes = fixture("Simple.xls");
     let early_limit = SourceBackedLimits::default().with_max_worksheet_scan_records(32);
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, early_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(early_limit),
+    )
+    .unwrap();
     assert!(owner.cell_value_by_index(0, 0, 0).unwrap().is_some());
 
     let bytes_limit = SourceBackedLimits::default().with_max_worksheet_scan_bytes(8);
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, bytes_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(bytes_limit),
+    )
+    .unwrap();
     assert!(matches!(
         owner.cell_value_by_index(0, 0, 0),
         Err(SourceBackedError::ResourceLimit {
@@ -1775,7 +1789,11 @@ fn selected_scan_limits_are_enforced_incrementally() {
 
     let records_limit = SourceBackedLimits::default().with_max_worksheet_scan_records(1);
     let source = Arc::new(CountingSource::new(bytes));
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source, records_limit).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        SourceBackedOptions::new().limits(records_limit),
+    )
+    .unwrap();
     assert!(matches!(
         owner.cell_value_by_index(0, 0, 0),
         Err(SourceBackedError::ResourceLimit {
@@ -2157,7 +2175,10 @@ fn explicit_limits_and_filepass_are_typed() {
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_global_bytes(1);
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at_with_limits(source, limits),
+        SourceBackedWorkbook::from_read_at_with_options(
+            source,
+            SourceBackedOptions::new().limits(limits)
+        ),
         Err(SourceBackedError::ResourceLimit {
             resource: "global bytes",
             ..
@@ -2607,7 +2628,11 @@ fn worksheet_scan_byte_limit_is_a_read_fence() {
 
     let source = Arc::new(CountingSource::new(bytes));
     let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(limit as u64);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let fence_ranges =
         physical_ranges_for_stream_range(&source, at as u64, region.1 - region.0 - limit);
     source.clear_ranges();
@@ -2638,7 +2663,11 @@ fn worksheet_byte_limit_below_one_header_reports_the_header_it_does_not_read() {
     // taken and the scan issues no read at all.
     let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
     let limits = SourceBackedLimits::default().with_max_worksheet_scan_bytes(2);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     source.clear_ranges();
     let result = owner.cell_value_by_index(0, 0, 0);
     assert!(
@@ -2991,9 +3020,9 @@ fn source_text_honors_valid_dimensions_and_retained_text_limits() {
     let modified = insert_before_worksheet_eof(&original, &frame_bytes(0x0200, &legacy_dimensions));
     assert_source_text_matches_eager(cfb_with_streams(&[("Workbook", &modified)]));
 
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(bytes.clone())),
-        SourceBackedLimits::default().with_max_text_cells(1),
+        SourceBackedOptions::new().limits(SourceBackedLimits::default().with_max_text_cells(1)),
     )
     .unwrap();
     assert!(matches!(
@@ -3004,9 +3033,9 @@ fn source_text_honors_valid_dimensions_and_retained_text_limits() {
         })
     ));
 
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(CountingSource::new(bytes)),
-        SourceBackedLimits::default().with_max_text_bytes(1),
+        SourceBackedOptions::new().limits(SourceBackedLimits::default().with_max_text_bytes(1)),
     )
     .unwrap();
     assert!(matches!(
@@ -3200,7 +3229,11 @@ fn the_whole_sheet_walk_costs_one_scan_not_one_per_cell() {
     // Compare the visitor with the uncached query scan. Retained-index query
     // savings are exercised separately in xls_query_index_cache.
     let limits = SourceBackedLimits::default().with_max_query_index_bytes(0);
-    let owner = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let owner = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        SourceBackedOptions::new().limits(limits),
+    )
+    .unwrap();
     let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
 
     // One selected-cell query: the whole-substream scan every query pays for,
@@ -3451,7 +3484,7 @@ fn an_open_with_options_threads_leniency_into_the_source_backed_open() {
 
     let owner = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        SourceBackedOptions::new().with_leniency(Leniency::TolerateFormattingDefects),
+        SourceBackedOptions::new().leniency(Leniency::TolerateFormattingDefects),
     )
     .expect("a lenient source-backed open repairs the defect");
     let report = owner.tolerance_report();

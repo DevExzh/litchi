@@ -85,27 +85,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No footnote matched the source-order selector.
-    #[error("the Pages body-footnote selector did not match a footnote")]
-    NotFound,
-    /// The requested replacement contains a native structural marker.
-    #[error("Pages footnote text cannot contain native anchor or attachment markers")]
-    StructuralMarker,
-    /// The replacement exceeds the semantic footnote text budget.
-    #[error("Pages footnote text exceeds its semantic byte budget")]
-    TextTooLarge,
-    /// The replacement exceeds the semantic custom-marker budget.
-    #[error("Pages footnote custom marker exceeds its semantic byte budget")]
-    CustomMarkTooLarge,
-    /// The snapshot has no exact physical source suitable for a changed edit.
-    #[error("this Pages source does not support physical footnote-text edits")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The selected native footnote cannot be rewritten without ambiguity.
     #[error("the Pages source cannot be edited safely")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Pages footnote-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -125,6 +114,51 @@ pub enum Error {
     /// The patch does not belong to this exact immutable package artifact.
     #[error("the Pages footnote-text patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No footnote matched the source-order selector.
+    #[error("the Pages body-footnote selector did not match a footnote")]
+    NotFound,
+    /// The requested replacement contains a native structural marker.
+    #[error("Pages footnote text cannot contain native anchor or attachment markers")]
+    StructuralMarker,
+    /// The replacement exceeds the semantic footnote text budget.
+    #[error("Pages footnote text exceeds its semantic byte budget")]
+    TextTooLarge,
+    /// The replacement exceeds the semantic custom-marker budget.
+    #[error("Pages footnote custom marker exceeds its semantic byte budget")]
+    CustomMarkTooLarge,
+    /// The snapshot has no exact physical source suitable for a changed edit.
+    #[error("this Pages source does not support physical footnote-text edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NotFound { .. } => RefusalKind::NotFound,
+            Self::StructuralMarker { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TextTooLarge { .. } | Self::CustomMarkTooLarge { .. } => {
+                RefusalKind::InvalidValue
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable body-footnote text and custom-marker value staged against an
@@ -263,7 +297,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !self.source.state.source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_package_footnote(
@@ -442,6 +476,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -546,7 +586,7 @@ impl<'source> FootnoteObjectLocations<'source> {
         let object_count = components.iter().try_fold(0usize, |count, component| {
             count
                 .checked_add(component.archive().objects.len())
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::Entries,
                     observed: usize_to_u64(usize::MAX),
                     maximum: usize_to_u64(super::MAX_OBJECTS),
@@ -555,7 +595,7 @@ impl<'source> FootnoteObjectLocations<'source> {
         budget.charge_references(object_count)?;
         budget.charge_work(object_count)?;
         if object_count > super::MAX_OBJECTS {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::Entries,
                 observed: usize_to_u64(object_count),
                 maximum: usize_to_u64(super::MAX_OBJECTS),
@@ -678,7 +718,7 @@ fn charge_graph_counter(
 ) -> Result<(), Error> {
     let observed = current.checked_add(amount).unwrap_or(usize::MAX);
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -698,9 +738,9 @@ fn resolve_footnote(
         Selector::Anchor(position) => graphs
             .iter()
             .position(|graph| graph.position == position)
-            .ok_or(Error::NotFound)?,
+            .ok_or(Error::Refused(Refusal::NotFound))?,
     };
-    let graph = graphs.get(index).ok_or(Error::NotFound)?;
+    let graph = graphs.get(index).ok_or(Error::Refused(Refusal::NotFound))?;
     let footnotes = package.body_footnotes().map_err(map_package_error)?;
     let footnote = footnotes.get(index).ok_or(Error::InvalidSource)?;
     Ok((graph.position, clone_footnote(footnote)?, *graph))
@@ -744,7 +784,7 @@ pub(super) fn native_footnotes_with_budget(
         super::footnote_table_entries(body_payload, body_identifier, package.state.source.limits())
             .map_err(|error| map_package_error_with_kind(error, LimitKind::Entries))?;
     if entries.len() > MAX_BODY_FOOTNOTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::Entries,
             observed: usize_to_u64(entries.len()),
             maximum: usize_to_u64(MAX_BODY_FOOTNOTES),
@@ -1352,7 +1392,7 @@ fn rewrite_storage_payload(
     let content_units = checked_utf16_units(content)?;
     let content_end = prefix_units
         .checked_add(content_units)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TextUnits,
             observed: u64::MAX,
             maximum: u64::from(u32::MAX),
@@ -1368,7 +1408,7 @@ fn rewrite_storage_payload(
         || rewritten.after_utf16_len()
             != prefix_units
                 .checked_add(checked_utf16_units(after)?)
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::TextUnits,
                     observed: u64::MAX,
                     maximum: u64::from(u32::MAX),
@@ -1436,7 +1476,7 @@ fn rewrite_custom_mark_wire(
     after: Option<&str>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 3) {
         if selected.is_some() || field.wire_type() != 2 {
@@ -1463,7 +1503,7 @@ fn rewrite_custom_mark_wire(
         .and_then(|length| length.checked_add(replacement_length))
         .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -1473,13 +1513,13 @@ fn rewrite_custom_mark_wire(
         .len()
         .checked_sub(usize::from(selected.is_some()))
         .and_then(|fields| fields.checked_add(usize::from(after.is_some())))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::WireFields,
             observed: u64::MAX,
             maximum: usize_to_u64(limits.max_fields()),
         })?;
     if output_fields > limits.max_fields() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
@@ -1490,7 +1530,7 @@ fn rewrite_custom_mark_wire(
         .checked_add(output_fields)
         .ok_or(Error::InvalidSource)?;
     if work > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(work),
             maximum: usize_to_u64(limits.max_rewrite_work()),
@@ -1532,7 +1572,7 @@ fn encoded_bytes_field_length(
     encoded_len((u64::from(number) << 3) | 2)
         .checked_add(encoded_len(usize_to_u64(payload_length)))
         .and_then(|length| length.checked_add(payload_length))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -1623,11 +1663,11 @@ fn verify_candidate(
 
 fn validate_text(text: &str) -> Result<(), Error> {
     if text.contains('\u{000e}') || text.contains('\u{fffc}') {
-        return Err(Error::StructuralMarker);
+        return Err(Error::Refused(Refusal::StructuralMarker));
     }
     checked_utf16_units(text)?;
     if text.len() > crate::footnote::body::MAX_TEXT_BYTES {
-        return Err(Error::TextTooLarge);
+        return Err(Error::Refused(Refusal::TextTooLarge));
     }
     Ok(())
 }
@@ -1636,7 +1676,7 @@ fn checked_utf16_units(text: &str) -> Result<usize, Error> {
     let units = text.encode_utf16().count();
     let maximum = usize::try_from(u32::MAX).unwrap_or(usize::MAX);
     if units > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextUnits,
             observed: usize_to_u64(units),
             maximum: u64::from(u32::MAX),
@@ -1646,7 +1686,7 @@ fn checked_utf16_units(text: &str) -> Result<usize, Error> {
 }
 
 fn position_from_anchor(anchor: u32) -> Result<Position, Error> {
-    let index = usize::try_from(anchor).map_err(|_error| Error::LimitExceeded {
+    let index = usize::try_from(anchor).map_err(|_error| Error::Limit {
         kind: LimitKind::TextUnits,
         observed: u64::from(anchor),
         maximum: u64::from(u32::MAX),
@@ -1656,7 +1696,7 @@ fn position_from_anchor(anchor: u32) -> Result<Position, Error> {
 
 fn validate_custom_mark(custom_mark: Option<&str>) -> Result<(), Error> {
     if custom_mark.is_some_and(|value| value.len() > crate::footnote::body::MAX_CUSTOM_MARK_BYTES) {
-        return Err(Error::CustomMarkTooLarge);
+        return Err(Error::Refused(Refusal::CustomMarkTooLarge));
     }
     Ok(())
 }
@@ -1686,8 +1726,10 @@ fn try_owned_text(text: &str) -> Result<String, Error> {
 
 fn map_footnote_value_error(error: crate::footnote::body::Error) -> Error {
     match error {
-        crate::footnote::body::Error::TextTooLarge => Error::TextTooLarge,
-        crate::footnote::body::Error::CustomMarkTooLarge => Error::CustomMarkTooLarge,
+        crate::footnote::body::Error::TextTooLarge => Error::Refused(Refusal::TextTooLarge),
+        crate::footnote::body::Error::CustomMarkTooLarge => {
+            Error::Refused(Refusal::CustomMarkTooLarge)
+        },
         crate::footnote::body::Error::PositionOutOfRange => Error::InvalidSource,
     }
 }
@@ -1698,7 +1740,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -1727,7 +1769,7 @@ fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> Error 
     match error {
         super::BodyStorageDecodeError::Package(error) => map_package_error(error),
         super::BodyStorageDecodeError::Wire(error) => map_text_rewrite_error(error),
-        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::LimitExceeded {
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1737,13 +1779,13 @@ fn map_body_storage_decode_error(error: super::BodyStorageDecodeError) -> Error 
 
 fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> Error {
     match error {
-        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::LimitExceeded {
+        super::BodyStorageDecodeError::SemanticLimit { observed, limit } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
         super::BodyStorageDecodeError::Package(PackageError::PayloadLimit { observed, limit }) => {
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::Entries,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(limit),
@@ -1757,33 +1799,31 @@ fn map_body_footnote_projection_error(error: super::BodyStorageDecodeError) -> E
 fn map_package_error_with_kind(error: PackageError, payload_limit_kind: LimitKind) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: payload_limit_kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::Entries,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::TextBytes,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(limit),
-            }
+        PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
         },
         PackageError::Semantic(
             crate::Error::TooManySections { actual, limit }
             | crate::Error::TooManyBodyStorages { actual, limit },
-        ) => Error::LimitExceeded {
+        ) => Error::Limit {
             kind: LimitKind::Entries,
             observed: usize_to_u64(actual),
             maximum: usize_to_u64(limit),
@@ -1813,7 +1853,7 @@ fn map_text_rewrite_error(error: RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1822,7 +1862,7 @@ fn map_text_rewrite_error(error: RewriteError) -> Error {
             field,
             value,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
@@ -1849,7 +1889,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1884,7 +1924,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1965,7 +2005,7 @@ mod tests {
         ));
         assert!(!matches!(
             checked_utf16_units("native"),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::TextUnits,
                 ..
             })
@@ -1996,7 +2036,7 @@ mod tests {
         );
         assert_eq!(
             text_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 9,
                 maximum: 8,
@@ -2012,7 +2052,7 @@ mod tests {
         );
         assert_eq!(
             entries_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::Entries,
                 observed: 5,
                 maximum: 4,
@@ -2028,7 +2068,7 @@ mod tests {
         );
         assert_eq!(
             aggregate_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 19,
                 maximum: 14,
@@ -2042,7 +2082,7 @@ mod tests {
         budget.charge_source(8).unwrap();
         assert!(matches!(
             budget.charge_source(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::InputBytes,
                 observed: 9,
                 maximum: 8,
@@ -2051,7 +2091,7 @@ mod tests {
         budget.charge_references(5).unwrap();
         assert!(matches!(
             budget.charge_references(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::Entries,
                 observed: 6,
                 maximum: 5,
@@ -2060,7 +2100,7 @@ mod tests {
         budget.charge_work(7).unwrap();
         assert!(matches!(
             budget.charge_work(1),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 8,
                 maximum: 7,
@@ -2081,7 +2121,7 @@ mod tests {
         ));
         assert_eq!(
             entries,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::Entries,
                 observed: 4097,
                 maximum: 4096,
@@ -2094,7 +2134,7 @@ mod tests {
         });
         assert_eq!(
             aggregate,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 19,
                 maximum: 14,
@@ -2109,7 +2149,7 @@ mod tests {
         ));
         assert_eq!(
             text,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 9,
                 maximum: 8,
@@ -2125,7 +2165,7 @@ mod tests {
         ));
         assert_eq!(
             wire,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 33,
                 maximum: 32,
@@ -2170,7 +2210,7 @@ mod tests {
         for (error, kind, observed, maximum) in cases {
             assert_eq!(
                 map_body_storage_decode_error(BodyStorageDecodeError::Wire(error)),
-                Error::LimitExceeded {
+                Error::Limit {
                     kind,
                     observed,
                     maximum,
@@ -2184,7 +2224,7 @@ mod tests {
                     limit: 4,
                 },
             )),
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: 5,
                 maximum: 4,
@@ -2203,7 +2243,7 @@ mod tests {
         ));
         assert_eq!(
             exceeded,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 9,
                 maximum: 8,
@@ -2219,7 +2259,7 @@ mod tests {
         ));
         assert_eq!(
             invalid,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 0,
                 maximum: 1_000,
@@ -2235,7 +2275,7 @@ mod tests {
         ));
         assert_eq!(
             text,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 17,
                 maximum: 16,
@@ -2251,7 +2291,7 @@ mod tests {
         ));
         assert_eq!(
             entries,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::Entries,
                 observed: 33,
                 maximum: 32,

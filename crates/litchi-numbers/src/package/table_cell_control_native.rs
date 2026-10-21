@@ -115,7 +115,9 @@ fn validate_bnc_format_metadata_kind(
         .ok_or(Error::InvalidSource { path })?;
 
     if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0 {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     let family_kind = |flag: u32, expected: u32| flags & flag != 0 && kind != Some(expected);
@@ -135,7 +137,9 @@ fn validate_bnc_format_metadata_kind(
         BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG,
         litchi_numbers_wire::CHECKBOX_CELL_FORMAT_KIND,
     ) {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     // The shared identifier is a decimal primary, a Currency/Duration
@@ -152,7 +156,9 @@ fn validate_bnc_format_metadata_kind(
             )
         )
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     Ok(())
@@ -179,7 +185,9 @@ fn text_secondary_identifier_for_census_view(
     if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0
         || flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
 
     let mut offset = BNC_FORMAT_FLAGS_END;
@@ -227,7 +235,9 @@ fn text_secondary_identifier_for_census_view(
         || cell.control_cell_spec_identifier().is_some()
         || text_identifier.is_none_or(|identifier| identifier == 0)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT {
         Ok(generic_identifier)
@@ -263,7 +273,9 @@ fn validate_native_cell_metadata(
                 || cell.control_cell_spec_identifier().is_some()
                 || !currency_cell_type_matches_view(cell)
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             Ok(Some((primary, NativePrimaryFormatKind::Currency)))
         },
@@ -281,7 +293,9 @@ fn validate_native_cell_metadata(
                 || !cell.has_only_duration_format_metadata()
                 || !cell.is_duration_format_compatible()
             {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             Ok(Some((primary, NativePrimaryFormatKind::Duration)))
         },
@@ -345,11 +359,9 @@ pub(super) fn preflight_copy_on_write_scalar_control(
         .catalog()
         .get_index(target.component_index)
         .ok_or(Error::InvalidSource { path })?;
-    let physical = source
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource)?;
+    let physical = source.state.components.physical().ok_or(Error::Refused(
+        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+    ))?;
     let member = physical
         .package()
         .iter()
@@ -454,12 +466,16 @@ pub(super) fn rewrite_scalar_control(
     budget: &mut TransactionBudget,
 ) -> Result<NativeControlOutput, Error> {
     if target.locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::TableLocked { path },
+        ));
     }
     if before.is_some_and(|value| matches!(value, CellControl::PopUpMenu(_)))
         || after.is_some_and(|value| matches!(value, CellControl::PopUpMenu(_)))
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let model_component = source
         .state
@@ -512,9 +528,13 @@ pub(super) fn rewrite_scalar_control(
         .iter()
         .find(|(id, _)| *id == tile_id)
         .map(|(_, reference)| *reference)
-        .ok_or(Error::CellNotFound)?;
+        .ok_or(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::CellNotFound,
+        ))?;
     if tile_identifier == target.model_identifier {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
     let tile_archive = source
@@ -739,7 +759,11 @@ pub(super) fn rewrite_scalar_control(
                 path,
             )?,
         ),
-        Some(CellControl::PopUpMenu(_)) => return Err(Error::UnsupportedDependency { path }),
+        Some(CellControl::PopUpMenu(_)) => {
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
+        },
         None => (NativeControlKind::Checkbox, Vec::new(), Vec::new()),
     };
     let _ = desired_kind;
@@ -775,7 +799,11 @@ pub(super) fn rewrite_scalar_control(
         let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
         let (kind, _control) = native_kind(after, path)?;
         cell.set_data_format_identifier(format_key, kind, Some(control_key))
-            .map_err(|_| Error::UnsupportedDependency { path })?;
+            .map_err(|_| {
+                Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                )
+            })?;
         cell.encode()
     } else {
         let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
@@ -939,7 +967,7 @@ pub(super) fn rewrite_scalar_control(
         }
         budget
             .charge_payload_bytes(archive_bytes.len(), path)
-            .map_err(|_| Error::LimitExceeded {
+            .map_err(|_| Error::Limit {
                 kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
                 observed: archive_bytes.len() as u64,
                 maximum: u64::MAX,
@@ -1593,7 +1621,9 @@ fn list_facts_with_input(
         || entries.iter().any(|entry| entry.ref_count == 0)
         || entries.windows(2).any(|pair| pair[0].key == pair[1].key)
     {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     // `next_list_id` is the source-authoritative allocation watermark.  A
     // stale/zero cursor would make deterministic COW allocation ambiguous and
@@ -1601,7 +1631,9 @@ fn list_facts_with_input(
     // still carry a positive cursor in valid native sources.
     let maximum_key = entries.last().map_or(0, |entry| entry.key);
     if list.next_list_id() == 0 || list.next_list_id() <= maximum_key {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok(ListFacts {
         next_key: list.next_list_id(),
@@ -1646,15 +1678,18 @@ pub(super) fn mutate_list(
             // dense registry appends exactly at the cursor and advances it in
             // the same prepared source-preserving rewrite.
             if facts.next_key == 0 || candidate > facts.next_key {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             let advance = if candidate == facts.next_key {
                 Some((
                     facts.next_key,
-                    facts
-                        .next_key
-                        .checked_add(1)
-                        .ok_or(Error::UnsupportedDependency { path })?,
+                    facts.next_key.checked_add(1).ok_or(Error::Refused(
+                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
+                            path,
+                        },
+                    ))?,
                 ))
             } else {
                 None
@@ -1815,33 +1850,31 @@ pub(super) fn charge_storage_report_without_input(
 
 pub(super) fn map_storage_error(error: storage_codec::DecodeError, path: Path) -> Error {
     match error.resource_limit() {
-        Some(storage_codec::DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(storage_codec::DecodeLimit::References { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
-                observed: observed as u64,
-                maximum: maximum as u64,
-                path,
-            }
+        Some(storage_codec::DecodeLimit::References { observed, maximum }) => Error::Limit {
+            kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
         },
-        Some(storage_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(storage_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(storage_codec::DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireNesting,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1851,13 +1884,13 @@ pub(super) fn map_storage_error(error: storage_codec::DecodeError, path: Path) -
             amount: requested,
             path,
         },
-        Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(storage_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(storage_codec::DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1954,7 +1987,9 @@ fn control_format_write(
         DisplayFormat::Currency(_) => {
             // Currency is handled in `canonical_format`, where the local
             // CurrencyCode copy can safely back the codec's borrowed string.
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            ));
         },
         DisplayFormat::Scientific(value) => {
             write = write.with_decimal_places(u32::from(value.decimal_places().value()));
@@ -2139,13 +2174,21 @@ pub(super) fn require_exclusive_selected_model_reference(
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
                 )
-                .map_err(|_| Error::UnsupportedDependency { path })?;
+                .map_err(|_| {
+                    Error::Refused(
+                        crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency {
+                            path,
+                        },
+                    )
+                })?;
             inspected = inspected
                 .checked_add(occurrences)
                 .ok_or(Error::InvalidSource { path })?;
             budget.charge_payload_references(occurrences, path)?;
             if probe.unexpected {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(
+                    crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+                ));
             }
             selected = selected
                 .checked_add(probe.matches)
@@ -2157,7 +2200,9 @@ pub(super) fn require_exclusive_selected_model_reference(
     // already proves that exact shape; this package-wide census proves that
     // no other message or opaque metadata owns the mutable object.
     if selected == 0 || inspected == 0 {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ));
     }
     Ok(())
 }
@@ -2238,55 +2283,49 @@ pub(super) fn verify_control_report(
 
 pub(super) fn map_control_error(error: control_codec::DecodeError, path: Path) -> Error {
     match error.resource_limit() {
-        Some(control_codec::DecodeLimit::InputBytes { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: super::table_cell_pop_up_menu::LimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-                path,
-            }
+        Some(control_codec::DecodeLimit::InputBytes { observed, maximum }) => Error::Limit {
+            kind: super::table_cell_pop_up_menu::LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
         },
-        Some(control_codec::DecodeLimit::OutputBytes { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: super::table_cell_pop_up_menu::LimitKind::WireOutputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-                path,
-            }
+        Some(control_codec::DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
+            kind: super::table_cell_pop_up_menu::LimitKind::WireOutputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
         },
-        Some(control_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(control_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(control_codec::DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireNesting,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(control_codec::DecodeLimit::References { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
-                observed: observed as u64,
-                maximum: maximum as u64,
-                path,
-            }
+        Some(control_codec::DecodeLimit::References { observed, maximum }) => Error::Limit {
+            kind: super::table_cell_pop_up_menu::LimitKind::PayloadReferences,
+            observed: observed as u64,
+            maximum: maximum as u64,
+            path,
         },
-        Some(control_codec::DecodeLimit::Items { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Items { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::PayloadItems,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(control_codec::DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::WireTextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2296,13 +2335,13 @@ pub(super) fn map_control_error(error: control_codec::DecodeError, path: Path) -
             amount: requested,
             path,
         },
-        Some(control_codec::DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Retained { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::RetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
             path,
         },
-        Some(control_codec::DecodeLimit::Scratch { observed, maximum }) => Error::LimitExceeded {
+        Some(control_codec::DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
             kind: super::table_cell_pop_up_menu::LimitKind::ScratchBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2341,7 +2380,9 @@ fn native_kind(value: &CellControl, path: Path) -> Result<(CellDataFormatKind, u
             },
             4,
         )),
-        CellControl::PopUpMenu(_) => Err(Error::UnsupportedDependency { path }),
+        CellControl::PopUpMenu(_) => Err(Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        )),
     }
 }
 
@@ -2417,7 +2458,11 @@ pub(super) fn validate_cross_component_reference(
             Some(object_identifier),
             Some(false),
         )
-        .map_err(|_| Error::UnsupportedDependency { path })
+        .map_err(|_| {
+            Error::Refused(
+                crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+            )
+        })
 }
 
 pub(super) fn unique_object(

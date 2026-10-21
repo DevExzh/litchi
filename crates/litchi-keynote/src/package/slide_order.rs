@@ -76,6 +76,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source package or selected wire payload is structurally invalid.
+    #[error("the Keynote source cannot be reordered safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote slide-order {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-order transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested order.
+    #[error("the reordered Keynote candidate failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-order patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// This package was prepared for semantic reading only and has no editable
     /// physical source.
     #[error("this Keynote source does not support physical edits")]
@@ -115,31 +151,34 @@ pub enum Error {
     /// Commit was requested without a staged operation.
     #[error("the Keynote slide-order transaction has no staged operation")]
     NoStagedOperation,
-    /// The source package or selected wire payload is structurally invalid.
-    #[error("the Keynote source cannot be reordered safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote slide-order {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-order transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested order.
-    #[error("the reordered Keynote candidate failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-order patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedTopology { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::DestinationOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,7 +218,7 @@ impl<'a> Edit<'a> {
         destination: Position,
     ) -> Result<&mut Self, Error> {
         if self.intent.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
 
         let selector = selector_input.into();
@@ -187,7 +226,7 @@ impl<'a> Edit<'a> {
             SlideSelector::Position(position) => {
                 let order = self.source.private_slide_node_order()?;
                 if position.get() >= order.len() {
-                    return Err(Error::SlidePositionNotFound { position });
+                    return Err(Error::Refused(Refusal::SlidePositionNotFound { position }));
                 }
                 (position, order.len())
             },
@@ -196,15 +235,15 @@ impl<'a> Edit<'a> {
                 let selected = show
                     .select_slide(selector)
                     .map_err(map_selector_error)?
-                    .ok_or(Error::SlideNameNotFound)?;
+                    .ok_or(Error::Refused(Refusal::SlideNameNotFound))?;
                 (Position::new(selected.index()), show.slides().len())
             },
         };
         if destination.get() >= slide_count {
-            return Err(Error::DestinationOutOfRange {
+            return Err(Error::Refused(Refusal::DestinationOutOfRange {
                 position: destination,
                 slide_count,
-            });
+            }));
         }
         self.intent = Some(Intent {
             source,
@@ -225,7 +264,9 @@ impl<'a> Edit<'a> {
     /// any source, topology, wire, allocation, limit, or readback invariant
     /// fails.
     pub fn commit(self) -> Result<Commit, Error> {
-        let intent = self.intent.ok_or(Error::NoStagedOperation)?;
+        let intent = self
+            .intent
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source_bytes = self.source.physical_shared_source()?;
         let source_fingerprint = fingerprint(&source_bytes);
         let before = self.source.private_slide_node_order()?;
@@ -411,6 +452,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -499,17 +546,17 @@ impl Package {
     fn physical_shared_source(&self) -> Result<Arc<[u8]>, Error> {
         match &self.state.source {
             PhysicalSource::Package(source) => Ok(source.shared_source()),
-            PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+            PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
         }
     }
 
     fn editable_source_catalog(&self) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
         let source = match &self.state.source {
             PhysicalSource::Package(source) => source,
-            PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+            PhysicalSource::Semantic(_) => return Err(Error::Refused(Refusal::UnsupportedSource)),
         };
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         Ok(source)
     }
@@ -556,7 +603,7 @@ impl Package {
         unique.extend_from_slice(expected);
         unique.sort_unstable();
         if unique.first() == Some(&0) || unique.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let show_identifier = self.root_show_identifier().map_err(map_read_error)?;
         let show_object = self
@@ -575,7 +622,7 @@ impl Package {
             || snapshot.has_slide_list()
             || snapshot.slide_node_identifiers() != expected
         {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         let mut slide_identifiers = Vec::new();
         slide_identifiers
@@ -594,28 +641,28 @@ impl Package {
                 self.semantic_wire_limits().map_err(map_read_error)?,
             )?;
             if slide_identifier == 0 {
-                return Err(Error::UnsupportedTopology);
+                return Err(Error::Refused(Refusal::UnsupportedTopology));
             }
             slide_identifiers.push(slide_identifier);
         }
         slide_identifiers.sort_unstable();
         if slide_identifiers.windows(2).any(|pair| pair[0] == pair[1]) {
-            return Err(Error::UnsupportedTopology);
+            return Err(Error::Refused(Refusal::UnsupportedTopology));
         }
         Ok(())
     }
 }
 
 fn flat_slide_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut slide_identifier = None;
     let mut depth_fields = 0usize;
     for field in view.fields() {
         match field.number() {
-            1 => return Err(Error::UnsupportedTopology),
+            1 => return Err(Error::Refused(Refusal::UnsupportedTopology)),
             2 => {
                 if slide_identifier.is_some() {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
                 super::require_canonical_length_delimited(field, "Keynote slide reference")
                     .map_err(map_wire_error)?;
@@ -636,13 +683,13 @@ fn flat_slide_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Erro
                 )
                 .map_err(map_wire_error)?;
                 if depth != 1 {
-                    return Err(Error::UnsupportedTopology);
+                    return Err(Error::Refused(Refusal::UnsupportedTopology));
                 }
             },
             _ => {},
         }
     }
-    slide_identifier.ok_or(Error::UnsupportedTopology)
+    slide_identifier.ok_or(Error::Refused(Refusal::UnsupportedTopology))
 }
 
 fn moved_order(before: &[u64], intent: Intent) -> Result<Box<[u64]>, Error> {
@@ -766,25 +813,24 @@ fn permute_slide_reference_records(
     if intent.source.get() >= slide_count || intent.destination.get() >= slide_count {
         return Err(Error::InvalidSource);
     }
-    let show_view = WireView::parse_with_limits(show, limits).map_err(map_wire_error)?;
+    let show_view = WireView::parse(show, limits).map_err(map_wire_error)?;
     let mut slide_trees = show_view.fields().filter(|field| field.number() == 3);
     let slide_tree = slide_trees.next().ok_or(Error::InvalidSource)?;
     if slide_trees.next().is_some() || slide_tree.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let tree_view =
-        WireView::parse_with_limits(slide_tree.payload(), limits).map_err(map_wire_error)?;
+    let tree_view = WireView::parse(slide_tree.payload(), limits).map_err(map_wire_error)?;
     let work = show_view
         .len()
         .checked_add(tree_view.len())
         .and_then(|value| value.checked_add(slide_count))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: usize_to_u64(limits.max_rewrite_work()),
         })?;
     if work > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(work),
             maximum: usize_to_u64(limits.max_rewrite_work()),
@@ -842,7 +888,7 @@ fn permute_slide_reference_records(
         }
     }
     if rewritten_show.len() != show.len() || rewritten_show.len() > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(rewritten_show.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -892,8 +938,8 @@ fn clone_identifiers(identifiers: &[u64]) -> Result<Box<[u64]>, Error> {
 
 fn map_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -904,7 +950,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Entries,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -921,7 +967,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -949,7 +995,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -986,7 +1032,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1012,7 +1058,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

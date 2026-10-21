@@ -51,7 +51,7 @@ pub fn source_backed_workbook_from_shared_ole_file(
 ) -> Result<SourceBackedWorkbook, SourceBackedError> {
     SourceBackedWorkbook::from_shared_ole_file_with_options(
         cfb,
-        SourceBackedOptions::default().with_limits(limits),
+        SourceBackedOptions::default().limits(limits),
     )
 }
 
@@ -61,7 +61,7 @@ pub fn source_backed_workbook_from_shared_ole_file(
 ///
 /// # Errors
 /// Returns the typed package or cell-values error if admission fails.
-pub fn cell_values_snapshot_from_bytes(
+pub(crate) fn cell_values_snapshot_from_bytes(
     package: &crate::Package,
     bytes: Vec<u8>,
 ) -> crate::package::Result<crate::cell_values::Snapshot> {
@@ -69,7 +69,7 @@ pub fn cell_values_snapshot_from_bytes(
         litchi_ole_common::object::Limits::default(),
         litchi_cfb::OleFileLimits::default(),
     )?;
-    crate::cell_values::Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits)
+    crate::cell_values::Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits)
         .map_err(crate::package::Error::Reader)
 }
 

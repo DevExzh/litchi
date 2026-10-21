@@ -7,7 +7,7 @@ use crate::charts::donut_inner_radius::{
     set_chart_donut_inner_radius as set_native_chart_donut_inner_radius,
 };
 
-impl Editor {
+impl Draft {
     /// Read the Segments inner radius of one donut chart.
     pub fn slide_chart_donut_inner_radius(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn slide_chart_donut_inner_radius(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<ChartDonutInnerRadius> {
@@ -44,7 +44,7 @@ fn slide_chart_donut_inner_radius(
 }
 
 fn set_slide_chart_donut_inner_radius(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     radius: ChartDonutInnerRadius,
@@ -68,7 +68,7 @@ fn set_slide_chart_donut_inner_radius(
         "Keynote",
         radius,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_donut_inner_radius(slide_index, drawable_object_id)? != radius {
         return Err(Error::InvalidFormat(
             "Keynote chart donut inner-radius update failed validation".to_owned(),

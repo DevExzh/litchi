@@ -388,49 +388,49 @@ fn try_boxed_str(value: &str) -> Result<Box<str>, TryReserveError> {
 /// Exact-source transactions for one chart's arrangement (bar/column gaps, pie geometry).
 pub mod arrangement {
     pub use crate::package::slide_chart_arrangement::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one chart axis title.
 pub mod axis_title {
     pub use crate::package::slide_chart_axis_title::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one chart caption.
 pub mod caption {
     pub use crate::package::slide_chart_caption::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one chart legend's visibility.
 pub mod legend {
     pub use crate::package::slide_chart_legend::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one chart title.
 pub mod title {
     pub use crate::package::slide_chart_title::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one chart value axis.
 pub mod value_axis {
     pub use crate::package::slide_chart_value_axis::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one slide chart's data grid.
 pub mod data {
     pub use crate::package::slide_chart_data::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

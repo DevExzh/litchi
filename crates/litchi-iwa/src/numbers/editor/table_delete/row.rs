@@ -23,7 +23,7 @@ fn deleted_coordinate(value: u32, deletion: u32) -> Option<u32> {
 }
 
 pub(super) fn delete_table_tile_row(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     deletion: usize,
@@ -177,7 +177,7 @@ pub(super) fn delete_table_tile_row(
 }
 
 pub(super) fn delete_row_headers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     deletion: usize,

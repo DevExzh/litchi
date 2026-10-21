@@ -618,7 +618,7 @@ Tab:\tab Tabbed text here\par
 #[cfg(feature = "rtf")]
 fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> std::io::Result<()> {
     // Parse the RTF
-    let doc = RtfDocument::parse(rtf_content).map_err(|e| {
+    let doc = raw::Tree::parse(rtf_content).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to parse {} RTF: {:?}", test_name, e),
@@ -656,7 +656,7 @@ fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> st
 
     // Verify the original can be re-parsed (demonstrates parser correctness)
     let rtf_output = std::fs::read_to_string(output_path)?;
-    let reparsed = RtfDocument::parse(&rtf_output).map_err(|e| {
+    let reparsed = raw::Tree::parse(&rtf_output).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("Failed to reparse {}: {:?}", output_path, e),

@@ -100,12 +100,7 @@ pub fn opc_probe_count() -> usize {
 }
 
 #[cfg(all(
-    any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ),
+    any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
 pub(crate) fn catalog_probe_limits(
