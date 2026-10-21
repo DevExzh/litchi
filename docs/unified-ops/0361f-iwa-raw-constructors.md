@@ -133,3 +133,13 @@ release profile, so those counts remain diagnostic and no native timing was
 started. The final builder uses the workspace release settings (`lto = true`,
 `panic = "abort"`, default debug level) for both native and counting binaries.
 Both earlier build attempts and their protocol sources remain external.
+
+The production-profile `matched-v3` build passes all four binary preflights:
+the six constructor/archive outputs match across native/counting builds and
+both endpoints. Four repeated allocation legs per route agree. Archive-object
+construction reduces requested bytes from 566,400 to 176,000 per 100 calls;
+parse, validation and encoding also allocate less. No route increases requested,
+peak or retained bytes. These are allocation results, not native latency
+acceptance. [The verified receipt](results/0361f/evidence.json) records the
+complete build, source manifests, toolchain, dependencies and measurements.
+Regenerate it with `constructor-collect.py /outside/0361f --out OUTPUT`.
