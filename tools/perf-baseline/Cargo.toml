@@ -15,6 +15,10 @@ current-owner-api = []
 current-property-api = []
 allocator-metrics = []
 ordinary-save-process-metrics = []
+# Enables the W5 OLE probe's isolated counting allocator.  Native timing
+# binaries leave this feature disabled so their allocator and output paths are
+# unchanged.
+w5-counting-allocator = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
 # The paired OLE probe is built against either migration boundary when these

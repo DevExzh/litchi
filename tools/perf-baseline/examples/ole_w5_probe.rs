@@ -29,6 +29,156 @@ use litchi_xls::cell_values::{
     Reference as XlsReference, Selector as XlsSelector, Value as XlsValue,
 };
 
+/// A deliberately opt-in allocator for the W5 retained-state evidence probe.
+///
+/// The native ABBA probe does not enable this feature.  Keeping the allocator
+/// behind a feature makes the extra atomics and the reporting path impossible
+/// to include accidentally in the timing binaries.  Reports are emitted with
+/// counting disabled so formatting the receipt cannot inflate the operation
+/// being measured.
+#[cfg(feature = "w5-counting-allocator")]
+mod w5_counting_allocator {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    static ENABLED: AtomicBool = AtomicBool::new(true);
+    static TOTAL_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static TOTAL_BYTES: AtomicUsize = AtomicUsize::new(0);
+    static LIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
+    static PEAK_CALLS: AtomicUsize = AtomicUsize::new(0);
+    static PEAK_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+    pub struct CountingAllocator;
+
+    #[derive(Clone, Copy)]
+    pub struct Snapshot {
+        pub total_calls: usize,
+        pub total_bytes: usize,
+        pub live_calls: usize,
+        pub live_bytes: usize,
+        pub peak_calls: usize,
+        pub peak_bytes: usize,
+    }
+
+    #[global_allocator]
+    static GLOBAL: CountingAllocator = CountingAllocator;
+
+    #[inline]
+    fn record_alloc(bytes: usize) {
+        if !ENABLED.load(Ordering::Relaxed) {
+            return;
+        }
+        TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
+        TOTAL_BYTES.fetch_add(bytes, Ordering::Relaxed);
+        let live_calls = LIVE_CALLS.fetch_add(1, Ordering::Relaxed) + 1;
+        let live_bytes = LIVE_BYTES.fetch_add(bytes, Ordering::Relaxed) + bytes;
+        PEAK_CALLS.fetch_max(live_calls, Ordering::Relaxed);
+        PEAK_BYTES.fetch_max(live_bytes, Ordering::Relaxed);
+    }
+
+    #[inline]
+    fn record_realloc(old_bytes: usize, new_bytes: usize) {
+        if !ENABLED.load(Ordering::Relaxed) {
+            return;
+        }
+        TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
+        TOTAL_BYTES.fetch_add(new_bytes, Ordering::Relaxed);
+        let live_bytes = if new_bytes >= old_bytes {
+            LIVE_BYTES.fetch_add(new_bytes - old_bytes, Ordering::Relaxed) + (new_bytes - old_bytes)
+        } else {
+            LIVE_BYTES.fetch_sub(old_bytes - new_bytes, Ordering::Relaxed) - (old_bytes - new_bytes)
+        };
+        PEAK_CALLS.fetch_max(LIVE_CALLS.load(Ordering::Relaxed), Ordering::Relaxed);
+        PEAK_BYTES.fetch_max(live_bytes, Ordering::Relaxed);
+    }
+
+    #[inline]
+    fn record_dealloc(bytes: usize) {
+        if !ENABLED.load(Ordering::Relaxed) {
+            return;
+        }
+        LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
+        LIVE_BYTES.fetch_sub(bytes, Ordering::Relaxed);
+    }
+
+    // The allocator is used only by this opt-in example binary.  All calls to
+    // System are kept in explicit unsafe blocks so the probe remains valid
+    // under the workspace's strict unsafe-operation lint settings.
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            let pointer = unsafe { System.alloc(layout) };
+            if !pointer.is_null() {
+                record_alloc(layout.size());
+            }
+            pointer
+        }
+
+        unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+            let pointer = unsafe { System.alloc_zeroed(layout) };
+            if !pointer.is_null() {
+                record_alloc(layout.size());
+            }
+            pointer
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            unsafe { System.dealloc(pointer, layout) };
+            record_dealloc(layout.size());
+        }
+
+        unsafe fn realloc(
+            &self,
+            pointer: *mut u8,
+            layout: Layout,
+            new_size: usize,
+        ) -> *mut u8 {
+            let new_pointer = unsafe { System.realloc(pointer, layout, new_size) };
+            if !new_pointer.is_null() {
+                record_realloc(layout.size(), new_size);
+            }
+            new_pointer
+        }
+    }
+
+    pub fn snapshot() -> Snapshot {
+        Snapshot {
+            total_calls: TOTAL_CALLS.load(Ordering::Relaxed),
+            total_bytes: TOTAL_BYTES.load(Ordering::Relaxed),
+            live_calls: LIVE_CALLS.load(Ordering::Relaxed),
+            live_bytes: LIVE_BYTES.load(Ordering::Relaxed),
+            peak_calls: PEAK_CALLS.load(Ordering::Relaxed),
+            peak_bytes: PEAK_BYTES.load(Ordering::Relaxed),
+        }
+    }
+
+    pub fn print_header() {
+        let enabled = ENABLED.swap(false, Ordering::SeqCst);
+        println!(
+            "w5_alloc,route,iteration,delta_calls,delta_bytes,live_calls,live_bytes,peak_calls,peak_bytes,base_live_calls,base_live_bytes,base_peak_calls,base_peak_bytes"
+        );
+        ENABLED.store(enabled, Ordering::SeqCst);
+    }
+
+    pub fn print_delta(route: &str, iteration: usize, before: Snapshot, after: Snapshot) {
+        let enabled = ENABLED.swap(false, Ordering::SeqCst);
+        println!(
+            "w5_alloc,{route},{iteration},{},{},{},{},{},{},{},{},{},{}",
+            after.total_calls.saturating_sub(before.total_calls),
+            after.total_bytes.saturating_sub(before.total_bytes),
+            after.live_calls,
+            after.live_bytes,
+            after.peak_calls,
+            after.peak_bytes,
+            before.live_calls,
+            before.live_bytes,
+            before.peak_calls,
+            before.peak_bytes,
+        );
+        ENABLED.store(enabled, Ordering::SeqCst);
+    }
+}
+
 #[cfg(feature = "current-owner-api")]
 use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage};
 
@@ -111,8 +261,12 @@ fn main() -> Result<(), Box<dyn StdError>> {
     };
 
     println!("route,sample,nanoseconds,output_bytes");
+    #[cfg(feature = "w5-counting-allocator")]
+    w5_counting_allocator::print_header();
     for iteration in 0..warmup.checked_add(samples).ok_or("sample count overflow")? {
         let started = Instant::now();
+        #[cfg(feature = "w5-counting-allocator")]
+        let allocation_before = w5_counting_allocator::snapshot();
         let output_bytes = match route_name {
             "open" => {
                 let editor = owner_open_editor(&corpus)?;
@@ -184,6 +338,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 if output != *expected {
                     return Err("DOC tracked-revision output differs from preflight".into());
                 }
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{}",
@@ -209,6 +372,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     output_bytes = output.len();
                 }
                 let elapsed = started.elapsed().as_nanos();
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{output_bytes}",
@@ -235,6 +407,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     return Err("XLS cell stage output differs from preflight".into());
                 }
                 black_box(&commit);
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{}",
@@ -256,6 +437,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 verify_doc_history(&run, source, expected)?;
                 let output_bytes = run.output.len();
                 black_box((&run.packages, &run.patches));
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{output_bytes}",
@@ -276,6 +466,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 verify_xls_history(&run, source, expected)?;
                 let output_bytes = run.output.len();
                 black_box((&run.packages, &run.patches));
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{output_bytes}",
@@ -287,6 +486,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
             _ => return Err(format!("unknown route {route_name:?}").into()),
         };
         let elapsed = started.elapsed().as_nanos();
+        #[cfg(feature = "w5-counting-allocator")]
+        if iteration >= warmup {
+            w5_counting_allocator::print_delta(
+                route_name,
+                iteration - warmup,
+                allocation_before,
+                w5_counting_allocator::snapshot(),
+            );
+        }
         if iteration >= warmup {
             println!(
                 "{route_name},{},{elapsed},{output_bytes}",
