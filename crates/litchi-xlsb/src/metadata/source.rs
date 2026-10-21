@@ -300,4 +300,48 @@ impl SourceBackedWorkbook {
             start,
         })
     }
+
+    /// Apply a metadata patch to a new source-backed owner.
+    ///
+    /// The patch is checked against the recorded property-part bytes before
+    /// the new owner is returned. Replaying a patch therefore reads only the
+    /// property families it changes and retains every other source member
+    /// lazily for [`SourceBackedWorkbook::write_to`]. A patch created from an
+    /// eager package can be replayed here when its recorded content base is
+    /// the same.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Conflict`] for a different content base,
+    /// [`Error::Signed`] for a changed signed source, and the source and
+    /// property decoding errors of the patch.
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
+        if patch.is_noop() {
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: patch.diagnostics(),
+            });
+        }
+        let source = self.source_backed_package();
+        let (base, composed) = match &self.metadata {
+            Some(revision) => (revision.base.clone(), revision.patch.compose(patch)?),
+            None => (self.metadata_snapshot()?, patch.clone()),
+        };
+        let current = Snapshot::read_source_backed_after(source, Host::Excel, &composed)?;
+        if source.has_signature_infrastructure() {
+            return Err(Error::Signed);
+        }
+        let package = self.with_metadata_revision(Some(Arc::new(Revision {
+            base,
+            current,
+            patch: composed,
+            topology: OnceLock::new(),
+        })));
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: patch.diagnostics(),
+        })
+    }
 }

@@ -28,7 +28,7 @@ fn native_cache() -> Cache {
 fn native_cache_round_trips_bounded_biff12() {
     let original = native_cache();
     let bytes = write_cache(&original).unwrap();
-    let records: Vec<_> = Records::new(&bytes)
+    let records: Vec<_> = Records::new(&bytes, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind())
         .collect();
     assert_eq!(records[0], kind::BEGIN_SLICER_CACHE);
@@ -65,19 +65,20 @@ fn validation_rejects_unsafe_selection_and_reserved_bits() {
     ));
 
     let mut bytes = write_cache(&native_cache()).unwrap();
-    let mut records: Vec<(crate::raw::Kind, Vec<u8>)> = Records::new(&bytes)
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut records: Vec<(crate::raw::Kind, Vec<u8>)> =
+        Records::new(&bytes, crate::raw::Limits::DEFAULT)
+            .map(|record| {
+                let record = record.unwrap();
+                (record.kind(), record.payload().to_vec())
+            })
+            .collect();
     let native = records
         .iter_mut()
         .find(|(kind, _)| *kind == kind::BEGIN_SLICER_CACHE_NATIVE)
         .unwrap();
     native.1[8] |= 0x80;
     bytes.clear();
-    let mut writer = crate::raw::Encoder::new(&mut bytes);
+    let mut writer = crate::raw::Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (kind, payload) in records {
         writer.write_record(kind, &payload).unwrap();
     }

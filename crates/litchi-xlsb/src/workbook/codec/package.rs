@@ -137,41 +137,38 @@ impl Workbook {
         self.worksheet_names
             .iter()
             .position(|name| name == worksheet_name)
-            .ok_or_else(|| {
-                crate::package::error::Error::WorksheetNotFound(worksheet_name.to_string())
-            })
+            .ok_or_else(|| crate::package::error::Error::WorksheetNotFound(None))
     }
 
     pub(crate) fn worksheet_uri(&self, index: usize) -> Result<litchi_opc::PackURI> {
         let catalog_position = self.catalog_position_for_worksheet(index)?;
-        let name = self
+        let _name = self
             .formula_context
             .worksheet_names
             .get(catalog_position)
             .ok_or_else(|| {
-                crate::package::error::Error::InvalidFormat(format!(
-                    "Worksheet catalog position {catalog_position} out of bounds"
-                ))
+                crate::package::error::Error::InvalidFormat(
+                    "Worksheet catalog position out of bounds",
+                )
             })?;
         let rel_id = self
             .worksheet_rel_ids
             .get(catalog_position)
             .and_then(Option::as_deref)
             .ok_or_else(|| {
-                crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet {name:?} has no worksheet relationship"
-                ))
+                crate::package::error::Error::UnsupportedFeature(
+                    "sheet has no worksheet relationship",
+                )
             })?;
         let workbook_part = self.package.main_document_part()?;
-        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-            crate::package::error::Error::FileNotFound(format!(
-                "relationship {rel_id:?} for sheet {name:?}"
-            ))
-        })?;
+        let relationship = workbook_part
+            .rels()
+            .get(rel_id)
+            .ok_or_else(|| crate::package::error::Error::FileNotFound("relationship for sheet"))?;
         if relationship.is_external() {
-            return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                "sheet {name:?} has an external worksheet relationship"
-            )));
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "sheet has an external worksheet relationship",
+            ));
         }
         Ok(relationship.target_partname()?)
     }
@@ -219,8 +216,8 @@ impl Workbook {
             let key = Self::merge_range_key(range);
             if require_canonical_order && previous.is_some_and(|value| value >= key) {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "BrtMergeCell collection".to_string(),
-                    val: "duplicate or noncanonical range order".to_string(),
+                    typ: "BrtMergeCell collection",
+                    val: "duplicate or noncanonical range order",
                 });
             }
             previous = Some(key);
@@ -236,14 +233,12 @@ impl Workbook {
                     active.remove(&col_first);
                 }
             }
-            if let Some((&col_first, &(col_last, _))) = active.range(..=range.col_last).next_back()
+            if let Some((&_col_first, &(col_last, _))) = active.range(..=range.col_last).next_back()
                 && col_last >= range.col_first
             {
-                return Err(crate::package::error::Error::InvalidCellReference(format!(
-                    "merged range {} overlaps an existing range beginning in column {}",
-                    range.to_range_string(),
-                    col_first
-                )));
+                return Err(crate::package::error::Error::InvalidCellReference(
+                    "merged range overlaps an existing range beginning in column",
+                ));
             }
             active.insert(range.col_first, (range.col_last, range.row_last));
             expirations.push(Reverse((range.row_last, range.col_first)));
@@ -271,7 +266,7 @@ impl Workbook {
     }
 
     pub(crate) fn inspect_merge_block(data: &[u8]) -> Result<MergeBlockLayout> {
-        let mut records = Records::new(data);
+        let mut records = Records::new(data, crate::raw::Limits::DEFAULT);
         let mut begin_offset = None;
         let mut block_span = None;
         let mut declared_count = None;
@@ -288,8 +283,8 @@ impl Workbook {
                 kind::BEGIN_MERGE_CELLS => {
                     if in_block || begin_offset.is_some() || !saw_end_sheet_data {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginMergeCells".to_string(),
-                            val: "duplicate, nested, or out-of-order record".to_string(),
+                            typ: "BrtBeginMergeCells",
+                            val: "duplicate, nested, or out-of-order record",
                         });
                     }
                     if record.payload().len() != 4 {
@@ -312,33 +307,29 @@ impl Workbook {
                 kind::MERGE_CELL => {
                     if !in_block {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtMergeCell".to_string(),
-                            val: "record occurs outside BrtBeginMergeCells".to_string(),
+                            typ: "BrtMergeCell",
+                            val: "record occurs outside BrtBeginMergeCells",
                         });
                     }
                     ranges.push(MergedCell::parse(record.payload())?);
                     if ranges.len() > declared_count.unwrap_or_default() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginMergeCells".to_string(),
-                            val: "declared count is smaller than the record collection".to_string(),
+                            typ: "BrtBeginMergeCells",
+                            val: "declared count is smaller than the record collection",
                         });
                     }
                 },
                 kind::END_MERGE_CELLS => {
                     if !in_block || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtEndMergeCells".to_string(),
-                            val: "orphan, duplicate, or nonempty record".to_string(),
+                            typ: "BrtEndMergeCells",
+                            val: "orphan, duplicate, or nonempty record",
                         });
                     }
                     if declared_count != Some(ranges.len()) {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginMergeCells".to_string(),
-                            val: format!(
-                                "declared count {:?} disagrees with {} BrtMergeCell records",
-                                declared_count,
-                                ranges.len()
-                            ),
+                            typ: "BrtBeginMergeCells",
+                            val: "declared count disagrees with BrtMergeCell records",
                         });
                     }
                     block_span = Some((begin_offset.expect("merge begin offset"), end));
@@ -347,8 +338,8 @@ impl Workbook {
                 kind::END_SHEET_DATA => {
                     if in_block {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtMergeCells collection".to_string(),
-                            val: "noncontiguous record collection".to_string(),
+                            typ: "BrtMergeCells collection",
+                            val: "noncontiguous record collection",
                         });
                     }
                     saw_end_sheet_data = true;
@@ -356,16 +347,16 @@ impl Workbook {
                 kind::END_SHEET => {
                     if in_block || end_sheet_offset.replace(start).is_some() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtEndSheet".to_string(),
-                            val: "duplicate or embedded in merge collection".to_string(),
+                            typ: "BrtEndSheet",
+                            val: "duplicate or embedded in merge collection",
                         });
                     }
                 },
                 record_type => {
                     if in_block {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtMergeCells collection".to_string(),
-                            val: format!("unexpected record 0x{record_type:04X}"),
+                            typ: "BrtMergeCells collection",
+                            val: "unexpected record",
                         });
                     }
                     if saw_end_sheet_data
@@ -379,15 +370,14 @@ impl Workbook {
         }
         if in_block || begin_offset.is_some() != block_span.is_some() {
             return Err(crate::package::error::Error::UnexpectedEndOfStream(
-                "BrtMergeCells collection".to_string(),
+                "BrtMergeCells collection",
             ));
         }
-        let end_sheet_offset = end_sheet_offset.ok_or_else(|| {
-            crate::package::error::Error::UnexpectedEndOfStream("BrtEndSheet".to_string())
-        })?;
+        let end_sheet_offset = end_sheet_offset
+            .ok_or_else(|| crate::package::error::Error::UnexpectedEndOfStream("BrtEndSheet"))?;
         if !saw_end_sheet_data {
             return Err(crate::package::error::Error::UnexpectedEndOfStream(
-                "BrtEndSheetData".to_string(),
+                "BrtEndSheetData",
             ));
         }
         if block_span.is_some() {
@@ -396,8 +386,8 @@ impl Workbook {
                 .is_some_and(|offset| block_span.is_some_and(|(begin, _)| offset < begin))
             {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "BrtMergeCells collection".to_string(),
-                    val: "collection occurs after a later worksheet feature".to_string(),
+                    typ: "BrtMergeCells collection",
+                    val: "collection occurs after a later worksheet feature",
                 });
             }
         }
@@ -413,7 +403,7 @@ impl Workbook {
             return Ok(Vec::new());
         }
         let mut output = Vec::with_capacity(10 + ranges.len() * 19);
-        let mut writer = crate::raw::Encoder::new(&mut output);
+        let mut writer = crate::raw::Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
         writer.write_record(
             kind::BEGIN_MERGE_CELLS,
             &(ranges.len() as u32).to_le_bytes(),
@@ -432,10 +422,9 @@ impl Workbook {
     ) -> Result<ExternalBook> {
         let part = self.package.get_part(uri)?;
         if part.content_type() != "application/vnd.ms-excel.externalLink" {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "external link part {uri} has invalid content type {:?}",
-                part.content_type()
-            )));
+            return Err(crate::package::error::Error::InvalidFormula(
+                "external link part has invalid content type",
+            ));
         }
 
         let parsed = crate::external_link::parse_external_link_with_budget(part.blob(), budget)?;
@@ -451,7 +440,7 @@ impl Workbook {
             Kind::Dde => {
                 if !relationships.is_empty() {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "DDE external link must not contain relationships".to_string(),
+                        "DDE external link must not contain relationships",
                     ));
                 }
                 Ok(ExternalBook {
@@ -461,41 +450,39 @@ impl Workbook {
             Kind::Workbook | Kind::Ole => {
                 if relationships.len() != 1 {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "external workbook/OLE link must have exactly one data-source relationship"
-                            .to_string(),
+                        "external workbook/OLE link must have exactly one data-source relationship",
                     ));
                 }
 
                 let relationship_id = parsed.relationship_id().ok_or_else(|| {
                     crate::package::error::Error::InvalidFormula(
-                        "external workbook/OLE link has no data-source relationship ID".to_string(),
+                        "external workbook/OLE link has no data-source relationship ID",
                     )
                 })?;
                 let relationship = relationships.get(relationship_id).ok_or_else(|| {
-                    crate::package::error::Error::InvalidFormula(format!(
-                        "external data relationship {relationship_id:?} is missing"
-                    ))
+                    crate::package::error::Error::InvalidFormula(
+                        "external data relationship is missing",
+                    )
                 })?;
                 if !relationship.is_external() {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "external data relationship {relationship_id:?} is internal"
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "external data relationship is internal",
+                    ));
                 }
 
-                let (allowed_relationship_types, source_kind) = match parsed.link().kind() {
+                let (allowed_relationship_types, _source_kind) = match parsed.link().kind() {
                     Kind::Workbook => (EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES, "external workbook"),
                     Kind::Ole => (OLE_DATA_SOURCE_RELATIONSHIP_TYPES, "OLE data source"),
                     Kind::Dde => {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "DDE link reached relationship resolution".to_string(),
+                            "DDE link reached relationship resolution",
                         ));
                     },
                 };
                 if !allowed_relationship_types.contains(&relationship.reltype()) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "{source_kind} relationship {relationship_id:?} has invalid type {:?}",
-                        relationship.reltype()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "relationship has invalid type",
+                    ));
                 }
 
                 let target_ref = relationship.target_ref();

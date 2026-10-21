@@ -99,12 +99,16 @@ pub(crate) fn parse_connections_part_recording(
 fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
     const CONTEXT: &str = "ExternalDataConnections";
     let begin = walker.required_begin(rt::BEGIN_EXT_CONNECTIONS, CONTEXT)?;
-    walker.finish(&Cursor::new(begin.payload(), "BrtBeginExtConnections"))?;
+    walker.finish(&Cursor::new(
+        begin.payload(),
+        "BrtBeginExtConnections",
+        crate::raw::Limits::DEFAULT,
+    ))?;
 
     let mut connections = Connections::default();
     loop {
         let Some(record) = walker.next()? else {
-            return Err(Error::UnexpectedEndOfStream(CONTEXT.to_string()));
+            return Err(Error::UnexpectedEndOfStream(CONTEXT));
         };
         match record.kind() {
             rt::BEGIN_EXT_CONNECTION => {
@@ -116,7 +120,11 @@ fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
                     .push(parse_connection(&mut walker, record.payload())?);
             },
             rt::END_EXT_CONNECTIONS => {
-                walker.finish(&Cursor::new(record.payload(), "BrtEndExtConnections"))?;
+                walker.finish(&Cursor::new(
+                    record.payload(),
+                    "BrtEndExtConnections",
+                    crate::raw::Limits::DEFAULT,
+                ))?;
                 super::write::validate_connections(&connections)?;
                 return Ok(connections);
             },
@@ -161,7 +169,7 @@ fn parse_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Co
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
 fn parse_ext_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
-    let mut cursor = Cursor::new(data, CONTEXT);
+    let mut cursor = Cursor::new(data, CONTEXT, crate::raw::Limits::DEFAULT);
     let refreshed_version = cursor.read_u8()?;
     let refreshable_min_version = cursor.read_u8()?;
     let pc = cursor.read_u8()?;
@@ -242,7 +250,7 @@ fn parse_ext_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Resul
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
 fn parse_db_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<DbProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECDbProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECDbProps", crate::raw::Limits::DEFAULT);
     let command_type = CommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
     let connection_string = cursor.read_wide_string()?;
@@ -267,7 +275,7 @@ fn parse_db_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<DbPr
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
 fn parse_olap_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<OlapProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECOlapProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECOlapProps", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
     let load_flags = cursor.read_u8()?;
@@ -292,7 +300,7 @@ fn parse_olap_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Ol
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
 fn parse_web_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<WebProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECWebProps");
+    let mut cursor = Cursor::new(data, "BrtBeginECWebProps", crate::raw::Limits::DEFAULT);
     let html_format = match cursor.read_u8()? {
         0 => HtmlFormat::None,
         1 => HtmlFormat::RichText,
@@ -358,7 +366,7 @@ fn parse_params(walker: &mut RecordWalker<'_, '_>, connection: &mut Connection) 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
 fn parse_param(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Parameter> {
     const CONTEXT: &str = "BrtBeginECParam";
-    let mut cursor = Cursor::new(data, CONTEXT);
+    let mut cursor = Cursor::new(data, CONTEXT, crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u16()?;
     let pbt = flags & PARAM_TYPE_MASK;
     let sql_type = cursor.read_u16()?;
@@ -388,11 +396,8 @@ fn parse_param(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Paramet
                 };
                 Some(ParameterValue::Boolean(boolean != 0))
             },
-            Some(other) => {
-                return Err(malformed(
-                    CONTEXT,
-                    format!("unknown parameter dataType {other:#x}"),
-                ));
+            Some(_other) => {
+                return Err(malformed(CONTEXT, "unknown parameter dataType"));
             },
             None => return Err(malformed(CONTEXT, "value parameter lacks a dataType")),
         },
@@ -436,7 +441,11 @@ fn parse_web_tables(walker: &mut RecordWalker<'_, '_>, connection: &mut Connecti
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = Cursor::new(record.payload(), "BrtPCDIString");
+                let mut cursor = Cursor::new(
+                    record.payload(),
+                    "BrtPCDIString",
+                    crate::raw::Limits::DEFAULT,
+                );
                 connection
                     .web_tables
                     .push(WebTableItem::Named(cursor.read_wide_string()?));
@@ -446,7 +455,11 @@ fn parse_web_tables(walker: &mut RecordWalker<'_, '_>, connection: &mut Connecti
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex");
+                let mut cursor = Cursor::new(
+                    record.payload(),
+                    "BrtPCDIIndex",
+                    crate::raw::Limits::DEFAULT,
+                );
                 connection
                     .web_tables
                     .push(WebTableItem::Index(cursor.read_u32()?));

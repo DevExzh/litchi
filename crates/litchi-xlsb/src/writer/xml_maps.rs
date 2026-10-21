@@ -17,8 +17,8 @@ pub(super) struct WorksheetXmlMapsWritePlan {
     pub(super) single_cells: Option<Vec<u8>>,
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(format!("Custom XML Maps: {}", message.into()))
+fn invalid(_message: impl Into<String>) -> Error {
+    Error::InvalidFormula("Custom XML Maps")
 }
 
 pub(super) fn stage(

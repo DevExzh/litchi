@@ -88,9 +88,10 @@ impl Scalar {
     fn validate(&self, limits: Limits) -> Result<()> {
         match self {
             Self::Number(value) if !(value.is_normal() || value.to_bits() == 0) => {
-                Err(Error::UnsupportedFeature(
-                    "scalar number edits require a normalized IEEE-754 value or positive zero"
-                        .to_string(),
+                Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "scalar number edits require a normalized IEEE-754 value or positive zero",
                 ))
             },
             Self::Text(value) => {
@@ -159,13 +160,17 @@ impl StylesDraft {
                 )
         });
         let Some(relationship) = targets.next() else {
-            return Err(Error::UnsupportedFeature(
-                "cell formats need a workbook styles part".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell formats need a workbook styles part",
             ));
         };
         if targets.next().is_some() {
-            return Err(Error::UnsupportedFeature(
-                "the workbook has more than one styles relationship".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "the workbook has more than one styles relationship",
             ));
         }
         let uri = relationship.target_partname()?;
@@ -236,18 +241,14 @@ impl Edit {
             self.shared_strings = Some(workbook.shared_strings().to_vec());
         }
         let index = usize::try_from(index).map_err(|_error| {
-            Error::InvalidCellReference(format!(
-                "shared-string index {index} does not fit this platform"
-            ))
+            Error::InvalidCellReference("shared-string index does not fit this platform")
         })?;
         self.shared_strings
             .as_ref()
             .and_then(|strings| strings.get(index))
             .cloned()
             .ok_or_else(|| {
-                Error::InvalidCellReference(format!(
-                    "shared-string index {index} is not present in the workbook"
-                ))
+                Error::InvalidCellReference("shared-string index is not present in the workbook")
             })
     }
 
@@ -283,16 +284,20 @@ impl Edit {
         scalar.validate(self.raw.limits())?;
         self.raw.scalar_assignment_guard(reference)?;
         if self.raw.is_removed(reference) {
-            return Err(Error::UnsupportedFeature(
-                "scalar edits cannot target a cell already staged for removal".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "scalar edits cannot target a cell already staged for removal",
             ));
         }
         let current = self.raw.current_cell(reference)?.cloned();
         let Some(current) = current else {
             if matches!(scalar, Scalar::Blank) {
                 if self.raw.source_has_cell(reference)? {
-                    return Err(Error::UnsupportedFeature(
-                        "scalar edits cannot target an unsupported cell-record family".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
+                        "edit_cell_values",
+                        "scalar edits cannot target an unsupported cell-record family",
                     ));
                 }
                 return Ok(false);
@@ -305,9 +310,10 @@ impl Edit {
         if (current.formula().is_some() || current.value().is_formula_cache())
             && self.calculation_chain_present
         {
-            return Err(Error::UnsupportedFeature(
-                "scalar edits cannot replace a formula while an opaque calculation chain is present"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "scalar edits cannot replace a formula while an opaque calculation chain is present",
             ));
         }
 
@@ -417,14 +423,18 @@ impl Edit {
             return Ok(false);
         }
         if self.raw.is_removed(reference) {
-            return Err(Error::UnsupportedFeature(
-                "format edits cannot target a cell already staged for removal".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "format edits cannot target a cell already staged for removal",
             ));
         }
         let current = self.raw.current_cell(reference)?.map(|cell| cell.style());
         if current.is_none() && self.raw.source_has_cell(reference)? {
-            return Err(Error::UnsupportedFeature(
-                "format edits cannot target an unsupported cell-record family".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "format edits cannot target an unsupported cell-record family",
             ));
         }
         let old = current.map_or(0, StyleIndex::get);
@@ -434,7 +444,7 @@ impl Edit {
         let styles = self
             .styles
             .as_mut()
-            .ok_or_else(|| Error::InvalidFormat("the styles draft was not loaded".to_string()))?;
+            .ok_or_else(|| Error::InvalidFormat("the styles draft was not loaded"))?;
         let new = styles.restyle(old, format)?;
         if new == old {
             return Ok(false);
@@ -469,10 +479,8 @@ impl Edit {
     /// calculation chain this owner cannot extend.
     pub fn set_formula_text(&mut self, reference: Reference, formula: &str) -> Result<bool> {
         let parsed = crate::package::formula::text::Compiler::compile(formula).map_err(|error| {
-            if let Error::UnresolvedDependency(message) = error {
-                Error::UnsupportedFeature(format!(
-                    "the formula needs workbook context ({message}); only formulas within the sheet are compiled"
-                ))
+            if let Error::UnresolvedDependency(_message) = error {
+                Error::refused(litchi_core::edit::RefusalKind::UnsupportedContent, "edit_cell_values", "the formula needs workbook context; only formulas within the sheet are compiled")
             } else {
                 error
             }
@@ -480,21 +488,26 @@ impl Edit {
         let formula = CellFormula::new(0x0002, parsed.rgce, parsed.rgcb)?;
         self.raw.scalar_assignment_guard(reference)?;
         if self.raw.is_removed(reference) {
-            return Err(Error::UnsupportedFeature(
-                "formula edits cannot target a cell already staged for removal".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit_cell_values",
+                "formula edits cannot target a cell already staged for removal",
             ));
         }
         let current = self.raw.current_cell(reference)?.cloned();
         let Some(current) = current else {
             if self.raw.source_has_cell(reference)? {
-                return Err(Error::UnsupportedFeature(
-                    "formula edits cannot target an unsupported cell-record family".to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "edit_cell_values",
+                    "formula edits cannot target an unsupported cell-record family",
                 ));
             }
             if self.calculation_chain_present {
-                return Err(Error::UnsupportedFeature(
-                    "a new formula cell cannot be added while an opaque calculation chain is present"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "a new formula cell cannot be added while an opaque calculation chain is present",
                 ));
             }
             self.raw.insert_formula(
@@ -513,9 +526,10 @@ impl Edit {
             return Ok(true);
         }
         if self.calculation_chain_present {
-            return Err(Error::UnsupportedFeature(
-                "a value cell cannot become a formula while an opaque calculation chain is present"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "a value cell cannot become a formula while an opaque calculation chain is present",
             ));
         }
         let cache = match current.value() {
@@ -533,7 +547,7 @@ impl Edit {
             | Value::FormulaBooleanCache(_)
             | Value::FormulaErrorCache(_) => {
                 return Err(Error::InvalidFormat(
-                    "a formula cache without a formula payload".to_string(),
+                    "a formula cache without a formula payload",
                 ));
             },
         };
@@ -650,8 +664,10 @@ impl Edit {
         }
         let Some(current) = self.raw.current_cell(reference)? else {
             if self.raw.source_has_cell(reference)? {
-                return Err(Error::UnsupportedFeature(
-                    "cell removal cannot target an unsupported cell-record family".to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "edit_cell_values",
+                    "cell removal cannot target an unsupported cell-record family",
                 ));
             }
             return Ok(false);
@@ -660,9 +676,10 @@ impl Edit {
             && self.calculation_chain_present
             && !self.raw.is_inserted(reference)
         {
-            return Err(Error::UnsupportedFeature(
-                "cell removal cannot remove a formula while an opaque calculation chain is present"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell removal cannot remove a formula while an opaque calculation chain is present",
             ));
         }
         self.raw.remove(reference)?;
@@ -847,8 +864,10 @@ impl Patch {
         validate_limits(self.transfer_limits)?;
         let source = serialize_package(package, self.transfer_limits.bytes())?;
         if source.as_slice() != self.before.as_ref() {
-            return Err(Error::UnsupportedFeature(
-                "cell-values package patch source is stale".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "cell-values package patch source is stale",
             ));
         }
         if self.is_noop() {
@@ -1003,7 +1022,7 @@ fn resolve_worksheet<'a>(
             .count();
         if matches > 1 {
             return Err(Error::InvalidFormat(
-                "cell-values selector name is ambiguous in the complete tab catalog".to_string(),
+                "cell-values selector name is ambiguous in the complete tab catalog",
             ));
         }
     }
@@ -1011,8 +1030,10 @@ fn resolve_worksheet<'a>(
         return Ok(None);
     };
     let Some(position) = tab.worksheet_position() else {
-        return Err(Error::UnsupportedFeature(
-            "cell-values editing requires a worksheet tab with a grid".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_cell_values",
+            "cell-values editing requires a worksheet tab with a grid",
         ));
     };
     workbook.worksheet_uri(position.get()).map(Some)
@@ -1172,7 +1193,7 @@ fn validate_limits(limits: TransferLimits) -> Result<()> {
         || limits.history_bytes() == 0
     {
         return Err(Error::InvalidFormat(
-            "cell-values transfer/history limits must all be nonzero".to_string(),
+            "cell-values transfer/history limits must all be nonzero",
         ));
     }
     Ok(())

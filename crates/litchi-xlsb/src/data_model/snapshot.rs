@@ -194,8 +194,7 @@ impl SourceState {
         limits: SemanticLimits,
     ) -> Result<Self> {
         let opc_limits = super::package::opc_capture_limits(limits)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let workbook_name = workbook.partname();
         let root_relationships =
             package.source_relationships_with_limits(&root_name, opc_limits)?;
@@ -204,8 +203,7 @@ impl SourceState {
         let content_types = package.source_content_types_with_limits(opc_limits)?;
         let model_part = model
             .map(|model| {
-                let part_name = litchi_opc::PackURI::new(&model.part.part_name)
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                let part_name = litchi_opc::PackURI::new(&model.part.part_name)?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: model.part.part_name.clone(),
                     content_type: model.part.content_type.clone(),
@@ -235,6 +233,6 @@ impl SourceState {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

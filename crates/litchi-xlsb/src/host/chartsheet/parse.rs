@@ -62,10 +62,10 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<C
         0 => State::Visible,
         1 => State::Hidden,
         2 => State::VeryHidden,
-        other => {
+        _other => {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh hsState".to_string(),
-                val: other.to_string(),
+                typ: "BrtBundleSh hsState",
+                val: "unexpected value",
             });
         },
     };
@@ -165,12 +165,12 @@ pub fn parse_chart_sheet_part(data: &[u8], name: String, state: u32) -> Result<C
             other => walker.skip_unhandled(other, "Chart Sheet stream")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndSheet".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndSheet"))
 }
 
 /// `BrtCsProp` payload (MS-XLSB 2.4.344).
 fn parse_cs_prop(data: &[u8], sheet: &mut ChartSheet) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtCsProp");
+    let mut cursor = Cursor::new(data, "BrtCsProp", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u16()?;
     sheet.published = flags & CS_PROP_PUBLISHED != 0;
     sheet.tab_color = parse_brt_color(cursor.read_bytes(BRT_COLOR_LEN)?)?;
@@ -188,18 +188,15 @@ fn parse_brt_color(data: &[u8]) -> Result<Color> {
         COLOR_TYPE_INDEXED => ColorType::Indexed,
         COLOR_TYPE_RGB => ColorType::Rgb,
         COLOR_TYPE_THEME => ColorType::Theme,
-        other => {
-            return Err(malformed("BrtColor", format!("color type {other}")));
+        _other => {
+            return Err(malformed("BrtColor", "color type"));
         },
     };
     if color_type == ColorType::Rgb && !valid_rgb {
         return Err(malformed("BrtColor", "direct color is not marked valid"));
     }
     if color_type == ColorType::Theme && data[1] > MAX_THEME_COLOR_INDEX {
-        return Err(malformed(
-            "BrtColor",
-            format!("theme color index {}", data[1]),
-        ));
+        return Err(malformed("BrtColor", "theme color index"));
     }
     Ok(Color {
         valid_rgb,
@@ -212,13 +209,13 @@ fn parse_brt_color(data: &[u8]) -> Result<Color> {
 
 /// `BrtCsPageSetup` payload (MS-XLSB 2.4.343).
 fn parse_cs_page_setup(data: &[u8]) -> Result<PageSetup> {
-    let mut cursor = Cursor::new(data, "BrtCsPageSetup");
+    let mut cursor = Cursor::new(data, "BrtCsPageSetup", crate::raw::Limits::DEFAULT);
     let paper_size = cursor.read_u32()?;
     let horizontal_resolution = cursor.read_u32()?;
     let vertical_resolution = cursor.read_u32()?;
     let copies = cursor.read_u32()?;
     if copies == 0 || copies > PAGE_SETUP_MAX_COPIES {
-        return Err(malformed("BrtCsPageSetup", format!("iCopies {copies}")));
+        return Err(malformed("BrtCsPageSetup", "iCopies"));
     }
     let page_start = cursor.read_i16()?;
     let flags = cursor.read_u16()?;
@@ -244,7 +241,7 @@ fn parse_cs_page_setup(data: &[u8]) -> Result<PageSetup> {
 
 /// `BrtCsProtection` payload (MS-XLSB 2.4.345).
 fn parse_cs_protection(data: &[u8]) -> Result<Protection> {
-    let mut cursor = Cursor::new(data, "BrtCsProtection");
+    let mut cursor = Cursor::new(data, "BrtCsProtection", crate::raw::Limits::DEFAULT);
     let protection = Protection {
         password_verifier: cursor.read_u16()?,
         locked: cursor.read_bool32()?,
@@ -260,13 +257,10 @@ fn parse_cs_protection(data: &[u8]) -> Result<Protection> {
 /// flags, which the immediately following `BrtCsProtection` record must
 /// repeat.
 fn parse_cs_protection_iso(data: &[u8]) -> Result<(StrongProtection, bool, bool)> {
-    let mut cursor = Cursor::new(data, "BrtCsProtectionIso");
+    let mut cursor = Cursor::new(data, "BrtCsProtectionIso", crate::raw::Limits::DEFAULT);
     let spin_count = cursor.read_u32()?;
     if spin_count > MAX_SPIN_COUNT {
-        return Err(malformed(
-            "BrtCsProtectionIso",
-            format!("dwSpinCount {spin_count}"),
-        ));
+        return Err(malformed("BrtCsProtectionIso", "dwSpinCount"));
     }
     let locked = cursor.read_bool32()?;
     let objects = cursor.read_bool32()?;
@@ -302,7 +296,7 @@ fn parse_cs_views(
     if !views.is_empty() {
         return Err(malformed("BrtBeginCsViews", "duplicate collection"));
     }
-    Cursor::new(data, "BrtBeginCsViews").finish()?;
+    Cursor::new(data, "BrtBeginCsViews", crate::raw::Limits::DEFAULT).finish()?;
     loop {
         let record = walker.required("BrtEndCsViews")?;
         match record.kind() {
@@ -310,7 +304,12 @@ fn parse_cs_views(
                 if views.is_empty() {
                     return Err(malformed("BrtBeginCsViews", "collection without a view"));
                 }
-                Cursor::new(record.payload(), "BrtEndCsViews").finish()?;
+                Cursor::new(
+                    record.payload(),
+                    "BrtEndCsViews",
+                    crate::raw::Limits::DEFAULT,
+                )
+                .finish()?;
                 return Ok(());
             },
             rt::BEGIN_CS_VIEW => {
@@ -322,7 +321,7 @@ fn parse_cs_views(
                         found: end.kind().get(),
                     });
                 }
-                Cursor::new(end.payload(), "BrtEndCsView").finish()?;
+                Cursor::new(end.payload(), "BrtEndCsView", crate::raw::Limits::DEFAULT).finish()?;
             },
             other => walker.skip_unhandled(other, "BrtBeginCsViews collection")?,
         }
@@ -331,11 +330,11 @@ fn parse_cs_views(
 
 /// `BrtBeginCsView` payload (MS-XLSB 2.4.38).
 fn parse_cs_view(data: &[u8]) -> Result<View> {
-    let mut cursor = Cursor::new(data, "BrtBeginCsView");
+    let mut cursor = Cursor::new(data, "BrtBeginCsView", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u16()?;
     let scale = cursor.read_u32()?;
     if scale != CS_VIEW_NO_ZOOM && !(CS_VIEW_MIN_SCALE..=CS_VIEW_MAX_SCALE).contains(&scale) {
-        return Err(malformed("BrtBeginCsView", format!("wScale {scale}")));
+        return Err(malformed("BrtBeginCsView", "wScale"));
     }
     let workbook_view_index = cursor.read_u32()?;
     cursor.finish()?;
@@ -352,7 +351,7 @@ fn set_rel_id(data: &[u8], context: &'static str, slot: &mut Option<String>) -> 
     if slot.is_some() {
         return Err(malformed(context, "duplicate record"));
     }
-    let mut cursor = Cursor::new(data, context);
+    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
     let rel_id = cursor.read_wide_string()?;
     if rel_id.is_empty() {
         return Err(malformed(context, "empty relationship ID"));

@@ -36,7 +36,7 @@ pub enum Error {
     Wire(#[from] WireError),
     /// A modeled external-link invariant was violated.
     #[error("invalid external link: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     /// A fixed-width or length-prefixed structure has the wrong size.
     #[error("invalid length: expected {expected}, found {found}")]
     InvalidLength { expected: usize, found: usize },

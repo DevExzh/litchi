@@ -128,11 +128,11 @@ fn overlapping_and_single_cell_ranges_are_refused_before_staging() {
     edit.merge_cells(0, MergedCell::new(0, 1, 0, 1)).unwrap();
     assert!(matches!(
         edit.merge_cells(0, MergedCell::new(1, 2, 1, 2)),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(matches!(
         edit.unmerge_cells(0, MergedCell::new(1, 2, 1, 2)),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(matches!(
         edit.merge_cells(0, MergedCell::new(3, 3, 3, 3)),

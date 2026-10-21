@@ -114,25 +114,16 @@ impl<F: FormulaBinary> Validation<F> {
         let mut cursor = ValidationCursor::new(data, "BrtDVal14");
         let header_flags = cursor.read_u32()?;
         if header_flags & !0x06 != 0 || header_flags & 0x02 == 0 {
-            return Err(invalid(
-                "BrtDVal14",
-                format!("invalid FRTHeader flags 0x{header_flags:08X}"),
-            ));
+            return Err(invalid("BrtDVal14", "invalid FRTHeader flags"));
         }
 
         let sqref_count = cursor.read_u32()?;
         if sqref_count != 1 {
-            return Err(invalid(
-                "BrtDVal14",
-                format!("FRTSqrefs count {sqref_count} is not 1"),
-            ));
+            return Err(invalid("BrtDVal14", "FRTSqrefs count is not 1"));
         }
         let sqref_flags = cursor.read_u32()?;
         if sqref_flags & 0x02 == 0 || sqref_flags & !0x0001_000f != 0 {
-            return Err(invalid(
-                "BrtDVal14",
-                format!("invalid FRTSqref flags 0x{sqref_flags:08X}"),
-            ));
+            return Err(invalid("BrtDVal14", "invalid FRTSqref flags"));
         }
         let ranges = cursor.read_ranges(1, i32::MAX as usize)?;
 
@@ -141,10 +132,7 @@ impl<F: FormulaBinary> Validation<F> {
             let formula_count = usize::try_from(cursor.read_u32()?)
                 .map_err(|_| invalid("BrtDVal14", "formula count overflow"))?;
             if formula_count > 2 {
-                return Err(invalid(
-                    "BrtDVal14",
-                    format!("FRT formula count {formula_count} exceeds 2"),
-                ));
+                return Err(invalid("BrtDVal14", "FRT formula count exceeds 2"));
             }
             formulas.reserve(formula_count);
             for _ in 0..formula_count {
@@ -258,7 +246,7 @@ pub fn parse_collection_settings(data: &[u8], extension14: bool) -> Result<(Sett
             } else {
                 "BrtBeginDVals"
             },
-            format!("validation count {count} exceeds 65,534"),
+            "validation count exceeds 65,534",
         ));
     }
     Ok((
@@ -334,10 +322,7 @@ fn validate_formula_presence(
     if (first, second) != expected {
         return Err(invalid(
             record,
-            format!(
-                "formula presence {first}/{second} does not match required {}/{}",
-                expected.0, expected.1
-            ),
+            "formula presence / does not match required /",
         ));
     }
     Ok(())
@@ -414,7 +399,7 @@ fn normalize_flags(
         problem.get_or_insert_with(|| format!("reserved flag bits are set in 0x{flags:08X}"));
         repaired &= !reserved;
     }
-    let Some(problem) = problem else {
+    let Some(_problem) = problem else {
         return Ok((flags, false));
     };
     tolerance.tolerate(
@@ -422,16 +407,13 @@ fn normalize_flags(
         record_type,
         location,
         flags,
-        || invalid(record, problem),
+        || invalid(record, "unexpected value"),
     )?;
     Ok((repaired, true))
 }
 
-fn invalid(typ: &'static str, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.to_string(),
-        val: val.into(),
-    }
+fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ: typ, val: val }
 }
 
 fn read_u16_le_at(data: &[u8], offset: usize) -> Result<u16> {
@@ -513,10 +495,7 @@ impl<'a> ValidationCursor<'a> {
         let count =
             usize::try_from(raw_count).map_err(|_| invalid(self.record, "NULL range list"))?;
         if !(minimum..=maximum).contains(&count) {
-            return Err(invalid(
-                self.record,
-                format!("range count {count} is outside {minimum}..={maximum}"),
-            ));
+            return Err(invalid(self.record, "range count is outside..="));
         }
         if count > self.data.len().saturating_sub(self.offset) / 16 {
             return Err(Error::InvalidLength {
@@ -545,7 +524,7 @@ impl<'a> ValidationCursor<'a> {
     fn read_nullable_string(
         &mut self,
         maximum: usize,
-        field: &'static str,
+        _field: &'static str,
     ) -> Result<Option<String>> {
         let count = self.read_u32()?;
         if count == u32::MAX {
@@ -554,10 +533,7 @@ impl<'a> ValidationCursor<'a> {
         let count =
             usize::try_from(count).map_err(|_| invalid(self.record, "string length overflow"))?;
         if count > maximum {
-            return Err(invalid(
-                self.record,
-                format!("{field} length {count} exceeds {maximum}"),
-            ));
+            return Err(invalid(self.record, "length exceeds"));
         }
         let bytes = self.take(
             count
@@ -572,16 +548,16 @@ impl<'a> ValidationCursor<'a> {
             .collect::<Vec<_>>();
         String::from_utf16(&units)
             .map(Some)
-            .map_err(|error| Error::Encoding(format!("invalid {field} UTF-16: {error}")))
+            .map_err(|_error| Error::Encoding("invalid UTF-16"))
     }
 
     fn read_classic_formula<F: FormulaBinary>(&mut self) -> Result<Option<F>> {
         let cce = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula token length overflow"))?;
         if cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "data-validation formula token length {cce} exceeds {MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula(
+                "data-validation formula token length exceeds",
+            ));
         }
         let rgce = self.take(cce)?.to_vec();
         let cb = usize::try_from(self.read_u32()?)
@@ -590,7 +566,7 @@ impl<'a> ValidationCursor<'a> {
         if cce == 0 {
             if cb != 0 {
                 return Err(Error::InvalidFormula(
-                    "empty data-validation formula has ancillary bytes".to_string(),
+                    "empty data-validation formula has ancillary bytes",
                 ));
             }
             Ok(None)
@@ -602,19 +578,16 @@ impl<'a> ValidationCursor<'a> {
     fn read_frt_formula<F: FormulaBinary>(&mut self) -> Result<F> {
         let flags = self.read_u32()?;
         if flags != 2 {
-            return Err(invalid(
-                self.record,
-                format!("invalid FRTFormula flags 0x{flags:08X}"),
-            ));
+            return Err(invalid(self.record, "invalid FRTFormula flags"));
         }
         let cce = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula token length overflow"))?;
         let cb = usize::try_from(self.read_u32()?)
             .map_err(|_| invalid(self.record, "formula ancillary length overflow"))?;
         if cce == 0 || cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "FRT data-validation formula token length {cce} is outside 1..={MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula(
+                "FRT data-validation formula token length is outside its allowed range",
+            ));
         }
         let rgce = self.take(cce)?.to_vec();
         let rgcb = self.take(cb)?.to_vec();

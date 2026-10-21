@@ -20,7 +20,7 @@ pub(crate) fn author_part(link: &Link, one_based_index: usize) -> Result<BlobPar
     link.validate()?;
     if one_based_index == 0 {
         return Err(Error::InvalidFormula(
-            "external-link part index must be one-based".to_string(),
+            "external-link part index must be one-based",
         ));
     }
     let mut part = BlobPart::new(

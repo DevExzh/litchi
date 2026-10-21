@@ -14,10 +14,10 @@ use crate::raw::{Cursor, Kind, Record, Records, kind as rt};
 /// looking for the record that opens a part stream.
 const MAX_LEADING_WRAPPER_BLOCKS: usize = 16;
 
-pub(crate) fn malformed(context: &str, detail: impl Into<String>) -> Error {
+pub(crate) fn malformed(context: &'static str, detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
+        typ: context,
+        val: detail,
     }
 }
 
@@ -37,7 +37,7 @@ impl<'a> RecordWalker<'a, 'static> {
     /// Walk `data`, refusing every defect (no report can carry a repair).
     pub(crate) fn new(data: &'a [u8]) -> Self {
         RecordWalker {
-            iter: Records::new(data),
+            iter: Records::new(data, crate::raw::Limits::DEFAULT),
             tolerance: Tolerance::refusing(),
             current: None,
         }
@@ -48,7 +48,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
     /// Walk `data`, recording Excel-compatible repairs into `report`.
     pub(crate) fn recording(data: &'a [u8], report: &'t mut ToleranceReport) -> Self {
         RecordWalker {
-            iter: Records::new(data),
+            iter: Records::new(data, crate::raw::Limits::DEFAULT),
             tolerance: Tolerance::recording(report),
             current: None,
         }
@@ -81,7 +81,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
 
     pub(crate) fn required(&mut self, context: &'static str) -> Result<Record<'a>> {
         self.next()?
-            .ok_or_else(|| Error::UnexpectedEndOfStream(context.to_string()))
+            .ok_or_else(|| Error::UnexpectedEndOfStream(context))
     }
 
     /// Read the record that opens a part stream, requiring it to be
@@ -138,7 +138,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
                 }
             }
         }
-        Err(Error::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context))
     }
 
     /// Skip a record the parser does not handle: a balanced collection when
@@ -164,7 +164,7 @@ impl<'a, 't> RecordWalker<'a, 't> {
             }
             self.skip_unhandled(record_type, context)?;
         }
-        Err(Error::UnexpectedEndOfStream(context.to_string()))
+        Err(Error::UnexpectedEndOfStream(context))
     }
 }
 

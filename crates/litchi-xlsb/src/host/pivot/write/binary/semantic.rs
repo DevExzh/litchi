@@ -43,7 +43,7 @@ use super::{validation, wire};
 /// is rejected; see the module documentation for the exact refusal rules.
 pub(super) fn write_pivot_cache_definition(definition: &PivotCacheDefinition) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(512);
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(
         rt::BEGIN_PIVOT_CACHE_DEF,
         &wire::definition_payload(definition),

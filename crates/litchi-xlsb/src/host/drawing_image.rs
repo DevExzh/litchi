@@ -131,7 +131,7 @@ impl ImageFormat {
     pub(crate) fn validate_payload(self, data: &[u8]) -> Result<()> {
         if data.is_empty() {
             return Err(Error::InvalidFormula(
-                "worksheet image payload cannot be empty".to_string(),
+                "worksheet image payload cannot be empty",
             ));
         }
         if data.len() > MAX_XLSB_WORKSHEET_IMAGE_BYTES {
@@ -142,8 +142,8 @@ impl ImageFormat {
         }
         if !self.has_matching_signature(data) {
             return Err(Error::Unrecognized {
-                typ: "worksheet image payload".to_string(),
-                val: format!("bytes do not match declared {} format", self.extension()),
+                typ: "worksheet image payload",
+                val: "bytes do not match declared format",
             });
         }
         Ok(())
@@ -216,7 +216,7 @@ impl Image {
                 )
             }) {
                 return Err(Error::Encoding(
-                    "worksheet image description contains an invalid XML character".to_string(),
+                    "worksheet image description contains an invalid XML character",
                 ));
             }
         }

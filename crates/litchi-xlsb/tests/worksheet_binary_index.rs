@@ -112,7 +112,7 @@ struct RawRecord {
 
 fn records(data: &[u8]) -> Vec<RawRecord> {
     let mut output = Vec::new();
-    for record in Records::new(data) {
+    for record in Records::new(data, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("record framing");
         output.push(RawRecord {
             kind: record.kind(),
@@ -165,7 +165,7 @@ fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
 fn insert_opaque_index_record(index: &[u8]) -> Vec<u8> {
     let insertion = {
         let mut bytes = Vec::new();
-        Encoder::new(&mut bytes)
+        Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(
                 Kind::new(OPAQUE_KIND).expect("opaque kind"),
                 b"extension bytes",
@@ -196,7 +196,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
     let new_payload_len = first_row_block.payload.len() - 4;
     let mut rebuilt = Vec::with_capacity(index.len() - 4);
     rebuilt.extend_from_slice(&index[..first_row_block.start]);
-    let mut writer = Encoder::new(&mut rebuilt);
+    let mut writer = Encoder::new(&mut rebuilt, litchi_xlsb::raw::Limits::DEFAULT);
     writer
         .write_record(
             kind::INDEX_ROW_BLOCK,
@@ -209,7 +209,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
 
 fn append_index_part_end(index: &[u8]) -> Vec<u8> {
     let mut output = index.to_vec();
-    Encoder::new(&mut output)
+    Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("second end marker");
     output
@@ -227,7 +227,7 @@ fn append_empty_index_block(index: &[u8]) -> Vec<u8> {
     block.extend_from_slice(&[0; 8]);
     block.extend_from_slice(&[0; 8]);
     let mut encoded = Vec::new();
-    Encoder::new(&mut encoded)
+    Encoder::new(&mut encoded, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_BLOCK, &block)
         .expect("empty index block");
     let mut output = Vec::with_capacity(index.len() + encoded.len());
@@ -250,7 +250,7 @@ fn write_empty_index_block(writer: &mut Encoder<&mut Vec<u8>>, row_start: u32) {
 
 fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     write_empty_index_block(&mut writer, 0);
     write_empty_index_block(&mut writer, 32);
     writer
@@ -261,7 +261,7 @@ fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
 
 fn empty_index_with_end(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    Encoder::new(&mut output)
+    Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("empty index end marker");
     output

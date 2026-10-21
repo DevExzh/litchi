@@ -107,7 +107,7 @@ impl Edit {
             .maps
             .iter_mut()
             .find(|map| map.id == map_id)
-            .ok_or_else(|| invalid(format!("XML map ID {map_id} was not found")))?;
+            .ok_or_else(|| invalid("XML map ID was not"))?;
         if map.name == name {
             return Ok(false);
         }
@@ -145,7 +145,7 @@ impl Edit {
             .maps
             .iter()
             .position(|map| map.id == map_id)
-            .ok_or_else(|| invalid(format!("XML map ID {map_id} was not found")))?;
+            .ok_or_else(|| invalid("XML map ID was not"))?;
         let before = catalog.maps[index].clone();
         if let Err(error) = edit(&mut catalog.maps[index]) {
             catalog.maps[index] = before;
@@ -191,7 +191,7 @@ impl Edit {
         let values = self
             .single_cell_bindings
             .get(sheet_index)
-            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?;
+            .ok_or_else(|| Error::WorksheetNotFound(Some(sheet_index)))?;
         let mut values = values.as_ref().cloned().unwrap_or_default();
         if let Some(index) = values
             .iter()
@@ -233,7 +233,7 @@ impl Edit {
         let Some(values) = self
             .single_cell_bindings
             .get(sheet_index)
-            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?
+            .ok_or_else(|| Error::WorksheetNotFound(Some(sheet_index)))?
             .as_ref()
         else {
             return Ok(None);
@@ -340,7 +340,7 @@ impl Edit {
             .mapped_tables
             .iter()
             .position(|table| table.table_id() == table_id)
-            .ok_or_else(|| invalid(format!("mapped table ID {table_id} was not found")))?;
+            .ok_or_else(|| invalid("mapped table ID was not"))?;
         let mut columns = self.mapped_tables[table_index].columns().to_vec();
         let Some(column_index) = columns
             .iter()
@@ -419,7 +419,7 @@ impl Edit {
             })
             .map(|part| {
                 parse_xml_map_info(part.bytes(), &self.before.limits().xml_maps)
-                    .map_err(|error| invalid(error.to_string()))
+                    .map_err(|_error| invalid("the Custom XML Maps part is not valid"))
             })
             .transpose()?;
         let projected_conformance = if projected_catalog.is_some() {
@@ -455,7 +455,7 @@ impl Edit {
                     &self.before.limits().xml_maps,
                 )?;
                 parse_xml_map_info(&xml, &self.before.limits().xml_maps)
-                    .map_err(|error| invalid(error.to_string()))?;
+                    .map_err(|_error| invalid("the Custom XML Maps part is not valid"))?;
                 source.dependencies[index].bytes = Arc::new(xml);
                 let map_name = source.dependencies[index].part_name.clone();
                 if self.before.conformance() != self.conformance {
@@ -541,14 +541,10 @@ impl Edit {
                 continue;
             }
             if host.table_type != crate::package::table::Type::Xml || host.single_cell {
-                return Err(invalid(format!(
-                    "table ID {table_id} is not an ordinary LTXML Table"
-                )));
+                return Err(invalid("table ID is not an ordinary LTXML Table"));
             }
             if !host.columns.iter().any(|column| column.id == column_id) {
-                return Err(invalid(format!(
-                    "column {column_id} is absent from physical table ID {table_id}"
-                )));
+                return Err(invalid("column is absent from physical table ID"));
             }
             let parsed =
                 match super::parse_table_bindings(part.bytes(), self.before.limits().bindings) {
@@ -556,24 +552,17 @@ impl Edit {
                     Err(error) => return Err(error),
                 };
             if parsed.value().table_id() != host.id {
-                return Err(invalid(format!(
-                    "host Table ID {} disagrees with XML binding table ID {}",
-                    host.id,
-                    parsed.value().table_id()
-                )));
+                return Err(invalid("host Table ID disagrees with XML binding table ID"));
             }
             if found.is_some() {
-                return Err(invalid(format!(
-                    "mapped table ID {table_id} is ambiguous across LTXML Table parts"
-                )));
+                return Err(invalid(
+                    "mapped table ID is ambiguous across LTXML Table parts",
+                ));
             }
             found = Some(parsed);
         }
-        found.ok_or_else(|| {
-            invalid(format!(
-                "mapped table ID {table_id} was not found in an existing LTXML Table part"
-            ))
-        })
+        found
+            .ok_or_else(|| invalid("mapped table ID was not found in an existing LTXML Table part"))
     }
 
     fn materialize_tables(&self, source: &mut SourceState) -> Result<()> {
@@ -625,7 +614,9 @@ impl Edit {
                     && relationship.mode == TargetMode::Internal
                 {
                     PackURI::from_rel_ref(worksheet.part_name.base_uri(), &relationship.target)
-                        .map_err(|error| invalid(error))?;
+                        .map_err(|_error| {
+                            invalid("a single-cell relationship target is not a valid part name")
+                        })?;
                 }
             }
         }
@@ -850,16 +841,10 @@ fn validate_draft(
         }
     }
     if total_bindings > limits.max_total_bindings {
-        return Err(invalid(format!(
-            "aggregate XML binding count {total_bindings} exceeds {}",
-            limits.max_total_bindings
-        )));
+        return Err(invalid("aggregate XML binding count exceeds"));
     }
     if total_xpath_units > limits.max_total_xpath_units {
-        return Err(invalid(format!(
-            "aggregate XML binding XPath units {total_xpath_units} exceeds {}",
-            limits.max_total_xpath_units
-        )));
+        return Err(invalid("aggregate XML binding XPath units exceeds"));
     }
 
     let mut map_ids = HashSet::new();
@@ -891,16 +876,10 @@ fn validate_draft(
         .flat_map(|values| values.iter())
     {
         if !map_ids.contains(&binding.map_id()) {
-            return Err(invalid(format!(
-                "single-cell binding references absent XML map ID {}",
-                binding.map_id()
-            )));
+            return Err(invalid("single-cell binding references absent XML map ID"));
         }
         if !table_ids.insert(binding.table_id()) {
-            return Err(invalid(format!(
-                "duplicate XML mapping table ID {}",
-                binding.table_id()
-            )));
+            return Err(invalid("duplicate XML mapping table ID"));
         }
     }
     Ok(())
@@ -963,7 +942,7 @@ fn serialize_catalog(
         conformance,
         &limits.xml_maps,
     )
-    .map_err(|error| invalid(error.to_string()))
+    .map_err(Error::Common)
 }
 
 fn next_relationship_id(relationships: &[SourceRelationship]) -> String {
@@ -979,8 +958,8 @@ fn next_relationship_id(relationships: &[SourceRelationship]) -> String {
     unreachable!("len + 1 guarantees an unused relationship ID")
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 #[allow(

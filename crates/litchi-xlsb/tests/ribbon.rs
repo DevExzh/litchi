@@ -112,7 +112,7 @@ fn package() -> Package {
 
 fn records(values: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in values {
         writer.write_record(*kind, payload).unwrap();
     }

@@ -212,9 +212,7 @@ impl Workbook {
         index: usize,
     ) -> crate::package::error::Result<usize> {
         self.worksheet_positions.get(index).copied().ok_or_else(|| {
-            crate::package::error::Error::InvalidFormat(format!(
-                "Worksheet index {index} out of bounds"
-            ))
+            crate::package::error::Error::InvalidFormat("Worksheet index out of bounds")
         })
     }
 
@@ -262,7 +260,7 @@ impl Workbook {
         };
         let Some(position) = tab.worksheet_position() else {
             return Err(crate::package::error::Error::UnsupportedFeature(
-                "selected XLSB tab has no worksheet grid".to_string(),
+                "selected XLSB tab has no worksheet grid",
             ));
         };
         // `Tab::worksheet_position` is the worksheet-only ordinal. The
@@ -502,9 +500,7 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
 
     fn active_worksheet(&self) -> crate::package::error::Result<Arc<Worksheet>> {
         let index = self.active_worksheet_index().ok_or_else(|| {
-            crate::package::error::Error::UnsupportedFeature(
-                "XLSB active sheet is not a worksheet".to_string(),
-            )
+            crate::package::error::Error::UnsupportedFeature("XLSB active sheet is not a worksheet")
         })?;
         self.worksheet_by_index(index)
     }
@@ -528,10 +524,7 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
                 return self.worksheet_by_index(i);
             }
         }
-        Err(crate::package::error::Error::InvalidFormat(format!(
-            "Worksheet '{}' not found",
-            name
-        )))
+        Err(crate::package::error::Error::InvalidFormat("Worksheet not"))
     }
 
     fn worksheets(&self) -> Worksheets<'_> {

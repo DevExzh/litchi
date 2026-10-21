@@ -51,19 +51,23 @@ const fn clamp_limit(value: usize, maximum: usize) -> usize {
     if value < maximum { value } else { maximum }
 }
 
-fn invalid(detail: impl Into<String>) -> Error {
+fn invalid(detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: "XLSB Custom Data".to_owned(),
-        val: detail.into(),
+        typ: "XLSB Custom Data",
+        val: detail,
     }
 }
 
-fn unsupported(detail: impl Into<String>) -> Error {
-    Error::UnsupportedFeature(format!("XLSB Custom Data: {}", detail.into()))
+fn unsupported(_detail: impl Into<String>) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_custom_data",
+        "XLSB Custom Data",
+    )
 }
 
-fn conflict(part: impl Into<String>) -> Error {
-    Error::PatchConflict { part: part.into() }
+fn conflict(part: &'static str) -> Error {
+    Error::PatchConflict { part: part }
 }
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
@@ -1021,7 +1025,7 @@ impl Edit {
         let target = match disposition {
             RemovalDisposition::RejectReferenced if reference_count != 0 => {
                 return Err(Error::CustomDataReferenced {
-                    id: removed.id().to_owned(),
+                    storage: index,
                     connections: reference_count,
                 });
             },
@@ -1339,8 +1343,7 @@ fn charge_context(
     let Some(context) = context else {
         return Ok(());
     };
-    let amount = u64::try_from(amount)
-        .map_err(|error| invalid(format!("execution charge exceeds u64: {error}")))?;
+    let amount = u64::try_from(amount).map_err(|_error| invalid("execution charge exceeds u64"))?;
     context.consume(resource, amount).map_err(Error::from)?;
     Ok(())
 }
@@ -1356,8 +1359,7 @@ fn reserve_context(
     let Some(context) = context else {
         return Ok(None);
     };
-    let amount = u64::try_from(amount)
-        .map_err(|error| invalid(format!("execution charge exceeds u64: {error}")))?;
+    let amount = u64::try_from(amount).map_err(|_error| invalid("execution charge exceeds u64"))?;
     context
         .reserve(resource, amount)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -1402,7 +1404,7 @@ fn map_binding_error(error: BindingError) -> Error {
         },
         BindingError::SourceMismatch => conflict("connections.bin source"),
         BindingError::BudgetRejected => Error::Execution(litchi_core::ExecutionError::Cancelled),
-        other => invalid(other.to_string()),
+        _other => invalid("unexpected value"),
     }
 }
 
@@ -1594,7 +1596,7 @@ fn package_size(package: &OpcPackage) -> Result<usize> {
     total = total
         .checked_add(
             package
-                .source_relationships(&PackURI::new("/").map_err(invalid)?)?
+                .source_relationships(&PackURI::new("/")?)?
                 .bytes()
                 .len(),
         )
@@ -1685,7 +1687,7 @@ fn capture_source(
             limits.max_relationship_xml_bytes(),
         ));
     }
-    let root_relationships = package.source_relationships(&PackURI::new("/").map_err(invalid)?)?;
+    let root_relationships = package.source_relationships(&PackURI::new("/")?)?;
     if root_relationships.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(Error::limit(
             LimitKind::RelationshipXmlBytes,
@@ -1795,18 +1797,16 @@ fn load_entries(
                 continue;
             }
             if owner.is_some() {
-                return Err(invalid(format!(
-                    "Custom Data Properties part '{}' must have exactly one workbook owner",
-                    properties_part.partname()
-                )));
+                return Err(invalid(
+                    "Custom Data Properties part must have exactly one workbook owner",
+                ));
             }
             owner = Some(relationship);
         }
         let Some(owner) = owner else {
-            return Err(invalid(format!(
-                "Custom Data Properties part '{}' must have exactly one workbook owner",
-                properties_part.partname()
-            )));
+            return Err(invalid(
+                "Custom Data Properties part must have exactly one workbook owner",
+            ));
         };
         let relationships = properties_part.rels();
         let mut data_relationship = None;
@@ -1817,24 +1817,21 @@ fn load_entries(
                 ));
             }
             if data_relationship.is_some() {
-                return Err(invalid(format!(
-                    "Custom Data Properties part '{}' must have one internal data relationship",
-                    properties_part.partname()
-                )));
+                return Err(invalid(
+                    "Custom Data Properties part must have one internal data relationship",
+                ));
             }
             data_relationship = Some(relationship);
         }
         let Some(data_relationship) = data_relationship else {
-            return Err(invalid(format!(
-                "Custom Data Properties part '{}' must have one internal data relationship",
-                properties_part.partname()
-            )));
+            return Err(invalid(
+                "Custom Data Properties part must have one internal data relationship",
+            ));
         };
         if data_relationship.is_external() {
-            return Err(invalid(format!(
-                "Custom Data Properties part '{}' must have one internal data relationship",
-                properties_part.partname()
-            )));
+            return Err(invalid(
+                "Custom Data Properties part must have one internal data relationship",
+            ));
         }
         if data_relationship.target_query().is_some()
             || data_relationship.target_fragment().is_some()
@@ -1847,8 +1844,7 @@ fn load_entries(
         let data_part = package.get_part(&data_part_name)?;
         if data_part.content_type() != DATA_CONTENT_TYPE {
             return Err(Error::InvalidContentType {
-                expected: DATA_CONTENT_TYPE.to_owned(),
-                got: data_part.content_type().to_owned(),
+                expected: DATA_CONTENT_TYPE,
             });
         }
         if data_part.blob().len() > limits.max_payload_bytes() {
@@ -1900,10 +1896,7 @@ fn load_entries(
                 .iter()
                 .any(|target| target.is_equivalent_to(part.partname()))
         {
-            return Err(invalid(format!(
-                "orphan Custom Data payload '{}'",
-                part.partname()
-            )));
+            return Err(invalid("orphan Custom Data payload"));
         }
     }
     entries.sort_unstable_by(|left, right| left.id().cmp(right.id()));
@@ -2263,8 +2256,7 @@ fn capture_connection(
     let part = package.get_part(&part_name)?;
     if part.content_type() != CONNECTIONS_CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONNECTIONS_CONTENT_TYPE.to_owned(),
-            got: part.content_type().to_owned(),
+            expected: CONNECTIONS_CONTENT_TYPE,
         });
     }
     if !connection_part
@@ -2379,9 +2371,7 @@ fn validate_connection_ids(
                 continue;
             }
             if !ids.contains(&id.as_str()) {
-                return Err(invalid(format!(
-                    "ExtConn14 Custom Data UID '{id}' has no Properties owner"
-                )));
+                return Err(invalid("ExtConn14 Custom Data UID has no Properties owner"));
             }
         }
     }
@@ -2413,10 +2403,8 @@ fn allocate_identity(package: &OpcPackage, entries: &[Storage]) -> Result<PartId
         used_ids.insert(relationship.r_id().to_owned());
     }
     loop {
-        let properties_part_name =
-            PackURI::new(format!("/xl/customData/props{index}.xml")).map_err(invalid)?;
-        let data_part_name =
-            PackURI::new(format!("/xl/customData/data{index}.bin")).map_err(invalid)?;
+        let properties_part_name = PackURI::new(format!("/xl/customData/props{index}.xml"))?;
+        let data_part_name = PackURI::new(format!("/xl/customData/data{index}.bin"))?;
         let workbook_relationship_id = if index == 1 {
             "rIdCustomDataProps".to_owned()
         } else {

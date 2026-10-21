@@ -27,7 +27,10 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A well-framed field violated its checked-in domain.
     #[error("unrecognized {typ}: {val}")]
-    Unrecognized { typ: String, val: String },
+    Unrecognized {
+        typ: &'static str,
+        val: &'static str,
+    },
     /// A bounded collection could not reserve the required memory.
     #[error("allocation failed for {resource}: {source}")]
     Allocation {
@@ -61,7 +64,7 @@ fn read_with(bytes: &[u8], mut tolerance: Tolerance<'_>) -> Result<Table> {
     let mut in_cell_style_xfs = false;
     let mut fmt_ordinal = 0u32;
 
-    for record in Records::new(bytes) {
+    for record in Records::new(bytes, crate::raw::Limits::DEFAULT) {
         let record = record?;
         let data = record.payload();
         match record.kind() {
@@ -254,8 +257,8 @@ fn direct_color(
             ordinal,
             u32::from(flags),
             || Error::Unrecognized {
-                typ: "BrtColor".to_string(),
-                val: "direct RGB color is not marked valid".to_string(),
+                typ: "BrtColor",
+                val: "direct RGB color is not marked valid",
             },
         )?;
         return Ok(None);
@@ -292,8 +295,8 @@ fn parse_border_with(data: &[u8], ordinal: u32, mut tolerance: Tolerance<'_>) ->
             ordinal,
             u32::from(flags & !0x03),
             || Error::Unrecognized {
-                typ: "BrtBorder flags".to_string(),
-                val: format!("0x{flags:02X}"),
+                typ: "BrtBorder flags",
+                val: "0x",
             },
         )?;
     }
@@ -336,8 +339,8 @@ fn parse_num_fmt_with(
     if !matches!(id, 5..=8 | 23..=26 | 41..=44 | 63..=66 | 164..=382) {
         tolerance.tolerate(LayoutDefect::NumberFormatId, kind::FMT, ordinal, id, || {
             Error::Unrecognized {
-                typ: "BrtFmt ifmt".to_string(),
-                val: id.to_string(),
+                typ: "BrtFmt ifmt",
+                val: "unexpected value",
             }
         })?;
     }
@@ -350,15 +353,15 @@ fn parse_num_fmt_with(
             ordinal,
             u32::try_from(length).unwrap_or(u32::MAX),
             || Error::Unrecognized {
-                typ: "BrtFmt stFmtCode length".to_string(),
-                val: length.to_string(),
+                typ: "BrtFmt stFmtCode length",
+                val: "unexpected value",
             },
         )?;
     }
     let trailing = data.len().saturating_sub(consumed.saturating_add(2));
     tolerance.tolerate_trailing(kind::FMT, ordinal, trailing, || Error::Unrecognized {
-        typ: "BrtFmt".to_string(),
-        val: format!("{trailing} trailing bytes"),
+        typ: "BrtFmt",
+        val: "trailing bytes",
     })?;
 
     Ok((id, format_code))
@@ -409,8 +412,8 @@ fn parse_side(
 ) -> Result<Option<BorderSide>> {
     let style_byte = data[0];
     let refusal = || Error::Unrecognized {
-        typ: "Blxf".to_string(),
-        val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
+        typ: "Blxf",
+        val: "style, reserved",
     };
     // MS-XLSB 2.5.5 Blxf: the reserved byte MUST be 0 and MUST be ignored.
     if data[1] != 0 {
@@ -450,7 +453,7 @@ fn decode_string(
     record_type: crate::raw::Kind,
     ordinal: u32,
 ) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(data, "XLWideString");
+    let mut cursor = Cursor::new(data, "XLWideString", crate::raw::Limits::DEFAULT);
     let value = tolerance.read_wide_string(&mut cursor, record_type, ordinal)?;
     Ok((value, cursor.position()))
 }

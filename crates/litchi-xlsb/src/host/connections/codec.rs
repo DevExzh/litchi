@@ -22,7 +22,7 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
     let mut local_known = 0usize;
     let mut opaque_bytes = 0usize;
 
-    for record in crate::raw::Records::with_limits(
+    for record in crate::raw::Records::new(
         data,
         crate::raw::Limits::new(write::MAX_CONNECTIONS_PART_BYTES, 1_048_576),
     ) {
@@ -56,8 +56,8 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
             .checked_add(header_len)
             .and_then(|value| value.checked_add(record.len()))
             .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                typ: "ExternalDataConnections".to_string(),
-                val: "opaque record range overflow".to_string(),
+                typ: "ExternalDataConnections",
+                val: "opaque record range overflow",
             })?;
         let bytes: Arc<[u8]> = Arc::from(data[offset..end].to_vec());
         opaque_bytes = opaque_bytes.saturating_add(bytes.len());
@@ -65,8 +65,8 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
             || opaque_bytes > write::MAX_UNKNOWN_BYTES
         {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "ExternalDataConnections".to_string(),
-                val: "opaque record bound exceeded".to_string(),
+                typ: "ExternalDataConnections",
+                val: "opaque record bound exceeded",
             });
         }
         unknown_records.push(UnknownRecord::new(

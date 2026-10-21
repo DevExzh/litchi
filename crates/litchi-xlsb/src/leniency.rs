@@ -1204,7 +1204,7 @@ mod tests {
     fn value_encodings_are_repaired_when_recording_and_refused_otherwise() {
         // "A", an unpaired high surrogate, "B".
         let data = [3, 0, 0, 0, 0x41, 0, 0x00, 0xD8, 0x42, 0];
-        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        let mut cursor = crate::raw::Cursor::new(&data, "test", crate::raw::Limits::DEFAULT);
         assert!(
             Tolerance::refusing()
                 .read_wide_string(&mut cursor, kind::CELL_ST, 0)
@@ -1213,7 +1213,7 @@ mod tests {
 
         let mut report = ToleranceReport::default();
         let mut tolerance = Tolerance::recording(&mut report);
-        let mut cursor = crate::raw::Cursor::new(&data, "test");
+        let mut cursor = crate::raw::Cursor::new(&data, "test", crate::raw::Limits::DEFAULT);
         assert_eq!(
             tolerance
                 .read_wide_string(&mut cursor, kind::CELL_ST, 4)
@@ -1221,14 +1221,14 @@ mod tests {
             "A\u{FFFD}B"
         );
         let null = [0xFF; 4];
-        let mut cursor = crate::raw::Cursor::new(&null, "test");
+        let mut cursor = crate::raw::Cursor::new(&null, "test", crate::raw::Limits::DEFAULT);
         assert_eq!(
             tolerance
                 .read_nullable_wide_string(&mut cursor, kind::NAME, 0)
                 .unwrap(),
             None
         );
-        let mut cursor = crate::raw::Cursor::new(&[5], "test");
+        let mut cursor = crate::raw::Cursor::new(&[5], "test", crate::raw::Limits::DEFAULT);
         assert!(
             tolerance
                 .read_bool8(&mut cursor, kind::CELL_BOOL, 6)

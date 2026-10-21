@@ -41,11 +41,11 @@ fn writes_worksheet_web_extension_collection() {
         .set_web_extension_bindings(vec![binding.clone()])
         .unwrap();
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
-    let records = Records::new(&buffer)
+    let records = Records::new(&buffer, crate::raw::Limits::DEFAULT)
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     let begin = records
@@ -309,7 +309,7 @@ fn test_cell_data_types() {
 fn test_worksheet_write_empty() {
     let sheet = Worksheet::new("Sheet1");
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
 
     let result = sheet.write(&mut writer, &mut shared_strings);
@@ -325,7 +325,7 @@ fn test_worksheet_write_with_data() {
     sheet.set_cell(1, 0, true);
 
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
 
     let result = sheet.write(&mut writer, &mut shared_strings);
@@ -360,11 +360,11 @@ fn writes_best_fit_in_the_specified_column_flag() {
         },
     );
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
-    let record = Records::new(buffer.as_slice())
+    let record = Records::new(buffer.as_slice(), crate::raw::Limits::DEFAULT)
         .find_map(|record| {
             let record = record.unwrap();
             (record.kind() == kind::COL_INFO).then_some(record)
@@ -427,7 +427,7 @@ fn writes_ms_xlsb_brt_fmla_num_layout_without_downgrading_formula() {
         formula_flags: 0,
     };
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet
         .write_cell(&mut writer, 12, 1, &cell, &mut shared_strings)
@@ -460,10 +460,10 @@ fn unsupported_formula_is_an_error_instead_of_a_cached_constant() {
         },
     );
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     let error = sheet.write(&mut writer, &mut shared_strings).unwrap_err();
-    assert!(matches!(error, Error::UnsupportedFeature(_)));
+    assert!(matches!(error, Error::Refused(_)));
 }
 
 #[test]
@@ -481,7 +481,7 @@ fn formula_without_cached_result_is_marked_for_recalculation() {
         formula_flags: 0,
     };
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet
         .write_cell(&mut writer, 0, 0, &cell, &mut shared_strings)
@@ -501,7 +501,7 @@ fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
     sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
 
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
@@ -551,7 +551,7 @@ fn writes_unsupported_group_definition_losslessly() {
     sheet.set_formula_group_binary(group).unwrap();
 
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
@@ -583,11 +583,12 @@ fn authored_sparkline_groups(
                 *kind,
                 crate::sparkline::Colors::uniform(color),
                 vec![item],
+                crate::sparkline::Limits::DEFAULT,
             )
             .unwrap()
         })
         .collect();
-    crate::sparkline::Groups::new(groups).unwrap()
+    crate::sparkline::Groups::new(groups, crate::sparkline::Limits::DEFAULT).unwrap()
 }
 
 #[test]
@@ -610,16 +611,20 @@ fn mutable_sparkline_set_clear_and_failures_are_atomic() {
 
     let formula_item = Sparkline::new(
         Location::new(3, 3).unwrap(),
-        Some(Formula::name(1).unwrap()),
+        Some(Formula::name(1, Limits::DEFAULT).unwrap()),
     );
-    let formula_groups = crate::sparkline::Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            crate::sparkline::Colors::uniform(crate::sparkline::Color::rgb(0, 0, 0, 255, 0)),
-            vec![formula_item],
-        )
-        .unwrap(),
-    ])
+    let formula_groups = crate::sparkline::Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                crate::sparkline::Colors::uniform(crate::sparkline::Color::rgb(0, 0, 0, 255, 0)),
+                vec![formula_item],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap();
     sheet.set_sparkline_groups(formula_groups).unwrap();
     assert!(sheet.sparkline_groups().is_some());
@@ -642,11 +647,11 @@ fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
     sheet.set_sparkline_groups(groups.clone()).unwrap();
 
     let mut buffer = Vec::new();
-    let mut writer = Encoder::new(&mut buffer);
+    let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
-    let kinds = Records::new(&buffer)
+    let kinds = Records::new(&buffer, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind())
         .collect::<Vec<_>>();
     let mut expected_tail = vec![kind::BEGIN_SPARKLINE_GROUPS];

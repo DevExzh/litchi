@@ -4,7 +4,7 @@ use crate::raw::{Encoder, Kind, Records, kind};
 
 fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     for (record, payload) in records {
         writer.write_record(*record, payload).unwrap();
     }
@@ -22,14 +22,18 @@ fn empty_sheet() -> Vec<u8> {
 
 fn groups() -> Groups {
     let colors = Colors::uniform(Color::rgb(20, 40, 60, 255, 0));
-    Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            colors,
-            vec![Sparkline::new(Location::new(4, 7).unwrap(), None)],
-        )
-        .unwrap(),
-    ])
+    Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                colors,
+                vec![Sparkline::new(Location::new(4, 7).unwrap(), None)],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap()
 }
 
@@ -46,7 +50,7 @@ fn absent_insert_uses_future_record_anchor_and_preserves_outside_bytes() {
         (kind::FRT_END, &[]),
         (kind::END_SHEET, &[]),
     ]);
-    let anchor = Records::new(&source)
+    let anchor = Records::new(&source, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == kind::FRT_BEGIN)
         .unwrap()
@@ -56,7 +60,7 @@ fn absent_insert_uses_future_record_anchor_and_preserves_outside_bytes() {
     let commit = edit.commit().unwrap();
     let after = commit.patch().after();
     let mut block_end = None;
-    let mut records = Records::new(after);
+    let mut records = Records::new(after, crate::raw::Limits::DEFAULT);
     while let Some(record) = records.next() {
         if record.unwrap().kind() == kind::END_SPARKLINE_GROUPS {
             block_end = Some(records.offset());
@@ -106,7 +110,7 @@ fn validates_nested_frt_tail_balance_and_preserves_balanced_tail() {
         (kind::FRT_END, &[]),
         (kind::END_SHEET, &[]),
     ]);
-    let anchor = Records::new(&nested)
+    let anchor = Records::new(&nested, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == kind::FRT_BEGIN)
         .unwrap()
@@ -114,7 +118,7 @@ fn validates_nested_frt_tail_balance_and_preserves_balanced_tail() {
     let mut edit = read(&nested, Limits::DEFAULT).unwrap().edit();
     edit.set(groups());
     let commit = edit.commit().unwrap();
-    let block_end = Records::new(commit.patch().after())
+    let block_end = Records::new(commit.patch().after(), crate::raw::Limits::DEFAULT)
         .scan(0usize, |end, record| {
             let record = record.unwrap();
             *end = record.offset();
@@ -328,7 +332,7 @@ fn strict_scan_rejects_family_members_outside_duplicate_unclosed_and_mismatch() 
     let block = super::encode_block(&groups(), Limits::DEFAULT).unwrap();
     let mut duplicate = Vec::new();
     let base = empty_sheet();
-    let end = Records::new(&base)
+    let end = Records::new(&base, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == kind::END_SHEET)
         .unwrap()
@@ -387,17 +391,21 @@ fn workbook_api_applies_atomically_and_refuses_stale_commits() {
 fn workbook_api_refuses_structural_formula_without_provable_context() {
     let package = crate::Package::new().unwrap();
     let colors = Colors::uniform(Color::rgb(20, 40, 60, 255, 0));
-    let unbound = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            colors,
-            vec![Sparkline::new(
-                Location::new(4, 7).unwrap(),
-                Some(Formula::name(1).unwrap()),
-            )],
-        )
-        .unwrap(),
-    ])
+    let unbound = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                colors,
+                vec![Sparkline::new(
+                    Location::new(4, 7).unwrap(),
+                    Some(Formula::name(1, Limits::DEFAULT).unwrap()),
+                )],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap();
     let before_bytes = package
         .workbook()

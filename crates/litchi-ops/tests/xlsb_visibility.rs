@@ -57,8 +57,8 @@ fn with_states(bytes: &[u8], states: &[u32]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut position = 0;
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("valid workbook record");
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -131,8 +131,8 @@ fn with_null_relationship(bytes: &[u8], target_position: usize) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut position = 0;
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("valid workbook record");
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -695,7 +695,7 @@ fn chart_parts_except_selection(bytes: &[u8]) -> Vec<Vec<u8>> {
             let part = package.get_part(part.partname()).unwrap();
             let source = part.blob();
             let mut normalized = source.to_vec();
-            for record in Records::new(source) {
+            for record in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
                 let record = record.unwrap();
                 if record.kind() == kind::BEGIN_CS_VIEW {
                     let (_, header_len) = litchi_xlsb::raw::Header::parse(
@@ -746,7 +746,7 @@ fn hiding_active_or_selected_tabs_updates_view_state_and_inverse_restores_it() {
 fn worksheet_selected(bytes: &[u8], uri: &str) -> bool {
     let package = OpcPackage::from_bytes(bytes).unwrap();
     let part = package.get_part(&PackURI::new(uri).unwrap()).unwrap();
-    let record = Records::new(part.blob())
+    let record = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(Result::unwrap)
         .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
         .expect("worksheet view");
@@ -763,8 +763,8 @@ fn multi_window_active_relocation_is_an_explicit_capability_refusal() {
     let mut output = Vec::new();
     let mut inserted = false;
     {
-        let mut writer = Encoder::new(&mut output);
-        for record in Records::new(&source) {
+        let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             writer
                 .write_record(record.kind(), record.payload())

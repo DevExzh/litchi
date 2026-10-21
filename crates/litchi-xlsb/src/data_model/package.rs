@@ -299,11 +299,7 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
         if part.partname().is_equivalent_to(&fixed_uri)
             && part.content_type() != DATA_MODEL_CONTENT_TYPE
         {
-            return Err(invalid(format!(
-                "fixed Data Model part '{}' has content type '{}' instead of '{DATA_MODEL_CONTENT_TYPE}'",
-                part.partname(),
-                part.content_type()
-            )));
+            return Err(invalid("fixed Data Model part has content type instead"));
         }
         if part.content_type() != DATA_MODEL_CONTENT_TYPE {
             continue;
@@ -312,10 +308,7 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
             return Err(invalid("package contains multiple Data Model parts"));
         }
         if !part.partname().is_equivalent_to(&fixed_uri) {
-            return Err(invalid(format!(
-                "Data Model part '{}' must be '{DATA_MODEL_PART_NAME}'",
-                part.partname()
-            )));
+            return Err(invalid("Data Model part must be"));
         }
         // The model payload is the only one this pass reads, so it is the
         // only part decoded here (ADR 0030).
@@ -344,14 +337,11 @@ pub(crate) fn inspect_model_part(package: &OpcPackage) -> Result<Option<ModelPar
 /// Validate a caller-provided opaque payload before staging it in a draft.
 pub(crate) fn validate_payload(part: &ModelPart) -> Result<()> {
     if !part.part_name.eq_ignore_ascii_case(DATA_MODEL_PART_NAME) {
-        return Err(invalid(format!(
-            "Data Model part must be '{DATA_MODEL_PART_NAME}'"
-        )));
+        return Err(invalid("Data Model part must be"));
     }
     if part.content_type != DATA_MODEL_CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: DATA_MODEL_CONTENT_TYPE.to_string(),
-            got: part.content_type.clone(),
+            expected: DATA_MODEL_CONTENT_TYPE,
         });
     }
     if part.bytes.is_empty() {
@@ -435,17 +425,15 @@ where
         let wanted = table.connection.to_lowercase();
         match names.get(&wanted).copied().unwrap_or(0) {
             0 => {
-                return Err(invalid(format!(
-                    "Data Model table '{}' references unknown workbook connection '{}'",
-                    table.name, table.connection
-                )));
+                return Err(invalid(
+                    "Data Model table references unknown workbook connection",
+                ));
             },
             1 => {},
             _ => {
-                return Err(invalid(format!(
-                    "Data Model table '{}' references multiple workbook connections named '{}'",
-                    table.name, table.connection
-                )));
+                return Err(invalid(
+                    "Data Model table references multiple workbook connections named",
+                ));
             },
         }
     }
@@ -453,7 +441,8 @@ where
 }
 
 pub(crate) fn model_part_uri() -> Result<PackURI> {
-    PackURI::new(DATA_MODEL_PART_NAME).map_err(|error| Error::InvalidUri(error.to_string()))
+    PackURI::new(DATA_MODEL_PART_NAME)
+        .map_err(|_error| Error::InvalidUri("the part name is not a valid package URI"))
 }
 
 pub(crate) fn reject_inbound_relationships(package: &OpcPackage, target: &PackURI) -> Result<()> {
@@ -467,10 +456,9 @@ pub(crate) fn reject_inbound_relationships(package: &OpcPackage, target: &PackUR
     for source in package.iter_parts() {
         for relationship in source.rels().iter() {
             if relationship_targets(relationship, target)? {
-                return Err(invalid(format!(
-                    "part '{}' has a relationship to the relationship-free Data Model part",
-                    source.partname()
-                )));
+                return Err(invalid(
+                    "part has a relationship to the relationship-free Data Model part",
+                ));
             }
         }
     }
@@ -484,8 +472,8 @@ fn relationship_targets(relationship: &litchi_opc::Relationship, target: &PackUR
     Ok(relationship.target_partname()?.is_equivalent_to(target))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 #[cfg(test)]

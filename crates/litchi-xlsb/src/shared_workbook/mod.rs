@@ -15,8 +15,8 @@ pub use crate::package::error::Error;
 /// Result type used by shared-workbook package and transaction operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub(super) fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(format!("XLSB shared-workbook: {}", message.into()))
+pub(super) fn invalid(_message: impl Into<String>) -> Error {
+    Error::InvalidFormat("XLSB shared-workbook")
 }
 
 pub(super) fn map_raw(error: crate::raw::Error) -> Error {

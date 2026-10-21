@@ -478,19 +478,14 @@ fn parse_begin_data_model(payload: &[u8]) -> Result<([u8; FRT_HEADER_LEN], u8)> 
     validate_frt_blank(header, "BrtBeginDataModel")?;
     let version = payload[FRT_HEADER_LEN];
     if version < MIN_MODEL_VERSION {
-        return Err(invalid(format!(
-            "bVerLoadModelMin {version} is below the required minimum {MIN_MODEL_VERSION}"
-        )));
+        return Err(invalid("bVerLoadModelMin is below the required minimum"));
     }
     Ok((header, version))
 }
 
-fn require_empty(payload: &[u8], name: &'static str) -> Result<()> {
+fn require_empty(payload: &[u8], _name: &'static str) -> Result<()> {
     if !payload.is_empty() {
-        return Err(invalid(format!(
-            "{name} payload must be empty, found {} bytes",
-            payload.len()
-        )));
+        return Err(invalid("payload must be empty, found bytes"));
     }
     Ok(())
 }
@@ -580,11 +575,9 @@ fn start_cursor<'a>(
     ))
 }
 
-fn validate_frt_blank(header: [u8; FRT_HEADER_LEN], context: &'static str) -> Result<()> {
+fn validate_frt_blank(header: [u8; FRT_HEADER_LEN], _context: &'static str) -> Result<()> {
     if header != [0; FRT_HEADER_LEN] {
-        return Err(invalid(format!(
-            "{context} FRTHeader reserved bytes must be zero"
-        )));
+        return Err(invalid("FRTHeader reserved bytes must be zero"));
     }
     Ok(())
 }
@@ -621,16 +614,10 @@ pub(crate) fn validate_definition(value: &Definition, limits: SemanticLimits) ->
         bounded(&table.name, "table name")?;
         bounded(&table.connection, "connection name")?;
         if !ids.insert(table.id.to_lowercase()) {
-            return Err(invalid(format!(
-                "duplicate Data Model table id {:?}",
-                table.id
-            )));
+            return Err(invalid("duplicate Data Model table id"));
         }
         if !names.insert(table.name.to_lowercase()) {
-            return Err(invalid(format!(
-                "duplicate Data Model table name {:?}",
-                table.name
-            )));
+            return Err(invalid("duplicate Data Model table name"));
         }
     }
     let mut relationship_keys = HashSet::new();
@@ -646,16 +633,10 @@ pub(crate) fn validate_definition(value: &Definition, limits: SemanticLimits) ->
         bounded(&relationship.to_table, "to table")?;
         bounded(&relationship.to_column, "to column")?;
         if !names.contains(&relationship.from_table.to_lowercase()) {
-            return Err(invalid(format!(
-                "relationship references unknown from_table {:?}",
-                relationship.from_table
-            )));
+            return Err(invalid("relationship references unknown from_table"));
         }
         if !names.contains(&relationship.to_table.to_lowercase()) {
-            return Err(invalid(format!(
-                "relationship references unknown to_table {:?}",
-                relationship.to_table
-            )));
+            return Err(invalid("relationship references unknown to_table"));
         }
         let key = (
             relationship.from_table.to_lowercase(),
@@ -679,10 +660,7 @@ pub(crate) fn validate_definition(value: &Definition, limits: SemanticLimits) ->
         bounded(&grouping.column_name, "time grouping column")?;
         bounded(&grouping.column_id, "time grouping column id")?;
         if !names.contains(&grouping.table_name.to_lowercase()) {
-            return Err(invalid(format!(
-                "time grouping references unknown table {:?}",
-                grouping.table_name
-            )));
+            return Err(invalid("time grouping references unknown table"));
         }
         if grouping.columns.len() > limits.max_time_grouping_columns {
             return Err(limit("time grouping calculated-column count"));
@@ -721,7 +699,7 @@ fn bounded(value: &str, label: &'static str) -> Result<()> {
     let bytes = value.len();
     let units = value.encode_utf16().count();
     if value.is_empty() {
-        return Err(invalid(format!("{label} must not be empty")));
+        return Err(invalid("must not be empty"));
     }
     if bytes > MAX_STRING_BYTES || units > MAX_STRING_UNITS {
         return Err(limit(label));
@@ -737,8 +715,10 @@ fn serialize_definition(
     let limits = limits.validate()?;
     validate_definition(value, limits)?;
     if layout.is_some_and(|layout| layout.opaque) {
-        return Err(Error::UnsupportedFeature(
-            "Data Model workbook block contains opaque future records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "the Data Model workbook block contains opaque future records",
         ));
     }
     let write_tables = layout.map_or(!value.tables.is_empty(), |value_layout| {
@@ -932,10 +912,7 @@ fn add_record_size(
     limits: SemanticLimits,
 ) -> Result<()> {
     if payload > limits.raw.payload() {
-        return Err(invalid(format!(
-            "Data Model record payload {payload} exceeds raw limit {}",
-            limits.raw.payload()
-        )));
+        return Err(invalid("Data Model record payload exceeds raw limit"));
     }
     let record_size = kind_len(kind)
         .checked_add(varint_len(payload))
@@ -1032,15 +1009,17 @@ pub(crate) fn patch_workbook(
     let parsed = parse_workbook(source, limits)?;
     if parsed.definition.as_ref() != before {
         return Err(Error::InvalidFormat(
-            "Data Model workbook source does not match the transaction snapshot".to_string(),
+            "Data Model workbook source does not match the transaction snapshot",
         ));
     }
     if before == after {
         return Ok(source.to_vec());
     }
     if parsed.layout.opaque {
-        return Err(Error::UnsupportedFeature(
-            "cannot edit a Data Model workbook block containing opaque future records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "the Data Model workbook block contains opaque future records",
         ));
     }
     let replacement = match after {
@@ -1097,8 +1076,8 @@ pub(crate) fn patch_workbook(
     Ok(output)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
@@ -1123,8 +1102,8 @@ fn is_model_record(value: u16) -> bool {
         || value == kind::MODEL_TIME_GROUPING_CALC_COL.get()
 }
 
-fn limit(name: &'static str) -> Error {
-    Error::InvalidFormat(format!("Data Model {name} limit exceeded"))
+fn limit(_name: &'static str) -> Error {
+    Error::InvalidFormat("Data Model limit exceeded")
 }
 
 #[cfg(test)]
@@ -1222,7 +1201,7 @@ mod tests {
             .find(|record| record.kind == kind::END_DATA_MODEL.get())
             .expect("end");
         let mut inserted = Vec::new();
-        let mut writer = Encoder::new(&mut inserted);
+        let mut writer = Encoder::new(&mut inserted, crate::raw::Limits::DEFAULT);
         writer
             .write_record(Kind::new(4095).expect("kind"), &[1, 2])
             .expect("record");
@@ -1283,7 +1262,7 @@ mod tests {
     fn model_records_after_end_book_are_rejected() {
         let fixture = fixture();
         let mut bytes = Vec::new();
-        let mut writer = Encoder::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
         writer.write_record(kind::END_BOOK, &[]).expect("end book");
         bytes.extend_from_slice(&fixture);
         assert!(parse_workbook(&bytes, SemanticLimits::DEFAULT).is_err());
@@ -1298,7 +1277,7 @@ mod tests {
             .find(|record| record.kind == kind::END_DATA_MODEL.get())
             .expect("end");
         let mut end_book = Vec::new();
-        Encoder::new(&mut end_book)
+        Encoder::new(&mut end_book, crate::raw::Limits::DEFAULT)
             .write_record(kind::END_BOOK, &[])
             .expect("end book");
         let mut bytes = fixture;

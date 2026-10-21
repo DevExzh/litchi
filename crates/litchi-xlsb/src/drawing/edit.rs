@@ -241,7 +241,7 @@ impl Edit {
         }
         let at = layout.insertion(Rank::Drawing);
         let mut payload = Vec::new();
-        Encoder::new(&mut payload).write_wide_string(&id)?;
+        Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(&id)?;
         let updated = splice(bytes, at..at, &record(kind::DRAWING, &payload)?);
         self.staged.replace_worksheet(&worksheet, updated)?;
         self.staged.touch(&worksheet);

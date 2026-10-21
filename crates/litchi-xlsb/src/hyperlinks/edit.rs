@@ -87,14 +87,14 @@ pub(crate) fn read_layout(
 ) -> Result<Vec<Hyperlink>> {
     let mut links = Vec::new();
     for unit in layout.units_of(kind::H_LINK) {
-        let item = Records::new(&worksheet[unit.span.clone()])
+        let item = Records::new(&worksheet[unit.span.clone()], crate::raw::Limits::DEFAULT)
             .next()
             .transpose()?
             .ok_or_else(|| invalid("an empty hyperlink record"))?;
         let mut link = Hyperlink::parse(item.payload())?;
         if !link.r_id.is_empty() {
             let relationship = relationships.get(&link.r_id).ok_or_else(|| {
-                Error::InvalidRelationship("a hyperlink names a missing relationship".to_owned())
+                Error::InvalidRelationship("a hyperlink names a missing relationship")
             })?;
             if relationship.is_external() {
                 link.target = Some(relationship.target_ref().to_owned());

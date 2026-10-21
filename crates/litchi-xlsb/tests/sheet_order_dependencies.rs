@@ -86,7 +86,7 @@ fn package_with_volatile_dependencies() -> Package {
 }
 
 fn records(bytes: &[u8]) -> Vec<(Kind, Vec<u8>)> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|record| {
             let record = record.expect("BIFF12 record");
             (record.kind(), record.payload().to_vec())
@@ -311,7 +311,7 @@ fn assert_reorder_guard(package: Package, label: &str) {
         .expect("stage reorder");
     let error = edit.commit().expect_err("dependency guard");
     assert!(
-        matches!(error, PackageError::UnsupportedFeature(_)),
+        matches!(error, PackageError::Refused(_)),
         "{label}: expected typed unsupported error, got {error:?}"
     );
     assert_eq!(package.to_bytes().expect("unchanged source"), before);
@@ -399,8 +399,8 @@ fn opaque_volatile_record_blocks_reordering_but_retains_exact_noop() {
     let mut opc = source.opc_package().clone();
     let before = owner_blob(&source);
     let mut output = Vec::new();
-    let mut writer = litchi_xlsb::raw::Encoder::new(&mut output);
-    for record in Records::new(&before) {
+    let mut writer = litchi_xlsb::raw::Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for record in Records::new(&before, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         writer
             .write_record(record.kind(), record.payload())

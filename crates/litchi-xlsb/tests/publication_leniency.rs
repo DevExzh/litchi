@@ -66,8 +66,8 @@ fn nan_workbook() -> Vec<u8> {
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
     let mut replaced = false;
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source_sheet) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source_sheet, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("fixture worksheet record");
         let mut payload = record.payload().to_vec();
         if !replaced && record.kind() == kind::CELL_REAL {
@@ -131,7 +131,7 @@ fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cel
 /// BIFF12 header.  Comparing this value catches an accidental normalization
 /// even when the high-level read still reports `#NUM!`.
 fn nan_cell_record(sheet: &[u8]) -> Vec<u8> {
-    let mut records = Records::new(sheet);
+    let mut records = Records::new(sheet, litchi_xlsb::raw::Limits::DEFAULT);
     while let Some(item) = records.next() {
         let record = item.expect("worksheet record");
         let start = record.offset();
@@ -191,17 +191,21 @@ fn assert_strict_cell_read_refuses(bytes: &[u8]) {
 
 fn sparkline_groups() -> Groups {
     let colors = Colors::uniform(Color::rgb(20, 40, 60, 255, 0));
-    Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            colors,
-            vec![Sparkline::new(
-                Location::new(4, 5).expect("sparkline location"),
-                None,
-            )],
-        )
-        .expect("sparkline group"),
-    ])
+    Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                colors,
+                vec![Sparkline::new(
+                    Location::new(4, 5).expect("sparkline location"),
+                    None,
+                )],
+                litchi_xlsb::sparkline::Limits::DEFAULT,
+            )
+            .expect("sparkline group"),
+        ],
+        litchi_xlsb::sparkline::Limits::DEFAULT,
+    )
     .expect("sparkline groups")
 }
 

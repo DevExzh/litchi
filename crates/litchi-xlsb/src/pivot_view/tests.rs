@@ -16,7 +16,7 @@ fn view_stream(name: &str, cache_id: u32) -> Vec<u8> {
         begin.extend_from_slice(&unit.to_le_bytes());
     }
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_SX_VIEW, &begin).unwrap();
     writer
         .write_record(kind::BEGIN_SX_LOCATION, &[0; 36])
@@ -43,7 +43,7 @@ fn refuses_truncation_and_records_outside_view() {
     assert!(Part::from_bytes(truncated).is_err());
 
     let mut trailing = view_stream("P", 1);
-    Encoder::new(&mut trailing)
+    Encoder::new(&mut trailing, crate::raw::Limits::DEFAULT)
         .write_record(kind::END_SX_LOCATION, &[])
         .unwrap();
     assert!(Part::from_bytes(trailing).is_err());

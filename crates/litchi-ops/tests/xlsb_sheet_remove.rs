@@ -208,8 +208,8 @@ fn dependency_free_chart_fixture() -> Vec<u8> {
     };
     let mut rewritten_blob = Vec::new();
     {
-        let mut writer = Encoder::new(&mut rewritten_blob);
-        for record in Records::new(&original_blob) {
+        let mut writer = Encoder::new(&mut rewritten_blob, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original_blob, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("read chart sheet record");
             if record.kind() != kind::DRAWING {
                 writer

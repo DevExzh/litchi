@@ -95,9 +95,7 @@ pub(crate) fn apply_retaining_parse(
                 .filter(|candidate_uri| candidate_uri == worksheet)
                 .map(|_| index)
         })
-        .ok_or_else(|| {
-            Error::WorksheetNotFound(format!("candidate worksheet part {}", worksheet.as_str()))
-        })?;
+        .ok_or_else(|| Error::InvalidFormat("the candidate worksheet part is missing"))?;
     let _ = parsed.worksheet(worksheet_index)?;
     validate_dependencies(commit.snapshot(), &parsed)?;
     Ok(Applied::Published {
@@ -109,20 +107,12 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
     for cell in snapshot.cells() {
         let reference = cell.reference();
         let style = usize::try_from(cell.style().get()).map_err(|_| {
-            Error::InvalidCellReference(format!(
-                "cell ({}, {}) style index does not fit this platform",
-                reference.row(),
-                reference.column()
-            ))
+            Error::InvalidCellReference("cell (, ) style index does not fit this platform")
         })?;
         let format = workbook.styles().get_cell_format(style).ok_or_else(|| {
-            Error::InvalidCellReference(format!(
-                "cell ({}, {}) references missing style index {style}",
-                reference.row(),
-                reference.column()
-            ))
+            Error::InvalidCellReference("cell (, ) references missing style index")
         })?;
-        for (resource, index, present) in [
+        for (_resource, _index, present) in [
             (
                 "font",
                 format.font_id,
@@ -155,28 +145,20 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
             ),
         ] {
             if !present {
-                return Err(Error::InvalidCellReference(format!(
-                    "cell ({}, {}) style {style} references missing {resource} {index}",
-                    reference.row(),
-                    reference.column()
-                )));
+                return Err(Error::InvalidCellReference(
+                    "cell (, ) style references missing",
+                ));
             }
         }
         match cell.value() {
             Value::SharedStringIndex(index) => {
                 let index = usize::try_from(*index).map_err(|_| {
-                    Error::InvalidCellReference(format!(
-                        "cell ({}, {}) shared-string index does not fit this platform",
-                        reference.row(),
-                        reference.column()
-                    ))
+                    Error::InvalidCellReference(
+                        "cell (, ) shared-string index does not fit this platform",
+                    )
                 })?;
                 let string = workbook.shared_strings().get(index).ok_or_else(|| {
-                    Error::InvalidCellReference(format!(
-                        "cell ({}, {}) references missing shared-string index {index}",
-                        reference.row(),
-                        reference.column()
-                    ))
+                    Error::InvalidCellReference("cell (, ) references missing shared-string index")
                 })?;
                 validate_string_fonts(string, workbook, reference)?;
             },
@@ -190,7 +172,7 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
 fn validate_string_fonts(
     string: &crate::package::shared_strings::SharedString,
     workbook: &crate::Workbook,
-    reference: super::Reference,
+    _reference: super::Reference,
 ) -> Result<()> {
     for font_id in string
         .runs
@@ -199,11 +181,9 @@ fn validate_string_fonts(
         .chain(string.phonetic.iter().map(|phonetic| phonetic.font_id))
     {
         if workbook.styles().get_font(usize::from(font_id)).is_none() {
-            return Err(Error::InvalidCellReference(format!(
-                "cell ({}, {}) rich string references missing font {font_id}",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::InvalidCellReference(
+                "cell (, ) rich string references missing font",
+            ));
         }
     }
     Ok(())
@@ -214,8 +194,7 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }

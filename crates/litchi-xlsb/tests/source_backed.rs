@@ -101,7 +101,7 @@ fn two_external_link_fixture() -> (Vec<u8>, usize) {
         .reltype()
         .to_owned();
     let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
-    let end = Records::new(&workbook_blob)
+    let end = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|record| {
             let record = record.unwrap();
             (record.kind() == kind::SUP_BOOK_SRC).then(|| {
@@ -112,7 +112,7 @@ fn two_external_link_fixture() -> (Vec<u8>, usize) {
         })
         .unwrap();
     let mut second_reference = Vec::new();
-    Encoder::new(&mut second_reference)
+    Encoder::new(&mut second_reference, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind::SUP_BOOK_SRC, &external_wide_string("rIdExternalCopy"))
         .unwrap();
     workbook_blob.splice(end..end, second_reference);
@@ -164,9 +164,9 @@ fn reserved_cell_flag_fixture() -> Vec<u8> {
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
-    let mut writer = Encoder::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
     let mut changed = false;
-    for record in Records::new(&source) {
+    for record in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::CELL_RK && !changed {
@@ -188,9 +188,9 @@ fn reserved_indexed_fixture() -> Vec<u8> {
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
-    let mut writer = Encoder::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
     let mut changed = false;
-    for record in Records::new(&source) {
+    for record in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::CELL_RK && !changed {
@@ -221,7 +221,7 @@ fn rewrite_sheet_states(states: &[u32]) -> Vec<u8> {
     let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
-    let offsets: Vec<usize> = Records::new(&workbook_blob)
+    let offsets: Vec<usize> = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|record| {
             let record = record.unwrap();
             (record.kind() == kind::BUNDLE_SH).then(|| {
@@ -244,8 +244,8 @@ fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
     let mut workbook_blob = Vec::new();
     let mut current_position = 0;
     {
-        let mut writer = Encoder::new(&mut workbook_blob);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut workbook_blob, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -302,7 +302,11 @@ fn add_comments_part(content_type: &str) -> Vec<u8> {
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let comments_uri = PackURI::new("/xl/comments1.bin").unwrap();
     let mut comments = Vec::new();
-    litchi_xlsb::comments::write(&mut Encoder::new(&mut comments), &[]).unwrap();
+    litchi_xlsb::comments::write(
+        &mut Encoder::new(&mut comments, litchi_xlsb::raw::Limits::DEFAULT),
+        &[],
+    )
+    .unwrap();
     package.add_part(Box::new(BlobPart::new(
         comments_uri,
         content_type.to_owned(),
@@ -413,7 +417,7 @@ fn set_date1904() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
-    let payload_offset = Records::new(&workbook_blob)
+    let payload_offset = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|record| {
             let record = record.unwrap();
             if record.kind() != kind::WORKBOOK_PROP || record.payload().is_empty() {
@@ -1323,8 +1327,7 @@ fn source_sheet_rejects_malformed_bundle_state_before_catalog_open() {
     let source = rewrite_sheet_states(&[3]);
     assert!(matches!(
         SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
-        Err(PackageError::Unrecognized { typ, val })
-            if typ == "BrtBundleSh hsState" && val == "3"
+        Err(PackageError::Unrecognized { typ, .. }) if typ == "BrtBundleSh hsState"
     ));
 }
 
@@ -1636,7 +1639,7 @@ fn table_column_payload(caption: &str) -> Vec<u8> {
 
 fn table_part_payload(id: u32, display_name: &str) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
     writer
         .write_record(kind::BEGIN_LIST, &table_header_payload(id, display_name))
         .unwrap();
@@ -1654,7 +1657,7 @@ fn table_part_payload(id: u32, display_name: &str) -> Vec<u8> {
 
 fn malformed_table_part_payload() -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_LIST, &[0; 8]).unwrap();
     data
 }
@@ -1672,7 +1675,7 @@ fn resident_table_formula(table_id: u32) -> (Vec<u8>, Vec<u8>) {
 
 fn worksheet_with_table(table_relationship_id: Option<&str>, formula: Option<&[u8]>) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
     let mut dimensions = Vec::new();
     for value in [0_u32, 1, 0, 0] {
         dimensions.extend_from_slice(&value.to_le_bytes());
@@ -1718,7 +1721,7 @@ fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
 
 fn two_sheet_workbook_payload() -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
     writer
         .write_record(kind::BUNDLE_SH, &bundle_sheet_payload(1, "rId1", "Sheet1"))
         .unwrap();

@@ -153,8 +153,8 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut in_views = false;
     let mut removed = false;
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for item in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("chart record");
             if record.kind() == kind::BEGIN_CS_VIEWS {
                 in_views = true;
@@ -188,7 +188,7 @@ fn worksheet_selected(bytes: &[u8], index: usize) -> bool {
     let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
     let uri = PackURI::new(format!("/xl/worksheets/sheet{index}.bin")).expect("worksheet URI");
     let part = package.get_part(&uri).expect("worksheet part");
-    let record = Records::new(part.blob())
+    let record = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(Result::unwrap)
         .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
         .expect("worksheet view record");

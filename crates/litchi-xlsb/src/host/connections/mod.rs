@@ -27,9 +27,9 @@ pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapsh
 
 pub type Result<T> = crate::package::error::Result<T>;
 
-pub(crate) fn invalid(detail: impl Into<String>) -> Error {
+pub(crate) fn invalid(detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: "XLSB External Data Connections".to_string(),
-        val: detail.into(),
+        typ: "XLSB External Data Connections",
+        val: detail,
     }
 }

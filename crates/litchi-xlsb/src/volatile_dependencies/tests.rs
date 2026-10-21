@@ -58,7 +58,7 @@ fn typed_stream_round_trips_without_execution() {
 #[test]
 fn reserved_bits_are_opaque_and_scalar_domains_are_rejected() {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(kind::BEGIN_VOL_DEPS, &[])
         .expect("begin");
@@ -180,7 +180,7 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
 fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
     let mut bytes = codec::write(&sample_dependencies(), SemanticLimits::DEFAULT, 1).expect("base");
     let mut records = Vec::new();
-    for record in crate::raw::Records::new(&bytes) {
+    for record in crate::raw::Records::new(&bytes, crate::raw::Limits::DEFAULT) {
         let record = record.expect("record");
         records.push((record.kind(), record.payload().to_vec()));
     }
@@ -189,7 +189,7 @@ fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
         (crate::raw::Kind::new(0x3ff).expect("kind"), vec![9, 8, 7]),
     );
     bytes.clear();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(record_kind, &payload).expect("record");
     }
@@ -200,5 +200,5 @@ fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
     let error = edit
         .set_dependencies(sample_dependencies())
         .expect_err("refusal");
-    assert!(matches!(error, Error::UnsupportedFeature(_)));
+    assert!(matches!(error, Error::Refused(_)));
 }

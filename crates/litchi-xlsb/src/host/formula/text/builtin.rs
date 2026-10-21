@@ -5,7 +5,6 @@ use super::super::function_table::BUILTIN_FUNCTIONS;
 #[derive(Debug, Clone, Copy)]
 pub(super) struct BuiltinFunction {
     pub(super) index: u16,
-    pub(super) name: &'static str,
     pub(super) min_args: u8,
     pub(super) max_args: u8,
 }
@@ -37,7 +36,6 @@ pub(super) fn builtin_function_by_name(name: &str) -> Option<BuiltinFunction> {
                 .eq_ignore_ascii_case(name)
                 .then_some(BuiltinFunction {
                     index,
-                    name: function_name,
                     min_args,
                     max_args,
                 })

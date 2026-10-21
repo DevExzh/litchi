@@ -78,7 +78,7 @@ pub(super) fn reconcile_with_limits(
     })?;
     if i128::from(table.total) + i128::from(reference_delta) != i128::from(actual) {
         return Err(Error::InvalidFormat(
-            "shared-string source count does not match worksheet references".to_string(),
+            "shared-string source count does not match worksheet references",
         ));
     }
     let mapping = table.mapping(&references)?;
@@ -150,8 +150,7 @@ fn validate_worksheet_uris(package: &OpcPackage, uris: &[PackURI]) -> Result<()>
         let part = package.get_part(uri)?;
         if part.content_type() != "application/vnd.ms-excel.worksheet" {
             return Err(Error::InvalidContentType {
-                expected: "application/vnd.ms-excel.worksheet".to_string(),
-                got: part.content_type().to_string(),
+                expected: "application/vnd.ms-excel.worksheet",
             });
         }
     }
@@ -171,24 +170,22 @@ fn shared_strings_uri(package: &OpcPackage) -> Result<PackURI> {
         }
         if relationship.is_external() {
             return Err(Error::InvalidRelationship(
-                "shared-string relationship is external".to_string(),
+                "shared-string relationship is external",
             ));
         }
         if found.is_some() {
             return Err(Error::InvalidRelationship(
-                "workbook has multiple shared-string relationships".to_string(),
+                "workbook has multiple shared-string relationships",
             ));
         }
         found = Some(relationship.target_partname()?);
     }
-    let uri = found.ok_or_else(|| {
-        Error::InvalidRelationship("workbook has no shared-string relationship".to_string())
-    })?;
+    let uri = found
+        .ok_or_else(|| Error::InvalidRelationship("workbook has no shared-string relationship"))?;
     let part = package.get_part(&uri)?;
     if part.content_type() != SHARED_STRING_CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: SHARED_STRING_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: SHARED_STRING_CONTENT_TYPE,
         });
     }
     Ok(uri)
@@ -207,13 +204,13 @@ impl SharedStringTable {
         let mut items = Vec::new();
         let mut ended = false;
         let mut in_table = false;
-        for item in Records::with_limits(source, limits) {
+        for item in Records::new(source, limits) {
             let record = item?;
             match record.kind() {
                 kind::BEGIN_SST => {
                     if in_table || total.is_some() {
                         return Err(Error::InvalidFormat(
-                            "shared-string table has duplicate BrtBeginSst records".to_string(),
+                            "shared-string table has duplicate BrtBeginSst records",
                         ));
                     }
                     if record.payload().len() != 8 {
@@ -238,9 +235,7 @@ impl SharedStringTable {
                             }
                         })?);
                     if occurrence_count > MAX_SST_COUNT || entry_count > occurrence_count {
-                        return Err(Error::InvalidFormat(format!(
-                            "invalid shared-string counts total={occurrence_count}, unique={entry_count}"
-                        )));
+                        return Err(Error::InvalidFormat("invalid shared-string counts"));
                     }
                     total = Some(occurrence_count);
                     unique = Some(entry_count);
@@ -265,27 +260,23 @@ impl SharedStringTable {
                 },
                 kind::SST_ITEM if !in_table && ended => {
                     return Err(Error::InvalidFormat(
-                        "shared-string item appears after BrtEndSst".to_string(),
+                        "shared-string item appears after BrtEndSst",
                     ));
                 },
                 kind::SST_ITEM if !in_table => {
                     return Err(Error::InvalidFormat(
-                        "shared-string item appears before BrtBeginSst".to_string(),
+                        "shared-string item appears before BrtBeginSst",
                     ));
                 },
                 _ => {},
             }
         }
-        let total = total.ok_or_else(|| {
-            Error::InvalidFormat("shared-string table has no BrtBeginSst".to_string())
-        })?;
-        let unique = unique.ok_or_else(|| {
-            Error::InvalidFormat("shared-string table has no unique count".to_string())
-        })?;
+        let total =
+            total.ok_or_else(|| Error::InvalidFormat("shared-string table has no BrtBeginSst"))?;
+        let unique = unique
+            .ok_or_else(|| Error::InvalidFormat("shared-string table has no unique count"))?;
         if !ended {
-            return Err(Error::InvalidFormat(
-                "shared-string table has no BrtEndSst".to_string(),
-            ));
+            return Err(Error::InvalidFormat("shared-string table has no BrtEndSst"));
         }
         let found = u32::try_from(items.len()).map_err(|_error| {
             Error::limit(
@@ -295,9 +286,9 @@ impl SharedStringTable {
             )
         })?;
         if found != unique {
-            return Err(Error::InvalidFormat(format!(
-                "shared-string unique count declares {unique} entries but stream contains {found}"
-            )));
+            return Err(Error::InvalidFormat(
+                "shared-string unique count declares entries but stream contains",
+            ));
         }
         Ok(Self { total, items })
     }
@@ -305,7 +296,7 @@ impl SharedStringTable {
     fn mapping(&self, references: &[u64]) -> Result<Vec<Option<u32>>> {
         if references.len() != self.items.len() {
             return Err(Error::InvalidFormat(
-                "shared-string reference scan does not match the table entry count".to_string(),
+                "shared-string reference scan does not match the table entry count",
             ));
         }
         let occurrence_count = references.iter().try_fold(0_u64, |sum, count| {
@@ -314,13 +305,17 @@ impl SharedStringTable {
             })
         })?;
         let occurrence_count = u32::try_from(occurrence_count).map_err(|_error| {
-            Error::UnsupportedFeature(
-                "shared-string occurrence count exceeds the wire range".to_string(),
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "shared-string occurrence count exceeds the wire range",
             )
         })?;
         if occurrence_count > MAX_SST_COUNT {
-            return Err(Error::UnsupportedFeature(
-                "shared-string occurrence count exceeds the wire range".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "shared-string occurrence count exceeds the wire range",
             ));
         }
         let live = references.iter().filter(|count| **count != 0).count();
@@ -329,7 +324,7 @@ impl SharedStringTable {
             .min(self.items.len());
         if live > capacity {
             return Err(Error::InvalidFormat(
-                "shared-string live entry count exceeds the occurrence count".to_string(),
+                "shared-string live entry count exceeds the occurrence count",
             ));
         }
 
@@ -372,15 +367,19 @@ impl SharedStringTable {
             } else {
                 mapping.push(Some(next));
                 next = next.checked_add(1).ok_or_else(|| {
-                    Error::UnsupportedFeature(
-                        "shared-string unique count exceeds the wire range".to_string(),
+                    Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit_cell_values",
+                        "shared-string unique count exceeds the wire range",
                     )
                 })?;
             }
         }
         if next > MAX_SST_COUNT {
-            return Err(Error::UnsupportedFeature(
-                "shared-string unique count exceeds the wire range".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "shared-string unique count exceeds the wire range",
             ));
         }
         Ok(mapping)
@@ -418,23 +417,25 @@ impl SharedStringTable {
             })
         })?;
         let occurrence_count = u32::try_from(occurrence_count).map_err(|_error| {
-            Error::UnsupportedFeature(
-                "shared-string occurrence count exceeds the wire range".into(),
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_cell_values",
+                "shared-string occurrence count exceeds the wire range",
             )
         })?;
         if occurrence_count > MAX_SST_COUNT || kept_unique > occurrence_count {
-            return Err(Error::InvalidFormat(format!(
-                "invalid reconciled shared-string counts total={occurrence_count}, unique={kept_unique}"
-            )));
+            return Err(Error::InvalidFormat(
+                "invalid reconciled shared-string counts",
+            ));
         }
 
-        for item in Records::with_limits(source, limits) {
+        for item in Records::new(source, limits) {
             let record = item?;
             match record.kind() {
                 kind::BEGIN_SST => {
                     if saw_begin || record.payload().len() != 8 {
                         return Err(Error::InvalidFormat(
-                            "shared-string table has an invalid BrtBeginSst record".to_string(),
+                            "shared-string table has an invalid BrtBeginSst record",
                         ));
                     }
                     saw_begin = true;
@@ -466,7 +467,7 @@ impl SharedStringTable {
                 },
                 kind::SST_ITEM if saw_end => {
                     return Err(Error::InvalidFormat(
-                        "shared-string item appears after BrtEndSst".to_string(),
+                        "shared-string item appears after BrtEndSst",
                     ));
                 },
                 _ => append_record(source, &record, limits, &mut output)?,
@@ -474,7 +475,7 @@ impl SharedStringTable {
         }
         if !saw_begin || !saw_end || in_table || item_index != self.items.len() {
             return Err(Error::InvalidFormat(
-                "shared-string table structure changed during rewrite".to_string(),
+                "shared-string table structure changed during rewrite",
             ));
         }
         Ok(output)
@@ -496,13 +497,13 @@ fn scan_worksheet(
     }
     let mut in_sheet_data = false;
     let mut frt_depth = 0_usize;
-    for item in Records::with_limits(source, limits) {
+    for item in Records::new(source, limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
                 if in_sheet_data {
                     return Err(Error::InvalidFormat(
-                        "worksheet has duplicate BrtBeginSheetData records".to_string(),
+                        "worksheet has duplicate BrtBeginSheetData records",
                     ));
                 }
                 in_sheet_data = true;
@@ -511,7 +512,7 @@ fn scan_worksheet(
             kind::END_SHEET_DATA => {
                 if !in_sheet_data {
                     return Err(Error::InvalidFormat(
-                        "worksheet has BrtEndSheetData without BrtBeginSheetData".to_string(),
+                        "worksheet has BrtEndSheetData without BrtBeginSheetData",
                     ));
                 }
                 in_sheet_data = false;
@@ -524,20 +525,19 @@ fn scan_worksheet(
             },
             kind::FRT_END if in_sheet_data => frt_depth = frt_depth.saturating_sub(1),
             kind::CELL_ISST if in_sheet_data && frt_depth != 0 => {
-                return Err(Error::UnsupportedFeature(
-                    "shared-string closure cannot interpret cell records in an opaque FRT block"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "shared-string closure cannot interpret cell records in an opaque FRT block",
                 ));
             },
             kind::CELL_ISST if in_sheet_data => {
                 let index = cell_isst_index(record.payload())?;
                 let slot = usize::try_from(index).map_err(|_error| {
-                    Error::InvalidCellReference(format!("shared-string index {index} is invalid"))
+                    Error::InvalidCellReference("shared-string index is invalid")
                 })?;
                 let count = references.get_mut(slot).ok_or_else(|| {
-                    Error::InvalidCellReference(format!(
-                        "worksheet references missing shared-string entry {index}"
-                    ))
+                    Error::InvalidCellReference("worksheet references missing shared-string entry")
                 })?;
                 *count = count.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "shared-string occurrence count",
@@ -546,17 +546,18 @@ fn scan_worksheet(
             candidate
                 if in_sheet_data && frt_depth == 0 && is_unsupported_cell_family(candidate) =>
             {
-                return Err(Error::UnsupportedFeature(format!(
-                    "shared-string remapping refuses unsupported worksheet cell family 0x{:04X}",
-                    candidate.get()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "shared-string remapping refuses unsupported worksheet cell family",
+                ));
             },
             _ => {},
         }
     }
     if in_sheet_data {
         return Err(Error::InvalidFormat(
-            "worksheet stream ended before BrtEndSheetData".to_string(),
+            "worksheet stream ended before BrtEndSheetData",
         ));
     }
     Ok(())
@@ -584,13 +585,13 @@ fn rewrite_worksheet(
         })?;
     let mut in_sheet_data = false;
     let mut frt_depth = 0_usize;
-    for item in Records::with_limits(source, limits) {
+    for item in Records::new(source, limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SHEET_DATA => {
                 if in_sheet_data {
                     return Err(Error::InvalidFormat(
-                        "worksheet has duplicate BrtBeginSheetData records".to_string(),
+                        "worksheet has duplicate BrtBeginSheetData records",
                     ));
                 }
                 in_sheet_data = true;
@@ -600,7 +601,7 @@ fn rewrite_worksheet(
             kind::END_SHEET_DATA => {
                 if !in_sheet_data {
                     return Err(Error::InvalidFormat(
-                        "worksheet has BrtEndSheetData without BrtBeginSheetData".to_string(),
+                        "worksheet has BrtEndSheetData without BrtBeginSheetData",
                     ));
                 }
                 in_sheet_data = false;
@@ -618,24 +619,25 @@ fn rewrite_worksheet(
                 append_record(source, &record, limits, &mut output)?;
             },
             kind::CELL_ISST if in_sheet_data && frt_depth != 0 => {
-                return Err(Error::UnsupportedFeature(
-                    "shared-string closure cannot interpret cell records in an opaque FRT block"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "shared-string closure cannot interpret cell records in an opaque FRT block",
                 ));
             },
             kind::CELL_ISST if in_sheet_data => {
                 let index = cell_isst_index(record.payload())?;
                 let old_index = usize::try_from(index).map_err(|_error| {
-                    Error::InvalidCellReference(format!("shared-string index {index} is invalid"))
+                    Error::InvalidCellReference("shared-string index is invalid")
                 })?;
                 let new_index =
                     mapping
                         .get(old_index)
                         .and_then(|value| *value)
                         .ok_or_else(|| {
-                            Error::InvalidCellReference(format!(
-                                "worksheet references removed shared-string entry {index}"
-                            ))
+                            Error::InvalidCellReference(
+                                "worksheet references removed shared-string entry",
+                            )
                         })?;
                 let mut payload = record.payload().to_vec();
                 payload[8..12].copy_from_slice(&new_index.to_le_bytes());
@@ -644,17 +646,18 @@ fn rewrite_worksheet(
             candidate
                 if in_sheet_data && frt_depth == 0 && is_unsupported_cell_family(candidate) =>
             {
-                return Err(Error::UnsupportedFeature(format!(
-                    "shared-string remapping refuses unsupported worksheet cell family 0x{:04X}",
-                    candidate.get()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit_cell_values",
+                    "shared-string remapping refuses unsupported worksheet cell family",
+                ));
             },
             _ => append_record(source, &record, limits, &mut output)?,
         }
     }
     if in_sheet_data {
         return Err(Error::InvalidFormat(
-            "worksheet stream ended before BrtEndSheetData".to_string(),
+            "worksheet stream ended before BrtEndSheetData",
         ));
     }
     Ok(output)
@@ -704,7 +707,7 @@ fn append_record_with_payload(
 ) -> Result<()> {
     let record_source = source
         .get(record.offset()..)
-        .ok_or_else(|| Error::InvalidFormat("record offset is outside source".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("record offset is outside source"))?;
     let (header, header_len) = Header::parse(record_source, limits)?;
     if header.len() != payload.len() {
         return Err(Error::InvalidLength {
@@ -714,7 +717,7 @@ fn append_record_with_payload(
     }
     let header_bytes = record_source
         .get(..header_len)
-        .ok_or_else(|| Error::InvalidFormat("record header is outside source".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("record header is outside source"))?;
     output.extend_from_slice(header_bytes);
     output.extend_from_slice(payload);
     Ok(())
@@ -727,7 +730,7 @@ fn record_range<'a>(
 ) -> Result<&'a [u8]> {
     let record_source = source
         .get(record.offset()..)
-        .ok_or_else(|| Error::InvalidFormat("record offset is outside source".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("record offset is outside source"))?;
     let (header, header_len) = Header::parse(record_source, limits)?;
     let end = record
         .offset()
@@ -738,7 +741,7 @@ fn record_range<'a>(
         })?;
     source
         .get(record.offset()..end)
-        .ok_or_else(|| Error::InvalidFormat("record range is outside source".to_string()))
+        .ok_or_else(|| Error::InvalidFormat("record range is outside source"))
 }
 
 fn check_replacement_limits(package: &OpcPackage, replacements: &[(PackURI, usize)]) -> Result<()> {

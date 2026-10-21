@@ -137,7 +137,7 @@ fn scoped_names_removal_and_no_ops() {
     let mut edit = named.edit().unwrap();
     assert!(matches!(
         edit.remove_defined_name("Local", Some(0.into())),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     edit.remove_defined_name("Missing", None).unwrap().unwrap();
     edit.remove_defined_name("Global", None).unwrap().unwrap();

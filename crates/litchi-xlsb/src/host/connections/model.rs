@@ -49,10 +49,10 @@ impl TryFrom<u32> for SourceType {
             0x65 => Self::DataFeed,
             0x66 => Self::Worksheet,
             0x67 => Self::TextDataModel,
-            other => {
+            _other => {
                 return Err(crate::package::walker::malformed(
                     "BrtBeginExtConnection",
-                    format!("unknown DBType {other:#x}"),
+                    "unknown DBType",
                 ));
             },
         })
@@ -89,10 +89,10 @@ impl TryFrom<u32> for CommandType {
             3 => Self::Table,
             4 => Self::Default,
             5 => Self::SpList,
-            other => {
+            _other => {
                 return Err(crate::package::walker::malformed(
                     "BrtBeginECDbProps",
-                    format!("unknown CmdType {other:#x}"),
+                    "unknown CmdType",
                 ));
             },
         })

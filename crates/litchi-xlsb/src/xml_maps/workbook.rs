@@ -79,7 +79,7 @@ impl crate::Package {
         let resulting = Snapshot::read_for_worksheets(&candidate, worksheets, patch.limits())?;
         if &resulting != patch.after() {
             return Err(crate::package::error::Error::InvalidFormat(
-                "XML Maps publication changed the planned semantic or owned graph".to_string(),
+                "XML Maps publication changed the planned semantic or owned graph",
             ));
         }
         crate::Workbook::validate_edit_candidate(&candidate)?;

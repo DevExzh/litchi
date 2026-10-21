@@ -5,7 +5,7 @@ use crate::raw::{Encoder, Kind, Records, kind};
 
 fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload).unwrap();
     }
@@ -102,7 +102,7 @@ fn edit_preserves_opaque_order_and_commits_atomically() {
         &[0x80, 0x01, 0xFE]
     );
 
-    let kinds: Vec<_> = Records::new(&output)
+    let kinds: Vec<_> = Records::new(&output, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind().get())
         .collect();
     let unknown = 0x1234;

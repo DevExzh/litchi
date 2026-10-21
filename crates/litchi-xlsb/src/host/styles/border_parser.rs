@@ -88,8 +88,8 @@ impl Border {
         let flags = data[0];
         if flags & !0x03 != 0 {
             return Err(Error::Unrecognized {
-                typ: "BrtBorder flags".to_string(),
-                val: format!("0x{flags:02X}"),
+                typ: "BrtBorder flags",
+                val: "0x",
             });
         }
 
@@ -110,8 +110,8 @@ impl Border {
         let style_byte = data[0];
         if style_byte > 13 || data[1] != 0 {
             return Err(Error::Unrecognized {
-                typ: "Blxf".to_string(),
-                val: format!("style 0x{style_byte:02X}, reserved 0x{:02X}", data[1]),
+                typ: "Blxf",
+                val: "style, reserved",
             });
         }
         let style = BorderStyle::from_u8(style_byte);
@@ -131,8 +131,8 @@ impl Border {
         }
         if !valid_rgb {
             return Err(Error::Unrecognized {
-                typ: "BrtColor".to_string(),
-                val: "direct RGB color is not marked valid".to_string(),
+                typ: "BrtColor",
+                val: "direct RGB color is not marked valid",
             });
         }
         Ok(Some(

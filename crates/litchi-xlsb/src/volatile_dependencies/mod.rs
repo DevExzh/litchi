@@ -105,8 +105,10 @@ pub(crate) fn reorder_owner(
         sheet_count,
     )?;
     if !parsed.rewrite_safe {
-        return Err(Error::UnsupportedFeature(
-            "sheet reordering cannot remap unmodeled volatile dependencies".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_volatile_dependencies",
+            "the Volatile Dependencies source contains records this edit cannot preserve",
         ));
     }
     Ok(Some(graph.part_name))

@@ -71,14 +71,13 @@ fn validate_sheet_content_type(part: &dyn Part, kind: Kind) -> Result<()> {
         Kind::IntlMacro => XLSB_INTL_MACROSHEET_CONTENT_TYPE,
         Kind::Unbound => {
             return Err(crate::package::error::Error::UnsupportedFeature(
-                "unbound XLSB tabs have no physical content type".to_string(),
+                "unbound XLSB tabs have no physical content type",
             ));
         },
     };
     if part.content_type() != expected {
         return Err(crate::package::error::Error::InvalidContentType {
-            expected: expected.to_string(),
-            got: part.content_type().to_string(),
+            expected: "a known value",
         });
     }
     Ok(())
@@ -110,25 +109,24 @@ impl Workbook {
         };
         if relationships.next().is_some() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet has multiple binary index relationships".to_string(),
+                "worksheet has multiple binary index relationships",
             ));
         }
         if relationship.is_external() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet binary index relationship is external".to_string(),
+                "worksheet binary index relationship is external",
             ));
         }
         let index_uri = relationship.target_partname()?;
         let index_part = self.package.get_part(&index_uri)?;
         if index_part.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
             return Err(crate::package::error::Error::InvalidContentType {
-                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
-                got: index_part.content_type().to_string(),
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE,
             });
         }
         if !index_part.rels().is_empty() {
             return Err(crate::package::error::Error::InvalidRelationship(
-                "worksheet binary index part must not have relationships".to_string(),
+                "worksheet binary index part must not have relationships",
             ));
         }
         crate::binary_index::WorksheetBinaryIndex::from_parts(
@@ -316,23 +314,16 @@ impl Workbook {
         let workbook = package.get_part(&workbook_uri)?;
         if workbook.content_type() != content_type::XLSB_BIN {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "XLSB workbook content type".to_string(),
-                val: format!(
-                    "expected '{}', found '{}'",
-                    content_type::XLSB_BIN,
-                    workbook.content_type()
-                ),
+                typ: "XLSB workbook content type",
+                val: "expected, found",
             });
         }
 
         let main = package.main_document_part()?;
         if main.partname() != workbook.partname() || main.content_type() != content_type::XLSB_BIN {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "XLSB main workbook relationship".to_string(),
-                val: format!(
-                    "expected '{}' to be the binary workbook main part",
-                    workbook_uri.as_str()
-                ),
+                typ: "XLSB main workbook relationship",
+                val: "expected to be the binary workbook main part",
             });
         }
 
@@ -393,8 +384,8 @@ impl Workbook {
         drawing_part: &dyn Part,
     ) -> Result<crate::package::drawing::SheetDrawing> {
         use crate::package::drawing::{EmbeddedChart, EmbeddedImage, Object, SheetDrawing};
-        let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|error| {
-            crate::package::error::Error::Encoding(format!("Drawings part is not UTF-8: {error}"))
+        let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|_error| {
+            crate::package::error::Error::Encoding("Drawings part is not UTF-8")
         })?;
         let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
         let drawing = crate::package::drawing::parse_drawing_part(drawing_part.blob())?;
@@ -410,11 +401,8 @@ impl Workbook {
             {
                 let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
                     crate::package::error::Error::Unrecognized {
-                        typ: "Drawings part".to_string(),
-                        val: format!(
-                            "picture {:?} relationship {rel_id:?} is missing",
-                            non_visual.name
-                        ),
+                        typ: "Drawings part",
+                        val: "picture relationship is missing",
                     }
                 })?;
                 if matches!(
@@ -423,8 +411,8 @@ impl Workbook {
                 ) {
                     if relationship.is_external() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "Drawings part".to_string(),
-                            val: format!("image relationship {rel_id:?} is external"),
+                            typ: "Drawings part",
+                            val: "image relationship is external",
                         });
                     }
                     let image_uri = relationship.target_partname()?;
@@ -484,11 +472,8 @@ impl Workbook {
             };
             let relationship = drawing_part.rels().get(rel_id).ok_or_else(|| {
                 crate::package::error::Error::Unrecognized {
-                    typ: "Drawings part".to_string(),
-                    val: format!(
-                        "graphic frame {:?} relationship {rel_id:?} is missing",
-                        frame.non_visual.name
-                    ),
+                    typ: "Drawings part",
+                    val: "graphic frame relationship is missing",
                 }
             })?;
             if !matches!(
@@ -499,8 +484,8 @@ impl Workbook {
             }
             if relationship.is_external() {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "Drawings part".to_string(),
-                    val: format!("chart relationship {rel_id:?} is external"),
+                    typ: "Drawings part",
+                    val: "chart relationship is external",
                 });
             }
             let chart_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -657,16 +642,16 @@ impl Workbook {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
-        let mut iter = Records::new(blob);
+        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
         let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(crate::package::error::Error::InvalidFormat(
-                "XLSB sheet names and relationship identifiers have different lengths".to_string(),
+                "XLSB sheet names and relationship identifiers have different lengths",
             ));
         }
         if info.worksheet_names.len() != info.worksheet_states.len() {
             return Err(crate::package::error::Error::InvalidFormat(
-                "XLSB sheet names and visibility states have different lengths".to_string(),
+                "XLSB sheet names and visibility states have different lengths",
             ));
         }
         let active_catalog_position =
@@ -683,23 +668,22 @@ impl Workbook {
             })?;
         for rel_id in &info.external_link_rel_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} is missing"
-                ))
+                crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship is missing",
+                )
             })?;
             if relationship.is_external() {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} is external"
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship is external",
+                ));
             }
             if !matches!(
                 relationship.reltype(),
                 relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
             ) {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "BrtSupBookSrc relationship {rel_id:?} has invalid type {:?}",
-                    relationship.reltype()
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "BrtSupBookSrc relationship has invalid type",
+                ));
             }
             external_link_uris.push(relationship.target_partname()?);
         }
@@ -717,9 +701,7 @@ impl Workbook {
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(format!(
-                    "PivotCache {cache_id} relationship {rel_id:?} is missing"
-                ))
+                crate::package::error::Error::InvalidFormula("PivotCache relationship is missing")
             })?;
             if relationship.is_external()
                 || !relationship
@@ -727,9 +709,9 @@ impl Workbook {
                     .to_ascii_lowercase()
                     .ends_with("/pivotcachedefinition")
             {
-                return Err(crate::package::error::Error::InvalidFormula(format!(
-                    "PivotCache {cache_id} relationship is external or has the wrong type"
-                )));
+                return Err(crate::package::error::Error::InvalidFormula(
+                    "PivotCache relationship is external or has the wrong type",
+                ));
             }
             let part = self.package.get_part(&relationship.target_partname()?)?;
             let definition = crate::package::pivot::parse_pivot_cache_definition_recording(
@@ -784,7 +766,7 @@ impl Workbook {
             let Some(rel_id) = rel_id.as_deref() else {
                 if state != State::VeryHidden {
                     return Err(crate::package::error::Error::InvalidRelationship(
-                        "unbound XLSB sheet tabs must be very hidden".to_string(),
+                        "unbound XLSB sheet tabs must be very hidden",
                     ));
                 }
                 sheet_tabs.push(TabMetadata::new(name.to_owned(), Kind::Unbound, state));
@@ -792,30 +774,25 @@ impl Workbook {
             };
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
                 crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {catalog_position} is missing"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position is missing",
                 }
             })?;
             if relationship.is_external() {
-                return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet catalog position {catalog_position} has an external relationship"
-                )));
+                return Err(crate::package::error::Error::UnsupportedFeature(
+                    "sheet catalog position has an external relationship",
+                ));
             }
             let Some(kind) = Kind::from_relationship_type(relationship.reltype()) else {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {catalog_position} has unsupported type {:?}",
-                        relationship.reltype()
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position has unsupported type",
                 });
             };
             let partname = relationship.target_partname()?;
             if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
                 return Err(crate::package::error::Error::InvalidRelationship(
-                    "multiple XLSB sheet tabs resolve to one physical part".to_string(),
+                    "multiple XLSB sheet tabs resolve to one physical part",
                 ));
             }
             let sheet_part = self.package.get_part(&partname)?;
@@ -832,16 +809,14 @@ impl Workbook {
             };
             let sheet_relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
                 crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {sheet_index} is missing"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position is missing",
                 }
             })?;
             if sheet_relationship.is_external() {
-                return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet catalog position {sheet_index} has an external relationship"
-                )));
+                return Err(crate::package::error::Error::UnsupportedFeature(
+                    "sheet catalog position has an external relationship",
+                ));
             }
             let reltype = sheet_relationship.reltype();
             if !is_worksheet_relationship(reltype)
@@ -851,10 +826,8 @@ impl Workbook {
                     continue;
                 }
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "relationship {rel_id:?} for sheet catalog position {sheet_index} has unsupported type {reltype:?}"
-                    ),
+                    typ: "sheet relationship",
+                    val: "relationship for sheet catalog position has unsupported type",
                 });
             }
             let sheet_part = self
@@ -868,8 +841,8 @@ impl Workbook {
                     .get(sheet_index)
                     .cloned()
                     .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                        typ: "BrtBundleSh".to_string(),
-                        val: format!("chart sheet index {sheet_index} out of bounds"),
+                        typ: "BrtBundleSh",
+                        val: "chart sheet index out of bounds",
                     })?;
                 let state = info.worksheet_states[sheet_index];
                 let chart_sheet = crate::package::chartsheet::parse_chart_sheet_part(
@@ -880,10 +853,8 @@ impl Workbook {
                 if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
                     let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or_else(|| {
                         crate::package::error::Error::Unrecognized {
-                            typ: "BrtDrawing".to_string(),
-                            val: format!(
-                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is missing"
-                            ),
+                            typ: "BrtDrawing",
+                            val: "relationship on chart sheet is missing",
                         }
                     })?;
                     if !matches!(
@@ -892,10 +863,8 @@ impl Workbook {
                     ) || relationship.is_external()
                     {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtDrawing".to_string(),
-                            val: format!(
-                                "relationship {drawing_rel_id:?} on chart sheet {sheet_index} is external or has the wrong type"
-                            ),
+                            typ: "BrtDrawing",
+                            val: "relationship on chart sheet is external or has the wrong type",
                         });
                     }
                     let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -909,10 +878,8 @@ impl Workbook {
             let worksheet_index = worksheet_positions
                 .binary_search(&sheet_index)
                 .map_err(|_missing_worksheet_position| crate::package::error::Error::Unrecognized {
-                    typ: "worksheet catalog".to_string(),
-                    val: format!(
-                        "worksheet relationship at catalog position {sheet_index} has no public worksheet ordinal"
-                    ),
+                    typ: "worksheet catalog",
+                    val: "worksheet relationship at catalog position has no public worksheet ordinal",
                 })?;
             // Worksheet Drawings parts (MS-XLSB 2.1.7.23) are standard
             // SpreadsheetDrawing XML parts discovered through the sheet's
@@ -925,8 +892,8 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::Unrecognized {
-                        typ: "worksheet drawing relationship".to_string(),
-                        val: "external Drawings part".to_string(),
+                        typ: "worksheet drawing relationship",
+                        val: "external Drawings part",
                     });
                 }
                 let drawing_part = self.package.get_part(&relationship.target_partname()?)?;
@@ -939,14 +906,14 @@ impl Workbook {
                 &mut self.tolerance,
             )? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or_else(|| {
-                    crate::package::error::Error::InvalidFormula(format!(
-                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is missing"
-                    ))
+                    crate::package::error::Error::InvalidFormula(
+                        "BrtListPart relationship on sheet is missing",
+                    )
                 })?;
                 if relationship.is_external() {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "BrtListPart relationship {table_rel_id:?} on sheet {sheet_index} is external"
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "BrtListPart relationship on sheet is external",
+                    ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
                 let table = crate::package::table::parse_table_part_recording(
@@ -963,7 +930,7 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "worksheet has an external table relationship".to_string(),
+                        "worksheet has an external table relationship",
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
@@ -980,18 +947,16 @@ impl Workbook {
                     .iter()
                     .any(|existing: &TableDefinition| existing.table_id() == table.table_id())
                 {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate workbook table ID {}",
-                        table.table_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate workbook table ID",
+                    ));
                 }
                 if tables.iter().any(|existing: &TableDefinition| {
                     excel_name_eq(existing.display_name(), table.display_name())
                 }) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate workbook table display name {:?}",
-                        table.display_name()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate workbook table display name",
+                    ));
                 }
                 tables.push(table);
             }
@@ -1003,7 +968,7 @@ impl Workbook {
             }) {
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "worksheet has an external PivotTable relationship".to_string(),
+                        "worksheet has an external PivotTable relationship",
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
@@ -1012,22 +977,18 @@ impl Workbook {
                     .iter()
                     .any(|(cache_id, _)| *cache_id == view.cache_id())
                 {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "PivotTable view {:?} references unknown cache {}",
-                        view.name(),
-                        view.cache_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "PivotTable view references unknown cache",
+                    ));
                 }
                 if pivot_views.iter().any(|existing: &View| {
                     existing.cache_id() == view.cache_id()
                         && existing.sheet_index() == view.sheet_index()
                         && excel_name_eq(existing.name(), view.name())
                 }) {
-                    return Err(crate::package::error::Error::InvalidFormula(format!(
-                        "duplicate PivotTable view {:?} for cache {} on sheet {sheet_index}",
-                        view.name(),
-                        view.cache_id()
-                    )));
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "duplicate PivotTable view for cache on sheet",
+                    ));
                 }
                 pivot_views.push(view);
             }
@@ -1074,12 +1035,12 @@ impl Workbook {
                 }
                 if found.is_some() {
                     return Err(crate::package::error::Error::InvalidRelationship(
-                        "XLSB workbook has multiple shared-string relationships".to_string(),
+                        "XLSB workbook has multiple shared-string relationships",
                     ));
                 }
                 if relationship.is_external() {
                     return Err(crate::package::error::Error::InvalidRelationship(
-                        "XLSB workbook shared-string relationship is external".to_string(),
+                        "XLSB workbook shared-string relationship is external",
                     ));
                 }
                 found = Some(relationship.target_partname()?);
@@ -1092,12 +1053,11 @@ impl Workbook {
         let shared_strings_part = self.package.get_part(&shared_strings_uri)?;
         if shared_strings_part.content_type() != XLSB_SHARED_STRINGS_CONTENT_TYPE {
             return Err(crate::package::error::Error::InvalidContentType {
-                expected: XLSB_SHARED_STRINGS_CONTENT_TYPE.to_string(),
-                got: shared_strings_part.content_type().to_string(),
+                expected: XLSB_SHARED_STRINGS_CONTENT_TYPE,
             });
         }
         let blob = shared_strings_part.blob();
-        let mut iter = Records::new(blob);
+        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
         Self::read_shared_strings(&mut iter, &mut self.shared_strings, &mut self.tolerance)?;
 
         Ok(())

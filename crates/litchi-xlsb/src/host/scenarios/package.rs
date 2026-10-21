@@ -21,7 +21,7 @@ struct Block<'a> {
 }
 
 fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
-    let mut iterator = Records::new(data);
+    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
     let mut begin = None;
     let mut header = None;
     let mut inner = Vec::new();
@@ -32,14 +32,14 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
         if end.is_some() {
             if record.kind() == codec::begin_manager() {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager collection".to_string(),
-                    val: "multiple BrtBeginScenMan records".to_string(),
+                    typ: "Scenario Manager collection",
+                    val: "multiple BrtBeginScenMan records",
                 });
             }
             if record.kind() == codec::end_manager() {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager collection".to_string(),
-                    val: "multiple BrtEndScenMan records".to_string(),
+                    typ: "Scenario Manager collection",
+                    val: "multiple BrtEndScenMan records",
                 });
             }
             continue;
@@ -52,15 +52,15 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
             },
             None if record.kind() == codec::end_manager() => {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager collection".to_string(),
-                    val: "BrtEndScenMan has no matching BrtBeginScenMan".to_string(),
+                    typ: "Scenario Manager collection",
+                    val: "BrtEndScenMan has no matching BrtBeginScenMan",
                 });
             },
             None => {},
             Some(_) if record.kind() == codec::begin_manager() => {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager collection".to_string(),
-                    val: "multiple BrtBeginScenMan records".to_string(),
+                    typ: "Scenario Manager collection",
+                    val: "multiple BrtBeginScenMan records",
                 });
             },
             Some(_) if record.kind() == codec::end_manager() => {
@@ -75,8 +75,8 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
             Some(_) => {
                 if inner.len() >= MAX_MANAGER_RECORDS {
                     return Err(Error::Unrecognized {
-                        typ: "Scenario Manager collection".to_string(),
-                        val: format!("record count exceeds {MAX_MANAGER_RECORDS}"),
+                        typ: "Scenario Manager collection",
+                        val: "record count exceeds",
                     });
                 }
                 inner.push(record);
@@ -88,12 +88,12 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
         return Ok(None);
     };
     let Some(end) = end else {
-        return Err(Error::UnexpectedEndOfStream("BrtEndScenMan".to_string()));
+        return Err(Error::UnexpectedEndOfStream("BrtEndScenMan"));
     };
     let Some(header) = header else {
         return Err(Error::Unrecognized {
-            typ: "Scenario Manager collection".to_string(),
-            val: "BrtBeginScenMan has no payload".to_string(),
+            typ: "Scenario Manager collection",
+            val: "BrtBeginScenMan has no payload",
         });
     };
     Ok(Some(Block {
@@ -105,22 +105,22 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
 }
 
 fn end_sheet_offset(data: &[u8]) -> Result<usize> {
-    let mut iterator = Records::new(data);
+    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
     let mut offset = None;
     while let Some(result) = iterator.next() {
         let record = result?;
         if record.kind() == kind::END_SHEET {
             if offset.replace(record.offset()).is_some() {
                 return Err(Error::Unrecognized {
-                    typ: "Scenario Manager insertion".to_string(),
-                    val: "worksheet must contain exactly one BrtEndSheet".to_string(),
+                    typ: "Scenario Manager insertion",
+                    val: "worksheet must contain exactly one BrtEndSheet",
                 });
             }
         }
     }
     offset.ok_or_else(|| Error::Unrecognized {
-        typ: "Scenario Manager insertion".to_string(),
-        val: "worksheet must contain exactly one BrtEndSheet".to_string(),
+        typ: "Scenario Manager insertion",
+        val: "worksheet must contain exactly one BrtEndSheet",
     })
 }
 
@@ -167,13 +167,17 @@ pub fn replace_worksheet(data: &[u8], manager: Option<&Manager>) -> Result<Vec<u
     }
     if original.is_opaque() {
         if manager.is_some_and(|candidate| candidate != &original) {
-            return Err(Error::UnsupportedFeature(
-                "Scenario Manager edit is unsafe while opaque records are present".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_scenarios",
+                "the Scenario Manager source contains opaque records",
             ));
         }
         if manager.is_none() {
-            return Err(Error::UnsupportedFeature(
-                "Scenario Manager removal would discard opaque records".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_scenarios",
+                "the Scenario Manager source contains opaque records",
             ));
         }
         return Ok(data.to_vec());

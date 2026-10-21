@@ -27,7 +27,7 @@ fn record(record_type: Kind, payload: &[u8]) -> (Kind, Vec<u8>) {
 
 fn build(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }

@@ -155,19 +155,17 @@ fn restore_relationships(part: &mut dyn Part, source: &[SourceRelationship]) -> 
 fn refuse_inbound(package: &OpcPackage, target_part: &litchi_opc::PackURI) -> Result<()> {
     for relationship in package.rels().iter() {
         if relationship_targets(relationship, target_part)? {
-            return Err(invalid(format!(
-                "cannot remove XML Maps part '{}' while another part references it",
-                target_part.as_str()
-            )));
+            return Err(invalid(
+                "cannot remove XML Maps part while another part references it",
+            ));
         }
     }
     for part in package.iter_parts() {
         for relationship in part.rels().iter() {
             if relationship_targets(relationship, target_part)? {
-                return Err(invalid(format!(
-                    "cannot remove XML Maps part '{}' while another part references it",
-                    target_part.as_str()
-                )));
+                return Err(invalid(
+                    "cannot remove XML Maps part while another part references it",
+                ));
             }
         }
     }
@@ -183,10 +181,10 @@ fn relationship_targets(
     }
     let target = relationship
         .target_partname()
-        .map_err(|error| invalid(error.to_string()))?;
+        .map_err(|_error| invalid("an XML maps relationship target is not a valid part name"))?;
     Ok(target.is_equivalent_to(target_part))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

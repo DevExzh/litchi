@@ -108,7 +108,7 @@ fn parse(bytes: &[u8], unit: &Unit, row: bool) -> Result<Vec<Break>> {
     } else {
         kind::END_COL_BRK
     };
-    let mut records = Records::new(bytes);
+    let mut records = Records::new(bytes, crate::raw::Limits::DEFAULT);
     let header = records
         .next()
         .transpose()?
@@ -142,10 +142,7 @@ fn parse(bytes: &[u8], unit: &Unit, row: bool) -> Result<Vec<Break>> {
         breaks.push(item);
     }
     if breaks.len() != declared {
-        return Err(invalid(format!(
-            "a page-break collection declares {declared} breaks and holds {}",
-            breaks.len()
-        )));
+        return Err(invalid("a page-break collection declares breaks and holds"));
     }
     Ok(breaks)
 }
@@ -162,9 +159,9 @@ pub(crate) fn encode(breaks: &[Break], row: bool) -> Result<Vec<u8>> {
         return Ok(Vec::new());
     }
     if breaks.len() > MAX_BREAKS {
-        return Err(invalid(format!(
-            "a worksheet holds at most {MAX_BREAKS} page breaks of one direction"
-        )));
+        return Err(invalid(
+            "a worksheet holds at most page breaks of one direction",
+        ));
     }
     let (id_limit, span_limit) = if row {
         (LAST_ROW, LAST_COLUMN)

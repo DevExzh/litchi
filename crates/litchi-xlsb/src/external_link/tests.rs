@@ -75,7 +75,7 @@ fn insert_unknown_records_after_known_record(
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
     let mut known = 0;
     let mut split = source.len();
-    for record in Records::with_limits(source, limits) {
+    for record in Records::new(source, limits) {
         let record = record.unwrap();
         if !codec::is_modeled_record(record.kind()) {
             continue;
@@ -87,7 +87,7 @@ fn insert_unknown_records_after_known_record(
         known += 1;
     }
     let mut opaque = Vec::new();
-    let mut writer = Encoder::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque, Limits::DEFAULT);
     for &(kind, payload) in records_to_insert {
         writer.write_record(kind, payload).unwrap();
     }
@@ -105,12 +105,12 @@ fn insert_repeated_unknown_after_first_record(
     payload: &[u8],
 ) -> Vec<u8> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut records = Records::with_limits(source, limits);
+    let mut records = Records::new(source, limits);
     let first = records.next().unwrap().unwrap();
     let (_, header_len) = Header::parse(&source[first.offset()..], limits).unwrap();
     let split = first.offset() + header_len + first.len();
     let mut opaque = Vec::new();
-    let mut writer = Encoder::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque, Limits::DEFAULT);
     let kind = RecordKind::new(0x3FFE).unwrap();
     for _ in 0..count {
         writer.write_record(kind, payload).unwrap();
@@ -130,7 +130,7 @@ fn replace_record_payload(
     payload: &[u8],
 ) -> Vec<u8> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut records = Records::with_limits(source, limits);
+    let mut records = Records::new(source, limits);
     let mut seen = 0;
     let mut range = None;
     while let Some(record) = records.next() {
@@ -147,7 +147,7 @@ fn replace_record_payload(
     }
     let (start, end) = range.unwrap();
     let mut replacement = Vec::new();
-    Encoder::new(&mut replacement)
+    Encoder::new(&mut replacement, Limits::DEFAULT)
         .write_record(target_kind, payload)
         .unwrap();
 
@@ -160,7 +160,7 @@ fn replace_record_payload(
 
 fn first_sup_name_bits(source: &[u8]) -> [u8; 7] {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    for record in Records::with_limits(source, limits) {
+    for record in Records::new(source, limits) {
         let record = record.unwrap();
         if record.kind() == crate::raw::kind::SUP_NAME_BITS {
             return record.payload().try_into().unwrap();
@@ -171,7 +171,7 @@ fn first_sup_name_bits(source: &[u8]) -> [u8; 7] {
 
 fn record_kinds(source: &[u8]) -> Vec<u16> {
     let limits = Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
-    Records::with_limits(source, limits)
+    Records::new(source, limits)
         .map(|record| u16::from(record.unwrap().kind()))
         .collect()
 }
@@ -635,7 +635,7 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
     }
 
     let mut one_record = Vec::new();
-    Encoder::new(&mut one_record)
+    Encoder::new(&mut one_record, Limits::DEFAULT)
         .write_record(RecordKind::new(0x3FFE).unwrap(), &[0xC0; 128])
         .unwrap();
     let count = MAX_UNKNOWN_BYTES / one_record.len() + 1;
@@ -1088,7 +1088,7 @@ fn external_link_malformed_wire_keeps_wire_and_structural_errors_typed() {
     assert!(matches!(wire_error, Error::Wire(_)));
 
     let mut structurally_invalid = source;
-    Encoder::new(&mut structurally_invalid)
+    Encoder::new(&mut structurally_invalid, Limits::DEFAULT)
         .write_record(crate::raw::kind::SUP_NAME_END, &[])
         .unwrap();
     let structural_error =

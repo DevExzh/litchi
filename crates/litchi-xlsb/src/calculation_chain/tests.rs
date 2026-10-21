@@ -12,7 +12,7 @@ use crate::raw::{Encoder, Kind};
 
 fn opaque_records() -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0x01, 0x02])
         .expect("first record");
@@ -628,7 +628,7 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
     let bytes = opaque_records();
     let package = package_with_chain(bytes.clone());
     let mut large_bytes = Vec::new();
-    let mut writer = Encoder::new(&mut large_bytes);
+    let mut writer = Encoder::new(&mut large_bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0_u8; 1024])
         .expect("large record");

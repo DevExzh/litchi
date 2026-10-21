@@ -146,7 +146,7 @@ impl Edit {
 /// (`dwCol`) is at most `last`, with their exact bytes.
 fn columns_inside(unit: &[u8], last: u32) -> Result<Vec<u8>> {
     let mut out = Vec::new();
-    let mut records = Records::new(unit);
+    let mut records = Records::new(unit, crate::raw::Limits::DEFAULT);
     let _header = records.next().transpose()?;
     let mut keep = false;
     let mut depth = 0usize;

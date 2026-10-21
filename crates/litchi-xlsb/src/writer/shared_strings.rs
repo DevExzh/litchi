@@ -65,17 +65,17 @@ impl SharedStringsWriter {
     pub(crate) fn write<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // Write BrtBeginSst
         let mut sst_header = Vec::new();
-        let mut temp_writer = Encoder::new(&mut sst_header);
-        let total_count = u32::try_from(self.total_count).map_err(|_| {
-            Error::Encoding("shared-string occurrence count exceeds u32".to_string())
-        })?;
+        let mut temp_writer = Encoder::new(&mut sst_header, crate::raw::Limits::DEFAULT);
+        let total_count = u32::try_from(self.total_count)
+            .map_err(|_| Error::Encoding("shared-string occurrence count exceeds u32"))?;
         let unique_count = u32::try_from(self.strings.len())
-            .map_err(|_| Error::Encoding("shared-string unique count exceeds u32".to_string()))?;
+            .map_err(|_| Error::Encoding("shared-string unique count exceeds u32"))?;
         if total_count > 0x7FFF_FFFF || unique_count > total_count {
-            return Err(Error::Unrecognized {
-                typ: "BrtBeginSst counts".to_string(),
-                val: format!("total={total_count}, unique={unique_count}"),
-            });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::InvalidValue,
+                "build_xlsb",
+                "shared-string counts are outside the XLSB range",
+            ));
         }
         temp_writer.write_u32(total_count)?;
         temp_writer.write_u32(unique_count)?;
@@ -96,7 +96,7 @@ impl SharedStringsWriter {
     /// Write a single SST item
     fn write_sst_item<W: Write>(&self, writer: &mut Encoder<W>, s: &str) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Encoder::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
 
         temp_writer.write_u8(0)?; // Flags (0 for plain text)
         temp_writer.write_wide_string(s)?;
@@ -195,8 +195,10 @@ mod tests {
         table.add_string("other".to_string());
 
         let mut bytes = Vec::new();
-        table.write(&mut Encoder::new(&mut bytes)).unwrap();
-        let mut records = crate::raw::Records::new(bytes.as_slice());
+        table
+            .write(&mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT))
+            .unwrap();
+        let mut records = crate::raw::Records::new(bytes.as_slice(), crate::raw::Limits::DEFAULT);
         let begin = records.next().unwrap().unwrap();
         assert_eq!(begin.kind(), kind::BEGIN_SST);
         assert_eq!(&begin.payload()[..4], &3u32.to_le_bytes());

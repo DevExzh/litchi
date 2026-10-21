@@ -71,33 +71,44 @@ fn authored_sparkline_groups_reach_the_public_worksheet_model() {
     area.extend_from_slice(&2u32.to_le_bytes());
     area.extend_from_slice(&0u16.to_le_bytes());
     area.extend_from_slice(&0u16.to_le_bytes());
-    let groups = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
-            vec![Sparkline::new(
-                Location::new(0, 0).unwrap(),
-                Some(Formula::new(reference, Vec::new()).unwrap()),
-            )],
-        )
-        .unwrap()
-        .with_date_axis(Formula::name(1).unwrap()),
-        Group::new(
-            SparklineType::Column,
-            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
-            vec![Sparkline::new(
-                Location::new(1, 1).unwrap(),
-                Some(Formula::new(area, Vec::new()).unwrap()),
-            )],
-        )
-        .unwrap(),
-        Group::new(
-            SparklineType::Stacked,
-            Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
-            vec![Sparkline::new(Location::new(2, 2).unwrap(), None)],
-        )
-        .unwrap(),
-    ])
+    let groups = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+                vec![Sparkline::new(
+                    Location::new(0, 0).unwrap(),
+                    Some(
+                        Formula::new(reference, Vec::new(), crate::sparkline::Limits::DEFAULT)
+                            .unwrap(),
+                    ),
+                )],
+                crate::sparkline::Limits::DEFAULT,
+            )
+            .unwrap()
+            .with_date_axis(Formula::name(1, crate::sparkline::Limits::DEFAULT).unwrap()),
+            Group::new(
+                SparklineType::Column,
+                Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+                vec![Sparkline::new(
+                    Location::new(1, 1).unwrap(),
+                    Some(
+                        Formula::new(area, Vec::new(), crate::sparkline::Limits::DEFAULT).unwrap(),
+                    ),
+                )],
+                crate::sparkline::Limits::DEFAULT,
+            )
+            .unwrap(),
+            Group::new(
+                SparklineType::Stacked,
+                Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+                vec![Sparkline::new(Location::new(2, 2).unwrap(), None)],
+                crate::sparkline::Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        crate::sparkline::Limits::DEFAULT,
+    )
     .unwrap();
 
     let mut workbook = Builder::new();
@@ -132,17 +143,24 @@ fn authored_sparkline_external_name_is_explicitly_unsupported_and_atomic() {
     let mut name_x = vec![0x39];
     name_x.extend_from_slice(&2u16.to_le_bytes());
     name_x.extend_from_slice(&1u32.to_le_bytes());
-    let groups = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
-            vec![Sparkline::new(
-                Location::new(0, 0).unwrap(),
-                Some(Formula::new(name_x, Vec::new()).unwrap()),
-            )],
-        )
-        .unwrap(),
-    ])
+    let groups = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
+                vec![Sparkline::new(
+                    Location::new(0, 0).unwrap(),
+                    Some(
+                        Formula::new(name_x, Vec::new(), crate::sparkline::Limits::DEFAULT)
+                            .unwrap(),
+                    ),
+                )],
+                crate::sparkline::Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        crate::sparkline::Limits::DEFAULT,
+    )
     .unwrap();
     let mut workbook = Builder::new();
     let mut sheet = Worksheet::new("Sheet1");
@@ -152,23 +170,23 @@ fn authored_sparkline_external_name_is_explicitly_unsupported_and_atomic() {
     let shared_strings_before = workbook.shared_strings.len();
 
     let error = workbook.build().unwrap_err();
-    assert!(matches!(
-        error,
-        crate::package::error::Error::UnsupportedFeature(message)
-            if message.contains("sparkline PtgNameX")
-    ));
+    assert!(matches!(error, crate::package::error::Error::Refused(_)));
     assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
     assert_eq!(workbook.shared_strings.len(), shared_strings_before);
     assert_eq!(workbook.worksheets[0].sparkline_groups(), Some(&groups));
 
-    let corrected = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
-            vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
-        )
-        .unwrap(),
-    ])
+    let corrected = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(SparkColor::rgb(0, 0, 0, 255, 0)),
+                vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+                crate::sparkline::Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        crate::sparkline::Limits::DEFAULT,
+    )
     .unwrap();
     workbook.worksheets[0]
         .set_sparkline_groups(corrected)
@@ -187,14 +205,18 @@ fn sparkline_encoding_limit_failure_is_atomic_and_recoverable() {
     };
     use litchi_sheet::sparkline::SparklineType;
 
-    let groups = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            Colors::uniform(SparkColor::rgb(1, 2, 3, 255, 0)),
-            vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
-        )
-        .unwrap(),
-    ])
+    let groups = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(SparkColor::rgb(1, 2, 3, 255, 0)),
+                vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap();
     let encode_failure_limits = Limits::DEFAULT.with_record_bytes(1).unwrap();
     let mut sheet = Worksheet::new("Sheet1");
@@ -742,20 +764,14 @@ fn formula_group_setters_reject_malformed_and_unsupported_inputs_without_install
     let error = unsupported_array
         .set_array_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
         .unwrap_err();
-    assert!(matches!(
-        error,
-        crate::package::error::Error::UnsupportedFeature(_)
-    ));
+    assert!(matches!(error, crate::package::error::Error::Refused(_)));
     assert!(unsupported_array.formula_groups.is_empty());
 
     let mut unsupported_shared = Worksheet::new("Unsupported shared");
     let error = unsupported_shared
         .set_shared_formula(0, 0, 0, 0, "NOT_A_REAL_FUNCTION(1)")
         .unwrap_err();
-    assert!(matches!(
-        error,
-        crate::package::error::Error::UnsupportedFeature(_)
-    ));
+    assert!(matches!(error, crate::package::error::Error::Refused(_)));
     assert!(unsupported_shared.formula_groups.is_empty());
 }
 
@@ -1208,13 +1224,17 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
     );
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let sheet_part = package.get_part(&sheet_uri).unwrap();
-    let drawing_record = crate::raw::Records::new(sheet_part.blob())
+    let drawing_record = crate::raw::Records::new(sheet_part.blob(), crate::raw::Limits::DEFAULT)
         .find_map(|record| {
             let record = record.unwrap();
             (record.kind() == kind::DRAWING).then_some(record)
         })
         .expect("BrtDrawing missing");
-    let mut cursor = crate::raw::Cursor::new(drawing_record.payload(), "BrtDrawing");
+    let mut cursor = crate::raw::Cursor::new(
+        drawing_record.payload(),
+        "BrtDrawing",
+        crate::raw::Limits::DEFAULT,
+    );
     let drawing_rel_id = cursor.read_wide_string().unwrap();
     cursor.finish().unwrap();
     let relationship = sheet_part.rels().get(&drawing_rel_id).unwrap();

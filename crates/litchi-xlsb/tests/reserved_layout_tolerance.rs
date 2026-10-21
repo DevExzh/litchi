@@ -36,15 +36,18 @@ fn fixture() -> Vec<u8> {
 fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
     let uri = PackURI::new(part).unwrap();
-    let mut stream: Stream = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Stream = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     transform(&mut stream);
     let mut blob = Vec::new();
-    let mut writer = Encoder::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_type, payload) in &stream {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -460,6 +463,7 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
             .get_part(&PackURI::new(WORKBOOK).unwrap())
             .unwrap()
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     ) {
         let record = record.unwrap();
         if record.kind() == kind::CALC_PROP {
@@ -471,6 +475,7 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
             .get_part(&PackURI::new(STYLES).unwrap())
             .unwrap()
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     ) {
         let record = record.unwrap();
         if record.kind() == kind::BORDER {

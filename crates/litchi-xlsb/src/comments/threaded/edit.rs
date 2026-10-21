@@ -394,22 +394,24 @@ fn validate(graph: &Graph) -> Result<()> {
     validation::validate_graph(graph).map_err(map_validation_error)
 }
 
-fn map_validation_error(error: validation::Error) -> Error {
-    Error::Unrecognized {
-        typ: "XLSB threaded-comments edit".to_string(),
-        val: error.to_string(),
-    }
+fn map_validation_error(_error: validation::Error) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::InvalidValue,
+        "edit_threaded_comments",
+        "the threaded-comments graph is invalid",
+    )
 }
 
-fn missing_worksheet(worksheet_part_name: &str) -> Error {
-    Error::Unrecognized {
-        typ: "XLSB threaded-comments edit".to_string(),
-        val: format!("worksheet '{worksheet_part_name}' has no threaded-comments part"),
-    }
+fn missing_worksheet(_worksheet_part_name: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::NotFound,
+        "edit_threaded_comments",
+        "the threaded-comments target was not found",
+    )
 }
 
-fn invalid_state(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(format!("XLSB threaded-comments edit: {}", message.into()))
+fn invalid_state(_message: impl Into<String>) -> Error {
+    Error::InvalidFormat("XLSB threaded-comments edit")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

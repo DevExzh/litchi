@@ -41,19 +41,17 @@ pub struct Entry {
 /// Read every `BrtName` record of a workbook stream in record order.
 pub(crate) fn read(stream: &[u8], context: &Context) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
-    for record in Records::new(stream) {
+    for record in Records::new(stream, crate::raw::Limits::DEFAULT) {
         let record = record?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = super::Definition::parse(record.payload())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let definition = super::Definition::parse(record.payload())?;
         let scope = definition
             .sheet_id
             .map(|id| {
-                usize::try_from(id).map_err(|_error| {
-                    Error::InvalidFormat("name scope exceeds this platform".to_string())
-                })
+                usize::try_from(id)
+                    .map_err(|_error| Error::InvalidFormat("name scope exceeds this platform"))
             })
             .transpose()?;
         let formula = definition.formula.as_deref().and_then(|rgce| {

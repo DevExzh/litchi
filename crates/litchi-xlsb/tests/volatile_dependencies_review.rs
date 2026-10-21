@@ -132,7 +132,7 @@ fn reserved_type_bits_package() -> Package {
         .expect("owner part")
         .blob();
     let mut records = Vec::new();
-    for record in Records::new(source) {
+    for record in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("owner record");
         let payload = if record.kind() == kind::BEGIN_VOL_TYPE {
             let mut payload = record.payload().to_vec();
@@ -145,7 +145,7 @@ fn reserved_type_bits_package() -> Package {
         records.push((record.kind(), payload));
     }
     let mut replacement = Vec::new();
-    let mut writer = Encoder::new(&mut replacement);
+    let mut writer = Encoder::new(&mut replacement, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer
             .write_record(record_kind, &payload)
@@ -315,7 +315,7 @@ fn nonzero_begin_type_reserved_bits_are_opaque_and_refuse_rewrite() {
         .expect_err("opaque source rewrite");
     assert!(matches!(
         error,
-        litchi_xlsb::volatile_dependencies::Error::UnsupportedFeature(_)
+        litchi_xlsb::volatile_dependencies::Error::Refused(_)
     ));
 }
 

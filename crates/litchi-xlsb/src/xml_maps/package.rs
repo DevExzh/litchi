@@ -66,7 +66,7 @@ pub(crate) fn read_with_limits(
                 part.blob(),
                 &limits.xml_maps,
             )
-            .map_err(|error| invalid(error.to_string()))?;
+            .map_err(Error::Common)?;
         if parsed.conformance != conformance {
             return Err(invalid(
                 "Custom XML Maps root namespace disagrees with its relationship conformance",
@@ -102,9 +102,7 @@ pub(crate) fn read_with_limits(
         let listed_tables = crate::package::table::parse_table_part_rel_ids(worksheet.blob())?;
         let listed = listed_tables.iter().cloned().collect::<HashSet<_>>();
         if listed.len() != listed_tables.len() {
-            return Err(invalid(format!(
-                "worksheet {sheet_index} repeats a BrtListPart relationship"
-            )));
+            return Err(invalid("worksheet repeats a BrtListPart relationship"));
         }
 
         let mut sheet_singles = None;
@@ -116,10 +114,7 @@ pub(crate) fn read_with_limits(
                 relationship_type::TABLE | relationship_type::STRICT_TABLE
             ) {
                 if !listed.contains(relationship.r_id()) {
-                    return Err(invalid(format!(
-                        "worksheet {sheet_index} has an orphan table relationship {:?}",
-                        relationship.r_id()
-                    )));
+                    return Err(invalid("worksheet has an orphan table relationship"));
                 }
                 if relationship.is_external() {
                     return Err(invalid("worksheet table relationship cannot be external"));
@@ -132,19 +127,15 @@ pub(crate) fn read_with_limits(
                 validate_table_height(&typed, sheet_index)?;
                 validate_table_connection(&typed, connections.as_ref(), sheet_index)?;
                 if !table_ids.insert(typed.id) {
-                    return Err(invalid(format!(
-                        "duplicate XML mapping table ID {}",
-                        typed.id
-                    )));
+                    return Err(invalid("duplicate XML mapping table ID"));
                 }
                 if geometry
                     .auto_filter
                     .is_some_and(|filter| ranges_overlap(typed.range, filter))
                 {
-                    return Err(invalid(format!(
-                        "ordinary table {} on worksheet {sheet_index} overlaps the worksheet AutoFilter",
-                        typed.id
-                    )));
+                    return Err(invalid(
+                        "ordinary table on worksheet overlaps the worksheet AutoFilter",
+                    ));
                 }
                 ordinary_tables.push((typed.id, typed.range));
                 if let Some(dimension) = geometry.authoritative_dimension() {
@@ -163,11 +154,9 @@ pub(crate) fn read_with_limits(
                             .iter()
                             .any(|column| column.id == binding.column_id())
                         {
-                            return Err(invalid(format!(
-                                "table {} XML binding refers to missing table column {}",
-                                typed.id,
-                                binding.column_id()
-                            )));
+                            return Err(invalid(
+                                "table XML binding refers to missing table column",
+                            ));
                         }
                     }
                     if !table.columns().is_empty() {
@@ -189,9 +178,9 @@ pub(crate) fn read_with_limits(
                 dependencies.push(part_name);
             } else if relationship.reltype() == SINGLE_CELLS_REL {
                 if seen_single {
-                    return Err(invalid(format!(
-                        "worksheet {sheet_index} has multiple tableSingleCells relationships"
-                    )));
+                    return Err(invalid(
+                        "worksheet has multiple tableSingleCells relationships",
+                    ));
                 }
                 seen_single = true;
                 if relationship.is_external() {
@@ -208,13 +197,12 @@ pub(crate) fn read_with_limits(
                         "tableSingleCells connection ID projection is inconsistent",
                     ));
                 }
-                for (binding, connection_id) in values.iter().zip(&connection_ids) {
+                for (_binding, connection_id) in values.iter().zip(&connection_ids) {
                     if *connection_id != 0 && !has_connection(connections.as_ref(), *connection_id)
                     {
-                        return Err(invalid(format!(
-                            "single-cell XML mapping {} on worksheet {sheet_index} references missing connection ID {connection_id}",
-                            binding.table_id()
-                        )));
+                        return Err(invalid(
+                            "single-cell XML mapping on worksheet references missing connection ID",
+                        ));
                     }
                 }
                 charge_bindings(
@@ -225,10 +213,7 @@ pub(crate) fn read_with_limits(
                 )?;
                 for value in &values {
                     if !table_ids.insert(value.table_id()) {
-                        return Err(invalid(format!(
-                            "duplicate XML mapping table ID {}",
-                            value.table_id()
-                        )));
+                        return Err(invalid("duplicate XML mapping table ID"));
                     }
                 }
                 dependencies.push(part_name);
@@ -246,18 +231,17 @@ pub(crate) fn read_with_limits(
         }
 
         for rel_id in listed_tables {
-            let relationship = worksheet.rels().get(&rel_id).ok_or_else(|| {
-                invalid(format!(
-                    "worksheet {sheet_index} BrtListPart relationship {rel_id:?} is missing"
-                ))
-            })?;
+            let relationship = worksheet
+                .rels()
+                .get(&rel_id)
+                .ok_or_else(|| invalid("worksheet BrtListPart relationship is missing"))?;
             if !matches!(
                 relationship.reltype(),
                 relationship_type::TABLE | relationship_type::STRICT_TABLE
             ) {
-                return Err(invalid(format!(
-                    "worksheet {sheet_index} BrtListPart relationship {rel_id:?} has the wrong type"
-                )));
+                return Err(invalid(
+                    "worksheet BrtListPart relationship has the wrong type",
+                ));
             }
         }
         validate_table_overlaps(&ordinary_tables, sheet_index)?;
@@ -276,19 +260,17 @@ pub(crate) fn read_with_limits(
                     .iter()
                     .any(|(_, range)| ranges_overlap(cell, *range))
                 {
-                    return Err(invalid(format!(
-                        "single-cell XML mapping {} overlaps an ordinary table",
-                        value.table_id()
-                    )));
+                    return Err(invalid(
+                        "single-cell XML mapping overlaps an ordinary table",
+                    ));
                 }
                 if geometry
                     .auto_filter
                     .is_some_and(|filter| ranges_overlap(cell, filter))
                 {
-                    return Err(invalid(format!(
-                        "single-cell XML mapping {} overlaps the worksheet AutoFilter",
-                        value.table_id()
-                    )));
+                    return Err(invalid(
+                        "single-cell XML mapping overlaps the worksheet AutoFilter",
+                    ));
                 }
             }
         }
@@ -327,10 +309,7 @@ fn validate_connection_references(
             continue;
         };
         if !has_connection(connections, connection_id) {
-            return Err(invalid(format!(
-                "MapInfo map {} references missing connection ID {connection_id}",
-                map.id
-            )));
+            return Err(invalid("MapInfo map references missing connection ID"));
         }
     }
     Ok(())
@@ -339,22 +318,20 @@ fn validate_connection_references(
 fn validate_table_connection(
     table: &crate::package::table::Table,
     connections: Option<&crate::package::connections::Connections>,
-    sheet_index: usize,
+    _sheet_index: usize,
 ) -> Result<()> {
     let Some(connection_id) = table.connection_id else {
         return Ok(());
     };
     if !matches!(table.table_type, crate::package::table::Type::Xml) {
-        return Err(invalid(format!(
-            "non-XML table {} on worksheet {sheet_index} has nonzero connection ID {connection_id}",
-            table.id
-        )));
+        return Err(invalid(
+            "non-XML table on worksheet has nonzero connection ID",
+        ));
     }
     if !has_connection(connections, connection_id) {
-        return Err(invalid(format!(
-            "XML table {} on worksheet {sheet_index} references missing connection ID {connection_id}",
-            table.id
-        )));
+        return Err(invalid(
+            "XML table on worksheet references missing connection ID",
+        ));
     }
     Ok(())
 }
@@ -456,7 +433,7 @@ pub(crate) fn preflight(
     ] {
         budget
             .consume(resource, amount)
-            .map_err(|error| invalid(error.to_string()))?;
+            .map_err(|error| Error::Execution(error.into()))?;
     }
     Ok(())
 }
@@ -508,28 +485,25 @@ fn validate_table_range(range: &crate::package::table::Range) -> Result<()> {
     Ok(())
 }
 
-fn validate_table_height(table: &crate::package::table::Table, sheet_index: usize) -> Result<()> {
+fn validate_table_height(table: &crate::package::table::Table, _sheet_index: usize) -> Result<()> {
     let height = u64::from(table.range.last_row) - u64::from(table.range.first_row) + 1;
     let reserved = u64::from(table.header_row_count) + u64::from(table.totals_row_count);
     if height <= reserved {
-        return Err(invalid(format!(
-            "ordinary table {} on worksheet {sheet_index} has no data rows beyond header and totals rows",
-            table.id
-        )));
+        return Err(invalid(
+            "ordinary table on worksheet has no data rows beyond header and totals rows",
+        ));
     }
     Ok(())
 }
 
 fn validate_table_overlaps(
     tables: &[(u32, crate::package::table::Range)],
-    sheet_index: usize,
+    _sheet_index: usize,
 ) -> Result<()> {
-    for (index, (left_id, left)) in tables.iter().enumerate() {
-        for (right_id, right) in tables.iter().skip(index + 1) {
+    for (index, (_left_id, left)) in tables.iter().enumerate() {
+        for (_right_id, right) in tables.iter().skip(index + 1) {
             if ranges_overlap(*left, *right) {
-                return Err(invalid(format!(
-                    "ordinary tables {left_id} and {right_id} overlap on worksheet {sheet_index}"
-                )));
+                return Err(invalid("ordinary tables and overlap on worksheet"));
             }
         }
     }
@@ -558,7 +532,7 @@ impl WorksheetGeometry {
 
 fn worksheet_geometry(data: &[u8]) -> Result<WorksheetGeometry> {
     let mut geometry = WorksheetGeometry::default();
-    for record in crate::raw::Records::new(data) {
+    for record in crate::raw::Records::new(data, crate::raw::Limits::DEFAULT) {
         let record = record?;
         let slot = match record.kind() {
             crate::raw::kind::WS_DIM => &mut geometry.dimension,
@@ -599,17 +573,15 @@ fn worksheet_geometry(data: &[u8]) -> Result<WorksheetGeometry> {
 fn require_range_within(
     inner: crate::package::table::Range,
     outer: crate::package::table::Range,
-    name: &str,
-    sheet_index: usize,
+    _name: &str,
+    _sheet_index: usize,
 ) -> Result<()> {
     if inner.first_row < outer.first_row
         || inner.last_row > outer.last_row
         || inner.first_column < outer.first_column
         || inner.last_column > outer.last_column
     {
-        return Err(invalid(format!(
-            "{name} on worksheet {sheet_index} exceeds BrtWsDim"
-        )));
+        return Err(invalid("on worksheet exceeds BrtWsDim"));
     }
     Ok(())
 }
@@ -644,27 +616,25 @@ fn charge_bindings<'a>(
     Ok(())
 }
 
-fn require_content_type(part: &dyn Part, expected: &str) -> Result<()> {
+fn require_content_type(part: &dyn Part, expected: &'static str) -> Result<()> {
     if part.content_type() == expected {
         Ok(())
     } else {
-        Err(Error::InvalidContentType {
-            expected: expected.to_string(),
-            got: part.content_type().to_string(),
+        Err(Error::InvalidContentType { expected: expected })
+    }
+}
+
+fn require_no_relationships(part: &dyn Part, owner: &'static str) -> Result<()> {
+    if part.rels().iter().next().is_none() {
+        Ok(())
+    } else {
+        Err(Error::Unrecognized {
+            typ: owner,
+            val: "an outbound relationship",
         })
     }
 }
 
-fn require_no_relationships(part: &dyn Part, owner: &str) -> Result<()> {
-    if part.rels().iter().next().is_none() {
-        Ok(())
-    } else {
-        Err(invalid(format!(
-            "{owner} must not have outbound relationships"
-        )))
-    }
-}
-
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

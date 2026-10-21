@@ -47,8 +47,7 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }

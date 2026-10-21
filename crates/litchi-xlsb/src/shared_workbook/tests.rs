@@ -44,7 +44,7 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
 fn typed_metadata_edit_preserves_unknown_revision_header_records() {
     let (mut package, header_part) = fixture();
     let mut bytes = package.get_part(&header_part).unwrap().blob().to_vec();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(Kind::new(FUTURE_KIND).unwrap(), b"future-header")
         .unwrap();
@@ -75,9 +75,12 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
             .iter()
             .any(|record| record.kind == FUTURE_KIND && record.payload == b"future-header")
     );
-    let reparsed = Records::new(package.get_part(&header_part).unwrap().blob())
-        .map(Result::unwrap)
-        .collect::<Vec<_>>();
+    let reparsed = Records::new(
+        package.get_part(&header_part).unwrap().blob(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .map(Result::unwrap)
+    .collect::<Vec<_>>();
     assert_eq!(reparsed.last().unwrap().kind().get(), FUTURE_KIND);
 }
 
@@ -121,7 +124,7 @@ fn malformed_biff12_records_are_rejected_without_partial_metadata() {
     assert!(super::codec::parse_log(&[0x80]).is_err());
 
     let mut users = Vec::new();
-    let mut writer = Encoder::new(&mut users);
+    let mut writer = Encoder::new(&mut users, crate::raw::Limits::DEFAULT);
     writer.write_record(Kind::new(401).unwrap(), &[]).unwrap();
     assert!(super::codec::parse_users(&users).is_err());
 }

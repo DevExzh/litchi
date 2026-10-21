@@ -77,7 +77,7 @@ pub(super) fn validate_closure(
             .any(|view| !names.contains(&Caseless::new(&view.cache_name)))
         {
             return Err(Error::InvalidFormat(
-                "slicer view references a missing cache".to_string(),
+                "slicer view references a missing cache",
             ));
         }
     }
@@ -100,7 +100,7 @@ fn validate_views_against_caches(
         .any(|view| !names.contains(&Caseless::new(&view.cache_name)))
     {
         return Err(Error::InvalidFormat(
-            "slicer view references a missing cache".to_string(),
+            "slicer view references a missing cache",
         ));
     }
     Ok(())
@@ -130,9 +130,7 @@ pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
     for cache in caches {
         write_cache(cache)?;
         if !names.insert(Caseless::new(&cache.name)) {
-            return Err(Error::InvalidFormat(
-                "duplicate slicer cache name".to_string(),
-            ));
+            return Err(Error::InvalidFormat("duplicate slicer cache name"));
         }
     }
     Ok(())
@@ -170,6 +168,10 @@ pub(super) fn store(
     }
 }
 
-fn scope_error(expected: &str) -> Error {
-    Error::UnsupportedFeature(format!("slicer transaction is not a {expected} owner"))
+fn scope_error(_expected: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_slicers",
+        "slicer transaction is not a owner",
+    )
 }

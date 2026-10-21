@@ -69,7 +69,7 @@ fn every_kind_workbook() -> Vec<u8> {
 fn bundle_entries(package: &OpcPackage) -> Vec<(String, String)> {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let workbook_part = package.get_part(&workbook_uri).unwrap();
-    Records::new(workbook_part.blob())
+    Records::new(workbook_part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|record| record.expect("valid workbook record"))
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .map(|record| {
@@ -117,7 +117,7 @@ fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type:
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let relationship_ids = bundle_entries(&package);
     let workbook_part = package.get_part(&workbook_uri).unwrap();
-    let position = Records::new(workbook_part.blob())
+    let position = Records::new(workbook_part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(Result::ok)
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .enumerate()
@@ -164,9 +164,9 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Encoder::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
         let mut position = 0;
-        for record in Records::new(&original) {
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -194,8 +194,8 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
     let mut rewritten = Vec::new();
     let mut current_position = 0;
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {

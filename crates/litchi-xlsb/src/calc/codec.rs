@@ -28,7 +28,7 @@ pub fn read(payload: &[u8]) -> Result<Props> {
 ///
 /// Mode, iteration, delta, and thread-count domains stay strict.
 pub(crate) fn read_with(payload: &[u8], mut tolerance: Tolerance<'_>) -> Result<Props> {
-    let mut cursor = Cursor::new(payload, "BrtCalcProp");
+    let mut cursor = Cursor::new(payload, "BrtCalcProp", crate::raw::Limits::DEFAULT);
     let id = cursor.read_u32()?;
     let mode = Mode::read(cursor.read_u32()?)?;
     let iters = cursor.read_u32()?;

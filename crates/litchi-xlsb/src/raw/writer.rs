@@ -19,22 +19,16 @@ pub struct Encoder<W: Write> {
 }
 
 impl<W: Write> Encoder<W> {
-    /// Write with safe default limits.
-    #[must_use]
-    pub const fn new(writer: W) -> Self {
-        Self::with_limits(writer, Limits::DEFAULT)
-    }
-
     /// Write with explicit finite limits.
     #[must_use]
-    pub const fn with_limits(writer: W, limits: Limits) -> Self {
+    pub const fn new(writer: W, limits: Limits) -> Self {
         Self { writer, limits }
     }
 
     /// Construct a writer after validating its raw limit profile.
     pub fn bounded(writer: W, limits: Limits) -> Result<Self> {
         match limits.validate() {
-            Ok(limits) => Ok(Self::with_limits(writer, limits)),
+            Ok(limits) => Ok(Self::new(writer, limits)),
             Err(error) => Err(error),
         }
     }

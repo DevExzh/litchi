@@ -17,7 +17,7 @@ impl SourceBackedWorksheet {
         let _ = preflight_package(&self.inner.package)?;
         if !matches!(self.metadata().kind, Kind::Worksheet) {
             return Err(Error::UnsupportedFeature(
-                "worksheet features belong to worksheets".to_string(),
+                "worksheet features belong to worksheets",
             ));
         }
         let result = read();

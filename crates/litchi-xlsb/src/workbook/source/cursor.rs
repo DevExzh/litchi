@@ -147,7 +147,7 @@ impl SourceBackedWorksheet {
         let stage = (|| {
             if !matches!(self.metadata().kind, Kind::Worksheet) {
                 return Err(Error::UnsupportedFeature(
-                    "source-backed XLSB cell cursors require a worksheet tab".to_string(),
+                    "source-backed XLSB cell cursors require a worksheet tab",
                 ));
             }
             if self
@@ -366,7 +366,7 @@ impl std::fmt::Debug for CellCursor {
 fn cells_ascend(data: &[u8]) -> Result<bool> {
     let mut row = 0_u32;
     let mut last: Option<(u32, u32)> = None;
-    for record in Records::new(data) {
+    for record in Records::new(data, crate::raw::Limits::DEFAULT) {
         let record = record?;
         let kind = record.kind();
         let is_cell = (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get()).contains(&kind.get())

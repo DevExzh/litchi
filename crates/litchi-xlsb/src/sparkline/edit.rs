@@ -105,8 +105,9 @@ impl Edit {
 
     fn snapshot(&self, sheet: usize) -> Result<(litchi_opc::PackURI, worksheet::Snapshot)> {
         let uri = self.staged.worksheet(sheet)?;
-        let snapshot = worksheet::read(self.staged.blob(&uri)?, self.limits)
-            .map_err(|error| crate::part_edit::invalid(error.to_string()))?;
+        let snapshot = worksheet::read(self.staged.blob(&uri)?, self.limits).map_err(|_error| {
+            crate::part_edit::invalid("the worksheet sparkline records are not valid")
+        })?;
         Ok((uri, snapshot))
     }
 
@@ -132,9 +133,9 @@ impl Edit {
                 draft.remove();
             },
         }
-        let commit = draft
-            .commit()
-            .map_err(|error| crate::part_edit::invalid(error.to_string()))?;
+        let commit = draft.commit().map_err(|_error| {
+            crate::part_edit::invalid("the worksheet sparkline records are not valid")
+        })?;
         validate_commit_context(&commit, &self.staged.workbook().formula_context)?;
         if commit.is_noop() {
             return Ok(false);
@@ -142,7 +143,9 @@ impl Edit {
         let (_, _, patch) = commit.into_publication();
         let (_, updated) = patch
             .apply_owned(self.staged.blob(&uri)?)
-            .map_err(|error| crate::part_edit::invalid(error.to_string()))?;
+            .map_err(|_error| {
+                crate::part_edit::invalid("the worksheet sparkline records are not valid")
+            })?;
         self.staged.replace_worksheet(&uri, updated)
     }
 

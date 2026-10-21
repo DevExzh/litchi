@@ -180,7 +180,7 @@ impl Parser {
                 self.limits.max_types,
             ));
         }
-        let mut cursor = Cursor::new(payload, "BrtBeginVolType");
+        let mut cursor = Cursor::new(payload, "BrtBeginVolType", crate::raw::Limits::DEFAULT);
         let flags = cursor.read_u32()?;
         // The low bit selects the dependency kind.  The remaining bits are
         // reserved by the record grammar and must not be interpreted.  Keep
@@ -392,14 +392,14 @@ impl Parser {
         }
         let value = match record_kind {
             value_kind if value_kind == kind::VOL_NUM => {
-                let mut cursor = Cursor::new(payload, "BrtVolNum");
+                let mut cursor = Cursor::new(payload, "BrtVolNum", crate::raw::Limits::DEFAULT);
                 let value = cursor.read_f64()?;
                 super::model::validate_xnum(value)?;
                 cursor.finish()?;
                 CachedValue::Number(value)
             },
             value_kind if value_kind == kind::VOL_ERR => {
-                let mut cursor = Cursor::new(payload, "BrtVolErr");
+                let mut cursor = Cursor::new(payload, "BrtVolErr", crate::raw::Limits::DEFAULT);
                 let value = ErrorCode::from_wire(cursor.read_u8()?)?;
                 cursor.finish()?;
                 CachedValue::Error(value)
@@ -408,7 +408,7 @@ impl Parser {
                 CachedValue::String(self.read_string(payload, "BrtVolStr")?)
             },
             value_kind if value_kind == kind::VOL_BOOL => {
-                let mut cursor = Cursor::new(payload, "BrtVolBool");
+                let mut cursor = Cursor::new(payload, "BrtVolBool", crate::raw::Limits::DEFAULT);
                 let value = cursor.read_bool8()?;
                 cursor.finish()?;
                 CachedValue::Bool(value)
@@ -450,7 +450,7 @@ impl Parser {
                 resource: "Volatile cell references",
                 source,
             })?;
-        let mut cursor = Cursor::new(payload, "BrtVolRef");
+        let mut cursor = Cursor::new(payload, "BrtVolRef", crate::raw::Limits::DEFAULT);
         let row = cursor.read_i32()?;
         let column = cursor.read_i32()?;
         let sheet_index = cursor.read_u32()?;
@@ -478,7 +478,7 @@ impl Parser {
     }
 
     fn read_string(&mut self, payload: &[u8], context: &'static str) -> Result<String> {
-        let mut cursor = Cursor::new(payload, context);
+        let mut cursor = Cursor::new(payload, context, crate::raw::Limits::DEFAULT);
         let units =
             usize::try_from(cursor.read_u32()?).map_err(|_error| Error::CapacityOverflow {
                 resource: "Volatile Dependencies UTF-16 string",
@@ -522,11 +522,7 @@ impl Parser {
                 .chunks_exact(2)
                 .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
         ) {
-            value.push(
-                decoded.map_err(|_error| {
-                    Error::InvalidFormat(format!("invalid UTF-16 in {context}"))
-                })?,
-            );
+            value.push(decoded.map_err(|_error| Error::InvalidFormat("invalid UTF-16"))?);
         }
         cursor.finish()?;
         Ok(value)
@@ -540,7 +536,7 @@ impl Parser {
             || self.current_topic.is_some()
         {
             return Err(Error::UnexpectedEndOfStream(
-                "Volatile Dependencies record hierarchy".to_string(),
+                "Volatile Dependencies record hierarchy",
             ));
         }
         let dependencies = Dependencies {
@@ -565,8 +561,10 @@ pub(crate) fn write(
 ) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     if value.has_unsupported_records {
-        return Err(Error::UnsupportedFeature(
-            "typed Volatile Dependencies edits cannot rewrite a stream containing unsupported records".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_volatile_dependencies",
+            "the Volatile Dependencies source contains records this edit cannot preserve",
         ));
     }
     value.validate(limits)?;
@@ -594,7 +592,7 @@ pub(crate) fn write(
             resource: "Volatile Dependencies output",
             source,
         })?;
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_VOL_DEPS, &[])?;
     for volatile_type in &value.types {
         writer.write_record(
@@ -654,7 +652,7 @@ pub(crate) fn write(
     writer.write_record(kind::END_VOL_DEPS, &[])?;
     if output.len() != capacity {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies writer size preflight disagreed with output".to_string(),
+            "Volatile Dependencies writer size preflight disagreed with output",
         ));
     }
     Ok(output)
@@ -798,14 +796,11 @@ fn add_record_count(left: usize, right: usize) -> Result<usize> {
     })
 }
 
-fn empty(payload: &[u8], record: &'static str) -> Result<()> {
+fn empty(payload: &[u8], _record: &'static str) -> Result<()> {
     if payload.is_empty() {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "{record} has {} unexpected payload bytes",
-            payload.len()
-        )))
+        Err(invalid("has unexpected payload bytes"))
     }
 }
 
@@ -834,6 +829,6 @@ const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

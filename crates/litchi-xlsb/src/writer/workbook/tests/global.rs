@@ -116,7 +116,7 @@ fn external_links_round_trip_with_inert_package_topology() {
         })
         .collect::<Vec<_>>();
     let mut support_relationship_ids = Vec::new();
-    for record in crate::raw::Records::new(workbook_part.blob()) {
+    for record in crate::raw::Records::new(workbook_part.blob(), crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         if record.kind() == kind::SUP_BOOK_SRC {
             let (relationship_id, consumed) =

@@ -23,10 +23,10 @@ struct ConnectionsGraph {
     part_name: PackURI,
 }
 
-fn invalid(detail: impl Into<String>) -> Error {
+fn invalid(detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: "External Data Connections package graph".to_string(),
-        val: detail.into(),
+        typ: "External Data Connections package graph",
+        val: detail,
     }
 }
 
@@ -126,7 +126,7 @@ pub(crate) fn store_on_workbook(
     };
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload)?;
-    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(Error::Encoding)?;
+    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME)?;
     if existing
         .as_ref()
         .is_none_or(|graph| !graph.part_name.is_equivalent_to(&canonical_part))
@@ -298,11 +298,7 @@ fn discover_graph(
     // restored.
     let part_name = part.partname().clone();
     if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-        return Err(invalid(format!(
-            "connections part '{}' has content type '{}'",
-            part_name.as_str(),
-            part.content_type()
-        )));
+        return Err(invalid("connections part has content type"));
     }
     if !part.rels().is_empty() {
         return Err(invalid("connections part must not have relationships"));

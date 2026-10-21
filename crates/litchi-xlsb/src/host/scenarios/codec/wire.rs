@@ -58,7 +58,7 @@ pub(crate) struct ChildHeader {
 }
 
 pub(crate) fn parse_manager_header(data: &[u8]) -> Result<Header> {
-    let mut cursor = Cursor::new(data, "BrtBeginScenMan");
+    let mut cursor = Cursor::new(data, "BrtBeginScenMan", crate::raw::Limits::DEFAULT);
     let current = cursor.read_u16()?;
     let shown = cursor.read_u16()?;
     let count = cursor.read_u32()?;
@@ -66,13 +66,13 @@ pub(crate) fn parse_manager_header(data: &[u8]) -> Result<Header> {
         Vec::new()
     } else {
         let count = usize::try_from(count).map_err(|_| Error::Unrecognized {
-            typ: "BrtBeginScenMan sqrfxResult".to_string(),
-            val: "range count overflows usize".to_string(),
+            typ: "BrtBeginScenMan sqrfxResult",
+            val: "range count overflows usize",
         })?;
         if !(1..=32).contains(&count) {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginScenMan sqrfxResult".to_string(),
-                val: format!("range count {count} is outside 1..=32"),
+                typ: "BrtBeginScenMan sqrfxResult",
+                val: "range count is outside 132",
             });
         }
         let mut ranges = Vec::with_capacity(count);
@@ -95,7 +95,7 @@ pub(crate) fn parse_manager_header(data: &[u8]) -> Result<Header> {
 }
 
 pub(crate) fn parse_scenario_header(data: &[u8]) -> Result<ChildHeader> {
-    let mut cursor = Cursor::new(data, "BrtBeginSct");
+    let mut cursor = Cursor::new(data, "BrtBeginSct", crate::raw::Limits::DEFAULT);
     let count = cursor.read_u16()?;
     let locked = cursor.read_bool32()?;
     let hidden = cursor.read_bool32()?;
@@ -114,14 +114,14 @@ pub(crate) fn parse_scenario_header(data: &[u8]) -> Result<ChildHeader> {
 }
 
 pub(crate) fn parse_changed_cell(data: &[u8]) -> Result<ChangedCell> {
-    let mut cursor = Cursor::new(data, "BrtSlc");
+    let mut cursor = Cursor::new(data, "BrtSlc", crate::raw::Limits::DEFAULT);
     let row = cursor.read_u32()?;
     let column = cursor.read_u32()?;
     let reserved = cursor.read_u32()?;
     if reserved != 0 {
         return Err(Error::Unrecognized {
-            typ: "BrtSlc fReserved".to_string(),
-            val: format!("0x{reserved:08X}"),
+            typ: "BrtSlc fReserved",
+            val: "0x",
         });
     }
     let unused = cursor.read_u32()?;
@@ -137,18 +137,18 @@ pub(crate) fn write_manager_header(
     result_ranges: &[CellRange],
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
     writer.write_u16(match current {
         Some(index) => u16::try_from(index).map_err(|_| Error::Unrecognized {
-            typ: "BrtBeginScenMan isctCur".to_string(),
-            val: "scenario index exceeds u16".to_string(),
+            typ: "BrtBeginScenMan isctCur",
+            val: "scenario index exceeds u16",
         })?,
         None => u16::MAX,
     })?;
     writer.write_u16(match shown {
         Some(index) => u16::try_from(index).map_err(|_| Error::Unrecognized {
-            typ: "BrtBeginScenMan isctShown".to_string(),
-            val: "scenario index exceeds u16".to_string(),
+            typ: "BrtBeginScenMan isctShown",
+            val: "scenario index exceeds u16",
         })?,
         None => u16::MAX,
     })?;
@@ -157,8 +157,8 @@ pub(crate) fn write_manager_header(
     } else {
         writer.write_u32(u32::try_from(result_ranges.len()).map_err(|_| {
             Error::Unrecognized {
-                typ: "BrtBeginScenMan sqrfxResult".to_string(),
-                val: "range count exceeds u32".to_string(),
+                typ: "BrtBeginScenMan sqrfxResult",
+                val: "range count exceeds u32",
             }
         })?)?;
         for range in result_ranges {
@@ -180,10 +180,10 @@ pub(crate) fn write_scenario_header(
     user_name: &str,
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
     writer.write_u16(u16::try_from(count).map_err(|_| Error::Unrecognized {
-        typ: "BrtBeginSct cref".to_string(),
-        val: "changed-cell count exceeds u16".to_string(),
+        typ: "BrtBeginSct cref",
+        val: "changed-cell count exceeds u16",
     })?)?;
     writer.write_u32(u32::from(locked))?;
     writer.write_u32(u32::from(hidden))?;
@@ -195,7 +195,7 @@ pub(crate) fn write_scenario_header(
 
 pub(crate) fn write_changed_cell(cell: &ChangedCell) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
     writer.write_u32(cell.row())?;
     writer.write_u32(cell.column())?;
     writer.write_u32(0)?;

@@ -127,8 +127,8 @@ where
 {
     let mut output = Vec::new();
     let mut ordinal = 0usize;
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), ordinal, &mut writer);
         ordinal = ordinal.saturating_add(1);
@@ -154,7 +154,7 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             if record.kind() == kind::BOOK_VIEW {
@@ -216,7 +216,7 @@ fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
 
 fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::EXTERN_SHEET).then(|| {
@@ -245,8 +245,8 @@ fn with_unknown_between_bundle_sheets(package: &Package) -> Package {
         let unknown = litchi_xlsb::raw::Kind::new(0x3ffe).expect("unknown record kind");
         let mut inserted = false;
         let mut bundles = 0usize;
-        let mut writer = Encoder::new(output);
-        for item in Records::new(source) {
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("workbook record");
             if record.kind() == kind::BUNDLE_SH {
                 if bundles == 1 && !inserted {
@@ -267,7 +267,7 @@ fn with_unknown_between_bundle_sheets(package: &Package) -> Package {
 
 fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
@@ -567,7 +567,7 @@ fn noncontiguous_internal_three_d_range_refuses_atomically() {
     edit.reorder_sheets(&order_by_names(&["B", "C", "A"]))
         .expect("stage reorder");
     let error = edit.commit().expect_err("noncontiguous range must refuse");
-    assert!(matches!(error, PackageError::UnsupportedFeature(_)));
+    assert!(matches!(error, PackageError::Refused(_)));
     assert_eq!(source.to_bytes().expect("source remains"), before);
 }
 
@@ -585,8 +585,8 @@ fn unknown_record_between_bundle_tabs_is_a_safe_reorder_barrier() {
 #[test]
 fn unknown_workbook_record_outside_catalog_refuses_changed_order_only() {
     let source = replace_workbook(&worksheets(&["A", "B"]), |source, output| {
-        let mut writer = Encoder::new(output);
-        for item in Records::new(source) {
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("record");
             if record.kind() == kind::END_BOOK {
                 writer
@@ -601,10 +601,7 @@ fn unknown_workbook_record_outside_catalog_refuses_changed_order_only() {
     let bytes = source.to_bytes().unwrap();
     let mut edit = source.edit().unwrap();
     edit.reorder_sheets(&order_by_names(&["B", "A"])).unwrap();
-    assert!(matches!(
-        edit.commit(),
-        Err(PackageError::UnsupportedFeature(_))
-    ));
+    assert!(matches!(edit.commit(), Err(PackageError::Refused(_))));
     let mut edit = source.edit().unwrap();
     assert!(!edit.reorder_sheets(&order_by_names(&["A", "B"])).unwrap());
     assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), bytes);

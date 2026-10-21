@@ -280,9 +280,9 @@ fn parse_person_empty(
         display_name: required_string(element, b"displayName", decoder, "person display name")?,
         id: required_guid(element, b"id", decoder, "person ID")?,
         user_id: unqualified_attribute_value(element, b"userId", decoder)
-            .map_err(|error| Error::Encoding(error.to_string()))?,
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?,
         provider_id: unqualified_attribute_value(element, b"providerId", decoder)
-            .map_err(|error| Error::Encoding(error.to_string()))?,
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?,
         attributes: raw_attributes(
             element,
             &[b"displayName", b"id", b"userId", b"providerId"],
@@ -374,13 +374,13 @@ fn parse_comment_empty(
 ) -> Result<Comment> {
     Ok(Comment {
         cell_ref: unqualified_attribute_value(element, b"ref", decoder)
-            .map_err(|error| Error::Encoding(error.to_string()))?,
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?,
         id: required_guid(element, b"id", decoder, "threaded-comment ID")?,
         parent_id: optional_guid(element, b"parentId", decoder, "threaded-comment parent ID")?,
         person_id: required_guid(element, b"personId", decoder, "threaded-comment person ID")?,
         text: None,
         date_time: unqualified_attribute_value(element, b"dT", decoder)
-            .map_err(|error| Error::Encoding(error.to_string()))?,
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?,
         done: optional_bool(element, b"done", decoder, "threaded-comment done flag")?,
         mentions: Vec::new(),
         attributes: raw_attributes(
@@ -616,7 +616,7 @@ fn write_mention(xml: &mut String, mention: &Mention) -> Result<()> {
         "\" startIndex=\"{}\" length=\"{}\"",
         mention.start_index, mention.length
     )
-    .map_err(|error| Error::Encoding(error.to_string()))?;
+    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     write_attributes(
         xml,
         &mention.attributes,
@@ -635,10 +635,9 @@ fn write_mention(xml: &mut String, mention: &Mention) -> Result<()> {
 fn write_attributes(xml: &mut String, attributes: &[RawAttribute], known: &[&[u8]]) -> Result<()> {
     for attribute in attributes {
         if known.iter().any(|name| *name == attribute.name.as_bytes()) {
-            return Err(invalid(format!(
-                "preserved XML attribute '{}' conflicts with a typed attribute",
-                attribute.name
-            )));
+            return Err(invalid(
+                "preserved XML attribute conflicts with a typed attribute",
+            ));
         }
         xml.push(' ');
         xml.push_str(&attribute.name);
@@ -662,7 +661,7 @@ fn write_extensions(xml: &mut String, extensions: &[RawXml]) -> Result<()> {
     }
     for extension in extensions {
         let value = std::str::from_utf8(&extension.bytes)
-            .map_err(|error| Error::Encoding(error.to_string()))?;
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
         xml.push_str(value);
     }
     Ok(())
@@ -717,17 +716,18 @@ fn raw_attributes(
 ) -> Result<Vec<RawAttribute>> {
     let mut attributes = Vec::new();
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Encoding(error.to_string()))?;
+        let attribute =
+            attribute.map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
         let name = attribute.key.as_ref();
         if name == b"xmlns" || known.iter().any(|item| *item == name) {
             continue;
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::Encoding(error.to_string()))?
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?
             .into_owned();
         let name = std::str::from_utf8(name)
-            .map_err(|error| Error::Encoding(error.to_string()))?
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?
             .to_owned();
         attributes.push(RawAttribute { name, value });
     }
@@ -741,10 +741,9 @@ fn require_root(
     closed: bool,
 ) -> Result<()> {
     if closed || !is_name(namespace, name, local) {
-        return Err(invalid(format!(
-            "part must have one '{}' root in the threaded-comments namespace",
-            String::from_utf8_lossy(local)
-        )));
+        return Err(invalid(
+            "part must have one root in the threaded-comments namespace",
+        ));
     }
     Ok(())
 }
@@ -758,13 +757,13 @@ fn required_string(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
-    description: &str,
+    _description: &str,
 ) -> Result<String> {
     let value = unqualified_attribute_value(element, name, decoder)
-        .map_err(|error| Error::Encoding(error.to_string()))?
-        .ok_or_else(|| invalid(format!("missing {description} attribute")))?;
+        .map_err(|_error| Error::Encoding("the text cannot be decoded"))?
+        .ok_or_else(|| invalid("missing attribute"))?;
     if value.is_empty() {
-        return Err(invalid(format!("{description} cannot be empty")));
+        return Err(invalid("cannot be empty"));
     }
     Ok(value)
 }
@@ -777,7 +776,7 @@ fn required_guid(
 ) -> Result<String> {
     let value = required_string(element, name, decoder, description)?;
     if !valid_guid(&value) {
-        return Err(invalid(format!("invalid {description} GUID '{value}'")));
+        return Err(invalid("invalid GUID"));
     }
     Ok(value)
 }
@@ -786,15 +785,15 @@ fn optional_guid(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
-    description: &str,
+    _description: &str,
 ) -> Result<Option<String>> {
     let Some(value) = unqualified_attribute_value(element, name, decoder)
-        .map_err(|error| Error::Encoding(error.to_string()))?
+        .map_err(|_error| Error::Encoding("the text cannot be decoded"))?
     else {
         return Ok(None);
     };
     if !valid_guid(&value) {
-        return Err(invalid(format!("invalid {description} GUID '{value}'")));
+        return Err(invalid("invalid GUID"));
     }
     Ok(Some(value))
 }
@@ -806,26 +805,24 @@ fn required_u32(
     description: &str,
 ) -> Result<u32> {
     let value = required_string(element, name, decoder, description)?;
-    value
-        .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid {description} '{value}'")))
+    value.parse::<u32>().map_err(|_| invalid("invalid"))
 }
 
 fn optional_bool(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
-    description: &str,
+    _description: &str,
 ) -> Result<Option<bool>> {
     let Some(value) = unqualified_attribute_value(element, name, decoder)
-        .map_err(|error| Error::Encoding(error.to_string()))?
+        .map_err(|_error| Error::Encoding("the text cannot be decoded"))?
     else {
         return Ok(None);
     };
     match value.as_str() {
         "1" | "true" => Ok(Some(true)),
         "0" | "false" => Ok(Some(false)),
-        _ => Err(invalid(format!("invalid {description} '{value}'"))),
+        _ => Err(invalid("invalid")),
     }
 }
 
@@ -837,10 +834,10 @@ fn check_size(xml: &[u8]) -> Result<()> {
     }
 }
 
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Encoding(error.to_string())
+fn xml_error(_error: impl std::fmt::Display) -> Error {
+    Error::Encoding("the text cannot be decoded")
 }
 
-fn invalid(value: impl Into<String>) -> Error {
-    Error::Invalid(value.into())
+fn invalid(value: &'static str) -> Error {
+    Error::Invalid(value)
 }

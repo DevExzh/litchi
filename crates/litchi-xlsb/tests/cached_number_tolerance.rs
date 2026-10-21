@@ -46,12 +46,15 @@ fn numbers_workbook() -> Vec<u8> {
 fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
     let uri = PackURI::new(SHEET1).unwrap();
-    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     let payload = &mut stream
         .iter_mut()
         .find(|(kind, _)| *kind == record_type)
@@ -59,7 +62,7 @@ fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
         .1;
     payload[8..16].copy_from_slice(&value.to_le_bytes());
     let mut blob = Vec::new();
-    let mut writer = Encoder::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }

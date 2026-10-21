@@ -46,7 +46,7 @@ pub(crate) fn parse_watch(payload: &[u8]) -> Result<Watch> {
             found: payload.len(),
         });
     }
-    let mut cursor = Cursor::with_limits(payload, "BrtCellWatch", Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtCellWatch", Limits::DEFAULT);
     let row = cursor.read_u32()?;
     let column = cursor.read_u32()?;
     cursor.finish()?;
@@ -55,7 +55,7 @@ pub(crate) fn parse_watch(payload: &[u8]) -> Result<Watch> {
 
 pub(crate) fn write_watch(watch: Watch) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(8);
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, Limits::DEFAULT);
     writer.write_u32(watch.row())?;
     writer.write_u32(watch.column())?;
     Ok(payload)
@@ -68,7 +68,7 @@ pub(crate) fn parse_phonetic(payload: &[u8]) -> Result<Info> {
             found: payload.len(),
         });
     }
-    let mut cursor = Cursor::with_limits(payload, "BrtPhoneticInfo", Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtPhoneticInfo", Limits::DEFAULT);
     let font_index = cursor.read_u16()?;
     let phonetic_type = Type::from_wire(cursor.read_u32()?)?;
     let alignment = Alignment::from_wire(cursor.read_u32()?)?;
@@ -78,7 +78,7 @@ pub(crate) fn parse_phonetic(payload: &[u8]) -> Result<Info> {
 
 pub(crate) fn write_phonetic(info: Info) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(10);
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, Limits::DEFAULT);
     writer.write_u16(info.font_index())?;
     writer.write_u32(info.phonetic_type().wire())?;
     writer.write_u32(info.alignment().wire())?;
@@ -87,13 +87,13 @@ pub(crate) fn write_phonetic(info: Info) -> Result<Vec<u8>> {
 
 pub(crate) fn encode_record(record_kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len().saturating_add(5));
-    Encoder::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output, Limits::DEFAULT).write_record(record_kind, payload)?;
     Ok(output)
 }
 
 pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
     let source: Arc<[u8]> = Arc::from(data);
-    let mut iterator = Records::with_limits(&source, Limits::DEFAULT);
+    let mut iterator = Records::new(&source, Limits::DEFAULT);
     let mut records = Vec::new();
     let mut watch_begin = None;
     let mut watch_end = None;
@@ -229,10 +229,10 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
         }
     }
 
-    let end_sheet_data = end_sheet_data
-        .ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheetData".to_string()))?;
+    let end_sheet_data =
+        end_sheet_data.ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheetData"))?;
     let end_sheet_index =
-        end_sheet_index.ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheet".to_string()))?;
+        end_sheet_index.ok_or_else(|| Error::UnexpectedEndOfStream("BrtEndSheet"))?;
     if end_sheet_index <= end_sheet_data {
         return Err(validation::invalid(
             "BrtEndSheet",
@@ -240,9 +240,7 @@ pub(crate) fn parse_stream(data: &[u8]) -> Result<Parsed> {
         ));
     }
     if watch_begin.is_some() != watch_end.is_some() {
-        return Err(Error::UnexpectedEndOfStream(
-            "BrtEndCellWatches".to_string(),
-        ));
+        return Err(Error::UnexpectedEndOfStream("BrtEndCellWatches"));
     }
     if let (Some(begin), Some(end)) = (watch_begin, watch_end) {
         if begin >= end {

@@ -19,8 +19,8 @@ pub(super) fn build_color_scale(
 ) -> Result<Scale> {
     if !(cfvos.len() == 2 || cfvos.len() == 3) || colors.len() != cfvos.len() {
         return Err(Error::Unrecognized {
-            typ: record.to_string(),
-            val: format!("{} thresholds and {} colors", cfvos.len(), colors.len()),
+            typ: record,
+            val: "thresholds and colors",
         });
     }
     if (extension14 && cfvos.iter().any(|cfvo| matches!(cfvo.cfvo_type, 8 | 9)))
@@ -29,8 +29,8 @@ pub(super) fn build_color_scale(
         || (cfvos.len() == 3 && matches!(cfvos[1].cfvo_type, 2 | 3))
     {
         return Err(Error::Unrecognized {
-            typ: record.to_string(),
-            val: "invalid min/mid/max threshold type".to_string(),
+            typ: record,
+            val: "invalid min/mid/max threshold type",
         });
     }
     let has_middle = colors.len() == 3;

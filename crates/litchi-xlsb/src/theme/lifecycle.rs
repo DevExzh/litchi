@@ -500,8 +500,7 @@ impl OwnerSource {
         let mut content_types = self.content_types.clone();
         if !part_names.iter().any(|name| name == &plan.theme_name) {
             part_names.push(plan.theme_name.clone());
-            let theme_name = PackURI::new(&plan.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let theme_name = PackURI::new(&plan.theme_name)?;
             content_types = content_types.with_part_overrides(
                 &[(&theme_name, CONTENT_TYPE)],
                 content_types_output_limit(),
@@ -554,8 +553,7 @@ impl OwnerSource {
         let workbook_relationship_xml = self
             .workbook_relationship_xml
             .without_relationship(&plan.relationship.id, relationship_output_limit())?;
-        let theme_name =
-            PackURI::new(&plan.theme_name).map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let theme_name = PackURI::new(&plan.theme_name)?;
         let content_types = self.content_types.without_parts(
             std::slice::from_ref(&theme_name),
             content_types_output_limit(),
@@ -580,8 +578,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let workbook = package.main_document_part()?;
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut workbook_relationships = Vec::new();
@@ -603,8 +600,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let theme_relationship_xml = theme
         .as_ref()
         .map(|snapshot| -> Result<ThemeRelationships> {
-            let name = PackURI::new(&snapshot.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let name = PackURI::new(&snapshot.graph.theme_name)?;
             let relationships = package.source_relationships_with_limits(&name, opc_limits)?;
             if relationships.member_present() {
                 Ok(ThemeRelationships::Exact(relationships))
@@ -619,8 +615,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let theme_xml = theme
         .as_ref()
         .map(|snapshot| {
-            let name = PackURI::new(&snapshot.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let name = PackURI::new(&snapshot.graph.theme_name)?;
             package.source_xml_part(&name).map_err(Error::from)
         })
         .transpose()?;
@@ -713,8 +708,7 @@ fn next_theme_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=maximum {
         let candidate = PackURI::new(format!(
             "{DEFAULT_THEME_DIRECTORY}/{DEFAULT_THEME_STEM}{index}.{DEFAULT_THEME_EXTENSION}"
-        ))
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+        ))?;
         if package
             .iter_parts()
             .all(|part| !part.partname().is_equivalent_to(&candidate))
@@ -786,8 +780,7 @@ fn plan_from_absent_source(source: &OwnerSource, relationship_type: &str) -> Res
                 .any(|relationship| relationship.id == *candidate)
         })
         .ok_or_else(|| invalid("no bounded Theme relationship ID is available"))?;
-    let workbook = PackURI::new(&source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let workbook = PackURI::new(&source.workbook_name)?;
     let target_ref = theme_name.relative_ref(workbook.base_uri());
     Ok(CreationPlan {
         workbook_name: source.workbook_name.clone(),
@@ -847,8 +840,7 @@ fn materialize(
     after: &OwnerSnapshot,
 ) -> Result<()> {
     let workbook_name = package.main_document_part()?.partname().clone();
-    let expected_workbook = PackURI::new(&before.source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let expected_workbook = PackURI::new(&before.source.workbook_name)?;
     if !workbook_name.is_equivalent_to(&expected_workbook) {
         return Err(invalid("Theme owner Workbook changed during publication"));
     }
@@ -859,8 +851,7 @@ fn materialize(
                     "Theme replacement cannot change its validated package graph",
                 ));
             }
-            let part_name = PackURI::new(&before.graph.theme_name)
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let part_name = PackURI::new(&before.graph.theme_name)?;
             let part = package.get_part(&part_name)?;
             if part.content_type() != CONTENT_TYPE
                 || part.rels().iter().count() != before.graph.theme_relationships.len()
@@ -884,8 +875,7 @@ fn materialize(
 
 fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Result<()> {
     let limits = litchi_opc::SourceLimits::default();
-    let workbook_name = PackURI::new(&source.workbook_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let workbook_name = PackURI::new(&source.workbook_name)?;
     let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;
     if current_workbook != source.workbook_relationship_xml {
         package.try_replace_relationships_with_limits(
@@ -897,8 +887,7 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
     match &source.theme_relationship_xml {
         ThemeRelationships::Absent => {},
         ThemeRelationships::FreshAbsent { owner } => {
-            let owner =
-                PackURI::new(owner).map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let owner = PackURI::new(owner)?;
             let current = package.source_relationships_with_limits(&owner, limits)?;
             if current.member_present() {
                 return Err(invalid(
@@ -938,8 +927,7 @@ fn add_owner(
         .theme
         .as_ref()
         .ok_or_else(|| invalid("Theme creation is missing its resulting snapshot"))?;
-    let theme_name = PackURI::new(&snapshot.graph.theme_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let theme_name = PackURI::new(&snapshot.graph.theme_name)?;
     package.validate_new_part_name(&theme_name)?;
     let source_xml = Arc::clone(&snapshot.source_xml);
     let source_token = after.source.theme_xml.clone();
@@ -961,8 +949,7 @@ fn add_owner(
                 .target_name
                 .as_ref()
                 .ok_or_else(|| invalid("Theme inverse is missing an internal Image target"))?;
-            let target =
-                PackURI::new(target_name).map_err(|error| Error::InvalidUri(error.to_string()))?;
+            let target = PackURI::new(target_name)?;
             let image = package.get_part(&target)?;
             validate_image_target(image.content_type(), image.rels().is_empty())?;
         }
@@ -995,8 +982,7 @@ fn remove_owner(
     workbook_name: &PackURI,
     before: &Snapshot,
 ) -> Result<()> {
-    let theme_name = PackURI::new(&before.graph.theme_name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let theme_name = PackURI::new(&before.graph.theme_name)?;
     let relationship_id = &before.graph.workbook_relationship.id;
     let workbook = package.get_part_mut(workbook_name)?;
     let relationship = workbook

@@ -182,14 +182,14 @@ fn workbook_sheet_count(workbook: &dyn Part, limits: SemanticLimits) -> Result<u
     }
     if collection_open {
         return Err(Error::UnexpectedEndOfStream(
-            "Workbook BrtBeginBundleShs collection".to_string(),
+            "Workbook BrtBeginBundleShs collection",
         ));
     }
     Ok(sheet_count)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 impl PartialEq for Snapshot {
@@ -243,8 +243,7 @@ impl SourceState {
             ));
         }
         let workbook_relationships = package.source_relationships(workbook_name)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let root_relationships = package.source_relationships(&root_name)?;
         let content_types = package.source_content_types()?;
         if workbook_relationships.bytes().len() > limits.max_part_bytes

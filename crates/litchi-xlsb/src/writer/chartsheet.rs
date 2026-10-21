@@ -128,9 +128,10 @@ impl ChartSheet {
             || self.metadata.legacy_drawing_rel_id.is_some()
             || self.metadata.legacy_drawing_header_footer_rel_id.is_some()
         {
-            return Err(Error::UnsupportedFeature(
-                "chart-sheet relationship IDs are allocated by the XLSB writer; legacy VML authoring is unsupported"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedProperty,
+                "build_xlsb",
+                "chart-sheet relationship IDs are allocated by the XLSB writer",
             ));
         }
         validate_string(&self.metadata.code_name, "chart-sheet code name")?;
@@ -143,23 +144,23 @@ impl ChartSheet {
         }
         for view in &self.metadata.views {
             if view.scale != 0 && !(10..=400).contains(&view.scale) {
-                return Err(Error::InvalidFormula(format!(
-                    "chart-sheet zoom {} is outside 10..=400 or zero",
-                    view.scale
-                )));
+                return Err(Error::InvalidFormula(
+                    "chart-sheet zoom is outside 10400 or zero",
+                ));
             }
             if view.workbook_view_index != 0 {
-                return Err(Error::UnsupportedFeature(format!(
-                    "chart-sheet workbook view index {} has no authored workbook view",
-                    view.workbook_view_index
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedProperty,
+                    "build_xlsb",
+                    "the chart-sheet workbook view index has no authored workbook view",
+                ));
             }
         }
         if let Some(strong) = &self.metadata.strong_protection {
             validate_strong_protection(strong)?;
             if self.metadata.protection.is_none() {
                 return Err(Error::InvalidFormula(
-                    "strong chart-sheet protection requires classic protection flags".to_string(),
+                    "strong chart-sheet protection requires classic protection flags",
                 ));
             }
         }
@@ -168,8 +169,7 @@ impl ChartSheet {
             (None, None) => {},
             _ => {
                 return Err(Error::InvalidFormula(
-                    "chart-sheet page setup and printer settings must be supplied together"
-                        .to_string(),
+                    "chart-sheet page setup and printer settings must be supplied together",
                 ));
             },
         }
@@ -188,7 +188,7 @@ pub(crate) fn write_chart_sheet(
 ) -> Result<Vec<u8>> {
     sheet.validate()?;
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(rt::BEGIN_SHEET, &[])?;
     write_properties(&mut writer, &sheet.metadata)?;
     write_views(&mut writer, &sheet.metadata.views)?;
@@ -202,9 +202,7 @@ pub(crate) fn write_chart_sheet(
             &mut writer,
             setup,
             printer_rel_id.ok_or_else(|| {
-                Error::InvalidFormula(
-                    "chart-sheet page setup has no printer relationship".to_string(),
-                )
+                Error::InvalidFormula("chart-sheet page setup has no printer relationship")
             })?,
         )?;
     }
@@ -221,18 +219,16 @@ fn validate_name(name: &str) -> Result<()> {
         || name.starts_with('\'')
         || name.ends_with('\'')
     {
-        return Err(Error::InvalidFormula(format!(
-            "chart-sheet name {name:?} does not follow BrtBundleSh grammar"
-        )));
+        return Err(Error::InvalidFormula(
+            "chart-sheet name does not follow BrtBundleSh grammar",
+        ));
     }
     Ok(())
 }
 
-fn validate_string(value: &str, context: &str) -> Result<()> {
+fn validate_string(value: &str, _context: &str) -> Result<()> {
     if value.encode_utf16().count() > MAX_STRING_UNITS || value.contains('\0') {
-        return Err(Error::InvalidFormula(format!(
-            "{context} is too long or contains NUL"
-        )));
+        return Err(Error::InvalidFormula("is too long or contains NUL"));
     }
     Ok(())
 }
@@ -240,20 +236,16 @@ fn validate_string(value: &str, context: &str) -> Result<()> {
 fn validate_color(color: Color) -> Result<()> {
     if color.color_type == ColorType::Rgb && !color.valid_rgb {
         return Err(Error::InvalidFormula(
-            "direct chart-sheet tab color is not marked valid".to_string(),
+            "direct chart-sheet tab color is not marked valid",
         ));
     }
     if color.color_type == ColorType::Theme && color.index > MAX_THEME_COLOR_INDEX {
-        return Err(Error::InvalidFormula(format!(
-            "chart-sheet theme color index {} exceeds {MAX_THEME_COLOR_INDEX}",
-            color.index
-        )));
+        return Err(Error::InvalidFormula(
+            "chart-sheet theme color index exceeds",
+        ));
     }
     if color.color_type == ColorType::Indexed && color.index > MAX_INDEXED_COLOR {
-        return Err(Error::InvalidFormula(format!(
-            "chart-sheet indexed color {} exceeds {MAX_INDEXED_COLOR}",
-            color.index
-        )));
+        return Err(Error::InvalidFormula("chart-sheet indexed color exceeds"));
     }
     Ok(())
 }
@@ -266,7 +258,7 @@ fn validate_strong_protection(value: &StrongProtection) -> Result<()> {
         || value.algorithm.is_empty()
     {
         return Err(Error::InvalidFormula(
-            "invalid or oversized chart-sheet strong-protection metadata".to_string(),
+            "invalid or oversized chart-sheet strong-protection metadata",
         ));
     }
     validate_string(&value.algorithm, "strong-protection algorithm")
@@ -274,16 +266,14 @@ fn validate_strong_protection(value: &StrongProtection) -> Result<()> {
 
 fn validate_page_setup(value: &PageSetup) -> Result<()> {
     if value.paper_size > MAX_PAPER_SIZE || (119..256).contains(&value.paper_size) {
-        return Err(Error::InvalidFormula(format!(
-            "chart-sheet paper size {} is invalid or reserved",
-            value.paper_size
-        )));
+        return Err(Error::InvalidFormula(
+            "chart-sheet paper size is invalid or reserved",
+        ));
     }
     if value.copies == 0 || value.copies > MAX_COPIES {
-        return Err(Error::InvalidFormula(format!(
-            "chart-sheet print copies {} is outside 1..={MAX_COPIES}",
-            value.copies
-        )));
+        return Err(Error::InvalidFormula(
+            "chart-sheet print copies is outside its allowed range",
+        ));
     }
     Ok(())
 }
@@ -301,7 +291,7 @@ fn write_properties<W: Write>(writer: &mut Encoder<W>, value: &ChartSheetMetadat
     data.push(value.tab_color.index);
     data.extend_from_slice(&value.tab_color.tint.to_le_bytes());
     data.extend_from_slice(&value.tab_color.rgba);
-    Encoder::new(&mut data).write_wide_string(&value.code_name)?;
+    Encoder::new(&mut data, crate::raw::Limits::DEFAULT).write_wide_string(&value.code_name)?;
     Ok(writer.write_record(rt::CS_PROP, &data)?)
 }
 
@@ -333,7 +323,8 @@ fn write_protection<W: Write>(
         data.extend_from_slice(&u32::from(classic.objects).to_le_bytes());
         write_blob(&mut data, &strong.hash)?;
         write_blob(&mut data, &strong.salt)?;
-        Encoder::new(&mut data).write_wide_string(&strong.algorithm)?;
+        Encoder::new(&mut data, crate::raw::Limits::DEFAULT)
+            .write_wide_string(&strong.algorithm)?;
         writer.write_record(rt::CS_PROTECTION_ISO, &data)?;
     }
     let mut data = Vec::with_capacity(10);
@@ -367,7 +358,7 @@ fn write_page_setup<W: Write>(
         | (u16::from(setup.use_page_start) << 4)
         | (u16::from(setup.draft) << 5);
     data.extend_from_slice(&flags.to_le_bytes());
-    Encoder::new(&mut data).write_wide_string(printer_rel_id)?;
+    Encoder::new(&mut data, crate::raw::Limits::DEFAULT).write_wide_string(printer_rel_id)?;
     Ok(writer.write_record(rt::CS_PAGE_SETUP, &data)?)
 }
 
@@ -377,7 +368,7 @@ fn write_rel_id<W: Write>(
     rel_id: &str,
 ) -> Result<()> {
     let mut data = Vec::new();
-    Encoder::new(&mut data).write_wide_string(rel_id)?;
+    Encoder::new(&mut data, crate::raw::Limits::DEFAULT).write_wide_string(rel_id)?;
     Ok(writer.write_record(record_type, &data)?)
 }
 

@@ -435,7 +435,7 @@ impl Package {
     pub(crate) fn projection(&self) -> Result<Arc<Workbook>> {
         self.workbook()?;
         self.5.0.get().cloned().ok_or(PackageError::InvalidFormat(
-            "the XLSB workbook projection is missing".to_owned(),
+            "the XLSB workbook projection is missing",
         ))
     }
 

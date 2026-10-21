@@ -302,8 +302,8 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = xlsb::raw::Encoder::new(&mut rewritten);
-        for record in xlsb::raw::Records::new(&original) {
+        let mut writer = xlsb::raw::Encoder::new(&mut rewritten, xlsb::raw::Limits::DEFAULT);
+        for record in xlsb::raw::Records::new(&original, xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == xlsb::raw::kind::BOOK_VIEW {

@@ -39,13 +39,12 @@ struct Node {
     text: String,
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 fn element_name(bytes: &[u8]) -> Result<(String, String)> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|error| invalid(format!("invalid XML name: {error}")))?;
+    let text = std::str::from_utf8(bytes).map_err(|_error| invalid("invalid XML name"))?;
     let (prefix, local) = text
         .split_once(':')
         .map_or(("", text), |(prefix, local)| (prefix, local));
@@ -53,9 +52,7 @@ fn element_name(bytes: &[u8]) -> Result<(String, String)> {
         "" | "x15" => X15,
         "xr10" => XR10,
         _ => {
-            return Err(invalid(format!(
-                "unsupported timeline XML prefix '{prefix}'"
-            )));
+            return Err(invalid("unsupported timeline XML prefix"));
         },
     };
     Ok((namespace.to_string(), local.to_string()))
@@ -67,20 +64,19 @@ fn attributes(
 ) -> Result<BTreeMap<String, String>> {
     let mut result = BTreeMap::new();
     for attribute in element.checked_attributes() {
-        let attribute =
-            attribute.map_err(|error| invalid(format!("invalid XML attribute: {error}")))?;
+        let attribute = attribute.map_err(|_error| invalid("invalid XML attribute"))?;
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
         let key = std::str::from_utf8(attribute.key.as_ref())
-            .map_err(|error| invalid(format!("invalid XML attribute name: {error}")))?
+            .map_err(|_error| invalid("invalid XML attribute name"))?
             .to_string();
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-            .map_err(|error| invalid(format!("invalid XML attribute value: {error}")))?
+            .map_err(|_error| invalid("invalid XML attribute value"))?
             .into_owned();
         if result.insert(key.clone(), value).is_some() {
-            return Err(invalid(format!("duplicate XML attribute '{key}'")));
+            return Err(invalid("duplicate XML attribute"));
         }
     }
     Ok(result)
@@ -88,8 +84,9 @@ fn attributes(
 
 fn resolve_namespace(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
     match reader.resolver().resolve_element(element.name()).0 {
-        ResolveResult::Bound(Namespace(namespace)) => String::from_utf8(namespace.to_vec())
-            .map_err(|error| invalid(format!("invalid XML namespace: {error}"))),
+        ResolveResult::Bound(Namespace(namespace)) => {
+            String::from_utf8(namespace.to_vec()).map_err(|_error| invalid("invalid XML namespace"))
+        },
         _ => Err(invalid("timeline XML element has no bound namespace")),
     }
 }
@@ -107,7 +104,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
     loop {
         let event = reader
             .read_event()
-            .map_err(|error| invalid(format!("invalid timeline XML: {error}")))?
+            .map_err(|_error| invalid("invalid timeline XML"))?
             .into_owned();
         let empty_event = matches!(&event, Event::Empty(_));
         match event {
@@ -119,9 +116,9 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
                 let (namespace, name) = element_name(element.name().as_ref())?;
                 let resolved = resolve_namespace(&reader, &element)?;
                 if resolved != namespace {
-                    return Err(invalid(format!(
-                        "timeline XML prefix '{name}' is bound to an unexpected namespace"
-                    )));
+                    return Err(invalid(
+                        "timeline XML prefix is bound to an unexpected namespace",
+                    ));
                 }
                 let node = Node {
                     namespace,
@@ -157,9 +154,9 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             Event::Text(text) => {
                 let value = text
                     .decode()
-                    .map_err(|error| invalid(format!("invalid timeline XML text: {error}")))?;
+                    .map_err(|_error| invalid("invalid timeline XML text"))?;
                 let value = quick_xml::escape::unescape(&value)
-                    .map_err(|error| invalid(format!("invalid timeline XML entity: {error}")))?;
+                    .map_err(|_error| invalid("invalid timeline XML entity"))?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
                 } else if !value.trim().is_empty() {
@@ -169,7 +166,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             Event::GeneralRef(reference) => {
                 let value = reference
                     .resolve_char_ref()
-                    .map_err(|error| invalid(format!("invalid XML reference: {error}")))?
+                    .map_err(|_error| invalid("invalid XML reference"))?
                     .map(|value| value.to_string())
                     .ok_or_else(|| invalid("custom XML entities are not supported"))?;
                 if let Some(node) = stack.last_mut() {
@@ -197,10 +194,7 @@ fn allowed(node: &Node, names: &[&str]) -> Result<()> {
         .keys()
         .any(|key| !names.contains(&key.as_str()))
     {
-        return Err(invalid(format!(
-            "unexpected attribute on '{}': {:?}",
-            node.name, node.attributes
-        )));
+        return Err(invalid("unexpected attribute on"));
     }
     Ok(())
 }
@@ -208,42 +202,35 @@ fn allowed(node: &Node, names: &[&str]) -> Result<()> {
 fn attr<'a>(node: &'a Node, name: &str, required: bool) -> Result<Option<&'a str>> {
     let value = node.attributes.get(name).map(String::as_str);
     if required && value.is_none() {
-        return Err(invalid(format!(
-            "'{}' requires attribute '{name}'",
-            node.name
-        )));
+        return Err(invalid("requires attribute"));
     }
     Ok(value)
 }
 
 fn required_attr<'a>(node: &'a Node, name: &str) -> Result<&'a str> {
-    attr(node, name, true)?
-        .ok_or_else(|| invalid(format!("'{}' requires attribute '{name}'", node.name)))
+    attr(node, name, true)?.ok_or_else(|| invalid("requires attribute"))
 }
 
 fn empty(node: &Node) -> Result<()> {
     if !node.children.is_empty() || !node.text.trim().is_empty() {
-        return Err(invalid(format!(
-            "timeline XML element '{}' must be empty",
-            node.name
-        )));
+        return Err(invalid("timeline XML element must be empty"));
     }
     Ok(())
 }
 
-fn parse_bool(value: Option<&str>, default: bool, field: &str) -> Result<bool> {
+fn parse_bool(value: Option<&str>, default: bool, _field: &str) -> Result<bool> {
     match value {
         None => Ok(default),
         Some("1" | "true") => Ok(true),
         Some("0" | "false") => Ok(false),
-        Some(value) => Err(invalid(format!("invalid {field} value '{value}'"))),
+        Some(_value) => Err(invalid("invalid value")),
     }
 }
 
 fn parse_u32(node: &Node, name: &str) -> Result<u32> {
     required_attr(node, name)?
         .parse()
-        .map_err(|_| invalid(format!("invalid {name} value")))
+        .map_err(|_| invalid("invalid value"))
 }
 
 fn parse_range(node: &Node) -> Result<Range> {

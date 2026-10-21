@@ -60,7 +60,7 @@ fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
 
 fn records(data: &[u8]) -> Vec<(Kind, Vec<u8>)> {
     let mut result = Vec::new();
-    for record in Records::new(data) {
+    for record in Records::new(data, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         result.push((record.kind(), record.payload().to_vec()));
     }

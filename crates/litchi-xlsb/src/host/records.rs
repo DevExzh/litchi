@@ -8,7 +8,7 @@ use std::io::Read;
 
 /// Decode one strict BIFF12 wide string and report consumed bytes.
 pub(crate) fn decode_string(buf: &[u8]) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(buf, "XLWideString");
+    let mut cursor = Cursor::new(buf, "XLWideString", Limits::DEFAULT);
     let value = cursor.read_wide_string()?;
     Ok((value, cursor.position()))
 }
@@ -21,7 +21,7 @@ pub(crate) fn decode_string_with(
     record_type: Kind,
     location: u32,
 ) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(buf, "XLWideString");
+    let mut cursor = Cursor::new(buf, "XLWideString", Limits::DEFAULT);
     let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
     Ok((value, cursor.position()))
 }
@@ -49,20 +49,20 @@ impl<R: Read> Stream<R> {
     pub(crate) fn read_type(&mut self) -> Result<Kind> {
         if self.pending_len.is_some() {
             return Err(Error::Unrecognized {
-                typ: "BIFF12 stream".to_string(),
-                val: "payload must be read before the next header".to_string(),
+                typ: "BIFF12 stream",
+                val: "payload must be read before the next header",
             });
         }
         let header = Header::read(&mut self.reader, self.limits)?
-            .ok_or_else(|| Error::UnexpectedEndOfStream("BIFF12 record header".to_string()))?;
+            .ok_or_else(|| Error::UnexpectedEndOfStream("BIFF12 record header"))?;
         self.pending_len = Some(header.len());
         Ok(header.kind())
     }
 
     pub(crate) fn fill_buffer(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
         let len = self.pending_len.take().ok_or_else(|| Error::Unrecognized {
-            typ: "BIFF12 stream".to_string(),
-            val: "record header must be read before its payload".to_string(),
+            typ: "BIFF12 stream",
+            val: "record header must be read before its payload",
         })?;
         buf.resize(len, 0);
         self.reader.read_exact(buf)?;
@@ -126,8 +126,8 @@ impl BundleSheetRecord {
         let state = binary::read_u32_le_at(data, 0)?;
         if state > 2 {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh hsState".to_string(),
-                val: state.to_string(),
+                typ: "BrtBundleSh hsState",
+                val: "unexpected value",
             });
         }
         let current_id = binary::read_u32_le_at(data, 4)?;
@@ -138,15 +138,15 @@ impl BundleSheetRecord {
             // before iTabID. This layout is also recognized by Apache POI.
             if data.len() < 16 {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh iTabID".to_string(),
-                    val: current_id.to_string(),
+                    typ: "BrtBundleSh iTabID",
+                    val: "unexpected value",
                 });
             }
             let beta_id = binary::read_u32_le_at(data, 8)?;
             if !(1..=0xFFFF).contains(&beta_id) {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh iTabID".to_string(),
-                    val: format!("current {current_id}, beta {beta_id}"),
+                    typ: "BrtBundleSh iTabID",
+                    val: "current, beta",
                 });
             }
             (beta_id, 12)
@@ -163,21 +163,21 @@ impl BundleSheetRecord {
             )?;
             if value.is_empty() {
                 return Err(Error::Unrecognized {
-                    typ: "BrtBundleSh strRelID".to_string(),
-                    val: "empty relationship ID".to_string(),
+                    typ: "BrtBundleSh strRelID",
+                    val: "empty relationship ID",
                 });
             }
             (Some(value), consumed)
         };
         if rel_id.is_none() && state != 2 {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh strRelID".to_string(),
-                val: "NULL relationship on a sheet that is not very hidden".to_string(),
+                typ: "BrtBundleSh strRelID",
+                val: "NULL relationship on a sheet that is not very hidden",
             });
         }
         let name_offset = strings_offset
             .checked_add(rel_consumed)
-            .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow".to_string()))?;
+            .ok_or_else(|| Error::Encoding("BrtBundleSh relationship size overflow"))?;
         let (name, name_consumed) = decode_string_with(
             &data[name_offset..],
             &mut tolerance,
@@ -187,8 +187,8 @@ impl BundleSheetRecord {
         let trailing = data.len().saturating_sub(name_offset + name_consumed);
         tolerance.tolerate_trailing(kind::BUNDLE_SH, ordinal, trailing, || {
             Error::Unrecognized {
-                typ: "BrtBundleSh".to_string(),
-                val: format!("{trailing} trailing bytes"),
+                typ: "BrtBundleSh",
+                val: "trailing bytes",
             }
         })?;
         let name_len = name.encode_utf16().count();
@@ -199,8 +199,8 @@ impl BundleSheetRecord {
             || name.ends_with('\'')
         {
             return Err(Error::Unrecognized {
-                typ: "BrtBundleSh strName".to_string(),
-                val: name,
+                typ: "BrtBundleSh strName",
+                val: "unexpected value",
             });
         }
 
@@ -294,7 +294,7 @@ impl CellRecord {
                         found: data.len(),
                     });
                 }
-                let mut cursor = Cursor::new(&data[6..], "BrtCellBool");
+                let mut cursor = Cursor::new(&data[6..], "BrtCellBool", Limits::DEFAULT);
                 CellValue::Bool(cursor.read_bool8()?)
             },
             kind::CELL_ERROR => {
@@ -335,7 +335,7 @@ impl CellRecord {
                         found: data.len(),
                     });
                 }
-                let mut cursor = Cursor::new(&data[6..], "BrtCellRk");
+                let mut cursor = Cursor::new(&data[6..], "BrtCellRk", Limits::DEFAULT);
                 CellValue::Real(cursor.read_rk()?)
             },
             // Formula records - parse formula bytes and cached value
@@ -399,7 +399,11 @@ impl CellRecord {
                     });
                 }
                 let formula_bytes = data[10..10 + formula_len].to_vec();
-                let mut cursor = Cursor::new(&data[10 + formula_len..], "BrtFmlaBool cached value");
+                let mut cursor = Cursor::new(
+                    &data[10 + formula_len..],
+                    "BrtFmlaBool cached value",
+                    Limits::DEFAULT,
+                );
                 let bool_value = cursor.read_bool8()?;
                 CellValue::Formula {
                     value: Box::new(CellValue::Bool(bool_value)),

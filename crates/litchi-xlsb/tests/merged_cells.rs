@@ -84,7 +84,7 @@ fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
 }
 
 fn records(data: &[u8]) -> Vec<(Kind, usize, usize, Vec<u8>)> {
-    let mut records = Records::new(data);
+    let mut records = Records::new(data, litchi_xlsb::raw::Limits::DEFAULT);
     let mut result = Vec::new();
     while let Some(record) = records.next() {
         let record = record.unwrap();
@@ -123,7 +123,7 @@ fn rewrite_first_sheet(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Ve
 
 fn merge_block(declared_count: u32, ranges: &[MergedCell]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     writer
         .write_record(kind::BEGIN_MERGE_CELLS, &declared_count.to_le_bytes())
         .unwrap();
@@ -156,7 +156,7 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     let source = workbook_bytes(&[("First", &[]), ("Second", &[])]);
     let source = rewrite_first_sheet(&source, |sheet| {
         let mut unknown = Vec::new();
-        Encoder::new(&mut unknown)
+        Encoder::new(&mut unknown, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(Kind::new(0x0FFE).unwrap(), b"unknown-record-payload")
             .unwrap();
         insert_before_end_sheet(sheet, &unknown)
@@ -284,7 +284,7 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
         }),
         rewrite_first_sheet(&base, |sheet| {
             let mut block = Vec::new();
-            let mut writer = Encoder::new(&mut block);
+            let mut writer = Encoder::new(&mut block, litchi_xlsb::raw::Limits::DEFAULT);
             writer
                 .write_record(kind::BEGIN_MERGE_CELLS, &1u32.to_le_bytes())
                 .unwrap();

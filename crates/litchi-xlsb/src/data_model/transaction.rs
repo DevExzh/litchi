@@ -130,8 +130,10 @@ impl Edit {
             return Ok(false);
         }
         if self.payload_edit_kind == PayloadEditKind::OpaqueReplacement {
-            return Err(Error::UnsupportedFeature(
-                "cannot rename a table after an opaque XLDM payload replacement; the replacement has no source identity provenance".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_data_model",
+                "cannot rename a table after an opaque XLDM payload replacement; the replacement has no source identity provenance",
             ));
         }
         validate_table_rename_name(&current, table_index, new_name)?;
@@ -225,9 +227,7 @@ impl Edit {
         let Some(index) = definition.time_groupings.iter().position(|existing| {
             existing.table_name == table_name && existing.column_id == column_id
         }) else {
-            return Err(invalid(format!(
-                "Data Model time grouping {table_name}.{column_id} is absent"
-            )));
+            return Err(invalid("Data Model time grouping. is absent"));
         };
         if definition.time_groupings[index] == grouping {
             return Ok(false);
@@ -322,8 +322,10 @@ impl Edit {
             return Ok(false);
         }
         if self.identity_baseline.as_ref() != self.before.definition() {
-            return Err(Error::UnsupportedFeature(
-                "cannot replace an opaque XLDM payload after a staged table-identity rename; use the closure-aware table rename or replace the complete model first".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_data_model",
+                "cannot replace an opaque XLDM payload after a staged table-identity rename; use the closure-aware table rename or replace the complete model first",
             ));
         }
         validate_time_groupings(part.bytes(), &definition.time_groupings)?;
@@ -356,8 +358,10 @@ impl Edit {
                     && self.payload.as_ref().map(|payload| payload.as_slice())
                         != Some(model.part.bytes())
                 {
-                    return Err(Error::UnsupportedFeature(
-                        "cannot replace an opaque XLDM payload after a staged table-identity rename; use the closure-aware table rename or replace the complete model first".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit_data_model",
+                        "cannot replace an opaque XLDM payload after a staged table-identity rename; use the closure-aware table rename or replace the complete model first",
                     ));
                 }
                 (Some(model.definition), Some(Arc::clone(&model.part.bytes)))
@@ -450,8 +454,10 @@ impl Edit {
                 if self.payload_edit_kind != PayloadEditKind::IdentityRename
                     && before_payload != after_payload
                 {
-                    return Err(Error::UnsupportedFeature(
-                        "time-grouping edits cannot be combined with an opaque XLDM payload replacement; native/generated regeneration requires a closure-aware writer".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit_data_model",
+                        "time-grouping edits cannot be combined with an opaque XLDM payload replacement; native/generated regeneration requires a closure-aware writer",
                     ));
                 }
                 ensure_opaque_identity_compatible_except_time_groupings(
@@ -520,14 +526,10 @@ fn unique_table_index(definition: &Definition, table_id: &str) -> Result<usize> 
         .filter(|(_, table)| table.id == table_id)
         .map(|(index, _)| index);
     let Some(index) = matches.next() else {
-        return Err(invalid(format!(
-            "Data Model table identity {table_id:?} is absent"
-        )));
+        return Err(invalid("Data Model table identity is absent"));
     };
     if matches.next().is_some() {
-        return Err(invalid(format!(
-            "Data Model table identity {table_id:?} is ambiguous"
-        )));
+        return Err(invalid("Data Model table identity is ambiguous"));
     }
     Ok(index)
 }
@@ -542,37 +544,41 @@ fn rename_xldm_table_payload(
     let storage = litchi_xldm::inspect_shared(payload)
         .map_err(|error| map_xldm_error("XLDM outer identity proof failed", error))?;
     if storage.profile() != StorageProfile::Xldm140 {
-        return Err(Error::UnsupportedFeature(
-            "Data Model table rename requires a complete Xldm140 payload".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "Data Model table rename requires a complete Xldm140 payload",
         ));
     }
     let metadata = litchi_xldm::metadata::inspect(&storage)
-        .map_err(|error| invalid(format!("XLDM metadata identity proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM metadata identity proof failed"))?;
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
-        .map_err(|error| invalid(format!("XLDM native identity proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM native identity proof failed"))?;
     let generated = litchi_xldm::generated::inspect_system_generated(&storage)
-        .map_err(|error| invalid(format!("XLDM generated identity proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM generated identity proof failed"))?;
     let olap = litchi_xldm::olap::inspect(&storage, &metadata)
-        .map_err(|error| invalid(format!("XLDM OLAP identity proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM OLAP identity proof failed"))?;
     let olap_proof = prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
         .map_err(|error| map_xldm_olap_proof_error("XLDM complete OLAP identity proof", error))?;
     if !olap_proof.is_complete() {
-        return Err(Error::UnsupportedFeature(
-            "Data Model table rename requires a complete XLDM OLAP closure".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "Data Model table rename requires a complete XLDM OLAP closure",
         ));
     }
     let closure = prove_xldm140_closure(&storage, &metadata, &olap, &native, &generated)
-        .map_err(|error| invalid(format!("XLDM identity closure proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM identity closure proof failed"))?;
     if !closure.is_complete() {
-        return Err(Error::UnsupportedFeature(
-            "Data Model table rename requires a complete known XLDM identity closure".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "Data Model table rename requires a complete known XLDM identity closure",
         ));
     }
     validate_outer_identity_graph(outer, closure.projection())?;
     if closure.projection().table(table_id).is_none() {
-        return Err(invalid(format!(
-            "XLDM table identity {table_id:?} is absent from the closure"
-        )));
+        return Err(invalid("XLDM table identity is absent from the closure"));
     }
     let patch = closure
         .rename_table_name_with_relationships_with_limit(table_id, new_name, max_part_bytes)
@@ -623,10 +629,7 @@ fn validate_outer_identity_graph(
             .insert(table.id.as_str(), table.name.as_str())
             .is_some()
         {
-            return Err(invalid(format!(
-                "outer Data Model table identity {:?} is duplicated",
-                table.id
-            )));
+            return Err(invalid("outer Data Model table identity is duplicated"));
         }
     }
 
@@ -639,25 +642,18 @@ fn validate_outer_identity_graph(
         })?;
     for table in &projection.tables {
         let Some(outer_name) = outer_tables.get(table.table_id.as_str()) else {
-            return Err(invalid(format!(
-                "proven XLDM table identity {:?} has no outer table",
-                table.table_id
-            )));
+            return Err(invalid("proven XLDM table identity has no outer table"));
         };
         if outer_name.to_lowercase() != table.xml_name.to_lowercase() {
-            return Err(invalid(format!(
-                "outer table {:?} name does not match the proven XLDM name",
-                table.table_id
-            )));
+            return Err(invalid(
+                "outer table name does not match the proven XLDM name",
+            ));
         }
         if proven_table_names
             .insert(table.table_id.as_str(), table.xml_name.as_str())
             .is_some()
         {
-            return Err(invalid(format!(
-                "proven XLDM table identity {:?} is duplicated",
-                table.table_id
-            )));
+            return Err(invalid("proven XLDM table identity is duplicated"));
         }
     }
     if proven_table_names.len() != outer_tables.len() {
@@ -680,10 +676,9 @@ fn validate_outer_identity_graph(
         let Some(containing_table_name) =
             proven_table_names.get(relationship.containing_table.as_str())
         else {
-            return Err(invalid(format!(
-                "proven XLDM relationship {:?} has no containing table identity",
-                relationship.relationship_id
-            )));
+            return Err(invalid(
+                "proven XLDM relationship has no containing table identity",
+            ));
         };
         let key = (
             containing_table_name.to_lowercase(),
@@ -772,33 +767,40 @@ fn valid_xml10_char(character: char) -> bool {
     )
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
-fn map_xldm_error(context: &str, error: litchi_xldm::Error) -> Error {
+fn map_xldm_error(_context: &str, error: litchi_xldm::Error) -> Error {
     match error {
-        litchi_xldm::Error::Unsupported { feature } => {
-            Error::UnsupportedFeature(format!("{context}: {feature}"))
-        },
+        litchi_xldm::Error::Unsupported { feature: _ } => Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "invalid value",
+        ),
         litchi_xldm::Error::Allocation { resource, source } => {
             Error::Allocation { resource, source }
         },
-        litchi_xldm::Error::Invalid(message) | litchi_xldm::Error::Xml(message) => {
-            invalid(format!("{context}: {message}"))
+        litchi_xldm::Error::Invalid(_message) | litchi_xldm::Error::Xml(_message) => {
+            invalid("invalid value")
         },
-        _ => invalid(format!("{context}: {error}")),
+        _ => invalid("invalid value"),
     }
 }
 
-fn map_xldm_rename_error(context: &str, error: Xldm140RenameError) -> Error {
-    let message = format!("{context}: {error}");
+fn map_xldm_rename_error(_context: &str, error: Xldm140RenameError) -> Error {
     match error.kind() {
-        Xldm140RenameErrorKind::InvalidSource => invalid(message),
-        Xldm140RenameErrorKind::Unsupported => Error::UnsupportedFeature(message),
+        Xldm140RenameErrorKind::InvalidSource => {
+            invalid("the Data Model rename source is not valid")
+        },
+        Xldm140RenameErrorKind::Unsupported => Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "the feature is not supported",
+        ),
         Xldm140RenameErrorKind::LimitExceeded => {
             let Some((actual, maximum)) = error.limit_bounds() else {
-                return invalid(message);
+                return invalid("the Data Model rename source is not valid");
             };
             Error::limit(super::LimitKind::Model, actual, maximum)
         },
@@ -807,40 +809,38 @@ fn map_xldm_rename_error(context: &str, error: Xldm140RenameError) -> Error {
                 // The legacy OLAP proof adapter carries only a detail string.
                 // Do not synthesize a TryReserveError; retain the diagnostic
                 // and fail as an invalid/unproven source instead.
-                return invalid(format!(
-                    "{message}; neutral allocation resource {} has no allocator source",
-                    error.allocation_resource().unwrap_or("XLDM rename")
-                ));
+                return invalid("; neutral allocation resource has no allocator source");
             };
             Error::Allocation {
                 resource: "Data Model XLDM rename allocation",
                 source: source.clone(),
             }
         },
-        _ => invalid(message),
+        _ => invalid("the Data Model rename source is not valid"),
     }
 }
 
-fn map_xldm_olap_proof_error(context: &str, error: litchi_xldm::OlapProofError) -> Error {
+fn map_xldm_olap_proof_error(_context: &str, error: litchi_xldm::OlapProofError) -> Error {
     match error {
-        litchi_xldm::OlapProofError::UnsupportedProfile => {
-            Error::UnsupportedFeature(format!("{context}: XLDM OLAP profile is unsupported"))
-        },
+        litchi_xldm::OlapProofError::UnsupportedProfile => Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            ": XLDM OLAP profile is unsupported",
+        ),
         litchi_xldm::OlapProofError::LimitExceeded {
             actual, maximum, ..
         } => Error::limit(super::LimitKind::Model, actual, maximum),
-        litchi_xldm::OlapProofError::Invalid { path, detail }
-        | litchi_xldm::OlapProofError::Unproven { path, detail } => {
-            invalid(format!("{context}: {path}: {detail}"))
-        },
-        litchi_xldm::OlapProofError::Allocation { resource, detail } => {
+        litchi_xldm::OlapProofError::Invalid { path: _, detail: _ }
+        | litchi_xldm::OlapProofError::Unproven { path: _, detail: _ } => invalid(":"),
+        litchi_xldm::OlapProofError::Allocation {
+            resource: _,
+            detail: _,
+        } => {
             // OlapProofError carries only a textual allocation detail, not a
             // TryReserveError. Preserve that detail without fabricating an
             // XLSB allocator source; caller-limited rename errors do carry
             // the real source and are mapped above.
-            invalid(format!(
-                "{context}: could not reserve XLDM OLAP proof {resource}: {detail}"
-            ))
+            invalid(": could not reserve XLDM OLAP proof")
         },
     }
 }
@@ -856,8 +856,10 @@ fn ensure_opaque_identity_compatible(
         || before.relationships != after.relationships
         || before.time_groupings != after.time_groupings
     {
-        return Err(Error::UnsupportedFeature(
-            "cannot rename or restructure Data Model metadata while the MS-XLDM payload is opaque; replace and validate the complete model in a format-aware owner first".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "cannot rename or restructure Data Model metadata while the MS-XLDM payload is opaque; replace and validate the complete model in a format-aware owner first",
         ));
     }
     Ok(())
@@ -871,8 +873,10 @@ fn ensure_opaque_identity_compatible_except_time_groupings(
         return Ok(());
     };
     if before.tables != after.tables || before.relationships != after.relationships {
-        return Err(Error::UnsupportedFeature(
-            "time-grouping edits cannot change Data Model tables or relationships while the MS-XLDM payload is opaque".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_data_model",
+            "time-grouping edits cannot change Data Model tables or relationships while the MS-XLDM payload is opaque",
         ));
     }
     Ok(())

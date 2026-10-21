@@ -81,19 +81,13 @@ impl Limits {
     /// Validate a caller policy before reading any Theme payload.
     pub(crate) fn validate(self) -> Result<Self> {
         if self.max_xml_bytes == 0 || self.max_xml_bytes > MAX_XML_BYTES {
-            return Err(invalid(format!(
-                "Theme XML byte limit must be between 1 and {MAX_XML_BYTES}"
-            )));
+            return Err(invalid("Theme XML byte limit must be between 1"));
         }
         if self.max_nodes == 0 || self.max_nodes > HARD_MAX_NODES {
-            return Err(invalid(format!(
-                "Theme node limit must be between 1 and {HARD_MAX_NODES}"
-            )));
+            return Err(invalid("Theme node limit must be between 1"));
         }
         if self.max_depth == 0 || self.max_depth > HARD_MAX_DEPTH {
-            return Err(invalid(format!(
-                "Theme depth limit must be between 1 and {HARD_MAX_DEPTH}"
-            )));
+            return Err(invalid("Theme depth limit must be between 1"));
         }
         Ok(self)
     }
@@ -294,8 +288,7 @@ fn locate_eager(package: &OpcPackage) -> Result<Option<(GraphState, &dyn Part)>>
     let workbook = package.main_document_part()?;
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut theme_parts = package
@@ -304,33 +297,32 @@ fn locate_eager(package: &OpcPackage) -> Result<Option<(GraphState, &dyn Part)>>
     let theme_part = theme_parts.next();
     if theme_parts.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "XLSB package contains multiple Theme parts".to_string(),
+            "XLSB package contains multiple Theme parts",
         ));
     }
     let Some(relationship) = find_theme_relationship(workbook.rels())? else {
         if theme_part.is_some() {
             return Err(Error::InvalidRelationship(
-                "Theme part is orphaned from the workbook".to_string(),
+                "Theme part is orphaned from the workbook",
             ));
         }
         return Ok(None);
     };
     if relationship.is_external() {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship must be internal".to_string(),
+            "workbook Theme relationship must be internal",
         ));
     }
     let theme_name = relationship.target_partname()?;
     let part = package.get_part(&theme_name)?;
     if theme_part.is_none_or(|candidate| !candidate.partname().is_equivalent_to(&theme_name)) {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship does not identify the unique Theme part".to_string(),
+            "workbook Theme relationship does not identify the unique Theme part",
         ));
     }
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_owned(),
-            got: part.content_type().to_owned(),
+            expected: CONTENT_TYPE,
         });
     }
     let theme_relationships = validate_theme_relationships(
@@ -357,8 +349,7 @@ fn locate_source<'a>(
 ) -> Result<Option<(GraphState, PartView<'a>)>> {
     if workbook.content_type() != content_type::XLSB_BIN {
         return Err(Error::InvalidContentType {
-            expected: content_type::XLSB_BIN.to_owned(),
-            got: workbook.content_type().to_owned(),
+            expected: content_type::XLSB_BIN,
         });
     }
     let mut theme_parts = package
@@ -367,33 +358,32 @@ fn locate_source<'a>(
     let theme_part = theme_parts.next();
     if theme_parts.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "XLSB package contains multiple Theme parts".to_string(),
+            "XLSB package contains multiple Theme parts",
         ));
     }
     let Some(relationship) = find_theme_relationship(workbook.rels())? else {
         if theme_part.is_some() {
             return Err(Error::InvalidRelationship(
-                "Theme part is orphaned from the workbook".to_string(),
+                "Theme part is orphaned from the workbook",
             ));
         }
         return Ok(None);
     };
     if relationship.is_external() {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship must be internal".to_string(),
+            "workbook Theme relationship must be internal",
         ));
     }
     let theme_name = relationship.target_partname()?;
     let part = package.part(&theme_name)?;
     if theme_part.is_none_or(|candidate| !candidate.partname().is_equivalent_to(&theme_name)) {
         return Err(Error::InvalidRelationship(
-            "workbook Theme relationship does not identify the unique Theme part".to_string(),
+            "workbook Theme relationship does not identify the unique Theme part",
         ));
     }
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_owned(),
-            got: part.content_type().to_owned(),
+            expected: CONTENT_TYPE,
         });
     }
     let theme_relationships = validate_theme_relationships(
@@ -425,7 +415,7 @@ fn find_theme_relationship(
     };
     if matching.next().is_some() {
         return Err(Error::InvalidRelationship(
-            "workbook has multiple Theme relationships".to_string(),
+            "workbook has multiple Theme relationships",
         ));
     }
     Ok(Some(first))
@@ -478,10 +468,9 @@ fn validate_theme_relationships(
             relationship_type::IMAGE
         };
         if relationship.reltype() != expected {
-            return Err(Error::InvalidRelationship(format!(
-                "Theme part relationship {:?} is not a {expected} Image relationship",
-                relationship.r_id(),
-            )));
+            return Err(Error::InvalidRelationship(
+                "Theme part relationship is not a Image relationship",
+            ));
         }
         if !relationship.is_external() {
             let target = relationship.target_partname()?;
@@ -495,13 +484,12 @@ fn validate_theme_relationships(
 fn validate_image_target(content_type_value: &str, is_leaf: bool) -> Result<()> {
     if !content_type_value.starts_with("image/") {
         return Err(Error::InvalidContentType {
-            expected: "an image/* Theme relationship target".to_string(),
-            got: content_type_value.to_string(),
+            expected: "an image/* Theme relationship target",
         });
     }
     if !is_leaf {
         return Err(Error::InvalidRelationship(
-            "Theme Image relationship target must be a leaf part".to_string(),
+            "Theme Image relationship target must be a leaf part",
         ));
     }
     Ok(())
@@ -518,7 +506,7 @@ fn validate_single_theme_inbound(
             && relationship.target_partname()?.is_equivalent_to(theme_name)
         {
             return Err(Error::InvalidRelationship(
-                "Theme part has an inbound package-root relationship".to_string(),
+                "Theme part has an inbound package-root relationship",
             ));
         }
     }
@@ -536,17 +524,16 @@ fn validate_single_theme_inbound(
                     || !is_theme_relationship(relationship.reltype())
                 {
                     return Err(Error::InvalidRelationship(
-                        "Theme part has an inbound relationship other than the workbook Theme edge"
-                            .to_string(),
+                        "Theme part has an inbound relationship other than the workbook Theme edge",
                     ));
                 }
             }
         }
     }
     if inbound != 1 {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme part must have exactly one workbook inbound relationship, found {inbound}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme part must have exactly one workbook inbound relationship",
+        ));
     }
     Ok(())
 }
@@ -562,7 +549,7 @@ fn validate_single_theme_inbound_source(
             && relationship.target_partname()?.is_equivalent_to(theme_name)
         {
             return Err(Error::InvalidRelationship(
-                "Theme part has an inbound package-root relationship".to_string(),
+                "Theme part has an inbound package-root relationship",
             ));
         }
     }
@@ -580,17 +567,16 @@ fn validate_single_theme_inbound_source(
                     || !is_theme_relationship(relationship.reltype())
                 {
                     return Err(Error::InvalidRelationship(
-                        "Theme part has an inbound relationship other than the workbook Theme edge"
-                            .to_string(),
+                        "Theme part has an inbound relationship other than the workbook Theme edge",
                     ));
                 }
             }
         }
     }
     if inbound != 1 {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme part must have exactly one workbook inbound relationship, found {inbound}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme part must have exactly one workbook inbound relationship",
+        ));
     }
     Ok(())
 }
@@ -604,16 +590,16 @@ fn validate_conformance(xml: &[u8], relationship_type_value: &str) -> Result<()>
         codec::NAMESPACE
     };
     if namespace != expected {
-        return Err(Error::InvalidRelationship(format!(
-            "Theme relationship conformance does not match Theme XML namespace: expected {expected}"
-        )));
+        return Err(Error::InvalidRelationship(
+            "Theme relationship conformance does not match Theme XML namespace",
+        ));
     }
     let mut reader = quick_xml::reader::NsReader::from_reader(xml);
     reader.resolver_mut().set_max_declarations_per_element(256);
     loop {
         let (resolved, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         if matches!(event, Event::Start(_) | Event::Empty(_))
             && let quick_xml::name::ResolveResult::Bound(value) = resolved
             && (value.as_ref() == codec::NAMESPACE.as_bytes()
@@ -685,7 +671,7 @@ fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
     loop {
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::CapacityOverflow {
@@ -885,7 +871,7 @@ fn source_namespace(xml: &[u8]) -> Result<Option<&'static str>> {
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 if element.local_name().as_ref() != b"theme" {
@@ -935,7 +921,7 @@ fn root_name_replacement(xml: &[u8], name: &str) -> Result<Replacement> {
             })?;
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         let end = origin
             .offset(reader.buffer_position())
             .ok_or(Error::CapacityOverflow {
@@ -1070,7 +1056,7 @@ fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
             })?;
         let event = reader
             .read_event()
-            .map_err(|error| Error::InvalidFormat(format!("invalid Theme XML: {error}")))?;
+            .map_err(|_error| Error::InvalidFormat("invalid Theme XML"))?;
         let end = origin
             .offset(reader.buffer_position())
             .ok_or(Error::CapacityOverflow {
@@ -1121,8 +1107,8 @@ fn root_element_ranges(xml: &[u8]) -> Result<(Range<usize>, Range<usize>)> {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 /// Retain the source-backed family fragment when a caller supplies a detached

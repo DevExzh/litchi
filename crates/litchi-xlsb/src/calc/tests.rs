@@ -8,7 +8,11 @@ use super::{LEN, Opts, Props, read, write};
 fn defaults_round_trip_exactly() {
     let expected = Props::default();
     let mut payload = Vec::new();
-    write(&expected, &mut Encoder::new(&mut payload)).unwrap();
+    write(
+        &expected,
+        &mut Encoder::new(&mut payload, crate::raw::Limits::DEFAULT),
+    )
+    .unwrap();
 
     assert_eq!(payload.len(), LEN);
     assert_eq!(read(&payload).unwrap(), expected);

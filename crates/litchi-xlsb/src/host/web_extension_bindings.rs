@@ -113,10 +113,10 @@ pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
 ) -> Result<Vec<Binding>> {
-    let mut iterator = Records::new(records);
+    let mut iterator = Records::new(records, crate::raw::Limits::DEFAULT);
     let begin = iterator
         .next()
-        .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+        .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
     if begin.kind() != kind::BEGIN_WEB_EXTENSIONS || !begin.payload().is_empty() {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -128,7 +128,7 @@ pub fn parse_xlsb_web_extension_bindings(
     loop {
         let record = iterator
             .next()
-            .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+            .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
         match record.kind() {
             kind::WEB_EXTENSION => {
                 if bindings.len() == MAX_BINDINGS {
@@ -159,11 +159,8 @@ pub fn parse_xlsb_web_extension_bindings(
                 }
                 return Ok(bindings);
             },
-            other => {
-                return Err(invalid(
-                    "WEBEXTENSIONS",
-                    format!("unexpected record 0x{other:04X}"),
-                ));
+            _other => {
+                return Err(invalid("WEBEXTENSIONS", "unexpected record 0x"));
             },
         }
     }
@@ -173,7 +170,7 @@ pub fn parse_xlsb_web_extension_bindings(
 pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> Result<Vec<u8>> {
     validate_bindings(bindings, None)?;
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
     for binding in bindings {
         writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
@@ -744,10 +741,7 @@ impl<'a> PackageAppRefs<'a> {
             if !self.values.contains(binding.application_reference.as_str()) {
                 return Err(invalid(
                     "BrtWebExtension.appRef",
-                    format!(
-                        "'{}' has no matching MS-OWEXML binding",
-                        binding.application_reference
-                    ),
+                    "has no matching MS-OWEXML binding",
                 ));
             }
         }
@@ -907,11 +901,8 @@ fn write_wide_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ: typ, val: val }
 }
 
 #[cfg(test)]

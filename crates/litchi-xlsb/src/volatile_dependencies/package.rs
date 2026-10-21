@@ -63,11 +63,7 @@ pub(crate) fn discover_graph(
     // must be restored by an inverse publication.
     let stored_part_name = part.partname().clone();
     if part.content_type() != CONTENT_TYPE {
-        return Err(invalid(format!(
-            "Volatile Dependencies part '{}' has content type '{}'",
-            part_name.as_str(),
-            part.content_type()
-        )));
+        return Err(invalid("Volatile Dependencies part has content type"));
     }
     if !part.rels().is_empty() {
         return Err(invalid(
@@ -115,10 +111,9 @@ fn scan_feature_relationships(
         for relationship in source.rels().iter() {
             relationship_count = checked_relationship_count(relationship_count, limits)?;
             if relationship.reltype() == RELATIONSHIP_TYPE && source.partname() != workbook_name {
-                return Err(invalid(format!(
-                    "Volatile Dependencies relationship on unexpected source part '{}'",
-                    source.partname().as_str()
-                )));
+                return Err(invalid(
+                    "Volatile Dependencies relationship on unexpected source part",
+                ));
             }
         }
     }
@@ -187,7 +182,8 @@ fn ensure_exclusive_inbound_relationship(
 }
 
 pub(crate) fn default_part_uri() -> Result<PackURI> {
-    PackURI::new(DEFAULT_PART_NAME).map_err(|error| Error::InvalidUri(error.to_string()))
+    PackURI::new(DEFAULT_PART_NAME)
+        .map_err(|_error| Error::InvalidUri("the part name is not a valid package URI"))
 }
 
 pub(crate) fn reject_inbound_relationships(
@@ -201,10 +197,9 @@ pub(crate) fn reject_inbound_relationships(
         if relationship.target_mode() == TargetMode::Internal
             && relationship.target_partname()?.is_equivalent_to(target)
         {
-            return Err(invalid(format!(
-                "package relationship targets Volatile Dependencies part '{}'",
-                target.as_str()
-            )));
+            return Err(invalid(
+                "package relationship targets Volatile Dependencies part",
+            ));
         }
     }
     for source in package.iter_parts() {
@@ -213,17 +208,13 @@ pub(crate) fn reject_inbound_relationships(
             if relationship.target_mode() == TargetMode::Internal
                 && relationship.target_partname()?.is_equivalent_to(target)
             {
-                return Err(invalid(format!(
-                    "part '{}' targets Volatile Dependencies part '{}'",
-                    source.partname().as_str(),
-                    target.as_str()
-                )));
+                return Err(invalid("part targets Volatile Dependencies part"));
             }
         }
     }
     Ok(())
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

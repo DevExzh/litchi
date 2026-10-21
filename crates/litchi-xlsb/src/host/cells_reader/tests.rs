@@ -20,7 +20,7 @@ use litchi_core::sheet::{Cell, CellValue};
 
 fn bool_formula_worksheet(formula: &ParsedFormula) -> Vec<u8> {
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
 
@@ -78,7 +78,7 @@ fn propagates_missing_group_definition_as_structural_error() {
 
 fn rich_string_worksheet() -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_COL_INFOS, &[]).unwrap();
     let mut column = 2u32.to_le_bytes().to_vec();
@@ -172,7 +172,7 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
     assert_eq!(Reader::sheet_protection_flags(&protection), flags);
 
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -250,7 +250,7 @@ fn reads_inline_rich_string_cells() {
 #[test]
 fn rejects_a_validation_collection_with_a_mismatched_count() {
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -279,7 +279,7 @@ fn rejects_a_validation_collection_with_a_mismatched_count() {
 #[test]
 fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -351,7 +351,7 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     formatting.rules = vec![color_rule.clone(), bar_rule.clone(), icon_rule.clone()];
 
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
@@ -462,7 +462,7 @@ fn reads_office_2013_conditional_formatting_visualizations() {
 #[test]
 fn rejects_incomplete_color_scale_collection() {
     let mut worksheet = Vec::new();
-    let mut writer = Encoder::new(&mut worksheet);
+    let mut writer = Encoder::new(&mut worksheet, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::WS_DIM, &[0; 16]).unwrap();
     writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();

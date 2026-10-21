@@ -45,7 +45,7 @@ use litchi_opc::constants::relationship_type;
 
 use super::{Formatting, RecordKind, write_conditional_formattings};
 use crate::package::Package;
-use crate::package::error::Result;
+use crate::package::error::{Error as PackageError, Result};
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, splice};
 use crate::raw::{Encoder, Records, kind};
 
@@ -415,7 +415,7 @@ impl Edit {
                 "the styles part holds the most differential formats it can",
             ));
         }
-        if !Records::new(&bytes)
+        if !Records::new(&bytes, crate::raw::Limits::DEFAULT)
             .any(|record| record.is_ok_and(|record| record.kind() == kind::BEGIN_DXFS))
         {
             bytes = insert_dxfs(&bytes)?;
@@ -493,7 +493,11 @@ impl Edit {
             }
         }
         let mut out = Vec::new();
-        write_conditional_formattings(&mut Encoder::new(&mut out), std::slice::from_ref(&format))?;
+        write_conditional_formattings(
+            &mut Encoder::new(&mut out, crate::raw::Limits::DEFAULT),
+            std::slice::from_ref(&format),
+        )
+        .map_err(map_authoring_error)?;
         Ok(out)
     }
 
@@ -572,6 +576,19 @@ impl Edit {
     }
 }
 
+fn map_authoring_error(error: super::Error) -> PackageError {
+    match error {
+        super::Error::UnsupportedFeature(_) | super::Error::Unrecognized { .. } => {
+            PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_conditional_formats",
+                "the conditional format contains unsupported authored content",
+            )
+        },
+        error => error.into(),
+    }
+}
+
 /// The top-left cell `(row, column)` of a format's first range.
 fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
     let first = format
@@ -591,7 +608,7 @@ fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
 fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
     const COLOR_PALETTE: u16 = 0x01D9;
     let mut at = None;
-    let mut records = Records::new(styles);
+    let mut records = Records::new(styles, crate::raw::Limits::DEFAULT);
     while let Some(record) = records.next() {
         let record = record?;
         if matches!(

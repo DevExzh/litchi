@@ -87,8 +87,8 @@ fn workbook_with_bundle_suffix(workbook: &Workbook, suffix: &[u8]) -> Workbook {
         .to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("workbook record");
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -119,8 +119,8 @@ fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
         .to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for record in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("workbook record");
             let mut payload = record.payload().to_vec();
             if record.kind() == kind::BUNDLE_SH {
@@ -1454,6 +1454,7 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
             .get_part(&workbook_uri)
             .expect("workbook part")
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     )
     .map(|record| record.expect("workbook record"))
     .find(|record| record.kind() == kind::BUNDLE_SH)

@@ -43,17 +43,14 @@ impl Value {
         let cfvo_type = u8::try_from(cursor.read_u32()?)
             .map_err(|_| invalid("BrtCFVO", "CFVO type overflow"))?;
         if !matches!(cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
-            return Err(invalid("BrtCFVO", format!("invalid type {cfvo_type}")));
+            return Err(invalid("BrtCFVO", "invalid type"));
         }
         let numeric_value = cursor.read_f64()?;
         if !numeric_value.is_finite() {
             return Err(invalid("BrtCFVO", "non-finite numeric parameter"));
         }
         if matches!(cfvo_type, 4 | 5) && !(0.0..=100.0).contains(&numeric_value) {
-            return Err(invalid(
-                "BrtCFVO",
-                format!("percentage parameter {numeric_value} outside 0..=100"),
-            ));
+            return Err(invalid("BrtCFVO", "percentage parameter outside 0..=100"));
         }
         let save_greater_than_or_equal = cursor.read_bool32()?;
         let greater_than_or_equal = cursor.read_bool32()?;
@@ -110,7 +107,7 @@ impl Value {
         let cfvo_type = u8::try_from(cursor.read_u32()?)
             .map_err(|_| invalid("BrtCFVO14", "CFVO type overflow"))?;
         if !matches!(cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
-            return Err(invalid("BrtCFVO14", format!("invalid type {cfvo_type}")));
+            return Err(invalid("BrtCFVO14", "invalid type"));
         }
         let numeric_value = cursor.read_f64()?;
         if !numeric_value.is_finite() {
@@ -144,10 +141,7 @@ impl Value {
             && matches!(cfvo_type, 4 | 5)
             && !(0.0..=100.0).contains(&numeric_value)
         {
-            return Err(invalid(
-                "BrtCFVO14",
-                format!("percentage parameter {numeric_value} outside 0..=100"),
-            ));
+            return Err(invalid("BrtCFVO14", "percentage parameter outside 0..=100"));
         }
         let value = if let Some(formula) = &formula_binary {
             Some(render_formula(formula, base, context)?)
@@ -182,10 +176,7 @@ impl Value {
         save_greater_than_or_equal: bool,
     ) -> Result<Vec<u8>> {
         if !matches!(self.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
-            return Err(invalid(
-                "BrtCFVO14",
-                format!("invalid type {}", self.cfvo_type),
-            ));
+            return Err(invalid("BrtCFVO14", "invalid type"));
         }
         if !numeric_value.is_finite() {
             return Err(invalid("BrtCFVO14", "non-finite numeric parameter"));
@@ -194,10 +185,7 @@ impl Value {
             && matches!(self.cfvo_type, 4 | 5)
             && !(0.0..=100.0).contains(&numeric_value)
         {
-            return Err(invalid(
-                "BrtCFVO14",
-                format!("percentage parameter {} outside 0..=100", numeric_value),
-            ));
+            return Err(invalid("BrtCFVO14", "percentage parameter outside 0..=100"));
         }
         if matches!(self.cfvo_type, 2 | 3 | 8 | 9) && formula_binary.is_some() {
             return Err(invalid(
@@ -216,7 +204,7 @@ impl Value {
         data.extend_from_slice(&u32::from(self.greater_than_or_equal).to_le_bytes());
         data.extend_from_slice(
             &u32::try_from(formula_binary.map_or(0, |formula| formula.rgce.len()))
-                .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
+                .map_err(|_| Error::InvalidFormula("formula is too large"))?
                 .to_le_bytes(),
         );
         Ok(data)
@@ -226,7 +214,7 @@ impl Value {
 impl Color {
     pub fn theme(index: u8, tint: i16) -> Result<Self> {
         if index > 0x0b {
-            return Err(invalid("BrtColor", format!("theme color index {index}")));
+            return Err(invalid("BrtColor", "theme color index"));
         }
         let tint_bytes = tint.to_le_bytes();
         Ok(Self {
@@ -251,7 +239,7 @@ impl Color {
         })?;
         let color_type = raw[0] >> 1;
         if color_type > 3 {
-            return Err(invalid("BrtColor", format!("color type {color_type}")));
+            return Err(invalid("BrtColor", "color type"));
         }
         let argb = if color_type == 2 {
             if raw[0] & 1 == 0 {
@@ -267,7 +255,7 @@ impl Color {
             None
         };
         if color_type == 3 && raw[1] > 0x0b {
-            return Err(invalid("BrtColor", format!("theme color index {}", raw[1])));
+            return Err(invalid("BrtColor", "theme color index"));
         }
         Ok(Self {
             color_type,
@@ -515,12 +503,8 @@ impl Rule {
     ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtBeginCFRule");
         let rule_type_raw = cursor.read_u32()?;
-        let rule_type = RuleType::from_u32(rule_type_raw).ok_or_else(|| {
-            invalid(
-                "BrtBeginCFRule",
-                format!("invalid rule type {rule_type_raw}"),
-            )
-        })?;
+        let rule_type = RuleType::from_u32(rule_type_raw)
+            .ok_or_else(|| invalid("BrtBeginCFRule", "invalid rule type"))?;
         let template = cursor.read_u32()?;
         validate_template(rule_type, template)?;
         let raw_dxf = cursor.read_u32()?;
@@ -537,10 +521,7 @@ impl Rule {
         }
         let priority = cursor.read_u32()?;
         if priority == 0 || priority > i32::MAX as u32 {
-            return Err(invalid(
-                "BrtBeginCFRule",
-                format!("invalid priority {priority}"),
-            ));
+            return Err(invalid("BrtBeginCFRule", "invalid priority"));
         }
         let parameter = cursor.read_u32()?;
         let reserved1 = cursor.read_u32()?;
@@ -601,11 +582,7 @@ impl Rule {
             if formula.rgce.len() != size as usize {
                 return Err(invalid(
                     "BrtBeginCFRule",
-                    format!(
-                        "formula {} declared {size} token bytes, found {}",
-                        index + 1,
-                        formula.rgce.len()
-                    ),
+                    "formula declared token bytes, found",
                 ));
             }
             formula_slots[index] = Some(formula);
@@ -627,7 +604,7 @@ impl Rule {
         if rule_type == RuleType::CellIs && !matches!(operator, Some(1..=8)) {
             return Err(invalid(
                 "BrtBeginCFRule",
-                format!("invalid cell comparison operator {parameter}"),
+                "invalid cell comparison operator",
             ));
         }
 
@@ -671,21 +648,14 @@ impl Rule {
         let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14");
         let rule_type_raw = cursor.read_u32()?;
-        let rule_type = RuleType::from_u32(rule_type_raw).ok_or_else(|| {
-            invalid(
-                "BrtBeginCFRule14",
-                format!("invalid rule type {rule_type_raw}"),
-            )
-        })?;
+        let rule_type = RuleType::from_u32(rule_type_raw)
+            .ok_or_else(|| invalid("BrtBeginCFRule14", "invalid rule type"))?;
         let template = cursor.read_u32()?;
         validate_extension14_template(rule_type, template)?;
         let raw_dxf = cursor.read_u32()?;
         let signed_priority = cursor.read_i32()?;
         if signed_priority != -1 && signed_priority <= 0 {
-            return Err(invalid(
-                "BrtBeginCFRule14",
-                format!("invalid priority {signed_priority}"),
-            ));
+            return Err(invalid("BrtBeginCFRule14", "invalid priority"));
         }
         if signed_priority == -1 && (rule_type != RuleType::DataBar || raw_dxf != 0) {
             return Err(invalid(
@@ -769,11 +739,7 @@ impl Rule {
             if formula.rgce.len() != declared_size as usize {
                 return Err(invalid(
                     "BrtBeginCFRule14",
-                    format!(
-                        "formula {} declared {declared_size} token bytes, found {}",
-                        index + 1,
-                        formula.rgce.len()
-                    ),
+                    "formula declared token bytes, found",
                 ));
             }
             formula_slots[index] = Some(formula);
@@ -840,10 +806,7 @@ impl Rule {
         })?;
         validate_extension14_template(self.rule_type, self.template)?;
         if metadata.priority != -1 && metadata.priority <= 0 {
-            return Err(invalid(
-                "BrtBeginCFRule14",
-                format!("invalid priority {}", metadata.priority),
-            ));
+            return Err(invalid("BrtBeginCFRule14", "invalid priority"));
         }
         if metadata.priority > 0 && self.priority != metadata.priority as u32 {
             return Err(invalid(
@@ -916,7 +879,7 @@ impl Rule {
         for formula in &slots {
             payload.extend_from_slice(
                 &u32::try_from(formula.map_or(0, |formula| formula.rgce.len()))
-                    .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
+                    .map_err(|_| Error::InvalidFormula("formula is too large"))?
                     .to_le_bytes(),
             );
         }

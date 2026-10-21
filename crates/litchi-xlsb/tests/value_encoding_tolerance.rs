@@ -63,12 +63,15 @@ fn rewrite(
 ) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
     let uri = PackURI::new(part).unwrap();
-    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     edit(
         &mut stream
             .iter_mut()
@@ -77,7 +80,7 @@ fn rewrite(
             .1,
     );
     let mut blob = Vec::new();
-    let mut writer = Encoder::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }

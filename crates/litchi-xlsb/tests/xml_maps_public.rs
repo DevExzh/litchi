@@ -13,12 +13,14 @@
 
 use std::io::Cursor;
 
+use litchi_core::edit::RefusalKind;
 use litchi_ooxml_common::spreadsheet_xml_maps::{
     DataBinding, XmlMap, XmlMapConformance, XmlMapInfo, XmlSchema,
 };
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::builder::{self, Builder};
+use litchi_xlsb::package::PackageError;
 use litchi_xlsb::package::table::{Column, Range, Table, Type};
 use litchi_xlsb::xml_maps::{
     CellReference, ColumnBinding, MappedTable, SemanticLimits, SingleCellBinding, XPath,
@@ -433,17 +435,29 @@ fn public_reader_rejects_malformed_relationships_content_types_and_outbound_rels
         maps_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("MapInfo content type", shape, "Invalid content type"));
+    cases.push((
+        "MapInfo content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         single_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("single-cell content type", shape, "Invalid content type"));
+    cases.push((
+        "single-cell content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         table_content_type: wrong,
         ..Shape::default()
     };
-    cases.push(("table content type", shape, "Invalid content type"));
+    cases.push((
+        "table content type",
+        shape,
+        "does not have the content type",
+    ));
     shape = Shape {
         omit_maps_relationship: true,
         ..Shape::default()
@@ -999,11 +1013,7 @@ fn opaque_records_and_ignored_flags_are_preserved_and_block_owned_singleton_edit
             )
             .unwrap()
     );
-    assert_error_contains(
-        owned.commit().unwrap_err(),
-        "losslessly edit Single Cell Tables",
-        "owned opaque singleton edit",
-    );
+    assert_unsupported_content(owned.commit().unwrap_err(), "owned opaque singleton edit");
 }
 
 #[test]
@@ -1205,7 +1215,7 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
                 .unwrap(),
             )
             .unwrap_err(),
-        "mapped table ID 99 was not found",
+        "mapped table ID was not found",
         "missing mapped table",
     );
 
@@ -1225,7 +1235,7 @@ fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
         .unwrap_err();
     assert_error_contains(
         error,
-        "column 99 is absent from physical table ID 2",
+        "column is absent from physical table ID",
         "absent physical column",
     );
 }
@@ -1414,11 +1424,7 @@ fn opaque_single_cell_last_removal_is_refused_without_mutation() {
             .is_some()
     );
     let error = transaction.commit().unwrap_err();
-    assert_error_contains(
-        error,
-        "losslessly edit Single Cell Tables",
-        "opaque singleton removal",
-    );
+    assert_unsupported_content(error, "opaque singleton removal");
     assert_eq!(physical_state(&workbook), before);
 }
 
@@ -1750,7 +1756,7 @@ fn isolated_shared_sct_and_singleton_geometry_fail_at_the_intended_reader_invari
             ),
             Shape::default(),
         ),
-        "single-cell XML mapping 1 overlaps an ordinary table",
+        "single-cell XML mapping overlaps an ordinary table",
     );
 
     let mut auto_filter_overlap = package_with(
@@ -1770,7 +1776,7 @@ fn isolated_shared_sct_and_singleton_geometry_fail_at_the_intended_reader_invari
     assert_reader_error(
         "singleton cell overlaps worksheet AutoFilter",
         auto_filter_overlap,
-        "single-cell XML mapping 1 overlaps the worksheet AutoFilter",
+        "single-cell XML mapping overlaps the worksheet AutoFilter",
     );
 }
 
@@ -1878,7 +1884,7 @@ fn hostile_graph_ownership_orphans_global_ids_geometry_and_conformance_are_rejec
     assert_reader_error(
         "global duplicate list ID",
         duplicate_id,
-        "duplicate XML mapping table ID 1",
+        "duplicate XML mapping table ID",
     );
 
     let mut outside_dimension = valid_package();
@@ -1973,7 +1979,7 @@ fn hostile_graph_ownership_orphans_global_ids_geometry_and_conformance_are_rejec
             ),
             Shape::default(),
         ),
-        "missing connection ID 9",
+        "missing connection ID",
     );
 }
 
@@ -2084,11 +2090,7 @@ fn ordinary_table_edits_preserve_unrelated_opacity_and_refuse_owned_block_opacit
             .unwrap(),
         )
         .unwrap_err();
-    assert_error_contains(
-        error,
-        "losslessly edit",
-        "owned opaque ordinary-table XML property block",
-    );
+    assert_unsupported_content(error, "owned opaque ordinary-table XML property block");
 }
 
 #[test]
@@ -3067,14 +3069,12 @@ fn assert_base_open_error(label: &str, package: OpcPackage, context: &str) {
 
 /// A changed publication over a signed workbook is refused (ADR 0006).
 #[track_caller]
-fn assert_signature_refusal(error: litchi_xlsb::package::PackageError) {
+fn assert_signature_refusal(error: PackageError) {
     assert!(
         matches!(
             error,
-            litchi_xlsb::package::PackageError::Signed
-                | litchi_xlsb::package::PackageError::Opc(
-                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-                )
+            PackageError::Signed
+                | PackageError::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
         ),
         "expected a signature refusal, got {error:?}"
     );
@@ -3088,6 +3088,17 @@ fn assert_error_contains(error: impl std::fmt::Display, context: &str, label: &s
             .contains(&context.to_ascii_lowercase()),
         "{label}: expected {context:?} context, found {error:?}"
     );
+}
+
+fn assert_unsupported_content(error: PackageError, label: &str) {
+    match error {
+        PackageError::Refused(refusal) => assert_eq!(
+            refusal.kind(),
+            RefusalKind::UnsupportedContent,
+            "{label}: expected an unsupported-content refusal, found {refusal:?}"
+        ),
+        error => panic!("{label}: expected a refusal, found {error:?}"),
+    }
 }
 
 fn assert_xml_limit_boundary(

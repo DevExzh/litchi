@@ -28,8 +28,8 @@ impl SortOrder {
             1 => Ok(Self::Ascending),
             2 => Ok(Self::Descending),
             _ => Err(Error::Unrecognized {
-                typ: field.to_string(),
-                val: value.to_string(),
+                typ: field,
+                val: "unexpected value",
             }),
         }
     }
@@ -66,8 +66,8 @@ impl CrossFilter {
             1 => Ok(Self::ShowItemsWithoutData),
             2 => Ok(Self::ShowItemsWithoutDataUnsorted),
             _ => Err(Error::Unrecognized {
-                typ: field.to_string(),
-                val: value.to_string(),
+                typ: field,
+                val: "unexpected value",
             }),
         }
     }
@@ -314,8 +314,8 @@ pub(crate) fn validate_name(value: &str, field: &'static str, max_units: usize) 
     let units = value.encode_utf16().count();
     if units == 0 || units > max_units || value.contains('\0') {
         return Err(Error::Unrecognized {
-            typ: field.to_string(),
-            val: format!("invalid UTF-16 length or NUL ({} units)", units),
+            typ: field,
+            val: "invalid UTF-16 length or NUL",
         });
     }
     Ok(())
@@ -335,8 +335,8 @@ pub(crate) fn validate_cache(value: &Cache) -> Result<()> {
         validate_name(&pivot.name, "slicer PivotTable name", MAX_NAME_UNITS)?;
         if !pivot_keys.insert((pivot.sheet_id, pivot.name.to_ascii_lowercase())) {
             return Err(Error::Unrecognized {
-                typ: "slicer PivotTable collection".to_string(),
-                val: "duplicate PivotTable reference".to_string(),
+                typ: "slicer PivotTable collection",
+                val: "duplicate PivotTable reference",
             });
         }
     }
@@ -350,22 +350,22 @@ pub(crate) fn validate_cache(value: &Cache) -> Result<()> {
             }
             if !native.items.iter().any(|item| item.selected) {
                 return Err(Error::Unrecognized {
-                    typ: "BrtSlicerCacheNativeItem".to_string(),
-                    val: "at least one item must be selected".to_string(),
+                    typ: "BrtSlicerCacheNativeItem",
+                    val: "at least one item must be selected",
                 });
             }
             let mut indices = std::collections::HashSet::with_capacity(native.items.len());
             for item in &native.items {
                 if !indices.insert(item.cache_index) {
                     return Err(Error::Unrecognized {
-                        typ: "BrtSlicerCacheNativeItem".to_string(),
-                        val: format!("duplicate cache index {}", item.cache_index),
+                        typ: "BrtSlicerCacheNativeItem",
+                        val: "duplicate cache index",
                     });
                 }
                 if native.cross_filter == CrossFilter::None && item.no_data {
                     return Err(Error::Unrecognized {
-                        typ: "BrtSlicerCacheNativeItem".to_string(),
-                        val: "no-data item requires cross filtering".to_string(),
+                        typ: "BrtSlicerCacheNativeItem",
+                        val: "no-data item requires cross filtering",
                     });
                 }
             }
@@ -388,20 +388,20 @@ pub(crate) fn validate_views(value: &Views) -> Result<()> {
         validate_name(&view.cache_name, "slicer view cache name", MAX_NAME_UNITS)?;
         if view.column_count == 0 || view.column_count > 20_000 {
             return Err(Error::Unrecognized {
-                typ: "BrtBeginSlicer column count".to_string(),
-                val: view.column_count.to_string(),
+                typ: "BrtBeginSlicer column count",
+                val: "unexpected value",
             });
         }
         if !names.insert(view.name.to_ascii_lowercase()) {
             return Err(Error::Unrecognized {
-                typ: "slicer view collection".to_string(),
-                val: "duplicate view name".to_string(),
+                typ: "slicer view collection",
+                val: "duplicate view name",
             });
         }
         if view.caption.is_some() && view.caption.as_deref().is_some_and(str::is_empty) {
             return Err(Error::Unrecognized {
-                typ: "slicer view caption".to_string(),
-                val: "caption cannot be empty".to_string(),
+                typ: "slicer view caption",
+                val: "caption cannot be empty",
             });
         }
         if let Some(caption) = &view.caption {

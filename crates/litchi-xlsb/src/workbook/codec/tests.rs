@@ -29,7 +29,7 @@ fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
 
 fn record_stream(records: &[(Kind, Vec<u8>)]) -> Result<Vec<u8>> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload)?;
     }
@@ -132,7 +132,7 @@ fn shared_string_owner_validates_declared_count() {
         (kind::END_SST, Vec::new()),
     ])
     .unwrap();
-    let mut records = Records::new(&data);
+    let mut records = Records::new(&data, crate::raw::Limits::DEFAULT);
     let mut strings: Vec<SharedString> = Vec::new();
     Workbook::read_shared_strings(&mut records, &mut strings, &mut Default::default()).unwrap();
     assert_eq!(strings.len(), 1);
@@ -227,7 +227,7 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
         })
         .collect::<Vec<_>>();
     let duplicate_data = record_stream(&duplicate_records).unwrap();
-    let mut duplicate_iter = Records::new(&duplicate_data);
+    let mut duplicate_iter = Records::new(&duplicate_data, crate::raw::Limits::DEFAULT);
     assert!(matches!(
         Workbook::read_workbook(&mut duplicate_iter, &mut Default::default()),
         Err(Error::Unrecognized { typ, .. }) if typ == "BrtBundleSh strName"
@@ -249,7 +249,7 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
         })
         .collect::<Vec<_>>();
     let distinct_data = record_stream(&distinct_records).unwrap();
-    let mut distinct_iter = Records::new(&distinct_data);
+    let mut distinct_iter = Records::new(&distinct_data, crate::raw::Limits::DEFAULT);
     let info = Workbook::read_workbook(&mut distinct_iter, &mut Default::default()).unwrap();
     assert_eq!(info.worksheet_names, canonically_equivalent_names);
 }

@@ -101,8 +101,8 @@ fn plain_chart_package() -> Package {
         )
     };
     let mut stripped_blob = Vec::new();
-    let mut writer = Encoder::new(&mut stripped_blob);
-    for item in Records::new(&original_blob) {
+    let mut writer = Encoder::new(&mut stripped_blob, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original_blob, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("chart sheet record");
         if matches!(
             record.kind(),
@@ -182,7 +182,7 @@ fn bundle_entries(package: &Package) -> Vec<BundleEntry> {
         .opc_package()
         .get_part(&workbook_uri)
         .expect("workbook part");
-    Records::new(workbook.blob())
+    Records::new(workbook.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("workbook record"))
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .map(|record| {
@@ -316,8 +316,8 @@ where
     F: FnMut(Kind, &[u8], &mut Encoder<&mut Vec<u8>>),
 {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), &mut writer);
     }
@@ -359,7 +359,7 @@ fn with_bundle_states(package: &Package, states: &[(usize, u32)]) -> Package {
 }
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::BOOK_VIEW).then(|| {
@@ -433,7 +433,7 @@ fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
 }
 
 fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::EXTERN_SHEET).then(|| {
@@ -458,14 +458,14 @@ fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
 }
 
 fn extern_sheet_record_count(package: &Package) -> usize {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| item.ok())
         .filter(|record| record.kind() == kind::EXTERN_SHEET)
         .count()
 }
 
 fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
@@ -532,7 +532,7 @@ fn volatile_ref_indices(package: &Package) -> Vec<u32> {
         .get_part(&uri)
         .expect("volatile owner")
         .blob();
-    Records::new(blob)
+    Records::new(blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.ok()?;
             (record.kind() == kind::VOL_REF)
@@ -691,9 +691,9 @@ fn package_with_retained_xml_reference() -> Package {
 fn with_unknown_workbook_record(package: &Package) -> Package {
     replace_workbook(package, |source, output| {
         let unknown = Kind::new(0x3ffe).expect("unknown workbook record kind");
-        let mut writer = Encoder::new(output);
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
         let mut inserted = false;
-        for item in Records::new(source) {
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("workbook record");
             if !inserted && record.kind() == kind::END_BOOK {
                 writer
@@ -718,7 +718,7 @@ fn assert_removal_guard(package: Package, label: &str) {
     assert!(
         matches!(
             error,
-            PackageError::UnsupportedFeature(_) | PackageError::InvalidFormat(_)
+            PackageError::Refused(_) | PackageError::InvalidFormat(_)
         ),
         "{label}: unexpected error {error:?}"
     );
@@ -882,7 +882,7 @@ fn removes_complete_catalog_tabs_and_updates_app_metadata() {
     let mut edit = source.edit().expect("edit");
     assert!(matches!(
         edit.remove_sheet("Data"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     let commit = edit.commit().expect("guarded commit");
     assert!(commit.patch().is_noop());
@@ -1036,7 +1036,7 @@ fn shared_child_relationships_refuse_removal_atomically() {
     let mut edit = source.edit().expect("edit");
     assert!(matches!(
         edit.remove_sheet("A"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     let commit = edit.commit().expect("guarded commit");
     assert!(commit.patch().is_noop());
@@ -1064,7 +1064,7 @@ fn chart_child_relationships_refuse_removal_atomically() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.remove_sheet("Chart"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
@@ -1329,7 +1329,7 @@ fn named_range_scopes_shift_or_removed_scoped_owners_are_guarded() {
                 vec![("Scoped".to_owned(), 0), ("Global".to_owned(), u32::MAX)]
             );
         },
-        Err(PackageError::UnsupportedFeature(_)) => {
+        Err(PackageError::Refused(_)) => {
             let commit = edit.commit().unwrap();
             assert!(commit.patch().is_noop());
             assert_eq!(commit.package().to_bytes().unwrap(), before);
@@ -1348,7 +1348,7 @@ fn named_range_scopes_shift_or_removed_scoped_owners_are_guarded() {
                     .any(|(_, scope)| *scope == 1)
             );
         },
-        Err(PackageError::UnsupportedFeature(_)) => {
+        Err(PackageError::Refused(_)) => {
             assert!(edit.commit().unwrap().patch().is_noop());
         },
         other => panic!("unexpected removed-scope result: {other:?}"),
@@ -1425,7 +1425,7 @@ fn surviving_xml_references_to_removed_sheet_refuse_atomically() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.remove_sheet("A"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
@@ -1510,7 +1510,7 @@ fn strict_worksheet_relationship_flavor_survives_removal() {
 fn selected_flag(package: &Package, name: &str) -> bool {
     let uri = sheet_part(package, name);
     let part = package.opc_package().get_part(&uri).unwrap();
-    Records::new(part.blob())
+    Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.unwrap();
             let mask = match record.kind() {
@@ -1580,7 +1580,7 @@ fn absent_workbook_views_preserve_optional_absence_and_refuse_hidden_default() {
         if hidden_first {
             assert!(matches!(
                 edit.remove_sheet("A"),
-                Err(PackageError::UnsupportedFeature(_))
+                Err(PackageError::Refused(_))
             ));
             assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
         } else {
@@ -1610,7 +1610,7 @@ fn binary_hyperlink_locations_cannot_keep_removed_sheet_names() {
         let mut edit = source.edit().unwrap();
         assert!(matches!(
             edit.remove_sheet(name),
-            Err(PackageError::UnsupportedFeature(_))
+            Err(PackageError::Refused(_))
         ));
         assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
     }
@@ -1659,7 +1659,7 @@ fn global_defined_name_cannot_lose_its_only_local_target() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.remove_sheet("B"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
     let mut safe = source.edit().unwrap();
@@ -1691,7 +1691,7 @@ fn live_formula_references_receive_typed_removal_refusal() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.remove_sheet("A"),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), before);
     let mut safe = source.edit().unwrap();

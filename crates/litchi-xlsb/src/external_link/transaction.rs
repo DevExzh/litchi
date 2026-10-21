@@ -64,7 +64,7 @@ impl Snapshot {
     pub fn resolved_link(&self, source: impl Into<String>) -> Result<Link> {
         if self.relationship_id().is_none() {
             return Err(Error::InvalidFormula(
-                "DDE external links do not have a relationship source".to_string(),
+                "DDE external links do not have a relationship source",
             ));
         }
         let mut link = self.link.clone();
@@ -283,7 +283,7 @@ impl Draft {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("DDE item was not found"))?;
+            .ok_or_else(|| invalid("DDE item was not"))?;
         *item = item
             .clone()
             .with_advise(want_advise)
@@ -301,7 +301,7 @@ impl Draft {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("DDE item was not found"))?;
+            .ok_or_else(|| invalid("DDE item was not"))?;
         *item = match cache {
             Some(cache) => item.clone().with_cached_values(cache),
             None => item.clone().without_cached_values(),
@@ -358,7 +358,7 @@ impl Draft {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("OLE item was not found"))?;
+            .ok_or_else(|| invalid("OLE item was not"))?;
         *item = item
             .clone()
             .with_advise(want_advise)
@@ -376,7 +376,7 @@ impl Draft {
         let item = entries
             .iter_mut()
             .find(|entry| same_name(entry.name(), name))
-            .ok_or_else(|| invalid("OLE item was not found"))?;
+            .ok_or_else(|| invalid("OLE item was not"))?;
         *item = match cache {
             Some(cache) => item.clone().with_cached_values(cache),
             None => item.clone().without_cached_values(),
@@ -509,8 +509,8 @@ fn same_name(left: &str, right: &str) -> bool {
         .eq(right.chars().flat_map(char::to_lowercase))
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormula(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormula(message)
 }
 
 fn clone_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {

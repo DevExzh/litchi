@@ -24,7 +24,7 @@ type Record = (Kind, Vec<u8>);
 
 fn encode(records: &[Record]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer
             .write_record(*record_kind, payload)

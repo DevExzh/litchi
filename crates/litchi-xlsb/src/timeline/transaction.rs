@@ -29,7 +29,7 @@ pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<(Cont
             let parts = package::load_caches(package_value, workbook)?;
             let mut canonical = true;
             for part in &parts {
-                let uri = PackURI::new(&part.part_name).map_err(Error::InvalidUri)?;
+                let uri = PackURI::new(&part.part_name)?;
                 canonical &=
                     package_value.get_part(&uri)?.blob() == write_cache(&part.cache)?.as_slice();
             }
@@ -49,7 +49,7 @@ pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<(Cont
             let view_part = package::load_views(package_value, worksheet)?;
             let mut canonical = true;
             if let Some(attached) = &view_part {
-                let uri = PackURI::new(&attached.part_name).map_err(Error::InvalidUri)?;
+                let uri = PackURI::new(&attached.part_name)?;
                 canonical = package_value.get_part(&uri)?.blob()
                     == write_views(&attached.views)?.as_slice();
             }
@@ -90,7 +90,7 @@ pub(super) fn validate_closure(
             .any(|view| !names.contains(&Caseless::new(&view.cache)))
         {
             return Err(Error::InvalidFormat(
-                "timeline view references a missing cache".to_string(),
+                "timeline view references a missing cache",
             ));
         }
     }
@@ -112,7 +112,7 @@ fn validate_views_against_caches(
         .any(|view| !names.contains(&Caseless::new(&view.cache)))
     {
         return Err(Error::InvalidFormat(
-            "timeline view references a missing cache".to_string(),
+            "timeline view references a missing cache",
         ));
     }
     Ok(())
@@ -141,9 +141,7 @@ pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
     for cache in caches {
         write_cache(cache)?;
         if !names.insert(Caseless::new(&cache.name)) {
-            return Err(Error::InvalidFormat(
-                "duplicate timeline cache name".to_string(),
-            ));
+            return Err(Error::InvalidFormat("duplicate timeline cache name"));
         }
     }
     Ok(())
@@ -179,6 +177,10 @@ pub(super) fn store(
         _ => Err(scope_error("matching")),
     }
 }
-fn scope_error(expected: &str) -> Error {
-    Error::UnsupportedFeature(format!("timeline transaction is not a {expected} owner"))
+fn scope_error(_expected: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_timelines",
+        "timeline transaction is not a owner",
+    )
 }

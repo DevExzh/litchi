@@ -165,10 +165,7 @@ impl Worksheet {
                 .any(|group| group.range.contains(position.0, position.1));
             let is_array_anchor = if *is_array && cell.formula_binary.is_none() {
                 let range_text = array_range.as_deref().ok_or_else(|| {
-                    Error::InvalidFormula(format!(
-                        "array formula at row {}, column {} is missing its range",
-                        position.0, position.1
-                    ))
+                    Error::InvalidFormula("array formula at row, column is missing its range")
                 })?;
                 Range::parse_a1(range_text)?.top_left() == position
             } else {

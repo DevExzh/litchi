@@ -157,8 +157,7 @@ impl SourceState {
         limits: SemanticLimits,
     ) -> Result<Self> {
         let workbook = package.get_part(workbook_name)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let opc_limits = opc_capture_limits(limits)?;
         let root_relationships =
             package.source_relationships_with_limits(&root_name, opc_limits)?;

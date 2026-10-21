@@ -184,6 +184,41 @@ fn sequential_edits_compose_and_an_undo_restores_the_source_values() {
 }
 
 #[test]
+fn source_metadata_patches_replay_against_the_content_base() {
+    let bytes = fixture("Simple.xlsb");
+    let eager = Package::from_bytes(&bytes).unwrap();
+    let mut first = eager.edit_metadata().unwrap();
+    first
+        .update(|metadata| metadata.title = Some("One".to_owned()))
+        .unwrap();
+    let (once, first_patch) = first.commit().unwrap().into_parts();
+    let mut second = once.edit_metadata().unwrap();
+    second
+        .update(|metadata| metadata.subject = Some("Two".to_owned()))
+        .unwrap();
+    let (_, second_patch) = second.commit().unwrap().into_parts();
+
+    let source_owner = source(&bytes);
+    let once = source_owner
+        .apply_metadata(&first_patch)
+        .unwrap()
+        .into_package();
+    let twice = once.apply_metadata(&second_patch).unwrap().into_package();
+    assert_eq!(twice.metadata().unwrap().title.as_deref(), Some("One"));
+    assert_eq!(twice.metadata().unwrap().subject.as_deref(), Some("Two"));
+
+    let restored = twice
+        .apply_metadata(&second_patch.inverse())
+        .unwrap()
+        .into_package()
+        .apply_metadata(&first_patch.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(published(&restored), bytes);
+    assert_eq!(published(&source_owner), bytes);
+}
+
+#[test]
 fn unsupported_fields_are_refused_and_change_nothing() {
     let bytes = fixture("Simple.xlsb");
     let workbook = source(&bytes);

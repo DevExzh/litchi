@@ -66,8 +66,7 @@ pub(crate) fn discover_graph_with_probe(
     let part = package.get_part(&part_name)?;
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: CONTENT_TYPE,
         });
     }
     if !part.rels().is_empty() {
@@ -407,10 +406,9 @@ fn scan_relationship_graph(
             if relationship.reltype() == RELATIONSHIP_TYPE
                 && !source.partname().is_equivalent_to(workbook_name)
             {
-                return Err(invalid(format!(
-                    "Calculation Chain relationship on unexpected source part '{}'",
-                    source.partname().as_str()
-                )));
+                return Err(invalid(
+                    "Calculation Chain relationship on unexpected source part",
+                ));
             }
             if let Some(target) = target {
                 if relationship.target_mode() == TargetMode::Internal
@@ -458,6 +456,6 @@ fn checked_graph_part_count(current: usize, limits: SemanticLimits) -> Result<us
     Ok(actual)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

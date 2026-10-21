@@ -277,7 +277,7 @@ fn formulas_needing_workbook_context_are_refused_before_staging() {
         assert!(
             matches!(
                 error,
-                PackageError::UnsupportedFeature(_) | PackageError::InvalidFormula(_)
+                PackageError::Refused(_) | PackageError::InvalidFormula(_)
             ),
             "{text}: {error:?}"
         );

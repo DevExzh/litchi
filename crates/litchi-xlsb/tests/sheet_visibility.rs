@@ -110,9 +110,9 @@ fn ambiguous_catalog_names_are_rejected_before_state_selection() {
     let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let replacement: Vec<_> = "data".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut rewritten = Vec::new();
-    let mut writer = Encoder::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
     let mut replaced = false;
-    for item in Records::new(&original) {
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BUNDLE_SH && payload.ends_with(&old) {
@@ -361,7 +361,7 @@ fn unknown_workbook_records_survive_a_native_state_patch() {
         .opc_package()
         .get_part(&uri)
         .expect("workbook part");
-    let unknown = Records::new(workbook.blob())
+    let unknown = Records::new(workbook.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|record| record.expect("record"))
         .find(|record| record.kind() == RawKind::new(0x3ffe).unwrap())
         .expect("unknown record");
@@ -586,8 +586,8 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
         .to_vec();
     let mut rewritten = Vec::new();
     let mut position = 0usize;
-    let mut writer = Encoder::new(&mut rewritten);
-    for item in Records::new(&original) {
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BUNDLE_SH {
@@ -620,8 +620,8 @@ fn with_unknown_workbook_record(bytes: &[u8]) -> Vec<u8> {
     let unknown = RawKind::new(0x3ffe).expect("unknown record kind");
     let mut rewritten = Vec::new();
     let mut inserted = false;
-    let mut writer = Encoder::new(&mut rewritten);
-    for item in Records::new(&original) {
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         if !inserted && record.kind() == kind::END_BOOK {
             writer
@@ -650,6 +650,7 @@ fn bundle_entries(package: &OpcPackage) -> Vec<(String, String)> {
             .get_part(&workbook_uri)
             .expect("workbook part")
             .blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
     )
     .map(|record| record.expect("workbook record"))
     .filter(|record| record.kind() == kind::BUNDLE_SH)
@@ -713,7 +714,7 @@ fn opaque_sheet_kind(position: usize) -> RawKind {
 }
 
 fn record_bytes(source: &[u8], target: RawKind) -> Vec<u8> {
-    let mut records = Records::new(source);
+    let mut records = Records::new(source, litchi_xlsb::raw::Limits::DEFAULT);
     while let Some(item) = records.next() {
         let record = item.expect("record");
         if record.kind() == target {
@@ -730,7 +731,7 @@ fn sheet_view_flags(package: &Package, position: usize) -> u16 {
         .get_part(&uri)
         .expect("sheet part")
         .blob();
-    Records::new(blob)
+    Records::new(blob, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("sheet record"))
         .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
         .map(|record| {
@@ -757,10 +758,10 @@ fn with_opaque_sheet_records(bytes: &[u8], positions: &[usize]) -> Vec<u8> {
             2 => b"opaque-second-sheet-record",
             _ => panic!("unexpected opaque sheet position {position}"),
         };
-        Encoder::new(&mut opaque)
+        Encoder::new(&mut opaque, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(opaque_sheet_kind(position), payload)
             .expect("opaque record");
-        let end_sheet = Records::new(&original)
+        let end_sheet = Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT)
             .map(|item| item.expect("sheet record"))
             .find(|record| record.kind() == kind::END_SHEET)
             .expect("end sheet record")
@@ -881,8 +882,8 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
         .to_vec();
     let mut rewritten = Vec::new();
     let mut current_position = 0usize;
-    let mut writer = Encoder::new(&mut rewritten);
-    for item in Records::new(&original) {
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BUNDLE_SH {
@@ -928,8 +929,8 @@ fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut view_payload = None;
     let mut inserted = false;
-    let mut writer = Encoder::new(&mut rewritten);
-    for item in Records::new(&original) {
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("chart record");
         if record.kind() == kind::BEGIN_CS_VIEW {
             view_payload = Some(record.payload().to_vec());
@@ -964,8 +965,8 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut in_views = false;
     let mut removed = false;
-    let mut writer = Encoder::new(&mut rewritten);
-    for item in Records::new(&original) {
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("chart record");
         if record.kind() == kind::BEGIN_CS_VIEWS {
             in_views = true;

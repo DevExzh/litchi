@@ -1078,7 +1078,7 @@ pub(crate) fn decode_cached_value(
         },
         kind::CELL_RK => {
             require_cached_exact(payload, 12)?;
-            let mut cursor = raw::Cursor::with_limits(&payload[8..], "BrtCellRk", limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtCellRk", limits);
             let value = cursor.read_rk()?;
             validate_cached_number(value)?;
             Ok(crate::cell_values::Value::RkNumber(value))
@@ -1117,8 +1117,7 @@ pub(crate) fn decode_cached_value(
             )
         },
         kind::CELL_ST => {
-            let mut cursor =
-                raw::Cursor::with_limits(&payload[8..], "BrtCellSt", cell_string_limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtCellSt", cell_string_limits);
             let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
             tolerance.finish(&cursor, kind_value, row)?;
             Ok(crate::cell_values::Value::InlineString(value))
@@ -1143,8 +1142,7 @@ pub(crate) fn decode_cached_value(
         },
         kind::FMLA_STRING => {
             require_cached_at_least(payload, 14)?;
-            let mut cursor =
-                raw::Cursor::with_limits(&payload[8..], "BrtFmlaString", cell_string_limits);
+            let mut cursor = raw::Cursor::new(&payload[8..], "BrtFmlaString", cell_string_limits);
             let value = tolerance.read_wide_string(&mut cursor, kind_value, row)?;
             if cursor.remaining() < 10 {
                 return Err(invalid("BrtFmlaString is missing formula metadata"));
@@ -1224,7 +1222,7 @@ fn validate_cached_number(value: f64) -> Result<()> {
 }
 
 fn preflight_cached_rich_string(bytes: &[u8], limits: raw::Limits) -> Result<()> {
-    let mut cursor = raw::Cursor::with_limits(bytes, "indexed RichStr", limits);
+    let mut cursor = raw::Cursor::new(bytes, "indexed RichStr", limits);
     let flags = cursor.read_u8()?;
     preflight_cached_string(&mut cursor, limits.string_units().min(32_767))?;
     if flags & 1 != 0 {
@@ -1581,7 +1579,7 @@ fn write_record(
     output
         .try_reserve(record_len)
         .map_err(|source| allocation("binary-index output bytes", source))?;
-    let mut writer = raw::Encoder::with_limits(output, limits.raw);
+    let mut writer = raw::Encoder::new(output, limits.raw);
     writer.write_record(kind_value, payload)?;
     Ok(())
 }
@@ -1604,8 +1602,8 @@ fn record_wire_len(kind_value: raw::Kind, payload_len: usize) -> Result<usize> {
         })
 }
 
-fn invalid(message: &str) -> Error {
-    Error::InvalidFormat(format!("worksheet binary index: {message}"))
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 const fn limit(kind: LimitKind, actual: usize, maximum: usize) -> Error {
@@ -1648,7 +1646,7 @@ mod tests {
 
     fn worksheet_with_cells(cells: &[(u32, u32)]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = raw::Encoder::new(&mut bytes);
+        let mut writer = raw::Encoder::new(&mut bytes, raw::Limits::DEFAULT);
         writer
             .write_record(kind::BEGIN_SHEET_DATA, &[])
             .expect("begin");
@@ -1728,7 +1726,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0), (0, 1)]);
         let index = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut shifted = Vec::new();
-        let mut writer = raw::Encoder::new(&mut shifted);
+        let mut writer = raw::Encoder::new(&mut shifted, raw::Limits::DEFAULT);
         writer.write_record(kind::FRT_BEGIN, &[0; 4]).expect("frt");
         shifted.extend_from_slice(&worksheet);
 
@@ -1766,7 +1764,7 @@ mod tests {
             .expect("second anchor")
             .offset;
         let mut index = Vec::new();
-        let mut writer = raw::Encoder::new(&mut index);
+        let mut writer = raw::Encoder::new(&mut index, raw::Limits::DEFAULT);
         let mut block = Vec::new();
         block.extend_from_slice(&2_u32.to_le_bytes());
         block.extend_from_slice(&4_u32.to_le_bytes());
@@ -1795,14 +1793,14 @@ mod tests {
         drop(writer);
 
         let mut shifted = Vec::new();
-        raw::Encoder::new(&mut shifted)
+        raw::Encoder::new(&mut shifted, raw::Limits::DEFAULT)
             .write_record(kind::FRT_BEGIN, &[0; 4])
             .expect("prefix");
         shifted.extend_from_slice(&worksheet);
         let maintained = maintain_index(Some(&index), &worksheet, &shifted, Limits::DEFAULT)
             .expect("maintain")
             .expect("existing index");
-        let first = raw::Records::new(&maintained)
+        let first = raw::Records::new(&maintained, raw::Limits::DEFAULT)
             .next()
             .expect("index block record")
             .expect("index block framing");
@@ -1818,7 +1816,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0)]);
         let canonical = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut opaque = Vec::new();
-        raw::Encoder::new(&mut opaque)
+        raw::Encoder::new(&mut opaque, raw::Limits::DEFAULT)
             .write_record(
                 raw::Kind::new(0x1234).expect("opaque kind"),
                 b"extension bytes",
@@ -1826,7 +1824,7 @@ mod tests {
             .expect("opaque record");
         opaque.extend_from_slice(&canonical);
 
-        let first_cell = raw::Records::new(&worksheet)
+        let first_cell = raw::Records::new(&worksheet, raw::Limits::DEFAULT)
             .find_map(|record| {
                 let record = record.expect("record");
                 (is_cell_kind(record.kind())).then_some(record)

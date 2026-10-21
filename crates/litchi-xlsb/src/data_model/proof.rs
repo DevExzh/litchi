@@ -17,25 +17,25 @@ pub(crate) fn prove_time_grouping(
     payload: &[u8],
     grouping: &TimeGrouping,
 ) -> Result<Xldm140TimeGroupingBinding> {
-    let storage = litchi_xldm::inspect(payload)
-        .map_err(|error| invalid(format!("XLDM outer proof failed: {error}")))?;
+    let storage =
+        litchi_xldm::inspect(payload).map_err(|_error| invalid("XLDM outer proof failed"))?;
     let metadata = litchi_xldm::metadata::inspect(&storage)
-        .map_err(|error| invalid(format!("XLDM metadata proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM metadata proof failed"))?;
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
-        .map_err(|error| invalid(format!("XLDM native-data proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM native-data proof failed"))?;
     let generated = litchi_xldm::generated::inspect_system_generated(&storage)
-        .map_err(|error| invalid(format!("XLDM generated-data proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM generated-data proof failed"))?;
     let olap = litchi_xldm::olap::inspect(&storage, &metadata)
-        .map_err(|error| invalid(format!("XLDM OLAP proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM OLAP proof failed"))?;
     let olap_proof = prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
-        .map_err(|error| invalid(format!("XLDM complete OLAP proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM complete OLAP proof failed"))?;
     if !olap_proof.is_complete() {
         return Err(invalid(
             "XLDM complete OLAP proof contains unknown or unlinked members".into(),
         ));
     }
     let closure = prove_xldm140_closure(&storage, &metadata, &olap, &native, &generated)
-        .map_err(|error| invalid(format!("XLDM identity closure proof failed: {error}")))?;
+        .map_err(|_error| invalid("XLDM identity closure proof failed"))?;
     let calculated = grouping
         .columns
         .iter()
@@ -82,9 +82,9 @@ pub(crate) fn prove_time_grouping(
             &grouping.column_id,
             &calculated,
         )
-        .map_err(|error| invalid(format!("XLDM time-grouping identity proof failed: {error}")))
+        .map_err(|_error| invalid("XLDM time-grouping identity proof failed"))
 }
 
-fn invalid(message: String) -> Error {
+fn invalid(message: &'static str) -> Error {
     Error::InvalidFormat(message)
 }

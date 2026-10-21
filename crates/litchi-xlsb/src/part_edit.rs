@@ -39,8 +39,8 @@ use crate::package::Package;
 use crate::package::error::{Error, Result};
 use crate::raw::{Kind, Records, kind};
 
-pub(crate) fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+pub(crate) fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,12 +94,79 @@ fn relationships_equal(left: &Relationships, right: &Relationships) -> bool {
         })
 }
 
+/// One relationship owner's exact semantic and publication state.
+///
+/// OPC relationship members are not ordinary parts: their XML spelling lives
+/// beside the typed edge graph. Keep both views in a patch so a raw edit that
+/// changes only whitespace, attribute order, or another admitted lexical
+/// detail remains an observable, reversible edit.
+#[derive(Debug, Clone)]
+struct RelationshipState {
+    entries: Vec<Relationship>,
+    xml: Arc<Vec<u8>>,
+    member_present: bool,
+}
+
+impl PartialEq for RelationshipState {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+            && self.member_present == other.member_present
+            && (Arc::ptr_eq(&self.xml, &other.xml) || self.xml == other.xml)
+    }
+}
+
+impl Eq for RelationshipState {}
+
+impl RelationshipState {
+    fn read(package: &OpcPackage, owner: &PackURI, graph: &Relationships) -> Result<Self> {
+        let (xml, member_present) = if let Some((xml, member_present)) =
+            package.retained_relationships_xml(owner)?
+        {
+            (xml, member_present)
+        } else if owner.as_str() != "/" && graph.is_empty() {
+            (Arc::new(Vec::new()), false)
+        } else {
+            let source = package.source_relationships_with_limits(owner, package.read_limits())?;
+            (source.bytes_arc(), source.member_present())
+        };
+        Ok(Self {
+            entries: relationships(graph),
+            xml,
+            member_present,
+        })
+    }
+
+    fn matches(
+        &self,
+        package: &OpcPackage,
+        owner: &PackURI,
+        graph: &Relationships,
+    ) -> Result<bool> {
+        if self.entries != relationships(graph) {
+            return Ok(false);
+        }
+        let current = package.retained_relationships_xml(owner)?;
+        let member_present = current.as_ref().map_or_else(
+            || owner.as_str() == "/" || !graph.is_empty(),
+            |(_, member_present)| *member_present,
+        );
+        if self.member_present != member_present {
+            return Ok(false);
+        }
+        if !self.member_present {
+            return Ok(true);
+        }
+        let source = package.source_relationships_with_limits(owner, package.read_limits())?;
+        Ok(self.xml.as_slice() == source.bytes())
+    }
+}
+
 /// One part's exact state: its content type, payload and relationships.
 #[derive(Debug, Clone)]
 struct State {
     content_type: String,
     blob: Arc<Vec<u8>>,
-    relationships: Vec<Relationship>,
+    relationships: RelationshipState,
 }
 
 impl PartialEq for State {
@@ -113,32 +180,38 @@ impl PartialEq for State {
 impl Eq for State {}
 
 impl State {
-    fn read(part: &dyn Part) -> Self {
-        Self {
+    fn read(package: &OpcPackage, part: &dyn Part) -> Result<Self> {
+        Ok(Self {
             content_type: part.content_type().to_owned(),
             blob: part.blob_arc(),
-            relationships: relationships(part.rels()),
+            relationships: RelationshipState::read(package, part.partname(), part.rels())?,
+        })
+    }
+
+    fn of(package: &OpcPackage, name: &PackURI) -> Result<Option<Self>> {
+        match package.get_part(name) {
+            Ok(part) => Ok(Some(Self::read(package, part)?)),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => Ok(None),
+            Err(error) => Err(error.into()),
         }
     }
 
-    fn of(package: &OpcPackage, name: &PackURI) -> Option<Self> {
-        package.get_part(name).ok().map(Self::read)
-    }
-
     /// Whether `part` holds exactly this state, without copying its payload.
-    fn matches(&self, part: &dyn Part) -> bool {
-        self.content_type == part.content_type()
+    fn matches(&self, package: &OpcPackage, part: &dyn Part) -> Result<bool> {
+        Ok(self.content_type == part.content_type()
             && {
                 let blob = part.blob();
                 std::ptr::eq(self.blob.as_slice(), blob) || self.blob.as_slice() == blob
             }
-            && self.relationships == relationships(part.rels())
+            && self
+                .relationships
+                .matches(package, part.partname(), part.rels())?)
     }
 
     fn to_part(&self, name: PackURI) -> Result<BlobPart> {
         let mut part =
             BlobPart::new_shared(name, self.content_type.clone(), Arc::clone(&self.blob));
-        add_relationships(part.rels_mut(), &self.relationships)?;
+        add_relationships(part.rels_mut(), &self.relationships.entries)?;
         Ok(part)
     }
 }
@@ -211,6 +284,7 @@ impl Manifests {
     }
 
     fn capture(package: &OpcPackage, deltas: &[Delta], after: bool, root: bool) -> Result<Self> {
+        let limits = package.read_limits();
         let mut relationships = Vec::new();
         for delta in deltas.iter().filter(|delta| !delta.payload_only()) {
             let present = if after {
@@ -219,15 +293,15 @@ impl Manifests {
                 delta.before.is_some()
             };
             if present {
-                relationships.push(package.source_relationships(&delta.name)?);
+                relationships.push(package.source_relationships_with_limits(&delta.name, limits)?);
             }
         }
         if root {
             let owner = PackURI::new("/")?;
-            relationships.push(package.source_relationships(&owner)?);
+            relationships.push(package.source_relationships_with_limits(&owner, limits)?);
         }
         let content_types = if deltas.iter().any(Delta::changes_content_types) {
-            Some(package.source_content_types()?)
+            Some(package.source_content_types_with_limits(limits)?)
         } else {
             None
         };
@@ -240,14 +314,16 @@ impl Manifests {
     /// Publish these manifest views on `package`, whose typed graph is the
     /// one they were captured from.
     fn restore(&self, package: &mut OpcPackage) -> Result<()> {
+        let limits = package.read_limits();
         if let Some(content_types) = &self.content_types {
-            let current = package.source_content_types()?;
+            let current = package.source_content_types_with_limits(limits)?;
             if current.bytes() != content_types.bytes() {
                 package.try_replace_content_types(current.bytes(), content_types)?;
             }
         }
         for relationships in &self.relationships {
-            let current = package.source_relationships(relationships.owner())?;
+            let current =
+                package.source_relationships_with_limits(relationships.owner(), limits)?;
             if current != *relationships {
                 package.try_replace_relationships(&current, relationships)?;
             }
@@ -262,7 +338,7 @@ impl Manifests {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
-    root: Option<(Vec<Relationship>, Vec<Relationship>)>,
+    root: Option<(RelationshipState, RelationshipState)>,
     manifests: Option<LazyManifests>,
 }
 
@@ -311,8 +387,22 @@ impl LazyManifests {
 /// Two patches are equal when they change the same parts the same way; the
 /// manifest views are derived from the graphs the patches were captured on.
 impl PartialEq for LazyManifests {
-    fn eq(&self, _other: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        if self.root != other.root
+            || self.inverse != other.inverse
+            || self.deltas.as_ref() != other.deltas.as_ref()
+        {
+            return false;
+        }
+        match (self.get(), other.get()) {
+            (Ok((before, after)), Ok((other_before, other_after))) => {
+                before == other_before && after == other_after
+            },
+            // Equality is only used as a diagnostic/value comparison. If a
+            // lazy capture cannot be reproduced under its source limits,
+            // treating the values as different is the conservative result.
+            _ => false,
+        }
     }
 }
 
@@ -375,11 +465,17 @@ impl PartPatch {
     fn root(
         before: &OpcPackage,
         after: &OpcPackage,
-    ) -> Option<(Vec<Relationship>, Vec<Relationship>)> {
-        if relationships_equal(before.rels(), after.rels()) {
-            None
+    ) -> Result<Option<(RelationshipState, RelationshipState)>> {
+        let owner = PackURI::new("/")?;
+        if relationships_equal(before.rels(), after.rels())
+            && before.same_retained_relationships(after, &owner)?
+        {
+            Ok(None)
         } else {
-            Some((relationships(before.rels()), relationships(after.rels())))
+            Ok(Some((
+                RelationshipState::read(before, &owner, before.rels())?,
+                RelationshipState::read(after, &owner, after.rels())?,
+            )))
         }
     }
 
@@ -393,8 +489,8 @@ impl PartPatch {
         let mut deltas = Vec::new();
         for name in names {
             let name = PackURI::new(name.as_str())?;
-            let before = State::of(before, &name);
-            let after = State::of(after, &name);
+            let before = State::of(before, &name)?;
+            let after = State::of(after, &name)?;
             if before != after {
                 deltas.push(Delta {
                     name,
@@ -405,7 +501,7 @@ impl PartPatch {
         }
         Self {
             deltas,
-            root: Self::root(before, after),
+            root: Self::root(before, after)?,
             manifests: None,
         }
         .with_manifests(before, after)
@@ -439,11 +535,18 @@ impl PartPatch {
             let part = part?;
             let name = part.partname();
             match optional_part(after, name)? {
-                Some(other) if same_part(part, other) => {},
-                other => push(Delta {
+                Some(other)
+                    if same_part(part, other)
+                        && before.same_retained_relationships(after, name)? => {},
+                Some(other) => push(Delta {
                     name: name.clone(),
-                    before: Some(State::read(part)),
-                    after: other.map(State::read),
+                    before: Some(State::read(before, part)?),
+                    after: Some(State::read(after, other)?),
+                })?,
+                None => push(Delta {
+                    name: name.clone(),
+                    before: Some(State::read(before, part)?),
+                    after: None,
                 })?,
             }
         }
@@ -453,14 +556,14 @@ impl PartPatch {
                 push(Delta {
                     name: part.partname().clone(),
                     before: None,
-                    after: Some(State::read(part)),
+                    after: Some(State::read(after, part)?),
                 })?;
             }
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         Self {
             deltas,
-            root: Self::root(before, after),
+            root: Self::root(before, after)?,
             manifests: None,
         }
         .with_manifests(before, after)
@@ -490,23 +593,24 @@ impl PartPatch {
     /// Replay onto a copy of the OPC graph `source`, refusing a graph that is
     /// not the patch's before state; `source` is unchanged.
     pub(crate) fn apply_graph(&self, source: &OpcPackage) -> Result<OpcPackage> {
-        if let Some((before, _)) = &self.root
-            && relationships(source.rels()) != *before
-        {
-            return Err(Error::PatchConflict {
-                part: "/_rels/.rels".to_owned(),
-            });
+        if let Some((before, _)) = &self.root {
+            let owner = PackURI::new("/")?;
+            if !before.matches(source, &owner, source.rels())? {
+                return Err(Error::PatchConflict {
+                    part: "/_rels/.rels",
+                });
+            }
         }
         for delta in &self.deltas {
             let current = optional_part(source, &delta.name)?;
             let matches = match (&delta.before, current) {
                 (None, None) => true,
-                (Some(state), Some(part)) => state.matches(part),
+                (Some(state), Some(part)) => state.matches(source, part)?,
                 _ => false,
             };
             if !matches {
                 return Err(Error::PatchConflict {
-                    part: delta.name.as_str().to_owned(),
+                    part: "a changed part",
                 });
             }
         }
@@ -529,10 +633,10 @@ impl PartPatch {
         }
         if let Some((before, after)) = &self.root {
             let graph = target.rels_mut();
-            for relationship in before {
+            for relationship in &before.entries {
                 graph.remove(&relationship.id);
             }
-            add_relationships(graph, after)?;
+            add_relationships(graph, &after.entries)?;
         }
         if let Some(manifests) = &self.manifests {
             manifests.get()?.1.restore(&mut target)?;
@@ -732,9 +836,13 @@ pub(crate) fn worksheet_uri(workbook: &Workbook, sheet: usize) -> Result<PackURI
         .worksheet_for_catalog_position(sheet)
         .ok_or_else(|| {
             if sheet < workbook.sheets().len() {
-                Error::UnsupportedFeature("worksheet features belong to worksheets".to_string())
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedTarget,
+                    "edit",
+                    "worksheet features belong to worksheets",
+                )
             } else {
-                Error::WorksheetNotFound(format!("catalog position {sheet}"))
+                Error::WorksheetNotFound(Some(sheet))
             }
         })?;
     workbook.worksheet_uri(worksheet)
@@ -965,7 +1073,7 @@ impl SheetLayout {
     /// Scan a worksheet stream. Unbalanced collections and a stream without
     /// a cell table or end record are refused.
     pub(crate) fn scan(data: &[u8]) -> Result<Self> {
-        let mut records = Records::new(data);
+        let mut records = Records::new(data, crate::raw::Limits::DEFAULT);
         let mut after_cells = false;
         let mut units = Vec::new();
         let mut stack: Vec<Kind> = Vec::new();
@@ -998,10 +1106,9 @@ impl SheetLayout {
                 {
                     stack.push(*close);
                 } else if BLOCKS.iter().any(|(_, close, _)| *close == kind) {
-                    return Err(invalid(format!(
-                        "worksheet record 0x{:04X} closes a collection it did not open",
-                        kind.get()
-                    )));
+                    return Err(invalid(
+                        "worksheet record closes a collection it did not open",
+                    ));
                 }
                 continue;
             }
@@ -1017,10 +1124,9 @@ impl SheetLayout {
                 continue;
             }
             if BLOCKS.iter().any(|(_, close, _)| *close == kind) {
-                return Err(invalid(format!(
-                    "worksheet record 0x{:04X} closes a collection it did not open",
-                    kind.get()
-                )));
+                return Err(invalid(
+                    "worksheet record closes a collection it did not open",
+                ));
             }
             let rank = SINGLES
                 .iter()
@@ -1065,7 +1171,7 @@ pub(crate) fn splice(data: &[u8], span: Range<usize>, replacement: &[u8]) -> Vec
 /// Encode one record.
 pub(crate) fn record(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(payload.len() + 6);
-    crate::raw::Encoder::new(&mut out).write_record(kind, payload)?;
+    crate::raw::Encoder::new(&mut out, crate::raw::Limits::DEFAULT).write_record(kind, payload)?;
     Ok(out)
 }
 
@@ -1187,7 +1293,7 @@ mod tests {
 
     fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
         let mut out = Vec::new();
-        let mut encoder = crate::raw::Encoder::new(&mut out);
+        let mut encoder = crate::raw::Encoder::new(&mut out, crate::raw::Limits::DEFAULT);
         for (kind, payload) in records {
             encoder.write_record(*kind, payload).unwrap();
         }

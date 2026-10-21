@@ -275,7 +275,7 @@ pub fn read(source: &[u8], limits: Limits) -> Result<Snapshot> {
 fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
     limits.validate()?;
     enforce_worksheet_bytes(source.len(), limits)?;
-    let mut records = Records::new(&source);
+    let mut records = Records::new(&source, crate::raw::Limits::DEFAULT);
     let mut family = Vec::new();
     family.try_reserve_exact(3).map_err(|_| Error::Allocation {
         resource: "worksheet family stack",
@@ -347,10 +347,7 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
                     )
                 })?;
                 if expected != record_kind {
-                    return Err(invalid(
-                        "sparkline record family",
-                        format!("expected {expected}, found {record_kind}"),
-                    ));
+                    return Err(invalid("sparkline record family", "expected, found"));
                 }
                 if record_kind == kind::END_SPARKLINE_GROUPS {
                     let start = outer_start.take().ok_or_else(|| {
@@ -551,9 +548,9 @@ fn fallible_copy(source: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn invalid(record: &'static str, reason: impl Into<String>) -> Error {
+fn invalid(record: &'static str, reason: &'static str) -> Error {
     Error::Value {
         record,
-        reason: reason.into(),
+        reason: reason,
     }
 }

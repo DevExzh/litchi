@@ -26,7 +26,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     }
     let mut view_bytes = Vec::new();
     {
-        let mut writer = Encoder::new(&mut view_bytes);
+        let mut writer = Encoder::new(&mut view_bytes, crate::raw::Limits::DEFAULT);
         writer
             .write_record(kind::BEGIN_SX_VIEW, &begin_view)
             .unwrap();
@@ -120,5 +120,5 @@ fn pivot_chart_refuses_a_missing_view_binding() {
     let error = workbook
         .build()
         .expect_err("missing PivotTable binding must fail");
-    assert!(error.to_string().contains("missing pivot table"));
+    assert!(error.to_string().contains("missing pivot table"), "{error}");
 }

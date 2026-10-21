@@ -78,7 +78,7 @@ fn wide(value: &str) -> Vec<u8> {
 }
 
 fn record(kind: Kind, payload: &[u8], output: &mut Vec<u8>) {
-    Encoder::new(output)
+    Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(kind, payload)
         .expect("synthetic BIFF12 record writes");
 }
@@ -1347,7 +1347,7 @@ fn opaque_frt_reference_is_readable_but_identity_mutation_refuses() {
         .expect("identity edit stages before closure proof");
     assert!(matches!(
         transaction.commit(),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert_eq!(package_bytes(&fixture.package), before);
 }

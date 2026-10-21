@@ -480,16 +480,16 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::ReorderSheets { .. }))
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering cannot be combined with other workbook operations".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering cannot be combined with other workbook operations",
             ));
         }
         if selectors.len() != self.sheet_catalog.len() {
-            return Err(Error::InvalidFormat(format!(
-                "sheet order must select every catalog tab exactly once (expected {}, found {})",
-                self.sheet_catalog.len(),
-                selectors.len()
-            )));
+            return Err(Error::InvalidFormat(
+                "sheet order must select every catalog tab exactly once",
+            ));
         }
         let mut order = Vec::new();
         order
@@ -507,24 +507,18 @@ impl Edit {
         seen.resize(self.sheet_catalog.len(), false);
         for selector in selectors {
             let catalog_position = resolve_catalog_position(&self.sheet_catalog, selector)?
-                .ok_or_else(|| {
-                    Error::WorksheetNotFound(
-                        "sheet order selector does not resolve in the source catalog".to_string(),
-                    )
-                })?;
-            let used = seen.get_mut(catalog_position).ok_or_else(|| {
-                Error::InvalidFormat("sheet order position is out of bounds".to_string())
-            })?;
+                .ok_or_else(|| Error::WorksheetNotFound(None))?;
+            let used = seen
+                .get_mut(catalog_position)
+                .ok_or_else(|| Error::InvalidFormat("sheet order position is out of bounds"))?;
             if std::mem::replace(used, true) {
-                return Err(Error::InvalidFormat(
-                    "sheet order selectors must be unique".to_string(),
-                ));
+                return Err(Error::InvalidFormat("sheet order selectors must be unique"));
             }
             order.push(catalog_position);
         }
         if seen.iter().any(|used| !used) {
             return Err(Error::InvalidFormat(
-                "sheet order selectors must cover the complete catalog".to_string(),
+                "sheet order selectors must cover the complete catalog",
             ));
         }
         let order: Arc<[usize]> = order.into();
@@ -624,8 +618,10 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::InsertSheet { .. }))
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet insertion cannot be combined with other workbook operations".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet insertion cannot be combined with other workbook operations",
             ));
         }
         if self.operations.len() >= self.limits.changes() {
@@ -649,9 +645,9 @@ impl Edit {
                 resource: "staged XLSB sheet catalog",
             })?;
         if catalog_position > staged_len {
-            return Err(Error::InvalidFormat(format!(
-                "sheet insertion position {catalog_position} exceeds staged catalog length {staged_len}"
-            )));
+            return Err(Error::InvalidFormat(
+                "sheet insertion position exceeds staged catalog length",
+            ));
         }
         validate_sheet_name_value(&name)?;
         validate_staged_insert_sheet_name(&self.sheet_catalog, &self.operations, &name)?;
@@ -751,8 +747,10 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::RemoveSheets { .. }))
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal cannot be combined with other workbook operations".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal cannot be combined with other workbook operations",
             ));
         }
         let existing_index =
@@ -917,7 +915,7 @@ impl Edit {
         let tab = &self.sheet_catalog[catalog_position];
         if tab.kind == Kind::Unbound && state != State::VeryHidden {
             return Err(Error::InvalidRelationship(
-                "unbound XLSB sheet tabs must be very hidden".to_string(),
+                "unbound XLSB sheet tabs must be very hidden",
             ));
         }
         let state_index = self
@@ -1021,8 +1019,10 @@ impl Edit {
             return Ok(None);
         };
         if self.sheet_catalog[catalog_position].kind != Kind::Worksheet {
-            return Err(Error::UnsupportedFeature(
-                "merged ranges belong to worksheets".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit",
+                "merged ranges belong to worksheets",
             ));
         }
         range.validate()?;
@@ -1034,7 +1034,7 @@ impl Edit {
             Some(index) => {
                 let Operation::SetMergedRanges { ranges, .. } = &self.operations[index] else {
                     return Err(Error::InvalidFormat(
-                        "merge selection names another operation".to_string(),
+                        "merge selection names another operation",
                     ));
                 };
                 ranges.to_vec()
@@ -1044,8 +1044,10 @@ impl Edit {
                 let worksheet = workbook
                     .worksheet_for_catalog_position(catalog_position)
                     .ok_or_else(|| {
-                        Error::UnsupportedFeature(
-                            "the selected tab has no worksheet part".to_string(),
+                        Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "edit",
+                            "the selected tab has no worksheet part",
                         )
                     })?;
                 workbook.merged_cell_ranges(worksheet)?
@@ -1056,16 +1058,20 @@ impl Edit {
         match (merge, exact) {
             (true, Some(_)) | (false, None) => {
                 if !merge && current.iter().any(|existing| existing.overlaps(&range)) {
-                    return Err(Error::UnsupportedFeature(
-                        "the range overlaps a different merge; name that merge exactly".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "the range overlaps a different merge; name that merge exactly",
                     ));
                 }
                 return Ok(Some(false));
             },
             (true, None) => {
                 if current.iter().any(|existing| existing.overlaps(&range)) {
-                    return Err(Error::UnsupportedFeature(
-                        "the range overlaps an existing merge".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "the range overlaps an existing merge",
                     ));
                 }
                 next.push(range);
@@ -1120,8 +1126,7 @@ impl Edit {
         sheet: impl Into<Selector<'b>>,
         range: crate::formula::Range,
     ) -> Result<Option<()>> {
-        crate::named_ranges::validate_name(name)
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        crate::named_ranges::validate_name(name)?;
         let scope = match scope {
             Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
                 Some(position) => Some(position),
@@ -1133,8 +1138,10 @@ impl Edit {
             return Ok(None);
         };
         if self.sheet_catalog[sheet].kind != Kind::Worksheet {
-            return Err(Error::UnsupportedFeature(
-                "a defined name refers to a worksheet range".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "a defined name refers to a worksheet range",
             ));
         }
         self.stage_defined_name(Operation::SetDefinedName {
@@ -1161,8 +1168,7 @@ impl Edit {
         name: &str,
         scope: Option<Selector<'a>>,
     ) -> Result<Option<()>> {
-        crate::named_ranges::validate_name(name)
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        crate::named_ranges::validate_name(name)?;
         let scope = match scope {
             Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
                 Some(position) => Some(position),
@@ -1295,7 +1301,7 @@ impl Edit {
     ) -> Result<()> {
         if !cache.is_formula_cache() {
             return Err(Error::InvalidFormat(
-                "formula authoring requires a Formula*Cache value".to_string(),
+                "formula authoring requires a Formula*Cache value",
             ));
         }
         let mut donor = self.base.materialize_workbook()?;
@@ -1345,14 +1351,18 @@ impl Edit {
         let drawing = source
             .sheet_drawing(source_catalog_position)
             .ok_or_else(|| {
-                Error::UnsupportedFeature(format!(
-                    "source sheet {source_sheet} has no decoded drawing"
-                ))
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "source sheet has no decoded drawing",
+                )
             })?;
         let embedded = drawing.images.get(image_index).ok_or_else(|| {
-            Error::UnsupportedFeature(format!(
-                "source sheet {source_sheet} has no embedded image {image_index}"
-            ))
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "source sheet has no embedded image",
+            )
         })?;
         let image =
             crate::writer::Image::new(Arc::clone(&embedded.data), embedded.format, target_anchor)?;
@@ -1409,14 +1419,14 @@ impl Edit {
         let style_index = author_style(&mut donor, style)?;
         let font_id = donor
             .styles()
-            .get_cell_format(usize::try_from(style_index.get()).map_err(|error| {
-                Error::InvalidFormat(format!("authored style index overflow: {error}"))
-            })?)
-            .ok_or_else(|| Error::InvalidFormat("authored cell XF is absent".to_string()))?
+            .get_cell_format(
+                usize::try_from(style_index.get())
+                    .map_err(|_error| Error::InvalidFormat("authored style index overflow"))?,
+            )
+            .ok_or_else(|| Error::InvalidFormat("authored cell XF is absent"))?
             .font_id;
-        let font_id = u16::try_from(font_id).map_err(|error| {
-            Error::InvalidFormat(format!("authored font index exceeds u16: {error}"))
-        })?;
+        let font_id = u16::try_from(font_id)
+            .map_err(|_error| Error::InvalidFormat("authored font index exceeds u16"))?;
         for run in &mut string.runs {
             run.font_id = font_id;
         }
@@ -1476,9 +1486,10 @@ impl Edit {
                     | Operation::RemoveSheets { .. }
             ) != is_catalog_topology
         }) {
-            return Err(Error::UnsupportedFeature(
-                "sheet catalog topology operations cannot be combined with other workbook operations"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet catalog topology operations cannot be combined with other workbook operations",
             ));
         }
         if self.operations.len() >= self.limits.changes() {
@@ -1505,9 +1516,11 @@ impl Edit {
                 })
             });
         if conflicts {
-            return Err(Error::UnsupportedFeature(format!(
-                "workbook transaction selects {selection:?} more than once"
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook transaction selects more than once",
+            ));
         }
         let index = self.operations.len();
         self.operations.push(operation);
@@ -1611,8 +1624,10 @@ impl Patch {
 
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
         if package.to_bytes()?.as_slice() != self.before.as_ref() {
-            return Err(Error::UnsupportedFeature(
-                "workbook patch source is stale".to_owned(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook patch source is stale",
             ));
         }
         if self.is_noop() {
@@ -1655,8 +1670,10 @@ impl Patch {
     #[cfg(test)]
     pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
         if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
-            return Err(Error::UnsupportedFeature(
-                "workbook patch source is stale".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook patch source is stale",
             ));
         }
         if self.is_noop() {
@@ -1690,16 +1707,19 @@ impl Patch {
     /// Returns an error for distinct exact bases or failed bounded replay.
     pub fn merge_three_way(&self, other: &Self) -> Result<MergeOutcome> {
         if self.before != other.before {
-            return Err(Error::UnsupportedFeature(
-                "workbook patches do not share an exact base".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook patches do not share an exact base",
             ));
         }
         if (self.operations.is_empty() && self.before != self.after)
             || (other.operations.is_empty() && other.before != other.after)
         {
-            return Err(Error::UnsupportedFeature(
-                "exact-image inverse patches do not carry forward semantic merge operations"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "exact-image inverse patches do not carry forward semantic merge operations",
             ));
         }
         let mut merged = self.operations.clone();
@@ -1883,7 +1903,7 @@ impl Patch {
         require(data, 32)?;
         if data.get(..8) != Some(MAGIC.as_slice()) {
             return Err(Error::InvalidFormat(
-                "unknown durable workbook patch version".to_string(),
+                "unknown durable workbook patch version",
             ));
         }
         let before_len = read_usize(data, 8)?;
@@ -1955,7 +1975,7 @@ impl Patch {
                 != after.as_ref()
         {
             return Err(Error::InvalidFormat(
-                "durable workbook patch operations do not reconstruct its after image".to_string(),
+                "durable workbook patch operations do not reconstruct its after image",
             ));
         }
         Ok(Self {
@@ -2145,8 +2165,10 @@ impl History {
                 .map(|entry| Arc::clone(&entry.after))
         };
         if expected.is_some_and(|source| source.as_ref() != patch.before.as_ref()) {
-            return Err(Error::UnsupportedFeature(
-                "workbook history patch does not continue its exact source tip".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook history patch does not continue its exact source tip",
             ));
         }
         while self.entries.len() > self.cursor {
@@ -2185,7 +2207,11 @@ impl History {
     /// not the entry's after state, and for a failed readback.
     pub fn undo(&mut self, package: &crate::Package) -> Result<Commit> {
         let index = self.cursor.checked_sub(1).ok_or_else(|| {
-            Error::UnsupportedFeature("workbook history has no undo entry".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook history has no undo entry",
+            )
         })?;
         let commit = package.apply(&self.entries[index].inverse())?;
         self.cursor = index;
@@ -2201,7 +2227,11 @@ impl History {
     /// not the entry's before state, and for a failed readback.
     pub fn redo(&mut self, package: &crate::Package) -> Result<Commit> {
         let patch = self.entries.get(self.cursor).ok_or_else(|| {
-            Error::UnsupportedFeature("workbook history has no redo entry".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "workbook history has no redo entry",
+            )
         })?;
         let commit = package.apply(patch)?;
         self.cursor = self.cursor.saturating_add(1);
@@ -2291,8 +2321,10 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
         .filter(|operation| matches!(operation, Operation::ReorderSheets { .. }))
         .count();
     if reorder_count > 1 {
-        return Err(Error::UnsupportedFeature(
-            "durable workbook patches may contain at most one sheet-reorder operation".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "durable workbook patches may contain at most one sheet-reorder operation",
         ));
     }
     let insert_count = operations
@@ -2307,8 +2339,10 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
         .saturating_add(usize::from(insert_count > 0))
         .saturating_add(usize::from(remove_count > 0));
     if topology_family_count > 1 {
-        return Err(Error::UnsupportedFeature(
-            "sheet topology operations cannot be combined in one durable patch".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet topology operations cannot be combined in one durable patch",
         ));
     }
     if reorder_count == 1
@@ -2316,8 +2350,10 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
             .iter()
             .any(|operation| !matches!(operation, Operation::ReorderSheets { .. }))
     {
-        return Err(Error::UnsupportedFeature(
-            "sheet reordering cannot be combined with other workbook operations".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet reordering cannot be combined with other workbook operations",
         ));
     }
     if insert_count > 0
@@ -2325,8 +2361,10 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
             .iter()
             .any(|operation| !matches!(operation, Operation::InsertSheet { .. }))
     {
-        return Err(Error::UnsupportedFeature(
-            "sheet insertion cannot be combined with other workbook operations".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet insertion cannot be combined with other workbook operations",
         ));
     }
     if remove_count > 0
@@ -2334,13 +2372,17 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
             .iter()
             .any(|operation| !matches!(operation, Operation::RemoveSheets { .. }))
     {
-        return Err(Error::UnsupportedFeature(
-            "sheet removal cannot be combined with other workbook operations".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet removal cannot be combined with other workbook operations",
         ));
     }
     if remove_count > 1 {
-        return Err(Error::UnsupportedFeature(
-            "durable workbook patches may contain at most one sheet-removal operation".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "durable workbook patches may contain at most one sheet-removal operation",
         ));
     }
     Ok(())
@@ -2438,9 +2480,11 @@ fn replay_workbook(
                 let worksheet = workbook
                     .worksheet_for_catalog_position(*catalog_position)
                     .ok_or_else(|| {
-                        Error::UnsupportedFeature(format!(
-                            "catalog position {catalog_position} is not a worksheet"
-                        ))
+                        Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedTarget,
+                            "edit",
+                            "catalog position is not a worksheet",
+                        )
                     })?;
                 let before = workbook.merged_cell_ranges(worksheet)?;
                 if before[..] != ranges[..] {
@@ -2467,7 +2511,7 @@ fn replay_workbook(
             | Operation::SetSheetName { .. }
             | Operation::SetSheetState { .. } => {
                 return Err(Error::InvalidFormat(
-                    "workbook metadata operation grouping is internally inconsistent".to_string(),
+                    "workbook metadata operation grouping is internally inconsistent",
                 ));
             },
         }
@@ -2544,15 +2588,21 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = workbook.package.get_part(&worksheet_uri)?.blob().to_vec();
     let mut drawing_rel_id = None;
-    for item in Records::new(&worksheet_source) {
+    for item in Records::new(&worksheet_source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() == kind::DRAWING {
             if drawing_rel_id.is_some() {
-                return Err(Error::UnsupportedFeature(
-                    "worksheet contains multiple BrtDrawing records".to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "worksheet contains multiple BrtDrawing records",
                 ));
             }
-            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing");
+            let mut cursor = crate::raw::Cursor::new(
+                record.payload(),
+                "BrtDrawing",
+                crate::raw::Limits::DEFAULT,
+            );
             drawing_rel_id = Some(cursor.read_wide_string()?);
         }
     }
@@ -2580,14 +2630,14 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
             )
         })
     {
-        return Err(Error::UnsupportedFeature(
-            "worksheet has a Drawing relationship without BrtDrawing ownership".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "worksheet has a Drawing relationship without BrtDrawing ownership",
         ));
     }
     let search_end = u32::try_from(workbook.package.iter_parts().count().saturating_add(1))
-        .map_err(|error| {
-            Error::InvalidFormat(format!("drawing part search bound exceeds u32: {error}"))
-        })?;
+        .map_err(|_error| Error::InvalidFormat("drawing part search bound exceeds u32"))?;
     let index = (1_u32..=search_end)
         .find(|index| {
             let drawing = PackURI::new(format!("/xl/drawings/drawing{index}.xml"));
@@ -2598,7 +2648,13 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
             drawing.is_ok_and(|uri| !workbook.package.contains_part(&uri))
                 && media.is_ok_and(|uri| !workbook.package.contains_part(&uri))
         })
-        .ok_or_else(|| Error::UnsupportedFeature("no drawing part index remains".to_string()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "no drawing part index remains",
+            )
+        })?;
     let drawing_uri = PackURI::new(format!("/xl/drawings/drawing{index}.xml"))?;
     let media_uri = PackURI::new(format!(
         "/xl/media/image{index}.{}",
@@ -2644,20 +2700,22 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         },
     );
     let mut drawing_payload = Vec::new();
-    Encoder::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
+    Encoder::new(&mut drawing_payload, crate::raw::Limits::DEFAULT)
+        .write_wide_string(&drawing_rel_id)?;
     let mut worksheet_output = Vec::new();
     let mut inserted = false;
-    for item in Records::new(&worksheet_source) {
+    for item in Records::new(&worksheet_source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            Encoder::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
+            Encoder::new(&mut worksheet_output, crate::raw::Limits::DEFAULT)
+                .write_record(kind::DRAWING, &drawing_payload)?;
             inserted = true;
         }
         copy_record(&worksheet_source, &record, &mut worksheet_output)?;
     }
     if !inserted {
         return Err(Error::InvalidFormat(
-            "worksheet has no safe BrtDrawing insertion boundary".to_string(),
+            "worksheet has no safe BrtDrawing insertion boundary",
         ));
     }
     crate::worksheet_index::maintain(
@@ -2674,7 +2732,7 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     if workbook.sheet_drawing(catalog_position).is_none() {
         return Err(Error::InvalidFormat(
-            "authored worksheet drawing failed semantic readback".to_string(),
+            "authored worksheet drawing failed semantic readback",
         ));
     }
     Ok(())
@@ -2689,11 +2747,10 @@ fn append_image(
     image: &crate::writer::Image,
 ) -> Result<()> {
     let worksheet_part = workbook.package.get_part(worksheet_uri)?;
-    let relationship = worksheet_part.rels().get(drawing_rel_id).ok_or_else(|| {
-        Error::InvalidFormat(format!(
-            "BrtDrawing relationship {drawing_rel_id:?} is absent"
-        ))
-    })?;
+    let relationship = worksheet_part
+        .rels()
+        .get(drawing_rel_id)
+        .ok_or_else(|| Error::InvalidFormat("BrtDrawing relationship is absent"))?;
     if relationship.is_external()
         || !matches!(
             relationship.reltype(),
@@ -2702,14 +2759,14 @@ fn append_image(
         )
     {
         return Err(Error::InvalidFormat(
-            "BrtDrawing relationship is external or has the wrong type".to_string(),
+            "BrtDrawing relationship is external or has the wrong type",
         ));
     }
     let drawing_uri = relationship.target_partname()?;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
-    let drawing = workbook.sheet_drawing(catalog_position).ok_or_else(|| {
-        Error::InvalidFormat("BrtDrawing has no decoded DrawingML inventory".to_string())
-    })?;
+    let drawing = workbook
+        .sheet_drawing(catalog_position)
+        .ok_or_else(|| Error::InvalidFormat("BrtDrawing has no decoded DrawingML inventory"))?;
     let before_images = drawing.images.len();
     let object_id = crate::package::drawing_write::next_drawing_object_id(
         workbook.package.get_part(&drawing_uri)?.blob(),
@@ -2746,32 +2803,36 @@ fn append_image(
     *workbook = validated;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     let drawing = workbook.sheet_drawing(catalog_position).ok_or_else(|| {
-        Error::InvalidFormat("appended worksheet drawing failed semantic readback".to_string())
+        Error::InvalidFormat("appended worksheet drawing failed semantic readback")
     })?;
     let expected_images = before_images
         .checked_add(1)
-        .ok_or_else(|| Error::InvalidFormat("drawing image count overflow".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("drawing image count overflow"))?;
     if drawing.images.len() != expected_images
         || drawing.images.last().map(|value| value.data.as_ref()) != Some(plan.data.as_ref())
     {
         return Err(Error::InvalidFormat(
-            "appended image dependency failed semantic readback".to_string(),
+            "appended image dependency failed semantic readback",
         ));
     }
     Ok(())
 }
 
 fn free_media_index(package: &litchi_opc::OpcPackage, extension: &str) -> Result<u32> {
-    let search_end =
-        u32::try_from(package.iter_parts().count().saturating_add(1)).map_err(|error| {
-            Error::InvalidFormat(format!("media part search bound exceeds u32: {error}"))
-        })?;
+    let search_end = u32::try_from(package.iter_parts().count().saturating_add(1))
+        .map_err(|_error| Error::InvalidFormat("media part search bound exceeds u32"))?;
     (1..=search_end)
         .find(|index| {
             PackURI::new(format!("/xl/media/image{index}.{extension}"))
                 .is_ok_and(|uri| !package.contains_part(&uri))
         })
-        .ok_or_else(|| Error::UnsupportedFeature("no image part index remains".to_string()))
+        .ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "no image part index remains",
+            )
+        })
 }
 
 fn is_strict(package: &litchi_opc::OpcPackage) -> bool {
@@ -2787,8 +2848,10 @@ fn is_strict(package: &litchi_opc::OpcPackage) -> bool {
 
 fn require_eager_drawing_projection(workbook: &Workbook) -> Result<()> {
     if workbook.drawing_load_policy() == DrawingLoadPolicy::Skipped {
-        return Err(Error::UnsupportedFeature(
-            "drawing authoring requires an eager drawing projection".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "drawing authoring requires an eager drawing projection",
         ));
     }
     Ok(())
@@ -2814,60 +2877,51 @@ fn transfer_cell(
     let source_cell = source_snapshot
         .cell(source_reference)?
         .cloned()
-        .ok_or_else(|| {
-            Error::InvalidCellReference(format!(
-                "source cell ({}, {}) is absent",
-                source_reference.row(),
-                source_reference.column()
-            ))
-        })?;
+        .ok_or_else(|| Error::InvalidCellReference("source cell (, ) is absent"))?;
     if target
         .cell_values(target_sheet)?
         .cell(target_reference)?
         .is_some()
     {
-        return Err(Error::UnsupportedFeature(format!(
-            "target cell ({}, {}) is occupied",
-            target_reference.row(),
-            target_reference.column()
-        )));
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "target cell (, ) is occupied",
+        ));
     }
     let mut package = target.package.clone();
     let style =
         super::resources::transfer_style(&source.package, &mut package, source_cell.style())?;
-    let value = match source_cell.value() {
-        Value::SharedStringIndex(index) => {
-            let index = usize::try_from(*index).map_err(|error| {
-                Error::InvalidCellReference(format!(
-                    "shared-string index does not fit usize: {error}"
-                ))
-            })?;
-            let string = source.shared_strings().get(index).ok_or_else(|| {
-                Error::InvalidCellReference(format!("source shared-string index {index} is absent"))
-            })?;
-            let string =
-                super::resources::transfer_string_fonts(&source.package, &mut package, string)?;
-            Value::SharedStringIndex(super::resources::intern_shared_string_for_new_cell(
-                &mut package,
-                &string,
-            )?)
-        },
-        Value::RichString(string) => Value::RichString(super::resources::transfer_string_fonts(
-            &source.package,
-            &mut package,
-            string,
-        )?),
-        Value::Blank => Value::Blank,
-        Value::RkNumber(value) => Value::RkNumber(*value),
-        Value::Error(value) => Value::Error(*value),
-        Value::Boolean(value) => Value::Boolean(*value),
-        Value::Number(value) => Value::Number(*value),
-        Value::InlineString(value) => Value::InlineString(value.clone()),
-        Value::FormulaStringCache(value) => Value::FormulaStringCache(value.clone()),
-        Value::FormulaNumberCache(value) => Value::FormulaNumberCache(*value),
-        Value::FormulaBooleanCache(value) => Value::FormulaBooleanCache(*value),
-        Value::FormulaErrorCache(value) => Value::FormulaErrorCache(*value),
-    };
+    let value =
+        match source_cell.value() {
+            Value::SharedStringIndex(index) => {
+                let index = usize::try_from(*index).map_err(|_error| {
+                    Error::InvalidCellReference("shared-string index does not fit usize")
+                })?;
+                let string = source.shared_strings().get(index).ok_or_else(|| {
+                    Error::InvalidCellReference("source shared-string index is absent")
+                })?;
+                let string =
+                    super::resources::transfer_string_fonts(&source.package, &mut package, string)?;
+                Value::SharedStringIndex(super::resources::intern_shared_string_for_new_cell(
+                    &mut package,
+                    &string,
+                )?)
+            },
+            Value::RichString(string) => Value::RichString(
+                super::resources::transfer_string_fonts(&source.package, &mut package, string)?,
+            ),
+            Value::Blank => Value::Blank,
+            Value::RkNumber(value) => Value::RkNumber(*value),
+            Value::Error(value) => Value::Error(*value),
+            Value::Boolean(value) => Value::Boolean(*value),
+            Value::Number(value) => Value::Number(*value),
+            Value::InlineString(value) => Value::InlineString(value.clone()),
+            Value::FormulaStringCache(value) => Value::FormulaStringCache(value.clone()),
+            Value::FormulaNumberCache(value) => Value::FormulaNumberCache(*value),
+            Value::FormulaBooleanCache(value) => Value::FormulaBooleanCache(*value),
+            Value::FormulaErrorCache(value) => Value::FormulaErrorCache(*value),
+        };
     let uri = target.worksheet_uri(target_sheet)?;
     let leniency = target.leniency();
     let mut edit = super::workbook::read_with_limits_and_leniency(
@@ -2914,15 +2968,13 @@ fn transfer_cell(
 fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: State) -> Result<()> {
     let catalog_len = workbook.sheets().len();
     if position > catalog_len {
-        return Err(Error::InvalidFormat(format!(
-            "sheet insertion position {position} exceeds catalog length {catalog_len}"
-        )));
+        return Err(Error::InvalidFormat(
+            "sheet insertion position exceeds catalog length",
+        ));
     }
     validate_sheet_name_value(name)?;
     if workbook.sheets().any(|tab| excel_name_eq(tab.name(), name)) {
-        return Err(Error::InvalidFormat(format!(
-            "duplicate sheet name {name:?}"
-        )));
+        return Err(Error::InvalidFormat("duplicate sheet name"));
     }
     reject_unmodeled_reorder_dependencies(&workbook.package)?;
     reject_shared_workbook_headers(&workbook.package)?;
@@ -3028,7 +3080,7 @@ fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     });
     let mut source = Vec::new();
     worksheet.write_with_sparkline_block(
-        &mut Encoder::new(&mut source),
+        &mut Encoder::new(&mut source, crate::raw::Limits::DEFAULT),
         &mut crate::writer::SharedStringsWriter::new(),
         None,
     )?;
@@ -3104,13 +3156,13 @@ fn collect_bundle_records(
     let mut open = false;
     let mut seen = false;
     let mut closed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if open || seen || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                        "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
                 open = true;
@@ -3131,32 +3183,32 @@ fn collect_bundle_records(
             },
             kind::BUNDLE_SH => {
                 return Err(Error::InvalidFormat(
-                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection",
                 ));
             },
             kind::END_BUNDLE_SHS => {
                 if !open || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                        "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
                 }
                 open = false;
                 closed = true;
             },
             _ if open => {
-                return Err(Error::UnsupportedFeature(
-                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records",
                 ));
             },
             _ => {},
         }
     }
     if open || !closed || !seen || records.len() != catalog_len {
-        return Err(Error::InvalidFormat(format!(
-            "Workbook BrtBundleSh count {} differs from catalog size {catalog_len}",
-            records.len()
-        )));
+        return Err(Error::InvalidFormat(
+            "Workbook BrtBundleSh count differs from catalog size",
+        ));
     }
     Ok(records)
 }
@@ -3172,22 +3224,21 @@ fn allocate_tab_id(records: &[crate::package::records::BundleSheetRecord]) -> Re
     used.resize(max_id.saturating_add(1), false);
     for record in records {
         let index = usize::try_from(record.id).map_err(|_error| {
-            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds usize".to_string())
+            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds usize")
         })?;
         let slot = used.get_mut(index).ok_or_else(|| {
-            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds u16".to_string())
+            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds u16")
         })?;
         if *slot {
             return Err(Error::InvalidFormat(
-                "BrtBundleSh stable sheet identifiers are not unique".to_string(),
+                "BrtBundleSh stable sheet identifiers are not unique",
             ));
         }
         *slot = true;
     }
     for candidate in 1..=u32::from(u16::MAX) {
-        let index = usize::try_from(candidate).map_err(|_error| {
-            Error::InvalidFormat("stable sheet identifier does not fit usize".to_string())
-        })?;
+        let index = usize::try_from(candidate)
+            .map_err(|_error| Error::InvalidFormat("stable sheet identifier does not fit usize"))?;
         if !used[index] {
             return Ok(candidate);
         }
@@ -3202,11 +3253,11 @@ fn allocate_tab_id(records: &[crate::package::records::BundleSheetRecord]) -> Re
 fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> Result<Vec<u8>> {
     if !(1..=u32::from(u16::MAX)).contains(&tab_id) || rel_id.is_empty() {
         return Err(Error::InvalidFormat(
-            "new BrtBundleSh has an invalid stable identifier or relationship".to_string(),
+            "new BrtBundleSh has an invalid stable identifier or relationship",
         ));
     }
     let mut payload = Vec::new();
-    let mut writer = Encoder::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
     writer.write_u32(u32::from(state_to_wire(state)))?;
     writer.write_u32(tab_id)?;
     writer.write_wide_string(rel_id)?;
@@ -3224,7 +3275,7 @@ fn rewrite_workbook_insert(
 ) -> Result<Vec<u8>> {
     if position > catalog_len {
         return Err(Error::InvalidFormat(
-            "sheet insertion position exceeds the source catalog".to_string(),
+            "sheet insertion position exceeds the source catalog",
         ));
     }
     let new_bundle_record = make_record(kind::BUNDLE_SH, new_bundle_payload)?;
@@ -3247,14 +3298,14 @@ fn rewrite_workbook_insert(
     let mut saw_bundle_collection = false;
     let mut bundle_collection_closed = false;
     let mut inserted = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         let raw = record_bytes(source, &record)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if bundle_open || saw_bundle_collection || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                        "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
                 saw_bundle_collection = true;
@@ -3273,13 +3324,13 @@ fn rewrite_workbook_insert(
             },
             kind::BUNDLE_SH => {
                 return Err(Error::InvalidFormat(
-                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection",
                 ));
             },
             kind::END_BUNDLE_SHS => {
                 if !bundle_open || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                        "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
                 }
                 if bundle_count == position {
@@ -3291,9 +3342,10 @@ fn rewrite_workbook_insert(
                 output.extend_from_slice(raw);
             },
             _ if bundle_open => {
-                return Err(Error::UnsupportedFeature(
-                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records",
                 ));
             },
             kind::BEGIN_BOOK
@@ -3320,11 +3372,12 @@ fn rewrite_workbook_insert(
                     rewrite_workbook_record_insert(raw, position, catalog_len, context)?;
                 output.extend_from_slice(&rewritten);
             },
-            other => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet insertion cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
-                    record.offset()
-                )));
+            _other => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet insertion cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+                ));
             },
         }
     }
@@ -3333,13 +3386,13 @@ fn rewrite_workbook_insert(
         || !saw_bundle_collection
         || bundle_count != catalog_len
     {
-        return Err(Error::InvalidFormat(format!(
-            "Workbook BrtBundleSh count {bundle_count} differs from catalog size {catalog_len}"
-        )));
+        return Err(Error::InvalidFormat(
+            "Workbook BrtBundleSh count differs from catalog size",
+        ));
     }
     if !inserted {
         return Err(Error::InvalidFormat(
-            "Workbook sheet catalog insertion record was not emitted".to_string(),
+            "Workbook sheet catalog insertion record was not emitted",
         ));
     }
     Ok(output)
@@ -3347,7 +3400,7 @@ fn rewrite_workbook_insert(
 
 fn make_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    Encoder::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(record_kind, payload)?;
     Ok(output)
 }
 
@@ -3384,12 +3437,10 @@ fn rewrite_workbook_record_insert(
                             found: payload.len(),
                         })?,
                 ))
-                .map_err(|_error| {
-                    Error::InvalidFormula("BrtBookView index overflow".to_string())
-                })?;
+                .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow"))?;
                 if old >= catalog_len {
                     return Err(Error::InvalidFormat(
-                        "BrtBookView points outside the sheet catalog".to_string(),
+                        "BrtBookView points outside the sheet catalog",
                     ));
                 }
                 let new = if old >= position {
@@ -3423,11 +3474,11 @@ fn rewrite_workbook_record_insert(
             })?);
             if old != u32::MAX {
                 let old = usize::try_from(old).map_err(|_error| {
-                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize")
                 })?;
                 if old >= catalog_len {
                     return Err(Error::InvalidFormula(
-                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
+                        "BrtName sheet scope exceeds the sheet catalog",
                     ));
                 }
                 let new = if old >= position {
@@ -3476,7 +3527,7 @@ fn rewrite_extern_sheet_payload_insert(
             found: payload.len(),
         },
     )?))
-    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow"))?;
     let expected = 4usize
         .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
             resource: "BrtExternSheet payload size",
@@ -3515,18 +3566,16 @@ fn rewrite_extern_sheet_payload_insert(
         let link = context
             .supporting_links
             .get(usize::try_from(external_link).map_err(|_error| {
-                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow")
             })?)
             .ok_or_else(|| {
-                Error::InvalidFormula(
-                    "BrtExternSheet supporting-link index is unresolved".to_string(),
-                )
+                Error::InvalidFormula("BrtExternSheet supporting-link index is unresolved")
             })?;
         if matches!(link, crate::package::formula::SupportingLink::SameSheet)
             && (first, last) != (-2, -2)
         {
             return Err(Error::InvalidFormula(
-                "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+                "same-sheet BrtExternSheet has invalid endpoints",
             ));
         }
         if !matches!(link, crate::package::formula::SupportingLink::SelfWorkbook) {
@@ -3537,23 +3586,25 @@ fn rewrite_extern_sheet_payload_insert(
         }
         if first < 0 || last < first {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range has invalid endpoints".to_string(),
+                "internal BrtExternSheet range has invalid endpoints",
             ));
         }
         let first = usize::try_from(first).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow")
         })?;
         let last = usize::try_from(last).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow")
         })?;
         if last >= catalog_len {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+                "internal BrtExternSheet range exceeds the sheet catalog",
             ));
         }
         if first < position && position <= last {
-            return Err(Error::UnsupportedFeature(
-                "sheet insertion would broaden an internal BrtExternSheet 3-D range".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet insertion would broaden an internal BrtExternSheet 3-D range",
             ));
         }
         let first = if first >= position {
@@ -3595,7 +3646,7 @@ fn rewrite_volatile_dependencies_insert(
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -3614,10 +3665,10 @@ fn rewrite_volatile_dependencies_insert(
                     found: record.payload().len(),
                 })?,
         ))
-        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow"))?;
         if old >= catalog_len {
             return Err(Error::InvalidFormat(
-                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+                "BrtVolRef sheet index exceeds the sheet catalog",
             ));
         }
         let new = if old >= position {
@@ -3628,9 +3679,9 @@ fn rewrite_volatile_dependencies_insert(
             old
         };
         let (_, header_len) = Header::parse(
-            source.get(record.offset()..).ok_or_else(|| {
-                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
-            })?,
+            source
+                .get(record.offset()..)
+                .ok_or_else(|| Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
             RawLimits::DEFAULT,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
@@ -3779,7 +3830,7 @@ fn validate_sheet_removal_positions(
 ) -> Result<(Vec<usize>, Vec<bool>)> {
     if positions.is_empty() {
         return Err(Error::InvalidFormat(
-            "sheet removal must select at least one catalog position".to_string(),
+            "sheet removal must select at least one catalog position",
         ));
     }
     let mut removed = Vec::new();
@@ -3793,13 +3844,13 @@ fn validate_sheet_removal_positions(
     let mut previous = None;
     for &position in positions {
         if position >= catalog_len {
-            return Err(Error::InvalidFormat(format!(
-                "sheet removal position {position} exceeds catalog length {catalog_len}"
-            )));
+            return Err(Error::InvalidFormat(
+                "sheet removal position exceeds catalog length",
+            ));
         }
         if previous.is_some_and(|old| position <= old) {
             return Err(Error::InvalidFormat(
-                "sheet-removal positions must be sorted and unique".to_string(),
+                "sheet-removal positions must be sorted and unique",
             ));
         }
         previous = Some(position);
@@ -3824,7 +3875,7 @@ fn validate_sheet_removal_positions(
     }
     if next == 0 {
         return Err(Error::InvalidFormat(
-            "sheet removal must leave at least one catalog tab".to_string(),
+            "sheet removal must leave at least one catalog tab",
         ));
     }
     Ok((remaining, removed))
@@ -3851,13 +3902,13 @@ fn modeled_sheet_removal_parts(
         })?;
     for rel_id in selected_rel_ids {
         let relationship = workbook.rels().get(rel_id).ok_or_else(|| {
-            Error::InvalidRelationship(format!(
-                "selected BrtBundleSh relationship {rel_id:?} is absent from the workbook"
-            ))
+            Error::InvalidRelationship(
+                "selected BrtBundleSh relationship is absent from the workbook",
+            )
         })?;
         if relationship.target_mode() != litchi_opc::TargetMode::Internal {
             return Err(Error::InvalidRelationship(
-                "selected XLSB sheet relationship must target an internal part".to_string(),
+                "selected XLSB sheet relationship must target an internal part",
             ));
         }
         let target = relationship.target_partname()?;
@@ -3865,9 +3916,7 @@ fn modeled_sheet_removal_parts(
             .part_metadata(&target)
             .map(|part| part.partname().clone())
             .ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "selected XLSB sheet relationship target {target} is absent"
-                ))
+                Error::InvalidRelationship("selected XLSB sheet relationship target is absent")
             })?;
         if !roots.iter().any(|root| root.is_equivalent_to(&canonical)) {
             roots.push(canonical);
@@ -3883,7 +3932,7 @@ fn modeled_sheet_removal_parts(
     for root in &roots {
         if !modeled.insert(root.clone()) {
             return Err(Error::InvalidRelationship(
-                "multiple selected workbook tabs resolve to one physical sheet part".to_string(),
+                "multiple selected workbook tabs resolve to one physical sheet part",
             ));
         }
     }
@@ -3896,21 +3945,21 @@ fn modeled_sheet_removal_parts(
             if relationship.reltype() == crate::binary_index::BINARY_INDEX_RELATIONSHIP {
                 if index_relationship.is_some() {
                     return Err(Error::InvalidRelationship(
-                        "worksheet has multiple binary-index relationships".to_string(),
+                        "worksheet has multiple binary-index relationships",
                     ));
                 }
                 if relationship.target_mode() != litchi_opc::TargetMode::Internal {
                     return Err(Error::InvalidRelationship(
-                        "worksheet binary-index relationship cannot be external".to_string(),
+                        "worksheet binary-index relationship cannot be external",
                     ));
                 }
                 index_relationship = Some(relationship);
             } else if relationship.target_mode() == litchi_opc::TargetMode::Internal {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet removal requires a disposition for outgoing internal relationship {} from {}",
-                    relationship.reltype(),
-                    root.as_str()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal requires a disposition for outgoing internal relationship",
+                ));
             }
         }
         let Some(relationship) = index_relationship else {
@@ -3918,20 +3967,19 @@ fn modeled_sheet_removal_parts(
         };
         if part.content_type() != WORKSHEET_CONTENT_TYPE {
             return Err(Error::InvalidRelationship(
-                "binary-index relationship has a non-worksheet owner".to_string(),
+                "binary-index relationship has a non-worksheet owner",
             ));
         }
         let target = canonical_sheet_removal_target(package, relationship)?;
         if target.is_equivalent_to(root) {
             return Err(Error::InvalidRelationship(
-                "worksheet binary-index relationship targets its worksheet".to_string(),
+                "worksheet binary-index relationship targets its worksheet",
             ));
         }
         let index = package.get_part(&target)?;
         if index.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
             return Err(Error::InvalidContentType {
-                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
-                got: index.content_type().to_string(),
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE,
             });
         }
         let canonical = index.partname().clone();
@@ -3939,9 +3987,10 @@ fn modeled_sheet_removal_parts(
             .iter()
             .any(|owner| owner.is_equivalent_to(&canonical))
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal requires a disposition for a binary-index part shared by selected tabs"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal requires a disposition for a binary-index part shared by selected tabs",
             ));
         }
         index_owners.insert(canonical.clone());
@@ -3954,11 +4003,11 @@ fn modeled_sheet_removal_parts(
         let part = package.get_part(index)?;
         for relationship in part.rels().iter() {
             if relationship.target_mode() == litchi_opc::TargetMode::Internal {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet removal requires a disposition for outgoing internal relationship {} from binary-index part {}",
-                    relationship.reltype(),
-                    index.as_str()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal requires a disposition for outgoing internal relationship from binary-index part",
+                ));
             }
         }
     }
@@ -3973,9 +4022,10 @@ fn modeled_sheet_removal_parts(
         }
         let target = canonical_sheet_removal_target(package, relationship)?;
         if modeled.iter().any(|part| part.is_equivalent_to(&target)) {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal requires a disposition for an incoming package relationship to a selected part"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal requires a disposition for an incoming package relationship to a selected part",
             ));
         }
     }
@@ -4009,10 +4059,11 @@ fn modeled_sheet_removal_parts(
                 false
             };
             if !allowed {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet removal requires a disposition for incoming relationship from {} to a selected part",
-                    source.partname().as_str()
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal requires a disposition for incoming relationship from to a selected part",
+                ));
             }
         }
     }
@@ -4030,9 +4081,10 @@ fn reject_unmodeled_binary_sheet_name_dependencies(package: &litchi_opc::OpcPack
                 .content_type()
                 .eq_ignore_ascii_case("application/vnd.ms-excel.table")
     }) {
-        return Err(Error::UnsupportedFeature(
-            "sheet removal requires a disposition for XLSB pivot-cache or table formula dependencies"
-                .to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet removal requires a disposition for XLSB pivot-cache or table formula dependencies",
         ));
     }
     Ok(())
@@ -4055,22 +4107,24 @@ fn reject_surviving_binary_sheet_dependencies(
             continue;
         }
         let source = package.get_part(part.partname())?.blob();
-        for item in Records::new(source) {
+        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
             let record = item?;
             match record.kind() {
                 kind::FRT_BEGIN | kind::AC_BEGIN | kind::ARR_FMLA | kind::SHR_FMLA => {
-                    return Err(Error::UnsupportedFeature(
-                        "sheet removal requires a disposition for a surviving worksheet extension or formula-group record"
-                            .to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "sheet removal requires a disposition for a surviving worksheet extension or formula-group record",
                     ));
                 },
                 kind::H_LINK => {
                     let hyperlink = crate::hyperlinks::Hyperlink::parse(record.payload())?;
                     if !hyperlink.r_id.is_empty() {
                         let Some(relationship) = part.rels().get(&hyperlink.r_id) else {
-                            return Err(Error::UnsupportedFeature(
-                                "sheet removal requires a disposition for an unresolved surviving BrtHLink relationship"
-                                    .to_string(),
+                            return Err(Error::refused(
+                                litchi_core::edit::RefusalKind::UnsupportedContent,
+                                "edit",
+                                "sheet removal requires a disposition for an unresolved surviving BrtHLink relationship",
                             ));
                         };
                         if relationship.target_mode() != litchi_opc::TargetMode::External
@@ -4080,9 +4134,10 @@ fn reject_surviving_binary_sheet_dependencies(
                                     | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
                             )
                         {
-                            return Err(Error::UnsupportedFeature(
-                                "sheet removal requires a disposition for a non-external surviving BrtHLink relationship"
-                                    .to_string(),
+                            return Err(Error::refused(
+                                litchi_core::edit::RefusalKind::UnsupportedContent,
+                                "edit",
+                                "sheet removal requires a disposition for a non-external surviving BrtHLink relationship",
                             ));
                         }
                         continue;
@@ -4091,9 +4146,10 @@ fn reject_surviving_binary_sheet_dependencies(
                         continue;
                     };
                     if internal_hyperlink_targets_removed_sheet(location, records, removed) {
-                        return Err(Error::UnsupportedFeature(
-                            "sheet removal requires a disposition for a surviving BrtHLink internal location"
-                                .to_string(),
+                        return Err(Error::refused(
+                            litchi_core::edit::RefusalKind::UnsupportedContent,
+                            "edit",
+                            "sheet removal requires a disposition for a surviving BrtHLink internal location",
                         ));
                     }
                 },
@@ -4175,11 +4231,7 @@ fn canonical_sheet_removal_target(
     package
         .part_metadata(&target)
         .map(|part| part.partname().clone())
-        .ok_or_else(|| {
-            Error::InvalidRelationship(format!(
-                "sheet-removal relationship target {target} is absent"
-            ))
-        })
+        .ok_or_else(|| Error::InvalidRelationship("sheet-removal relationship target is absent"))
 }
 
 fn remove_modeled_sheet_parts(
@@ -4227,7 +4279,7 @@ fn remove_modeled_sheet_parts(
                 continue;
             }
             return Err(Error::InvalidRelationship(
-                "a surviving XLSB package part references a removed sheet part".to_string(),
+                "a surviving XLSB package part references a removed sheet part",
             ));
         }
     }
@@ -4235,9 +4287,9 @@ fn remove_modeled_sheet_parts(
         let workbook_part = package.get_part_mut(workbook_uri)?;
         for rel_id in selected_rel_ids {
             if workbook_part.rels_mut().remove(rel_id).is_none() {
-                return Err(Error::InvalidRelationship(format!(
-                    "selected workbook relationship {rel_id:?} disappeared before removal"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "selected workbook relationship disappeared before removal",
+                ));
             }
         }
     }
@@ -4305,9 +4357,10 @@ fn reject_sheet_xml_dependencies(
         )?
         .is_some()
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal is unsupported while a surviving XML/VML part references a removed sheet"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal is unsupported while a surviving XML/VML part references a removed sheet",
             ));
         }
     }
@@ -4327,13 +4380,13 @@ fn rewrite_workbook_remove(
     let mut bundle_open = false;
     let mut saw_collection = false;
     let mut closed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if bundle_open || saw_collection || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                        "Workbook has duplicate or malformed BrtBundleShs collections",
                     ));
                 }
                 bundle_open = true;
@@ -4346,22 +4399,23 @@ fn rewrite_workbook_remove(
             },
             kind::BUNDLE_SH => {
                 return Err(Error::InvalidFormat(
-                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection",
                 ));
             },
             kind::END_BUNDLE_SHS => {
                 if !bundle_open || !record.payload().is_empty() {
                     return Err(Error::InvalidFormat(
-                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                        "Workbook has an unbalanced BrtEndBundleShs collection",
                     ));
                 }
                 bundle_open = false;
                 closed = true;
             },
             _ if bundle_open => {
-                return Err(Error::UnsupportedFeature(
-                    "sheet removal cannot detach an unknown record interspersed with BrtBundleSh records"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal cannot detach an unknown record interspersed with BrtBundleSh records",
                 ));
             },
             kind::BEGIN_BOOK
@@ -4384,24 +4438,25 @@ fn rewrite_workbook_remove(
             | kind::EXTERN_SHEET
             | kind::NAME
             | kind::CALC_PROP => {},
-            other => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet removal cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
-                    record.offset()
-                )));
+            _other => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+                ));
             },
         }
     }
     if bundle_open || !closed || !saw_collection || bundle_count != catalog_len {
-        return Err(Error::InvalidFormat(format!(
-            "Workbook BrtBundleSh count {bundle_count} differs from catalog size {catalog_len}",
-        )));
+        return Err(Error::InvalidFormat(
+            "Workbook BrtBundleSh count differs from catalog size",
+        ));
     }
     if bundle_records.len() != catalog_len
         || positions.iter().any(|position| *position >= catalog_len)
     {
         return Err(Error::InvalidFormat(
-            "sheet-removal catalog metadata is inconsistent".to_string(),
+            "sheet-removal catalog metadata is inconsistent",
         ));
     }
     removal_book_view_transitions(source, removed, bundle_records)?;
@@ -4414,7 +4469,7 @@ fn rewrite_workbook_remove(
         })?;
     let mut bundle_index = 0usize;
     let mut open = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         let raw = record_bytes(source, &record)?;
         match record.kind() {
@@ -4486,21 +4541,19 @@ fn rewrite_workbook_record_remove(
                             found: payload.len(),
                         })?,
                 ))
-                .map_err(|_error| {
-                    Error::InvalidFormula("BrtBookView index overflow".to_string())
-                })?;
+                .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow"))?;
                 if old >= catalog_len || old >= removed.len() {
                     return Err(Error::InvalidFormat(
-                        "BrtBookView points outside the sheet catalog".to_string(),
+                        "BrtBookView points outside the sheet catalog",
                     ));
                 }
                 let new = if removed[old] {
                     let fallback = fallback_visible_position(old, removed, bundle_records)?;
                     remaining[fallback]
                 } else {
-                    *remaining.get(old).ok_or_else(|| {
-                        Error::InvalidFormat("BrtBookView index is unmapped".to_string())
-                    })?
+                    *remaining
+                        .get(old)
+                        .ok_or_else(|| Error::InvalidFormat("BrtBookView index is unmapped"))?
                 };
                 output[header_len + field_offset..header_len + field_offset + 4].copy_from_slice(
                     &u32::try_from(new)
@@ -4527,16 +4580,18 @@ fn rewrite_workbook_record_remove(
             })?);
             if old != u32::MAX {
                 let old = usize::try_from(old).map_err(|_error| {
-                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize")
                 })?;
                 if old >= catalog_len {
                     return Err(Error::InvalidFormula(
-                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
+                        "BrtName sheet scope exceeds the sheet catalog",
                     ));
                 }
                 if removed[old] {
-                    return Err(Error::UnsupportedFeature(
-                        "sheet removal cannot safely delete a sheet-scoped BrtName".to_string(),
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "sheet removal cannot safely delete a sheet-scoped BrtName",
                     ));
                 }
                 output[header_len + 5..header_len + 9].copy_from_slice(
@@ -4578,7 +4633,7 @@ fn reject_name_formula_dependencies(
         .sheet_id
         .map(|sheet| {
             usize::try_from(sheet).map_err(|_error| {
-                Error::InvalidFormula("defined-name sheet scope does not fit usize".to_string())
+                Error::InvalidFormula("defined-name sheet scope does not fit usize")
             })
         })
         .transpose()?;
@@ -4598,10 +4653,12 @@ fn reject_removed_formula_targets(
             | Token::AreaRef3d { sheet_index, .. }
             | Token::ExternalName { sheet_index, .. } => Some(sheet_index),
             Token::TableReference(reference) if !reference.invalid => Some(reference.sheet_index),
-            Token::Unknown(kind) => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet removal requires a disposition for unknown formula token 0x{kind:02X}"
-                )));
+            Token::Unknown(_kind) => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal requires a disposition for unknown formula token",
+                ));
             },
             Token::Number(_)
             | Token::String(_)
@@ -4627,9 +4684,10 @@ fn reject_removed_formula_targets(
             continue;
         };
         if name_formula_xti_removed(context, xti, removed, scope)? {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal requires a disposition for a formula referencing a removed tab"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal requires a disposition for a formula referencing a removed tab",
             ));
         }
     }
@@ -4645,54 +4703,47 @@ fn name_formula_xti_removed(
     let xti = context
         .external_sheets
         .get(usize::from(index))
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!("defined-name XTI index {index} is absent"))
-        })?;
+        .ok_or_else(|| Error::InvalidFormula("defined-name XTI index is absent"))?;
     let link = context
         .supporting_links
-        .get(usize::try_from(xti.external_link).map_err(|_error| {
-            Error::InvalidFormula("defined-name external-link index overflow".to_string())
-        })?)
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!(
-                "defined-name XTI index {index} has no supporting link {}",
-                xti.external_link
-            ))
-        })?;
+        .get(
+            usize::try_from(xti.external_link).map_err(|_error| {
+                Error::InvalidFormula("defined-name external-link index overflow")
+            })?,
+        )
+        .ok_or_else(|| Error::InvalidFormula("defined-name XTI index has no supporting link"))?;
     match link {
         crate::package::formula::SupportingLink::SelfWorkbook => {
             if (xti.first_sheet, xti.last_sheet) == (-1, -1) {
                 return Ok(false);
             }
             if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
-                return Err(Error::InvalidFormula(format!(
-                    "defined-name XTI index {index} has invalid internal sheet range {}..={}",
-                    xti.first_sheet, xti.last_sheet
-                )));
+                return Err(Error::InvalidFormula(
+                    "defined-name XTI index has invalid internal sheet range",
+                ));
             }
-            let first = usize::try_from(xti.first_sheet).map_err(|_error| {
-                Error::InvalidFormula("defined-name XTI first sheet overflow".to_string())
-            })?;
-            let last = usize::try_from(xti.last_sheet).map_err(|_error| {
-                Error::InvalidFormula("defined-name XTI last sheet overflow".to_string())
-            })?;
+            let first = usize::try_from(xti.first_sheet)
+                .map_err(|_error| Error::InvalidFormula("defined-name XTI first sheet overflow"))?;
+            let last = usize::try_from(xti.last_sheet)
+                .map_err(|_error| Error::InvalidFormula("defined-name XTI last sheet overflow"))?;
             if last >= removed.len() {
-                return Err(Error::InvalidFormula(format!(
-                    "defined-name XTI last sheet {last} exceeds the worksheet catalog"
-                )));
+                return Err(Error::InvalidFormula(
+                    "defined-name XTI last sheet exceeds the worksheet catalog",
+                ));
             }
             Ok((first..=last).all(|sheet| removed[sheet]))
         },
         crate::package::formula::SupportingLink::SameSheet => {
             if (xti.first_sheet, xti.last_sheet) != (-2, -2) {
-                return Err(Error::InvalidFormula(format!(
-                    "defined-name same-sheet XTI index {index} has invalid endpoints"
-                )));
+                return Err(Error::InvalidFormula(
+                    "defined-name same-sheet XTI index has invalid endpoints",
+                ));
             }
             let Some(scope) = scope else {
-                return Err(Error::UnsupportedFeature(
-                    "sheet removal requires a disposition for a workbook-scoped same-sheet defined-name formula"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal requires a disposition for a workbook-scoped same-sheet defined-name formula",
                 ));
             };
             Ok(removed.get(scope).copied().unwrap_or(false))
@@ -4722,7 +4773,11 @@ fn map_formula_error(error: crate::formula::Error) -> Error {
         crate::formula::Error::InvalidLength { expected, found } => {
             Error::InvalidLength { expected, found }
         },
-        crate::formula::Error::UnsupportedFeature(feature) => Error::UnsupportedFeature(feature),
+        crate::formula::Error::UnsupportedFeature(_) => Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "the structural edit cannot rewrite this formula feature",
+        ),
         crate::formula::Error::UnresolvedDependency(dependency) => {
             Error::UnresolvedDependency(dependency)
         },
@@ -4746,7 +4801,7 @@ fn fallback_visible_position(
         }
     }
     Err(Error::InvalidFormat(
-        "sheet removal leaves no visible tab for BrtBookView".to_string(),
+        "sheet removal leaves no visible tab for BrtBookView",
     ))
 }
 
@@ -4757,7 +4812,7 @@ fn removal_book_view_transitions(
 ) -> Result<Vec<(usize, usize)>> {
     let mut transitions = Vec::new();
     let mut book_view_count = 0usize;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::BOOK_VIEW {
             continue;
@@ -4776,10 +4831,10 @@ fn removal_book_view_transitions(
                 found: payload.len(),
             },
         )?))
-        .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow"))?;
         if old >= removed.len() {
             return Err(Error::InvalidFormat(
-                "BrtBookView points outside the sheet catalog".to_string(),
+                "BrtBookView points outside the sheet catalog",
             ));
         }
         if removed[old] {
@@ -4788,8 +4843,10 @@ fn removal_book_view_transitions(
         }
     }
     if book_view_count > 1 && !transitions.is_empty() {
-        return Err(Error::UnsupportedFeature(
-            "multiple BrtBookView active tabs cannot be relocated during sheet removal".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "multiple BrtBookView active tabs cannot be relocated during sheet removal",
         ));
     }
     Ok(transitions)
@@ -4808,7 +4865,7 @@ fn apply_sheet_removal_view_dependencies(
         target
     } else {
         let mut book_view_count = 0usize;
-        for item in Records::new(source) {
+        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
             if item?.kind() == kind::BOOK_VIEW {
                 book_view_count = book_view_count.saturating_add(1);
             }
@@ -4824,14 +4881,13 @@ fn apply_sheet_removal_view_dependencies(
                     .iter()
                     .position(|selected| !*selected)
                     .ok_or_else(|| {
-                        Error::InvalidFormat(
-                            "sheet removal leaves no surviving catalog tab".to_string(),
-                        )
+                        Error::InvalidFormat("sheet removal leaves no surviving catalog tab")
                     })?;
             if fallback != first_survivor {
-                return Err(Error::UnsupportedFeature(
-                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView",
                 ));
             }
             fallback
@@ -4840,35 +4896,41 @@ fn apply_sheet_removal_view_dependencies(
                 .get(default_source)
                 .is_none_or(|record| record.state != 0)
             {
-                return Err(Error::UnsupportedFeature(
-                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView",
                 ));
             }
             default_source
         }
     };
-    let tab = tabs.get(target).ok_or_else(|| {
-        Error::InvalidFormat("BrtBookView fallback exceeds the sheet catalog".to_string())
-    })?;
+    let tab = tabs
+        .get(target)
+        .ok_or_else(|| Error::InvalidFormat("BrtBookView fallback exceeds the sheet catalog"))?;
     if !matches!(tab.kind(), Kind::Worksheet | Kind::Chart) {
-        return Err(Error::UnsupportedFeature(
-            "sheet removal cannot update selected flags for the fallback tab kind".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet removal cannot update selected flags for the fallback tab kind",
         ));
     }
     let Some(rel_id) = records[target].rel_id.as_deref() else {
-        return Err(Error::UnsupportedFeature(
-            "sheet removal cannot update selected flags for an unbound fallback tab".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "edit",
+            "sheet removal cannot update selected flags for an unbound fallback tab",
         ));
     };
     let target_uri = {
         let workbook_part = package.get_part(workbook_uri)?;
-        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-            Error::InvalidRelationship(format!("sheet relationship {rel_id:?} is missing"))
-        })?;
+        let relationship = workbook_part
+            .rels()
+            .get(rel_id)
+            .ok_or_else(|| Error::InvalidRelationship("sheet relationship is missing"))?;
         if relationship.target_mode() != litchi_opc::TargetMode::Internal {
             return Err(Error::InvalidRelationship(
-                "sheet relationship for a fallback tab is external".to_string(),
+                "sheet relationship for a fallback tab is external",
             ));
         }
         let target = relationship.target_partname()?;
@@ -4876,9 +4938,7 @@ fn apply_sheet_removal_view_dependencies(
             .part_metadata(&target)
             .map(|part| part.partname().clone())
             .ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "fallback sheet relationship target {target} is absent"
-                ))
+                Error::InvalidRelationship("fallback sheet relationship target is absent")
             })?
     };
     let source_blob = package.get_part(&target_uri)?.blob();
@@ -4907,7 +4967,7 @@ fn rewrite_extern_sheet_payload_remove(
             found: payload.len(),
         },
     )?))
-    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow"))?;
     let expected = 4usize
         .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
             resource: "BrtExternSheet payload size",
@@ -4946,18 +5006,16 @@ fn rewrite_extern_sheet_payload_remove(
         let link = context
             .supporting_links
             .get(usize::try_from(external_link).map_err(|_error| {
-                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow")
             })?)
             .ok_or_else(|| {
-                Error::InvalidFormula(
-                    "BrtExternSheet supporting-link index is unresolved".to_string(),
-                )
+                Error::InvalidFormula("BrtExternSheet supporting-link index is unresolved")
             })?;
         if matches!(link, crate::package::formula::SupportingLink::SameSheet)
             && (first, last) != (-2, -2)
         {
             return Err(Error::InvalidFormula(
-                "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+                "same-sheet BrtExternSheet has invalid endpoints",
             ));
         }
         if !matches!(link, crate::package::formula::SupportingLink::SelfWorkbook) {
@@ -4968,18 +5026,18 @@ fn rewrite_extern_sheet_payload_remove(
         }
         if first < 0 || last < first {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range has invalid endpoints".to_string(),
+                "internal BrtExternSheet range has invalid endpoints",
             ));
         }
         let first = usize::try_from(first).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow")
         })?;
         let last = usize::try_from(last).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow")
         })?;
         if last >= catalog_len || last >= removed.len() {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+                "internal BrtExternSheet range exceeds the sheet catalog",
             ));
         }
         let first_remaining = (first..=last).find(|position| !removed[*position]);
@@ -4991,9 +5049,7 @@ fn rewrite_extern_sheet_payload_remove(
         let last_remaining = (first..=last)
             .rev()
             .find(|position| !removed[*position])
-            .ok_or_else(|| {
-                Error::InvalidFormula("internal XTI range has no endpoint".to_string())
-            })?;
+            .ok_or_else(|| Error::InvalidFormula("internal XTI range has no endpoint"))?;
         let new_first = remaining[first_remaining];
         let new_last = remaining[last_remaining];
         output[offset + 4..offset + 8].copy_from_slice(
@@ -5022,7 +5078,7 @@ fn rewrite_volatile_dependencies_remove(
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -5041,22 +5097,24 @@ fn rewrite_volatile_dependencies_remove(
                     found: record.payload().len(),
                 })?,
         ))
-        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow"))?;
         if old >= catalog_len || old >= removed.len() {
             return Err(Error::InvalidFormat(
-                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+                "BrtVolRef sheet index exceeds the sheet catalog",
             ));
         }
         if removed[old] {
-            return Err(Error::UnsupportedFeature(
-                "sheet removal cannot safely delete a volatile dependency reference".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet removal cannot safely delete a volatile dependency reference",
             ));
         }
         let new = remaining[old];
         let (_, header_len) = Header::parse(
-            source.get(record.offset()..).ok_or_else(|| {
-                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
-            })?,
+            source
+                .get(record.offset()..)
+                .ok_or_else(|| Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
             RawLimits::DEFAULT,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
@@ -5141,9 +5199,10 @@ fn apply_sheet_order(workbook: &mut Workbook, order: &[usize]) -> Result<bool> {
             .content_type()
             .eq_ignore_ascii_case(crate::shared_workbook::package::HEADERS_CONTENT_TYPE)
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering is unsupported with shared-workbook revision headers because their historical display order is immutable"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering is unsupported with shared-workbook revision headers because their historical display order is immutable",
             ));
         }
     }
@@ -5157,10 +5216,9 @@ fn apply_sheet_order(workbook: &mut Workbook, order: &[usize]) -> Result<bool> {
 
 fn validate_sheet_order(order: &[usize], catalog_len: usize) -> Result<Vec<usize>> {
     if order.len() != catalog_len {
-        return Err(Error::InvalidFormat(format!(
-            "sheet order has {} entries but the catalog has {catalog_len}",
-            order.len()
-        )));
+        return Err(Error::InvalidFormat(
+            "sheet order has entries but the catalog",
+        ));
     }
     let mut inverse = Vec::new();
     inverse
@@ -5171,20 +5229,18 @@ fn validate_sheet_order(order: &[usize], catalog_len: usize) -> Result<Vec<usize
         })?;
     inverse.resize(catalog_len, usize::MAX);
     for (new_position, &old_position) in order.iter().enumerate() {
-        let slot = inverse.get_mut(old_position).ok_or_else(|| {
-            Error::InvalidFormat("sheet order contains an out-of-range position".to_string())
-        })?;
+        let slot = inverse
+            .get_mut(old_position)
+            .ok_or_else(|| Error::InvalidFormat("sheet order contains an out-of-range position"))?;
         if *slot != usize::MAX {
             return Err(Error::InvalidFormat(
-                "sheet order contains a duplicate position".to_string(),
+                "sheet order contains a duplicate position",
             ));
         }
         *slot = new_position;
     }
     if inverse.iter().any(|position| *position == usize::MAX) {
-        return Err(Error::InvalidFormat(
-            "sheet order omits a catalog position".to_string(),
-        ));
+        return Err(Error::InvalidFormat("sheet order omits a catalog position"));
     }
     Ok(inverse)
 }
@@ -5201,15 +5257,17 @@ fn reject_unmodeled_reorder_dependencies(package: &litchi_opc::OpcPackage) -> Re
                 litchi_opc::constants::content_type::OFC_VBA_PROJECT_SIGNATURE_AGILE,
             )
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering is unsupported while a VBA project dependency is present"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering is unsupported while a VBA project dependency is present",
             ));
         }
         if content_type.contains("calcchain") || part_name.contains("calcchain") {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering is unsupported while a calculation-chain dependency is present"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering is unsupported while a calculation-chain dependency is present",
             ));
         }
         if content_type.eq_ignore_ascii_case(crate::slicer::package::CACHE_CONTENT_TYPE)
@@ -5218,8 +5276,10 @@ fn reject_unmodeled_reorder_dependencies(package: &litchi_opc::OpcPackage) -> Re
             || content_type == "application/vnd.ms-excel.timeline+xml"
             || content_type.eq_ignore_ascii_case(crate::shared_workbook::package::LOG_CONTENT_TYPE)
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering is unsupported with unmodeled slicer, timeline or revision-log dependencies".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering is unsupported with unmodeled slicer, timeline or revision-log dependencies",
             ));
         }
         if content_type.eq_ignore_ascii_case(crate::data_model::DATA_MODEL_CONTENT_TYPE)
@@ -5227,9 +5287,10 @@ fn reject_unmodeled_reorder_dependencies(package: &litchi_opc::OpcPackage) -> Re
                 crate::package::connections::package::CONNECTIONS_CONTENT_TYPE,
             )
         {
-            return Err(Error::UnsupportedFeature(
-                "sheet reordering is unsupported with unmodeled data-model or connections dependencies"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reordering is unsupported with unmodeled data-model or connections dependencies",
             ));
         }
     }
@@ -5241,9 +5302,10 @@ fn reject_shared_workbook_headers(package: &litchi_opc::OpcPackage) -> Result<()
         part.content_type()
             .eq_ignore_ascii_case(crate::shared_workbook::package::HEADERS_CONTENT_TYPE)
     }) {
-        return Err(Error::UnsupportedFeature(
-            "sheet insertion is unsupported with shared-workbook revision headers because their historical display order is immutable"
-                .to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "sheet insertion is unsupported with shared-workbook revision headers because their historical display order is immutable",
         ));
     }
     Ok(())
@@ -5267,14 +5329,14 @@ fn rewrite_workbook_order(
     let mut bundle_open = false;
     let mut bundle_collection_closed = false;
     let mut records = Vec::new();
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         let raw = record_bytes(source, &record)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if bundle_open || saw_bundle_collection {
                     return Err(Error::InvalidFormat(
-                        "Workbook has duplicate or nested BrtBundleShs collections".to_string(),
+                        "Workbook has duplicate or nested BrtBundleShs collections",
                     ));
                 }
                 if !record.payload().is_empty() {
@@ -5291,13 +5353,13 @@ fn rewrite_workbook_order(
             },
             kind::BUNDLE_SH => {
                 return Err(Error::InvalidFormat(
-                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection",
                 ));
             },
             kind::END_BUNDLE_SHS => {
                 if !bundle_open {
                     return Err(Error::InvalidFormat(
-                        "BrtEndBundleShs has no matching collection".to_string(),
+                        "BrtEndBundleShs has no matching collection",
                     ));
                 }
                 if !record.payload().is_empty() {
@@ -5310,9 +5372,10 @@ fn rewrite_workbook_order(
                 bundle_collection_closed = true;
             },
             _ if bundle_open => {
-                return Err(Error::UnsupportedFeature(
-                    "sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records",
                 ));
             },
             kind::BEGIN_BOOK
@@ -5335,11 +5398,12 @@ fn rewrite_workbook_order(
             | kind::EXTERN_SHEET
             | kind::NAME
             | kind::CALC_PROP => {},
-            other => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "sheet reordering cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
-                    record.offset()
-                )));
+            _other => {
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "sheet reordering cannot preserve unmodeled workbook record at offset without a catalog dependency contract",
+                ));
             },
         }
         records.try_reserve(1).map_err(|source| Error::Allocation {
@@ -5350,14 +5414,13 @@ fn rewrite_workbook_order(
     }
     if bundle_open || !bundle_collection_closed || !saw_bundle_collection {
         return Err(Error::InvalidFormat(
-            "Workbook sheet catalog has no complete BrtBundleSh collection".to_string(),
+            "Workbook sheet catalog has no complete BrtBundleSh collection",
         ));
     }
     if bundle_records.len() != catalog_len {
-        return Err(Error::InvalidFormat(format!(
-            "Workbook BrtBundleSh count {} differs from catalog size {catalog_len}",
-            bundle_records.len()
-        )));
+        return Err(Error::InvalidFormat(
+            "Workbook BrtBundleSh count differs from catalog size",
+        ));
     }
 
     let mut output = Vec::new();
@@ -5375,7 +5438,7 @@ fn rewrite_workbook_order(
                     output.extend_from_slice(bundle_records.get(old_position).ok_or_else(
                         || {
                             Error::InvalidFormat(
-                                "sheet order references an absent BrtBundleSh record".to_string(),
+                                "sheet order references an absent BrtBundleSh record",
                             )
                         },
                     )?);
@@ -5389,7 +5452,7 @@ fn rewrite_workbook_order(
     }
     if !inserted_bundles {
         return Err(Error::InvalidFormat(
-            "Workbook sheet catalog records were not emitted".to_string(),
+            "Workbook sheet catalog records were not emitted",
         ));
     }
     Ok(output)
@@ -5428,11 +5491,9 @@ fn rewrite_workbook_record(
                             found: payload.len(),
                         })?,
                 ))
-                .map_err(|_error| {
-                    Error::InvalidFormula("BrtBookView index overflow".to_string())
-                })?;
+                .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow"))?;
                 let new = *inverse.get(old).ok_or_else(|| {
-                    Error::InvalidFormat("BrtBookView points outside the sheet catalog".to_string())
+                    Error::InvalidFormat("BrtBookView points outside the sheet catalog")
                 })?;
                 let output_len = output.len();
                 let target = output
@@ -5465,12 +5526,10 @@ fn rewrite_workbook_record(
             })?);
             if old != u32::MAX {
                 let old = usize::try_from(old).map_err(|_error| {
-                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize")
                 })?;
                 let new = *inverse.get(old).ok_or_else(|| {
-                    Error::InvalidFormula(
-                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
-                    )
+                    Error::InvalidFormula("BrtName sheet scope exceeds the sheet catalog")
                 })?;
                 output[header_len + 5..header_len + 9].copy_from_slice(
                     &u32::try_from(new)
@@ -5510,7 +5569,7 @@ fn rewrite_extern_sheet_payload(
             found: payload.len(),
         },
     )?))
-    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow"))?;
     let expected = 4usize
         .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
             resource: "BrtExternSheet payload size",
@@ -5549,19 +5608,17 @@ fn rewrite_extern_sheet_payload(
         let link = context
             .supporting_links
             .get(usize::try_from(external_link).map_err(|_error| {
-                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow")
             })?)
             .ok_or_else(|| {
-                Error::InvalidFormula(
-                    "BrtExternSheet supporting-link index is unresolved".to_string(),
-                )
+                Error::InvalidFormula("BrtExternSheet supporting-link index is unresolved")
             })?;
         match link {
             crate::package::formula::SupportingLink::SelfWorkbook => {},
             crate::package::formula::SupportingLink::SameSheet => {
                 if (first, last) != (-2, -2) {
                     return Err(Error::InvalidFormula(
-                        "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+                        "same-sheet BrtExternSheet has invalid endpoints",
                     ));
                 }
                 continue;
@@ -5574,18 +5631,18 @@ fn rewrite_extern_sheet_payload(
         }
         if first < 0 || last < first {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range has invalid endpoints".to_string(),
+                "internal BrtExternSheet range has invalid endpoints",
             ));
         }
         let first = usize::try_from(first).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow")
         })?;
         let last = usize::try_from(last).map_err(|_error| {
-            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow")
         })?;
         if last >= catalog_len {
             return Err(Error::InvalidFormula(
-                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+                "internal BrtExternSheet range exceeds the sheet catalog",
             ));
         }
         let span = last
@@ -5598,15 +5655,16 @@ fn rewrite_extern_sheet_payload(
         let mut maximum = 0usize;
         for old_position in first..=last {
             let new_position = *inverse.get(old_position).ok_or_else(|| {
-                Error::InvalidFormula("internal BrtExternSheet endpoint is unmapped".to_string())
+                Error::InvalidFormula("internal BrtExternSheet endpoint is unmapped")
             })?;
             minimum = minimum.min(new_position);
             maximum = maximum.max(new_position);
         }
         if maximum.saturating_sub(minimum).saturating_add(1) != span {
-            return Err(Error::UnsupportedFeature(
-                "sheet reorder would make an internal BrtExternSheet 3-D range non-contiguous"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "sheet reorder would make an internal BrtExternSheet 3-D range non-contiguous",
             ));
         }
         output[offset + 4..offset + 8].copy_from_slice(
@@ -5634,7 +5692,7 @@ fn rewrite_volatile_dependencies(
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -5653,19 +5711,19 @@ fn rewrite_volatile_dependencies(
                     found: record.payload().len(),
                 })?,
         ))
-        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow"))?;
         if old >= catalog_len {
             return Err(Error::InvalidFormat(
-                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+                "BrtVolRef sheet index exceeds the sheet catalog",
             ));
         }
         let new = *inverse
             .get(old)
-            .ok_or_else(|| Error::InvalidFormat("BrtVolRef sheet index is unmapped".to_string()))?;
+            .ok_or_else(|| Error::InvalidFormat("BrtVolRef sheet index is unmapped"))?;
         let (_, header_len) = Header::parse(
-            source.get(record.offset()..).ok_or_else(|| {
-                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
-            })?,
+            source
+                .get(record.offset()..)
+                .ok_or_else(|| Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
             RawLimits::DEFAULT,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
@@ -5712,7 +5770,7 @@ fn replace_record_payload(
 fn record_bytes<'a>(source: &'a [u8], record: &crate::raw::Record<'_>) -> Result<&'a [u8]> {
     let record_source = source
         .get(record.offset()..)
-        .ok_or_else(|| Error::InvalidFormat("record offset is outside its part".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("record offset is outside its part"))?;
     let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
     let end = record
         .offset()
@@ -5723,7 +5781,7 @@ fn record_bytes<'a>(source: &'a [u8], record: &crate::raw::Record<'_>) -> Result
         })?;
     source
         .get(record.offset()..end)
-        .ok_or_else(|| Error::InvalidFormat("record range is outside its part".to_string()))
+        .ok_or_else(|| Error::InvalidFormat("record range is outside its part"))
 }
 
 fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Result<(bool, bool)> {
@@ -5743,7 +5801,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                         tab.worksheet_position()
                             .is_some_and(|position| position.get() == *sheet)
                     })
-                    .ok_or_else(|| Error::WorksheetNotFound(format!("sheet index {sheet}")))?;
+                    .ok_or_else(|| Error::WorksheetNotFound(Some(*sheet)))?;
                 if tab.name() != name {
                     validate_sheet_name_value(name)?;
                 }
@@ -5757,9 +5815,9 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                 name,
                 dependencies,
             } => {
-                let tab = tabs.get(*catalog_position).ok_or_else(|| {
-                    Error::WorksheetNotFound(format!("sheet index {catalog_position}"))
-                })?;
+                let tab = tabs
+                    .get(*catalog_position)
+                    .ok_or_else(|| Error::WorksheetNotFound(Some(*catalog_position)))?;
                 // A no-op must remain an exact source no-op even when a
                 // leniently opened package retained a malformed authored
                 // name.  Changed names are validated below before any
@@ -5777,12 +5835,12 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                 catalog_position,
                 state,
             } => {
-                let tab = tabs.get(*catalog_position).ok_or_else(|| {
-                    Error::WorksheetNotFound(format!("sheet index {catalog_position}"))
-                })?;
+                let tab = tabs
+                    .get(*catalog_position)
+                    .ok_or_else(|| Error::WorksheetNotFound(Some(*catalog_position)))?;
                 if tab.kind() == Kind::Unbound && *state != State::VeryHidden {
                     return Err(Error::InvalidRelationship(
-                        "unbound XLSB sheet tabs must be very hidden".to_string(),
+                        "unbound XLSB sheet tabs must be very hidden",
                     ));
                 }
                 if tab.state() != *state {
@@ -5800,7 +5858,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             | Operation::SetMergedRanges { .. }
             | Operation::SetDefinedName { .. } => {
                 return Err(Error::InvalidFormat(
-                    "workbook metadata operation grouping is internally inconsistent".to_string(),
+                    "workbook metadata operation grouping is internally inconsistent",
                 ));
             },
         }
@@ -5832,7 +5890,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
     for (catalog_position, state) in &states {
         let final_state = final_states
             .get_mut(*catalog_position)
-            .ok_or_else(|| Error::WorksheetNotFound(format!("sheet index {catalog_position}")))?;
+            .ok_or_else(|| Error::WorksheetNotFound(Some(*catalog_position)))?;
         *final_state = *state;
     }
     drop(tabs);
@@ -5843,12 +5901,12 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
         let mut output = source.clone();
         let mut index = 0usize;
         let mut replaced = false;
-        for item in Records::new(&source) {
+        for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
             let record = item?;
             if record.kind() == kind::BUNDLE_SH {
                 if let Some(state) = states.get(&index).copied() {
                     let header_source = source.get(record.offset()..).ok_or_else(|| {
-                        Error::InvalidFormat("record offset is outside workbook.bin".to_string())
+                        Error::InvalidFormat("record offset is outside workbook.bin")
                     })?;
                     let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
                     let payload_start =
@@ -5874,9 +5932,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             }
         }
         if !replaced {
-            return Err(Error::WorksheetNotFound(
-                "sheet state record was not found".to_string(),
-            ));
+            return Err(Error::InvalidFormat("the sheet state record was not"));
         }
         let mut package = workbook.package.clone();
         package.get_part_mut(&uri)?.set_blob(output);
@@ -5888,7 +5944,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
     let mut output = Vec::with_capacity(source.len());
     let mut index = 0usize;
     let mut replaced = false;
-    for item in Records::new(&source) {
+    for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() == kind::BUNDLE_SH {
             let name = names.get(&index).copied();
@@ -5906,7 +5962,8 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                     })?;
                     state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
                 }
-                Encoder::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
+                Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
+                    .write_record(kind::BUNDLE_SH, &payload)?;
                 replaced = true;
             } else {
                 copy_record(&source, &record, &mut output)?;
@@ -5917,9 +5974,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
         }
     }
     if !replaced {
-        return Err(Error::WorksheetNotFound(
-            "sheet metadata record was not found".to_string(),
-        ));
+        return Err(Error::InvalidFormat("the sheet metadata record was not"));
     }
     // Parse every dependent XML part and stage all successful replacements
     // before changing the candidate package.  A dependency refusal therefore
@@ -6037,7 +6092,7 @@ fn apply_sheet_view_dependencies(
     }
     if kinds.len() != final_states.len() {
         return Err(Error::InvalidFormat(
-            "sheet catalog and visibility state counts differ".to_string(),
+            "sheet catalog and visibility state counts differ",
         ));
     }
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
@@ -6050,9 +6105,10 @@ fn apply_sheet_view_dependencies(
         if let Some(previous) = relocated_target
             && previous != *new_active
         {
-            return Err(Error::UnsupportedFeature(
-                "multiple BrtBookView active tabs cannot be mapped to one selected view"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "multiple BrtBookView active tabs cannot be mapped to one selected view",
             ));
         }
         relocated_target = Some(*new_active);
@@ -6060,12 +6116,12 @@ fn apply_sheet_view_dependencies(
     let old_active = workbook.active_catalog_position().unwrap_or(0);
     if old_active >= final_states.len() {
         return Err(Error::InvalidFormat(
-            "active workbook view points outside the sheet catalog".to_string(),
+            "active workbook view points outside the sheet catalog",
         ));
     }
     if transitions.is_empty() && final_states[old_active].is_hidden() {
         return Err(Error::InvalidFormat(
-            "active workbook view has no relocatable BrtBookView".to_string(),
+            "active workbook view has no relocatable BrtBookView",
         ));
     }
 
@@ -6086,30 +6142,30 @@ fn apply_sheet_view_dependencies(
         match kinds[*catalog_position] {
             Kind::Worksheet | Kind::Chart => {},
             Kind::Dialog | Kind::Macro | Kind::IntlMacro | Kind::Unbound => {
-                return Err(Error::UnsupportedFeature(format!(
-                    "cannot update the selected view for {:?} sheet tab",
-                    kinds[*catalog_position]
-                )));
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "cannot update the selected view for sheet tab",
+                ));
             },
         }
     }
 
     let mut sheet_parts = vec![None; kinds.len()];
     let mut catalog_position = 0usize;
-    for item in Records::new(&workbook_source) {
+    for item in Records::new(&workbook_source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::BUNDLE_SH {
             continue;
         }
         let bundle = crate::package::records::BundleSheetRecord::parse(record.payload())?;
         if let Some(rel_id) = bundle.rel_id.as_deref() {
-            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-                Error::InvalidRelationship(format!("sheet relationship {rel_id:?} is missing"))
-            })?;
+            let relationship = workbook_part
+                .rels()
+                .get(rel_id)
+                .ok_or_else(|| Error::InvalidRelationship("sheet relationship is missing"))?;
             if relationship.is_external() {
-                return Err(Error::InvalidRelationship(format!(
-                    "sheet relationship {rel_id:?} is external"
-                )));
+                return Err(Error::InvalidRelationship("sheet relationship is external"));
             }
             sheet_parts[catalog_position] = Some(relationship.target_partname()?);
         }
@@ -6117,7 +6173,7 @@ fn apply_sheet_view_dependencies(
     }
     if catalog_position != kinds.len() {
         return Err(Error::InvalidFormat(
-            "workbook sheet records do not match the sheet catalog".to_string(),
+            "workbook sheet records do not match the sheet catalog",
         ));
     }
 
@@ -6161,14 +6217,16 @@ fn apply_sheet_view_dependencies(
 
 fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(usize, usize)>> {
     if final_states.is_empty() {
-        return Err(Error::UnsupportedFeature(
-            "workbook must retain at least one visible sheet tab".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "workbook must retain at least one visible sheet tab",
         ));
     }
     let source = output.to_vec();
     let mut transitions = Vec::new();
     let mut saw_book_view = false;
-    for item in Records::new(&source) {
+    for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != kind::BOOK_VIEW {
             continue;
@@ -6185,20 +6243,20 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
             current_bytes[2],
             current_bytes[3],
         ]))
-        .map_err(|_error| {
-            Error::InvalidFormula("BrtBookView itabCur does not fit usize".to_string())
-        })?;
+        .map_err(|_error| Error::InvalidFormula("BrtBookView itabCur does not fit usize"))?;
         if current >= final_states.len() {
             return Err(Error::InvalidFormat(
-                "BrtBookView itabCur points outside the sheet catalog".to_string(),
+                "BrtBookView itabCur points outside the sheet catalog",
             ));
         }
         let next = if final_states[current] == State::Visible {
             current
         } else {
             next_visible_sheet(current, final_states).ok_or_else(|| {
-                Error::UnsupportedFeature(
-                    "workbook must retain at least one visible sheet tab".to_string(),
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "workbook must retain at least one visible sheet tab",
                 )
             })?
         };
@@ -6206,7 +6264,7 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
             continue;
         }
         let header_source = source.get(record.offset()..).ok_or_else(|| {
-            Error::InvalidFormat("book-view record offset is outside workbook.bin".to_string())
+            Error::InvalidFormat("book-view record offset is outside workbook.bin")
         })?;
         let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
         let payload_start = record
@@ -6241,18 +6299,22 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
         return Ok(Vec::new());
     }
     if !transitions.is_empty() {
-        let book_view_count = Records::new(&source).try_fold(0usize, |count, item| {
-            let record = item?;
-            Ok::<_, Error>(count.saturating_add(if record.kind() == kind::BOOK_VIEW {
-                1
-            } else {
-                0
-            }))
-        })?;
+        let book_view_count = Records::new(&source, crate::raw::Limits::DEFAULT).try_fold(
+            0usize,
+            |count, item| {
+                let record = item?;
+                Ok::<_, Error>(count.saturating_add(if record.kind() == kind::BOOK_VIEW {
+                    1
+                } else {
+                    0
+                }))
+            },
+        )?;
         if book_view_count > 1 {
-            return Err(Error::UnsupportedFeature(
-                "active-tab relocation across multiple BrtBookView records is unsupported"
-                    .to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "active-tab relocation across multiple BrtBookView records is unsupported",
             ));
         }
     }
@@ -6273,27 +6335,29 @@ fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result
     };
     if selected {
         let mut view_count = 0usize;
-        for item in Records::new(source) {
+        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
             if item?.kind() == record_kind {
                 view_count = view_count.saturating_add(1);
                 if view_count > 1 {
-                    return Err(Error::UnsupportedFeature(format!(
-                        "cannot map multiple {:?} view records to one active workbook view",
-                        kind
-                    )));
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "cannot map multiple view records to one active workbook view",
+                    ));
                 }
             }
         }
         if view_count == 0 {
-            return Err(Error::UnsupportedFeature(format!(
-                "cannot select active {:?} sheet without a view record",
-                kind
-            )));
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "cannot select active sheet without a view record",
+            ));
         }
     }
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         if record.kind() != record_kind {
             continue;
@@ -6308,9 +6372,9 @@ fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result
         if old == updated {
             continue;
         }
-        let header_source = source.get(record.offset()..).ok_or_else(|| {
-            Error::InvalidFormat("sheet-view record offset is outside its part".to_string())
-        })?;
+        let header_source = source
+            .get(record.offset()..)
+            .ok_or_else(|| Error::InvalidFormat("sheet-view record offset is outside its part"))?;
         let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
         let payload_start =
             record
@@ -6343,14 +6407,16 @@ fn validate_sheet_state_invariants(workbook: &Workbook) -> Result<()> {
         .filter(|tab| tab.state() == State::Visible)
         .count();
     if visible == 0 {
-        return Err(Error::UnsupportedFeature(
-            "workbook must retain at least one visible sheet tab".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "workbook must retain at least one visible sheet tab",
         ));
     }
     for tab in workbook.sheets() {
         if tab.kind() == Kind::Unbound && tab.state() != State::VeryHidden {
             return Err(Error::InvalidRelationship(
-                "unbound XLSB sheet tabs must be very hidden".to_string(),
+                "unbound XLSB sheet tabs must be very hidden",
             ));
         }
     }
@@ -6409,7 +6475,7 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
             found: source.len(),
         })?
         .to_vec();
-    Encoder::new(&mut payload).write_wide_string(name)?;
+    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(name)?;
     payload.extend_from_slice(suffix);
     let mut tolerance_report = crate::leniency::ToleranceReport::default();
     let _validated_record = crate::package::records::BundleSheetRecord::parse_with(
@@ -6428,7 +6494,7 @@ fn validate_sheet_name_value(name: &str) -> Result<()> {
         || name.starts_with('\'')
         || name.ends_with('\'')
     {
-        return Err(Error::InvalidFormat(format!("invalid sheet name {name:?}")));
+        return Err(Error::InvalidFormat("invalid sheet name"));
     }
     Ok(())
 }
@@ -6441,9 +6507,7 @@ fn validate_staged_sheet_name(
     name: &str,
 ) -> Result<()> {
     if catalog_position >= catalog.len() {
-        return Err(Error::WorksheetNotFound(format!(
-            "sheet index {catalog_position}"
-        )));
+        return Err(Error::WorksheetNotFound(Some(catalog_position)));
     }
     // Every earlier staged name has already passed this check.  Resolve only
     // the effective names of the other catalog entries for the new request;
@@ -6466,9 +6530,7 @@ fn validate_staged_sheet_name(
             })
             .unwrap_or(right_tab.name.as_str());
         if excel_name_eq(name, right_name) {
-            return Err(Error::InvalidFormat(format!(
-                "duplicate sheet name {name:?}"
-            )));
+            return Err(Error::InvalidFormat("duplicate sheet name"));
         }
     }
     Ok(())
@@ -6480,17 +6542,13 @@ fn validate_staged_insert_sheet_name(
     name: &str,
 ) -> Result<()> {
     if catalog.iter().any(|tab| excel_name_eq(&tab.name, name)) {
-        return Err(Error::InvalidFormat(format!(
-            "duplicate sheet name {name:?}"
-        )));
+        return Err(Error::InvalidFormat("duplicate sheet name"));
     }
     if operations.iter().any(|operation| {
         matches!(operation, Operation::InsertSheet { name: staged, .. }
             if excel_name_eq(staged, name))
     }) {
-        return Err(Error::InvalidFormat(format!(
-            "duplicate sheet name {name:?}"
-        )));
+        return Err(Error::InvalidFormat("duplicate sheet name"));
     }
     Ok(())
 }
@@ -6501,26 +6559,20 @@ fn validate_final_sheet_name_changes(
 ) -> Result<()> {
     for (&left_position, left_name) in changes {
         if left_position >= tabs.len() {
-            return Err(Error::WorksheetNotFound(format!(
-                "sheet index {left_position}"
-            )));
+            return Err(Error::WorksheetNotFound(Some(left_position)));
         }
         for (right_position, right_tab) in tabs.iter().enumerate() {
             if right_position != left_position
                 && !changes.contains_key(&right_position)
                 && excel_name_eq(left_name, right_tab.name())
             {
-                return Err(Error::InvalidFormat(format!(
-                    "duplicate sheet name {left_name:?}"
-                )));
+                return Err(Error::InvalidFormat("duplicate sheet name"));
             }
         }
         if changes.iter().any(|(&right_position, right_name)| {
             right_position != left_position && excel_name_eq(left_name, right_name)
         }) {
-            return Err(Error::InvalidFormat(format!(
-                "duplicate sheet name {left_name:?}"
-            )));
+            return Err(Error::InvalidFormat("duplicate sheet name"));
         }
     }
     Ok(())
@@ -6539,7 +6591,7 @@ fn resolve_catalog_position(
             let first = matches.next().map(|(position, _)| position);
             if matches.next().is_some() {
                 return Err(Error::InvalidFormat(
-                    "sheet selector name is ambiguous in the complete tab catalog".to_string(),
+                    "sheet selector name is ambiguous in the complete tab catalog",
                 ));
             }
             Ok(first)
@@ -6799,7 +6851,7 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let sheet = read_next_usize(data, offset)?;
             let length = read_next_usize(data, offset)?;
             let name = std::str::from_utf8(read_slice(data, offset, length)?)
-                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .map_err(|_error| Error::InvalidFormat("sheet name is not UTF-8"))?
                 .to_string();
             Ok(Operation::RenameSheet { sheet, name })
         },
@@ -6807,7 +6859,7 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let catalog_position = read_next_usize(data, offset)?;
             let length = read_next_usize(data, offset)?;
             let name = std::str::from_utf8(read_slice(data, offset, length)?)
-                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .map_err(|_error| Error::InvalidFormat("sheet name is not UTF-8"))?
                 .to_string();
             Ok(Operation::SetSheetName {
                 catalog_position,
@@ -6819,7 +6871,7 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let catalog_position = read_next_usize(data, offset)?;
             let length = read_next_usize(data, offset)?;
             let name = std::str::from_utf8(read_slice(data, offset, length)?)
-                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .map_err(|_error| Error::InvalidFormat("sheet name is not UTF-8"))?
                 .to_string();
             Ok(Operation::SetSheetName {
                 catalog_position,
@@ -6866,7 +6918,7 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let state = state_from_wire(read_slice(data, offset, 1)?[0])?;
             let length = read_next_usize(data, offset)?;
             let name = std::str::from_utf8(read_slice(data, offset, length)?)
-                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .map_err(|_error| Error::InvalidFormat("sheet name is not UTF-8"))?
                 .to_string();
             Ok(Operation::InsertSheet {
                 catalog_position,
@@ -6953,14 +7005,11 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             let description = if description_len == u64::MAX {
                 None
             } else {
-                let length = usize::try_from(description_len).map_err(|error| {
-                    Error::InvalidFormat(format!("image description length overflow: {error}"))
-                })?;
+                let length = usize::try_from(description_len)
+                    .map_err(|_error| Error::InvalidFormat("image description length overflow"))?;
                 Some(
                     std::str::from_utf8(read_slice(data, offset, length)?)
-                        .map_err(|error| {
-                            Error::InvalidFormat(format!("image description is not UTF-8: {error}"))
-                        })?
+                        .map_err(|_error| Error::InvalidFormat("image description is not UTF-8"))?
                         .to_string(),
                 )
             };
@@ -6999,15 +7048,14 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
         12 => {
             let length = read_next_usize(data, offset)?;
             let name = std::str::from_utf8(read_slice(data, offset, length)?)
-                .map_err(|error| {
-                    Error::InvalidFormat(format!("defined name is not UTF-8: {error}"))
-                })?
+                .map_err(|_error| Error::InvalidFormat("defined name is not UTF-8"))?
                 .to_string();
             let scope = match read_next_u64(data, offset)? {
                 u64::MAX => None,
-                value => Some(usize::try_from(value).map_err(|error| {
-                    Error::InvalidFormat(format!("defined-name scope overflow: {error}"))
-                })?),
+                value => Some(
+                    usize::try_from(value)
+                        .map_err(|_error| Error::InvalidFormat("defined-name scope overflow"))?,
+                ),
             };
             let target = match read_slice(data, offset, 1)?[0] {
                 0 => None,
@@ -7022,14 +7070,11 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                         crate::formula::Range::new(row_first, row_last, col_first, col_last)?,
                     ))
                 },
-                flag => {
-                    return Err(Error::InvalidFormat(format!(
-                        "defined-name target flag {flag} is invalid"
-                    )));
+                _flag => {
+                    return Err(Error::InvalidFormat("defined-name target flag is invalid"));
                 },
             };
-            crate::named_ranges::validate_name(&name)
-                .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+            crate::named_ranges::validate_name(&name)?;
             Ok(Operation::SetDefinedName {
                 name,
                 scope,
@@ -7077,9 +7122,7 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 ranges: canonical_merge_ranges(ranges)?.into(),
             })
         },
-        _ => Err(Error::InvalidFormat(format!(
-            "unknown workbook patch operation {tag}"
-        ))),
+        _ => Err(Error::InvalidFormat("unknown workbook patch operation")),
     }
 }
 
@@ -7118,7 +7161,7 @@ fn canonical_merge_ranges(
         range.validate()?;
         if range.row_first == range.row_last && range.col_first == range.col_last {
             return Err(Error::InvalidFormat(
-                "a merged range must span more than one cell".to_string(),
+                "a merged range must span more than one cell",
             ));
         }
     }
@@ -7136,8 +7179,10 @@ fn canonical_merge_ranges(
             .take_while(|next| next.row_first <= range.row_last)
             .any(|next| next.overlaps(range))
         {
-            return Err(Error::UnsupportedFeature(
-                "merged ranges must not overlap".to_string(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "merged ranges must not overlap",
             ));
         }
     }
@@ -7169,9 +7214,7 @@ fn image_format_from_bits(value: u8) -> Result<crate::package::drawing_image::Im
         6 => Ok(crate::package::drawing_image::ImageFormat::Emf),
         7 => Ok(crate::package::drawing_image::ImageFormat::Wmf),
         8 => Ok(crate::package::drawing_image::ImageFormat::Wdp),
-        _ => Err(Error::InvalidFormat(format!(
-            "unknown durable image format {value}"
-        ))),
+        _ => Err(Error::InvalidFormat("unknown durable image format")),
     }
 }
 
@@ -7188,16 +7231,14 @@ fn state_from_wire(value: u8) -> Result<State> {
         0 => Ok(State::Visible),
         1 => Ok(State::Hidden),
         2 => Ok(State::VeryHidden),
-        _ => Err(Error::InvalidFormat(format!(
-            "unknown durable sheet state {value}"
-        ))),
+        _ => Err(Error::InvalidFormat("unknown durable sheet state")),
     }
 }
 
 fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
     let record_source = source
         .get(record.offset()..)
-        .ok_or_else(|| Error::InvalidFormat("record offset is outside workbook.bin".to_string()))?;
+        .ok_or_else(|| Error::InvalidFormat("record offset is outside workbook.bin"))?;
     let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
     let end = record
         .offset()
@@ -7207,9 +7248,9 @@ fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<
             resource: "workbook record range",
         })?;
     output.extend_from_slice(
-        source.get(record.offset()..end).ok_or_else(|| {
-            Error::InvalidFormat("record range is outside workbook.bin".to_string())
-        })?,
+        source
+            .get(record.offset()..end)
+            .ok_or_else(|| Error::InvalidFormat("record range is outside workbook.bin"))?,
     );
     Ok(())
 }
@@ -7221,16 +7262,15 @@ fn validate_limits(limits: TransferLimits) -> Result<()> {
         || limits.history_bytes() == 0
     {
         return Err(Error::InvalidFormat(
-            "workbook patch transfer/history limits must be nonzero".to_string(),
+            "workbook patch transfer/history limits must be nonzero",
         ));
     }
     Ok(())
 }
 
 fn push_usize(output: &mut Vec<u8>, value: usize) -> Result<()> {
-    let value = u64::try_from(value).map_err(|error| {
-        Error::InvalidFormat(format!("workbook patch length exceeds u64: {error}"))
-    })?;
+    let value = u64::try_from(value)
+        .map_err(|_error| Error::InvalidFormat("workbook patch length exceeds u64"))?;
     output.extend_from_slice(&value.to_le_bytes());
     Ok(())
 }
@@ -7242,10 +7282,10 @@ fn read_usize(data: &[u8], offset: usize) -> Result<usize> {
             expected: offset.saturating_add(8),
             found: data.len(),
         })?;
-    usize::try_from(u64::from_le_bytes(bytes.try_into().map_err(|error| {
-        Error::InvalidFormat(format!("invalid workbook patch length: {error}"))
+    usize::try_from(u64::from_le_bytes(bytes.try_into().map_err(|_error| {
+        Error::InvalidFormat("invalid workbook patch length")
     })?))
-    .map_err(|error| Error::InvalidFormat(format!("workbook patch length exceeds usize: {error}")))
+    .map_err(|_error| Error::InvalidFormat("workbook patch length exceeds usize"))
 }
 
 fn read_next_usize(data: &[u8], offset: &mut usize) -> Result<usize> {
@@ -7256,22 +7296,22 @@ fn read_next_usize(data: &[u8], offset: &mut usize) -> Result<usize> {
 
 fn read_next_u32(data: &[u8], offset: &mut usize) -> Result<u32> {
     let bytes = read_slice(data, offset, 4)?;
-    Ok(u32::from_le_bytes(bytes.try_into().map_err(|error| {
-        Error::InvalidFormat(format!("invalid workbook patch coordinate: {error}"))
+    Ok(u32::from_le_bytes(bytes.try_into().map_err(|_error| {
+        Error::InvalidFormat("invalid workbook patch coordinate")
     })?))
 }
 
 fn read_next_u64(data: &[u8], offset: &mut usize) -> Result<u64> {
     let bytes = read_slice(data, offset, 8)?;
-    Ok(u64::from_le_bytes(bytes.try_into().map_err(|error| {
-        Error::InvalidFormat(format!("invalid workbook patch u64: {error}"))
+    Ok(u64::from_le_bytes(bytes.try_into().map_err(|_error| {
+        Error::InvalidFormat("invalid workbook patch u64")
     })?))
 }
 
 fn read_next_i64(data: &[u8], offset: &mut usize) -> Result<i64> {
     let bytes = read_slice(data, offset, 8)?;
-    Ok(i64::from_le_bytes(bytes.try_into().map_err(|error| {
-        Error::InvalidFormat(format!("invalid workbook patch i64: {error}"))
+    Ok(i64::from_le_bytes(bytes.try_into().map_err(|_error| {
+        Error::InvalidFormat("invalid workbook patch i64")
     })?))
 }
 

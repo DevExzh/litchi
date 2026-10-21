@@ -100,7 +100,7 @@ fn collection(bytes: &[u8], layout: &SheetLayout) -> Result<Option<Collection>> 
         ));
     }
     let base = unit.span.start;
-    let mut records = Records::new(&bytes[unit.span.clone()]);
+    let mut records = Records::new(&bytes[unit.span.clone()], crate::raw::Limits::DEFAULT);
     let header = records
         .next()
         .transpose()?

@@ -168,7 +168,7 @@ impl DependencyKind {
         match value {
             0 => Ok(Self::Rtd),
             1 => Ok(Self::Cube),
-            value => Err(invalid(format!("unknown volatile dependency type {value}"))),
+            _value => Err(invalid("unknown volatile dependency type")),
         }
     }
 
@@ -189,12 +189,10 @@ impl CellReference {
     /// Construct a checked zero-based cell reference.
     pub fn new(row: u32, column: u32, sheet_index: u32) -> Result<Self> {
         if row >= 1_048_576 {
-            return Err(invalid(format!("volatile row {row} is outside 0..1048575")));
+            return Err(invalid("volatile row is outside 0..1048575"));
         }
         if column >= 16_384 {
-            return Err(invalid(format!(
-                "volatile column {column} is outside 0..16383"
-            )));
+            return Err(invalid("volatile column is outside 0..16383"));
         }
         Ok(Self {
             row,
@@ -255,9 +253,7 @@ impl ErrorCode {
             0x24 => Ok(Self::Num),
             0x2A => Ok(Self::Na),
             0x2B => Ok(Self::GettingData),
-            value => Err(invalid(format!(
-                "invalid volatile BErr value 0x{value:02X}"
-            ))),
+            _value => Err(invalid("invalid volatile BErr value")),
         }
     }
 
@@ -430,10 +426,9 @@ impl Dependencies {
                                 }
                             })?;
                         if sheet_index >= sheet_count {
-                            return Err(invalid(format!(
-                                "volatile sheet ordinal {} exceeds {} Workbook BrtBundleSh records",
-                                reference.sheet_index, sheet_count
-                            )));
+                            return Err(invalid(
+                                "volatile sheet ordinal exceeds Workbook BrtBundleSh records",
+                            ));
                         }
                     }
                 }
@@ -468,10 +463,7 @@ pub(crate) fn validate_xnum(value: f64) -> Result<()> {
         FpCategory::Nan | FpCategory::Infinite | FpCategory::Subnormal
     ) || (value == 0.0 && value.is_sign_negative())
     {
-        return Err(invalid(format!(
-            "invalid volatile Xnum bit pattern 0x{:016X}",
-            value.to_bits()
-        )));
+        return Err(invalid("invalid volatile Xnum bit pattern"));
     }
     Ok(())
 }
@@ -517,6 +509,6 @@ const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

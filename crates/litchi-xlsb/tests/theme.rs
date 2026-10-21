@@ -887,6 +887,44 @@ fn typed_theme_owner_rejects_lexically_stale_theme_relationships_atomically() {
 }
 
 #[test]
+fn raw_opc_lexical_relationship_edit_is_reversible() {
+    let (workbook, _) = image_bearing_theme_workbook();
+    let package = workbook.to_package();
+    let before = package.to_bytes().expect("source bytes");
+    let before_relationship_xml = relationship_xml(&workbook, &theme_uri());
+
+    let mut edit = package.edit_opc().expect("raw OPC edit");
+    edit.update(|package| {
+        replace_theme_relationship_source_lexically(package);
+        Ok(())
+    })
+    .expect("stage lexical relationship edit");
+    let commit = edit.commit().expect("commit lexical relationship edit");
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+
+    let after_workbook = commit.package().workbook().expect("committed workbook");
+    let after_relationship_xml = relationship_xml(after_workbook, &theme_uri());
+    assert_ne!(after_relationship_xml, before_relationship_xml);
+
+    let replayed = package
+        .apply_opc(commit.patch())
+        .expect("replay lexical relationship edit")
+        .into_package();
+    assert_eq!(
+        replayed.to_bytes().expect("replayed bytes"),
+        commit.package().to_bytes().expect("committed bytes")
+    );
+
+    let restored = commit
+        .package()
+        .apply_opc(&commit.patch().inverse())
+        .expect("inverse lexical relationship edit")
+        .into_package();
+    assert_eq!(restored.to_bytes().expect("restored bytes"), before);
+}
+
+#[test]
 fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
     let absent_package = remove_workbook_theme(native_workbook().opc_package().clone());
     let mut absent = Workbook::from_opc_package(absent_package).expect("open absent-theme host");

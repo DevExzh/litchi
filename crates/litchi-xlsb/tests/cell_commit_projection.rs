@@ -60,9 +60,9 @@ fn nan_workbook() -> Vec<u8> {
     let uri = PackURI::new(SHEET1).expect("worksheet URI");
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     let mut replaced = false;
-    for item in Records::new(source_sheet) {
+    for item in Records::new(source_sheet, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("fixture worksheet record");
         let mut payload = record.payload().to_vec();
         if !replaced && record.kind() == kind::CELL_REAL {

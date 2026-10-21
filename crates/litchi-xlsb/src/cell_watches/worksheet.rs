@@ -228,9 +228,9 @@ impl Patch {
     /// Apply this patch only to its exact source snapshot.
     pub(crate) fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(Error::UnsupportedFeature(
-                "cell-watch patch source snapshot does not match".to_string(),
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-watch worksheet stream",
+            });
         }
         Ok(self.after.to_vec())
     }

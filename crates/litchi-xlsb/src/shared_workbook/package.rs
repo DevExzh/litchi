@@ -165,12 +165,12 @@ fn store_inner(package: &mut OpcPackage, source: &Catalog) -> Result<()> {
 
     let workbook_uri = package.main_document_part()?.partname().clone();
     package.try_add_part(Box::new(BlobPart::new(
-        PackURI::new(&users.part_name).map_err(Error::InvalidUri)?,
+        PackURI::new(&users.part_name)?,
         USERS_CONTENT_TYPE.to_string(),
         write_users(users)?,
     )))?;
     package.try_add_part(Box::new(BlobPart::new(
-        PackURI::new(&headers.part_name).map_err(Error::InvalidUri)?,
+        PackURI::new(&headers.part_name)?,
         HEADERS_CONTENT_TYPE.to_string(),
         write_headers(headers)?,
     )))?;
@@ -189,9 +189,9 @@ fn store_inner(package: &mut OpcPackage, source: &Catalog) -> Result<()> {
             false,
         );
     }
-    let header_uri = PackURI::new(&headers.part_name).map_err(Error::InvalidUri)?;
+    let header_uri = PackURI::new(&headers.part_name)?;
     for log in &catalog.logs {
-        let log_uri = PackURI::new(&log.part_name).map_err(Error::InvalidUri)?;
+        let log_uri = PackURI::new(&log.part_name)?;
         package.try_add_part(Box::new(BlobPart::new(
             log_uri.clone(),
             LOG_CONTENT_TYPE.to_string(),
@@ -381,14 +381,11 @@ fn require_workbook(part: &dyn Part) -> Result<()> {
     }
 }
 
-fn require_content_type(part: &dyn Part, expected: &str) -> Result<()> {
+fn require_content_type(part: &dyn Part, expected: &'static str) -> Result<()> {
     if part.content_type() == expected {
         Ok(())
     } else {
-        Err(Error::InvalidContentType {
-            expected: expected.to_string(),
-            got: part.content_type().to_string(),
-        })
+        Err(Error::InvalidContentType { expected: expected })
     }
 }
 
@@ -401,7 +398,7 @@ fn require_no_relationships(part: &dyn Part, label: &str) -> Result<()> {
 }
 
 fn relative_target(source: &PackURI, target: &str) -> Result<String> {
-    let target = PackURI::new(target).map_err(Error::InvalidUri)?;
+    let target = PackURI::new(target)?;
     Ok(target.relative_ref(source.base_uri()))
 }
 

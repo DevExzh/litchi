@@ -124,7 +124,7 @@ fn bundle_entries(package: &Package) -> Vec<BundleEntry> {
         .opc_package()
         .get_part(&workbook_uri)
         .expect("workbook part");
-    Records::new(workbook.blob())
+    Records::new(workbook.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("workbook record"))
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .map(|record| {
@@ -241,8 +241,8 @@ where
     F: FnMut(Kind, &[u8], &mut Encoder<&mut Vec<u8>>),
 {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), &mut writer);
     }
@@ -266,7 +266,7 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
 }
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::BOOK_VIEW).then(|| {
@@ -285,10 +285,10 @@ fn with_opaque_sheet_record(package: &Package, name: &str) -> Package {
     let original = opc.get_part(&part).expect("sheet part").blob().to_vec();
     let opaque_kind = Kind::new(0x0ffe).expect("opaque worksheet record kind");
     let mut opaque = Vec::new();
-    Encoder::new(&mut opaque)
+    Encoder::new(&mut opaque, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(opaque_kind, b"opaque-insert-preservation")
         .expect("opaque record");
-    let end_sheet = Records::new(&original)
+    let end_sheet = Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("sheet record"))
         .find(|record| record.kind() == kind::END_SHEET)
         .expect("end sheet record")
@@ -304,7 +304,7 @@ fn with_opaque_sheet_record(package: &Package, name: &str) -> Package {
 }
 
 fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
@@ -356,7 +356,7 @@ fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
 }
 
 fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::EXTERN_SHEET).then(|| {
@@ -381,7 +381,7 @@ fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
 }
 
 fn extern_sheet_record_count(package: &Package) -> usize {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| item.ok())
         .filter(|record| record.kind() == kind::EXTERN_SHEET)
         .count()
@@ -390,9 +390,9 @@ fn extern_sheet_record_count(package: &Package) -> usize {
 fn with_unknown_workbook_record(package: &Package) -> Package {
     replace_workbook(package, |source, output| {
         let unknown = Kind::new(0x3ffe).expect("unknown workbook record kind");
-        let mut writer = Encoder::new(output);
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
         let mut inserted = false;
-        for item in Records::new(source) {
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("workbook record");
             if !inserted && record.kind() == kind::END_BOOK {
                 writer
@@ -565,7 +565,7 @@ fn volatile_ref_indices(package: &Package) -> Vec<u32> {
         .get_part(&uri)
         .expect("volatile owner")
         .blob();
-    Records::new(blob)
+    Records::new(blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.ok()?;
             (record.kind() == kind::VOL_REF)
@@ -871,7 +871,7 @@ fn insertion_inside_a_three_d_range_refuses_without_broadening_the_old_set() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.insert_sheet(Position::new(1), "Inserted".to_owned(), State::Visible),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(edit.commit().unwrap().patch().is_noop());
     assert_eq!(source.to_bytes().unwrap(), before);
@@ -908,7 +908,7 @@ fn assert_insert_guard(package: Package, label: &str) {
         if label == "orphan volatile owner" {
             matches!(error, PackageError::InvalidFormat(_))
         } else {
-            matches!(error, PackageError::UnsupportedFeature(_))
+            matches!(error, PackageError::Refused(_))
         },
         "{label}: expected typed dependency error, got {error:?}"
     );

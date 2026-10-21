@@ -110,8 +110,8 @@ impl TryFrom<u32> for PivotCacheSourceType {
             2 => Ok(Self::Consolidation),
             3 => Ok(Self::Scenario),
             _ => Err(Error::Unrecognized {
-                typ: "PivotCache source type".to_string(),
-                val: format!("0x{value:08X}"),
+                typ: "PivotCache source type",
+                val: "0x",
             }),
         }
     }
@@ -336,8 +336,8 @@ impl TryFrom<u8> for PivotCacheErrorCode {
             0x2A => Ok(Self::NA),
             0x2B => Ok(Self::GettingData),
             _ => Err(Error::Unrecognized {
-                typ: "PivotCache item error code".to_string(),
-                val: format!("0x{value:02X}"),
+                typ: "PivotCache item error code",
+                val: "0x",
             }),
         }
     }
@@ -443,8 +443,8 @@ impl TryFrom<u8> for PivotCacheGroupBy {
             6 => Ok(Self::Quarters),
             7 => Ok(Self::Years),
             _ => Err(Error::Unrecognized {
-                typ: "PivotCache grouping type".to_string(),
-                val: format!("0x{value:02X}"),
+                typ: "PivotCache grouping type",
+                val: "0x",
             }),
         }
     }
@@ -650,8 +650,8 @@ impl TryFrom<u8> for PivotNameFunction {
             10 => Ok(Self::VarP),
             255 => Ok(Self::Unspecified),
             _ => Err(Error::Unrecognized {
-                typ: "PivotName aggregation function".to_string(),
-                val: format!("{value}"),
+                typ: "PivotName aggregation function",
+                val: "invalid value",
             }),
         }
     }

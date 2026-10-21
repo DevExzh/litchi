@@ -101,13 +101,13 @@ fn package_with_owner_bytes(package: &Package, bytes: Vec<u8>) -> Package {
 
 fn rewrite_records(bytes: &[u8], insert_at: usize, kind: Kind, payload: &[u8]) -> Vec<u8> {
     let mut records = Vec::new();
-    for record in Records::new(bytes) {
+    for record in Records::new(bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("valid owner record");
         records.push((record.kind(), record.payload().to_vec()));
     }
     records.insert(insert_at.min(records.len()), (kind, payload.to_vec()));
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     for (record_kind, record_payload) in records {
         writer
             .write_record(record_kind, &record_payload)
@@ -451,7 +451,7 @@ fn unknown_and_reserved_record_kinds_are_exact_noops_but_changed_edits_refuse() 
         let result = changed.set_dependencies(changed_dependencies());
         assert!(matches!(
             result,
-            Err(litchi_xlsb::volatile_dependencies::Error::UnsupportedFeature(_))
+            Err(litchi_xlsb::volatile_dependencies::Error::Refused(_))
         ));
         assert_eq!(package_bytes(&unsupported), before);
     }

@@ -1000,6 +1000,39 @@ impl OpcPackage {
         ))
     }
 
+    /// Return the retained relationship-member bytes when their semantic
+    /// binding still matches the current typed graph.
+    ///
+    /// This is the zero-copy provenance path for format patch capture. A
+    /// caller that needs a canonical member for an authored or changed graph
+    /// should use [`Self::source_relationships`]. The boolean reports whether
+    /// the physical relationship member is present; a source member with no
+    /// edges is therefore distinguishable from an absent part member.
+    pub fn retained_relationships_xml(
+        &self,
+        owner: &PackURI,
+    ) -> Result<Option<(Arc<Vec<u8>>, bool)>> {
+        let (owner_ref, relationships) = if owner.as_str() == PACKAGE_URI {
+            (owner, self.rels())
+        } else {
+            let Some(part) = self.part_metadata(owner) else {
+                return Ok(None);
+            };
+            (part.partname(), part.rels())
+        };
+        let Some(source) = self
+            .source_relationships_xml
+            .get(owner_ref)
+            .filter(|source| source.binding.matches(relationships))
+        else {
+            return Ok(None);
+        };
+        let member_present = owner_ref.as_str() == PACKAGE_URI
+            || !relationships.is_empty()
+            || self.source_relationships_member_present(owner_ref);
+        Ok(Some((Arc::clone(&source.bytes), member_present)))
+    }
+
     /// Compare one owner's retained relationship spelling and physical presence.
     /// Typed relationship equality is a separate caller check; two absent
     /// retained tokens may have different authored fallback graphs.

@@ -80,7 +80,7 @@ impl Edit {
         let after = Snapshot::read_with_limits(&candidate, self.before.limits())?;
         if after.is_present() {
             return Err(Error::InvalidFormat(
-                "Calculation Chain removal readback still has an owner".to_string(),
+                "Calculation Chain removal readback still has an owner",
             ));
         }
         self.source

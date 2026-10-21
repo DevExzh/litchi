@@ -92,13 +92,12 @@ impl Edit {
         let after = Snapshot::read_with_limits(&candidate, self.before.limits())?;
         if after.dependencies() != after_dependencies.as_deref() {
             return Err(Error::InvalidFormat(
-                "Volatile Dependencies transaction readback did not match staged content"
-                    .to_string(),
+                "Volatile Dependencies transaction readback did not match staged content",
             ));
         }
         if after.source() == self.before.source() {
             return Err(Error::InvalidFormat(
-                "changed Volatile Dependencies transaction produced no source change".to_string(),
+                "changed Volatile Dependencies transaction produced no source change",
             ));
         }
         self.source
@@ -107,7 +106,9 @@ impl Edit {
 }
 
 fn unsupported_unknown_records() -> Error {
-    Error::UnsupportedFeature(
-        "typed Volatile Dependencies edits are refused while unsupported source records are present; an exact no-op or owner removal remains safe".to_string(),
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "edit_volatile_dependencies",
+        "the Volatile Dependencies source contains records this edit cannot preserve",
     )
 }

@@ -64,10 +64,9 @@ fn validate_formula_context(formula: &Formula, context: &Context) -> Result<()> 
                 .ok()
                 .and_then(|value| value.checked_sub(1));
             if !resolved.is_some_and(|value| value < context.defined_names.len()) {
-                return Err(Error::InvalidFormula(format!(
-                    "sparkline PtgName index {index} exceeds {} workbook names",
-                    context.defined_names.len()
-                )));
+                return Err(Error::InvalidFormula(
+                    "sparkline PtgName index exceeds workbook names",
+                ));
             }
         },
         FormulaKind::ExternalName => validate_external_name(formula, context)?,
@@ -76,9 +75,9 @@ fn validate_formula_context(formula: &Formula, context: &Context) -> Result<()> 
                 .ixti()
                 .expect("structurally validated 3-D token has an XTI");
             if !context.is_internal_single_sheet_xti(ixti) {
-                return Err(Error::InvalidFormula(format!(
-                    "sparkline 3-D source XTI {ixti} must select exactly one valid internal worksheet"
-                )));
+                return Err(Error::InvalidFormula(
+                    "sparkline 3-D source XTI must select exactly one valid internal worksheet",
+                ));
             }
         },
     }
@@ -95,47 +94,37 @@ fn validate_external_name(formula: &Formula, context: &Context) -> Result<()> {
     let xti = context
         .external_sheets
         .get(usize::from(ixti))
-        .ok_or_else(|| {
-            Error::InvalidFormula(format!(
-                "sparkline PtgNameX XTI {ixti} exceeds {} entries",
-                context.external_sheets.len()
-            ))
-        })?;
+        .ok_or_else(|| Error::InvalidFormula("sparkline PtgNameX XTI exceeds entries"))?;
     let link_index = usize::try_from(xti.external_link)
-        .map_err(|_| Error::InvalidFormula("sparkline external-link index overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("sparkline external-link index overflow"))?;
     let link = context.supporting_links.get(link_index).ok_or_else(|| {
-        Error::InvalidFormula(format!(
-            "sparkline PtgNameX refers to missing supporting link {}",
-            xti.external_link
-        ))
+        Error::InvalidFormula("sparkline PtgNameX refers to missing supporting link")
     })?;
     let SupportingLink::ExternalWorkbook(book_index) = link else {
         return Err(Error::InvalidFormula(
-            "sparkline PtgNameX must refer to an external BrtSupBookSrc".to_string(),
+            "sparkline PtgNameX must refer to an external BrtSupBookSrc",
         ));
     };
     let book_index = usize::try_from(*book_index)
-        .map_err(|_| Error::InvalidFormula("sparkline external-book index overflow".to_string()))?;
+        .map_err(|_| Error::InvalidFormula("sparkline external-book index overflow"))?;
     let book = context.external_books.get(book_index).ok_or_else(|| {
-        Error::InvalidFormula(format!(
-            "sparkline PtgNameX refers to missing external book {book_index}"
-        ))
+        Error::InvalidFormula("sparkline PtgNameX refers to missing external book")
     })?;
     let metadata = book.metadata_ref();
     if !metadata.is_workbook() {
-        return Err(Error::UnsupportedFeature(
-            "sparkline PtgNameX refers to inert DDE or OLE data rather than an external workbook"
-                .to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit_sparklines",
+            "the sparkline formula refers to inert external data",
         ));
     }
     let resolved = usize::try_from(name_index)
         .ok()
         .and_then(|value| value.checked_sub(1));
     if !resolved.is_some_and(|value| value < metadata.defined_names().len()) {
-        return Err(Error::InvalidFormula(format!(
-            "sparkline external name index {name_index} exceeds {} names",
-            metadata.defined_names().len()
-        )));
+        return Err(Error::InvalidFormula(
+            "sparkline external name index exceeds names",
+        ));
     }
     Ok(())
 }
@@ -145,12 +134,11 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }
 
 fn map_error(error: super::Error) -> Error {
-    Error::InvalidFormat(error.to_string())
+    Error::Sparkline(error)
 }

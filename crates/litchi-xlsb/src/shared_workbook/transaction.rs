@@ -7,7 +7,7 @@
 //! new package, the exact part-level [`Patch`] and the [`Diagnostics`];
 //! [`crate::Package::apply_shared_workbook`] replays a patch onto an equal
 //! package. An unchanged catalog publishes nothing, and a changed edit of a
-//! signed workbook is refused with [`Error::Signed`].
+//! signed workbook is refused with [`crate::shared_workbook::Error::Signed`].
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -18,7 +18,6 @@ use super::model::{
     Catalog, Header, Info, RawRecord, RevisionHeaders, RevisionLog, User, UserNames,
 };
 use super::{Result, package, validation};
-use crate::package::error::Error;
 use crate::part_edit::{Staged, family};
 
 family!("shared-workbook", shared_error);
@@ -62,8 +61,8 @@ impl crate::Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PatchConflict`] when this package is not the patch's
-    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// Returns [`crate::shared_workbook::Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`crate::shared_workbook::Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_shared_workbook(&self, patch: &Patch) -> Result<Commit> {
         Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
@@ -332,7 +331,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns the catalog validation errors, [`Error::Signed`] for a changed
+    /// Returns the catalog validation errors, [`crate::shared_workbook::Error::Signed`] for a changed
     /// edit of a signed workbook and the workbook validation errors of the
     /// result.
     pub fn commit(mut self) -> Result<Commit> {
@@ -444,7 +443,7 @@ impl SourceState {
             });
         }
         for name in names {
-            let uri = litchi_opc::PackURI::new(&name).map_err(Error::InvalidUri)?;
+            let uri = litchi_opc::PackURI::new(&name)?;
             let part = package.get_part(&uri)?;
             parts.push(SourcePart {
                 part_name: part.partname().to_string(),

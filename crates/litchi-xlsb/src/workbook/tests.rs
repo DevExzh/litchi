@@ -38,7 +38,7 @@ fn wide_string(value: &str) -> Vec<u8> {
 
 fn external_link_records(records: &[(RawKind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -293,7 +293,7 @@ fn parse_external_link_with_relationship_type(
 
 fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<SharedString>> {
     let data = external_link_records(records);
-    let mut iter = Records::new(data.as_slice());
+    let mut iter = Records::new(data.as_slice(), crate::raw::Limits::DEFAULT);
     let mut strings = Vec::new();
     Workbook::read_shared_strings(&mut iter, &mut strings, &mut Default::default())?;
     Ok(strings)
@@ -450,7 +450,7 @@ fn package_with_external_links<'a>(links: &[ExternalLinkFixture<'a>]) -> OpcPack
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Encoder::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
         for (workbook_relationship_id, _, _) in links {
             writer
                 .write_record(kind::SUP_BOOK_SRC, &wide_string(workbook_relationship_id))
@@ -1368,7 +1368,7 @@ fn resolves_external_formula_tokens_from_package_relationships() {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Encoder::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
         writer
             .write_record(kind::SUP_BOOK_SRC, &wide_string("rIdExternal"))
             .unwrap();

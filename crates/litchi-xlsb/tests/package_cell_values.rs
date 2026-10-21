@@ -91,9 +91,9 @@ fn package_cell_name_selection_rejects_ambiguous_names() {
     let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let replacement: Vec<_> = "data".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut rewritten = Vec::new();
-    let mut records = Encoder::new(&mut rewritten);
+    let mut records = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
     let mut replaced = false;
-    for record in Records::new(&original) {
+    for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.expect("record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BUNDLE_SH && payload.ends_with(&old) {

@@ -37,7 +37,7 @@ pub(crate) fn require_exclusive_inbound(
     package: &OpcPackage,
     owner_part: &PackURI,
     targets: &[(String, PackURI)],
-    description: &'static str,
+    _description: &'static str,
 ) -> Result<()> {
     for relationship in package.rels().iter() {
         if relationship.is_external() {
@@ -48,9 +48,9 @@ pub(crate) fn require_exclusive_inbound(
             .iter()
             .any(|(_, owned_target)| *owned_target == target)
         {
-            return Err(super::error::Error::InvalidRelationship(format!(
-                "{description} target {target} is also referenced from the package root"
-            )));
+            return Err(super::error::Error::InvalidRelationship(
+                "target is also referenced from the package root",
+            ));
         }
     }
     for source in package.iter_parts() {
@@ -66,9 +66,9 @@ pub(crate) fn require_exclusive_inbound(
                 continue;
             };
             if source.partname() != owner_part || relationship.r_id() != relationship_id {
-                return Err(super::error::Error::InvalidRelationship(format!(
-                    "{description} target {target} has a non-owner inbound relationship"
-                )));
+                return Err(super::error::Error::InvalidRelationship(
+                    "target has a non-owner inbound relationship",
+                ));
             }
         }
     }

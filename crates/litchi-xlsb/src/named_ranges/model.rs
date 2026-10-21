@@ -54,26 +54,24 @@ impl Definition {
 pub fn validate_name(name: &str) -> Result<()> {
     let utf16_len = name.encode_utf16().count();
     if utf16_len == 0 || utf16_len > 255 {
-        return Err(Error::InvalidFormula(format!(
-            "defined name length {utf16_len} is outside 1..=255"
-        )));
+        return Err(Error::InvalidFormula("defined name length is outside 1255"));
     }
     let mut chars = name.chars();
     let first = chars.next().expect("checked non-empty defined name");
     if !is_name_start(first) || !chars.all(is_name_character) {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} does not follow XLNameWideString grammar"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name does not follow XLNameWideString grammar",
+        ));
     }
     if name.eq_ignore_ascii_case("TRUE") || name.eq_ignore_ascii_case("FALSE") {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} is a reserved Boolean literal"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name is a reserved Boolean literal",
+        ));
     }
     if is_a1_reference(name) || starts_with_r1c1_reference(name) {
-        return Err(Error::InvalidFormula(format!(
-            "defined name {name:?} conflicts with a cell reference"
-        )));
+        return Err(Error::InvalidFormula(
+            "defined name conflicts with a cell reference",
+        ));
     }
     Ok(())
 }
