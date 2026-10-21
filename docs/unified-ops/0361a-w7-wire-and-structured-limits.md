@@ -158,5 +158,15 @@ On the branch after the trunk merge `c3abe0ecc4` (environment from
 | `unified_bench_matrix.py --check` | 0 |
 | `tools/check_feature_matrix.py` | 31 ok, 0 failed |
 
+After merging trunk again (`07d91aaa47`, 0359a; one conflict in the
+`unified_bench_matrix.py` parser list, resolved by keeping both `p0359a` and
+`p0361a`, matrix regenerated: 3,370 rows, `--check` 0), these were re-run and
+exited 0: fmt; workspace clippy with all features and `-D warnings`; the
+glossary gate (48 profiles, 3,266 banned names, 498 families, 78 immutable
+owners); `check_iwork_leaf_public_api`; `check_crate_boundaries`;
+`non_iwork_gate verify`; the tool unittests (1,320 OK); the iWork crate
+tests (5,404 passed, 0 failed); litchi-ops `--lib` with the three iWork
+features (359 passed).
+
 Commits: `d84cc0fed9` (wire), `e1183e711f` (structured), `e070ef237e`
-(trunk merge), and this record.
+(trunk merge), `bb71058dcd` (this record), `07d91aaa47` (trunk merge).
