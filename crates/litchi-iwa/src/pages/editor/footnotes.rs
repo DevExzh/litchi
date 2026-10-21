@@ -1527,17 +1527,12 @@ mod tests {
         let source = [0x1a, 0x01, b'x'];
         let mut budget = FootnoteGraphBudget::default();
         budget.input_bytes = budget
-            .rewrite_limits
-            .max_message_bytes()
+            .limits
+            .max_input_bytes()
             .checked_sub(2)
-            .expect("default message limit is larger than the test payload");
-        let error = FootnoteStorageProjection::decode(
-            &source,
-            7,
-            "test",
-            &mut budget,
-        )
-        .expect_err("the remaining aggregate input budget is two bytes");
+            .expect("default input limit is larger than the test payload");
+        let error = FootnoteStorageProjection::decode(&source, 7, "test", &mut budget)
+            .expect_err("the remaining aggregate input budget is two bytes");
         assert!(matches!(
             error,
             Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
@@ -1560,10 +1555,8 @@ mod tests {
                 .unwrap()
                 .with_rewrite_work(8)
                 .unwrap(),
-            rewrite_limits: litchi_iwa_text_wire::RewriteLimits::new(
-                4, 4, 4, 4, 4, 4, 4, 4, 8,
-            )
-            .unwrap(),
+            rewrite_limits: litchi_iwa_text_wire::RewriteLimits::new(4, 4, 4, 4, 4, 4, 4, 4, 4)
+                .unwrap(),
             input_bytes: 3,
             fields: 3,
             work: 3,
