@@ -32,9 +32,9 @@ default-policy names and immutable projections; no compatibility aliases or
 deprecated entry points were added. The picture owner remains on its existing
 owner migration track and is not treated as an exception here.
 
-Validation completed before this record was written:
+Validation completed for the final source and consumer set:
 
-* `cargo test --offline -p litchi-odraw --all-targets --all-features`: 98
+* `cargo test --offline -p litchi-odraw --all-targets --all-features`: 99
   passed;
 * `cargo test --offline -p litchi-ppt writer::table::tests -- --nocapture`:
   12 passed;
