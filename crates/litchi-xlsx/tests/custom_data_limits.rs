@@ -17,9 +17,9 @@ use std::collections::BTreeMap;
 
 use litchi_core::Resource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::custom_data::{EditOptions, RemovalDisposition};
-use litchi_xlsx::{CustomData, CustomDataLimits, Error, Package, SemanticLimits};
+use litchi_xlsx::{CustomData, CustomDataLimits, Error, OpenOptions, Package, SemanticLimits};
 
 /// The package's semantic limits with `limits` for Custom Data.
 fn custom_limits(limits: &CustomDataLimits) -> SemanticLimits {
@@ -1033,6 +1033,75 @@ fn host_xml_limits_accept_exact_boundaries_and_reject_one_under() {
             .is_err()
     );
     assert_eq!(package_bytes(&extended.package), extended_before);
+}
+
+#[test]
+fn unrelated_eager_edit_retains_physical_limit_for_connections_read() {
+    let fixture = single_fixture();
+    let source = package_bytes(&fixture.package);
+    let mut admitted = None;
+
+    // Package ingress validates the workbook and relationship catalog under
+    // this physical XML ceiling. The connections family reads its deferred
+    // XML member later and must enforce the same retained ceiling.
+    for maximum in 1..=64 {
+        let limits = SourceLimits::builder()
+            .max_depth(maximum)
+            .expect("positive XML depth limit")
+            .build()
+            .expect("valid XML depth limit");
+        let Ok(package) =
+            Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+        else {
+            continue;
+        };
+        if matches!(
+            package.edit_connections(),
+            Err(Error::Limit {
+                kind: litchi_xlsx::LimitKind::Connections(
+                    litchi_xlsx::connections::LimitKind::Depth,
+                ),
+                ..
+            })
+        ) {
+            admitted = Some((package, limits));
+            break;
+        }
+    }
+    let (package, limits) = admitted.expect(
+        "the workbook must admit one depth profile whose deferred connections read is refused",
+    );
+
+    let mut edit = package.edit().expect("unrelated workbook edit starts");
+    edit.sheet(0_usize)
+        .expect("first worksheet lookup succeeds")
+        .expect("minimal fixture has one worksheet")
+        .set("A1", "unrelated")
+        .expect("unrelated cell edit succeeds");
+    let committed = edit.commit().expect("unrelated edit commits");
+
+    assert!(matches!(
+        committed.package().edit_connections(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        })
+    ));
+    let reopened = Package::from_bytes_with_options(
+        &committed
+            .package()
+            .to_plain_bytes()
+            .expect("committed package serializes"),
+        OpenOptions::new().source_limits(limits),
+    )
+    .expect("the owning package still admits the deferred member");
+    assert!(matches!(
+        reopened.edit_connections(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        })
+    ));
 }
 
 #[test]

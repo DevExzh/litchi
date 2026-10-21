@@ -441,10 +441,36 @@ pub(crate) struct Inner {
     pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
-    /// The ingress policies this workbook was opened with (its leniency,
-    /// limits and encryption limits); snapshots derived from it by edits
-    /// re-open under the same policies.
-    pub(super) options: crate::OpenOptions,
+    /// The ingress policies this workbook retains after open (its leniency,
+    /// semantic limits and encryption limits); snapshots derived from it by
+    /// edits re-open under the same policies.
+    pub(super) options: WorkbookOptions,
+}
+
+/// The policies an owned workbook snapshot actually needs after ingress.
+///
+/// Physical source limits live on the validated OPC package, while cache
+/// limits and an execution context belong only to a source-backed owner.
+/// Keeping those source-owner fields out of every eager snapshot preserves
+/// the compact immutable workbook layout without dropping any policy used by
+/// owned edits or encrypted output.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct WorkbookOptions {
+    pub(super) leniency: Leniency,
+    pub(super) semantic_limits: crate::SemanticLimits,
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_limits: crate::encryption::Limits,
+}
+
+impl WorkbookOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        Self {
+            leniency: options.leniency,
+            semantic_limits: options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+        }
+    }
 }
 
 /// The owned, read-only semantic projection of an XLSX [`crate::Package`].
@@ -487,7 +513,7 @@ impl Workbook {
         package: OpcPackage,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_package(package, None, options)
+        Self::open_package(package, None, WorkbookOptions::from_open_options(&options))
     }
 
     /// The semantic budgets of this snapshot.
@@ -514,13 +540,9 @@ impl Workbook {
         }
     }
 
-    /// The ingress policies the owning package was opened with.
-    #[cfg_attr(
-        not(feature = "encryption"),
-        allow(dead_code, reason = "read by the encrypted outputs")
-    )]
-    pub(crate) fn open_options(&self) -> &crate::OpenOptions {
-        &self.inner.options
+    #[cfg(feature = "encryption")]
+    pub(crate) fn encryption_limits(&self) -> crate::encryption::Limits {
+        self.inner.options.encryption_limits
     }
 
     /// The lineage's memo of worksheet drawing chart inventories.
@@ -540,7 +562,8 @@ impl Workbook {
         encryption: PackageEncryption,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        let mut workbook = Self::open_package(package, None, options)?;
+        let mut workbook =
+            Self::open_package(package, None, WorkbookOptions::from_open_options(&options))?;
         workbook.policy = Some(Arc::new(Policy {
             encryption,
             semantic_limits: workbook.semantic_limits().to_owned(),
@@ -560,16 +583,14 @@ impl Workbook {
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
-        let options = source.map_or_else(crate::OpenOptions::default, |source| {
-            source.inner.options.clone()
-        });
+        let options = source.map_or_else(WorkbookOptions::default, |source| source.inner.options);
         Self::open_package(package, source, options)
     }
 
     fn open_package(
         package: OpcPackage,
         source: Option<&Workbook>,
-        options: crate::OpenOptions,
+        options: WorkbookOptions,
     ) -> Result<Self> {
         let leniency = options.leniency;
         // The packaging repairs come first (they were made before the

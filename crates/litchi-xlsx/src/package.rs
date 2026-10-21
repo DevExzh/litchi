@@ -637,7 +637,7 @@ impl Package {
             plaintext,
             password,
             mode,
-            &self.workbook.open_options().encryption_limits_value(),
+            &self.workbook.encryption_limits(),
         )?)
     }
 
