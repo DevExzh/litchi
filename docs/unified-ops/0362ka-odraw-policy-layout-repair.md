@@ -42,7 +42,7 @@ budgets.
 
 Validation completed on the final source tree:
 
-* `cargo test --offline -p litchi-odraw --all-targets --all-features`: 103
+* `cargo test --offline -p litchi-odraw --all-targets --all-features`: 104
   passed;
 * `cargo clippy --offline -p litchi-odraw --all-targets --all-features --
   -D warnings`: passed;
