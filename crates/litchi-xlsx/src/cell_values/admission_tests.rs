@@ -19,7 +19,7 @@ use litchi_opc::constants::content_type as ct;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 use crate::cell_values::test_editors::SourceBackedEditor;
-use crate::cell_values::{CellValueEdit, SheetCellValueEdit};
+use crate::cell_values::{Change, SheetChange};
 use crate::error::EditBlock;
 use crate::{Address, Error, Number, Value};
 
@@ -157,7 +157,7 @@ fn edit_a1(sheet: &str, shape: &PackageShape) -> Result<Vec<u8>, Error> {
 fn edit_cell(sheet: &str, shape: &PackageShape, address: &str) -> Result<Vec<u8>, Error> {
     let editor = editor(sheet, shape)?;
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1(address).expect("A1 address"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -369,7 +369,7 @@ fn inline_rich_text_is_admitted_and_reads_back_complete() {
     );
     let editor = editor(&source, &PackageShape::default()).expect("rich inline worksheet");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -462,7 +462,7 @@ fn the_calculation_chain_is_dropped_with_its_relationship() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("calcChain package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -515,7 +515,7 @@ fn a_shared_string_part_is_admitted_and_preserved() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("shared-string package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -561,15 +561,15 @@ fn a_shared_string_cell_cannot_be_mutated_or_removed() {
         "<worksheet xmlns=\"{SML}\"><dimension ref=\"A1\"/><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c></row></sheetData></worksheet>"
     );
     for edit in [
-        CellValueEdit::set(
+        Change::set(
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
         ),
-        CellValueEdit::clear(Address::from_a1("A1").expect("A1")),
-        CellValueEdit::remove(Address::from_a1("A1").expect("A1")),
+        Change::clear(Address::from_a1("A1").expect("A1")),
+        Change::remove(Address::from_a1("A1").expect("A1")),
     ] {
         let error = match editor(&source, &shape).and_then(|editor| {
-            editor.edit_many([SheetCellValueEdit {
+            editor.edit_many([SheetChange {
                 selector: "Sheet1".into(),
                 edit,
             }])
@@ -628,7 +628,7 @@ fn a_large_shared_string_table_stays_within_the_retained_part_bound() {
     );
     let editor = editor(&source, &shape).expect("large shared-string package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),
@@ -948,7 +948,7 @@ fn an_exact_no_op_reproduces_the_producer_worksheet_byte_for_byte() {
     );
     let editor = editor(&source, &PackageShape::default()).expect("producer-shaped worksheet");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("1").expect("the value already stored")),
@@ -999,7 +999,7 @@ fn publishing_a_producer_shaped_package_changes_only_the_expected_members() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
         .expect("producer-shaped package");
     let commit = editor
-        .edit_many([SheetCellValueEdit::set(
+        .edit_many([SheetChange::set(
             "Sheet1",
             Address::from_a1("A1").expect("A1"),
             Value::Number(Number::new("42").expect("numeral")),

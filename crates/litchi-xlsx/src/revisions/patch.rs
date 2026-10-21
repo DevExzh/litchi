@@ -86,7 +86,28 @@ impl Patch {
 
 crate::record::record_family!("revision");
 
-crate::record::no_limits!("revision");
+crate::record::limit_kinds!("revision", Revisions {
+    /// Encoded or expanded XML bytes in one revision part.
+    PartBytes => "revision part bytes",
+    /// Nested revision XML elements.
+    XmlDepth => "revision XML depth",
+    /// Revision XML elements in one part.
+    XmlNodes => "revision XML nodes",
+    /// UTF-8 text and attribute bytes.
+    TextBytes => "revision text bytes",
+    /// Users in the revision catalog.
+    Users => "revision users",
+    /// Headers in the revision catalog.
+    Headers => "revision headers",
+    /// Revision log parts.
+    Logs => "revision logs",
+    /// Records in one revision log.
+    Records => "revision records per log",
+    /// Records across all revision logs.
+    TotalRecords => "total revision records",
+    /// Sheet identifiers in revision headers.
+    SheetIds => "revision sheet identifiers",
+});
 
 impl crate::record::Record for Patch {
     fn is_noop(&self) -> bool {

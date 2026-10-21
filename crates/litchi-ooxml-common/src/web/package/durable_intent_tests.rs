@@ -30,7 +30,7 @@ fn custom_intent(
     additions: Vec<Pane>,
     operations: Vec<(OwnerSelector, custom_function::Operation)>,
 ) -> WebIntent {
-    WebIntent::CustomFunctions(custom_function::Edit::ensure(additions, operations))
+    WebIntent::CustomFunctions(custom_function::Change::ensure(additions, operations))
 }
 
 fn encode_test_intent(intent: &WebIntent) -> Vec<u8> {

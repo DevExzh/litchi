@@ -20,7 +20,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
-use litchi_xlsx::cell_values::{CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit};
+use litchi_xlsx::cell_values::{Change, MAX_BATCH_EDITS, SheetChange};
 use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
@@ -475,9 +475,9 @@ fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
 fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::sheet::Commit {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
-        CellValueEdit::set(address("A1"), Number::new("10.50").unwrap()),
-        CellValueEdit::set(address("B2"), false),
-        CellValueEdit::set(address("C3"), Value::Error(ErrorValue::NotAvailable)),
+        Change::set(address("A1"), Number::new("10.50").unwrap()),
+        Change::set(address("B2"), false),
+        Change::set(address("C3"), Value::Error(ErrorValue::NotAvailable)),
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -713,11 +713,8 @@ fn source_insert_holes_order_rows_expand_dimension_and_read_back() {
     );
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    edit.apply_batch([CellValueEdit::insert(
-        address("A1"),
-        Number::new("1").unwrap(),
-    )])
-    .unwrap();
+    edit.apply_batch([Change::insert(address("A1"), Number::new("1").unwrap())])
+        .unwrap();
     edit.insert(address("C1"), Number::new("3").unwrap())
         .unwrap();
     edit.insert(address("C3"), Number::new("9").unwrap())
@@ -764,7 +761,7 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
         .unwrap();
     edit.insert("Sheet1", address("D1"), Number::new("40").unwrap())
         .unwrap();
-    edit.apply_batch([SheetCellValueEdit::insert(
+    edit.apply_batch([SheetChange::insert(
         "Sheet2",
         address("A4"),
         Number::new("50").unwrap(),
@@ -919,16 +916,16 @@ fn insert_duplicate_and_late_existing_target_batches_are_atomic() {
     let mut edit = editor.edit("Sheet1").unwrap();
     assert!(matches!(
         edit.apply_batch([
-            CellValueEdit::insert(address("B1"), Number::new("2").unwrap()),
-            CellValueEdit::insert(address("B1"), Number::new("3").unwrap()),
+            Change::insert(address("B1"), Number::new("2").unwrap()),
+            Change::insert(address("B1"), Number::new("3").unwrap()),
         ]),
         Err(Error::Invalid(message)) if message == "duplicate value-only selector 'B1'"
     ));
     assert!(edit.is_empty());
     assert!(matches!(
         edit.apply_batch([
-            CellValueEdit::insert(address("B1"), Number::new("2").unwrap()),
-            CellValueEdit::insert(address("A1"), Number::new("3").unwrap()),
+            Change::insert(address("B1"), Number::new("2").unwrap()),
+            Change::insert(address("A1"), Number::new("3").unwrap()),
         ]),
         Err(Error::Invalid(message))
             if message == "cell selector 'A1' already has an existing cell owner"
@@ -1172,8 +1169,8 @@ fn scalar_staging_and_batch_staging_are_equivalent_and_clear_retains_record() {
     let batch = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = batch.edit("Sheet1").unwrap();
     edit.apply_batch([
-        CellValueEdit::set(address("A1"), 5u32),
-        CellValueEdit::clear(address("C3")),
+        Change::set(address("A1"), 5u32),
+        Change::clear(address("C3")),
     ])
     .unwrap();
     let batch_commit = edit.commit().unwrap();
@@ -1220,9 +1217,9 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
-        CellValueEdit::remove(address("A1")),
-        CellValueEdit::remove(address("B2")),
-        CellValueEdit::remove(address("C3")),
+        Change::remove(address("A1")),
+        Change::remove(address("B2")),
+        Change::remove(address("C3")),
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -1291,8 +1288,8 @@ fn remove_missing_and_duplicate_selectors_fail_atomically() {
     assert!(edit.is_empty());
     assert!(matches!(
         edit.apply_batch([
-            CellValueEdit::remove(address("B2")),
-            CellValueEdit::set(address("B2"), false),
+            Change::remove(address("B2")),
+            Change::set(address("B2"), false),
         ]),
         Err(Error::Invalid(message)) if message == "duplicate value-only selector 'B2'"
     ));
@@ -1315,8 +1312,8 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
     let before = edit.len();
     assert!(matches!(
         edit.apply_batch([
-            CellValueEdit::set(address("B2"), false),
-            CellValueEdit::set(address("Z99"), 9u32),
+            Change::set(address("B2"), false),
+            Change::set(address("Z99"), 9u32),
         ]),
         Err(Error::Invalid(message))
             if message == "cell selector 'Z99' has no existing cell owner"
@@ -1380,7 +1377,7 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch(
-        (1..=MAX_BATCH_EDITS).map(|row| CellValueEdit::set(address(&format!("A{row}")), 0u32)),
+        (1..=MAX_BATCH_EDITS).map(|row| Change::set(address(&format!("A{row}")), 0u32)),
     )
     .unwrap();
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
@@ -1389,10 +1386,8 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
 
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    edit.apply_batch(
-        (1..=MAX_BATCH_EDITS).map(|row| CellValueEdit::remove(address(&format!("A{row}")))),
-    )
-    .unwrap();
+    edit.apply_batch((1..=MAX_BATCH_EDITS).map(|row| Change::remove(address(&format!("A{row}")))))
+        .unwrap();
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
     assert!(edit.remove(address("A257")).is_err());
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
@@ -1405,9 +1400,8 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(insert_bytes))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch(
-        (1..=MAX_BATCH_EDITS).map(|row| {
-            CellValueEdit::insert(address(&format!("A{row}")), Number::new("0").unwrap())
-        }),
+        (1..=MAX_BATCH_EDITS)
+            .map(|row| Change::insert(address(&format!("A{row}")), Number::new("0").unwrap())),
     )
     .unwrap();
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
@@ -1435,9 +1429,9 @@ fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
 
     let commit = editor
         .edit_many([
-            SheetCellValueEdit::set("Sheet1", address("A1"), 10u32),
-            SheetCellValueEdit::clear("Sheet2", address("B2")),
-            SheetCellValueEdit::remove("Sheet2", address("C3")),
+            SheetChange::set("Sheet1", address("A1"), 10u32),
+            SheetChange::clear("Sheet2", address("B2")),
+            SheetChange::remove("Sheet2", address("C3")),
         ])
         .unwrap()
         .commit()
@@ -1507,16 +1501,16 @@ fn multi_sheet_duplicate_and_late_failure_are_atomic() {
         .unwrap();
     assert!(
         edit.apply_batch([
-            SheetCellValueEdit::set("Sheet1", address("A1"), 4u32),
-            SheetCellValueEdit::set("Sheet1", address("A1"), 5u32),
+            SheetChange::set("Sheet1", address("A1"), 4u32),
+            SheetChange::set("Sheet1", address("A1"), 5u32),
         ])
         .is_err()
     );
     assert!(edit.is_empty());
     assert!(
         edit.apply_batch([
-            SheetCellValueEdit::set("Sheet1", address("A1"), 4u32),
-            SheetCellValueEdit::set("Sheet2", address("Z99"), 5u32),
+            SheetChange::set("Sheet1", address("A1"), 4u32),
+            SheetChange::set("Sheet2", address("Z99"), 5u32),
         ])
         .is_err()
     );
@@ -1529,7 +1523,7 @@ fn multi_sheet_commit_rejects_foreign_source_lineage() {
     let first =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = first
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 4u32)])
         .unwrap()
         .commit()
         .unwrap();
@@ -1549,7 +1543,7 @@ fn multi_sheet_publication_rejects_source_revision_before_output() {
     let source = Arc::new(VersionedSource::new(bytes));
     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
     let commit = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 4u32)])
         .unwrap()
         .commit()
         .unwrap();
@@ -1620,7 +1614,7 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 4u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 4u32)])
         .unwrap()
         .commit()
         .unwrap();
@@ -1673,7 +1667,7 @@ fn multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 42u32)])
         .unwrap()
         .commit()
         .unwrap();
@@ -1747,7 +1741,7 @@ fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
     // A changed edit of a signed source is refused at commit (record 0360).
     assert!(matches!(
         editor
-            .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
+            .edit_many([SheetChange::set("Sheet1", address("A1"), 42u32)])
             .unwrap()
             .commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
@@ -1913,7 +1907,7 @@ fn changed_publication_reuses_selected_semantics_without_extra_source_reads() {
     let opened = editor.cache_diagnostics().successful_loads;
 
     let edit = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 2u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 2u32)])
         .unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
@@ -2108,8 +2102,8 @@ fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
         .unwrap();
     let commit = editor
         .edit_many([
-            SheetCellValueEdit::set("Sheet1", address("A1"), 40u32),
-            SheetCellValueEdit::set("Sheet2", address("A1"), 50u32),
+            SheetChange::set("Sheet1", address("A1"), 40u32),
+            SheetChange::set("Sheet2", address("A1"), 50u32),
         ])
         .unwrap()
         .commit()
@@ -2268,10 +2262,10 @@ fn managed_cancellation_during_batch_iterators_keeps_staging_atomic() {
     let mut index = 0;
     let result = edit.apply_batch(std::iter::from_fn(move || {
         let value = match index {
-            0 => Some(CellValueEdit::set(address("A1"), 2u32)),
+            0 => Some(Change::set(address("A1"), 2u32)),
             1 => {
                 cancellation_for_iterator.cancel();
-                Some(CellValueEdit::set(address("B2"), false))
+                Some(Change::set(address("B2"), false))
             },
             _ => None,
         };
@@ -2302,10 +2296,10 @@ fn managed_cancellation_during_batch_iterators_keeps_staging_atomic() {
     let mut index = 0;
     let result = edit.apply_batch(std::iter::from_fn(move || {
         let value = match index {
-            0 => Some(SheetCellValueEdit::set("Sheet1", address("A1"), 2u32)),
+            0 => Some(SheetChange::set("Sheet1", address("A1"), 2u32)),
             1 => {
                 cancellation_for_iterator.cancel();
-                Some(SheetCellValueEdit::set("Sheet2", address("A1"), 3u32))
+                Some(SheetChange::set("Sheet2", address("A1"), 3u32))
             },
             _ => None,
         };
@@ -2353,7 +2347,7 @@ fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
     )
     .unwrap();
     let commit = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 10u32)])
+        .edit_many([SheetChange::set("Sheet1", address("A1"), 10u32)])
         .unwrap()
         .commit()
         .unwrap();
@@ -2381,7 +2375,7 @@ fn managed_empty_multi_edit_iterator_reports_cancellation_before_invalid_batch()
     .unwrap();
     let result = editor.edit_many(std::iter::from_fn(move || {
         cancellation_source.cancel();
-        None::<SheetCellValueEdit<'static>>
+        None::<SheetChange<'static>>
     }));
     assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
     drop(editor);

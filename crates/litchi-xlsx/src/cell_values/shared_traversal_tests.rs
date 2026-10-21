@@ -12,7 +12,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::SheetCellValueEdit;
+use crate::cell_values::SheetChange;
 use crate::cell_values::test_editors::SourceBackedEditor;
 use crate::{Address, Error, Number, Value};
 
@@ -512,7 +512,7 @@ fn eligible_small_source_uses_successful_value_edit_control() {
     let mut edit = editor
         .edit_sheets(["Sheet1".into()])
         .expect("eligible worksheet");
-    edit.apply_batch([SheetCellValueEdit::set(
+    edit.apply_batch([SheetChange::set(
         "Sheet1",
         Address::from_a1("A1").expect("A1 address"),
         2u32,

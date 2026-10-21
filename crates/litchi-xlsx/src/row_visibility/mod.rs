@@ -32,4 +32,4 @@ mod snapshot;
 pub mod source;
 
 pub use snapshot::Snapshot;
-pub use source::{MAX_BATCH_EDITS, RowVisibilityEdit};
+pub use source::{Change, MAX_BATCH_EDITS};

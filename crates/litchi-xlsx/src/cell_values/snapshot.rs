@@ -2368,7 +2368,7 @@ mod row_reuse_tests {
 
     use super::Snapshot;
     use crate::cell::{Cell, Store, Value};
-    use crate::cell_values::CellValueEdit;
+    use crate::cell_values::Change;
     use crate::cell_values::test_editors::RowVisibilityEditor as RowVisibilitySourceBackedEditor;
     use crate::cell_values::test_editors::SourceBackedEditor;
     use crate::formula::Formula;
@@ -2831,27 +2831,27 @@ mod row_reuse_tests {
         let worksheet = scalar_fixture();
         let candidate = commit_with(&worksheet, |edit| {
             edit.apply_batch([
-                CellValueEdit::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
+                Change::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
                 // B1 is source-implicit.  The rewritten owner must gain an
                 // explicit address before any preceding owners are omitted.
-                CellValueEdit::set(Address::from_a1("B1").unwrap(), 22u32),
-                CellValueEdit::set(Address::from_a1("C1").unwrap(), false),
-                CellValueEdit::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
-                CellValueEdit::set(
+                Change::set(Address::from_a1("B1").unwrap(), 22u32),
+                Change::set(Address::from_a1("C1").unwrap(), false),
+                Change::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
+                Change::set(
                     Address::from_a1("E1").unwrap(),
                     Value::date("2026-08-14").unwrap(),
                 ),
-                CellValueEdit::set(
+                Change::set(
                     Address::from_a1("F1").unwrap(),
                     Value::Error(ErrorValue::DivZero),
                 ),
-                CellValueEdit::set_formula(
+                Change::set_formula(
                     Address::from_a1("G1").unwrap(),
                     Formula::new("A1+C1").unwrap(),
                 ),
                 // The source dimension is intentionally stale.  The emitted
                 // dimension must be used by the merged Store.
-                CellValueEdit::set(Address::from_a1("H4").unwrap(), 9u32),
+                Change::set(Address::from_a1("H4").unwrap(), 9u32),
             ])
         })
         .expect("replacement-only candidate");

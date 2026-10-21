@@ -66,7 +66,7 @@ mod validation;
 
 pub use patch::Diagnostics;
 pub use snapshot::{MAX_MULTI_WORKSHEET_BYTES, MAX_SHEET_OWNERS, MultiSnapshot, Snapshot};
-pub use source::{CellValueEdit, Edit, MAX_BATCH_EDITS, SheetCellValueEdit, sheet};
+pub use source::{Change, Edit, MAX_BATCH_EDITS, SheetChange, sheet};
 
 crate::workbook::source::deferred::source_family!(
     "cell-value",

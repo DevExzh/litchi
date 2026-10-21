@@ -912,7 +912,7 @@ fn run_source(operation: Operation) -> AnyResult<SampleRecord> {
 }
 
 fn stage_eager(
-    sheet: &mut litchi_xlsx::workbook::WorksheetEdit<'_>,
+    sheet: &mut litchi_xlsx::workbook::edit::Sheet<'_>,
     operation: Operation,
 ) -> AnyResult<()> {
     match operation {

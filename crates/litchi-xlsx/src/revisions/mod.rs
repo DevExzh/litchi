@@ -21,10 +21,6 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn limit(name: &str) -> Error {
-    invalid(format!("{name} exceeds configured limit"))
-}
-
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }

@@ -32,7 +32,7 @@ pub const MAX_BATCH_EDITS: usize = 256;
 /// One typed value-only edit for a scalar cell.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum CellValueEdit {
+pub enum Change {
     /// Insert one numeric cell at an absent coordinate.
     Insert { address: Address, value: Number },
     /// Replace the stored scalar value without changing local style.
@@ -53,19 +53,19 @@ pub enum CellValueEdit {
 
 /// One selector-first scalar edit for a bounded multi-worksheet transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetCellValueEdit<'a> {
+pub struct SheetChange<'a> {
     /// Worksheet selected by its semantic name or zero-based position.
     pub selector: Selector<'a>,
     /// Scalar operation applied to one selected worksheet.
-    pub edit: CellValueEdit,
+    pub edit: Change,
 }
 
-impl<'a> SheetCellValueEdit<'a> {
+impl<'a> SheetChange<'a> {
     /// Construct a selector-first numeric insertion for an absent coordinate.
     pub fn insert(selector: impl Into<Selector<'a>>, address: Address, value: Number) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::insert(address, value),
+            edit: Change::insert(address, value),
         }
     }
 
@@ -77,7 +77,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set(address, value),
+            edit: Change::set(address, value),
         }
     }
 
@@ -89,7 +89,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set_formula(address, formula),
+            edit: Change::set_formula(address, formula),
         }
     }
 
@@ -101,7 +101,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set_shared_formula(address, formula),
+            edit: Change::set_shared_formula(address, formula),
         }
     }
 
@@ -110,7 +110,7 @@ impl<'a> SheetCellValueEdit<'a> {
     pub fn clear(selector: impl Into<Selector<'a>>, address: Address) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::clear(address),
+            edit: Change::clear(address),
         }
     }
 
@@ -119,12 +119,12 @@ impl<'a> SheetCellValueEdit<'a> {
     pub fn remove(selector: impl Into<Selector<'a>>, address: Address) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::remove(address),
+            edit: Change::remove(address),
         }
     }
 }
 
-impl CellValueEdit {
+impl Change {
     /// Construct a numeric insertion for an absent coordinate.
     pub fn insert(address: Address, value: Number) -> Self {
         Self::Insert { address, value }
@@ -216,7 +216,7 @@ impl SourceBackedWorkbook {
     /// Begin a bounded selector-first transaction and stage its initial batch.
     pub fn edit_cell_values_batch<'a, I>(&self, edits: I) -> Result<Edit>
     where
-        I: IntoIterator<Item = SheetCellValueEdit<'a>>,
+        I: IntoIterator<Item = SheetChange<'a>>,
     {
         self.edit_package()?.check_execution()?;
         let mut requests = edits.into_iter();
@@ -381,7 +381,7 @@ impl Edit {
         address: Address,
         value: Number,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::insert(selector, address, value)])
+        self.apply_batch([SheetChange::insert(selector, address, value)])
     }
 
     /// Stage one selector-first scalar replacement.
@@ -391,7 +391,7 @@ impl Edit {
         address: Address,
         value: impl Into<Value>,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set(selector, address, value)])
+        self.apply_batch([SheetChange::set(selector, address, value)])
     }
 
     /// Stage one selector-first cacheless scalar formula replacement.
@@ -401,7 +401,7 @@ impl Edit {
         address: Address,
         formula: Formula,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set_formula(selector, address, formula)])
+        self.apply_batch([SheetChange::set_formula(selector, address, formula)])
     }
 
     /// Stage one selector-first shared-formula master replacement.
@@ -411,14 +411,12 @@ impl Edit {
         address: Address,
         formula: Formula,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set_shared_formula(
-            selector, address, formula,
-        )])
+        self.apply_batch([SheetChange::set_shared_formula(selector, address, formula)])
     }
 
     /// Stage one selector-first scalar clear.
     pub fn clear<'a>(&mut self, selector: impl Into<Selector<'a>>, address: Address) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::clear(selector, address)])
+        self.apply_batch([SheetChange::clear(selector, address)])
     }
 
     /// Stage one selector-first complete cell-owner removal.
@@ -427,13 +425,13 @@ impl Edit {
         selector: impl Into<Selector<'a>>,
         address: Address,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::remove(selector, address)])
+        self.apply_batch([SheetChange::remove(selector, address)])
     }
 
     /// Stage a bounded cross-worksheet batch atomically.
     pub fn apply_batch<'a, I>(&mut self, edits: I) -> Result<()>
     where
-        I: IntoIterator<Item = SheetCellValueEdit<'a>>,
+        I: IntoIterator<Item = SheetChange<'a>>,
     {
         self.before.check_execution()?;
         let remaining = MAX_BATCH_EDITS.saturating_sub(self.staged_cells);
@@ -476,13 +474,13 @@ impl Edit {
             }
             let source = snapshot.editable_cell(address);
             let value = match request.edit {
-                CellValueEdit::Insert { value, .. } => {
+                Change::Insert { value, .. } => {
                     snapshot.require_insertable_absence(address)?;
                     let value = Value::Number(value);
                     value.validate_for_write()?;
                     StagedValueEdit::Insert(Content::Value(value))
                 },
-                CellValueEdit::Set { value, .. } => {
+                Change::Set { value, .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -498,7 +496,7 @@ impl Edit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
-                CellValueEdit::SetFormula { formula, .. } => {
+                Change::SetFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -512,7 +510,7 @@ impl Edit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
-                CellValueEdit::SetSharedFormula { formula, .. } => {
+                Change::SetSharedFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -526,7 +524,7 @@ impl Edit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
-                CellValueEdit::Clear { .. } => {
+                Change::Clear { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -541,7 +539,7 @@ impl Edit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
-                CellValueEdit::Remove { .. } => {
+                Change::Remove { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",

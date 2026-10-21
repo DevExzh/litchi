@@ -1151,10 +1151,7 @@ impl Classify for litchi_core::Error {
 /// (record 0360).
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
-    matches!(
-        error,
-        litchi_ooxml_common::Error::Limit { .. }
-    )
+    matches!(error, litchi_ooxml_common::Error::Limit { .. })
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]

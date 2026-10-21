@@ -502,7 +502,7 @@ pub(crate) struct OrdinaryFormControlOverlay {
     pub(crate) expected_collection: FormControlCollection,
 }
 
-/// Validate one selector against the eager owner used by `WorksheetEdit`.
+/// Validate one selector against the eager owner used by `Sheet`.
 pub(crate) fn validate_ordinary_form_control_selector(
     package: &OpcPackage,
     worksheet_uri: &PackURI,

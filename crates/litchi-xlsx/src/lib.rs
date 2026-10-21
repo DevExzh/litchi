@@ -339,13 +339,12 @@ pub use workbook::data_model::{
     write_data_model,
 };
 pub use workbook::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
-    DurablePatch, Edit, Flavor, FormControlEdit, History, HistoryLimits, JoinError, JoinFailure,
-    MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
-    SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
-    ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, DateSystem, DurablePatch, Edit, Flavor,
+    History, HistoryLimits, JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet,
+    PackageChange, Patch, SealedPatch, Selector, SourceBackedWorkbook, SourceCell, SourceCellView,
+    SourceWorksheet, State, ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
     WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,
-    WorksheetContentPartRelationship, WorksheetEdit, WorksheetKind,
+    WorksheetContentPartRelationship, WorksheetKind,
 };
 pub use workbook_metadata::{
     FutureMetadata, MetadataBehavior, MetadataBlock, MetadataRecord, MetadataType,

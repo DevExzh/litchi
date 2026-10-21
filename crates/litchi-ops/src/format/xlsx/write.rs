@@ -2771,7 +2771,7 @@ fn apply_operation(
 /// Convert the value stored at `address` to `cell_type` (record 0338): an
 /// empty coordinate is left alone, and a formula cell is refused.
 fn retype(
-    worksheet: &mut xlsx::WorksheetEdit<'_>,
+    worksheet: &mut xlsx::workbook::edit::Sheet<'_>,
     address: Address,
     cell_type: CellType,
 ) -> Result<()> {
@@ -2921,7 +2921,7 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 /// coordinator owns the run lifecycle, while this module owns target
 /// admission, native projected-state comparison, and the native commit.  A
 /// run never shadows cell state in the unified layer: the native
-/// `WorksheetEdit::state` view is the authority for each staged before/after
+/// `xlsx::workbook::edit::Sheet::state` view is the authority for each staged before/after
 /// pair.
 /// CSV/TSV import through one native edit (record 0266).
 mod find;

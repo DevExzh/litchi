@@ -54,7 +54,7 @@ use super::super::{codec, package};
 
 use self::snapshot::Snapshot;
 use super::super::svg::{PictureSelector, SvgInput};
-use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+use super::worksheet::{NewSheet, Sheet, Tab};
 
 const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
 
@@ -749,14 +749,14 @@ impl Edit {
     pub fn sheet<'e, 's>(
         &'e mut self,
         selector: impl Into<Selector<'s>>,
-    ) -> Result<Option<WorksheetEdit<'e>>> {
+    ) -> Result<Option<Sheet<'e>>> {
         guard::no_removal(self, "transaction")?;
         let sheet = Snapshot::new(&self.base).worksheet(selector)?;
         let Some(sheet) = sheet else {
             return Ok(None);
         };
         let position = sheet.position();
-        Ok(Some(WorksheetEdit {
+        Ok(Some(Sheet {
             edit: self,
             position,
         }))
@@ -766,13 +766,10 @@ impl Edit {
     /// zero-based position. Unlike [`Self::sheet`], this entry point also
     /// accepts chart, dialog, and macro sheets because visibility belongs to
     /// the workbook catalog rather than worksheet cell storage.
-    pub fn tab<'e, 's>(
-        &'e mut self,
-        selector: impl Into<Selector<'s>>,
-    ) -> Result<Option<TabEdit<'e>>> {
+    pub fn tab<'e, 's>(&'e mut self, selector: impl Into<Selector<'s>>) -> Result<Option<Tab<'e>>> {
         guard::no_removal(self, "transaction")?;
         let tab = Snapshot::new(&self.base).tab(selector)?;
-        Ok(tab.map(|tab| TabEdit {
+        Ok(tab.map(|tab| Tab {
             edit: self,
             position: tab.position(),
         }))

@@ -21,7 +21,7 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, SourceCacheLimits,
     TargetMode,
 };
-use litchi_xlsx::row_visibility::{MAX_BATCH_EDITS, RowVisibilityEdit, Snapshot};
+use litchi_xlsx::row_visibility::{Change, MAX_BATCH_EDITS, Snapshot};
 use litchi_xlsx::{Error, RowIndex};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -295,9 +295,9 @@ fn batch_changes_only_hidden_owners_and_exact_inverse_restores_source() {
             .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
-        RowVisibilityEdit::hide(row(0)),
-        RowVisibilityEdit::hide(row(1)),
-        RowVisibilityEdit::unhide(row(2)),
+        Change::hide(row(0)),
+        Change::hide(row(1)),
+        Change::unhide(row(2)),
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -438,15 +438,12 @@ fn duplicate_missing_and_oversized_batches_are_atomic() {
     assert!(edit.hide(row(400)).is_err());
     assert_eq!(edit.len(), 0);
     assert!(
-        edit.apply_batch([
-            RowVisibilityEdit::hide(row(0)),
-            RowVisibilityEdit::unhide(row(0))
-        ])
-        .is_err()
+        edit.apply_batch([Change::hide(row(0)), Change::unhide(row(0))])
+            .is_err()
     );
     assert_eq!(edit.len(), 0);
-    let too_many = (0..=MAX_BATCH_EDITS)
-        .map(|index| RowVisibilityEdit::hide(row(u32::try_from(index).unwrap())));
+    let too_many =
+        (0..=MAX_BATCH_EDITS).map(|index| Change::hide(row(u32::try_from(index).unwrap())));
     assert!(edit.apply_batch(too_many).is_err());
     assert_eq!(edit.len(), 0);
 }
@@ -732,9 +729,9 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
-        RowVisibilityEdit::hide(row(0)),
-        RowVisibilityEdit::hide(row(1)),
-        RowVisibilityEdit::unhide(row(2)),
+        Change::hide(row(0)),
+        Change::hide(row(1)),
+        Change::unhide(row(2)),
     ])
     .unwrap();
     let commit = edit.commit().unwrap();

@@ -1,7 +1,7 @@
 //! A typed custom-function edit carried by a durable Web Extensions patch
 //! ([`super::WebIntent::CustomFunctions`]).
 //!
-//! [`Edit`] is the bounded semantic request a planner binds to its ordinary
+//! [`Change`] is the bounded semantic request a planner binds to its ordinary
 //! source-checked [`super::Patch`]; it is a value, not a staging handle.
 
 use super::{
@@ -25,13 +25,13 @@ pub enum Operation {
 /// [`GraphMode::EnsureGraph`]. Complete graph replacement is represented by a
 /// [`super::WebIntent::Put`] so no panes or resources can be silently omitted.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Edit {
+pub struct Change {
     pub mode: GraphMode,
     pub operations: Vec<(OwnerSelector, Operation)>,
     pub additions: Vec<Pane>,
 }
 
-impl Edit {
+impl Change {
     #[must_use]
     pub fn existing(operations: Vec<(OwnerSelector, Operation)>) -> Self {
         Self {

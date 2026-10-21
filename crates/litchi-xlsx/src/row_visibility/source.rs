@@ -153,12 +153,12 @@ pub const MAX_BATCH_EDITS: usize = 256;
 /// One direct visibility edit for an existing row owner.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct RowVisibilityEdit {
+pub struct Change {
     row: Row,
     hidden: bool,
 }
 
-impl RowVisibilityEdit {
+impl Change {
     /// Construct a checked hide operation.
     #[must_use]
     pub const fn hide(row: Row) -> Self {
@@ -189,7 +189,7 @@ impl RowVisibilityEdit {
 pub struct Edit {
     workbook: SourceBackedWorkbook,
     before: Snapshot,
-    staged: Vec<RowVisibilityEdit>,
+    staged: Vec<Change>,
 }
 
 impl Edit {
@@ -213,19 +213,16 @@ impl Edit {
 
     /// Stage canonical hiding of one existing row owner.
     pub fn hide(&mut self, row: Row) -> Result<()> {
-        self.apply_batch([RowVisibilityEdit::hide(row)])
+        self.apply_batch([Change::hide(row)])
     }
 
     /// Stage canonical unhiding of one existing row owner.
     pub fn unhide(&mut self, row: Row) -> Result<()> {
-        self.apply_batch([RowVisibilityEdit::unhide(row)])
+        self.apply_batch([Change::unhide(row)])
     }
 
     /// Stage a bounded visibility batch atomically.
-    pub fn apply_batch(
-        &mut self,
-        edits: impl IntoIterator<Item = RowVisibilityEdit>,
-    ) -> Result<()> {
+    pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = Change>) -> Result<()> {
         self.before.check_execution()?;
         let mut pending = Vec::new();
         pending

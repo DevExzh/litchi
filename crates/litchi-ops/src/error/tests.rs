@@ -436,17 +436,23 @@ fn shared_ooxml_family_limits_are_limit_exceeded() {
     let shared = || {
         [
             litchi_ooxml_common::Error::Limit {
-                kind: litchi_ooxml_common::LimitKind::CustomXml(litchi_ooxml_common::custom_xml::LimitKind::Items),
+                kind: litchi_ooxml_common::LimitKind::CustomXml(
+                    litchi_ooxml_common::custom_xml::LimitKind::Items,
+                ),
                 observed: 11,
                 maximum: 10,
             },
             litchi_ooxml_common::Error::Limit {
-                kind: litchi_ooxml_common::LimitKind::Web(litchi_ooxml_common::web::LimitKind::Panes),
+                kind: litchi_ooxml_common::LimitKind::Web(
+                    litchi_ooxml_common::web::LimitKind::Panes,
+                ),
                 observed: 11,
                 maximum: 10,
             },
             litchi_ooxml_common::Error::Limit {
-                kind: litchi_ooxml_common::LimitKind::Ribbon(litchi_ooxml_common::ribbon::LimitKind::XmlBytes),
+                kind: litchi_ooxml_common::LimitKind::Ribbon(
+                    litchi_ooxml_common::ribbon::LimitKind::XmlBytes,
+                ),
                 observed: 11,
                 maximum: 10,
             },

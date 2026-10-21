@@ -1,6 +1,7 @@
 //! Bounded `SpreadsheetML` revision XML codecs.
 
-use crate::error::Result;
+use super::LimitKind;
+use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -16,7 +17,7 @@ use super::model::{
     STRICT_REL_NS, bounded, valid_date, validate_attrs, validate_element, validate_guid,
     validate_headers, validate_log, validate_users,
 };
-use super::{invalid, limit, xml_error};
+use super::{invalid, xml_error};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[derive(Clone, Debug)]
@@ -38,7 +39,7 @@ pub fn parse_revision_users(xml: &[u8]) -> Result<RevisionUsers> {
         return Err(invalid("users count does not match userInfo children"));
     }
     if count > MAX_USERS {
-        return Err(limit("revision users"));
+        return Err(Error::limit(LimitKind::Users, count, MAX_USERS));
     }
     let mut users = Vec::with_capacity(count);
     let mut ids = HashSet::new();
@@ -121,7 +122,11 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
         validate_guid(v)?;
     }
     if root.children.len() > MAX_HEADERS {
-        return Err(limit("revision headers"));
+        return Err(Error::limit(
+            LimitKind::Headers,
+            root.children.len(),
+            MAX_HEADERS,
+        ));
     }
     let mut headers = Vec::with_capacity(root.children.len());
     let mut guids = HashSet::new();
@@ -155,9 +160,13 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
         }
         total_sheets = total_sheets
             .checked_add(count)
-            .ok_or_else(|| limit("sheet ids"))?;
+            .ok_or_else(|| Error::limit(LimitKind::SheetIds, usize::MAX, MAX_SHEET_IDS))?;
         if total_sheets > MAX_SHEET_IDS {
-            return Err(limit("sheet ids"));
+            return Err(Error::limit(
+                LimitKind::SheetIds,
+                total_sheets,
+                MAX_SHEET_IDS,
+            ));
         }
         let mut sheet_ids = Vec::with_capacity(count);
         let mut seen = HashSet::new();
@@ -226,7 +235,11 @@ pub fn parse_revision_log(xml: &[u8]) -> Result<RevisionLog> {
     whitespace(&root)?;
     only_attrs(&root, &[])?;
     if root.children.len() > MAX_RECORDS_PER_LOG {
-        return Err(limit("revision records"));
+        return Err(Error::limit(
+            LimitKind::Records,
+            root.children.len(),
+            MAX_RECORDS_PER_LOG,
+        ));
     }
     let mut records = Vec::with_capacity(root.children.len());
     for node in &root.children {
@@ -384,11 +397,19 @@ pub fn write_revision_log(
 
 fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_PART_BYTES {
-        return Err(limit("revision part bytes"));
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            xml.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let processed = process_ooxml(xml)?;
     if processed.len() > MAX_PART_BYTES {
-        return Err(limit("MCE-expanded revision part bytes"));
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            processed.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
@@ -405,20 +426,31 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         match event {
             Event::Start(e) => {
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("revision XML depth"));
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        MAX_DEPTH,
+                    ));
                 }
                 let n = make_node(&e, &ns, &reader, decoder, &mut strings)?;
                 nodes += 1;
                 if nodes > MAX_NODES {
-                    return Err(limit("revision XML nodes"));
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 stack.push(n);
             },
             Event::Empty(e) => {
+                if stack.len() >= MAX_DEPTH {
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        MAX_DEPTH,
+                    ));
+                }
                 let n = make_node(&e, &ns, &reader, decoder, &mut strings)?;
                 nodes += 1;
                 if nodes > MAX_NODES {
-                    return Err(limit("revision XML nodes"));
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 attach(n, &mut stack, &mut root)?;
             },
@@ -499,9 +531,13 @@ fn make_node(
             .into_owned();
         *strings = strings
             .checked_add(local.len() + value.len())
-            .ok_or_else(|| limit("revision strings"))?;
+            .ok_or_else(|| Error::limit(LimitKind::TextBytes, usize::MAX, MAX_STRING_BYTES))?;
         if *strings > MAX_STRING_BYTES {
-            return Err(limit("revision strings"));
+            return Err(Error::limit(
+                LimitKind::TextBytes,
+                *strings,
+                MAX_STRING_BYTES,
+            ));
         }
         attrs.push(RevisionAttribute {
             namespace,
@@ -520,9 +556,13 @@ fn make_node(
 fn append_text(node: Option<&mut Node>, value: &str, strings: &mut usize) -> Result<()> {
     *strings = strings
         .checked_add(value.len())
-        .ok_or_else(|| limit("revision strings"))?;
+        .ok_or_else(|| Error::limit(LimitKind::TextBytes, usize::MAX, MAX_STRING_BYTES))?;
     if *strings > MAX_STRING_BYTES {
-        return Err(limit("revision strings"));
+        return Err(Error::limit(
+            LimitKind::TextBytes,
+            *strings,
+            MAX_STRING_BYTES,
+        ));
     }
     if let Some(n) = node {
         n.text.push_str(value);
@@ -562,7 +602,7 @@ fn start(name: &str, c: RevisionConformance) -> String {
 }
 fn finish(s: String) -> Result<Vec<u8>> {
     if s.len() > MAX_PART_BYTES {
-        Err(limit("serialized revision part bytes"))
+        Err(Error::limit(LimitKind::PartBytes, s.len(), MAX_PART_BYTES))
     } else {
         Ok(s.into_bytes())
     }
@@ -755,5 +795,40 @@ fn ns_text(v: &ResolveResult<'_>) -> Result<String> {
         ResolveResult::Unbound | ResolveResult::Unknown(_) => {
             Err(invalid("unbound revision element namespace"))
         },
+    }
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+
+    #[test]
+    fn nested_empty_and_explicit_elements_share_the_depth_budget() {
+        for leaf in ["<leaf/>", "<leaf></leaf>"] {
+            let xml = format!(
+                "{}{}{}",
+                "<node>".repeat(MAX_DEPTH),
+                leaf,
+                "</node>".repeat(MAX_DEPTH)
+            )
+            .replacen("<node>", &format!("<node xmlns=\"{NS}\">"), 1);
+            let error = parse_document(xml.as_bytes()).expect_err("depth refusal");
+            assert!(
+                matches!(error, Error::Limit {
+                kind: crate::LimitKind::Revisions(LimitKind::XmlDepth),
+                observed,
+                maximum,
+            } if observed == (MAX_DEPTH + 1) as u64 && maximum == MAX_DEPTH as u64),
+                "{error:?}"
+            );
+            let within = format!(
+                "{}{}{}",
+                "<node>".repeat(MAX_DEPTH - 1),
+                leaf,
+                "</node>".repeat(MAX_DEPTH - 1)
+            )
+            .replacen("<node>", &format!("<node xmlns=\"{NS}\">"), 1);
+            assert!(parse_document(within.as_bytes()).is_ok());
+        }
     }
 }

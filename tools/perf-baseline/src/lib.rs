@@ -23677,9 +23677,9 @@ fn xlsx_row_visibility_source_output(
     let mut edit = editor.edit("Sheet1")?;
     let operations = updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     });
     edit.apply_batch(operations)?;
@@ -23848,9 +23848,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut noop = editor.edit("Sheet1")?;
     let noop_operations = updates.iter().map(|(row, _)| {
         if initially_hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     });
     noop.apply_batch(noop_operations)?;
@@ -23870,9 +23870,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut staged = source_editor.edit("Sheet1")?;
     staged.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let commit = staged.commit()?;
@@ -23913,9 +23913,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut revision_edit = revision_editor.edit("Sheet1")?;
     revision_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let revision_commit = revision_edit.commit()?;
@@ -23965,9 +23965,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut signed_edit = signed_editor.edit("Sheet1")?;
     signed_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     // A changed commit over a signed source is refused before any output
@@ -23988,9 +23988,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut partial_edit = partial_editor.edit("Sheet1")?;
     partial_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let partial_commit = partial_edit.commit()?;
@@ -24009,9 +24009,9 @@ fn xlsx_row_visibility_lifecycle_gates(
     let mut zero_edit = zero_editor.edit("Sheet1")?;
     zero_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+            litchi_xlsx::row_visibility::Change::hide(*row)
         } else {
-            litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+            litchi_xlsx::row_visibility::Change::unhide(*row)
         }
     }))?;
     let zero_commit = zero_edit.commit()?;
@@ -44136,9 +44136,9 @@ fn run_xlsx_row_visibility_edit_save(
             let mut edit = editor.edit("Sheet1")?;
             edit.apply_batch(updates.iter().map(|(row, hidden)| {
                 if *hidden {
-                    litchi_xlsx::row_visibility::RowVisibilityEdit::hide(*row)
+                    litchi_xlsx::row_visibility::Change::hide(*row)
                 } else {
-                    litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
+                    litchi_xlsx::row_visibility::Change::unhide(*row)
                 }
             }))?;
             let stage_duration = started.elapsed();

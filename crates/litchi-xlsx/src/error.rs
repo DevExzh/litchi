@@ -325,6 +325,8 @@ pub enum LimitKind {
     /// Source-backed row visibility
     /// ([`crate::row_visibility::source::LimitKind`]).
     RowVisibility(crate::row_visibility::source::LimitKind),
+    /// Workbook revision metadata ([`crate::revisions::LimitKind`]).
+    Revisions(crate::revisions::LimitKind),
 }
 
 impl LimitKind {
@@ -371,6 +373,7 @@ impl LimitKind {
             Self::XmlMaps(kind) => kind.as_str(),
             Self::CellValues(kind) => kind.as_str(),
             Self::RowVisibility(kind) => kind.as_str(),
+            Self::Revisions(kind) => kind.as_str(),
         }
     }
 }

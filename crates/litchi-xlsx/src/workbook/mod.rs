@@ -25,10 +25,9 @@ pub use drawing::{
     WorksheetSvgDescriptor, WorksheetSvgImage,
 };
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Diagnostics,
-    DurablePatch, Edit, FormControlEdit, JoinError, JoinFailure, MergeChoice, MergeLimits,
-    NewSheet, PackageChange, Patch, RowEdit, SealedPatch, State, TabEdit, ThreeWayPlan,
-    WorksheetEdit,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, Diagnostics, DurablePatch, Edit, JoinError,
+    JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, SealedPatch, State,
+    ThreeWayPlan,
 };
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;

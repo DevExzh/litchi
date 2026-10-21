@@ -1315,11 +1315,42 @@
           "name": "into_snapshot",
           "scope": "litchi_ooxml_common",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "into_workbook",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common::web::custom_function",
+          "name": "Edit",
+          "replacement": "Change (semantic patch input, record 0360)"
         }
       ],
       "families": [
+        "litchi_ooxml_common::custom_xml",
         "litchi_ooxml_common::properties"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "ooxml-common-full",
@@ -1468,11 +1499,42 @@
           "name": "into_snapshot",
           "scope": "litchi_ooxml_common",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "into_workbook",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common::web::custom_function",
+          "name": "Edit",
+          "replacement": "Change (semantic patch input, record 0360)"
         }
       ],
       "families": [
+        "litchi_ooxml_common::custom_xml",
         "litchi_ooxml_common::properties"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "pptx-minimal",
@@ -3466,20 +3528,137 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "WorksheetEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "TabEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "ColumnEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "DefaultsEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "FormControlEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "CellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "SheetCellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowVisibilityEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit",
-        "litchi_xlsx::conditional_formatting::edit",
-        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::active_x",
         "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::auto_filter::source",
+        "litchi_xlsx::calculation_properties::edit",
+        "litchi_xlsx::calculation_properties::source",
+        "litchi_xlsx::cell_values",
+        "litchi_xlsx::cell_values::sheet",
+        "litchi_xlsx::chain",
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::chart_sheet",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::conditional_formatting::source",
+        "litchi_xlsx::connections",
+        "litchi_xlsx::custom_data",
+        "litchi_xlsx::data_type_icons",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::data_validation::source",
+        "litchi_xlsx::defined_names::source",
+        "litchi_xlsx::drawing::edit",
+        "litchi_xlsx::external_links",
+        "litchi_xlsx::form_control::source",
+        "litchi_xlsx::hyperlinks::source",
+        "litchi_xlsx::merge::source",
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::named_sheet_view",
+        "litchi_xlsx::ole_objects",
+        "litchi_xlsx::opc",
+        "litchi_xlsx::package::printer_settings",
+        "litchi_xlsx::page_breaks::edit",
+        "litchi_xlsx::page_breaks::source",
+        "litchi_xlsx::page_margins::source",
+        "litchi_xlsx::page_setup::source",
+        "litchi_xlsx::pivot::cached_unique_names",
+        "litchi_xlsx::pivot::server_formats",
+        "litchi_xlsx::pivot::table_data",
+        "litchi_xlsx::print_options::source",
+        "litchi_xlsx::query_table",
+        "litchi_xlsx::revisions",
+        "litchi_xlsx::rich_values::refresh_intervals",
+        "litchi_xlsx::row_visibility::source",
+        "litchi_xlsx::sheet_protection::source",
+        "litchi_xlsx::slicer",
+        "litchi_xlsx::smart_tags",
+        "litchi_xlsx::survey",
+        "litchi_xlsx::tab_state::source",
+        "litchi_xlsx::task_panes",
+        "litchi_xlsx::timeline",
+        "litchi_xlsx::volatile_dependencies",
         "litchi_xlsx::workbook::comments::edit",
-        "litchi_xlsx::drawing::edit"
+        "litchi_xlsx::workbook::data_model",
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::xml_maps"
       ],
       "immutable_owners": [
-        "litchi_xlsx::Workbook"
+        "litchi_xlsx::Package",
+        "litchi_xlsx::SourceBackedWorkbook",
+        "litchi_xlsx::SourceWorksheet",
+        "litchi_xlsx::Workbook",
+        "litchi_xlsx::Worksheet"
       ],
       "family_methods": true
     },
@@ -4028,20 +4207,138 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "WorksheetEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "TabEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "ColumnEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "DefaultsEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "FormControlEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "CellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "SheetCellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowVisibilityEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit",
-        "litchi_xlsx::conditional_formatting::edit",
-        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::active_x",
+        "litchi_xlsx::active_x::vba",
         "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::auto_filter::source",
+        "litchi_xlsx::calculation_properties::edit",
+        "litchi_xlsx::calculation_properties::source",
+        "litchi_xlsx::cell_values",
+        "litchi_xlsx::cell_values::sheet",
+        "litchi_xlsx::chain",
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::chart_sheet",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::conditional_formatting::source",
+        "litchi_xlsx::connections",
+        "litchi_xlsx::custom_data",
+        "litchi_xlsx::data_type_icons",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::data_validation::source",
+        "litchi_xlsx::defined_names::source",
+        "litchi_xlsx::drawing::edit",
+        "litchi_xlsx::external_links",
+        "litchi_xlsx::form_control::source",
+        "litchi_xlsx::hyperlinks::source",
+        "litchi_xlsx::merge::source",
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::named_sheet_view",
+        "litchi_xlsx::ole_objects",
+        "litchi_xlsx::opc",
+        "litchi_xlsx::package::printer_settings",
+        "litchi_xlsx::page_breaks::edit",
+        "litchi_xlsx::page_breaks::source",
+        "litchi_xlsx::page_margins::source",
+        "litchi_xlsx::page_setup::source",
+        "litchi_xlsx::pivot::cached_unique_names",
+        "litchi_xlsx::pivot::server_formats",
+        "litchi_xlsx::pivot::table_data",
+        "litchi_xlsx::print_options::source",
+        "litchi_xlsx::query_table",
+        "litchi_xlsx::revisions",
+        "litchi_xlsx::rich_values::refresh_intervals",
+        "litchi_xlsx::row_visibility::source",
+        "litchi_xlsx::sheet_protection::source",
+        "litchi_xlsx::slicer",
+        "litchi_xlsx::smart_tags",
+        "litchi_xlsx::survey",
+        "litchi_xlsx::tab_state::source",
+        "litchi_xlsx::task_panes",
+        "litchi_xlsx::timeline",
+        "litchi_xlsx::volatile_dependencies",
         "litchi_xlsx::workbook::comments::edit",
-        "litchi_xlsx::drawing::edit"
+        "litchi_xlsx::workbook::data_model",
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::xml_maps"
       ],
       "immutable_owners": [
-        "litchi_xlsx::Workbook"
+        "litchi_xlsx::Package",
+        "litchi_xlsx::SourceBackedWorkbook",
+        "litchi_xlsx::SourceWorksheet",
+        "litchi_xlsx::Workbook",
+        "litchi_xlsx::Worksheet"
       ],
       "family_methods": true
     },

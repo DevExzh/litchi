@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, ReadAt};
 use litchi_opc::{OpcPackage, SourceBackedPackage, SourceCacheLimits, SourceLimits};
-use litchi_xlsx::cell_values::{self, MultiSnapshot, SheetCellValueEdit, Snapshot};
+use litchi_xlsx::cell_values::{self, MultiSnapshot, SheetChange, Snapshot};
 use litchi_xlsx::{OpenOptions, Result, Selector, SourceBackedWorkbook, row_visibility};
 
 /// Drive the cell-value families over one source-backed workbook.
@@ -206,7 +206,7 @@ impl SourceBackedEditor {
 
     pub fn edit_many<'a, I>(&self, edits: I) -> Result<cell_values::Edit>
     where
-        I: IntoIterator<Item = SheetCellValueEdit<'a>>,
+        I: IntoIterator<Item = SheetChange<'a>>,
     {
         self.workbook.edit_cell_values_batch(edits)
     }

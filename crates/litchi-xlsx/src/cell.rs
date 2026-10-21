@@ -333,7 +333,7 @@ macro_rules! exact_integer_value {
 
 exact_integer_value!(i8, i16, i32, u8, u16, u32);
 
-/// Primary payload accepted by [`crate::WorksheetEdit::set`].
+/// Primary payload accepted by [`crate::workbook::edit::Sheet::set`].
 ///
 /// Plain strings are always inert text. Formula interpretation requires an
 /// explicit checked [`Formula`].
@@ -492,7 +492,7 @@ impl fmt::Display for Number {
 ///
 /// Read with [`crate::Worksheet::rich_text`], changed with
 /// [`RichText::set_run_text`], written with
-/// [`crate::WorksheetEdit::set_rich_text`] as the cell's own inline rich
+/// [`crate::workbook::edit::Sheet::set_rich_text`] as the cell's own inline rich
 /// string.
 ///
 /// ```

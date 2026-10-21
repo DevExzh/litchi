@@ -16,7 +16,7 @@ use super::super::Snapshot;
 use super::super::patch::SheetRecord;
 use super::super::snapshot::SourceProvenance;
 use super::{
-    CellValueEdit, MAX_BATCH_EDITS, StagedValueEdit, append_actions, effective_action_count,
+    Change, MAX_BATCH_EDITS, StagedValueEdit, append_actions, effective_action_count,
     shared_formula_changed, shared_formula_readback,
 };
 use crate::cell::{Cell, Content, Number, Value};
@@ -208,27 +208,27 @@ impl Edit {
 
     /// Stage one numeric insertion for an absent coordinate.
     pub fn insert(&mut self, address: Address, value: Number) -> Result<()> {
-        self.apply_batch([CellValueEdit::insert(address, value)])
+        self.apply_batch([Change::insert(address, value)])
     }
 
     /// Stage one value replacement. Repeated selectors are rejected.
     pub fn set(&mut self, address: Address, value: impl Into<Value>) -> Result<()> {
-        self.apply_batch([CellValueEdit::set(address, value)])
+        self.apply_batch([Change::set(address, value)])
     }
 
     /// Stage one cacheless scalar formula replacement.
     pub fn set_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
-        self.apply_batch([CellValueEdit::set_formula(address, formula)])
+        self.apply_batch([Change::set_formula(address, formula)])
     }
 
     /// Stage one shared-formula master replacement.
     pub fn set_shared_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
-        self.apply_batch([CellValueEdit::set_shared_formula(address, formula)])
+        self.apply_batch([Change::set_shared_formula(address, formula)])
     }
 
     /// Stage one scalar clear. Repeated selectors are rejected.
     pub fn clear(&mut self, address: Address) -> Result<()> {
-        self.apply_batch([CellValueEdit::clear(address)])
+        self.apply_batch([Change::clear(address)])
     }
 
     /// Stage complete removal of one scalar `<c>` owner.
@@ -236,11 +236,11 @@ impl Edit {
     /// The containing `<row>` is retained even when this is its last cell.
     /// Repeated selectors are rejected.
     pub fn remove(&mut self, address: Address) -> Result<()> {
-        self.apply_batch([CellValueEdit::remove(address)])
+        self.apply_batch([Change::remove(address)])
     }
 
     /// Stage a bounded batch atomically.
-    pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = CellValueEdit>) -> Result<()> {
+    pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = Change>) -> Result<()> {
         self.before.check_execution()?;
         let mut pending = Vec::new();
         pending
@@ -271,13 +271,13 @@ impl Edit {
             }
             let source = self.before.editable_cell(address);
             let value = match edit {
-                CellValueEdit::Insert { value, .. } => {
+                Change::Insert { value, .. } => {
                     self.before.require_insertable_absence(address)?;
                     let value = Value::Number(value);
                     value.validate_for_write()?;
                     StagedValueEdit::Insert(Content::Value(value))
                 },
-                CellValueEdit::Set { value, .. } => {
+                Change::Set { value, .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{address}' has no existing cell owner"
@@ -291,7 +291,7 @@ impl Edit {
                     self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
-                CellValueEdit::SetFormula { formula, .. } => {
+                Change::SetFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{address}' has no existing cell owner"
@@ -303,7 +303,7 @@ impl Edit {
                     self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
-                CellValueEdit::SetSharedFormula { formula, .. } => {
+                Change::SetSharedFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{address}' has no existing cell owner"
@@ -315,7 +315,7 @@ impl Edit {
                     self.before.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
-                CellValueEdit::Clear { .. } => {
+                Change::Clear { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{address}' has no existing cell owner"
@@ -328,7 +328,7 @@ impl Edit {
                     self.before.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
-                CellValueEdit::Remove { .. } => {
+                Change::Remove { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{address}' has no existing cell owner"

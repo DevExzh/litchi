@@ -95,7 +95,7 @@ pub enum WebIntent {
         conformance: Conformance,
     },
     Remove,
-    CustomFunctions(custom_function::Edit),
+    CustomFunctions(custom_function::Change),
 }
 
 /// Attach semantic intent to a planned package transaction.
@@ -114,7 +114,7 @@ pub(in crate::web::package) fn bind_intent(patch: Patch, intent: WebIntent) -> P
 pub(in crate::web::package) fn custom_edit_for_graph(
     existing: &Panes,
     incoming: &Panes,
-) -> Result<custom_function::Edit> {
+) -> Result<custom_function::Change> {
     if existing.len() != incoming.len() {
         return invalid("custom-function graph intent changed pane count".into());
     }
@@ -139,7 +139,7 @@ pub(in crate::web::package) fn custom_edit_for_graph(
     if operations.is_empty() {
         return invalid("custom-function graph intent has no changed owner".into());
     }
-    Ok(custom_function::Edit::existing(operations))
+    Ok(custom_function::Change::existing(operations))
 }
 
 impl Patch {
@@ -1233,7 +1233,7 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                     decode_operation(&mut decoder, limits)?,
                 ));
             }
-            WebIntent::CustomFunctions(custom_function::Edit {
+            WebIntent::CustomFunctions(custom_function::Change {
                 mode,
                 operations,
                 additions,
@@ -1601,7 +1601,7 @@ fn replay_intent(package: &OpcPackage, intent: &WebIntent, limits: &Limits) -> R
 
 fn replay_custom_functions(
     package: &OpcPackage,
-    edit: &custom_function::Edit,
+    edit: &custom_function::Change,
     limits: &Limits,
 ) -> Result<Patch> {
     if edit.mode == GraphMode::ReplaceManagedGraph {
