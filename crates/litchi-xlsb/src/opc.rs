@@ -265,6 +265,7 @@ mod tests {
         })
         .unwrap();
         let (source, _) = seed.commit().unwrap().into_parts();
+        let source = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
 
         let mut edit = source.edit_opc().unwrap();
         let replacement = edit
@@ -290,17 +291,33 @@ mod tests {
         let (after, patch) = edit.commit().unwrap().into_parts();
         let source_bytes = after
             .opc_package()
-            .content_types_source_xml()
+            .content_types_source_bytes()
             .expect("raw source allocation");
         assert_eq!(source_bytes.as_slice(), replacement.as_slice());
 
         let replayed = patch.0.apply_graph(source.opc_package()).unwrap();
         assert_eq!(
             replayed
-                .content_types_source_xml()
+                .content_types_source_bytes()
                 .expect("replayed raw source allocation")
                 .as_slice(),
             replacement.as_slice()
+        );
+        let restored = patch
+            .0
+            .inverse()
+            .apply_graph(after.opc_package())
+            .expect("inverse source replay");
+        let restored_bytes = restored
+            .content_types_source_bytes()
+            .expect("restored source allocation");
+        assert_eq!(
+            restored_bytes.as_slice(),
+            source
+                .opc_package()
+                .content_types_source_bytes()
+                .expect("original source allocation")
+                .as_slice()
         );
     }
 
@@ -323,7 +340,9 @@ mod tests {
             lexical_content_types_edit(opc)
         })
         .unwrap();
-        let (_, patch) = edit.commit().unwrap().into_parts();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        let replayed = source.apply_opc(&patch).unwrap().into_package();
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
 
         let mut divergent = source.edit_opc().unwrap();
         divergent

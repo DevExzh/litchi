@@ -818,37 +818,8 @@ impl OpcPackage {
     /// the graph matches the source binding again, and callers still need the
     /// validating replacement API to install new bytes.
     #[must_use]
-    pub fn content_types_source_xml(&self) -> Option<Arc<Vec<u8>>> {
+    pub fn content_types_source_bytes(&self) -> Option<Arc<Vec<u8>>> {
         self.source_content_types_xml.clone()
-    }
-
-    /// Compare the original content-types members even when either is no
-    /// longer compatible with its typed graph. Unlike publication comparison,
-    /// this distinguishes replacement of the raw member from a structural
-    /// edit that only invalidated its coverage. No XML is parsed or authored.
-    #[must_use]
-    pub fn same_content_types_source(&self, other: &Self) -> bool {
-        match (
-            &self.source_content_types_xml,
-            &other.source_content_types_xml,
-        ) {
-            (None, None) => true,
-            (Some(left), Some(right)) => Arc::ptr_eq(left, right) || left == right,
-            _ => false,
-        }
-    }
-
-    /// Whether this package still carries a source content-types member and
-    /// its parsed binding, even when structural edits make that source token
-    /// incompatible with the current part graph.
-    ///
-    /// Format patch capture uses this provenance bit together with
-    /// [`Self::same_content_types_source`] to keep an explicitly replaced
-    /// lexical member distinguishable from an unchanged source token that a
-    /// structural edit temporarily invalidated.
-    #[must_use]
-    pub fn has_content_types_source(&self) -> bool {
-        self.source_content_types_xml.is_some() && self.source_content_types.is_some()
     }
 
     /// Serialize the typed content-type graph under required output limits.
@@ -935,7 +906,11 @@ impl OpcPackage {
                 "stale content-types source replacement".to_owned(),
             ));
         }
-        if current.bytes() == replacement.as_slice() {
+        let source_differs = self
+            .source_content_types_xml
+            .as_ref()
+            .is_some_and(|source| source.as_slice() != replacement.as_slice());
+        if current.bytes() == replacement.as_slice() && !source_differs {
             return Ok(false);
         }
         if self.is_signed() || self.requires_signature_edit_policy() {
@@ -997,7 +972,11 @@ impl OpcPackage {
                 "content-types replacement has an invalid owner or content type".to_owned(),
             ));
         }
-        if current.bytes() == replacement.bytes() {
+        let source_differs = self
+            .source_content_types_xml
+            .as_ref()
+            .is_some_and(|source| source.as_slice() != replacement.bytes());
+        if current.bytes() == replacement.bytes() && !source_differs {
             return Ok(false);
         }
         if self.is_signed() || self.requires_signature_edit_policy() {
@@ -4026,7 +4005,10 @@ mod tests {
                 crate::TargetMode::External,
             )
             .unwrap();
-        assert!(package.same_content_types_source(&original));
+        assert_eq!(
+            package.content_types_source_bytes(),
+            original.content_types_source_bytes()
+        );
         assert!(package.retained_content_types_xml().unwrap().is_none());
         assert!(package.retained_relationships_xml(&root).unwrap().is_none());
         assert_eq!(

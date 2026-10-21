@@ -1508,7 +1508,7 @@ impl OpcPackage {
     /// The expected owner bytes and physical-member bit must still match the
     /// current publication view. Replacement bytes are parsed, audited and
     /// retained only after those stale-source and signature checks succeed.
-    pub fn try_replace_relationships_source_bytes_with_limits(
+    pub fn try_replace_relationships_source_bytes(
         &mut self,
         owner: &PackURI,
         expected: &[u8],

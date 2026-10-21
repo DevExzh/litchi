@@ -261,9 +261,39 @@ struct Delta {
 /// unchanged part while callers keep a patch alive.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ContentTypesImage {
+    /// The exact admitted source member when the package still owns one, or
+    /// the authored publication view for a package without source metadata.
     bytes: Arc<Vec<u8>>,
+    /// The publication view for this graph. This can be authored XML even
+    /// when `bytes` is an admitted source image whose binding is temporarily
+    /// incompatible with the typed graph.
+    publication: Arc<Vec<u8>>,
     source: bool,
     explicit: bool,
+}
+
+impl ContentTypesImage {
+    /// Whether this image still describes the destination before the patch's
+    /// typed deltas are applied. Explicit raw replacements need both the
+    /// publication view and the admitted source allocation: comparing only
+    /// source bytes would accept an unrelated typed manifest overlay.
+    fn matches_base(&self, package: &OpcPackage) -> Result<bool> {
+        let current = match package.retained_content_types_xml()? {
+            Some(bytes) => bytes,
+            None => package.authored_content_types_xml(package.read_limits())?,
+        };
+        if current.as_slice() != self.publication.as_slice() {
+            return Ok(false);
+        }
+        if self.source {
+            let has_source = package.content_types_source_bytes().is_some();
+            let source_matches = package
+                .content_types_source_bytes()
+                .is_some_and(|bytes| bytes.as_slice() == self.bytes.as_slice());
+            return Ok(has_source && source_matches);
+        }
+        Ok(true)
+    }
 }
 
 /// A compact retained relationship image for one changed owner.
@@ -358,19 +388,20 @@ impl Manifests {
                 Some(bytes) => bytes,
                 None => package.authored_content_types_xml(limits)?,
             };
-            if current.as_slice() != content_types.bytes.as_slice() {
+            let source_differs = content_types.explicit
+                && content_types.source
+                && package
+                    .content_types_source_bytes()
+                    .is_none_or(|bytes| bytes.as_slice() != content_types.bytes.as_slice());
+            if current.as_slice() != content_types.bytes.as_slice() || source_differs {
                 let current_matches_base = expected
-                    .is_some_and(|expected| current.as_slice() == expected.bytes.as_slice());
-                if current_matches_base {
+                    .is_some_and(|expected| current.as_slice() == expected.publication.as_slice());
+                if content_types.explicit || current_matches_base {
                     package.try_replace_content_types_bytes_with_limits(
                         current.as_slice(),
                         Arc::clone(&content_types.bytes),
                         limits,
                     )?;
-                } else if content_types.explicit {
-                    return Err(Error::PatchConflict {
-                        part: "content types",
-                    });
                 }
             }
         }
@@ -397,7 +428,7 @@ impl Manifests {
             if current.as_slice() != relationship.bytes.as_slice()
                 || current_member_present != relationship.member_present
             {
-                package.try_replace_relationships_source_bytes_with_limits(
+                package.try_replace_relationships_source_bytes(
                     &relationship.owner,
                     current.as_slice(),
                     current_member_present,
@@ -523,7 +554,8 @@ impl PartPatch {
             let (before_content_types, after_content_types) = if content_types_changed {
                 let mut before_content_types = Self::content_types_image(before)?;
                 let mut after_content_types = Self::content_types_image(after)?;
-                let source_changed = !before.same_content_types_source(after);
+                let source_changed =
+                    before.content_types_source_bytes() != after.content_types_source_bytes();
                 // A source allocation change is the provenance of an explicit
                 // raw manifest replacement. Mark both directions so an
                 // inverse cannot silently discard that lexical image on a
@@ -555,13 +587,18 @@ impl PartPatch {
     }
 
     fn content_types_image(package: &OpcPackage) -> Result<ContentTypesImage> {
-        let source = package.has_content_types_source();
-        let bytes = match package.content_types_source_xml() {
+        let source = package.content_types_source_bytes().is_some();
+        let publication = match package.retained_content_types_xml()? {
             Some(bytes) => bytes,
             None => package.authored_content_types_xml(package.read_limits())?,
         };
+        let bytes = match (source, package.content_types_source_bytes()) {
+            (true, Some(bytes)) => bytes,
+            _ => Arc::clone(&publication),
+        };
         Ok(ContentTypesImage {
             bytes,
+            publication,
             source,
             explicit: false,
         })
@@ -612,7 +649,8 @@ impl PartPatch {
         .with_manifests(
             before,
             after,
-            !before.same_retained_content_types(after)? || !before.same_content_types_source(after),
+            !before.same_retained_content_types(after)?
+                || before.content_types_source_bytes() != after.content_types_source_bytes(),
         )
     }
 
@@ -678,7 +716,8 @@ impl PartPatch {
         .with_manifests(
             before,
             after,
-            !before.same_retained_content_types(after)? || !before.same_content_types_source(after),
+            !before.same_retained_content_types(after)?
+                || before.content_types_source_bytes() != after.content_types_source_bytes(),
         )
     }
 
@@ -728,6 +767,17 @@ impl PartPatch {
             }
         }
         crate::signature_policy::ensure_unsigned(source)?;
+        if let Some(manifests) = &self.manifests {
+            let (before, _) = manifests.get();
+            if let Some(content_types) = before.content_types.as_ref()
+                && content_types.explicit
+                && !content_types.matches_base(source)?
+            {
+                return Err(Error::PatchConflict {
+                    part: "content types",
+                });
+            }
+        }
         let mut target = source.clone();
         for delta in &self.deltas {
             if delta.payload_only()

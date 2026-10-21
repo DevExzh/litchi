@@ -51,16 +51,19 @@ explicit `read_limits()`, so a source admitted under a larger limit remains
 editable through replay.
 
 Content-types-only lexical edits are retained as manifest patches, so they
-are no longer mistaken for an empty raw OPC edit. Replay compares the
-destination manifest with the recorded current-side bytes: a retained
-lexical image refuses a divergent manifest instead of silently disappearing,
-while an authored structural fallback is regenerated alongside unrelated
-additions. Source allocation identity distinguishes an explicit replacement
-from a structural edit that temporarily invalidates an older source binding;
-both directions of an explicit replacement retain the conflict guard. The
-patch stores compact shared manifest byte images and changed-owner relationship
-images, so retaining patches does not retain complete before/after package
-graphs. This keeps structural composition and lexical fidelity separate.
+are no longer mistaken for an empty raw OPC edit. Replay preflights an
+explicit replacement against its recorded publication and source allocation
+before applying typed deltas, then restores the after image against the
+post-delta publication. This keeps mixed lexical and structural edits
+replayable on an equal package, rejects a divergent manifest instead of
+silently dropping the raw bytes, and lets an authored structural fallback
+compose with unrelated additions. Source allocation identity distinguishes
+an explicit replacement from a structural edit that temporarily invalidates
+an older source binding; both directions of an explicit replacement retain
+the conflict guard. The patch stores compact shared manifest byte images and
+changed-owner relationship images, so retaining patches does not retain
+complete before/after package graphs. This keeps structural composition and
+lexical fidelity separate.
 
 The regression test
 `theme::raw_opc_lexical_relationship_edit_is_reversible` proves that a
@@ -104,7 +107,7 @@ Focused validation on this review tree:
 | `cargo test -p litchi-xlsb --all-features conditional` | 58 passed |
 | `cargo test -p litchi-xlsb --all-features --lib opc` | 13 passed |
 | `cargo test -p litchi-xlsb --all-features` | 736 unit, all integration and doctests passed |
-| raw OPC lexical relationship and content-types regressions | passed |
+| raw OPC lexical relationship and content-types regressions, including mixed and invalid-source inverse replay | passed |
 | source-backed metadata replay regression | passed |
 
 The complete `cargo test -p litchi-xlsb --all-features` run passes after the
