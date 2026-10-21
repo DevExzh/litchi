@@ -98,7 +98,16 @@ The historical frozen baseline remains diagnostic because its extracted source
 archive has no complete revision provenance. A reproducible pre-W4 baseline is
 now prepared from the exact current-trunk integration commit
 `e63a1fe3534bcaaae2ce367339f7f8275877baef` in the external worktree
-`/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-alloc-v1`. The only source
+`/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-alloc-v1`. A file-filtered
+base archive is retained outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-prew4-allocator-base-v2.tar`
+(206,110,720 bytes, SHA-256
+`c9281495a28f5abaea8326091071c2f4e77a5015a38596709c287fcd74cee42a`); its
+selected path list is next to it with SHA-256
+`d69e80ecb137da9d9f040afa0fe26e3f2b46a734279b758b5942e81ce0469d27`. The
+archive contains the exact base commit's Cargo manifest, `.cargo`, crates,
+perf harness, and build lint/toolchain manifests, and excludes documentation,
+media, test data, unrelated tools, and all performance captures. The only source
 overlay is this adapter at SHA-256
 `3929b1fbdaf4771d0667bc8a79cf0e274b72eebca6c064cb4a64d9c900c8f1b5`; the
 Cargo manifest adds the `legacy-xlsx-source-history` feature and registers the
