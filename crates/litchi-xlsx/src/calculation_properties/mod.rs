@@ -22,7 +22,7 @@ pub mod source;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{parse, parse_features, parse_features_with_limits, parse_with_limits};
+pub use codec::{parse, parse_features};
 pub use features::{Feature, Features};
 pub use limits::{LimitKind, Limits};
 pub use model::{Builder, Mode, Properties, ReferenceMode, Specified};

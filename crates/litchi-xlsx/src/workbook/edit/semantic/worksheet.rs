@@ -330,6 +330,7 @@ impl WorksheetEdit<'_> {
             let sheet = Worksheet {
                 owner: Arc::clone(&self.edit.base.inner),
                 data,
+                policy: None,
             };
             let intents = self
                 .edit

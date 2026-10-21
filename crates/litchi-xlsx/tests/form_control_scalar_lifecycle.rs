@@ -1644,8 +1644,11 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
         member(&source, CONTROL_PROPERTIES_MEMBER).as_slice()
     );
     assert_eq!(restored_vml, member(&source, VML_MEMBER).as_slice());
-    let restored_control =
-        litchi_xlsx::form_control::parse(restored_properties).expect("parse inverse properties");
+    let restored_control = litchi_xlsx::form_control::parse(
+        restored_properties,
+        &litchi_xlsx::form_control::Limits::default(),
+    )
+    .expect("parse inverse properties");
     assert_eq!(
         restored_control.checked(),
         Some(&litchi_xlsx::form_control::KnownOrUnknown::Known(

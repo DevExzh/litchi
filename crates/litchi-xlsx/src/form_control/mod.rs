@@ -18,9 +18,8 @@ mod owner;
 pub mod source;
 
 pub use codec::{
-    SourceProperties, SourceView, SourceWritable, insert_item, inspect, inspect_with_limits, parse,
-    parse_with_limits, remove_item, replace_items, replace_scalar, set_scalar, write,
-    write_with_limits,
+    SourceProperties, SourceView, SourceWritable, insert_item, inspect, parse, remove_item,
+    replace_items, replace_scalar, set_scalar, write,
 };
 pub(crate) use mirror::{ClientDataSource, MirrorLimits, replace_scalar_pair_with_limits};
 pub use model::{
@@ -29,6 +28,7 @@ pub use model::{
     OpaqueAttribute, OpaqueXml, Properties, ScalarField, ScalarValue, SelectionType, TextHAlign,
     TextVAlign,
 };
+pub(crate) use owner::owner_to_xlsx;
 pub use owner::{
     FormControlCollection, FormControlDiagnostic, FormControlDiagnosticCode, FormControlOwnerError,
     FormControlPartRead, FormControlReadSet, FormControlView, MceProvenance, OwnerLimits,
@@ -37,9 +37,6 @@ pub use owner::{
 pub(crate) use owner::{
     eager_form_controls_for_effective_topology, eager_form_controls_for_sheet_with_limits,
     source_form_controls_for_sheet_with_limits,
-};
-pub(crate) use owner::{
-    eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
 };
 pub use source::FormControlSnapshot;
 #[allow(

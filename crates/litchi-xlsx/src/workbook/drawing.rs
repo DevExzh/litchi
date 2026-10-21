@@ -679,10 +679,8 @@ fn read_drawing<'a>(
         });
     }
     let worksheet_part = owner.package.get_part(sheet_uri)?;
-    let worksheet_scan = WorksheetSourceScan::scan_with_limits(
-        worksheet_part.blob(),
-        worksheet_source_limits(owner),
-    )?;
+    let worksheet_scan =
+        WorksheetSourceScan::scan(worksheet_part.blob(), worksheet_source_limits(owner))?;
     let reference = worksheet_scan.drawing(ordinal)?;
     let relationship = worksheet_part
         .rels()
@@ -702,7 +700,7 @@ fn read_drawing<'a>(
             ct::OFC_DRAWING
         )));
     }
-    let source = Arc::new(SourceDrawing::scan_with_limits(
+    let source = Arc::new(SourceDrawing::scan(
         drawing_part.blob(),
         ordinal,
         drawing_source_limits(owner),

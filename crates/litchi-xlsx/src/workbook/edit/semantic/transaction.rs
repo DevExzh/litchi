@@ -2177,8 +2177,14 @@ impl Edit {
                 package_changes.push(PackageChange::FormControl {
                     sheet: data.name.as_str().into(),
                     control: overlay.position,
-                    before: Box::new(crate::form_control::parse(&overlay.before_properties)?),
-                    after: Box::new(crate::form_control::parse(&overlay.after_properties)?),
+                    before: Box::new(crate::form_control::parse(
+                        &overlay.before_properties,
+                        &crate::form_control::Limits::default(),
+                    )?),
+                    after: Box::new(crate::form_control::parse(
+                        &overlay.after_properties,
+                        &crate::form_control::Limits::default(),
+                    )?),
                 });
             }
             form_control_validations.extend(
@@ -2218,6 +2224,7 @@ impl Edit {
             let sheet = Worksheet {
                 owner: Arc::clone(&base.inner),
                 data: Arc::clone(&data),
+                policy: None,
             };
             let store = sheet.store()?;
             let change_start = changes.len();
@@ -3830,6 +3837,7 @@ impl Edit {
             let sheet = Worksheet {
                 owner: Arc::clone(&self.base.inner),
                 data,
+                policy: None,
             };
             let source = sheet.web_bindings()?.clone();
             self.sheets.entry(position).or_default().web = Some(source);
@@ -3924,6 +3932,7 @@ impl Edit {
         let sheet = Worksheet {
             owner: Arc::clone(&self.base.inner),
             data,
+            policy: None,
         };
         Ok(sheet.hyperlinks()?.into_iter().find(|value| {
             crate::hyperlinks::model::reference_key(value.reference().range()) == key
@@ -4663,6 +4672,7 @@ fn lower_style_requests(
         let sheet = Worksheet {
             owner: Arc::clone(&base.inner),
             data: Arc::clone(data),
+            policy: None,
         };
         let store = sheet.store()?;
         let request_count = actions
@@ -5207,6 +5217,7 @@ fn validate_web_edit(
             let sheet = Worksheet {
                 owner: Arc::clone(&base.inner),
                 data: Arc::clone(data),
+                policy: None,
             };
             codec::check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
         }

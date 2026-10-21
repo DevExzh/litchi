@@ -323,11 +323,9 @@ pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{FontChange, LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
     Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
-    Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart, Position as SurveyPosition,
-    Question as SurveyQuestion, QuestionFormat as SurveyQuestionFormat,
-    QuestionType as SurveyQuestionType, Questions as SurveyQuestions, Snapshot as SurveySnapshot,
-    Survey, load as load_surveys, parse as parse_survey, validate as validate_survey,
-    write as write_survey,
+    Id as SurveyId, Position as SurveyPosition, Question as SurveyQuestion,
+    QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
+    Questions as SurveyQuestions, Survey,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,

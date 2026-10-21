@@ -116,6 +116,7 @@ pub(super) fn validate_web_integrity(workbook: &Workbook) -> Result<()> {
         let sheet = Worksheet {
             owner: Arc::clone(&workbook.inner),
             data: Arc::clone(data),
+            policy: None,
         };
         check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
     }

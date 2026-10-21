@@ -29,6 +29,7 @@ pub struct SemanticLimits {
     survey: crate::survey::Limits,
     calculation_properties: crate::calculation_properties::Limits,
     pivot_table_data: crate::pivot::table_data::Limits,
+    form_controls: Option<crate::form_control::OwnerLimits>,
 }
 
 macro_rules! copy_limit {
@@ -73,4 +74,19 @@ impl SemanticLimits {
         crate::pivot::table_data::Limits,
         "the `pivotTableData` reads and edits"
     );
+
+    /// Bound worksheet form-control reads by `limits`.
+    #[must_use]
+    pub const fn form_controls(mut self, limits: crate::form_control::OwnerLimits) -> Self {
+        self.form_controls = Some(limits);
+        self
+    }
+
+    /// The configured budget of worksheet form-control reads; `None` reads
+    /// under the default policy (the finite owner defaults for a loaded
+    /// package, the source read limits for a source-backed workbook).
+    #[must_use]
+    pub const fn form_controls_value(&self) -> Option<crate::form_control::OwnerLimits> {
+        self.form_controls
+    }
 }

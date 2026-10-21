@@ -1514,7 +1514,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
         ..DrawingOptions::default()
     });
     let drawing_xml = part(&bytes, DRAWING);
-    let source = SourceDrawing::scan_with_ordinal(&drawing_xml, 4).unwrap();
+    let source = SourceDrawing::scan(&drawing_xml, 4, ScanLimits::default()).unwrap();
     assert_eq!(source.drawing_ordinal(), 4);
     assert_eq!(source.dialect(), DrawingDialect::Transitional);
     assert_eq!(
@@ -1612,7 +1612,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
 fn scanner_preserves_direct_owner_ranges_inherited_prefixes_and_opaque_payload() {
     let bytes = svg_fixture();
     let drawing_xml = part(&bytes, DRAWING);
-    let source = SourceDrawing::scan(&drawing_xml).unwrap();
+    let source = SourceDrawing::scan(&drawing_xml, 0, ScanLimits::default()).unwrap();
     let picture = source.picture(0).unwrap();
     let owner = picture.svg_owner().owner().unwrap();
     assert_eq!(owner.embedded_relationship_id(), Some("rIdSvg"));
@@ -1672,9 +1672,9 @@ fn attach_save_reopen_detach_preserves_geometry_source_and_opaque_member() {
             .any(|window| window == b"source-manifest-comment")
     );
     let attached_drawing = part(&attached, DRAWING);
-    let attached_source = SourceDrawing::scan(&attached_drawing).unwrap();
+    let attached_source = SourceDrawing::scan(&attached_drawing, 0, ScanLimits::default()).unwrap();
     let before_drawing = part(&before, DRAWING);
-    let before_source = SourceDrawing::scan(&before_drawing).unwrap();
+    let before_source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     assert_eq!(
         attached_source.picture(0).unwrap().anchor(),
         before_source.picture(0).unwrap().anchor()
@@ -1713,11 +1713,12 @@ fn namespace_only_and_opaque_extension_wrappers_survive_attach() {
 fn attach_each_selector_keeps_two_cell_one_cell_and_absolute_geometry() {
     let before = raster_fixture();
     let before_drawing = part(&before, DRAWING);
-    let before_source = SourceDrawing::scan(&before_drawing).unwrap();
+    let before_source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     for index in 0..3 {
         let attached = edit_attach(&before, selector(index), NEW_SVG).unwrap();
         let attached_drawing = part(&attached, DRAWING);
-        let after_source = SourceDrawing::scan(&attached_drawing).unwrap();
+        let after_source =
+            SourceDrawing::scan(&attached_drawing, 0, ScanLimits::default()).unwrap();
         assert_eq!(
             after_source.picture(index).unwrap().anchor(),
             before_source.picture(index).unwrap().anchor()
@@ -1750,7 +1751,7 @@ fn multiple_pictures_attach_and_detach_in_one_atomic_transaction() {
     let svg_parts = part_names_with_content_type(&attached_bytes, "image/svg+xml");
     assert_eq!(svg_parts.len(), 3);
     let drawing = part(&attached_bytes, DRAWING);
-    let source = SourceDrawing::scan(&drawing).unwrap();
+    let source = SourceDrawing::scan(&drawing, 0, ScanLimits::default()).unwrap();
     assert!(
         source
             .pictures()
@@ -2137,7 +2138,7 @@ fn strict_host_uses_strict_core_and_transitional_svg_attribute_namespace() {
     assert!(text.contains(STRICT_A));
     assert!(text.contains(STRICT_REL));
     assert!(text.contains(REL));
-    let source = SourceDrawing::scan(&xml).unwrap();
+    let source = SourceDrawing::scan(&xml, 0, ScanLimits::default()).unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(source.relationship_dialect(), RelationshipDialect::Strict);
     assert_eq!(
@@ -2542,7 +2543,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let unknown_drawing = part(&unknown, DRAWING);
-    let unknown_source = SourceDrawing::scan(&unknown_drawing).unwrap();
+    let unknown_source = SourceDrawing::scan(&unknown_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         unknown_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Opaque | SvgOwnerState::None
@@ -2563,7 +2564,8 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let duplicate_drawing = part(&duplicate, DRAWING);
-    let duplicate_source = SourceDrawing::scan(&duplicate_drawing).unwrap();
+    let duplicate_source =
+        SourceDrawing::scan(&duplicate_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         duplicate_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Ambiguous
@@ -2575,7 +2577,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let mce_drawing = part(&mce, DRAWING);
-    let mce_source = SourceDrawing::scan(&mce_drawing).unwrap();
+    let mce_source = SourceDrawing::scan(&mce_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         mce_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Refused
@@ -2588,7 +2590,7 @@ fn unknown_duplicate_mce_external_and_foreign_owners_are_safe_refusals() {
         ..DrawingOptions::default()
     });
     let linked_drawing = part(&linked, DRAWING);
-    let linked_source = SourceDrawing::scan(&linked_drawing).unwrap();
+    let linked_source = SourceDrawing::scan(&linked_drawing, 0, ScanLimits::default()).unwrap();
     assert!(matches!(
         linked_source.picture(0).unwrap().svg_owner(),
         SvgOwnerState::Linked(_)
@@ -3113,13 +3115,13 @@ fn invalid_input_selector_and_custom_scan_limits_fail_before_publication() {
         max_xml_bytes: drawing.len() - 1,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&drawing, 0, limited).is_err());
+    assert!(SourceDrawing::scan(&drawing, 0, limited).is_err());
     let limited_nodes = ScanLimits {
         max_nodes: 2,
         ..ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&drawing, 0, limited_nodes).is_err());
-    let source = SourceDrawing::scan(&drawing).unwrap();
+    assert!(SourceDrawing::scan(&drawing, 0, limited_nodes).is_err());
+    let source = SourceDrawing::scan(&drawing, 0, ScanLimits::default()).unwrap();
     let owner = source.picture(0).unwrap();
     assert!(owner.namespace_complete_picture(&drawing, 1).is_err());
     let foreign_source = drawing.clone();
@@ -3247,7 +3249,7 @@ fn source_relationship_ranges_and_content_type_are_stable_across_inverse() {
     let before = raster_fixture();
     let before_content_types = content_types_member(&before);
     let before_drawing = part(&before, DRAWING);
-    let source = SourceDrawing::scan(&before_drawing).unwrap();
+    let source = SourceDrawing::scan(&before_drawing, 0, ScanLimits::default()).unwrap();
     let picture = source.picture(0).unwrap();
     assert_eq!(picture.blip_range().prefix(), b"a");
     assert!(picture.blip_range().start_end() <= picture.blip_range().range().end);
