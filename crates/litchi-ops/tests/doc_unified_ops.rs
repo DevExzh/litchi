@@ -554,3 +554,110 @@ fn doc_outline_reports_paragraphs_without_inventing_headings_or_formatting() {
     assert_eq!(stats["words"], 2);
     assert!(stats.get("styleDistribution").is_none());
 }
+
+fn run_prop(file: &File, path: &str, key: &str) -> Option<String> {
+    let node = file
+        .get(path)
+        .unwrap_or_else(|error| panic!("{path}: {error}"));
+    let view = node.view();
+    view.format()
+        .unwrap()
+        .find(|prop| prop.key() == key)
+        .map(|prop| prop.to_string())
+}
+
+fn many_paragraphs(count: usize) -> File {
+    let mut builder = litchi_doc::Builder::new();
+    for index in 0..count {
+        builder
+            .add_paragraph(&format!("Paragraph {index:03} body text."))
+            .unwrap();
+    }
+    open_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap()
+}
+
+/// Record 0359a: direct paragraph `bold`/`italic` sets join the body run
+/// (one leaf commit), read back as the isolated setter's, and a paragraph
+/// whose text the run replaced closes the run before a toggle.
+#[test]
+fn doc_paragraph_toggles_coalesce_into_one_commit() {
+    let file = many_paragraphs(40);
+    let commit = file
+        .edit(|edit| {
+            for index in 1..=40 {
+                edit.set(
+                    format!("/body/p[{index}]").as_str(),
+                    props! { "bold" => true },
+                )?;
+            }
+            edit.set("/body/p[3]", props! { "italic" => true })?;
+            // A repeat of a staged value is a no-op inside the run.
+            edit.set("/body/p[5]", props! { "bold" => true })?;
+            Ok::<_, litchi_ops::Error>(())
+        })
+        .expect("coalesced toggles");
+    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics.operations(), 42);
+    for index in 1..=40 {
+        assert_eq!(
+            run_prop(&commit.file, &format!("/body/p[{index}]/r[1]"), "bold").as_deref(),
+            Some("true"),
+            "paragraph {index}"
+        );
+    }
+    assert_eq!(
+        run_prop(&commit.file, "/body/p[3]/r[1]", "italic").as_deref(),
+        Some("true")
+    );
+    assert_eq!(run_prop(&commit.file, "/body/p[4]/r[1]", "italic"), None);
+
+    // The isolated setter publishes the same document, one commit per set.
+    let mut isolated = file.clone();
+    for index in 1..=40 {
+        isolated = isolated
+            .set(
+                format!("/body/p[{index}]").as_str(),
+                props! { "bold" => true },
+            )
+            .unwrap();
+    }
+    isolated = isolated
+        .set("/body/p[3]", props! { "italic" => true })
+        .unwrap();
+    for index in 1..=40 {
+        let path = format!("/body/p[{index}]/r[1]");
+        for key in ["bold", "italic"] {
+            assert_eq!(
+                run_prop(&commit.file, &path, key),
+                run_prop(&isolated, &path, key),
+                "{path} {key}"
+            );
+        }
+    }
+
+    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+
+    // Text then a toggle of the same paragraph: two runs.
+    let mixed = file
+        .edit(|edit| {
+            edit.set("/body/p[1]", props! { "text" => "Replaced text." })?;
+            edit.set("/body/p[1]", props! { "bold" => true })?;
+            Ok::<_, litchi_ops::Error>(())
+        })
+        .expect("text then toggle");
+    assert_eq!(mixed.diagnostics.commits(), 2);
+    assert_eq!(paragraph_text(&mixed.file, "/body/p[1]"), "Replaced text.");
+    assert_eq!(
+        run_prop(&mixed.file, "/body/p[1]/r[1]", "bold").as_deref(),
+        Some("true")
+    );
+
+    // A toggle the base already holds changes nothing.
+    let bold = commit.file.clone();
+    let noop = bold
+        .edit(|edit| edit.set("/body/p[2]", props! { "bold" => true }))
+        .expect("held toggle");
+    assert!(!noop.diagnostics.changed());
+    assert_eq!(noop.file.to_bytes().unwrap(), bold.to_bytes().unwrap());
+}
