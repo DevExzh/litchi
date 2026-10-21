@@ -16,8 +16,9 @@ artifact-sized copy on the source-backed publication path.
 The internal cell-value `Snapshot` and exact `Patch` endpoints now retain
 `Arc<Vec<u8>>`.  `Snapshot::open_package` adopts the common object's shared
 vector directly, and source-backed `package_from_snapshot` passes a cloned
-handle through `OwnedSource::from_arc`.  The common overlay owner has a
-corresponding `open_owned_vec` entry point that uses the sealed
+handle through `SharedOleFile::open_owned_vec_with_limits`, retaining the
+snapshot's source version and sealed immutable-vector path.  The common
+overlay owner has a corresponding `open_owned_vec` entry point that uses the sealed
 `SharedOleFile::open_owned_vec_with_limits` path, so source-backed numeric
 plans keep their immutable-provenance fast path.  Public byte projections
 remain borrowed slices; no new format-facing owner API is introduced.
