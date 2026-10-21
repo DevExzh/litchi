@@ -1,9 +1,30 @@
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::raw::Reader;
-use litchi_doc::tracked_revision::Limits;
 use litchi_doc::{Builder, SignatureName};
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use std::io::Cursor;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<PackageEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &PackageEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn word_blob() -> Vec<u8> {
     let mut bytes = vec![0; 56];
@@ -55,9 +76,8 @@ fn malformed_stw_user_error_is_deferred_and_cached() {
         .write_to(&mut output)
         .expect("fixture DOC");
 
-    let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-            .expect("fixture package");
+    let mut package = open_object(output.into_inner(), Targets::default(), Limits::default())
+        .expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let mut word = package
         .stream(&word_path)
@@ -69,7 +89,7 @@ fn malformed_stw_user_error_is_deferred_and_cached() {
     package
         .put_stream(&word_path, word)
         .expect("malformed StwUser pointer");
-    let bytes = package.finish().expect("fixture package finish");
+    let bytes = object_bytes(&package);
 
     let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");
@@ -96,9 +116,8 @@ fn document_facade_defers_and_reads_stw_user_signature_bytes() {
         .write_to(&mut output)
         .expect("fixture DOC");
 
-    let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-            .expect("fixture package");
+    let mut package = open_object(output.into_inner(), Targets::default(), Limits::default())
+        .expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let mut word = package
         .stream(&word_path)
@@ -125,7 +144,7 @@ fn document_facade_defers_and_reads_stw_user_signature_bytes() {
     package
         .put_stream(&word_path, word)
         .expect("StwUser pointer");
-    let bytes = package.finish().expect("fixture package finish");
+    let bytes = object_bytes(&package);
 
     let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
     let document = package.document().expect("document open");

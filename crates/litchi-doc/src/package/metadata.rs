@@ -75,6 +75,8 @@ pub enum Error {
     /// A property-set edit was refused (an invalid value or name, or a source
     /// stream that cannot be rewritten without loss).
     Property(OleError),
+    /// A shared property-set or object refusal with its typed classification.
+    Object(litchi_ole_common::Error),
     /// The document is encrypted; its properties cannot be rewritten without
     /// storing them in plaintext.
     Encrypted,
@@ -88,6 +90,7 @@ impl fmt::Display for Error {
             Self::Package(error) => write!(formatter, "DOC package error: {error}"),
             Self::Metadata(error) => fmt::Display::fmt(error, formatter),
             Self::Property(_) => formatter.write_str("DOC document property edit was refused"),
+            Self::Object(error) => write!(formatter, "DOC property-set error: {error}"),
             Self::Encrypted => {
                 formatter.write_str("the metadata of an encrypted DOC document cannot be rewritten")
             },
@@ -104,6 +107,7 @@ impl std::error::Error for Error {
             Self::Package(error) => Some(error),
             Self::Metadata(error) => Some(error),
             Self::Property(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Encrypted | Self::PatchConflict => None,
         }
     }
@@ -124,6 +128,12 @@ impl From<MetadataError> for Error {
 impl From<OleError> for Error {
     fn from(error: OleError) -> Self {
         Self::Property(error)
+    }
+}
+
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
     }
 }
 

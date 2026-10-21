@@ -5785,9 +5785,24 @@ mod tests {
         BlobLimits, CompositionLimits, HistoryLimits, Patch, PatchLimits, Reversible,
         SubEditJoinFailure,
     };
-    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+    use litchi_ole_common::object::{
+        Edit as PackageEditor, Limits as ObjectLimits, OpenOptions as ObjectOpenOptions,
+        Package as ObjectPackage, Targets,
+    };
     use std::io::Cursor;
     use std::sync::{Arc, OnceLock};
+
+    fn open_object(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: ObjectLimits,
+    ) -> Result<PackageEditor, litchi_ole_common::Error> {
+        ObjectPackage::open_with_options(
+            bytes,
+            ObjectOpenOptions::new().targets(targets).limits(limits),
+        )
+        .and_then(|package| package.edit())
+    }
 
     fn doc(paragraphs: &[&str]) -> Vec<u8> {
         let mut writer = Builder::new();
@@ -5851,7 +5866,7 @@ mod tests {
     }
 
     fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-        let mut package = PackageEditor::open(bytes, Targets::default(), Limits::default())
+        let mut package = open_object(bytes, Targets::default(), Limits::default())
             .expect("fixture package should open");
         let word_path = ["WordDocument".to_string()];
         let word = package.stream(&word_path).expect("WordDocument");
@@ -5904,17 +5919,16 @@ mod tests {
         package
             .put_stream(&table_path, table)
             .expect("normalized table stream");
-        package.finish().expect("normalized fixture publication")
+        crate::package::object_edit_bytes(&package).expect("normalized fixture publication")
     }
 
     fn doc_with_opaque_stream(paragraphs: &[&str]) -> Vec<u8> {
-        let mut package =
-            PackageEditor::open(doc(paragraphs), Targets::default(), Limits::default())
-                .expect("fixture package should open");
+        let mut package = open_object(doc(paragraphs), Targets::default(), Limits::default())
+            .expect("fixture package should open");
         package
             .add_stream(vec!["OpaqueVendorData".to_string()], b"untouched".to_vec())
             .expect("opaque stream should be admitted");
-        package.finish().expect("fixture package should finish")
+        crate::package::object_edit_bytes(&package).expect("fixture package should finish")
     }
 
     fn dofr_record(kind: u32, payload: &[u8]) -> Vec<u8> {
@@ -5927,9 +5941,8 @@ mod tests {
     }
 
     fn doc_with_auxiliary_tables() -> Vec<u8> {
-        let mut package =
-            PackageEditor::open(doc(&["alpha bravo"]), Targets::default(), Limits::default())
-                .expect("fixture package should open");
+        let mut package = open_object(doc(&["alpha bravo"]), Targets::default(), Limits::default())
+            .expect("fixture package should open");
         let word_path = ["WordDocument".to_string()];
         let mut word = package
             .stream(&word_path)
@@ -5989,7 +6002,7 @@ mod tests {
                 b"untouched auxiliary stream".to_vec(),
             )
             .expect("opaque auxiliary stream");
-        package.finish().expect("fixture package should finish")
+        crate::package::object_edit_bytes(&package).expect("fixture package should finish")
     }
 
     fn picture_doc(floating: bool) -> Vec<u8> {
@@ -6126,9 +6139,8 @@ mod tests {
 
     #[cfg(feature = "performance-diagnostics")]
     fn public_reader_failure_doc() -> Vec<u8> {
-        let mut package =
-            PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
-                .expect("fixture package should open");
+        let mut package = open_object(doc(&["alpha"]), Targets::default(), Limits::default())
+            .expect("fixture package should open");
         let mut word = package
             .stream(&["WordDocument".to_string()])
             .expect("WordDocument stream")
@@ -6143,13 +6155,12 @@ mod tests {
         package
             .put_stream(&["WordDocument".to_string()], word)
             .expect("replace WordDocument stream");
-        package.finish().expect("fixture package should finish")
+        crate::package::object_edit_bytes(&package).expect("fixture package should finish")
     }
 
     fn protected_dop_doc() -> Vec<u8> {
-        let mut package =
-            PackageEditor::open(doc(&["alpha"]), Targets::default(), Limits::default())
-                .expect("fixture package should open");
+        let mut package = open_object(doc(&["alpha"]), Targets::default(), Limits::default())
+            .expect("fixture package should open");
         let word_path = ["WordDocument".to_string()];
         let word = package
             .stream(&word_path)
@@ -6184,7 +6195,7 @@ mod tests {
         package
             .put_stream(&table_path, table)
             .expect("protected DOP should remain a valid package");
-        package.finish().expect("fixture package should finish")
+        crate::package::object_edit_bytes(&package).expect("fixture package should finish")
     }
 
     #[test]
@@ -6892,9 +6903,8 @@ mod tests {
         assert!(commit.patch().has_auxiliary_changes());
         assert!(commit.patch().to_durable(patch_limits()).is_err());
         let published = commit.package();
-        let package =
-            PackageEditor::open(published.finish(), Targets::default(), Limits::default())
-                .expect("published package");
+        let package = open_object(published.finish(), Targets::default(), Limits::default())
+            .expect("published package");
         assert_eq!(
             package
                 .stream(&["OpaqueVendorData".to_string()])
@@ -7342,7 +7352,7 @@ mod tests {
                 .expect("changed candidate paragraph text"),
             "alpha expanded"
         );
-        let package = PackageEditor::open(
+        let package = open_object(
             commit.package().finish(),
             Targets::default(),
             Limits::default(),
@@ -7982,7 +7992,7 @@ mod tests {
     fn retained_picture_mismatch_is_atomic_and_missing_data_handoff_is_current() {
         for floating in [false, true] {
             let donor = Snapshot::parse(&picture_doc(floating)).expect("donor");
-            let mut package = PackageEditor::open(
+            let mut package = open_object(
                 formatted_picture_receiver_doc(),
                 Targets::default(),
                 Limits::default(),
@@ -7991,8 +8001,10 @@ mod tests {
             package
                 .remove_stream(&["Data".to_string()])
                 .expect("remove unused Data");
-            let receiver =
-                Snapshot::parse(&package.finish().expect("receiver bytes")).expect("receiver");
+            let receiver = Snapshot::parse(
+                &crate::package::object_edit_bytes(&package).expect("receiver bytes"),
+            )
+            .expect("receiver");
             let plan = receiver
                 .plan_picture_transfer_from(
                     &donor,

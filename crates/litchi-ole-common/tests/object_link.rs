@@ -8,8 +8,9 @@
 )]
 
 use litchi_cfb::OleWriter;
+use litchi_ole_common::Error;
 use litchi_ole_common::object::link::{Kind, Limits as LinkLimits};
-use litchi_ole_common::object::{Edit, Limits, Target, Targets};
+use litchi_ole_common::object::{Edit, Limits, OpenOptions, Package, Target, Targets};
 use std::io::Cursor;
 
 fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
@@ -45,6 +46,39 @@ fn target() -> Targets {
     Targets::one(Target::new("object", ["ObjectPool", "_1"]).expect("target should validate"))
 }
 
+fn open_editor(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Edit, Error> {
+    Package::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))?.edit()
+}
+
+fn staged(editor: &Edit) -> Package {
+    editor
+        .clone()
+        .commit()
+        .expect("staged package")
+        .into_package()
+}
+
+trait RenderBytes {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error>;
+}
+
+impl RenderBytes for Edit {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error> {
+        let package = self.clone().commit()?.into_package();
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+}
+
+impl RenderBytes for Package {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+}
+
 fn package() -> Vec<u8> {
     let link = linked_wire();
     write_cfb(|writer| {
@@ -62,7 +96,7 @@ fn package() -> Vec<u8> {
 
 #[test]
 fn selected_objects_expose_shared_link_metadata() {
-    let editor = Edit::open(package(), target(), Limits::default()).expect("editor should open");
+    let editor = open_editor(package(), target(), Limits::default()).expect("editor should open");
     let link = editor
         .objects()
         .get("object")
@@ -74,8 +108,7 @@ fn selected_objects_expose_shared_link_metadata() {
     assert_eq!(link.link_update_option(), 7);
     assert_eq!(link.unknown_tail(), &[0xAA, 0xBB, 0xCC]);
     assert_eq!(
-        editor
-            .staged()
+        staged(&editor)
             .link("object", LinkLimits::default())
             .unwrap()
             .unwrap(),
@@ -87,7 +120,7 @@ fn selected_objects_expose_shared_link_metadata() {
 fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     let original = package();
     let mut editor =
-        Edit::open(original.clone(), target(), Limits::default()).expect("editor should open");
+        open_editor(original.clone(), target(), Limits::default()).expect("editor should open");
     editor
         .update_link("object", LinkLimits::default(), |link| {
             link.set_cache_hint(false);
@@ -109,7 +142,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     assert_eq!(object.stream(&["Payload"]), Some(&b"opaque"[..]));
 
     let mut rejected =
-        Edit::open(original.clone(), target(), Limits::default()).expect("editor should reopen");
+        open_editor(original.clone(), target(), Limits::default()).expect("editor should reopen");
     assert!(
         rejected
             .update_link("object", LinkLimits::default(), |_link| {
@@ -119,7 +152,9 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     );
     assert!(!rejected.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
-        rejected.finish().expect("rejected editor should finish"),
+        rejected
+            .render_bytes()
+            .expect("rejected editor should finish"),
         original
     );
 }

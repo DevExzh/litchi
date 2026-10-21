@@ -8,11 +8,11 @@
 )]
 
 use litchi_cfb::OleWriter;
-use litchi_ole_common::{Error, LimitKind};
-use litchi_ole_common::object::{Edit, Limits, Target, Targets};
+use litchi_ole_common::object::{Edit, Limits, OpenOptions, Package, Target, Targets};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as StreamLimits, OleNativeStream, OlePresentationStream,
 };
+use litchi_ole_common::{Error, LimitKind};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -30,9 +30,9 @@ fn presentation(data: &[u8]) -> Vec<u8> {
         data.to_vec(),
         StreamLimits::default(),
     )
-        .expect("presentation should construct")
-        .to_bytes(StreamLimits::default())
-        .expect("presentation should serialize")
+    .expect("presentation should construct")
+    .to_bytes(StreamLimits::default())
+    .expect("presentation should serialize")
 }
 
 fn native(data: &[u8]) -> Vec<u8> {
@@ -44,6 +44,39 @@ fn native(data: &[u8]) -> Vec<u8> {
 
 fn targets() -> Targets {
     Targets::one(Target::new("object", ["ObjectPool", "_1"]).expect("target should validate"))
+}
+
+fn open_editor(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Edit, Error> {
+    Package::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))?.edit()
+}
+
+fn staged(editor: &Edit) -> Package {
+    editor
+        .clone()
+        .commit()
+        .expect("staged package")
+        .into_package()
+}
+
+trait RenderBytes {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error>;
+}
+
+impl RenderBytes for Edit {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error> {
+        let package = self.clone().commit()?.into_package();
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+}
+
+impl RenderBytes for Package {
+    fn render_bytes(&self) -> Result<Vec<u8>, Error> {
+        let mut bytes = Vec::new();
+        self.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
 }
 
 fn package() -> Vec<u8> {
@@ -111,7 +144,7 @@ fn metadata(object: &litchi_ole_common::object::Object, name: &str) -> (u32, u64
 
 #[test]
 fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
-    let editor = Edit::open(package(), targets(), Limits::default()).expect("editor should open");
+    let editor = open_editor(package(), targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
 
     let presentations = object
@@ -159,7 +192,7 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
         b"opaque native bytes"
     );
 
-    let snapshot = editor.staged();
+    let snapshot = staged(&editor);
     assert_eq!(
         snapshot
             .presentations("object", StreamLimits::default())
@@ -180,10 +213,9 @@ fn object_and_snapshot_expose_typed_ole2_streams_without_name_scans() {
 #[test]
 fn typed_owner_edits_are_noop_source_checked_and_reversible() {
     let original = package();
-    let source_editor = Edit::open(original.clone(), targets(), Limits::default())
+    let source_editor = open_editor(original.clone(), targets(), Limits::default())
         .expect("source editor should open");
-    let source = source_editor
-        .staged()
+    let source = staged(&source_editor)
         .presentation("object", 7, StreamLimits::default())
         .expect("source presentation should parse")
         .expect("source presentation should exist");
@@ -205,21 +237,20 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
         source.bytes()
     );
 
-    let mut noop = Edit::open(original.clone(), targets(), Limits::default())
+    let mut noop = open_editor(original.clone(), targets(), Limits::default())
         .expect("no-op editor should open");
     noop.update_presentation("object", 7, StreamLimits::default(), |_transaction| Ok(()))
         .expect("no-op presentation edit should commit");
     assert!(!noop.clone().commit().unwrap().diagnostics().changed());
-    assert_eq!(noop.finish().expect("no-op should finish"), original);
+    assert_eq!(noop.render_bytes().expect("no-op should finish"), original);
 
     let mut owner =
-        Edit::open(original.clone(), targets(), Limits::default()).expect("owner should open");
+        open_editor(original.clone(), targets(), Limits::default()).expect("owner should open");
     owner
         .apply_presentation_patch("object", 7, typed_commit.patch())
         .expect("typed patch should publish");
     assert_eq!(
-        owner
-            .staged()
+        staged(&owner)
             .presentation("object", 7, StreamLimits::default())
             .unwrap()
             .unwrap()
@@ -230,8 +261,7 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
         .apply_presentation_patch("object", 7, &typed_commit.patch().inverse())
         .expect("inverse patch should publish through owner");
     assert_eq!(
-        owner
-            .staged()
+        staged(&owner)
             .presentation("object", 7, StreamLimits::default())
             .unwrap()
             .unwrap()
@@ -239,7 +269,7 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
         source.bytes()
     );
 
-    let mut stale = Edit::open(original.clone(), targets(), Limits::default())
+    let mut stale = open_editor(original.clone(), targets(), Limits::default())
         .expect("stale editor should open");
     stale
         .update_presentation("object", 7, StreamLimits::default(), |transaction| {
@@ -247,16 +277,17 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
             Ok(())
         })
         .expect("intervening edit should publish");
-    let after_intervening = stale.staged().finish().expect("snapshot should finish");
+    let after_intervening = staged(&stale)
+        .render_bytes()
+        .expect("snapshot should finish");
     assert!(
         stale
             .apply_presentation_patch("object", 7, typed_commit.patch())
             .is_err()
     );
     assert_eq!(
-        stale
-            .staged()
-            .finish()
+        staged(&stale)
+            .render_bytes()
             .expect("stale rejection should preserve owner"),
         after_intervening
     );
@@ -266,7 +297,7 @@ fn typed_owner_edits_are_noop_source_checked_and_reversible() {
 fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
     let original = package();
     let mut editor =
-        Edit::open(original, targets(), Limits::default()).expect("editor should open");
+        open_editor(original, targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
     let storage_metadata = (
         object.storage().directory().state_bits(),
@@ -286,8 +317,7 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
         max_toc_entries: 999,
     };
     assert_eq!(
-        editor
-            .staged()
+        staged(&editor)
             .presentation("object", 7, limits)
             .unwrap()
             .unwrap()
@@ -300,8 +330,7 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
             Ok(())
         })
         .expect("presentation edit should publish");
-    let native_source = editor
-        .staged()
+    let native_source = staged(&editor)
         .native("object", StreamLimits::default())
         .unwrap()
         .expect("native source should exist");
@@ -325,8 +354,7 @@ fn native_owner_edit_and_explicit_limits_preserve_directory_metadata() {
         })
         .expect("native edit should publish");
     assert_eq!(
-        editor
-            .staged()
+        staged(&editor)
             .native("object", StreamLimits::default())
             .unwrap()
             .unwrap()
@@ -368,7 +396,7 @@ fn presentation_count_limit_is_independent_of_toc_entry_limit() {
                 .expect("presentation stream should write");
         }
     });
-    let editor = Edit::open(package, targets(), Limits::default()).expect("editor should open");
+    let editor = open_editor(package, targets(), Limits::default()).expect("editor should open");
     let object = editor.objects().get("object").expect("object should exist");
     let limits = StreamLimits {
         max_bytes: stream.len(),
@@ -395,7 +423,8 @@ fn absent_typed_streams_still_validate_explicit_limits() {
             .create_stream(&["ObjectPool", "_1", "Opaque"], b"opaque")
             .expect("opaque stream should write");
     });
-    let mut editor = Edit::open(package, targets(), Limits::default()).expect("editor should open");
+    let mut editor =
+        open_editor(package, targets(), Limits::default()).expect("editor should open");
     let invalid = StreamLimits {
         max_bytes: 0,
         max_data_bytes: 1,
@@ -458,11 +487,10 @@ fn malformed_known_stream_is_rejected_without_owner_publication() {
             .create_stream(&["ObjectPool", "_1", "\u{0002}OlePres007"], &[1, 2, 3])
             .expect("malformed presentation should write");
     });
-    let mut editor = Edit::open(malformed.clone(), targets(), Limits::default())
+    let mut editor = open_editor(malformed.clone(), targets(), Limits::default())
         .expect("opaque malformed package should open");
     assert!(
-        editor
-            .staged()
+        staged(&editor)
             .presentation("object", 7, StreamLimits::default())
             .is_err()
     );
@@ -473,7 +501,7 @@ fn malformed_known_stream_is_rejected_without_owner_publication() {
     );
     assert!(!editor.clone().commit().unwrap().diagnostics().changed());
     assert_eq!(
-        editor.finish().expect("rejected edit should finish"),
+        editor.render_bytes().expect("rejected edit should finish"),
         malformed
     );
 }

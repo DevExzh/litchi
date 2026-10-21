@@ -32,7 +32,9 @@ use litchi_cfb::{
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
 use litchi_core::{Position, ReadAt, SourceVersion};
-use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::fmt;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
@@ -82,7 +84,13 @@ impl Snapshot {
     /// Returns a typed CFB, BIFF, protection, duplicate-owner, allocation, or
     /// complete-workbook validation error before publishing a snapshot.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = PackageEditor::open(bytes, Targets::default(), Limits::default())?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )?
+        .edit()?;
         Self::from_package_editor(package)
     }
 
@@ -102,7 +110,7 @@ impl Snapshot {
         require_visible_worksheet(&sheets)?;
         let bytes = match rendered {
             Some(rendered) => rendered,
-            None => package.finish()?,
+            None => crate::scoped::object_editor_bytes(&package)?,
         };
         // The complete reader's validation-only mode: every record is
         // validated as `Reader::new` validates it; no cell is decoded, and
@@ -437,11 +445,13 @@ impl Edit {
             }
             *field = encode_visibility(change.after);
         }
-        let mut package = PackageEditor::open(
+        let mut package = ObjectPackage::open_with_options(
             self.source.inner.bytes.to_vec(),
-            Targets::default(),
-            Limits::default(),
-        )?;
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )?
+        .edit()?;
         // Publish the rendering the package publication already validated
         // instead of rendering the same editor state a second time.
         let rendered = package.put_stream_shared_with_rendered(
@@ -449,7 +459,7 @@ impl Edit {
             Arc::from(workbook),
         )?;
         debug_assert_eq!(
-            package.clone().finish().ok().as_deref(),
+            crate::scoped::object_editor_bytes(&package).ok().as_deref(),
             Some(rendered.as_slice()),
             "a fresh render of the committed editor reproduces its validated rendering"
         );
@@ -1620,13 +1630,19 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.build().unwrap().write_to(&mut output).unwrap();
-        let mut package =
-            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-                .unwrap();
+        let mut package = ObjectPackage::open_with_options(
+            output.into_inner(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .unwrap()
+        .edit()
+        .unwrap();
         package
             .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
             .unwrap();
-        package.finish().unwrap()
+        crate::scoped::object_editor_bytes(&package).unwrap()
     }
 
     /// The generic commit publishes the rendering its package publication
@@ -1645,11 +1661,13 @@ mod tests {
             edit.set_visibility(Selector::Position(Position::new(target)), visibility)
                 .unwrap();
             let commit = edit.commit_record().unwrap();
-            let mut rerendered = PackageEditor::open(
+            let mut rerendered = ObjectPackage::open_with_options(
                 source.bytes().to_vec(),
-                Targets::default(),
-                Limits::default(),
+                OpenOptions::new()
+                    .targets(Targets::default())
+                    .limits(Limits::default()),
             )
+            .and_then(|package| package.edit())
             .unwrap();
             rerendered
                 .put_stream_shared(
@@ -1659,7 +1677,9 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 commit.snapshot().bytes(),
-                rerendered.finish().unwrap().as_slice()
+                crate::scoped::object_editor_bytes(&rerendered)
+                    .unwrap()
+                    .as_slice()
             );
         }
     }
@@ -1672,13 +1692,19 @@ mod tests {
     }
 
     fn edit_workbook(source: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
-        let mut package =
-            PackageEditor::open(source.to_vec(), Targets::default(), Limits::default()).unwrap();
+        let mut package = ObjectPackage::open_with_options(
+            source.to_vec(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .and_then(|package| package.edit())
+        .unwrap();
         let path = vec!["Workbook".to_string()];
         let mut workbook = package.stream(&path).unwrap().to_vec();
         edit(&mut workbook);
         package.put_stream(&path, workbook).unwrap();
-        package.finish().unwrap()
+        crate::scoped::object_editor_bytes(&package).unwrap()
     }
 
     fn signed(source: &[u8]) -> Vec<u8> {
@@ -2097,16 +2123,19 @@ mod tests {
     #[test]
     fn deserialization_rejects_unrelated_stream_changes() {
         let source = Snapshot::from_bytes(package(2)).unwrap();
-        let mut package = PackageEditor::open(
+        let mut package = ObjectPackage::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            Limits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
         )
+        .and_then(|package| package.edit())
         .unwrap();
         package
             .put_stream(&["Opaque".to_string()], b"changed".to_vec())
             .unwrap();
-        let unrelated = Snapshot::from_bytes(package.finish().unwrap()).unwrap();
+        let unrelated =
+            Snapshot::from_bytes(crate::scoped::object_editor_bytes(&package).unwrap()).unwrap();
         let forged = Patch::new(
             Arc::clone(&source.inner.bytes),
             Arc::clone(&unrelated.inner.bytes),

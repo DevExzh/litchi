@@ -8849,6 +8849,9 @@
         }
       ],
       "families": [],
+      "immutable_owners": [
+        "litchi_ole_common::object::Package"
+      ],
       "family_methods": true
     },
     {

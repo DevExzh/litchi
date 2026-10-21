@@ -10,14 +10,35 @@ use litchi_core::Position;
 use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::tracked_revision::Limits;
 use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Reader};
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
     document_summary::DIGITAL_SIGNATURE,
 };
 use std::io::Cursor;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<PackageEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &PackageEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn record(flags: u16) -> Vec<u8> {
     let mut data = vec![0; 36];
@@ -64,8 +85,7 @@ fn signature_blob() -> Vec<u8> {
 
 fn signed_document_with_selsf(source: &[u8]) -> Vec<u8> {
     let base = document_with_selsf(source, 36);
-    let mut package =
-        PackageEditor::open(base, Targets::default(), Limits::default()).expect("package");
+    let mut package = open_object(base, Targets::default(), Limits::default()).expect("package");
     let mut section = Section::new(DOCUMENT_SUMMARY_INFORMATION_FMTID);
     section.set_page(CodePage::Utf16Le);
     section
@@ -78,7 +98,7 @@ fn signed_document_with_selsf(source: &[u8]) -> Vec<u8> {
             stream,
         )
         .expect("signature stream insertion");
-    package.finish().expect("signed package finish")
+    object_bytes(&package)
 }
 
 fn document_with_selsf(source: &[u8], length: u32) -> Vec<u8> {
@@ -95,8 +115,7 @@ fn document_with_selsf_body(body: &str, source: &[u8], length: u32) -> Vec<u8> {
         .write_to(&mut output)
         .expect("fixture DOC");
     let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-            .expect("package");
+        open_object(output.into_inner(), Targets::default(), Limits::default()).expect("package");
 
     let word_path = ["WordDocument".to_string()];
     let mut word = package.stream(&word_path).expect("WordDocument").to_vec();
@@ -124,7 +143,7 @@ fn document_with_selsf_body(body: &str, source: &[u8], length: u32) -> Vec<u8> {
             b"untouched auxiliary stream".to_vec(),
         )
         .expect("opaque stream");
-    package.finish().expect("package finish")
+    object_bytes(&package)
 }
 
 #[test]
@@ -322,7 +341,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         .expect("published Selsf read")
         .expect("published Selsf");
     assert_eq!(published_selection.cp_anchor(), 1);
-    let published_package = PackageEditor::open(
+    let published_package = open_object(
         commit.package().finish(),
         Targets::default(),
         Limits::default(),

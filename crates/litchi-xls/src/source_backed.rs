@@ -167,6 +167,7 @@ pub(crate) fn workbook_error(error: crate::SourceBackedError) -> crate::Error {
     match error {
         crate::SourceBackedError::Parse(error) => error,
         crate::SourceBackedError::Cfb(error) => crate::Error::Cfb(error),
+        crate::SourceBackedError::Object(error) => crate::Error::Object(error),
         crate::SourceBackedError::Io(error) => crate::Error::Io(error),
         _ => crate::Error::Internal("the committed source-backed workbook could not be reopened"),
     }

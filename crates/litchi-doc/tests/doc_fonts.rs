@@ -11,9 +11,31 @@ use litchi_core::Position;
 use litchi_doc::raw::Reader;
 use litchi_doc::writer::{Builder, CharacterFormatting, ParagraphFormatting};
 use litchi_doc::{Document, Error, FontFamily};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use std::io::Cursor;
 use std::path::PathBuf;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<ObjectEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &ObjectEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn fixture_directory() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/doc")
@@ -164,7 +186,7 @@ fn fc_lcb_offset(word_document: &[u8], index: usize) -> usize {
 #[test]
 fn a_malformed_font_table_is_a_typed_error_that_spares_the_rest() {
     let bytes = std::fs::read(poi_fixture("test.doc")).unwrap();
-    let mut editor = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut editor = open_object(bytes, Targets::default(), Limits::default()).unwrap();
     let word_path = ["WordDocument".to_string()];
     let mut word_document = editor.stream(&word_path).unwrap().to_vec();
     // Shorten lcbSttbfFfn (entry 15) by one byte: the last font record is
@@ -173,7 +195,7 @@ fn a_malformed_font_table_is_a_typed_error_that_spares_the_rest() {
     let lcb = u32::from_le_bytes(word_document[lcb_at..lcb_at + 4].try_into().unwrap());
     word_document[lcb_at..lcb_at + 4].copy_from_slice(&(lcb - 1).to_le_bytes());
     editor.put_stream(&word_path, word_document).unwrap();
-    let document = open_bytes(editor.finish().unwrap());
+    let document = open_bytes(object_bytes(&editor));
 
     let original = open_poi("test.doc");
     assert_eq!(document.text().unwrap(), original.text().unwrap());

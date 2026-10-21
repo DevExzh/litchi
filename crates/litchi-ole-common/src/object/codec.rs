@@ -133,9 +133,7 @@ impl Package {
             .iter()
             .find(|storage| storage.path() == target.path())
             .cloned()
-            .ok_or_else(|| {
-                OleError::InvalidFormat(format!("object storage {:?} not found", target.path()))
-            })?;
+            .ok_or_else(Error::target_not_found)?;
         let object_package = Self {
             sector_size: self.sector_size,
             root_clsid: storage.class_id(),
@@ -245,10 +243,7 @@ impl Package {
         limits: Limits,
     ) -> Result<(), Error> {
         if path.is_empty() || path.iter().any(String::is_empty) {
-            return Err(OleError::InvalidFormat(
-                "new package stream path must contain names".into(),
-            )
-            .into());
+            return Err(Error::invalid_selector());
         }
         if data.len() as u64 > limits.max_stream_size {
             return Err(Error::Limit {
@@ -258,9 +253,7 @@ impl Package {
             });
         }
         if self.streams.iter().any(|stream| stream.path() == path) {
-            return Err(
-                OleError::InvalidFormat(format!("package stream {path:?} already exists")).into(),
-            );
+            return Err(Error::invalid_selector());
         }
         if path.len() > 1
             && !self
@@ -268,10 +261,7 @@ impl Package {
                 .iter()
                 .any(|storage| storage.path() == &path[..path.len() - 1])
         {
-            return Err(OleError::InvalidFormat(
-                "new package stream parent storage is missing".into(),
-            )
-            .into());
+            return Err(Error::invalid_selector());
         }
         self.streams.push(Stream::new(path, data, None));
         self.check(limits)
@@ -310,11 +300,7 @@ impl Package {
             .iter()
             .any(|storage| same_path(storage.path(), path.as_slice()))
         {
-            return Err(OleError::InvalidFormat(format!(
-                "package entry {:?} is a storage, not a stream",
-                path.as_slice()
-            ))
-            .into());
+            return Err(Error::invalid_selector());
         }
         Ok(None)
     }
@@ -384,11 +370,7 @@ impl Package {
                     None => false,
                 };
                 if is_storage {
-                    return Err(OleError::InvalidFormat(format!(
-                        "package entry {:?} is a storage, not a stream",
-                        path.as_slice()
-                    ))
-                    .into());
+                    return Err(Error::invalid_selector());
                 }
                 removed.push(None);
             }
@@ -428,7 +410,7 @@ impl Package {
             .storages
             .iter()
             .position(|storage| storage.path() == path)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
+            .ok_or_else(Error::target_not_found)?;
         let removed_storages = self
             .storages
             .iter()
@@ -540,11 +522,7 @@ impl Package {
             .iter()
             .any(|storage| storage.path() == target.path())
         {
-            return Err(OleError::InvalidFormat(format!(
-                "object storage {:?} already exists",
-                target.path()
-            ))
-            .into());
+            return Err(Error::invalid_selector());
         }
         if target.path().len() > 1
             && !self
@@ -552,9 +530,7 @@ impl Package {
                 .iter()
                 .any(|storage| storage.path() == &target.path()[..target.path().len() - 1])
         {
-            return Err(
-                OleError::InvalidFormat("new object storage parent is missing".into()).into(),
-            );
+            return Err(Error::invalid_selector());
         }
         let storage_count = self
             .storages
@@ -624,9 +600,7 @@ impl Package {
     pub(crate) fn remove_object(&mut self, path: &[String], limits: Limits) -> Result<(), Error> {
         let found = self.storages.iter().any(|storage| storage.path() == path);
         if !found {
-            return Err(
-                OleError::InvalidFormat(format!("object storage {path:?} not found")).into(),
-            );
+            return Err(Error::target_not_found());
         }
         self.storages
             .retain(|storage| !storage.path().starts_with(path));
@@ -1359,9 +1333,7 @@ fn find_storage<R: Read + Seek>(
     path: &[String],
     max_entries: usize,
 ) -> Result<Storage, Error> {
-    let (name, parent) = path
-        .split_last()
-        .ok_or_else(|| OleError::InvalidFormat("object target path is empty".into()))?;
+    let (name, parent) = path.split_last().ok_or_else(Error::invalid_selector)?;
     let refs = path_refs(parent);
     let mut metadata = None;
     ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
@@ -1374,13 +1346,9 @@ fn find_storage<R: Read + Seek>(
         }
         Ok::<(), Error>(())
     })?;
-    let metadata = metadata
-        .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
+    let metadata = metadata.ok_or_else(Error::target_not_found)?;
     if metadata.kind() != EntryKind::Storage {
-        return Err(OleError::InvalidFormat(format!(
-            "object target path {path:?} is not a storage"
-        ))
-        .into());
+        return Err(Error::invalid_selector());
     }
     Ok(Storage::new(path.to_vec(), metadata))
 }

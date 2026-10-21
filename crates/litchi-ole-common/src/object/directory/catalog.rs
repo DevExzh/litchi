@@ -107,8 +107,8 @@ impl Catalog {
     /// Returns an error when an entry violates CFB invariants or resource
     /// limits, or when copying the supplied entries cannot be allocated.
     pub fn parse(entries: &[DirectoryEntry], limits: Limits) -> Result<Self, crate::Error> {
-        let projections = validation::validate_catalog(entries, limits)
-            .map_err(crate::Error::from)?;
+        let projections =
+            validation::validate_catalog(entries, limits).map_err(crate::Error::from)?;
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(entries.len())
@@ -132,8 +132,8 @@ impl Catalog {
         entries: Vec<DirectoryEntry>,
         limits: Limits,
     ) -> Result<Self, crate::Error> {
-        let projections = validation::validate_catalog(&entries, limits)
-            .map_err(crate::Error::from)?;
+        let projections =
+            validation::validate_catalog(&entries, limits).map_err(crate::Error::from)?;
         let raw: Arc<[DirectoryEntry]> = entries.into();
         Ok(Self::from_parts(raw, projections, limits))
     }
@@ -155,8 +155,7 @@ impl Catalog {
         raw: Arc<[DirectoryEntry]>,
         limits: Limits,
     ) -> Result<Self, crate::Error> {
-        let projections = validation::validate_catalog(&raw, limits)
-            .map_err(crate::Error::from)?;
+        let projections = validation::validate_catalog(&raw, limits).map_err(crate::Error::from)?;
         Ok(Self::from_parts(raw, projections, limits))
     }
 

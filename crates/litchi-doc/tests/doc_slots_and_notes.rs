@@ -12,9 +12,31 @@ use litchi_core::Position;
 use litchi_doc::raw::Reader;
 use litchi_doc::writer::{Builder, CommentEntry};
 use litchi_doc::{Document, Error, HeaderFooterType, Paragraph};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use std::io::Cursor;
 use std::path::PathBuf;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<ObjectEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &ObjectEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn fixture_directory() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/doc")
@@ -324,7 +346,7 @@ fn one_bad_comment_leaves_the_others_readable() {
 
     // Replace the second comment's story mark (U+0005 before its text) with
     // a letter, in the UTF-16LE text of the WordDocument stream.
-    let mut editor = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut editor = open_object(bytes, Targets::default(), Limits::default()).unwrap();
     let word_path = ["WordDocument".to_string()];
     let mut word_document = editor.stream(&word_path).unwrap().to_vec();
     let marked = "\u{5}Second note"
@@ -337,7 +359,7 @@ fn one_bad_comment_leaves_the_others_readable() {
         .expect("the second comment's story");
     word_document[at..at + 2].copy_from_slice(&u16::from(b'X').to_le_bytes());
     editor.put_stream(&word_path, word_document).unwrap();
-    let damaged = open_bytes(editor.finish().unwrap());
+    let damaged = open_bytes(object_bytes(&editor));
 
     assert!(damaged.comments().is_err());
     assert_eq!(damaged.comment_count(), 3);

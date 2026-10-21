@@ -15,7 +15,9 @@ use crate::protection::{
 };
 use litchi_cfb::OleFile;
 use litchi_core::edit::RefusalKind;
-use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Target, Targets,
+};
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{Binding, PropertySetReader};
 use std::collections::{HashMap, HashSet};
@@ -122,7 +124,11 @@ impl Editor {
         let (workbook_path, workbook) = read_workbook(&bytes, limits)?;
         let (sheets, form_controls, opaque_identity) = parse_workbook(&workbook)?;
         let targets = targets_for_sheets(&sheets)?;
-        let package = ObjectEditor::open(bytes, targets, limits)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )?
+        .edit()?;
         let preserved_control_counts = form_controls.iter().map(Vec::len).collect();
         Ok(Self {
             package,
@@ -497,7 +503,7 @@ impl Editor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub(crate) fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(Into::into)
+        crate::scoped::object_editor_bytes(&self.package)
     }
 
     fn commit(&mut self) -> Result<()> {
@@ -652,8 +658,8 @@ fn reject_document_summary_signature<R: std::io::Read + std::io::Seek>(
                 ));
             }
         },
-        Err(litchi_cfb::OleError::StreamNotFound) => {},
-        Err(error) => return Err(Error::Cfb(error)),
+        Err(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::StreamNotFound)) => {},
+        Err(error) => return Err(error.into()),
     }
     Ok(())
 }

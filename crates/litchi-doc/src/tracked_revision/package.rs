@@ -33,7 +33,9 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
-use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Targets,
+};
 use litchi_ole_common::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
     document_summary::DIGITAL_SIGNATURE,
@@ -1017,13 +1019,14 @@ impl RevisionEditor {
     where
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
     {
-        let (package, mut ole) = ObjectEditor::open_with_ole_file_with_admission(
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_with_admission(
             bytes,
-            Targets::default(),
-            limits,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
             admission,
         )?;
-        let editor = Self::open_from_package(package, &mut ole, policy)?;
+        let editor = Self::open_from_package(package.edit()?, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
@@ -1037,14 +1040,16 @@ impl RevisionEditor {
     where
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
     {
-        let (package, mut ole) = ObjectEditor::open_with_ole_file_profiled_with_admission(
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_profiled_with_admission(
             bytes,
-            Targets::default(),
-            limits,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
             observer,
             admission,
         )?;
-        let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
+        let editor =
+            Self::open_from_package(package.edit()?, &mut ole, ProtectionPolicy::default())?;
         Ok((editor, ole))
     }
 
@@ -3074,7 +3079,7 @@ impl RevisionEditor {
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Apply this editor's protection policy to a rendered candidate while
@@ -3866,8 +3871,15 @@ mod picture_group_tests {
         ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
     };
 
+    fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+        ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+            .unwrap()
+            .edit()
+            .unwrap()
+    }
+
     fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-        let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+        let mut package = open_object(bytes, Targets::default(), Limits::default());
         let word_path = ["WordDocument".to_string()];
         let word = package.stream(&word_path).unwrap();
         let fib = FileInformationBlock::parse(word).unwrap();
@@ -3907,7 +3919,7 @@ mod picture_group_tests {
         word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
         package.put_stream(&word_path, word).unwrap();
         package.put_stream(&table_path, table).unwrap();
-        package.finish().unwrap()
+        crate::package::object_edit_bytes(&package).unwrap()
     }
 
     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {

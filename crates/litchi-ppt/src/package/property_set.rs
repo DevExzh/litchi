@@ -427,7 +427,7 @@ fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
     let mut ole = OleFile::open(Cursor::new(bytes))?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
-        Err(OleError::StreamNotFound) => Ok(None),
+        Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
         Err(error) => Err(error.into()),
     }
 }

@@ -13,8 +13,9 @@ describes a caller-selected policy; no raw helper creates one implicitly and
 there are no `_with_limits` twins or aliases.
 
 The directory catalog and transaction now use the common OLE error. Catalog
-validation reports typed directory and storage limits, and directory patches
-report `PatchConflict` through the common error. OLEDS presentation, native,
+validation reports exact `LimitKind` dimensions for directory entries, name
+bytes, total catalog bytes, and recursive directory depth, and directory
+patches report `PatchConflict` through the common error. OLEDS presentation, native,
 TOC, clipboard-format, target-device, and serialization routes use
 `ole_streams::Limits` and return the common typed error. Oversized complete
 streams report `LimitKind::StreamBytes`, including the snapshot constructors;
@@ -48,3 +49,11 @@ does common all-target clippy with `-D warnings`; DOC/PPT test-profile checks
 also pass. No native performance measurement belongs to this raw-helper slice.
 The shared object owner/options/source-sharing migration, legacy consumer
 integration, and the full workspace gate remain required.
+
+The common conversion boundary matches only the fixed labels owned by these
+raw helpers. Physical CFB labels such as input, directory-image, and
+allocation-table bytes remain structured `Error::Cfb` failures rather than
+being guessed as stream bytes. The reverse `From<Error> for OleError` adapter
+was removed; the directory codec keeps its one internal SID bridge explicit,
+so owner refusals and patch conflicts cannot lose their category in a
+low-level format string.

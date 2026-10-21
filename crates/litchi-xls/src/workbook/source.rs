@@ -308,6 +308,9 @@ pub enum SourceBackedError {
     Io(io::Error),
     /// A CFB validation or range-read error.
     Cfb(OleError),
+    /// A shared property-set or object operation failed with typed
+    /// refusal/conflict information.
+    Object(litchi_ole_common::Error),
     /// An existing XLS semantic codec rejected the source.
     Parse(Error),
     /// The source changed between two consistency fences.
@@ -352,6 +355,7 @@ impl fmt::Display for SourceBackedError {
         match self {
             Self::Io(error) => write!(formatter, "source I/O error: {error}"),
             Self::Cfb(error) => write!(formatter, "source CFB error: {error}"),
+            Self::Object(error) => write!(formatter, "source XLS object error: {error}"),
             Self::Parse(error) => write!(formatter, "source XLS parse error: {error}"),
             Self::SourceChanged { expected, observed } => write!(
                 formatter,
@@ -398,6 +402,7 @@ impl std::error::Error for SourceBackedError {
         match self {
             Self::Io(error) => Some(error),
             Self::Cfb(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Parse(error) => Some(error),
             Self::Execution(error) => Some(error),
             Self::SourceChanged { .. }
@@ -435,6 +440,12 @@ impl From<OleError> for SourceBackedError {
             },
             other => Self::Cfb(other),
         }
+    }
+}
+
+impl From<litchi_ole_common::Error> for SourceBackedError {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
     }
 }
 

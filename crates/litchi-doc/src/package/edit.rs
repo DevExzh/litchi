@@ -881,7 +881,9 @@ mod tests {
     use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
     use crate::tracked_revision::Limits as RevisionLimits;
     use litchi_core::Position;
-    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+    use litchi_ole_common::object::{
+        OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
+    };
     use std::io::Cursor;
 
     fn package() -> crate::Package {
@@ -906,8 +908,15 @@ mod tests {
             .write_to(&mut output)
             .expect("fixture DOC");
         let bytes = output.into_inner();
-        let mut package = PackageEditor::open(bytes, Targets::default(), RevisionLimits::default())
-            .expect("fixture package should open");
+        let mut package = ObjectPackage::open_with_options(
+            bytes,
+            ObjectOpenOptions::new()
+                .targets(Targets::default())
+                .limits(RevisionLimits::default()),
+        )
+        .expect("fixture package should open")
+        .edit()
+        .expect("fixture package should be editable");
         let word_path = ["WordDocument".to_owned()];
         let word = package.stream(&word_path).expect("WordDocument");
         let fib = FileInformationBlock::parse(word).expect("fixture FIB");
@@ -965,7 +974,7 @@ mod tests {
         package
             .put_stream(&table_path, table)
             .expect("protected table stream");
-        package.finish().expect("protected fixture publication")
+        crate::package::object_edit_bytes(&package).expect("protected fixture publication")
     }
 
     #[test]

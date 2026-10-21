@@ -101,7 +101,8 @@ impl Sid {
         } else {
             Err(OleError::InvalidFormat(format!(
                 "CFB directory SID {raw:#010X} is outside the regular SID range"
-            )).into())
+            ))
+            .into())
         }
     }
 

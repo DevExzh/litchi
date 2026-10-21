@@ -353,7 +353,7 @@ impl<R: Read + Seek> Reader<R> {
             .property_set_stream(&["\u{0005}SummaryInformation"])
         {
             Ok(value) => Ok(Some(value)),
-            Err(OleError::StreamNotFound) => Ok(None),
+            Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }
@@ -406,7 +406,7 @@ impl<R: Read + Seek> Reader<R> {
             .property_set_stream(&["\u{0005}DocumentSummaryInformation"])
         {
             Ok(value) => Ok(Some(value)),
-            Err(OleError::StreamNotFound) => Ok(None),
+            Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }

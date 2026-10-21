@@ -1079,7 +1079,7 @@ impl ToleranceReport {
             &[&str],
         ) -> std::result::Result<
             litchi_ole_common::property_set::Stream,
-            litchi_cfb::OleError,
+            litchi_ole_common::Error,
         >,
     ) {
         for name in PROPERTY_SET_STREAMS {

@@ -16,7 +16,9 @@ use super::{AutoTable, LabelTable};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 /// An immutable DOC package snapshot carrying its caption metadata.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,9 +130,15 @@ impl Editor {
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
-        let package =
-            ObjectEditor::open(bytes, Targets::new([]).map_err(PackageError::from)?, limits)
-                .map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::new([]).map_err(PackageError::from)?)
+                .limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word = package
             .stream(&["WordDocument".to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound("WordDocument".into()))?;
@@ -246,7 +254,7 @@ impl Editor {
 
     /// Captures the current package as an immutable snapshot.
     pub(crate) fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         Ok(Snapshot::new(bytes, self.captions.clone()))
     }
 
@@ -255,7 +263,7 @@ impl Editor {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Commits the package as an immutable snapshot with reversible patches.

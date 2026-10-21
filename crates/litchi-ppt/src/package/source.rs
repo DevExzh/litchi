@@ -205,7 +205,7 @@ impl SourceBackedPackage {
     /// The projection uses the same property-set grammar as the ordinary
     /// cursor-backed package. Stream reads retain the shared source's version
     /// checks and do not require materializing an eager `OleFile`.
-    pub fn metadata(&self) -> std::result::Result<Metadata, OleError> {
+    pub fn metadata(&self) -> std::result::Result<Metadata, litchi_ole_common::Error> {
         <SharedOleFile as SharedPropertySetReader>::get_metadata(self.shared.as_ref())
     }
 

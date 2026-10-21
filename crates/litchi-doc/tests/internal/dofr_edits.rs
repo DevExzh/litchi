@@ -15,14 +15,36 @@ use litchi_doc::Package;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
 use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::tracked_revision::{Limits, RevisionKind, RevisionMetadata};
+use litchi_doc::tracked_revision::{RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
     document_summary::DIGITAL_SIGNATURE,
 };
 use std::io::Cursor;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<PackageEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &PackageEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn base_doc() -> Vec<u8> {
     base_doc_with_text("alpha")
@@ -171,8 +193,7 @@ fn doc_with_dofr_and_stw_user(
     signature_stream_name: Option<&str>,
     stw_user_data: Option<Vec<u8>>,
 ) -> Vec<u8> {
-    let mut package =
-        PackageEditor::open(base, Targets::default(), Limits::default()).expect("package");
+    let mut package = open_object(base, Targets::default(), Limits::default()).expect("package");
     let word_path = ["WordDocument".to_string()];
     let mut word = package.stream(&word_path).expect("WordDocument").to_vec();
     let fib = FileInformationBlock::parse(&word).expect("FIB");
@@ -228,7 +249,7 @@ fn doc_with_dofr_and_stw_user(
             .add_stream(vec![signature_name.to_string()], stream)
             .expect("signature stream insertion");
     }
-    package.finish().expect("DOC package finish")
+    object_bytes(&package)
 }
 
 fn changed_frame_patch(

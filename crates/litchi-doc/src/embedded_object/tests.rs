@@ -9,11 +9,20 @@ use super::transaction::TransactionError;
 use crate::builder::Builder;
 use litchi_cfb::OleWriter;
 use litchi_ole_common::object::link::Limits as LinkLimits;
-use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Target, Targets,
+};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as OleStreamLimits, OleNativeStream, OlePresentationStream,
 };
 use std::io::Cursor;
+
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+    ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .unwrap()
+        .edit()
+        .unwrap()
+}
 
 #[test]
 fn object_pool_target_names_follow_decimal_storage_form() {
@@ -152,7 +161,7 @@ fn base_doc() -> Vec<u8> {
 }
 
 fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(bytes, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let word = package.stream(&word_path).unwrap();
     let fib = crate::parts::fib::FileInformationBlock::parse(word).unwrap();
@@ -192,12 +201,12 @@ fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 fn protected_doc(source: Vec<u8>) -> Vec<u8> {
     const DOP_INDEX: usize = 31;
-    let mut package = ObjectEditor::open(source, Targets::default(), Limits::default()).unwrap();
+    let mut package = open_object(source, Targets::default(), Limits::default());
     let word_path = ["WordDocument".to_string()];
     let table_name = {
         let word = package.stream(&word_path).unwrap();
@@ -223,7 +232,7 @@ fn protected_doc(source: Vec<u8>) -> Vec<u8> {
     word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
     package.put_stream(&word_path, word).unwrap();
     package.put_stream(&table_path, table).unwrap();
-    package.finish().unwrap()
+    crate::package::object_edit_bytes(&package).unwrap()
 }
 
 fn picture_data(marker: u32) -> Vec<u8> {
@@ -906,19 +915,22 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
     );
 
     let target = Target::new("_77", [OBJECT_POOL, "_77"]).unwrap();
-    let mut object_editor = ObjectEditor::open(
+    let mut object_editor = open_object(
         source.bytes().to_vec(),
         Targets::one(target),
         Limits::default(),
-    )
-    .unwrap();
+    );
     object_editor
         .add_storage(
             Target::new("_00077", [OBJECT_POOL, "_00077"]).unwrap(),
             ole2_test_object(0x30),
         )
         .unwrap();
-    let ambiguous = Snapshot::open(object_editor.finish().unwrap(), Limits::default()).unwrap();
+    let ambiguous = Snapshot::open(
+        crate::package::object_edit_bytes(&object_editor).unwrap(),
+        Limits::default(),
+    )
+    .unwrap();
     let ole_file = litchi_cfb::OleFile::open(Cursor::new(ambiguous.bytes())).unwrap();
     assert!(
         ole_file
@@ -1113,10 +1125,9 @@ fn snapshot_rejects_a_field_whose_objectpool_owner_was_removed() {
     let bytes = editor.finish().unwrap();
 
     let target = Target::new("_123", [OBJECT_POOL, "_123"]).unwrap();
-    let mut object_editor =
-        ObjectEditor::open(bytes, Targets::one(target), Limits::default()).unwrap();
+    let mut object_editor = open_object(bytes, Targets::one(target), Limits::default());
     object_editor.remove_storage("_123").unwrap();
-    let orphaned = object_editor.finish().unwrap();
+    let orphaned = crate::package::object_edit_bytes(&object_editor).unwrap();
 
     assert!(Snapshot::open(orphaned, Limits::default()).is_err());
 }

@@ -113,6 +113,24 @@ impl Limits {
             self.max_streams_per_object
         }
     }
+
+    /// Intersects this requested policy with a retained ingress policy.
+    ///
+    /// An edit may tighten a package's bounds, but it can never widen the
+    /// limits under which the package was admitted.
+    pub(crate) fn constrained_by(self, retained: Self) -> Self {
+        Self {
+            max_objects: self.max_objects.min(retained.max_objects),
+            max_storage_depth: self.max_storage_depth.min(retained.max_storage_depth),
+            max_streams_per_object: self
+                .max_streams_per_object
+                .min(retained.max_streams_per_object),
+            max_streams: self.max_streams.min(retained.max_streams),
+            max_stream_size: self.max_stream_size.min(retained.max_stream_size),
+            max_object_size: self.max_object_size.min(retained.max_object_size),
+            max_total_size: self.max_total_size.min(retained.max_total_size),
+        }
+    }
 }
 
 /// One captured CFB storage below a selected object.

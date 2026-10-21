@@ -8,6 +8,7 @@ use super::super::model::{
 use super::package::try_path_refs;
 use super::semantic::validate_section;
 use super::support::allocation;
+use crate::Error;
 use crate::protection::{Limits as ProtectionLimits, reject_protected_container};
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use std::collections::HashMap;
@@ -28,7 +29,7 @@ impl Edit {
     /// Returns an error if `bytes` are not a readable unprotected compound
     /// file, a contained stream cannot be read, or editor storage cannot be
     /// allocated.
-    pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
+    pub fn new(bytes: Vec<u8>) -> Result<Self, Error> {
         let streams = {
             let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
             let max_entries = ole.directory_entry_count();
@@ -59,14 +60,14 @@ impl Edit {
     ///
     /// Returns an error if the backing stream cannot be parsed or the selected
     /// section cannot be cloned.
-    pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, OleError> {
+    pub fn property_set(&self, kind: Binding) -> Result<Option<Section>, Error> {
         let Some(stream) = self.load_stream(kind)? else {
             return Ok(None);
         };
-        stream
+        Ok(stream
             .section(kind.format_identifier())
             .map(try_clone_property_set)
-            .transpose()
+            .transpose()?)
     }
 
     /// Applies an isolated typed edit to one bound property-set section.
@@ -75,9 +76,9 @@ impl Edit {
     ///
     /// Returns an error if loading, cloning, or validating the stream fails,
     /// `edit` returns an error, or the updated stream cannot be serialized.
-    pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), OleError>
+    pub fn update<F>(&mut self, kind: Binding, edit: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut Section) -> Result<(), OleError>,
+        F: FnOnce(&mut Section) -> Result<(), Error>,
     {
         let mut stream = self.load_stream_for_rewrite(kind)?.unwrap_or_else(|| {
             if kind == Binding::UserDefinedProperties {
@@ -116,15 +117,9 @@ impl Edit {
     ///
     /// Returns an error if the section FMTID does not match `kind` or the
     /// replacement cannot be loaded, validated, or serialized.
-    pub fn replace(
-        &mut self,
-        kind: Binding,
-        section: Section,
-    ) -> Result<Option<Section>, OleError> {
+    pub fn replace(&mut self, kind: Binding, section: Section) -> Result<Option<Section>, Error> {
         if section.format_identifier != kind.format_identifier() {
-            return Err(invalid(
-                "Replacement section format ID does not match target",
-            ));
+            return Err(invalid("Replacement section format ID does not match target").into());
         }
         let previous = self.property_set(kind)?;
         self.update(kind, |target| {
@@ -140,7 +135,7 @@ impl Edit {
     ///
     /// Returns an error if the existing stream cannot be read or the retained
     /// document-summary stream cannot be serialized.
-    pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, OleError> {
+    pub fn remove(&mut self, kind: Binding) -> Result<Option<Section>, Error> {
         let Some(previous) = self.property_set(kind)? else {
             return Ok(None);
         };
@@ -162,7 +157,7 @@ impl Edit {
     ///
     /// Returns an error if composing a stream path, allocating output, or
     /// writing the replacement compound file fails.
-    pub fn finish(self) -> Result<Vec<u8>, OleError> {
+    pub fn finish(self) -> Result<Vec<u8>, Error> {
         if self.staged.is_empty() {
             return Ok(self.original);
         }

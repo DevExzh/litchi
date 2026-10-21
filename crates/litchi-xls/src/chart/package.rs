@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use litchi_biff::{Limits as BiffLimits, Records};
 use litchi_ograph::chart::{Kind as GraphChartKind, Ref as GraphChartRef, Refs as GraphCharts};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits as ObjectLimits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 use super::chart_area;
 #[cfg(test)]
@@ -91,7 +93,13 @@ impl Edit {
 
     fn open_based(base: crate::scoped::Base, bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open(bytes, Targets::default(), ObjectLimits::default())?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(ObjectLimits::default()),
+        )?
+        .edit()?;
         let workbook_path = [vec!["Workbook".into()], vec!["Book".into()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -665,7 +673,7 @@ impl Edit {
 
     /// The rewritten compound-file allocation (the codec-level output).
     pub(crate) fn finish(self) -> Result<Vec<u8>> {
-        self.package.finish().map_err(Into::into)
+        crate::scoped::object_editor_bytes(&self.package)
     }
 
     /// Validate the staged chart edits and publish them as a new package.

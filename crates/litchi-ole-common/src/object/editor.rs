@@ -1,12 +1,12 @@
 //! Transactional CFB stream and selected-storage editing.
 
 use super::cfb_path::CfbPath;
-use super::codec::{self, Package};
+use super::codec::{self, Package as CapturedPackage};
 use super::discovery;
 use super::link::{self, Link};
 use super::model::{self, Limits, Objects};
 use super::patch::{Commit, Diagnostics, Patch};
-use super::snapshot::Snapshot;
+use super::snapshot::Package;
 use super::target::{Target, Targets};
 use crate::ole_streams::{self, native, presentation};
 use crate::{Error, LimitKind};
@@ -28,7 +28,7 @@ pub struct PreparedReplacement {
     key: String,
     path: Vec<String>,
     before: Arc<[u8]>,
-    replacement: Package,
+    replacement: CapturedPackage,
     source: Arc<Vec<u8>>,
     limits: Limits,
 }
@@ -81,38 +81,19 @@ fn observe_cfb_parse<T>(
 /// from are never changed.
 #[derive(Debug, Clone)]
 pub struct Edit {
-    targets: Targets,
+    targets: Arc<Targets>,
     limits: Limits,
     cfb_limits: OleFileLimits,
     original: Arc<Vec<u8>>,
-    base_package: Package,
-    package: Package,
-    objects: Objects,
+    base_package: Arc<CapturedPackage>,
+    package: Arc<CapturedPackage>,
+    objects: Arc<Objects>,
     changed: bool,
     layout: SectorLayoutPolicy,
     validated_layout: SectorLayoutPolicy,
 }
 
 impl Edit {
-    /// Opens a CFB package with an explicit host-resolved target catalog.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the CFB is malformed or protected, a target is
-    /// missing/invalid, or a configured resource limit is exceeded.
-    pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, Error> {
-        Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open(Cursor::new(bytes))?;
-        let admitted = Self::admit_open(&mut ole, targets, limits)?;
-        let original = Arc::new(ole.into_inner().into_inner());
-        Ok(Self::from_admitted(
-            original,
-            limits,
-            OleFileLimits::default(),
-            admitted,
-        ))
-    }
-
     /// Opens a package with an explicit low-level CFB admission profile.
     ///
     /// Security-sensitive format owners should use this entry point when the
@@ -120,7 +101,7 @@ impl Edit {
     /// CFB profile is applied before directory, FAT, or selected-object
     /// allocations, then the object capture profile is applied to the admitted
     /// package.
-    pub fn open_with_cfb_limits(
+    pub(crate) fn open_with_cfb_limits(
         bytes: Vec<u8>,
         targets: Targets,
         limits: Limits,
@@ -133,71 +114,12 @@ impl Edit {
         Ok(Self::from_admitted(original, limits, cfb_limits, admitted))
     }
 
-    /// Opens a package and returns the validated physical OLE context used by
-    /// the object owner.
-    ///
-    /// The returned `OleFile` is parsed from the same source content as the
-    /// returned editor. Keeping source opening inside this bounded API
-    /// prevents callers from pairing an editor with an unrelated parsed CFB.
-    /// The editor retains one source copy because both values are returned;
-    /// that copy is made only after common CFB admission succeeds.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same protection, target, capture, discovery, and resource
-    /// limit errors as [`Self::open`].
-    pub fn open_with_ole_file(
+    /// Internal bounded implementation for [`super::Package`] admission.
+    pub(crate) fn open_with_ole_file_with_admission_and_cfb_limits<E, F>(
         bytes: Vec<u8>,
         targets: Targets,
         limits: Limits,
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), Error> {
-        Self::open_with_ole_file_with_admission(bytes, targets, limits, |_| Ok(()))
-    }
-
-    /// Opens a package with one caller-owned admission callback between the
-    /// top-level CFB parse and any selected-stream capture.
-    ///
-    /// The callback receives immutable parsed directory and allocation-table
-    /// metadata. It runs before common package admission can read payloads,
-    /// so a format owner can reject declared content with its own typed error
-    /// without parsing the CFB a second time. Existing callers that do not
-    /// need this format-specific gate should use [`Self::open_with_ole_file`].
-    ///
-    /// ```
-    /// use std::io::Cursor;
-    /// use litchi_cfb::{OleError, OleWriter};
-    /// use litchi_ole_common::{Error, object::{Edit, Limits, Targets}};
-    ///
-    /// let mut writer = OleWriter::new();
-    /// writer.create_stream(&["payload"], b"example")?;
-    /// let mut bytes = Cursor::new(Vec::new());
-    /// writer.write_to(&mut bytes)?;
-    /// let result = Edit::open_with_ole_file_with_admission::<Error, _>(
-    ///     bytes.into_inner(), Targets::default(), Limits::default(),
-    ///     |ole| {
-    ///         if ole.stream_len(&["payload"])? > 4 {
-    ///             return Err(OleError::InvalidFormat("caller payload limit".into()).into());
-    ///         }
-    ///         Ok(())
-    ///     },
-    /// );
-    /// assert!(matches!(result, Err(Error::Cfb(OleError::InvalidFormat(_)))));
-    /// # Ok::<(), Error>(())
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns a caller error for a rejected admission or a converted
-    /// low-level CFB error for parsing and common object admission failures.
-    ///
-    /// # Panics
-    ///
-    /// A panic from the caller-owned admission callback propagates to the
-    /// caller.
-    pub fn open_with_ole_file_with_admission<E, F>(
-        bytes: Vec<u8>,
-        targets: Targets,
-        limits: Limits,
+        cfb_limits: OleFileLimits,
         admission: F,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
     where
@@ -205,82 +127,22 @@ impl Edit {
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
     {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open(Cursor::new(bytes))
+        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)
             .map_err(Error::from)
             .map_err(E::from)?;
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
-        let editor = Self::from_admitted(original, limits, OleFileLimits::default(), admitted);
+        let editor = Self::from_admitted(original, limits, cfb_limits, admitted);
         Ok((editor, ole))
     }
 
-    /// Opens a package and reports the operation-local top-level in-memory CFB
-    /// parse.
-    ///
-    /// This is the feature-gated equivalent of [`Self::open_with_ole_file`].
-    /// When strict-owner input validation permits parsing, the observer
-    /// receives exactly one balanced pair around the top-level
-    /// `OleFile::open`. Semantic target/package failures occur after a
-    /// successful parse and are not folded into the parse result.
-    ///
-    /// # Panics
-    ///
-    /// Observer panics propagate. Event balancing is guaranteed only when the
-    /// observer returns normally from every callback.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::open_with_ole_file`].
     #[cfg(feature = "performance-diagnostics")]
-    pub fn open_with_ole_file_profiled(
+    pub(crate) fn open_with_ole_file_profiled_with_admission_and_cfb_limits<E, F>(
         bytes: Vec<u8>,
         targets: Targets,
         limits: Limits,
-        observer: impl FnMut(CfbParseEvent),
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), Error> {
-        Self::open_with_ole_file_profiled_with_admission(bytes, targets, limits, observer, |_| {
-            Ok(())
-        })
-    }
-
-    /// Feature-gated profiled equivalent of
-    /// [`Self::open_with_ole_file_with_admission`].
-    ///
-    /// The parse observer still surrounds exactly one top-level CFB parse;
-    /// the caller-owned admission callback runs after its `Finished` event and
-    /// before common stream capture.
-    ///
-    /// ```no_run
-    /// # #[cfg(feature = "performance-diagnostics")]
-    /// # {
-    /// use litchi_ole_common::{Error, object::{Edit, Limits, Targets}};
-    ///
-    /// let _result = Edit::open_with_ole_file_profiled_with_admission::<Error, _>(
-    ///     Vec::new(),
-    ///     Targets::default(),
-    ///     Limits::default(),
-    ///     |_| {},
-    ///     |_| Ok::<(), Error>(()),
-    /// );
-    /// # }
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns a caller error for a rejected admission or a converted
-    /// low-level CFB error for parsing and common object admission failures.
-    ///
-    /// # Panics
-    ///
-    /// A panic from the parse observer or caller-owned admission callback
-    /// propagates to the caller. Event balancing is guaranteed only when both
-    /// callbacks return normally.
-    #[cfg(feature = "performance-diagnostics")]
-    pub fn open_with_ole_file_profiled_with_admission<E, F>(
-        bytes: Vec<u8>,
-        targets: Targets,
-        limits: Limits,
+        cfb_limits: OleFileLimits,
         mut observer: impl FnMut(CfbParseEvent),
         admission: F,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
@@ -290,13 +152,13 @@ impl Edit {
     {
         Self::validate_open_inputs(&targets, limits)?;
         let mut ole = observe_cfb_parse(&mut observer, || {
-            OleFile::open(Cursor::new(bytes)).map_err(Error::from)
+            OleFile::open_with_limits(Cursor::new(bytes), cfb_limits).map_err(Error::from)
         })
         .map_err(E::from)?;
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
-        let editor = Self::from_admitted(original, limits, OleFileLimits::default(), admitted);
+        let editor = Self::from_admitted(original, limits, cfb_limits, admitted);
         Ok((editor, ole))
     }
 
@@ -316,7 +178,7 @@ impl Edit {
         ole: &mut OleFile<R>,
         targets: Targets,
         limits: Limits,
-    ) -> Result<(Targets, Package, Objects), Error> {
+    ) -> Result<(Targets, CapturedPackage, Objects), Error> {
         codec::open(ole, limits.max_package_directory_entries())?;
         if let Some(target) = targets
             .iter()
@@ -335,7 +197,7 @@ impl Edit {
             .map(|target| target.resolve(ole, limits.max_package_directory_entries()))
             .collect::<Result<Vec<_>, _>>()?;
         let resolved_targets = Targets::new(resolved_target_entries)?;
-        let package = Package::capture(&mut *ole, limits)?;
+        let package = CapturedPackage::capture(&mut *ole, limits)?;
         package.check(limits)?;
         let objects = discovery::from_package(&package, &resolved_targets, limits)?;
         Ok((resolved_targets, package, objects))
@@ -345,46 +207,63 @@ impl Edit {
         original: Arc<Vec<u8>>,
         limits: Limits,
         cfb_limits: OleFileLimits,
-        (targets, package, objects): (Targets, Package, Objects),
+        (targets, package, objects): (Targets, CapturedPackage, Objects),
     ) -> Self {
+        let targets = Arc::new(targets);
+        let package = Arc::new(package);
         Self {
             targets,
             limits,
             cfb_limits,
             original,
-            base_package: package.clone(),
+            base_package: Arc::clone(&package),
             package,
-            objects,
+            objects: Arc::new(objects),
             changed: false,
             layout: SectorLayoutPolicy::default(),
             validated_layout: SectorLayoutPolicy::default(),
         }
     }
 
-    /// A read view of the staged state as an immutable, shareable snapshot.
+    /// A read view of the staged state as an immutable, shareable package.
     ///
     /// The view shares large stream allocations, renders nothing, and is
     /// independent of this edit's subsequent changes; publishing still goes
     /// through [`Self::commit`].
     #[must_use]
-    pub fn staged(&self) -> Snapshot {
-        Snapshot::new(
-            self.targets.clone(),
+    pub(crate) fn staged(&self) -> Package {
+        self.staged_with_current(Arc::clone(&self.original))
+    }
+
+    pub(crate) fn staged_with_current(&self, current: Arc<Vec<u8>>) -> Package {
+        Package::new(
+            Arc::clone(&self.targets),
             self.limits,
             self.cfb_limits,
-            Arc::clone(&self.original),
-            self.base_package.clone(),
-            self.package.clone(),
-            self.objects.clone(),
-            self.changed,
+            // A Package is the immutable publication of this edit.  Its
+            // source identity must therefore be the bytes it publishes,
+            // rather than the editor's older base.  Keeping both handles on
+            // the same Arc preserves O(1) source sharing and lets a later
+            // Package::edit use the published content as its replay base.
+            Arc::clone(&current),
+            current,
+            // A published package is a fresh immutable base. Do not carry
+            // the editor's historical base or its `changed` marker into a
+            // later edit: doing so would make an edit started from a prior
+            // commit render against stale topology and could turn a no-op
+            // follow-up into a byte-changing publication.
+            Arc::clone(&self.package),
+            Arc::clone(&self.package),
+            Arc::clone(&self.objects),
+            false,
             self.layout,
-            self.validated_layout,
+            self.layout,
         )
     }
 
-    pub(crate) fn from_snapshot(snapshot: &Snapshot) -> Self {
+    pub(crate) fn from_package(snapshot: &Package) -> Self {
         Self {
-            targets: snapshot.targets().clone(),
+            targets: snapshot.targets_shared(),
             limits: snapshot.limits(),
             cfb_limits: snapshot.cfb_limits(),
             original: snapshot.original(),
@@ -395,6 +274,19 @@ impl Edit {
             layout: snapshot.layout(),
             validated_layout: snapshot.validated_layout(),
         }
+    }
+
+    pub(crate) fn from_package_with_options(
+        package: &Package,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+        layout: SectorLayoutPolicy,
+    ) -> Self {
+        let mut edit = Self::from_package(package);
+        edit.limits = limits;
+        edit.cfb_limits = cfb_limits;
+        edit.layout = layout;
+        edit
     }
 
     /// Object capture bounds retained by this editor and its snapshots.
@@ -456,7 +348,7 @@ impl Edit {
         let mut bytes = self
             .objects
             .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .ok_or_else(Error::target_not_found)?
             .compound()
             .to_vec();
         edit(&mut bytes)?;
@@ -498,10 +390,7 @@ impl Edit {
                 maximum: self.limits.max_object_size,
             });
         }
-        let object = self
-            .objects
-            .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
         if object.compound() == compound_file.as_slice() {
             return Ok(None);
         }
@@ -513,7 +402,7 @@ impl Edit {
                 .max_object_storages()
                 .saturating_add(self.limits.max_object_streams()),
         )?;
-        let replacement = Package::capture_object(&mut replacement_ole, self.limits)?;
+        let replacement = CapturedPackage::capture_object(&mut replacement_ole, self.limits)?;
         replacement.check_object_limits(self.limits)?;
         Ok(Some(PreparedReplacement {
             key: key.to_owned(),
@@ -548,9 +437,10 @@ impl Edit {
             )
             .into());
         }
-        let object = self.objects.get(&prepared.key).ok_or_else(|| {
-            OleError::InvalidFormat(format!("object target {:?} not found", prepared.key))
-        })?;
+        let object = self
+            .objects
+            .get(&prepared.key)
+            .ok_or_else(Error::target_not_found)?;
         if object.path() != prepared.path || object.compound() != prepared.before.as_ref() {
             return Err(OleError::InvalidFormat(
                 "prepared replacement source does not match object editor".into(),
@@ -558,9 +448,11 @@ impl Edit {
             .into());
         }
         let mut candidate = self.clone();
-        candidate
-            .package
-            .replace_object(&prepared.path, &prepared.replacement, self.limits)?;
+        Arc::make_mut(&mut candidate.package).replace_object(
+            &prepared.path,
+            &prepared.replacement,
+            self.limits,
+        )?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -589,7 +481,7 @@ impl Edit {
             return Ok(());
         }
         let mut candidate = self.clone();
-        candidate.package.put_stream(path, data, self.limits)?;
+        Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -620,7 +512,7 @@ impl Edit {
             return self.clone().finish();
         }
         let mut candidate = self.clone();
-        candidate.package.put_stream(path, data, self.limits)?;
+        Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
         let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
         *self = candidate;
         Ok(rendered)
@@ -688,7 +580,7 @@ impl Edit {
                 continue;
             }
             let candidate = candidate.get_or_insert_with(|| self.clone());
-            candidate.package.put_stream(path, data, self.limits)?;
+            Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
         }
         if let Some(candidate) = candidate {
             let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
@@ -707,9 +599,7 @@ impl Edit {
     /// the parent is missing, or the rendered package fails validation.
     pub fn add_stream(&mut self, path: Vec<String>, data: Vec<u8>) -> Result<(), Error> {
         let mut candidate = self.clone();
-        candidate
-            .package
-            .add_stream(path, data.into(), self.limits)?;
+        Arc::make_mut(&mut candidate.package).add_stream(path, data.into(), self.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -728,12 +618,13 @@ impl Edit {
     /// editor unchanged.
     pub fn remove_stream(&mut self, path: &[String]) -> Result<Option<Arc<[u8]>>, Error> {
         self.validate_stream_path_depth(path)?;
-        let path = CfbPath::try_from_slice(path, "stream removal path")?;
+        let path = CfbPath::try_from_slice(path, "stream removal path")
+            .map_err(|_| Error::invalid_selector())?;
         let Some(removed) = self.package.removable_stream(&path)? else {
             return Ok(None);
         };
         let mut candidate = self.clone();
-        candidate.package.remove_stream(&path, self.limits)?;
+        Arc::make_mut(&mut candidate.package).remove_stream(&path, self.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(Some(removed))
     }
@@ -765,16 +656,13 @@ impl Edit {
                 });
             }
             self.validate_stream_path_depth(path)?;
-            let path = CfbPath::try_from_slice(path, "stream removal path")?;
+            let path = CfbPath::try_from_slice(path, "stream removal path")
+                .map_err(|_| Error::invalid_selector())?;
             let identity = path.identity_hash();
             if validated.iter().any(|(existing, existing_identity)| {
                 *existing_identity == identity && existing.same_as(&path)
             }) {
-                return Err(OleError::InvalidFormat(format!(
-                    "stream removal batch contains duplicate path {:?}",
-                    path.as_slice()
-                ))
-                .into());
+                return Err(Error::invalid_selector());
             }
             validated
                 .try_reserve(1)
@@ -788,8 +676,7 @@ impl Edit {
             return Ok(Vec::new());
         }
         let mut candidate = self.clone();
-        let removed = candidate
-            .package
+        let removed = Arc::make_mut(&mut candidate.package)
             .remove_streams(validated.iter().map(|(path, _identity)| path), self.limits)?;
         let changed = removed.iter().any(Option::is_some);
         if changed {
@@ -828,7 +715,7 @@ impl Edit {
         let object_path = self
             .objects
             .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
+            .ok_or_else(Error::target_not_found)?
             .path()
             .to_vec();
         let mut stream_path = object_path;
@@ -935,10 +822,7 @@ impl Edit {
     }
 
     fn object_presentation_path(&self, key: &str, index: usize) -> Result<Vec<String>, Error> {
-        let object = self
-            .objects
-            .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
         object.validate_presentation_count()?;
         let mut path = object.path().to_vec();
         path.push(ole_streams::presentation_name(index)?);
@@ -946,10 +830,7 @@ impl Edit {
     }
 
     fn object_native_path(&self, key: &str) -> Result<Vec<String>, Error> {
-        let object = self
-            .objects
-            .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
         object.validate_presentation_count()?;
         let mut path = object.path().to_vec();
         path.push(ole_streams::NATIVE_STREAM_NAME.to_string());
@@ -978,12 +859,10 @@ impl Edit {
                 .max_object_storages()
                 .saturating_add(self.limits.max_object_streams()),
         )?;
-        let nested = Package::capture_object(&mut nested_ole, self.limits)?;
+        let nested = CapturedPackage::capture_object(&mut nested_ole, self.limits)?;
         let mut candidate = self.clone();
-        candidate
-            .package
-            .add_object(&target, &nested, self.limits)?;
-        candidate.targets.push(target)?;
+        Arc::make_mut(&mut candidate.package).add_object(&target, &nested, self.limits)?;
+        Arc::make_mut(&mut candidate.targets).push(target)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -995,16 +874,11 @@ impl Edit {
     /// Returns an error when the target is missing or the rendered package
     /// fails validation.
     pub fn remove_storage(&mut self, key: &str) -> Result<Arc<[u8]>, Error> {
-        let object = self
-            .objects
-            .get(key)
-            .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?;
+        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
         let removed = object.compound_shared();
         let mut candidate = self.clone();
-        candidate
-            .package
-            .remove_object(object.path(), self.limits)?;
-        candidate.targets = candidate.targets.without(key)?;
+        Arc::make_mut(&mut candidate.package).remove_object(object.path(), self.limits)?;
+        candidate.targets = Arc::new(candidate.targets.without(key)?);
         *self = candidate.commit_candidate()?;
         Ok(removed)
     }
@@ -1034,7 +908,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the edited CFB cannot be rendered.
-    pub fn finish(self) -> Result<Vec<u8>, Error> {
+    fn finish(&self) -> Result<Vec<u8>, Error> {
         if self.changed {
             if self.layout == SectorLayoutPolicy::Reuse
                 && let Some(rendered) = self.package.render_copy_through(
@@ -1052,34 +926,35 @@ impl Edit {
             // Ordinary publication repeats the already validated deterministic
             // render. A caller-selected layout change needs a new physical gate.
             if self.layout != self.validated_layout {
-                OleFile::open_with_limits(Cursor::new(rendered.as_slice()), self.cfb_limits)?;
+                open_candidate_with_limits(rendered.as_slice(), self.cfb_limits)?;
             }
             Ok(rendered)
         } else {
-            Ok(match Arc::try_unwrap(self.original) {
-                Ok(bytes) => bytes,
-                Err(bytes) => bytes.as_ref().clone(),
-            })
+            Ok(self.original.as_ref().clone())
         }
     }
 
-    /// Commits this edit as an immutable snapshot plus a reversible patch.
+    /// Commits this edit as an immutable package plus a reversible patch.
     ///
     /// The source editor is consumed, so callers cannot accidentally keep
     /// mutating a value after using the commit result. The patch is checked
-    /// against the exact original artifact and the snapshot has already
+    /// against the exact original artifact and the package has already
     /// passed the common CFB/resource validation performed by each edit.
     ///
     /// # Errors
     ///
     /// Returns an error when the edited package cannot be rendered.
     pub fn commit(self) -> Result<Commit, Error> {
-        let before = self.original.as_ref().clone();
-        let snapshot = self.staged();
-        let after = self.finish()?;
-        let patch = Patch::new(before, after);
+        let before = Arc::clone(&self.original);
+        let after = if self.changed {
+            Arc::new(self.finish()?)
+        } else {
+            Arc::clone(&self.original)
+        };
+        let package = self.staged_with_current(Arc::clone(&after));
+        let patch = Patch::new_shared(before, after);
         let diagnostics = Diagnostics::new(!patch.is_noop());
-        Ok(Commit::new(snapshot, patch, diagnostics))
+        Ok(Commit::new(package, patch, diagnostics))
     }
 
     fn commit_candidate(self) -> Result<Self, Error> {
@@ -1108,15 +983,41 @@ impl Edit {
             self.package
                 .render_with_layout(Some(self.original.as_slice()), self.layout)?
         };
-        let mut check =
-            OleFile::open_with_limits(Cursor::new(rendered.as_slice()), self.cfb_limits)?;
+        let mut check = open_candidate_with_limits(rendered.as_slice(), self.cfb_limits)?;
         codec::open(&check, self.limits.max_package_directory_entries())?;
-        let mut parsed = Package::capture(&mut check, self.limits)?;
+        let mut parsed = CapturedPackage::capture(&mut check, self.limits)?;
         parsed.reuse_stream_allocations(&self.package)?;
-        self.package = parsed;
-        self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
+        self.package = Arc::new(parsed);
+        self.objects = Arc::new(discovery::from_package(
+            &self.package,
+            &self.targets,
+            self.limits,
+        )?);
         self.changed = true;
         self.validated_layout = self.layout;
         Ok((self, rendered))
+    }
+}
+
+/// Reopen a rendered mutation candidate under the editor's retained physical
+/// CFB policy. The common object edit surface reports a candidate that grows
+/// beyond that policy as its existing stream-byte budget, while direct CFB
+/// ingress keeps the low-level physical label and error intact.
+fn open_candidate_with_limits<'a>(
+    bytes: &'a [u8],
+    limits: OleFileLimits,
+) -> Result<OleFile<Cursor<&'a [u8]>>, Error> {
+    match OleFile::open_with_limits(Cursor::new(bytes), limits) {
+        Ok(file) => Ok(file),
+        Err(OleError::LimitExceeded {
+            resource: "input bytes",
+            observed,
+            maximum,
+        }) => Err(Error::Limit {
+            kind: LimitKind::StreamBytes,
+            observed,
+            maximum,
+        }),
+        Err(error) => Err(error.into()),
     }
 }

@@ -50,7 +50,9 @@ use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
 /// The object and record limits a cell-value snapshot is read under.
 pub use litchi_ole_common::object::Limits;
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, OpenOptions, Package as ObjectPackage, Targets,
+};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -715,12 +717,14 @@ impl Snapshot {
     /// The bounded corpus and other security-sensitive callers use this entry
     /// point instead of inheriting the broad convenience defaults.
     pub(crate) fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = PackageEditor::open_with_cfb_limits(
+        let package = ObjectPackage::open_with_options(
             bytes,
-            Targets::default(),
-            limits,
-            OleFileLimits::default(),
-        )?;
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits)
+                .cfb_limits(OleFileLimits::default()),
+        )?
+        .edit()?;
         Self::from_package_editor(package)
     }
 
@@ -731,8 +735,14 @@ impl Snapshot {
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
-        let package =
-            PackageEditor::open_with_cfb_limits(bytes, Targets::default(), limits, cfb_limits)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits)
+                .cfb_limits(cfb_limits),
+        )?
+        .edit()?;
         Self::from_package_editor(package)
     }
 
@@ -833,7 +843,7 @@ impl Snapshot {
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let source = match rendered {
             Some(rendered) => rendered,
-            None => package.finish()?,
+            None => crate::scoped::object_editor_bytes(&package)?,
         };
         let source_version = fresh_snapshot_source_version();
 
@@ -4507,12 +4517,14 @@ impl Edit {
         // immutable source owner.  The CFB profile is part of the source
         // contract even when the object profile alone would accept the
         // replacement stream.
-        let mut package = PackageEditor::open_with_cfb_limits(
+        let mut package = ObjectPackage::open_with_options(
             self.source.inner.bytes.to_vec(),
-            Targets::default(),
-            self.source.inner.limits,
-            self.source.inner.cfb_limits,
-        )?;
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(self.source.inner.limits)
+                .cfb_limits(self.source.inner.cfb_limits),
+        )?
+        .edit()?;
         // The committed package editor has already rendered, reopened, and
         // recaptured the candidate CFB, and it hands back the exact artifact
         // it validated. Publish that artifact instead of rendering the same
@@ -4522,7 +4534,7 @@ impl Edit {
         let rendered =
             package.put_stream_shared_with_rendered(&self.source.inner.workbook_path, workbook)?;
         debug_assert_eq!(
-            package.clone().finish().ok().as_deref(),
+            crate::scoped::object_editor_bytes(&package).ok().as_deref(),
             Some(rendered.as_slice()),
             "a fresh render of the committed editor reproduces its validated rendering"
         );
@@ -4615,12 +4627,14 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
         ..
     } = change;
     let workbook: Arc<[u8]> = Arc::from(workbook);
-    let mut package = PackageEditor::open_with_cfb_limits(
+    let mut package = ObjectPackage::open_with_options(
         source.inner.bytes.to_vec(),
-        Targets::default(),
-        source.inner.limits,
-        source.inner.cfb_limits,
-    )?;
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(source.inner.limits)
+            .cfb_limits(source.inner.cfb_limits),
+    )?
+    .edit()?;
     let rendered =
         package.put_stream_shared_with_rendered(&source.inner.workbook_path, workbook)?;
     let snapshot = Snapshot::open_package(package, Some(rendered), None)?;
@@ -8022,12 +8036,14 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         source.clone()
     } else {
         let target_bytes = materialize_numeric_plan(&plan, source.bytes().len())?;
-        let package = PackageEditor::open_with_cfb_limits(
+        let package = ObjectPackage::open_with_options(
             target_bytes.clone(),
-            Targets::default(),
-            source.inner.limits,
-            source.inner.cfb_limits,
-        )?;
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(source.inner.limits)
+                .cfb_limits(source.inner.cfb_limits),
+        )?
+        .edit()?;
         // The publication boundary's complete reopen already parses this
         // target in full. The target checks below used to run on a second,
         // independent `Reader::new` over the identical bytes; they now read

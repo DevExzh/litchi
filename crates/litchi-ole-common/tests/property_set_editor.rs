@@ -157,7 +157,7 @@ fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
     let error = editor.update(Standard::UserDefinedProperties, |section| {
         section.set_page(CodePage::Utf16Le);
         section.add_named(2, "Name".into(), Value::I4(1))?;
-        section.add_named(3, "name".into(), Value::I4(2))
+        Ok(section.add_named(3, "name".into(), Value::I4(2))?)
     });
     assert!(error.is_err());
     assert_eq!(editor.finish().unwrap(), original);

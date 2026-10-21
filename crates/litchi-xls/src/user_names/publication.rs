@@ -15,7 +15,9 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Edit as PackageEditor, Limits as PackageLimits, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits as PackageLimits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
 /// The User Names family error and result: the crate's.
@@ -58,7 +60,7 @@ impl Snapshot {
                 reason: "User Names stream path changed between CFB validation passes",
             });
         }
-        let bytes = Arc::<[u8]>::from(package.finish()?.into_boxed_slice());
+        let bytes = Arc::<[u8]>::from(crate::scoped::object_editor_bytes(&package)?);
         let user_names = parse_user_names(&bytes, limits)?;
         Ok(Self {
             inner: Arc::new(Inner {
@@ -269,11 +271,13 @@ impl Edit {
 
         let replacement =
             Arc::<[u8]>::from(user_names_commit.package().finish().into_boxed_slice());
-        let mut package = PackageEditor::open(
+        let mut package = ObjectPackage::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            PackageLimits::default(),
-        )?;
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(PackageLimits::default()),
+        )?
+        .edit()?;
         let rendered =
             package.put_stream_shared_with_rendered(&source.inner.user_names_path, replacement)?;
         let snapshot = Snapshot::from_bytes(rendered, source.inner.user_names_limits)?;
@@ -494,10 +498,14 @@ fn preflight_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<Vec<Str
 }
 
 fn open_package(bytes: Vec<u8>) -> Result<(PackageEditor, Vec<String>)> {
-    let (package, ole) =
-        PackageEditor::open_with_ole_file(bytes, Targets::default(), PackageLimits::default())?;
+    let (package, ole) = ObjectPackage::open_with_ole_file(
+        bytes,
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(PackageLimits::default()),
+    )?;
     let path = find_user_names_path(&ole)?;
-    Ok((package, path))
+    Ok((package.edit()?, path))
 }
 
 fn find_user_names_path<R: std::io::Read + std::io::Seek>(ole: &OleFile<R>) -> Result<Vec<String>> {

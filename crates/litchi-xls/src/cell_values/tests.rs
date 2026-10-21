@@ -24,12 +24,19 @@ fn package() -> Vec<u8> {
     writer.write_formula(sheet, 8, 0, "1+1").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default()).unwrap();
+    let mut package = ObjectPackage::open_with_options(
+        output.into_inner(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
+    )
+    .unwrap()
+    .edit()
+    .unwrap();
     package
         .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 fn protected_package(worksheet: bool) -> Vec<u8> {
@@ -3223,16 +3230,19 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
 /// before it adopted the validated rendering: publish the stream through a
 /// fresh package editor, then finish (render) the editor a second time.
 fn rerendered_artifact(source: &Snapshot, workbook_stream: &[u8]) -> Vec<u8> {
-    let mut package = PackageEditor::open(
+    let mut package = ObjectPackage::open_with_options(
         source.bytes().to_vec(),
-        Targets::default(),
-        Limits::default(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
     )
+    .unwrap()
+    .edit()
     .unwrap();
     package
         .put_stream_shared(&source.inner.workbook_path, Arc::from(workbook_stream))
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 /// The generic commit publishes the rendering its package publication

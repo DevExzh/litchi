@@ -36,7 +36,10 @@ impl Snapshot {
     ///
     /// Returns an error when an entry violates CFB invariants or the supplied
     /// resource limits.
-    pub fn from_entries(entries: Vec<DirectoryEntry>, limits: Limits) -> Result<Self, crate::Error> {
+    pub fn from_entries(
+        entries: Vec<DirectoryEntry>,
+        limits: Limits,
+    ) -> Result<Self, crate::Error> {
         Ok(Self::from_catalog(Catalog::from_entries(entries, limits)?))
     }
 

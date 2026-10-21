@@ -51,6 +51,9 @@ pub enum Error {
     CachedSource(Arc<SourceBackedError>),
     /// The retained CFB source or its atomic publisher failed.
     Cfb(OleError),
+    /// A shared OLE object or property-set operation failed with typed
+    /// refusal/conflict information.
+    Object(litchi_ole_common::Error),
     /// Sequential output failed.
     Io(io::Error),
     /// A checked allocation could not be reserved.
@@ -94,6 +97,12 @@ impl From<OleError> for Error {
     }
 }
 
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         Self::Io(error)
@@ -107,6 +116,7 @@ impl fmt::Debug for Error {
             Self::Source(_) => "Source",
             Self::CachedSource(_) => "CachedSource",
             Self::Cfb(_) => "Cfb",
+            Self::Object(_) => "Object",
             Self::Io(_) => "Io",
             Self::Allocation { .. } => "Allocation",
             Self::EncryptionPolicy => "EncryptionPolicy",
@@ -123,6 +133,7 @@ impl fmt::Display for Error {
             Self::Source(error) => fmt::Display::fmt(error, formatter),
             Self::CachedSource(error) => fmt::Display::fmt(error.as_ref(), formatter),
             Self::Cfb(error) => fmt::Display::fmt(error, formatter),
+            Self::Object(error) => fmt::Display::fmt(error, formatter),
             Self::Io(error) => fmt::Display::fmt(error, formatter),
             Self::Allocation { resource, source } => {
                 write!(formatter, "could not reserve {resource}: {source}")
@@ -142,6 +153,7 @@ impl std::error::Error for Error {
             Self::Source(error) => Some(error),
             Self::CachedSource(error) => Some(error.as_ref()),
             Self::Cfb(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Allocation { source, .. } => Some(source),
             Self::EncryptionPolicy | Self::InvalidData(_) => None,
@@ -1342,14 +1354,16 @@ fn eager_metadata(ole_file: &mut OleFile<Cursor<Vec<u8>>>) -> Metadata {
         .unwrap_or_default()
 }
 
-fn metadata_error_is_soft(error: &OleError) -> bool {
+fn metadata_error_is_soft(error: &litchi_ole_common::Error) -> bool {
     matches!(
         error,
-        OleError::InvalidFormat(_)
-            | OleError::InvalidData(_)
-            | OleError::NotOleFile
-            | OleError::CorruptedFile(_)
-            | OleError::StreamNotFound
+        litchi_ole_common::Error::Cfb(
+            OleError::InvalidFormat(_)
+                | OleError::InvalidData(_)
+                | OleError::NotOleFile
+                | OleError::CorruptedFile(_)
+                | OleError::StreamNotFound,
+        )
     )
 }
 

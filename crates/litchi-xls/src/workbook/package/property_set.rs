@@ -58,7 +58,7 @@ impl Snapshot {
                 None
             },
             Ok(stream) => Some(SummaryInformation::from_stream(&stream)?),
-            Err(OleError::StreamNotFound) => None,
+            Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => None,
             Err(error) => return Err(error.into()),
         };
 
@@ -77,7 +77,7 @@ impl Snapshot {
                         stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned();
                     (document_summary_information, user_defined_properties)
                 },
-                Err(OleError::StreamNotFound) => (None, None),
+                Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => (None, None),
                 Err(error) => return Err(error.into()),
             };
 

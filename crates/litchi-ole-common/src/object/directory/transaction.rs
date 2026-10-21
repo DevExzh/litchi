@@ -140,11 +140,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::set_metadata`].
-    pub fn replace_metadata(
-        &mut self,
-        sid: Sid,
-        metadata: Metadata,
-    ) -> Result<&mut Self, Error> {
+    pub fn replace_metadata(&mut self, sid: Sid, metadata: Metadata) -> Result<&mut Self, Error> {
         self.set_metadata(sid, metadata)
     }
 
@@ -178,11 +174,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns the same errors as [`Self::update_metadata`].
-    pub fn set_class_id(
-        &mut self,
-        sid: Sid,
-        class_id: Option<Guid>,
-    ) -> Result<&mut Self, Error> {
+    pub fn set_class_id(&mut self, sid: Sid, class_id: Option<Guid>) -> Result<&mut Self, Error> {
         self.update_metadata(sid, |metadata| {
             metadata.set_class_id(class_id);
             Ok(())
@@ -274,11 +266,11 @@ impl Edit {
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(self.candidate.raw_entries().len())
-        .map_err(|source| OleError::Allocation {
+            .map_err(|source| OleError::Allocation {
                 resource: "CFB directory transaction entries",
                 source,
-        })
-        .map_err(Error::from)?;
+            })
+            .map_err(Error::from)?;
         entries.extend(self.candidate.raw_entries().iter().cloned());
         edit(&mut entries)?;
         let candidate = Catalog::from_entries(entries, self.source.limits())?;

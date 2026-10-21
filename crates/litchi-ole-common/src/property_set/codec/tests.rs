@@ -58,7 +58,7 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
     let mut editor = Edit::new(source.into_inner()).expect("editor source");
     editor
         .update(Binding::SummaryInformation, |section| {
-            section.add(2, Value::Lpstr("Title".into()))
+            Ok(section.add(2, Value::Lpstr("Title".into()))?)
         })
         .expect("summary edit");
     let mut ole =
@@ -107,7 +107,7 @@ fn a_user_defined_edit_creates_a_typed_document_summary_section() {
     let mut editor = Edit::new(source.into_inner()).expect("editor source");
     editor
         .update(Binding::UserDefinedProperties, |section| {
-            section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))
+            Ok(section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))?)
         })
         .expect("user-defined edit");
     let mut ole =
