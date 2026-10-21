@@ -144,13 +144,18 @@ impl Edit {
     ///
     /// Returns an error when the storage has no valid OLEDS link stream, the
     /// callback rejects the candidate, or the package cannot be validated.
-    pub fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
+    pub fn update_link<F>(
+        &mut self,
+        storage_id: u32,
+        limits: litchi_ole_common::object::link::Limits,
+        edit: F,
+    ) -> Result<()>
     where
         F: FnOnce(
             &mut litchi_ole_common::object::link::Link,
         ) -> std::result::Result<(), litchi_ole_common::Error>,
     {
-        Ok(self.inner.update_link(storage_id, edit)?)
+        Ok(self.inner.update_link(storage_id, limits, edit)?)
     }
 
     /// Clone-edits one presentation under explicit OLEDS limits.

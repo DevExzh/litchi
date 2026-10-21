@@ -821,7 +821,7 @@ impl Edit {
     ///
     /// Returns an error when `key` is absent, its OLEDS stream is missing or
     /// malformed, `edit` fails, or the resulting package cannot be validated.
-    pub fn update_link<F>(&mut self, key: &str, edit: F) -> Result<(), Error>
+    pub fn update_link<F>(&mut self, key: &str, limits: link::Limits, edit: F) -> Result<(), Error>
     where
         F: FnOnce(&mut Link) -> Result<(), Error>,
     {
@@ -837,9 +837,9 @@ impl Edit {
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
-        let mut link = Link::parse_shared(bytes)?;
+        let mut link = Link::parse_shared(bytes, limits)?;
         edit(&mut link)?;
-        self.put_stream(&stream_path, link.to_bytes())
+        self.put_stream(&stream_path, link.to_bytes(limits)?)
     }
 
     /// Atomically edits one selected object's OLEDS presentation under

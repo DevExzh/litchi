@@ -1312,6 +1312,10 @@ impl Snapshot {
             reason = "the unit tests drive the engine directly; Package is the public route"
         )
     )]
+    #[allow(
+        dead_code,
+        reason = "the test crate exercises the engine through its public package route"
+    )]
     pub(crate) fn edit_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
         let mut edit = Edit::new(self.clone())?;
         edit.source.transaction_limits = edit

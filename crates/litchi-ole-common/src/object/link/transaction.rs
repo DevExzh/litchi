@@ -1,8 +1,7 @@
 //! Failure-atomic typed link transactions.
 
 use super::{Link, Patch, Snapshot, Times, validation};
-use crate::property_set::Guid;
-use litchi_cfb::OleError;
+use crate::{Error, property_set::Guid};
 
 /// A deterministic identity for one exact serialized OLEDS link stream.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -75,7 +74,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when `flags` changes the embedded/linked layout.
-    pub fn set_flags(&mut self, flags: u32) -> Result<&mut Self, OleError> {
+    pub fn set_flags(&mut self, flags: u32) -> Result<&mut Self, Error> {
         self.candidate.set_flags(flags)?;
         Ok(self)
     }
@@ -92,7 +91,7 @@ impl Edit {
     ///
     /// Returns an error when the link has no class identifier field in its
     /// wire layout.
-    pub fn set_class_id(&mut self, value: Guid) -> Result<&mut Self, OleError> {
+    pub fn set_class_id(&mut self, value: Guid) -> Result<&mut Self, Error> {
         self.candidate.set_class_id(value)?;
         Ok(self)
     }
@@ -103,7 +102,7 @@ impl Edit {
     ///
     /// Returns an error when the link has no timestamp group in its wire
     /// layout.
-    pub fn set_times(&mut self, value: Times) -> Result<&mut Self, OleError> {
+    pub fn set_times(&mut self, value: Times) -> Result<&mut Self, Error> {
         self.candidate.set_times(value)?;
         Ok(self)
     }
@@ -114,9 +113,9 @@ impl Edit {
     ///
     /// Returns an error when `edit` fails or leaves the candidate with an
     /// invalid OLEDS layout.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut Link) -> Result<(), OleError>,
+        F: FnOnce(&mut Link) -> Result<(), Error>,
     {
         let mut candidate = self.candidate.clone();
         edit(&mut candidate)?;
@@ -130,20 +129,20 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the candidate has an invalid OLEDS layout.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = self.source.patch_to(&snapshot);
         let diagnostics = Diagnostics::new(!patch.is_noop());
         Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
+    fn materialize(&self) -> Result<Snapshot, Error> {
         validation::validate(&self.candidate)?;
         if !self.has_changes() {
             return Ok(self.source.clone());
         }
-        let bytes = self.candidate.to_bytes().into();
-        Snapshot::parse_shared(bytes)
+        let bytes = self.candidate.to_bytes(self.source.limits())?.into();
+        Snapshot::parse_shared(bytes, self.source.limits())
     }
 }
 
@@ -160,9 +159,9 @@ pub use litchi_core::edit::Diagnostics;
 ///
 /// Returns an error when `edit` fails or leaves the link with an invalid OLEDS
 /// layout.
-pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
 where
-    F: FnOnce(&mut Edit) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

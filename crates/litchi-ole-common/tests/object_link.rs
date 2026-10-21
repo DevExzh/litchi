@@ -8,7 +8,7 @@
 )]
 
 use litchi_cfb::OleWriter;
-use litchi_ole_common::object::link::Kind;
+use litchi_ole_common::object::link::{Kind, Limits as LinkLimits};
 use litchi_ole_common::object::{Edit, Limits, Target, Targets};
 use std::io::Cursor;
 
@@ -67,13 +67,20 @@ fn selected_objects_expose_shared_link_metadata() {
         .objects()
         .get("object")
         .expect("object should be discovered")
-        .link()
+        .link(LinkLimits::default())
         .expect("link should parse")
         .expect("link stream should be present");
     assert_eq!(link.kind(), Kind::Linked);
     assert_eq!(link.link_update_option(), 7);
     assert_eq!(link.unknown_tail(), &[0xAA, 0xBB, 0xCC]);
-    assert_eq!(editor.staged().link("object").unwrap().unwrap(), link);
+    assert_eq!(
+        editor
+            .staged()
+            .link("object", LinkLimits::default())
+            .unwrap()
+            .unwrap(),
+        link
+    );
 }
 
 #[test]
@@ -82,7 +89,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     let mut editor =
         Edit::open(original.clone(), target(), Limits::default()).expect("editor should open");
     editor
-        .update_link("object", |link| {
+        .update_link("object", LinkLimits::default(), |link| {
             link.set_cache_hint(false);
             link.set_link_update_option(19);
             Ok(())
@@ -93,7 +100,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
         .get("object")
         .expect("object should remain");
     let link = object
-        .link()
+        .link(LinkLimits::default())
         .expect("edited link should parse")
         .expect("edited link should remain");
     assert!(!link.cache_hint());
@@ -105,7 +112,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
         Edit::open(original.clone(), target(), Limits::default()).expect("editor should reopen");
     assert!(
         rejected
-            .update_link("object", |_link| {
+            .update_link("object", LinkLimits::default(), |_link| {
                 Err(litchi_cfb::OleError::InvalidFormat("reject edit".into()).into())
             })
             .is_err()

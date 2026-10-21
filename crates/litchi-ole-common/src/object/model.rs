@@ -217,13 +217,11 @@ impl Stream {
     ///
     /// Returns an error when a standard OLEDS stream is malformed or exceeds
     /// the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, Error> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         if self.name() != Some(link::NAME) {
             return Ok(None);
         }
-        Link::parse_shared(Arc::clone(&self.data))
-            .map(Some)
-            .map_err(Error::from)
+        Link::parse_shared(Arc::clone(&self.data), limits).map(Some)
     }
 
     /// Parses this stream as an OLEDS presentation stream under explicit
@@ -340,13 +338,13 @@ impl Object {
     ///
     /// Returns an error when the direct-child OLEDS stream is malformed or
     /// exceeds the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, Error> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         match self
             .streams
             .iter()
             .find(|stream| stream.path().len() == 1 && stream.name() == Some(link::NAME))
         {
-            Some(stream) => stream.link(),
+            Some(stream) => stream.link(limits),
             None => Ok(None),
         }
     }

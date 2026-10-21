@@ -8,6 +8,7 @@ use super::storage::{OBJECT_POOL, is_object_storage_name};
 use super::transaction::TransactionError;
 use crate::builder::Builder;
 use litchi_cfb::OleWriter;
+use litchi_ole_common::object::link::Limits as LinkLimits;
 use litchi_ole_common::object::{Edit as ObjectEditor, Target, Targets};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as OleStreamLimits, OleNativeStream, OlePresentationStream,
@@ -302,9 +303,9 @@ fn ole2_test_object(marker: u8) -> Vec<u8> {
         [marker.wrapping_add(2), marker.wrapping_add(3)],
         OleStreamLimits::default(),
     )
-        .unwrap()
-        .to_bytes(litchi_ole_common::ole_streams::Limits::default())
-        .unwrap();
+    .unwrap()
+    .to_bytes(litchi_ole_common::ole_streams::Limits::default())
+    .unwrap();
     object_cfb_with_ole2_streams(
         &comp_obj,
         &ole,
@@ -412,7 +413,7 @@ fn public_object_callback_preserves_typed_failure_and_discards_candidate() {
     let source = crate::Package::from_bytes(&bytes).unwrap();
     let mut edit = source.edit_embedded_objects().unwrap();
     let error = edit
-        .update_link(77, |link| {
+        .update_link(77, LinkLimits::default(), |link| {
             link.set_cache_hint(true);
             Err(ObjectError::Limit {
                 kind: LimitKind::StreamBytes,
@@ -455,7 +456,7 @@ fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
 
     let mut transaction = source.edit();
     transaction
-        .update_link(77, |link| {
+        .update_link(77, LinkLimits::default(), |link| {
             link.set_cache_hint(true);
             Ok(())
         })

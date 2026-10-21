@@ -124,12 +124,12 @@ impl Snapshot {
     ///
     /// Returns an error when `key` is absent or its OLEDS stream is malformed
     /// or exceeds the metadata limit.
-    pub fn link(&self, key: &str) -> Result<Option<Link>, Error> {
+    pub fn link(&self, key: &str, limits: super::link::Limits) -> Result<Option<Link>, Error> {
         self.state
             .objects
             .get(key)
             .ok_or_else(|| OleError::InvalidFormat(format!("object target {key:?} not found")))?
-            .link()
+            .link(limits)
     }
 
     /// Returns one selected object's presentation under explicit OLEDS limits.

@@ -90,9 +90,13 @@ impl<'a> Reader<'a> {
     }
 }
 
-pub(crate) fn parse(wire: Arc<[u8]>) -> Result<Link, OleError> {
-    if wire.len() > MAX_BYTES {
-        return Err(invalid("OLE link stream exceeds the metadata limit"));
+pub(crate) fn parse(wire: Arc<[u8]>, limits: super::Limits) -> Result<Link, OleError> {
+    if wire.len() > limits.max_bytes {
+        return Err(OleError::LimitExceeded {
+            resource: "link stream bytes",
+            observed: wire.len() as u64,
+            maximum: limits.max_bytes as u64,
+        });
     }
     let parsed = parse_fields(wire.as_ref())?;
     Ok(Link {
