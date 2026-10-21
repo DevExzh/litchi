@@ -141,7 +141,7 @@ impl Edit {
         }
         staged.validate_signature_edit_from(self.source.opc_package())?;
         crate::Workbook::validate_edit_candidate(&staged)?;
-        let package = if patch.projection_unchanged(self.source.opc_package(), &staged) {
+        let package = if patch.projection_unchanged(self.source.opc_package()) {
             self.source.with_unparsed(staged)
         } else {
             self.source.reparse_candidate_retaining_projection(staged)?
@@ -432,6 +432,55 @@ mod tests {
         assert!(!restored.projection_cached());
         assert_graph_equal(&restored, &package);
         assert!(restored.workbook().is_ok());
+    }
+
+    #[test]
+    fn a_recipient_edge_to_a_changed_part_forces_projection_reparse() {
+        let package = Package::new().unwrap();
+        let name = PackURI::new("/custom/retyped-unreferenced.bin").unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part(name.as_str())));
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+        assert!(!source.projection_cached());
+
+        let mut changed = source.edit_opc().unwrap();
+        changed
+            .update(|opc| {
+                opc.get_part_mut(&name)?.set_blob(vec![4, 5, 6]);
+                Ok(())
+            })
+            .unwrap();
+        let (after, patch) = changed.commit().unwrap().into_parts();
+        assert!(!after.projection_cached());
+
+        // This recipient has an unrelated inbound edge to the patch's
+        // changed part. The patch's recorded base did not, so only the
+        // recipient-before closure can reveal that replay must reparse.
+        let mut recipient_edit = source.edit_opc().unwrap();
+        recipient_edit
+            .update(|opc| {
+                opc.rels_mut().try_add_relationship(
+                    "urn:litchi:test".into(),
+                    name.as_str().into(),
+                    "rIdRecipientEdge".into(),
+                    TargetMode::Internal,
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let (recipient, _) = recipient_edit.commit().unwrap().into_parts();
+        assert!(recipient.projection_cached());
+
+        let replayed = recipient.apply_opc(&patch).unwrap().into_package();
+        assert!(replayed.projection_cached());
+        assert_eq!(
+            replayed.opc_package().get_part(&name).unwrap().blob(),
+            &[4, 5, 6]
+        );
     }
 
     #[test]

@@ -329,13 +329,17 @@ Raw OPC commits, staged edit commits, and `apply_opc` now use the same
 `PartPatch::projection_unchanged` proof before publishing a candidate. Root
 relationship edits always take the existing full-reparse path. For part
 deltas, the proof lowercases the changed part names and walks the internal
-relationship closure from both the recorded base and the candidate. External
-relationships are outside the workbook projection; malformed or dangling
-internal targets fail the proof conservatively and retain the full-reparse
-path. A manifest-only or dependency-disjoint part patch still runs the normal
-patch, manifest, signature, source-limit, and lightweight workbook checks, then
-publishes an unparsed package so the workbook projection is not decoded twice.
-Any closure-affecting change continues through
+relationship closure in the recipient's before graph. With no root delta,
+every relationship owner that can differ after apply is already in the part
+delta set, so an unchanged reachable owner cannot acquire a new edge to a
+changed part; the before-graph proof also covers a recipient's unrelated edge
+to a part that was inert in the recorded base. External relationships are
+outside the workbook projection; malformed or dangling internal targets fail
+the proof conservatively and retain the full-reparse path. A manifest-only or
+dependency-disjoint part patch still runs the normal patch, manifest,
+signature, source-limit, and lightweight workbook checks, then publishes an
+unparsed package so the workbook projection is not decoded twice. Any
+closure-affecting change continues through
 `reparse_candidate_retaining_projection`, preserving the validating open's
 projection and tolerance policy.
 
@@ -348,10 +352,73 @@ part bytes, content-types publication bytes, and retained relationship bytes;
 they intentionally do not treat ZIP member ordering or writer metadata as
 part-content differences.
 
-Focused validation passed 12 `opc` tests and the full XLSB library suite (740
-tests). `cargo fmt --all -- --check` and `git diff --check` also pass. A fresh
-paired performance measurement of the dependency-disjoint publication path is
-still pending; the earlier structural and inverse replay measurements remain
-preliminary and are not used as acceptance evidence for this optimization.
+Focused validation passed 13 `opc` tests and the full XLSB library suite (741
+tests). `cargo fmt --all -- --check` and `git diff --check` also pass. The
+first paired performance measurement of the dependency-disjoint publication
+path is recorded below; its inverse leg exposed a redundant post-apply closure
+walk, so that candidate is explicitly rejected and the repair is recorded in
+the next section.
+
+The first paired measurement after this change is now available. The same
+before/after probe sources were rebuilt into distinct absolute target
+directories from commit `a6a55b09f4` and its recorded baseline. The baseline
+binary is
+`tgt-expanded-before-a6a55b09f4/release/w4b-expanded-probe-before-v2`, size
+7,643,696 bytes, SHA-256
+`c38df593f0083aa3c0379d67363796adeb4f97076976393b8f6dddd61e5bce01`; the
+candidate is
+`tgt-expanded-after-a6a55b09f4/release/w4b-expanded-probe`, size 7,482,512
+bytes, SHA-256
+`59b03e57a40ba0ae851facdb8691cd5885e0a48b33c354b8c1723b7a5c5d6f0e`.
+The baseline and candidate probe source hashes are respectively
+`74f2271ca386e08515e50f5b0d87e9b4d6e514e7284084179114d2571e794a44`
+and `65d0629300694e7bab1bbc15b053223e58f77db2832bf75523ac3ddf5b7615b4`.
+
+The isolated run was pinned to CPU 29, used 31 samples per case, and ran
+`before, after, after, before`. JSON and stderr captures are outside the
+checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-a6a55b09f4-abba-20261021`;
+each leg reported the exact preflight `base_parts=7 after_parts=8
+base_bytes=5155 after_bytes=5320`. The table gives the range of the two leg
+medians and the ratio of their mean medians, in microseconds:
+
+| Case | Before leg range | After leg range | After / before |
+|---|---:|---:|---:|
+| `structural/commit` | 10.4140–10.4600 | 8.1720–8.8180 | 0.813931 |
+| `structural/commit_save` | 44.8822–44.9622 | 43.1562–43.8422 | 0.968323 |
+| `structural/forward_replay` | 72.8784–73.3264 | 69.6944–69.9564 | 0.955172 |
+| `structural/inverse_replay` | 75.2126–75.5484 | 76.4944–76.5104 | 1.014883 |
+| `history/retained128_build` | 4594.4050–4612.6560 | 2907.1160–2932.1270 | 0.634214 |
+
+The dependency-disjoint optimization therefore removes the earlier commit and
+forward-replay regressions and sharply reduces retained patch-history build
+cost. Inverse replay remains a small 1.49% regression in this pair and is
+retained as an owner-review item; this record does not claim that route is
+accepted. The capture directory contains only external evidence, so no large
+benchmark artifacts are committed.
+
+## 9. Closure traversal repair
+
+The pair above is rejected as an acceptance result because inverse replay was
+1.49% slower. A one-sample Callgrind comparison of the same inverse route,
+with the preflight retained and `LITCHI_PROBE_ONLY=structural/inverse_replay`,
+reported 28,070,984 instructions for the baseline and 28,945,476 for the
+candidate. In the candidate, `PartPatch::projection_unchanged` accounted for
+842,395 instructions and its `closure_is_disjoint` walk for 836,047. The
+capture and `Ir` annotations are outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/inverse-callgrind-a6a55b09f4`;
+`sha256` in that directory records the files. This isolates the extra work to
+the newly added proof rather than a second workbook projection parse.
+
+The proof now walks only the recipient's before graph. A patch with no root
+delta can change relationship owners only through its part deltas, so if none
+of those parts is reachable before apply, no unchanged owner can make one
+reachable afterward. The recipient-edge regression test proves the converse:
+an unrelated inbound edge to a changed part forces eager projection
+revalidation. Root edits, reachable deltas, malformed targets, and dangling
+targets still use the full reparse path. Focused validation now passes 13 `opc`
+tests and the full XLSB library suite passes 741 tests. A new paired release
+ABBA, plus the final same-binary retained-history heap comparison, is required
+before this repair can be accepted.
 
 [0351]: 0351-api-contract.md

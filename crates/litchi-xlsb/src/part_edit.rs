@@ -630,14 +630,19 @@ impl PartPatch {
     /// patch-state, manifest, signature, and source-limit checks, but it cannot
     /// alter the typed workbook.  Keeping the projection lazy for that narrow
     /// case avoids parsing the same workbook graph twice when a caller only
-    /// needs to publish an opaque part.  The closure is walked in both graphs:
-    /// a recipient may have an unrelated relationship that makes a previously
-    /// inert changed part reachable, and that must force the normal reparse.
+    /// needs to publish an opaque part.  The recipient's before graph is the
+    /// only graph that needs to be walked. With no root delta, every
+    /// relationship owner that can differ after apply is already in
+    /// `self.deltas`: an unchanged reachable owner cannot acquire a new edge
+    /// to a changed part. Therefore proving the changed set unreachable before
+    /// apply also proves it unreachable afterward, while still catching a
+    /// recipient's unrelated relationship to a part that was inert in the
+    /// recorded base.
     ///
     /// A malformed or dangling relationship is treated conservatively as
     /// requiring a reparse.  The full workbook/OPC validation remains the
     /// authority for that case.
-    pub(crate) fn projection_unchanged(&self, before: &OpcPackage, after: &OpcPackage) -> bool {
+    pub(crate) fn projection_unchanged(&self, before: &OpcPackage) -> bool {
         // A root relationship edit can select a different workbook or expose
         // a previously unreachable dependency.  Keep the existing full
         // validation path even when the lexical relationship bytes happen to
@@ -657,7 +662,7 @@ impl PartPatch {
             return true;
         }
 
-        closure_is_disjoint(before, &changed) && closure_is_disjoint(after, &changed)
+        closure_is_disjoint(before, &changed)
     }
 
     /// Attach the manifest views of both sides to a changed patch.
@@ -886,7 +891,7 @@ impl PartPatch {
             return Ok(package.clone());
         }
         let target = self.apply_graph(package.opc_package())?;
-        if self.projection_unchanged(package.opc_package(), &target) {
+        if self.projection_unchanged(package.opc_package()) {
             Workbook::validate_edit_candidate(&target)?;
             Ok(package.with_unparsed(target))
         } else {
@@ -1207,9 +1212,7 @@ impl Staged {
         }
         crate::signature_policy::ensure_unsigned(&staged)?;
         let package = match self.publication {
-            Publication::Reparse
-                if patch.projection_unchanged(self.source.opc_package(), &staged) =>
-            {
+            Publication::Reparse if patch.projection_unchanged(self.source.opc_package()) => {
                 Workbook::validate_edit_candidate(&staged)?;
                 self.source.with_unparsed(staged)
             },
