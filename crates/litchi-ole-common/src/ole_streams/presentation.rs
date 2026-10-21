@@ -230,11 +230,7 @@ impl Edit {
     }
 
     /// Stages insertion of a TOC entry.
-    pub fn insert_toc_entry(
-        &mut self,
-        index: usize,
-        entry: TocEntry,
-    ) -> Result<&mut Self, Error> {
+    pub fn insert_toc_entry(&mut self, index: usize, entry: TocEntry) -> Result<&mut Self, Error> {
         let limits = self.source.limits;
         self.update(|stream| stream.insert_toc_entry(index, entry, limits))
     }

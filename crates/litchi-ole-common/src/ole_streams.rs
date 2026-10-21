@@ -464,11 +464,7 @@ fn ensure_u32(value: usize, field: &str) -> Result<u32, Error> {
     u32::try_from(value).map_err(|_| invalid(format!("{field} exceeds u32")))
 }
 
-fn reserve_output(
-    output: &mut Vec<u8>,
-    size: usize,
-    resource: &'static str,
-) -> Result<(), Error> {
+fn reserve_output(output: &mut Vec<u8>, size: usize, resource: &'static str) -> Result<(), Error> {
     output
         .try_reserve_exact(size)
         .map_err(|source| Error::Cfb(OleError::Allocation { resource, source }))
@@ -664,8 +660,7 @@ impl TocEntry {
             ));
         }
         let mut reader = Reader::new(&bytes);
-        let (format, format_marker) =
-            parse_clipboard_format(&mut reader, false, limits.max_bytes)?;
+        let (format, format_marker) = parse_clipboard_format(&mut reader, false, limits.max_bytes)?;
         let target_size = reader.u32("TOCENTRY target-device size")?;
         let target = reader.sized_range(target_size, "TOCENTRY target device", false, false)?;
         if let Some(range) = target.as_ref() {

@@ -8,13 +8,13 @@
 )]
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_ole_common::{Error, LimitKind};
 use litchi_ole_common::object::{Limits as ObjectLimits, Target, Targets, discover};
 use litchi_ole_common::ole_streams::{
     CF_DIB, CF_METAFILEPICT, ClipboardFormat, Limits, OleNativeStream, OlePresentationStream,
     TOC_SIGNATURE, TocEntry, native, parse_named_native, parse_named_presentation, presentation,
     presentation_index, presentation_name,
 };
+use litchi_ole_common::{Error, LimitKind};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -240,8 +240,8 @@ fn alternate_standard_clipboard_marker_survives_typed_rewrite() {
 
     let mut toc = toc_entry();
     toc[0..4].copy_from_slice(&0xffff_fffeu32.to_le_bytes());
-    let entry = TocEntry::parse(&toc, Limits::default())
-        .expect("alternate TOC marker should parse");
+    let entry =
+        TocEntry::parse(&toc, Limits::default()).expect("alternate TOC marker should parse");
     assert_eq!(entry.clipboard_format_marker(), 0xffff_fffe);
     let mut edited = entry.clone();
     edited.set_advf(edited.advf() + 1);
@@ -393,7 +393,7 @@ fn toc_insert_remove_authoring_sets_nani_and_matching_count() {
         ClipboardFormat::Standard(CF_METAFILEPICT),
         Limits::default(),
     )
-        .expect("new TOC entry should be valid");
+    .expect("new TOC entry should be valid");
     let mut edit = source.edit();
     edit.insert_toc_entry(0, entry)
         .expect("insertion should create a NANI table");
@@ -517,14 +517,10 @@ fn named_stream_validation_and_real_cfb_object_integration() {
 
 #[test]
 fn registered_clipboard_format_is_bounded_and_lossless() {
-    let format = ClipboardFormat::registered(b"CustomFormat\0".to_vec(), Limits::default())
-        .unwrap();
-    let stream = OlePresentationStream::new(
-        format.clone(),
-        b"payload".to_vec(),
-        Limits::default(),
-    )
-    .unwrap();
+    let format =
+        ClipboardFormat::registered(b"CustomFormat\0".to_vec(), Limits::default()).unwrap();
+    let stream =
+        OlePresentationStream::new(format.clone(), b"payload".to_vec(), Limits::default()).unwrap();
     let parsed = OlePresentationStream::parse(stream.bytes(), Limits::default()).unwrap();
     assert_eq!(parsed.clipboard_format(), &format);
     assert!(ClipboardFormat::registered(b"not-terminated".to_vec(), Limits::default()).is_err());
@@ -534,9 +530,8 @@ fn registered_clipboard_format_is_bounded_and_lossless() {
 fn primary_registered_bound_is_separate_from_toc_registered_formats() {
     let mut registered_bytes = vec![b'R'; 600];
     registered_bytes.push(0);
-    let format =
-        ClipboardFormat::registered(registered_bytes, Limits::default())
-            .expect("format should fit stream cap");
+    let format = ClipboardFormat::registered(registered_bytes, Limits::default())
+        .expect("format should fit stream cap");
     let entry = TocEntry::new(format.clone(), Limits::default())
         .expect("TOCENTRY should accept the registered name");
     let entry_bytes = entry
@@ -562,8 +557,7 @@ fn primary_registered_bound_is_separate_from_toc_registered_formats() {
         .expect("TOC registered name should use the caller stream bound");
     assert_eq!(parsed.toc_entries()[0].clipboard_format(), &format);
     assert!(
-        OlePresentationStream::new(format.clone(), b"payload".to_vec(), Limits::default())
-            .is_err()
+        OlePresentationStream::new(format.clone(), b"payload".to_vec(), Limits::default()).is_err()
     );
     let primary = presentation::Snapshot::parse(&presentation(false), Limits::default()).unwrap();
     let mut edit = primary.edit();
@@ -613,11 +607,8 @@ fn target_device_checks_offsets_and_complete_devmode_bounds() {
     unterminated[0..2].copy_from_slice(&8u16.to_le_bytes());
     unterminated.extend_from_slice(b"driver");
     assert!(
-        litchi_ole_common::ole_streams::TargetDevice::from_bytes(
-            unterminated,
-            Limits::default()
-        )
-        .is_err()
+        litchi_ole_common::ole_streams::TargetDevice::from_bytes(unterminated, Limits::default())
+            .is_err()
     );
 
     let mut devmode = vec![0; 8 + 156];
@@ -632,10 +623,7 @@ fn target_device_checks_offsets_and_complete_devmode_bounds() {
     short_devmode[6..8].copy_from_slice(&8u16.to_le_bytes());
     short_devmode[8 + 68..8 + 70].copy_from_slice(&70u16.to_le_bytes());
     assert!(
-        litchi_ole_common::ole_streams::TargetDevice::from_bytes(
-            short_devmode,
-            Limits::default()
-        )
-        .is_err()
+        litchi_ole_common::ole_streams::TargetDevice::from_bytes(short_devmode, Limits::default())
+            .is_err()
     );
 }
