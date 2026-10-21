@@ -25,6 +25,11 @@
 | F4 — unprefixed DOFR and saved-selection edits | `parts::dofr::{Edit, Commit, Patch}` and `parts::saved_selection::{Edit, Commit, Patch}`; the prefixed root re-exports are gone |
 | DOC 1k batch, operation bound raised through `EditOptions` | 1,000 `bold` sets: 0.91–1.04× the leaf edit in one process, 0.72× each alone (budget ≤ 2.0×), after the DOC body run coalesces paragraph toggles; on the 0359 tip 6.6 s at 15.7 GB peak, 6.0× the leaf (§5) |
 
+Commits: `cfdeed88d4` (F4), `4394b957a5` (DOC F1), `fc45dbf787` (XLS F1
+and F2, harnesses, gate), `29abcb4af5` (DOC and RTF F2, gate),
+`6e90981ce5` (DOC body-run toggles, probe), `2f3c75bf8b` (trunk merge),
+`e3e805f2dd` (record, evidence, `p0359a`), and this record's gate table.
+
 ## 2. Source-backed families (F2)
 
 Every family follows the 0355a §1 shape:
@@ -242,7 +247,27 @@ batch budget).
 
 ## 8. Gates
 
-TBD.
+Re-run in full on the head after the trunk merge (`e3e805f2dd`), one
+cargo command at a time (`.coord` gate script; logs not committed); the
+working tree was clean afterwards.
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-{doc,xls,rtf,ograph,ole-common,crypto,ppt} -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features doc`, `xls`, `rtf`, `ppt` | 0 each |
+| `cargo test --no-fail-fast --all-features -p` each of the seven crates (doc 1,488, xls 1,871, rtf 1,562, ograph 70, ole-common 310, crypto 88, ppt 1,570) | 0 |
+| `cargo test -p litchi-ops --all-features` (lib 953, doc 217, the integration targets in six chunks 1,473; 2,643) | 0 |
+| `cargo test -p litchi --all-features` (209); `cargo test -p litchi-cli --all-features --test officecli_corpus` (5) | 0; 0 |
+| `LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test capabilities --test registry`, and with every feature but `encryption`; `git diff --exit-code -- crates/litchi-ops/tests` | 0, 0; 0 (no change) |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p` the six crates, `litchi-ops`, `litchi` | 0 |
+| `RUSTC_BOOTSTRAP=1 tools/check_api_glossary.py` (47 profiles, 3,257 bans, 498 families, 77 owners) | 0 |
+| `check_crate_boundaries.py`; `non_iwork_gate.py verify` | 0; 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `tools/perf-baseline`: `cargo check --locked --all-targets`; `tools/native-resave`: `cargo check --locked --all-features`; `tools/perf-cfb-profile`: `cargo check --all-targets` | 0; 0; 0 |
+| tool unit tests (`test_officecli_corpus`, `test_officecli_capability_delta`, `test_no_3rdparty_references`, `test_check_crate_boundaries`, `test_non_iwork_gate`, `test_check_api_glossary`, `test_unified_bench_matrix`; 1,304) | 0 |
+| `officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check`, `check_feature_matrix.py` (31 builds) | 0 each |
+| `officecli_capability_delta.py --officecli …` (regenerated) | 0, no change |
 
 ## 9. Gaps and follow-ups
 
@@ -262,4 +287,8 @@ TBD.
 
 ## 10. Log entry
 
-TBD.
+- 0359a (W5 review): `doc::body_text` and `xls::cell_values` are crate-private behind `Package::edit` and new `Package` routes (DOC `compose`/`plan_three_way`/`history`/`apply_durable`/transfer plans and body reads; XLS `apply_semantic`/`plan_three_way`/`plan_transfer`/`history`, `Edit::join`, `Commit::record_in`).
+- Source-backed publishers are deferred families on source-backed owners: DOC `source_backed::paragraph` (`source_backed::Package`), XLS `source_backed::{cells, comments, sheet_visibility}` (`SourceBackedWorkbook`), RTF `source_backed::tail_append` (`source_backed::Package`); commit writes nothing, `write_to`/`save` stream the former plan byte for byte.
+- F3 accepted under 0351 §2.1 rule 6; F4 `parts::{dofr, saved_selection}::{Edit, Commit, Patch}`.
+- DOC body run coalesces paragraph `bold`/`italic`: 1k sets 6.6 s/15.7 GB → 1.3–1.6 s/0.13 GB, 0.91–1.04× the leaf (budget 2.0×); 256-set batch 0.13×.
+- ABBA vs the 0359 tip: source-backed routes 0.44–1.00×, outputs identical; four one-run misses are the same callgrind instructions; gates all 0; `p0359a`.
