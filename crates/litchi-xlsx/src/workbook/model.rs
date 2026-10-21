@@ -1027,22 +1027,6 @@ impl Workbook {
         crate::pivot::server_formats::view_workbook(self, selector)
     }
 
-    /// Alias for the typed extension collection view.
-    pub fn pivot_server_formats<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableView> {
-        self.pivot_table_server_formats(selector)
-    }
-
-    /// Low-level source-bound alias for the extension collection view.
-    pub fn pivot_server_formats_source<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::server_formats::Snapshot> {
-        self.pivot_table_server_formats_source(selector)
-    }
-
     /// Resolve the typed `pivotTableData` payload for one semantic
     /// non-worksheet PivotTable.  A missing C444 owner is reported as `None`;
     /// malformed or ambiguous owners remain fallible diagnostics.

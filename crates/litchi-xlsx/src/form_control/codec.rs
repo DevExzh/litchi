@@ -320,11 +320,6 @@ pub fn replace_scalar(
     replace_scalar_with_limits(xml, field, value, Limits::default())
 }
 
-/// Alias for [`replace_scalar`].
-pub fn set_scalar(xml: &[u8], field: ScalarField, value: Option<ScalarValue>) -> Result<Vec<u8>> {
-    replace_scalar(xml, field, value)
-}
-
 /// Replace ordered list items by source-local splice.
 pub fn replace_items(xml: &[u8], values: &[Item]) -> Result<Vec<u8>> {
     replace_items_with_limits(xml, values, Limits::default())

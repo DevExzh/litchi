@@ -449,12 +449,15 @@ fn workbook_facade_resolves_server_formats_by_semantic_selector() {
         .unwrap();
     let by_position = workbook
         .workbook_ref()
-        .pivot_server_formats(PivotTableSelector::Position(0))
+        .pivot_table_server_formats(PivotTableSelector::Position(0))
         .unwrap();
 
     assert_eq!(by_name.table_name(), "Pivot");
     assert_eq!(by_name.cache_id(), 7);
-    assert_eq!(by_name.formats(), by_position.formats());
+    assert_eq!(
+        by_name.server_formats().formats(),
+        by_position.server_formats().formats()
+    );
     assert_eq!(
         workbook
             .workbook_ref()
@@ -534,6 +537,7 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
             .workbook_ref()
             .pivot_table("Pivot")
             .unwrap()
+            .server_formats()
             .formats(),
         commit.patch().after().formats()
     );
@@ -582,6 +586,7 @@ fn workbook_facade_patch_is_stale_checked_and_composes_with_ordinary_edit() {
             .workbook_ref()
             .pivot_table("Pivot")
             .unwrap()
+            .server_formats()
             .formats()[0]
             .culture
             .as_deref(),
@@ -751,7 +756,11 @@ fn strict_and_transitional_roots_keep_the_same_extension_qnames_and_relationship
             4
         );
         assert_eq!(
-            load(&fixture.package(), "Pivot").unwrap().formats().len(),
+            load(&fixture.package(), "Pivot")
+                .unwrap()
+                .server_formats()
+                .formats()
+                .len(),
             2
         );
     }
@@ -766,7 +775,7 @@ fn u32_whitespace_and_strict_transitional_relationship_ids_are_accepted() {
             ..FixtureOptions::default()
         });
         let snapshot = load(&fixture.package(), "Pivot").unwrap();
-        assert_eq!(snapshot.formats().len(), 2);
+        assert_eq!(snapshot.server_formats().formats().len(), 2);
         assert_eq!(snapshot.cache_id(), 7);
     }
 }
@@ -788,7 +797,14 @@ fn c510_uri_token_padding_and_numeric_lexicals_survive_structural_rewrite() {
         let source = String::from_utf8(before.clone()).unwrap();
         assert!(source.contains(&format!(r#"uri="{padded_uri}""#)));
         assert!(source.contains(&format!(r#"count="{padded_count}""#)));
-        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 2);
+        assert_eq!(
+            load(&package, "Pivot")
+                .unwrap()
+                .server_formats()
+                .formats()
+                .len(),
+            2
+        );
 
         let no_op = edit(&mut package, "Pivot").unwrap().commit().unwrap();
         assert!(!no_op.changed());
@@ -801,7 +817,14 @@ fn c510_uri_token_padding_and_numeric_lexicals_survive_structural_rewrite() {
         let changed = String::from_utf8(table_blob(&package)).unwrap();
         assert!(changed.contains(&format!(r#"uri="{padded_uri}""#)));
         assert!(changed.contains(&format!(r#"count="{padded_count}""#)));
-        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 2);
+        assert_eq!(
+            load(&package, "Pivot")
+                .unwrap()
+                .server_formats()
+                .formats()
+                .len(),
+            2
+        );
 
         commit.patch().inverse().apply(&mut package).unwrap();
         assert_eq!(table_blob(&package), before);
@@ -876,7 +899,7 @@ fn mce_selected_owner_is_readable_but_scalar_publication_is_refused() {
 
     let snapshot = load(&package, "Pivot").unwrap();
     assert!(snapshot.has_ambiguous_mce_owner());
-    assert_eq!(snapshot.formats().len(), 2);
+    assert_eq!(snapshot.server_formats().formats().len(), 2);
     let before = table_blob(&package);
     assert!(edit(&mut package, "Pivot").is_err());
     assert_eq!(table_blob(&package), before);
@@ -1139,18 +1162,21 @@ fn typed_reads_are_selector_first_and_close_the_logical_cache_identity() {
     let by_name = load(&package, PivotTableSelector::Name("Pivot")).unwrap();
     assert_eq!(by_name.table_name(), "Pivot");
     assert_eq!(by_name.cache_id(), 7);
-    assert_eq!(by_name.formats().len(), 2);
+    assert_eq!(by_name.server_formats().formats().len(), 2);
     assert_eq!(
-        by_name.formats()[0],
+        by_name.server_formats().formats()[0],
         ServerFormat::new(Some("en-US".to_owned()), Some("#,##0.00".to_owned()))
     );
     assert_eq!(
-        by_name.formats()[1],
+        by_name.server_formats().formats()[1],
         ServerFormat::new(Some("_x005F_005F_".to_owned()), None)
     );
 
     let by_position = load(&package, PivotTableSelector::Position(0)).unwrap();
-    assert_eq!(by_position.formats(), by_name.formats());
+    assert_eq!(
+        by_position.server_formats().formats(),
+        by_name.server_formats().formats()
+    );
     assert!(load(&package, TABLE_URI).is_err());
     assert!(load(&package, PivotTableSelector::Position(1)).is_err());
 }
@@ -1169,9 +1195,15 @@ fn server_format_children_use_the_extension_namespace_and_allow_legal_spacing() 
     replace_default_server_format_children(&mut package, spaced_children);
 
     let snapshot = load(&package, "Pivot").unwrap();
-    assert_eq!(snapshot.formats().len(), 2);
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("en-US"));
-    assert_eq!(snapshot.formats()[1].format.as_deref(), Some("0.00"));
+    assert_eq!(snapshot.server_formats().formats().len(), 2);
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("en-US")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[1].format.as_deref(),
+        Some("0.00")
+    );
 }
 
 #[test]
@@ -1306,7 +1338,7 @@ fn strict_root_and_alternate_prefixes_keep_typed_values() {
     });
     let snapshot = load(&fixture.package(), "Pivot").unwrap();
     assert_eq!(
-        snapshot.formats(),
+        snapshot.server_formats().formats(),
         [
             ServerFormat::new(Some("\"fr-FR\"".to_owned()), Some("_x0041_".to_owned())),
             ServerFormat::new(Some("\u{1}".to_owned()), None),
@@ -1384,10 +1416,16 @@ fn scalar_set_replace_clear_preserves_children_count_and_opaque_siblings() {
     );
 
     let after = load(&package, "Pivot").unwrap();
-    assert_eq!(after.formats()[0].culture.as_deref(), Some("de-DE"));
-    assert_eq!(after.formats()[0].format, None);
-    assert_eq!(after.formats()[1].format.as_deref(), Some("0.00%"));
-    assert_eq!(after.formats().len(), 2);
+    assert_eq!(
+        after.server_formats().formats()[0].culture.as_deref(),
+        Some("de-DE")
+    );
+    assert_eq!(after.server_formats().formats()[0].format, None);
+    assert_eq!(
+        after.server_formats().formats()[1].format.as_deref(),
+        Some("0.00%")
+    );
+    assert_eq!(after.server_formats().formats().len(), 2);
 
     let mut replay = original.clone();
     apply_patch(&mut replay, commit.patch()).unwrap();
@@ -1412,7 +1450,7 @@ fn changed_scalar_preserves_unchanged_entity_lexical_attributes() {
             .contains(r#"format="&#34;&#10;""#)
     );
     assert_eq!(
-        load(&package, "Pivot").unwrap().formats()[0]
+        load(&package, "Pivot").unwrap().server_formats().formats()[0]
             .format
             .as_deref(),
         Some("\"\n")
@@ -1462,10 +1500,19 @@ fn explicit_keep_set_clear_distinguishes_absent_attributes() {
     let commit = transaction.commit().unwrap();
     assert!(commit.changed());
     let snapshot = load(&package, "Pivot").unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("en-US"));
-    assert_eq!(snapshot.formats()[0].format.as_deref(), Some("0"));
-    assert_eq!(snapshot.formats()[1].culture, None);
-    assert_eq!(snapshot.formats()[1].format.as_deref(), Some("0.00"));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("en-US")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[0].format.as_deref(),
+        Some("0")
+    );
+    assert_eq!(snapshot.server_formats().formats()[1].culture, None);
+    assert_eq!(
+        snapshot.server_formats().formats()[1].format.as_deref(),
+        Some("0.00")
+    );
 }
 
 #[test]
@@ -1535,7 +1582,10 @@ fn structural_list_crud_preserves_order_count_comments_and_prefix_in_both_dialec
             ServerFormat::new(Some("second".to_owned()), None),
             ServerFormat::new(Some("inserted".to_owned()), Some("0.00%".to_owned())),
         ];
-        assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+        assert_eq!(
+            load(&package, "Pivot").unwrap().server_formats().formats(),
+            expected
+        );
         let changed = String::from_utf8(table_blob(&package)).unwrap();
         assert!(changed.contains(r#"count="3""#));
         assert!(changed.contains("<!-- before -->"));
@@ -1547,7 +1597,10 @@ fn structural_list_crud_preserves_order_count_comments_and_prefix_in_both_dialec
         // This source intentionally retains physical comments/spacing.  The
         // ordinary PackageWriter publication contract is compact-only, while
         // the owner under test must still read and rewrite the retained XML.
-        assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+        assert_eq!(
+            load(&package, "Pivot").unwrap().server_formats().formats(),
+            expected
+        );
 
         commit.patch().inverse().apply(&mut package).unwrap();
         assert_eq!(table_blob(&package), before);
@@ -1594,6 +1647,7 @@ fn ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse() {
                 .workbook_ref()
                 .pivot_table("Pivot")
                 .unwrap()
+                .server_formats()
                 .formats(),
             commit.patch().after().formats()
         );
@@ -1626,7 +1680,10 @@ fn equal_typed_reorder_retains_each_lexical_leaf_source() {
     let mut package = fixture.package();
     let before = table_blob(&package);
     let snapshot = load(&package, "Pivot").unwrap();
-    assert_eq!(snapshot.formats()[0], snapshot.formats()[1]);
+    assert_eq!(
+        snapshot.server_formats().formats()[0],
+        snapshot.server_formats().formats()[1]
+    );
 
     let mut transaction = edit(&mut package, "Pivot").unwrap();
     transaction.reorder_server_formats(&[1, 0]).unwrap();
@@ -1638,8 +1695,8 @@ fn equal_typed_reorder_retains_each_lexical_leaf_source() {
     assert!(prefixed < defaulted);
     assert!(changed.contains(r#"format="0" culture="&#115;ame""#));
     assert_eq!(
-        load(&package, "Pivot").unwrap().formats(),
-        snapshot.formats()
+        load(&package, "Pivot").unwrap().server_formats().formats(),
+        snapshot.server_formats().formats()
     );
 
     commit.patch().inverse().apply(&mut package).unwrap();
@@ -1670,7 +1727,11 @@ fn insert_remove_is_an_exact_noop_but_remove_insert_is_a_source_change() {
     });
     let mut package = fixture.package();
     let before = table_blob(&package);
-    let expected = load(&package, "Pivot").unwrap().formats().to_vec();
+    let expected = load(&package, "Pivot")
+        .unwrap()
+        .server_formats()
+        .formats()
+        .to_vec();
     let mut transaction = edit(&mut package, "Pivot").unwrap();
     let removed = transaction.remove_server_format(0).unwrap();
     assert_eq!(removed, ServerFormat::new(Some("same".to_owned()), None));
@@ -1678,7 +1739,10 @@ fn insert_remove_is_an_exact_noop_but_remove_insert_is_a_source_change() {
     let commit = transaction.commit().unwrap();
     assert!(commit.changed());
     assert!(!commit.patch().is_empty());
-    assert_eq!(load(&package, "Pivot").unwrap().formats(), expected);
+    assert_eq!(
+        load(&package, "Pivot").unwrap().server_formats().formats(),
+        expected
+    );
     assert_ne!(table_blob(&package), before);
 }
 
@@ -1731,7 +1795,14 @@ fn proven_index_references_are_remapped_and_invalid_removals_are_refused() {
     let changed = String::from_utf8(table_blob(&package)).unwrap();
     assert!(changed.contains(r#"<x15:x in="2"/>"#));
     assert!(!changed.contains(r#"<x15:x in="1"/>"#));
-    assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 3);
+    assert_eq!(
+        load(&package, "Pivot")
+            .unwrap()
+            .server_formats()
+            .formats()
+            .len(),
+        3
+    );
 
     let fixture = Fixture::build(FixtureOptions {
         pivot_table_outer_exts: pivot_data_extension(&pivot_value_cell("1")),
@@ -1840,7 +1911,14 @@ fn unchanged_reference_indices_retain_whitespace_and_entity_lexical_spelling() {
             changed.contains(&format!(r#"in="{raw_index}""#)),
             "structural edits that keep the referenced index must preserve raw lexical in"
         );
-        assert_eq!(load(&package, "Pivot").unwrap().formats().len(), 4);
+        assert_eq!(
+            load(&package, "Pivot")
+                .unwrap()
+                .server_formats()
+                .formats()
+                .len(),
+            4
+        );
     }
 }
 
@@ -2705,7 +2783,11 @@ fn greater_than_65535_server_format_text_is_allowed_within_caller_limits() {
     let package = OpcPackage::from_bytes_with_limits(&fixture.bytes, limits).unwrap();
     let snapshot = load(&package, "Pivot").unwrap();
     assert_eq!(
-        snapshot.formats()[0].culture.as_ref().unwrap().len(),
+        snapshot.server_formats().formats()[0]
+            .culture
+            .as_ref()
+            .unwrap()
+            .len(),
         65_536
     );
 }
@@ -2725,8 +2807,14 @@ fn unpaired_surrogate_is_rejected_but_escaped_control_and_literal_are_retained()
         ..FixtureOptions::default()
     });
     let snapshot = load(&control.package(), "Pivot").unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("\u{1}"));
-    assert_eq!(snapshot.formats()[1].culture.as_deref(), Some("_x0041_"));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("\u{1}")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[1].culture.as_deref(),
+        Some("_x0041_")
+    );
 }
 
 #[test]
@@ -2748,7 +2836,10 @@ fn numeric_xml_controls_are_rejected_in_typed_and_opaque_attributes() {
         ..FixtureOptions::default()
     });
     let snapshot = load(&typed_spreadsheet_escape.package(), "Pivot").unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("\u{1}"));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("\u{1}")
+    );
 
     let opaque_spreadsheet_escape = Fixture::build(FixtureOptions {
         table_attrs: r#" foreign="_x0001_""#.to_owned(),
@@ -2778,8 +2869,14 @@ fn changed_writes_escape_decoded_controls_and_literal_xstring_markers() {
     assert!(changed.contains(r#"culture="_x0001_""#));
     assert!(changed.contains(r#"format="_x005F_x0041_""#));
     let snapshot = load(&package, "Pivot").unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("\u{1}"));
-    assert_eq!(snapshot.formats()[1].format.as_deref(), Some("_x0041_"));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("\u{1}")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[1].format.as_deref(),
+        Some("_x0041_")
+    );
 }
 
 #[test]

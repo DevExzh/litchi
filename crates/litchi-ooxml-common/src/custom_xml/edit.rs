@@ -96,15 +96,6 @@ impl Edit {
         Ok(true)
     }
 
-    /// Contextual alias for [`Self::set_xml`].
-    /// # Errors
-    ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn set_item_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
-        self.set_xml(index, xml)
-    }
-
     /// Replace the declared XML content type while retaining payload bytes.
     /// # Errors
     ///
@@ -198,15 +189,6 @@ impl Edit {
         let xml = rewrite_props(source, before, &props, conformance)?;
         drop(props);
         self.set_properties_xml(index, xml)
-    }
-
-    /// Contextual alias for [`Self::set_properties`].
-    /// # Errors
-    ///
-    /// Returns an error when input violates OOXML constraints, exceeds a configured
-    /// bound, or an underlying XML or package operation fails.
-    pub fn set_props(&mut self, index: usize, props: Props) -> Result<bool> {
-        self.set_properties(index, props)
     }
 
     /// Remove the known properties relationship and leave unknown data-part

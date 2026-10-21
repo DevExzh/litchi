@@ -60,24 +60,6 @@ impl Edit {
         self.draft.as_ref()
     }
 
-    /// Contextual alias for [`Self::info`].
-    #[must_use]
-    pub fn xml_maps(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Contextual catalog alias for [`Self::info`].
-    #[must_use]
-    pub fn catalog(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Explicit alias for the typed `MapInfo` value.
-    #[must_use]
-    pub fn map_info(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
     /// The conformance that will be used at publication.
     #[must_use]
     pub fn conformance(&self) -> XmlMapConformance {

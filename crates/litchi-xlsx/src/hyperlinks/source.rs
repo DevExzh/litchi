@@ -151,16 +151,6 @@ impl Edit {
         self.replace_by_reference(value)
     }
 
-    /// Alias for [`Self::put`].
-    pub fn put_hyperlink(&mut self, value: super::Hyperlink) -> Result<bool> {
-        self.put(value)
-    }
-
-    /// Alias for [`Self::put`].
-    pub fn replace_hyperlink(&mut self, value: super::Hyperlink) -> Result<bool> {
-        self.put(value)
-    }
-
     /// Replace one existing hyperlink, allowing its reference to change.
     pub fn replace_at(
         &mut self,
@@ -217,14 +207,6 @@ impl Edit {
         Ok(Some(removed))
     }
 
-    /// Alias for [`Self::remove`].
-    pub fn remove_hyperlink(
-        &mut self,
-        reference: super::HyperlinkReference,
-    ) -> Result<Option<super::Hyperlink>> {
-        self.remove(reference)
-    }
-
     /// Replace the complete staged hyperlink list.
     pub fn set(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
         self.before.check_execution()?;
@@ -238,16 +220,6 @@ impl Edit {
         self.record_mutation();
         self.before.check_execution()?;
         Ok(true)
-    }
-
-    /// Alias for [`Self::set`].
-    pub fn replace(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
-        self.set(values)
-    }
-
-    /// Alias for [`Self::set`].
-    pub fn replace_all(&mut self, values: Vec<super::Hyperlink>) -> Result<bool> {
-        self.set(values)
     }
 
     /// Remove every hyperlink.

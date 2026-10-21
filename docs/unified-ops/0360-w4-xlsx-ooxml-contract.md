@@ -64,6 +64,25 @@ XLSX/shared OOXML glossary profiles pass, plus 35 glossary/matrix tool tests.
 The fresh inventory has zero flagged rows; its coverage does not prove that
 aliases or untyped resource failures are absent.
 
+## Duplicate convenience entries
+
+A second naming slice removes 58 documented duplicate methods and aliases.
+Collection snapshots keep their existing canonical loaders and accessors;
+hyperlink edits keep `put`, `remove` and `set`; drawings keep explicit lazy
+payload reads; pivot snapshots expose lists through their typed values.
+All affected tests and callers move with the removals. Neither the underlying
+operation nor its output algorithm changes. The glossary bans every removed
+entry at its caller-visible scopes (119 paths per full XLSX/shared profile
+pair), including reexports.
+
+[The alias receipt](results/0360/convenience-aliases.json) records a passing
+all-target/all-feature workspace check, all four glossary profiles, 247
+focused tests, clippy, warning-free rustdoc and harness compilation.
+
+The additional exact-forwarder audit remains part of the final naming review;
+constructors using `Default` and public entry points calling private helpers
+are not duplicate public operations.
+
 ## Required work before acceptance
 
 - Finish typed limits for every remaining family whose empty `LimitKind`

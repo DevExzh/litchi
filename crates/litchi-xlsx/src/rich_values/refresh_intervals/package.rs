@@ -55,11 +55,6 @@ impl Snapshot {
         })
     }
 
-    /// Alias emphasizing the source-bound read operation.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Every `CT_RichValueType` in source order, including types with no
     /// refresh payload.  The slice index is the transaction selector.
     #[must_use]

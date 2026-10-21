@@ -426,23 +426,12 @@ impl Item {
         &self.value
     }
 
-    /// Alias matching the wire attribute name.
-    #[must_use]
-    pub fn val(&self) -> &str {
-        self.value()
-    }
-
     /// Replace the item value.
     pub fn set_value(&mut self, value: impl Into<String>) -> Result<()> {
         let value = value.into();
         validate_item_value(&value, MAX_ITEM_VALUE_BYTES)?;
         self.value = value;
         Ok(())
-    }
-
-    /// Alias matching the wire attribute name.
-    pub fn set_val(&mut self, value: impl Into<String>) -> Result<()> {
-        self.set_value(value)
     }
 
     /// Whether a source item carries opaque attributes or child markup.
@@ -1139,12 +1128,6 @@ impl Properties {
         self.seltype
             .cloned()
             .unwrap_or(KnownOrUnknown::Known(SelectionType::Single))
-    }
-
-    /// Alias using a word-separated spelling of the wire name.
-    #[must_use]
-    pub fn effective_sel_type(&self) -> KnownOrUnknown<SelectionType> {
-        self.effective_seltype()
     }
 
     /// Return the optional horizontal alignment.

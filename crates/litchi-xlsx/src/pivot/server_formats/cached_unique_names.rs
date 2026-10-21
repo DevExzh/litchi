@@ -467,25 +467,10 @@ impl Snapshot {
         graph.snapshot(cache_selector.into(), field_selector)
     }
 
-    /// Alias emphasizing that this state is tied to exact source bytes.
-    pub fn read<'a>(
-        package: &OpcPackage,
-        cache_selector: impl Into<PivotCacheSelector>,
-        field_selector: PivotCacheFieldSelector<'a>,
-    ) -> Result<Self> {
-        Self::load(package, cache_selector, field_selector)
-    }
-
     /// The typed diagnostic value.
     #[must_use]
     pub fn cached_unique_names(&self) -> &CachedUniqueNames {
         &self.value
-    }
-
-    /// Alias for callers using the element name.
-    #[must_use]
-    pub fn names(&self) -> &[CachedUniqueName] {
-        self.value.names()
     }
 
     /// The semantic cache ID.
@@ -515,7 +500,7 @@ impl Snapshot {
     /// Canonical advanced-layer entry accessor.
     #[must_use]
     pub fn entries(&self) -> &[CachedUniqueName] {
-        self.names()
+        self.cached_unique_names().names()
     }
 
     /// Whether the recognized payload was selected through an MCE branch.
@@ -605,12 +590,12 @@ impl<'a> Transaction<'a> {
         let before = Snapshot::load(target, cache_selector, field_selector)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.names().len())
+            .try_reserve_exact(before.cached_unique_names().names().len())
             .map_err(|source| Error::Allocation {
                 resource: "cached unique-name staged values",
                 source,
             })?;
-        for name in before.names() {
+        for name in before.cached_unique_names().names() {
             let mut copy = String::new();
             copy.try_reserve_exact(name.name.len())
                 .map_err(|source| Error::Allocation {
@@ -632,7 +617,7 @@ impl<'a> Transaction<'a> {
         before: Snapshot,
         staged: Vec<String>,
     ) -> Result<Self> {
-        if staged.len() != before.names().len() {
+        if staged.len() != before.cached_unique_names().names().len() {
             return Err(invalid(
                 "cached unique-name staged values do not match source length",
             ));
@@ -659,6 +644,7 @@ impl<'a> Transaction<'a> {
         validate_name_value(value, self.target.read_limits())?;
         let position = self
             .before
+            .cached_unique_names()
             .names()
             .iter()
             .position(|entry| entry.index == item_index)
@@ -717,6 +703,7 @@ impl<'a> Transaction<'a> {
     #[must_use]
     pub(crate) fn is_changed(&self) -> bool {
         self.before
+            .cached_unique_names()
             .names()
             .iter()
             .zip(&self.staged)
@@ -764,6 +751,7 @@ impl<'a> Transaction<'a> {
             PivotCacheFieldSelector::Ordinal(self.before.field_ordinal()),
         )?;
         if !after
+            .cached_unique_names()
             .names()
             .iter()
             .map(|entry| entry.name.as_str())
@@ -930,12 +918,12 @@ impl Edit {
         let before = Snapshot::load(source.pivot_package(), cache_selector, field_selector)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.names().len())
+            .try_reserve_exact(before.cached_unique_names().names().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook cached unique-name staged values",
                 source,
             })?;
-        for name in before.names() {
+        for name in before.cached_unique_names().names() {
             let mut copy = String::new();
             copy.try_reserve_exact(name.name.len())
                 .map_err(|source| Error::Allocation {
@@ -968,6 +956,7 @@ impl Edit {
         validate_name_value(value, self.source.pivot_package().read_limits())?;
         let position = self
             .before
+            .cached_unique_names()
             .names()
             .iter()
             .position(|entry| entry.index == item_index)
@@ -1021,6 +1010,7 @@ impl Edit {
 
     fn changed(&self) -> bool {
         self.before
+            .cached_unique_names()
             .names()
             .iter()
             .zip(&self.staged)
@@ -1029,7 +1019,11 @@ impl Edit {
 
     /// Discard every staged change.
     pub fn reset(&mut self) {
-        for (slot, before) in self.staged.iter_mut().zip(self.before.names()) {
+        for (slot, before) in self
+            .staged
+            .iter_mut()
+            .zip(self.before.cached_unique_names().names())
+        {
             slot.clone_from(&before.name);
         }
     }
@@ -2087,7 +2081,12 @@ fn rewrite_cache(
     let mut output_len = source.len();
     let mut owner_len = owner.len();
     let mut changed = false;
-    for ((entry, previous), next) in before.entries.iter().zip(before.names()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.cached_unique_names().names())
+        .zip(staged)
+    {
         validate_name_value(next, limits)?;
         let encoded_len = escaped_xstring_len(next)?;
         if encoded_len > maximum_attribute_bytes || encoded_len > MAX_ATTRIBUTE_TEXT_BYTES {
@@ -2155,7 +2154,12 @@ fn rewrite_cache(
             source,
         })?;
     let mut cursor = 0usize;
-    for ((entry, previous), next) in before.entries.iter().zip(before.names()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.cached_unique_names().names())
+        .zip(staged)
+    {
         let range = &entry.name.value;
         output.extend_from_slice(
             source

@@ -19,7 +19,7 @@ pub mod source;
 
 pub use codec::{
     SourceProperties, SourceView, SourceWritable, insert_item, inspect, parse, remove_item,
-    replace_items, replace_scalar, set_scalar, write,
+    replace_items, replace_scalar, write,
 };
 pub(crate) use mirror::{ClientDataSource, MirrorLimits, replace_scalar_pair_with_limits};
 pub use model::{

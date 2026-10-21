@@ -39,39 +39,10 @@ impl Snapshot {
         })
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Borrow the typed Custom XML Maps value when the workbook owns one.
     #[must_use]
     pub fn info(&self) -> Option<&XmlMapInfo> {
         self.info.as_ref()
-    }
-
-    /// Contextual alias for [`Self::info`].
-    #[must_use]
-    pub fn xml_maps(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Contextual catalog alias for [`Self::info`].
-    #[must_use]
-    pub fn catalog(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Explicit alias for the typed `MapInfo` value.
-    #[must_use]
-    pub fn map_info(&self) -> Option<&XmlMapInfo> {
-        self.info()
-    }
-
-    /// Contextual value alias for [`Self::info`].
-    #[must_use]
-    pub fn value(&self) -> Option<&XmlMapInfo> {
-        self.info()
     }
 
     /// The namespace conformance used by the owned part, or Transitional for

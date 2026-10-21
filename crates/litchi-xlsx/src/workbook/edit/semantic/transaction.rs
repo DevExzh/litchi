@@ -1204,18 +1204,6 @@ impl Edit {
         super::super::transfer::copy_scalar_cells_from(self, donor, source, range, target, anchor)
     }
 
-    /// Descriptive alias for [`Self::copy_cells_from`].
-    pub fn copy_scalar_cells_from<'source, 'range, 'target, 'anchor>(
-        &mut self,
-        donor: &Workbook,
-        source: impl Into<Selector<'source>>,
-        range: impl Into<Area<'range>>,
-        target: impl Into<Selector<'target>>,
-        anchor: impl Into<At<'anchor>>,
-    ) -> Result<Option<&mut Self>> {
-        self.copy_cells_from(donor, source, range, target, anchor)
-    }
-
     /// Move a bounded cell region with the same dependency closure and
     /// refusals as [`Self::copy_cells`].
     ///

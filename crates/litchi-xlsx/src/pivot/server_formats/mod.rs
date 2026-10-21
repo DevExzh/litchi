@@ -10,12 +10,12 @@
 //! extension bytes and all other package members remain source material.
 //!
 //! The ordinary workbook surface is `Workbook::pivot_table_server_formats`
-//! (also available as `Workbook::pivot_server_formats`) for typed reads and
+//! for typed reads and
 //! `Package::edit_pivot_table` for a source-checked edit.  Selectors are a
 //! semantic PivotTable name or workbook position; callers do not provide OPC
 //! relationship IDs or Part names.  An edit stages `ServerFormat` values or
 //! explicit `Attribute::{Keep,Set,Clear}` operations for `culture` and
-//! `format`, then publishes through `Commit::workbook` and its exact
+//! `format`, then publishes through `Commit::package` and its exact
 //! reversible `Patch`.
 //!
 //! This owner covers the C510 `pivotTableServerFormats` payload under a
@@ -188,12 +188,6 @@ impl PivotTableView {
         &self.value
     }
 
-    /// Alias for callers using the extension element's collection name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.value.formats()
-    }
-
     /// Semantic PivotTable name.
     #[must_use]
     pub fn table_name(&self) -> &str {
@@ -315,12 +309,6 @@ impl PivotTableServerFormats {
         &self.formats
     }
 
-    /// Alias for callers using the XML collection name.
-    #[must_use]
-    pub fn server_formats(&self) -> &[ServerFormat] {
-        self.formats()
-    }
-
     /// Whether one `pivotValueCellExtra@in` used the unresolved inclusive
     /// endpoint.  Such a source remains readable but cannot be changed.
     #[must_use]
@@ -368,24 +356,10 @@ impl Snapshot {
         graph.snapshot(selector)
     }
 
-    /// Alias emphasizing that this state is tied to exact source bytes.
-    pub fn read<'a>(
-        package: &OpcPackage,
-        selector: impl Into<PivotTableSelector<'a>>,
-    ) -> Result<Self> {
-        Self::load(package, selector)
-    }
-
     /// The typed server-format collection.
     #[must_use]
     pub fn server_formats(&self) -> &PivotTableServerFormats {
         &self.value
-    }
-
-    /// Alias for callers that use the extension element's name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.value.formats()
     }
 
     /// Semantic PivotTable name.
@@ -622,20 +596,20 @@ impl<'a> Transaction<'a> {
         ensure_editable(&before)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "PivotTable staged server-format values",
                 source,
             })?;
-        staged.extend_from_slice(before.formats());
+        staged.extend_from_slice(before.server_formats().formats());
         let mut staged_sources = Vec::new();
         staged_sources
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "PivotTable staged server-format source order",
                 source,
             })?;
-        staged_sources.extend((0..before.formats().len()).map(Some));
+        staged_sources.extend((0..before.server_formats().formats().len()).map(Some));
         Ok(Self {
             selection: before.selection,
             target,
@@ -820,7 +794,7 @@ impl<'a> Transaction<'a> {
     /// Whether the staged semantic list differs from the source list.
     #[must_use]
     pub(crate) fn is_changed(&self) -> bool {
-        self.before.formats() != self.staged.as_slice()
+        self.before.server_formats().formats() != self.staged.as_slice()
             || self
                 .staged_sources
                 .iter()
@@ -858,7 +832,7 @@ impl<'a> Transaction<'a> {
             .set_blob_shared(Arc::new(output));
         validate_candidate_limits(&candidate)?;
         let after = Snapshot::load(&candidate, PivotTableSelector::Position(self.selection))?;
-        if after.formats() != self.staged.as_slice()
+        if after.server_formats().formats() != self.staged.as_slice()
             || !after.same_closure(&self.before)
             || after.table_owner.start != self.before.table_owner.start
         {
@@ -994,7 +968,9 @@ impl SourcePatch {
         } else {
             resulting.same_source(&self.after)
         };
-        if resulting.formats() != self.after.formats() || !target_matches {
+        if resulting.server_formats().formats() != self.after.server_formats().formats()
+            || !target_matches
+        {
             return Err(invalid(
                 "PivotTable server-format patch verification failed",
             ));
@@ -1069,20 +1045,20 @@ impl Edit {
         ensure_editable(&before)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format values",
                 source,
             })?;
-        staged.extend_from_slice(before.formats());
+        staged.extend_from_slice(before.server_formats().formats());
         let mut staged_sources = Vec::new();
         staged_sources
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format source order",
                 source,
             })?;
-        staged_sources.extend((0..before.formats().len()).map(Some));
+        staged_sources.extend((0..before.server_formats().formats().len()).map(Some));
         Ok(Self {
             source: source.clone(),
             selection: before.selection,
@@ -1102,12 +1078,6 @@ impl Edit {
     #[must_use]
     pub fn server_formats(&self) -> &[ServerFormat] {
         &self.staged
-    }
-
-    /// Alias for callers using the extension element's name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.server_formats()
     }
 
     /// Set, replace, or clear both optional attributes explicitly.
@@ -1278,10 +1248,11 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.clear();
-        self.staged.extend_from_slice(self.before.formats());
+        self.staged
+            .extend_from_slice(self.before.server_formats().formats());
         self.staged_sources.clear();
         self.staged_sources
-            .extend((0..self.before.formats().len()).map(Some));
+            .extend((0..self.before.server_formats().formats().len()).map(Some));
     }
 
     /// Validate, reopen, and publish a new immutable package. An unchanged
@@ -2032,7 +2003,12 @@ fn rewrite_scalar_table(
     let mut output_len = source.len();
     let mut owner_len = owner.len();
     let mut has_edits = false;
-    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.server_formats().formats())
+        .zip(staged)
+    {
         has_edits |= apply_planned_attribute_delta(
             source,
             &entry.start_tag,
@@ -2080,7 +2056,12 @@ fn rewrite_scalar_table(
         ));
     }
     let mut edits = Vec::<(Range<usize>, Vec<u8>)>::new();
-    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.server_formats().formats())
+        .zip(staged)
+    {
         push_named_attribute_edit(
             source,
             &entry.start_tag,
@@ -2363,7 +2344,7 @@ fn staged_child_len(
     existing_leaf_len(
         before.table.bytes.as_slice(),
         &before.entries[source_index],
-        &before.formats()[source_index],
+        &before.server_formats().formats()[source_index],
         &staged[new_index],
         maximum_attribute_bytes,
         include_open,
@@ -2780,7 +2761,7 @@ fn append_staged_child(
         output,
         source,
         &before.entries[source_index],
-        &before.formats()[source_index],
+        &before.server_formats().formats()[source_index],
         &staged[new_index],
         maximum_attribute_bytes,
         include_open,

@@ -30,11 +30,6 @@ impl Snapshot {
         Ok(Self { revisions, source })
     }
 
-    /// Alias for [`Self::load`] that emphasizes the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Borrow the complete typed revision owner, when present.
     #[must_use]
     pub fn revisions(&self) -> Option<&Revisions> {

@@ -626,12 +626,6 @@ impl Snapshot {
         &self.entries
     }
 
-    /// Alias emphasizing the custom-data storage collection.
-    #[must_use]
-    pub fn storages(&self) -> &[Part] {
-        self.entries()
-    }
-
     /// Find a storage by its exact decoded UID.
     #[must_use]
     pub fn find(&self, id: &str) -> Option<&Part> {

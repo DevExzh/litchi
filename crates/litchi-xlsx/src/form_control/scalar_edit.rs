@@ -88,11 +88,6 @@ impl FormControlSnapshot {
     pub const fn form_controls(&self) -> &FormControlCollection {
         &self.collection
     }
-    /// Alias for [`Self::form_controls`].
-    #[must_use]
-    pub const fn collection(&self) -> &FormControlCollection {
-        &self.collection
-    }
     /// Resolve one control by an ordinary selector.
     pub fn control<'a>(
         &self,

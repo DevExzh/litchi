@@ -265,7 +265,7 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
     let mut transaction = Edit::new(&package).unwrap();
     assert!(
         transaction
-            .set_item_xml(
+            .set_xml(
                 0,
                 br#"<customer xmlns="urn:customer"><future marker="changed"/></customer>"#.to_vec(),
             )

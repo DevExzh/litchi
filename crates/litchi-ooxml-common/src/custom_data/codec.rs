@@ -226,12 +226,6 @@ impl Limits {
         self.uid_units = value;
         self
     }
-
-    /// Alias for [`Self::with_uid_units`].
-    #[must_use]
-    pub const fn with_max_uid_units(self, value: usize) -> Self {
-        self.with_uid_units(value)
-    }
 }
 
 impl Default for Limits {

@@ -732,11 +732,6 @@ impl<'a> ContentPartSource<'a> {
         &self.owner
     }
 
-    /// Alias for [`Self::owner_element`] used by range-oriented callers.
-    pub const fn owner_range(&self) -> ByteRange {
-        self.owner.range()
-    }
-
     /// Required `r:id` value authored by the owner.
     #[must_use]
     pub fn relationship_id(&self) -> &str {

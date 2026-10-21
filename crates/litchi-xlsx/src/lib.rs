@@ -278,8 +278,7 @@ pub use pivot::{
 pub use print_options::{PrintOptions, parse_print_options};
 pub use semantic_limits::SemanticLimits;
 pub use streaming::{
-    StreamingCell, StreamingCellValue, StreamingValue, StreamingWorkbookLimits,
-    StreamingWorkbookWriter,
+    StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
 };
 // Query-table semantic types remain under the contextual `query_table` owner;
 // its package reads are also available at this convenience facade (edits go

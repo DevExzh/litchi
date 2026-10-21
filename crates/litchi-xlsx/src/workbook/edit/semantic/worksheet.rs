@@ -243,14 +243,6 @@ impl Sheet<'_> {
         Ok(self)
     }
 
-    /// Alias for [`Self::put_hyperlink`] emphasizing replacement semantics.
-    pub fn replace_hyperlink(
-        &mut self,
-        hyperlink: crate::hyperlinks::Hyperlink,
-    ) -> Result<&mut Self> {
-        self.put_hyperlink(hyperlink)
-    }
-
     /// Remove one hyperlink selected by its checked cell or range reference.
     pub fn remove_hyperlink(
         &mut self,

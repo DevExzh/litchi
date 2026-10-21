@@ -42,22 +42,11 @@ impl Snapshot {
         })
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Borrow the workbook's external-link entries in stable relationship-ID
     /// order.
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
         &self.entries
-    }
-
-    /// Contextual alias for [`Self::entries`].
-    #[must_use]
-    pub fn links(&self) -> &[Entry] {
-        self.entries()
     }
 
     /// The workbook part that owns the external-link relationships.

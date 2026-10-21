@@ -196,11 +196,6 @@ impl WorksheetSourceScan {
         &self.references
     }
 
-    /// Alias emphasizing that the values are relationship references.
-    pub fn references(&self) -> &[WorksheetDrawingReference] {
-        &self.references
-    }
-
     /// Return the only normative direct drawing owner, when present.
     pub fn drawing(&self, ordinal: usize) -> Result<&WorksheetDrawingReference> {
         self.references.get(ordinal).ok_or_else(|| {
@@ -242,11 +237,6 @@ pub fn scan_worksheet_drawing_references(
         references.push(value);
     }
     Ok(references)
-}
-
-/// Short alias for callers that prefer a source-scanner verb.
-pub fn scan(source: &[u8], limits: WorksheetSourceLimits) -> Result<WorksheetSourceScan> {
-    WorksheetSourceScan::scan(source, limits)
 }
 
 struct Scanner<'a> {

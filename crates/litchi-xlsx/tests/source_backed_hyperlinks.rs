@@ -319,11 +319,11 @@ fn source_links(snapshot: &litchi_xlsx::hyperlinks::Snapshot) -> Vec<Hyperlink> 
 }
 
 fn stage_change(edit: &mut litchi_xlsx::hyperlinks::source::Edit) {
-    edit.put_hyperlink(internal("B2", "Sheet1!D4", Some("added"), None))
+    edit.put(internal("B2", "Sheet1!D4", Some("added"), None))
         .unwrap();
-    edit.replace_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
+    edit.put(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
         .unwrap();
-    edit.put_hyperlink(external(
+    edit.put(external(
         "C3",
         EXTERNAL_TARGET,
         Some("updated remote"),
@@ -331,7 +331,7 @@ fn stage_change(edit: &mut litchi_xlsx::hyperlinks::source::Edit) {
     ))
     .unwrap();
     assert!(
-        edit.remove_hyperlink(HyperlinkReference::new("B2").unwrap())
+        edit.remove(HyperlinkReference::new("B2").unwrap())
             .unwrap()
             .is_some()
     );
@@ -358,10 +358,10 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
             .put_hyperlink(internal("B2", "Sheet1!D4", Some("added"), None))
             .unwrap();
         sheet
-            .replace_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
+            .put_hyperlink(internal("A1", "Sheet1!C3", Some("replaced"), Some("tip")))
             .unwrap();
         sheet
-            .replace_hyperlink(external(
+            .put_hyperlink(external(
                 "C3",
                 EXTERNAL_TARGET,
                 Some("updated remote"),
@@ -463,8 +463,7 @@ fn exact_noop_including_signed_source_bytes_and_changed_signed_source_refusal() 
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
     let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
-    edit.put_hyperlink(internal("D4", "Sheet1!D4", None, None))
-        .unwrap();
+    edit.put(internal("D4", "Sheet1!D4", None, None)).unwrap();
     // A changed edit of a signed source is refused at commit.
     assert!(matches!(
         edit.commit(),
@@ -582,8 +581,7 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
     let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     let baseline = edit.values().unwrap();
-    edit.remove_hyperlink(HyperlinkReference::new("C3").unwrap())
-        .unwrap();
+    edit.remove(HyperlinkReference::new("C3").unwrap()).unwrap();
     assert!(edit.set(baseline).unwrap());
     assert!(!edit.commit().unwrap().diagnostics().changed());
 
@@ -602,14 +600,14 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
     let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
-    edit.put_hyperlink(external("D4", NEW_EXTERNAL_TARGET, None, None))
+    edit.put(external("D4", NEW_EXTERNAL_TARGET, None, None))
         .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Unsupported { .. })));
 
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
     let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
-    edit.replace_hyperlink(external(
+    edit.put(external(
         "C3",
         NEW_EXTERNAL_TARGET,
         Some("retargeted"),
@@ -622,7 +620,7 @@ fn relationship_changes_and_opaque_owners_refuse_before_output() {
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(fixture(false)))).unwrap();
     let mut edit = editor.edit_hyperlinks("Sheet1").unwrap();
     assert!(
-        edit.remove_hyperlink(HyperlinkReference::new("C3").unwrap())
+        edit.remove(HyperlinkReference::new("C3").unwrap())
             .unwrap()
             .is_some()
     );

@@ -77,8 +77,14 @@ fn package() -> OpcPackage {
 fn reads_and_edits_server_formats() {
     let mut package = package();
     let snapshot = Snapshot::load(&package, PivotTableSelector::Name("Pivot")).unwrap();
-    assert_eq!(snapshot.formats()[0].culture.as_deref(), Some("en-US"));
-    assert_eq!(snapshot.formats()[1], ServerFormat::new(None, None));
+    assert_eq!(
+        snapshot.server_formats().formats()[0].culture.as_deref(),
+        Some("en-US")
+    );
+    assert_eq!(
+        snapshot.server_formats().formats()[1],
+        ServerFormat::new(None, None)
+    );
 
     let before = package
         .get_part(snapshot.table_part())
@@ -107,7 +113,9 @@ fn reads_and_edits_server_formats() {
     );
     assert_ne!(changed, before.as_slice());
     assert_eq!(
-        commit.snapshot().formats()[0].format.as_deref(),
+        commit.snapshot().server_formats().formats()[0]
+            .format
+            .as_deref(),
         Some("#,##0")
     );
 
@@ -119,7 +127,10 @@ fn reads_and_edits_server_formats() {
     );
     patch.apply(&mut package).unwrap();
     assert_eq!(
-        Snapshot::load(&package, "Pivot").unwrap().formats()[1]
+        Snapshot::load(&package, "Pivot")
+            .unwrap()
+            .server_formats()
+            .formats()[1]
             .format
             .as_deref(),
         Some("0")
@@ -167,9 +178,9 @@ fn ordered_list_edits_update_count_and_round_trip_exactly() {
     assert!(changed_text.contains("count=\"3\""));
     assert!(changed_text.contains("culture=\"fr-FR\""));
     assert!(changed_text.contains("format=\"&amp; &lt;\""));
-    assert_eq!(commit.snapshot().formats().len(), 3);
+    assert_eq!(commit.snapshot().server_formats().formats().len(), 3);
     assert_eq!(
-        commit.snapshot().formats()[0],
+        commit.snapshot().server_formats().formats()[0],
         ServerFormat::new(None, None)
     );
 
@@ -196,7 +207,7 @@ fn ordered_list_reorder_preserves_leaf_source_and_count_lexical_bytes() {
     );
     assert!(original_text.contains("<x15:serverFormat culture=\"en-US\" format=\"0.00\"/>"));
     assert_eq!(
-        commit.snapshot().formats()[0],
+        commit.snapshot().server_formats().formats()[0],
         ServerFormat::new(None, None)
     );
 }
@@ -289,7 +300,10 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
 
     let next = commit.package();
     assert_eq!(
-        next.pivot_table("Pivot").unwrap().formats()[0]
+        next.pivot_table("Pivot")
+            .unwrap()
+            .server_formats()
+            .formats()[0]
             .format
             .as_deref(),
         Some("#,##0")

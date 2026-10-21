@@ -448,7 +448,7 @@ fn source_core_content_parts_pair_all_anchor_geometry_and_ranges() {
             assert!(owner_bytes.ends_with(b"/>"));
             assert_eq!(
                 owner_bytes,
-                &xml[owner.owner_range().start..owner.owner_range().end]
+                &xml[owner.owner_element().range().start..owner.owner_element().range().end]
             );
 
             let anchor_bytes = owner
@@ -808,14 +808,14 @@ fn worksheet_content_part_facade_pairs_source_typed_geometry_and_borrowed_payloa
                 }
             );
 
-            let payload = part.payload().expect("target XML must be read lazily");
+            let payload = part.read_payload().expect("target XML must be read lazily");
             assert_eq!(
                 payload.bytes(),
                 target_payload(index, PackageFault::None).as_slice()
             );
             assert!(payload.outbound_relationships().is_empty());
             let first_payload_ptr = payload.bytes().as_ptr();
-            let second_payload = part.payload().unwrap();
+            let second_payload = part.read_payload().unwrap();
             assert_eq!(first_payload_ptr, second_payload.bytes().as_ptr());
         }
 
@@ -866,7 +866,7 @@ fn worksheet_content_part_relation_and_target_graph_failures_are_typed() {
     let workbook = Package::from_bytes(&malformed_target).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 }
 
 #[test]
@@ -895,7 +895,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let drawing = worksheet.drawing(0).unwrap();
         assert!(
-            drawing.content_part(0).unwrap().payload().is_err(),
+            drawing.content_part(0).unwrap().read_payload().is_err(),
             "payload fault {fault:?} was accepted"
         );
     }
@@ -904,7 +904,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let workbook = Package::from_bytes(&legal).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    let payload = drawing.content_part(0).unwrap().payload().unwrap();
+    let payload = drawing.content_part(0).unwrap().read_payload().unwrap();
     assert!(
         payload
             .bytes()
@@ -940,7 +940,12 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(
-        drawing.content_part(0).unwrap().payload().unwrap().bytes(),
+        drawing
+            .content_part(0)
+            .unwrap()
+            .read_payload()
+            .unwrap()
+            .bytes(),
         b"<payload/>"
     );
 
@@ -958,7 +963,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     .unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 
     let nested = content_part_package(false, PackageFault::NestedDepthTarget, 1);
     let limits = SourceLimits::builder()
@@ -973,7 +978,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     .unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 }
 
 #[test]
@@ -995,15 +1000,15 @@ fn worksheet_content_part_shared_target_and_outbound_graph_are_retained_and_boun
         second.relationship().target_uri()
     );
     assert_eq!(
-        first.payload().unwrap().bytes(),
-        second.payload().unwrap().bytes()
+        first.read_payload().unwrap().bytes(),
+        second.read_payload().unwrap().bytes()
     );
 
     let outbound = content_part_package(false, PackageFault::OutboundGraph, 1);
     let workbook = Package::from_bytes(&outbound).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    let payload = drawing.content_part(0).unwrap().payload().unwrap();
+    let payload = drawing.content_part(0).unwrap().read_payload().unwrap();
     assert_eq!(payload.outbound_relationships().len(), 1);
     assert_eq!(
         payload.outbound_relationships()[0].relationship_id(),

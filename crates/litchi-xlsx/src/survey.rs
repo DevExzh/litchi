@@ -626,10 +626,6 @@ impl Question {
         Ok(question)
     }
 
-    /// Alias for [`Self::for_column`] for constructor-style call sites.
-    pub fn new_for_column(name: impl Into<String>) -> Result<Self> {
-        Self::for_column(name)
-    }
     /// Change the bound table-column UID.
     pub fn set_binding(&mut self, value: Binding) {
         self.binding = value;
@@ -3311,21 +3307,10 @@ impl Snapshot {
         })
     }
 
-    /// Alias emphasizing that this result is source-bound.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Survey entries in deterministic UID order.
     #[must_use]
     pub fn entries(&self) -> &[Part] {
         &self.entries
-    }
-
-    /// Contextual alias for [`Self::entries`].
-    #[must_use]
-    pub fn surveys(&self) -> &[Part] {
-        self.entries()
     }
 
     /// Resource policy retained by this snapshot.

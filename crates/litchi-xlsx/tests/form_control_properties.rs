@@ -638,7 +638,7 @@ fn x14_expanded_names_and_item_string_values_are_exactly_preserved() {
         properties.item_list().unwrap().items()[0].value(),
         "  first & \n second  "
     );
-    assert_eq!(properties.item_list().unwrap().items()[1].val(), "second");
+    assert_eq!(properties.item_list().unwrap().items()[1].value(), "second");
     assert_eq!(
         properties.fmla_link().map(FormControlFormula::as_str),
         Some("  Sheet1!$A$1  ")

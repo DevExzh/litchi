@@ -249,12 +249,6 @@ impl Snapshot {
         &self.values
     }
 
-    /// Alias for [`Self::hyperlinks`].
-    #[must_use]
-    pub fn values(&self) -> &[Hyperlink] {
-        self.hyperlinks()
-    }
-
     /// Developer-facing worksheet name captured at ingress.
     #[must_use]
     pub fn sheet_name(&self) -> &str {

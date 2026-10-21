@@ -674,18 +674,6 @@ impl<RawE, ActiveE> StreamError<RawE, ActiveE> {
         }
     }
 
-    /// Alias for [`Self::raw_callback_error`].
-    #[must_use]
-    pub fn raw_error(&self) -> Option<&RawE> {
-        self.raw_callback_error()
-    }
-
-    /// Alias for [`Self::active_callback_error`].
-    #[must_use]
-    pub fn active_error(&self) -> Option<&ActiveE> {
-        self.active_callback_error()
-    }
-
     /// Return the primary MCE error, if this is an MCE failure.
     #[must_use]
     pub fn mce_error(&self) -> Option<&Error> {
@@ -1204,19 +1192,6 @@ where
             return finish_callbacks(raw_error, active_error, state.report.clone());
         }
     }
-}
-
-/// Alias retained for callers that prefer an explicit active-observer name.
-pub fn process_markup_compatibility_stream_with_active_observer<ActiveE, Active>(
-    input: &mut dyn BufRead,
-    capabilities: &Capabilities,
-    limits: &StreamLimits,
-    active: Active,
-) -> Result<StreamReport, StreamError<std::convert::Infallible, ActiveE>>
-where
-    Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<(), ActiveE>,
-{
-    process_markup_compatibility_stream(input, capabilities, limits, active)
 }
 
 fn finish_callbacks<RawE, ActiveE>(

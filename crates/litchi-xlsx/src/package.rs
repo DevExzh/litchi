@@ -506,11 +506,6 @@ impl Package {
         )
     }
 
-    /// Alias emphasizing that the catalog includes Custom Data Properties.
-    pub fn custom_data_properties(&self) -> Result<crate::custom_data::Snapshot> {
-        self.custom_data()
-    }
-
     /// Read one worksheet's source-bound row and column page breaks.
     ///
     /// # Errors

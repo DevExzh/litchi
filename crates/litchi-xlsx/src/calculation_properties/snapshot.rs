@@ -108,11 +108,6 @@ impl Snapshot {
         })
     }
 
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     /// Exact authored `calcPr` state, if present.
     #[must_use]
     pub fn properties(&self) -> Option<&Properties> {

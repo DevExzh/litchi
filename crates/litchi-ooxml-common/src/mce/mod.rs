@@ -33,7 +33,6 @@ pub use stream::{
     ActiveFlow, EventLimitExceeded, InputLimitExceeded, RawAttribute, RawElement, RawElementKind,
     SemanticAttribute, SemanticDecl, SemanticElement, SemanticEnd, SemanticEvent,
     SemanticGeneralRef, SemanticText, StreamError, StreamLimits, StreamReport, XMLNS_NAMESPACE,
-    process_markup_compatibility_stream, process_markup_compatibility_stream_with_active_observer,
-    process_markup_compatibility_stream_with_observers,
+    process_markup_compatibility_stream, process_markup_compatibility_stream_with_observers,
     process_markup_compatibility_stream_with_stoppable_observers,
 };

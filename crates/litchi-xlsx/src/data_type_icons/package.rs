@@ -86,11 +86,6 @@ impl Snapshot {
         })
     }
 
-    /// Alias emphasizing that the result is tied to exact source bytes.
-    pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Self> {
-        Self::load(package, worksheet)
-    }
-
     #[must_use]
     pub fn worksheet_part(&self) -> &PackURI {
         &self.worksheet

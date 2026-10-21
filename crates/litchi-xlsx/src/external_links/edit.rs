@@ -49,12 +49,6 @@ impl Edit {
         &self.draft
     }
 
-    /// Contextual alias for [`Self::entries`].
-    #[must_use]
-    pub fn links(&self) -> &[super::package::Entry] {
-        self.entries()
-    }
-
     /// Apply a checked mutation to one existing inert link.
     pub fn edit(
         &mut self,
