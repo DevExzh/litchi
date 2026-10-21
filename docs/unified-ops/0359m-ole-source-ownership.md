@@ -3,8 +3,8 @@
 - Date: 2026-10-21.
 - Base: `1c7c6d8f7b` (the frozen W5 COW/state-reuse candidate).
 - Candidate source: `daa2d35860`.
-- Status: source repair complete; focused validation and native qualification
-  are pending coordinator release from the current heavy hold.
+- Status: source repair and focused validation are complete; native
+  qualification remains pending a coordinator quiet window.
 
 The cell-value owner previously kept complete artifacts as `Arc<[u8]>`, then
 copied each committed snapshot into a `Vec<u8>` before reopening a source-backed
@@ -32,8 +32,15 @@ admission remain unchanged.  A regression asserts that a committed snapshot
 and its patch share both endpoint allocations, and the common overlay test
 covers the new sealed-vector entry point's protection classification.
 
-Validation and paired source-backed allocation/native evidence must be added
-after the coordinator releases the heavy hold.  The frozen 0359j–0359l
-receipts remain historical evidence; this candidate has no accepted
-performance result until the source-matched owner, cell, history and inverse
-routes are rebuilt and requalified.
+Validation at this candidate passed with one capped, offline Cargo process:
+
+```
+cargo test --offline -p litchi-ole-common -p litchi-xls --all-targets --all-features
+cargo clippy --offline -p litchi-ole-common -p litchi-xls --all-targets --all-features -- -D warnings
+```
+
+Both commands used the external target
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-target`.
+The frozen 0359j–0359l receipts remain historical evidence; this candidate
+has no accepted performance result until the source-matched owner, cell,
+history and inverse routes are rebuilt and requalified in a quiet window.
