@@ -594,14 +594,8 @@ pub(crate) struct Transaction<'a> {
     selection: usize,
 }
 
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "the raw-graph route is exercised by the engine tests"
-    )
-)]
 impl<'a> Transaction<'a> {
+    #[cfg(test)]
     /// Resolve a cache field and begin a source-bound transaction.
     pub(crate) fn new<'selector>(
         target: &'a mut OpcPackage,
@@ -654,6 +648,7 @@ impl<'a> Transaction<'a> {
         })
     }
 
+    #[cfg(test)]
     /// Replace one existing name by its unique `index` attribute.
     pub(crate) fn set_cached_unique_name(
         &mut self,
@@ -687,6 +682,7 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
     pub(crate) fn insert_cached_unique_name(
         &mut self,
@@ -698,6 +694,7 @@ impl<'a> Transaction<'a> {
         ))
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
     pub(crate) fn remove_cached_unique_name(
         &mut self,
@@ -708,6 +705,7 @@ impl<'a> Transaction<'a> {
         ))
     }
 
+    #[cfg(test)]
     /// Structural list changes are outside the unresolved index-bound scope.
     pub(crate) fn set_cached_unique_name_index(&mut self, _old: u32, _new: u32) -> Result<()> {
         Err(invalid(
@@ -875,27 +873,26 @@ impl SourcePatch {
 /// Committed source-bound edit.
 #[derive(Clone, Debug)]
 pub(crate) struct SourceCommit {
+    /// The resulting state, read only by the engine tests.
+    #[cfg(test)]
     snapshot: Snapshot,
     patch: SourcePatch,
     changed: bool,
 }
 
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "the raw-graph route is exercised by the engine tests"
-    )
-)]
 impl SourceCommit {
     fn new(snapshot: Snapshot, patch: SourcePatch, changed: bool) -> Self {
+        #[cfg(not(test))]
+        drop(snapshot);
         Self {
+            #[cfg(test)]
             snapshot,
             patch,
             changed,
         }
     }
 
+    #[cfg(test)]
     /// Resulting snapshot.
     #[must_use]
     pub(crate) fn snapshot(&self) -> &Snapshot {

@@ -612,13 +612,6 @@ pub(crate) struct Transaction<'a> {
     selection: usize,
 }
 
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "the raw-graph route is exercised by the engine tests"
-    )
-)]
 impl<'a> Transaction<'a> {
     /// Resolve a semantic PivotTable selector and begin an isolated edit.
     pub(crate) fn new<'selector>(
@@ -652,6 +645,7 @@ impl<'a> Transaction<'a> {
         })
     }
 
+    #[cfg(test)]
     /// Set, replace, or clear both optional attributes explicitly.  `None`
     /// means clear for this method; use [`Self::update_server_format`] when a
     /// field must be retained.
@@ -670,6 +664,7 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    #[cfg(test)]
     /// Insert one ordered `serverFormat` leaf before `index`.
     ///
     /// The collection is schema-required and non-empty, so insertion accepts
@@ -701,11 +696,13 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Append one ordered `serverFormat` leaf.
     pub(crate) fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
         self.insert_server_format(self.staged.len(), value)
     }
 
+    #[cfg(test)]
     /// Remove one ordered `serverFormat` leaf.
     ///
     /// Removing the last leaf is refused because the schema requires at least
@@ -724,6 +721,7 @@ impl<'a> Transaction<'a> {
         Ok(self.staged.remove(index))
     }
 
+    #[cfg(test)]
     /// Move one leaf, interpreting `to` in the final ordered sequence.
     pub(crate) fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
         if from >= self.staged.len() || to >= self.staged.len() {
@@ -738,6 +736,7 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Reorder the leaves using a final-position-to-old-position permutation.
     pub(crate) fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
         let len = self.staged.len();
@@ -767,6 +766,7 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
     pub(crate) fn update_server_format(&mut self, index: usize, edit: Format) -> Result<bool> {
         let current = self
@@ -781,6 +781,7 @@ impl<'a> Transaction<'a> {
         self.set_server_format(index, next)
     }
 
+    #[cfg(test)]
     /// Set or clear only the `culture` attribute.
     pub(crate) fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
@@ -792,6 +793,7 @@ impl<'a> Transaction<'a> {
         )
     }
 
+    #[cfg(test)]
     /// Set or clear only the `format` attribute.
     pub(crate) fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
@@ -803,6 +805,7 @@ impl<'a> Transaction<'a> {
         )
     }
 
+    #[cfg(test)]
     /// Clear the `format` attribute.
     pub(crate) fn clear_format(&mut self, index: usize) -> Result<bool> {
         self.update_server_format(
@@ -1004,21 +1007,19 @@ impl SourcePatch {
 /// A committed transaction and reversible patch.
 #[derive(Clone, Debug)]
 pub(crate) struct SourceCommit {
+    /// The resulting state, read only by the engine tests.
+    #[cfg(test)]
     snapshot: Snapshot,
     patch: SourcePatch,
     changed: bool,
 }
 
-#[cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "the raw-graph route is exercised by the engine tests"
-    )
-)]
 impl SourceCommit {
     fn new(snapshot: Snapshot, patch: SourcePatch, changed: bool) -> Self {
+        #[cfg(not(test))]
+        drop(snapshot);
         Self {
+            #[cfg(test)]
             snapshot,
             patch,
             changed,
@@ -1026,6 +1027,7 @@ impl SourceCommit {
     }
 
     /// Resulting immutable source-bound state.
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
