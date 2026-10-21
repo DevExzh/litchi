@@ -57,10 +57,6 @@ pub(crate) struct Deferred {
     /// The committed workbook catalog of a workbook-level change, which the
     /// infallible catalog accessors read without materializing the output.
     catalog: Option<Catalog>,
-    /// The source policy under which `catalog` was parsed. A replay onto a
-    /// recipient with another policy must parse the recorded target XML under
-    /// that recipient policy before exposing the catalog.
-    catalog_limits: litchi_opc::SourceLimits,
     /// Weak owner identity used to reconstruct a deferred workbook while its
     /// pending output is still alive. The endpoint keeps only the pending
     /// token, avoiding one repeated owner weak pointer per retained patch.
@@ -85,7 +81,6 @@ pub(crate) enum RestoreEndpoint {
         publisher: Arc<dyn DeferredPublisher>,
         fingerprint: OnceLock<(u64, [u8; 32])>,
         catalog: Option<Catalog>,
-        catalog_limits: litchi_opc::SourceLimits,
         pending: Weak<Deferred>,
     },
 }
@@ -102,14 +97,12 @@ impl Clone for RestoreEndpoint {
                 publisher,
                 fingerprint,
                 catalog,
-                catalog_limits,
                 pending,
             } => Self::Deferred {
                 package: Arc::clone(package),
                 publisher: Arc::clone(publisher),
                 fingerprint: clone_fingerprint(fingerprint),
                 catalog: catalog.clone(),
-                catalog_limits: *catalog_limits,
                 pending: pending.clone(),
             },
         }
@@ -152,7 +145,6 @@ impl RestoreEndpoint {
                 publisher: Arc::clone(&pending.publish),
                 fingerprint: OnceLock::new(),
                 catalog: pending.catalog.clone(),
-                catalog_limits: pending.catalog_limits,
                 pending: Arc::downgrade(pending),
             },
         }
@@ -228,15 +220,19 @@ impl RestoreEndpoint {
 
     fn catalog_for(&self, package: &SourceBackedPackage) -> Result<Option<Catalog>> {
         let Self::Deferred {
+            package: recorded_package,
             publisher,
             catalog,
-            catalog_limits,
             ..
         } = self
         else {
             return Ok(None);
         };
-        if package.read_limits() == *catalog_limits {
+        // The endpoint's package is the package under which its catalog was
+        // parsed. Keep the policy comparison, but derive the recorded policy
+        // from that already-retained package instead of copying all of the
+        // SourceLimits fields into every deferred endpoint.
+        if package.read_limits() == recorded_package.read_limits() {
             return Ok(catalog.clone());
         }
         publisher.catalog(package)
@@ -278,7 +274,6 @@ impl SourceBackedWorkbook {
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::new(),
                 catalog,
-                catalog_limits: base.inner.package.read_limits(),
                 owner: Arc::downgrade(&base.inner),
             })),
         }
@@ -504,7 +499,6 @@ impl SourceBackedWorkbook {
             materialized: OnceLock::new(),
             fingerprint: OnceLock::new(),
             catalog,
-            catalog_limits: next.inner.package.read_limits(),
             owner: Arc::downgrade(&next.inner),
         }));
         Ok(next)
@@ -533,7 +527,6 @@ impl SourceBackedWorkbook {
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::new(),
                 catalog,
-                catalog_limits: package.read_limits(),
                 owner: Arc::downgrade(&base.inner),
             })),
         })
