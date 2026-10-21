@@ -268,6 +268,36 @@ impl FootnoteGraphBudget {
             .map_err(Into::into)
     }
 
+    fn remaining_rewrite_limits(&self) -> Result<litchi_iwa_text_wire::RewriteLimits> {
+        let input_bytes = self.remaining(
+            self.input_bytes,
+            self.rewrite_limits.max_message_bytes(),
+            LimitKind::InputBytes,
+        )?;
+        let fields = self.remaining(
+            self.fields,
+            self.rewrite_limits.max_fields(),
+            LimitKind::Fields,
+        )?;
+        let work = self.remaining(
+            self.work,
+            self.rewrite_limits.max_rewrite_work(),
+            LimitKind::RewriteWork,
+        )?;
+        litchi_iwa_text_wire::RewriteLimits::new(
+            input_bytes,
+            fields,
+            self.rewrite_limits.max_nesting(),
+            self.rewrite_limits.max_fragments(),
+            self.rewrite_limits.max_text_bytes(),
+            self.rewrite_limits.max_table_entries(),
+            self.rewrite_limits.max_object_references(),
+            self.rewrite_limits.max_output_bytes(),
+            work,
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
     fn remaining(&self, current: usize, maximum: usize, kind: LimitKind) -> Result<usize> {
         let remaining = maximum.checked_sub(current).ok_or_else(|| {
             Error::InvalidFormat("Pages footnote aggregate budget overflows usize".to_owned())
@@ -514,7 +544,8 @@ impl<'source> FootnoteStorageProjection<'source> {
         label: &str,
         wire_budget: &mut FootnoteGraphBudget,
     ) -> Result<Self> {
-        let validation = litchi_iwa_text_wire::validate_storage(source, wire_budget.rewrite_limits)
+        let validation_limits = wire_budget.remaining_rewrite_limits()?;
+        let validation = litchi_iwa_text_wire::validate_storage(source, validation_limits)
             .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
         wire_budget.charge_input(source.len())?;
         wire_budget.charge_fields(validation.fields())?;
@@ -1486,6 +1517,32 @@ mod tests {
             })
         ));
         assert!(graphs.is_empty());
+    }
+
+    #[test]
+    fn storage_projection_validates_against_remaining_graph_budget() {
+        let source = [0x1a, 0x01, b'x'];
+        let mut budget = FootnoteGraphBudget::default();
+        budget.input_bytes = budget
+            .rewrite_limits
+            .max_message_bytes()
+            .checked_sub(2)
+            .expect("default message limit is larger than the test payload");
+        let error = FootnoteStorageProjection::decode(
+            &source,
+            7,
+            "test",
+            &mut budget,
+        )
+        .expect_err("the remaining aggregate input budget is two bytes");
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: 3,
+                limit: 2,
+            })
+        ));
     }
 
     #[test]

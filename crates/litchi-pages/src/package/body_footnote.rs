@@ -2524,11 +2524,11 @@ fn rewrite_body_storage(
     budget.observe(LimitKind::TextUnits, rewritten_result.after_utf16_len())?;
     let rewritten = rewritten_result.into_bytes();
     budget.charge(LimitKind::TextBytes, rewritten.len())?;
-    let wire_output = rewritten
-        .len()
-        .checked_mul(2)
-        .ok_or(Error::InvalidSource)?
-        .max(1);
+    // Parsing the rewritten storage does not allocate an output buffer.  Use
+    // the exact input length for this read-only wire profile; the former 2x
+    // reservation could reject a valid payload before the actual replacement
+    // size was known.
+    let wire_output = rewritten.len().max(1);
     let wire_limits = storage_wire_limits(limits, rewritten.len(), wire_output)?;
     let view = WireView::parse(&rewritten, wire_limits).map_err(map_common_wire_error)?;
     let table_field = view
@@ -2600,20 +2600,20 @@ fn rewrite_body_storage(
     )
     .map_err(map_graph_error)?;
     budget.charge_graph_rewrite(rewrite_report)?;
-    let replacement_bytes = rewritten_table.len();
-    let replacement_capacity = rewritten
-        .len()
-        .checked_add(replacement_bytes)
-        .ok_or(Error::InvalidSource)?;
-    budget.charge(LimitKind::WireBytes, replacement_capacity)?;
-    budget.charge(LimitKind::RetainedBytes, replacement_capacity)?;
+    let replacement_limits = storage_wire_limits(limits, rewritten.len(), rewritten.len())?;
+    let replacement_output = length_delimited_field_output_len(
+        &rewritten,
+        FOOTNOTE_TABLE_FIELD,
+        if entries.is_empty() {
+            None
+        } else {
+            Some(&rewritten_table)
+        },
+        replacement_limits,
+    )?;
+    budget.charge(LimitKind::WireBytes, replacement_output)?;
+    budget.charge(LimitKind::RetainedBytes, replacement_output)?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let replacement_output = rewritten
-        .len()
-        .checked_add(replacement_bytes)
-        .and_then(|value| value.checked_add(32))
-        .ok_or(Error::InvalidSource)?;
-    let replacement_limits = storage_wire_limits(limits, rewritten.len(), replacement_output)?;
     let output = replace_length_delimited_field(
         &rewritten,
         FOOTNOTE_TABLE_FIELD,
@@ -2623,6 +2623,7 @@ fn rewrite_body_storage(
             Some(&rewritten_table)
         },
         replacement_limits,
+        archive_limits.max_message_bytes(),
     )?;
     let template = body_template_from_storage_wire(&rewritten, wire_limits)?;
     Ok((output, template))
@@ -2884,18 +2885,22 @@ fn replace_length_delimited_field(
     number: u32,
     replacement: Option<&[u8]>,
     limits: WireLimits,
+    max_output_bytes: usize,
 ) -> Result<Vec<u8>, Error> {
-    let replacement_bytes = replacement.map_or(0, |value| value.len());
-    let reserve_capacity = source
-        .len()
-        .checked_add(replacement_bytes)
-        .ok_or(Error::InvalidSource)?;
     let view = WireView::parse(source, limits).map_err(map_common_wire_error)?;
+    let output_length = length_delimited_field_output_len_from_view(&view, number, replacement)?;
+    if output_length > max_output_bytes {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: output_length as u64,
+            maximum: max_output_bytes as u64,
+        });
+    }
     let mut output = Vec::new();
     output
-        .try_reserve_exact(reserve_capacity)
+        .try_reserve_exact(output_length)
         .map_err(|_| Error::Allocation {
-            amount: source.len(),
+            amount: output_length,
         })?;
     let mut found = false;
     for field in view.fields() {
@@ -2916,7 +2921,71 @@ fn replace_length_delimited_field(
             append_length_delimited(&mut output, number, payload)?;
         }
     }
+    if output.len() != output_length {
+        return Err(Error::Verification);
+    }
     Ok(output)
+}
+
+fn length_delimited_field_output_len(
+    source: &[u8],
+    number: u32,
+    replacement: Option<&[u8]>,
+    limits: WireLimits,
+) -> Result<usize, Error> {
+    let view = WireView::parse(source, limits).map_err(map_common_wire_error)?;
+    length_delimited_field_output_len_from_view(&view, number, replacement)
+}
+
+fn length_delimited_field_output_len_from_view(
+    view: &WireView<'_>,
+    number: u32,
+    replacement: Option<&[u8]>,
+) -> Result<usize, Error> {
+    let replacement_length = if let Some(payload) = replacement {
+        let key = u64::from(number)
+            .checked_shl(3)
+            .and_then(|value| value.checked_add(2))
+            .ok_or(Error::InvalidSource)?;
+        let payload_length = u64::try_from(payload.len()).map_err(|_| Error::InvalidSource)?;
+        let framing = litchi_iwa_common::varint::encoded_len(key)
+            .checked_add(litchi_iwa_common::varint::encoded_len(payload_length))
+            .ok_or(Error::InvalidSource)?;
+        Some(
+            framing
+                .checked_add(payload.len())
+                .ok_or(Error::InvalidSource)?,
+        )
+    } else {
+        None
+    };
+    let mut output_length = 0usize;
+    let mut found = false;
+    for field in view.fields() {
+        if field.number() == number {
+            if found {
+                return Err(Error::InvalidSource);
+            }
+            found = true;
+            if let Some(length) = replacement_length {
+                output_length = output_length
+                    .checked_add(length)
+                    .ok_or(Error::InvalidSource)?;
+            }
+        } else {
+            output_length = output_length
+                .checked_add(field.raw().len())
+                .ok_or(Error::InvalidSource)?;
+        }
+    }
+    if !found {
+        if let Some(length) = replacement_length {
+            output_length = output_length
+                .checked_add(length)
+                .ok_or(Error::InvalidSource)?;
+        }
+    }
+    Ok(output_length)
 }
 
 fn append_length_delimited(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Result<(), Error> {
@@ -3561,6 +3630,46 @@ mod tests {
         litchi_iwa_common::encode_varint_into(&mut bytes, u64::from(field) << 3);
         litchi_iwa_common::encode_varint_into(&mut bytes, value);
         bytes
+    }
+
+    #[test]
+    fn replacement_output_limit_uses_exact_encoded_length() {
+        let mut source = raw_length_delimited(FOOTNOTE_TABLE_FIELD, b"old");
+        source.extend_from_slice(&raw_varint(3, 7));
+        let replacement = b"replacement";
+        let limits = WireLimits::default()
+            .with_input_bytes(source.len())
+            .expect("source fits wire input limit");
+        let output_length = length_delimited_field_output_len(
+            &source,
+            FOOTNOTE_TABLE_FIELD,
+            Some(replacement),
+            limits,
+        )
+        .expect("replacement length");
+        let exact = replace_length_delimited_field(
+            &source,
+            FOOTNOTE_TABLE_FIELD,
+            Some(replacement),
+            limits,
+            output_length,
+        )
+        .expect("exact output budget admits replacement");
+        assert_eq!(exact.len(), output_length);
+        assert!(matches!(
+            replace_length_delimited_field(
+                &source,
+                FOOTNOTE_TABLE_FIELD,
+                Some(replacement),
+                limits,
+                output_length - 1,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed,
+                maximum,
+            }) if observed == output_length as u64 && maximum == (output_length - 1) as u64
+        ));
     }
 
     #[test]
