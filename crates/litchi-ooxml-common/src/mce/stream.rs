@@ -2798,20 +2798,11 @@ impl<'a> Processor<'a> {
         // `validate` refused either limit above the ceiling before processing
         // began; the clamp keeps the bound if a caller changed a public field
         // since.
-        let (max_attributes, attribute_limit) = if self.limits.max_attributes_per_event
-            <= self.limits.processing.max_attributes_per_element
-        {
-            (
-                self.limits.max_attributes_per_event,
-                "stream attributes per event",
-            )
-        } else {
-            (
-                self.limits.processing.max_attributes_per_element,
-                "attributes per element",
-            )
-        };
-        let max_attributes = max_attributes.min(ATTRIBUTES_PER_ELEMENT_CEILING);
+        let max_attributes = self
+            .limits
+            .max_attributes_per_event
+            .min(self.limits.processing.max_attributes_per_element)
+            .min(ATTRIBUTES_PER_ELEMENT_CEILING);
         for attribute in element.unchecked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;
@@ -2832,13 +2823,8 @@ impl<'a> Processor<'a> {
                 ));
             }
             if preliminary.len() >= max_attributes {
-                let kind = if attribute_limit == "stream attributes per event" {
-                    LimitKind::Attributes
-                } else {
-                    LimitKind::Attributes
-                };
                 return Err(limit(
-                    kind,
+                    LimitKind::Attributes,
                     preliminary.len().checked_add(1).unwrap_or(usize::MAX),
                     max_attributes,
                 ));
@@ -3228,7 +3214,7 @@ fn apply_directives(
     limits: &StreamLimits,
     scope: &Scope<NamespaceUri>,
 ) -> Result<(), Error> {
-    let additional_context_bytes = directive_bytes(&values)?;
+    let additional_context_bytes = directive_bytes(&values, limits.max_context_bytes)?;
     if context
         .bytes
         .checked_add(additional_context_bytes)
@@ -3690,11 +3676,11 @@ fn check_uri_bytes(uri: &str, limits: &StreamLimits) -> Result<(), Error> {
     Ok(())
 }
 
-fn directive_bytes(values: &DirectiveValues) -> Result<usize, Error> {
+fn directive_bytes(values: &DirectiveValues, maximum: usize) -> Result<usize, Error> {
     values.values.iter().try_fold(0usize, |sum, value| {
         sum.checked_add(value.value.len())
             .and_then(|sum| sum.checked_add(1))
-            .ok_or_else(|| limit_lower_bound(LimitKind::ContextBytes, usize::MAX))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ContextBytes, maximum))
     })
 }
 
