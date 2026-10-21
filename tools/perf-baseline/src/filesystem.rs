@@ -3309,11 +3309,12 @@ fn prepare_xlsx_repeat_store_operation(
     let cache_limits = SourceCacheLimits::new(cache_max_bytes, cache_max_entries)?;
     let selected_member = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
     let source_for_workbook: Arc<dyn ReadAt> = source.clone();
-    let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at_with_options(
         source_for_workbook,
-        SourceLimits::default(),
-        cache_limits,
-        xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(xlsx_repeat_store_context(u64::try_from(bytes.len())?)?),
     )?;
     let worksheet = workbook
         .sheet("Sheet1")?
@@ -3353,7 +3354,7 @@ fn prepare_xlsx_repeat_store_operation(
         // are required: one pinned catalog plus one evictable worksheet. Each
         // following worksheet then evicts Sheet1's PartData while its parsed
         // Store remains retained by the SourceWorksheet handle.
-        for sheet in workbook.sheets().skip(1) {
+        for sheet in workbook.sheets()?.skip(1) {
             sheet.cell("A1")?;
         }
     }

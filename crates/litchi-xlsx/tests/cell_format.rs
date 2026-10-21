@@ -452,7 +452,7 @@ fn compare_owners(path: &Path, limit: usize) -> bool {
     ) else {
         return false;
     };
-    for (eager_sheet, source_sheet) in eager.workbook_ref().sheets().zip(source.sheets()) {
+    for (eager_sheet, source_sheet) in eager.workbook_ref().sheets().zip(source.sheets().unwrap()) {
         if eager_sheet.kind() != WorksheetKind::Worksheet {
             continue;
         }

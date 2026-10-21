@@ -114,12 +114,4 @@ impl Snapshot {
         self.closure.same_source(&other.closure)
             && self.format_cells_locked == other.format_cells_locked
     }
-
-    pub(super) fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
-        self.closure.matches_source_backed(package)
-    }
-
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        self.closure.matches_current_source(package)
-    }
 }

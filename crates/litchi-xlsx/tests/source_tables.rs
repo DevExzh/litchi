@@ -67,7 +67,9 @@ fn source_tables_equal_the_eager_owner_tables_across_the_corpus() {
             ) else {
                 continue;
             };
-            for (eager_sheet, source_sheet) in eager.workbook_ref().sheets().zip(source.sheets()) {
+            for (eager_sheet, source_sheet) in
+                eager.workbook_ref().sheets().zip(source.sheets().unwrap())
+            {
                 match (eager_sheet.tables(), source_sheet.tables()) {
                     (Ok(left), Ok(right)) => {
                         assert_eq!(describe(&left), describe(&right), "{}", path.display());
@@ -163,7 +165,7 @@ fn workbook_lookup_searches_every_worksheet_in_order() {
     let eager = litchi_xlsx::Package::open(&path).unwrap();
     let source = SourceBackedWorkbook::open(&path).unwrap();
     let mut seen = 0usize;
-    for sheet in source.sheets() {
+    for sheet in source.sheets().unwrap() {
         if sheet.kind() != WorksheetKind::Worksheet {
             continue;
         }
@@ -206,7 +208,7 @@ fn non_cell_sheets_own_no_tables() {
     let source = SourceBackedWorkbook::open(&path).unwrap();
     let eager = litchi_xlsx::Package::open(&path).unwrap();
     let mut checked = false;
-    for (source_sheet, eager_sheet) in source.sheets().zip(eager.workbook_ref().sheets()) {
+    for (source_sheet, eager_sheet) in source.sheets().unwrap().zip(eager.workbook_ref().sheets()) {
         if source_sheet.kind() == WorksheetKind::Worksheet {
             continue;
         }
@@ -246,7 +248,11 @@ fn caller_event_limits_reach_eager_and_source_table_reads() {
     let eager_sheet = eager.workbook_ref().sheet(0_usize).unwrap().unwrap();
     assert_event_limit(eager_sheet.tables().unwrap_err());
 
-    let source = SourceBackedWorkbook::from_reader_with_limits(Cursor::new(bytes), limits).unwrap();
+    let source = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(bytes),
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
     let source_sheet = source.sheet(0_usize).unwrap().unwrap();
     assert_event_limit(source_sheet.tables().unwrap_err());
 }

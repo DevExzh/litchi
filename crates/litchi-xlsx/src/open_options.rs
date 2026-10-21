@@ -1,7 +1,8 @@
 //! Configuration for XLSX package ingress.
 
 use crate::leniency::Leniency;
-use litchi_opc::SourceLimits;
+use litchi_core::ExecutionContext;
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 
 /// Policies for opening an XLSX [`crate::Package`].
 ///
@@ -19,16 +20,22 @@ use litchi_opc::SourceLimits;
 /// # }
 /// ```
 ///
+/// The source-backed owner ([`crate::SourceBackedWorkbook`]) also reads the
+/// deferred-payload cache limits and the caller-owned execution context; an
+/// owning [`crate::Package`] ignores both.
+///
 /// Defaults retain the standard finite source and encryption policies and
 /// the strict leniency. Setters consume already constructed policy values
 /// and perform no I/O.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct OpenOptions {
     pub(crate) source_limits: SourceLimits,
     pub(crate) leniency: Leniency,
     pub(crate) semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     pub(crate) encryption_limits: crate::encryption::Limits,
+    pub(crate) cache_limits: Option<SourceCacheLimits>,
+    pub(crate) execution_context: Option<ExecutionContext>,
 }
 
 impl OpenOptions {
@@ -96,5 +103,37 @@ impl OpenOptions {
     pub const fn encryption_limits(mut self, limits: crate::encryption::Limits) -> Self {
         self.encryption_limits = limits;
         self
+    }
+
+    /// Select the finite deferred-payload cache of a source-backed owner
+    /// ([`crate::SourceBackedWorkbook`]); the default is the OPC default
+    /// cache.
+    #[must_use]
+    pub const fn cache_limits(mut self, limits: SourceCacheLimits) -> Self {
+        self.cache_limits = Some(limits);
+        self
+    }
+
+    /// The deferred-payload cache limits of a source-backed owner, when
+    /// selected.
+    #[must_use]
+    pub const fn cache_limits_value(&self) -> Option<SourceCacheLimits> {
+        self.cache_limits
+    }
+
+    /// Select the caller-owned execution context of a source-backed owner
+    /// ([`crate::SourceBackedWorkbook`]): cancellation is checked before
+    /// mandatory reads and deferred materializations, and retained payloads
+    /// are charged to its memory budget.
+    #[must_use]
+    pub fn execution_context(mut self, context: ExecutionContext) -> Self {
+        self.execution_context = Some(context);
+        self
+    }
+
+    /// The execution context of a source-backed owner, when selected.
+    #[must_use]
+    pub const fn execution_context_value(&self) -> Option<&ExecutionContext> {
+        self.execution_context.as_ref()
     }
 }

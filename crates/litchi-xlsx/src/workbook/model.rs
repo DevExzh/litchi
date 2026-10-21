@@ -545,8 +545,9 @@ impl Workbook {
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
-        let options =
-            source.map_or_else(crate::OpenOptions::default, |source| source.inner.options);
+        let options = source.map_or_else(crate::OpenOptions::default, |source| {
+            source.inner.options.clone()
+        });
         Self::open_package(package, source, options)
     }
 
@@ -691,7 +692,7 @@ impl Workbook {
                 format_cache,
                 chart_inventories,
                 tolerance,
-                options,
+                options: options.clone(),
             }),
             policy: source.map_or_else(
                 || {

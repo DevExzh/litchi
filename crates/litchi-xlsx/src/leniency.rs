@@ -961,7 +961,7 @@ mod tests {
         let source =
             crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(fixture.as_slice()))
                 .unwrap();
-        for sheet in source.sheets() {
+        for sheet in source.sheets().unwrap() {
             assert!(sheet.tolerance_report().unwrap().is_clean());
         }
         assert!(source.tolerance_report().is_clean());

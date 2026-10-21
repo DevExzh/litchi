@@ -1069,8 +1069,8 @@ fn finish_xlsx_producer_corpus(
     // code serves generated and real files.
     let selected_sheet = SELECTED_SHEET.min(sheet_count.saturating_sub(1));
     let sheet_names = workbook
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
+        .sheet_names()
+        .map(str::to_owned)
         .collect::<Vec<_>>();
     let selected_name = sheet_names
         .get(selected_sheet)
@@ -1387,7 +1387,7 @@ fn producer_xlsx_semantics(
         return Err("producer XLSX semantic oracle observed an unexpected sheet count".into());
     }
     workbook
-        .sheets()
+        .sheets()?
         .map(|sheet| {
             Ok(ProducerWorksheetSemantics {
                 name: sheet.name().to_owned(),
@@ -2519,7 +2519,7 @@ fn run_xlsx_full_cell_scan(
         let started = std::time::Instant::now();
         let timed = (|| {
             let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
-            let sheets = workbook.sheets().collect::<Vec<_>>();
+            let sheets = workbook.sheets()?.collect::<Vec<_>>();
             if sheets.len() != spec.sheet_count {
                 return Err(format!(
                     "producer full-cell scan observed {} worksheets instead of {}",

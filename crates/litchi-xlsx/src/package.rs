@@ -93,7 +93,7 @@ impl Package {
     /// policies.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
         Self::from_validated(
-            OpcPackage::from_vec_with_limits(owned_input(bytes, options)?, options.source_limits)?,
+            OpcPackage::from_vec_with_limits(owned_input(bytes, &options)?, options.source_limits)?,
             options,
         )
     }
@@ -744,7 +744,7 @@ impl std::ops::Deref for Package {
 
 /// Copy borrowed input into the owned source archive after the input-size
 /// admission check, so an oversized input is refused before it is copied.
-fn owned_input(bytes: &[u8], options: OpenOptions) -> Result<Vec<u8>> {
+fn owned_input(bytes: &[u8], options: &OpenOptions) -> Result<Vec<u8>> {
     let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     let maximum = options.source_limits.max_input_bytes();
     if observed > maximum {

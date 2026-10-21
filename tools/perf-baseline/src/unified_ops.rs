@@ -1493,10 +1493,7 @@ pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dy
 }
 
 pub(crate) fn leaf_xlsx_names(workbook: &litchi_xlsx::SourceBackedWorkbook) -> Vec<String> {
-    workbook
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
-        .collect()
+    workbook.sheet_names().map(str::to_owned).collect()
 }
 
 /// Cell text for one leaf XLSX cell, as the unified workbook text renders it.

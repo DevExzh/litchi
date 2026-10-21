@@ -95,14 +95,6 @@ impl Sheet {
         }
     }
 
-    /// Zero-based position in workbook order.
-    pub(super) fn position(&self) -> usize {
-        match &self.model {
-            SheetModel::Owned(worksheet) => worksheet.position(),
-            SheetModel::Source(worksheet) => worksheet.position(),
-        }
-    }
-
     fn extent(&self) -> Result<Option<Rect>> {
         let result = match &self.model {
             SheetModel::Owned(worksheet) => worksheet.stored_extent(),

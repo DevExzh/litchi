@@ -1645,9 +1645,7 @@ fn workbook_value(file: &Xlsx, key: WorkbookKey) -> Option<Value<'_>> {
         },
         WorkbookKey::ActiveTab => {
             let active = match &file.0.owner {
-                XlsxOwner::Source(workbook) => {
-                    workbook.active_sheet().map(|sheet| sheet.position())
-                },
+                XlsxOwner::Source(workbook) => workbook.active_sheet_position(),
                 XlsxOwner::Eager(workbook) => workbook
                     .workbook_ref()
                     .active_sheet()

@@ -62,7 +62,7 @@ fn owned_report(bytes: &[u8]) -> ToleranceReport {
 fn source_report(bytes: &[u8]) -> ToleranceReport {
     let workbook =
         SourceBackedWorkbook::from_reader(Cursor::new(bytes.to_vec())).expect("source open");
-    for sheet in workbook.sheets() {
+    for sheet in workbook.sheets().unwrap() {
         sheet.tolerance_report().expect("source worksheet parse");
     }
     workbook.tolerance_report()
@@ -407,7 +407,7 @@ fn stale_active_tab_and_local_sheet_id_are_repaired_at_open() {
         .collect::<Vec<_>>();
     assert_eq!(names, ["Kept"]);
     let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
-    assert_eq!(source.active_sheet().unwrap().name(), "Flags");
+    assert_eq!(source.active_sheet().unwrap().unwrap().name(), "Flags");
 }
 
 /// Finding 4.8 (opt-in): a sheet name breaking Excel's authoring rules fails
@@ -435,9 +435,11 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
         litchi_xlsx::OpenOptions::new().leniency(lenient),
     )
     .unwrap();
-    let source =
-        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(bytes.clone()), lenient)
-            .unwrap();
+    let source = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        litchi_xlsx::OpenOptions::new().leniency(lenient),
+    )
+    .unwrap();
     assert_eq!(workbook.leniency(), lenient);
     assert_eq!(
         workbook
@@ -453,7 +455,7 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
     for sheet in workbook.workbook_ref().sheets() {
         sheet.tolerance_report().unwrap();
     }
-    for sheet in source.sheets() {
+    for sheet in source.sheets().unwrap() {
         sheet.tolerance_report().unwrap();
     }
     let report = workbook.workbook_ref().tolerance_report();
@@ -490,7 +492,13 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
         )
         .is_err()
     );
-    assert!(SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(empty), lenient).is_err());
+    assert!(
+        SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(empty),
+            litchi_xlsx::OpenOptions::new().leniency(lenient)
+        )
+        .is_err()
+    );
 }
 
 /// Finding 4.9: a leading `=` is stripped and an empty expression dropped,
