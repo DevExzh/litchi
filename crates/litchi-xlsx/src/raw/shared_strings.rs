@@ -513,7 +513,8 @@ impl Table {
     }
 
     /// Parse shared strings from `xl/sharedStrings.xml`.
-    pub fn parse(content: &str) -> SheetResult<Self> {
+    pub fn parse(content: &str, limits: &litchi_opc::SourceLimits) -> SheetResult<Self> {
+        crate::raw::check_source_bytes(content.len(), limits)?;
         let content = litchi_ooxml_common::mce::process_str(content)?;
         SharedStringParser::parse(content.as_ref())
     }
@@ -622,7 +623,7 @@ impl Table {
 
     /// Serialize the table as a Transitional `SpreadsheetML` shared-string
     /// part.
-    pub fn write_xml(&self) -> Result<Vec<u8>> {
+    pub fn write_xml(&self, limits: &litchi_opc::SourceLimits) -> Result<Vec<u8>> {
         use std::fmt::Write as _;
 
         let mut xml = String::with_capacity(256 + self.strings.len() * 32);
@@ -690,7 +691,9 @@ impl Table {
             }
         }
         xml.push_str("</sst>");
-        Ok(xml.into_bytes())
+        let xml = xml.into_bytes();
+        crate::raw::check_source_bytes(xml.len(), limits)?;
+        Ok(xml)
     }
 
     fn ensure_index(&mut self) -> Result<()> {
@@ -876,7 +879,7 @@ mod tests {
                 <x:si/>
             </x:sst>"#
         );
-        let strings = Table::parse(&xml).unwrap();
+        let strings = Table::parse(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             strings.strings(),
             &["A & B\n😀_x0041_", "", "Rich <text>", ""]
@@ -902,7 +905,7 @@ mod tests {
                 <si><f:t>Ignored</f:t><t>Strict</t></si><si><r><f:t>Ignored</f:t><t>Run</t></r></si>
             </sst>"#
         );
-        let strings = Table::parse(&xml).unwrap();
+        let strings = Table::parse(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(strings.strings(), &["Strict", "Run"]);
         assert_eq!(strings.rich_text_runs(1).unwrap()[0].text, "Run");
     }
@@ -916,7 +919,10 @@ mod tests {
             format!(r#"<sst xmlns="{S}"><si><t>bad_xD800_</t></si></sst>"#),
             format!(r#"<sst xmlns="{S}"><si><r><rPr/><t>x</t>"#),
         ] {
-            assert!(Table::parse(&xml).is_err(), "accepted {xml}");
+            assert!(
+                Table::parse(&xml, &litchi_opc::SourceLimits::default()).is_err(),
+                "accepted {xml}"
+            );
         }
     }
 
@@ -934,7 +940,8 @@ mod tests {
             format!(r#"<sst xmlns="{S}" uniqueCount="NaN"><si><t>one</t></si></sst>"#),
             format!(r#"<sst xmlns="{S}" count="-1"><si><t>one</t></si></sst>"#),
         ] {
-            let parsed = Table::parse(&xml).unwrap_or_else(|e| panic!("{xml}: {e}"));
+            let parsed = Table::parse(&xml, &litchi_opc::SourceLimits::default())
+                .unwrap_or_else(|e| panic!("{xml}: {e}"));
             assert_eq!(parsed.strings(), ["one"], "{xml}");
         }
     }
@@ -943,7 +950,7 @@ mod tests {
     #[test]
     fn oversized_unique_count_hint_does_not_preallocate() {
         let xml = format!(r#"<sst xmlns="{S}" uniqueCount="4294967295"><si><t>one</t></si></sst>"#);
-        let parsed = Table::parse(&xml).unwrap();
+        let parsed = Table::parse(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(parsed.strings(), ["one"]);
     }
 
@@ -965,8 +972,13 @@ mod tests {
         assert_eq!(table.intern_rich(rich).unwrap(), 1);
         assert_eq!(table.intern("literal _x0041_").unwrap(), 2);
 
-        let xml = String::from_utf8(table.write_xml().unwrap()).unwrap();
-        let parsed = Table::parse(&xml).unwrap();
+        let xml = String::from_utf8(
+            table
+                .write_xml(&litchi_opc::SourceLimits::default())
+                .unwrap(),
+        )
+        .unwrap();
+        let parsed = Table::parse(&xml, &litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(parsed.get(0), Some(" literal _x0041_\u{1} "));
         assert_eq!(parsed.get(1), Some("literal _x0041_"));
         assert_eq!(

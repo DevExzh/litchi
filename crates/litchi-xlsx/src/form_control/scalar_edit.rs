@@ -1143,7 +1143,7 @@ fn source_sheet(
 ) -> Result<(usize, String, PackURI)> {
     let workbook = package.main_document_part()?;
     let data = workbook.data()?;
-    let catalog = raw::parse_catalog(data.as_bytes())?;
+    let catalog = raw::parse_catalog(data.as_bytes(), &package.read_limits())?;
     let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
     let position = match selector {
         litchi_core::Selector::Position(position) => position.get(),

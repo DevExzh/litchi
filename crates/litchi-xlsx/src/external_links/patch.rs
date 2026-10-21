@@ -78,7 +78,23 @@ impl Patch {
 
 crate::record::record_family!("external-link");
 
-crate::record::no_limits!("external-link");
+crate::record::limit_kinds!("external-link", ExternalLinks {
+    XmlBytes => "external-link XML bytes",
+    TargetUri => "external-link target URI bytes",
+    SheetNames => "external-link sheet names",
+    DefinedNames => "external-link defined names",
+    CachedSheets => "external-link cached sheets",
+    CachedRows => "external-link cached rows",
+    CachedCells => "external-link cached cells",
+    Items => "external-link items",
+    MatrixCells => "external-link matrix cells",
+    CacheTextBytes => "external-link cache text bytes",
+    RelationshipIdBytes => "external-link relationship ID bytes",
+    AlternateUrlMetadataBytes => "external-link alternate URL metadata bytes",
+    CellColumn => "external-link cell column",
+    CellRow => "external-link cell row",
+    ColumnLetters => "external-link column letters",
+});
 
 impl crate::record::Record for Patch {
     fn is_noop(&self) -> bool {

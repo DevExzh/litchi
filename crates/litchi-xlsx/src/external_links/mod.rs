@@ -39,5 +39,45 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
 }
 
 pub(super) fn limit(name: &str) -> Error {
-    invalid(format!("external-link {name} limit exceeded"))
+    use model::{
+        MAX_ALTERNATE_URL_METADATA_BYTES, MAX_CACHE_TEXT_BYTES, MAX_CACHED_CELLS, MAX_CACHED_ROWS,
+        MAX_CACHED_SHEETS, MAX_CELL_COLUMN, MAX_CELL_ROW, MAX_COLUMN_LETTERS, MAX_DEFINED_NAMES,
+        MAX_EXTERNAL_TARGET_BYTES, MAX_LINK_ITEMS, MAX_RELATIONSHIP_ID_BYTES, MAX_SHEET_NAMES,
+    };
+
+    let (kind, maximum) = if name.contains("target URI") {
+        (LimitKind::TargetUri, MAX_EXTERNAL_TARGET_BYTES)
+    } else if name.contains("sheet names") {
+        (LimitKind::SheetNames, MAX_SHEET_NAMES)
+    } else if name.contains("defined names") {
+        (LimitKind::DefinedNames, MAX_DEFINED_NAMES)
+    } else if name.contains("cached sheets") {
+        (LimitKind::CachedSheets, MAX_CACHED_SHEETS)
+    } else if name.contains("cached rows") {
+        (LimitKind::CachedRows, MAX_CACHED_ROWS)
+    } else if name.contains("cached cells") {
+        (LimitKind::CachedCells, MAX_CACHED_CELLS)
+    } else if name.contains("matrix") || name.contains("values") {
+        (LimitKind::MatrixCells, MAX_CACHED_CELLS)
+    } else if name.contains("items") {
+        (LimitKind::Items, MAX_LINK_ITEMS)
+    } else if name.contains("cache text") {
+        (LimitKind::CacheTextBytes, MAX_CACHE_TEXT_BYTES)
+    } else if name.contains("relationship ID") {
+        (LimitKind::RelationshipIdBytes, MAX_RELATIONSHIP_ID_BYTES)
+    } else if name.contains("alternate URL") {
+        (
+            LimitKind::AlternateUrlMetadataBytes,
+            MAX_ALTERNATE_URL_METADATA_BYTES,
+        )
+    } else if name.contains("column letters") {
+        (LimitKind::ColumnLetters, MAX_COLUMN_LETTERS)
+    } else if name.contains("column") {
+        (LimitKind::CellColumn, MAX_CELL_COLUMN as usize)
+    } else if name.contains("row") {
+        (LimitKind::CellRow, MAX_CELL_ROW as usize)
+    } else {
+        (LimitKind::XmlBytes, MAX_CACHE_TEXT_BYTES)
+    };
+    Error::limit(kind, maximum.saturating_add(1), maximum)
 }

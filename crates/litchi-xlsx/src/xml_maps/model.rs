@@ -80,10 +80,6 @@ pub struct XmlMapInfo {
     pub maps: Vec<XmlMap>,
 }
 
-/// Short compatibility name for [`XmlMapSchema`].
-pub type XmlSchema = XmlMapSchema;
-/// Short compatibility name for [`XmlMapDataBinding`].
-pub type DataBinding = XmlMapDataBinding;
 pub use litchi_ooxml_common::spreadsheet_xml_maps::XmlMapLimits;
 
 impl From<XmlMapConformance> for litchi_ooxml_common::spreadsheet_xml_maps::XmlMapConformance {

@@ -2977,7 +2977,10 @@ mod tests {
         value.tables[0].id.push('y');
         assert!(matches!(
             write_data_model(&value),
-            Err(Error::Invalid(message)) if message.contains("serialized descriptor bytes")
+            Err(Error::Limit {
+                kind: crate::LimitKind::DataModel(crate::workbook::data_model::LimitKind::XmlBytes,),
+                ..
+            })
         ));
     }
 
@@ -2997,7 +3000,12 @@ mod tests {
         let result = parse_data_model(xml.as_bytes());
         assert!(matches!(
             result,
-            Err(Error::Invalid(message)) if message.contains("extension bytes")
+            Err(Error::Limit {
+                kind: crate::LimitKind::DataModel(
+                    crate::workbook::data_model::LimitKind::ExtensionBytes,
+                ),
+                ..
+            })
         ));
     }
 
@@ -3009,7 +3017,12 @@ mod tests {
         let result = parse_data_model(xml.as_bytes());
         assert!(matches!(
             result,
-            Err(Error::Invalid(message)) if message.contains("namespace bytes")
+            Err(Error::Limit {
+                kind: crate::LimitKind::DataModel(
+                    crate::workbook::data_model::LimitKind::NamespaceBytes,
+                ),
+                ..
+            })
         ));
     }
 

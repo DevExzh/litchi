@@ -321,7 +321,7 @@ impl Edit {
         let mut tabs = Vec::new();
         tabs.try_reserve_exact(visibility_changed.len())
             .map_err(|source| allocation("tab-state workbook edit plan", source))?;
-        let source_catalog = raw::parse_catalog(before.workbook_xml())?;
+        let source_catalog = raw::parse_catalog(before.workbook_xml(), &package.read_limits())?;
         for position in visibility_changed {
             let binding = before.binding(position)?;
             let state = raw_visibility(&self.staged_visibility[position]).ok_or_else(|| {

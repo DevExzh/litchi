@@ -649,7 +649,7 @@ mod tests {
                 return pipeline_error("grid", bytes, error);
             }
         }
-        match crate::raw::web::read(&bytes) {
+        match crate::raw::web::read(&bytes, &litchi_opc::SourceLimits::default()) {
             Ok(bindings) => PipelineOutcome::Success { bytes, bindings },
             Err(error) => pipeline_error("web", bytes, error),
         }

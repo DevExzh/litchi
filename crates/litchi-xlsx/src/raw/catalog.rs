@@ -596,7 +596,8 @@ impl WorkbookInfo {
 }
 
 /// Parse and validate the workbook-level catalog from `workbook.xml` bytes.
-pub fn parse_catalog(content: &[u8]) -> Result<Catalog> {
+pub fn parse_catalog(content: &[u8], limits: &litchi_opc::SourceLimits) -> Result<Catalog> {
+    super::check_source_bytes(content.len(), limits)?;
     WorkbookInfo::parse(content).map(|info| Catalog {
         sheets: info.sheets,
         active_sheet_index: info.active_tab.unwrap_or(0),
@@ -646,7 +647,7 @@ pub fn parse_catalog_with_mce(
 }
 
 fn parse_workbook_details(content: &str) -> Result<Catalog> {
-    parse_catalog(content.as_bytes())
+    parse_catalog(content.as_bytes(), &litchi_opc::SourceLimits::default())
 }
 
 /// Parse workbook metadata, returning sheets, the active sheet index, and the date system.
@@ -661,12 +662,14 @@ fn parse_workbook_xml(content: &str) -> Result<(Vec<Sheet>, usize, bool)> {
 }
 
 /// Parse a standalone `sheet` element.
-pub fn parse_sheet(sheet_xml: &str) -> Result<Option<Sheet>> {
+pub fn parse_sheet(sheet_xml: &str, limits: &litchi_opc::SourceLimits) -> Result<Option<Sheet>> {
+    super::check_source_bytes(sheet_xml.len(), limits)?;
     let wrapped = format!(
         r#"<workbook xmlns="{}" xmlns:r="{}"><sheets>{sheet_xml}</sheets></workbook>"#,
         String::from_utf8_lossy(SPREADSHEETML_NAMESPACE),
         RELATIONSHIPS_NAMESPACE
     );
+    super::check_source_bytes(wrapped.len(), limits)?;
     parse_workbook_xml(&wrapped).map(|(mut sheets, _, _)| sheets.pop())
 }
 
@@ -807,6 +810,23 @@ mod tests {
     const STRICT_R: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
     #[test]
+    fn parse_catalog_requires_and_honors_source_limits() {
+        let limits = litchi_opc::SourceLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let error = parse_catalog(b"<workbook/>", &limits).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::Error::Package(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::PartBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn parses_namespaced_workbook_metadata_and_decodes_attributes() {
         let xml = format!(
             r#"<x:workbook xmlns:x="{S}" xmlns:rel="{R}" xmlns:f="urn:foreign">
@@ -841,9 +861,12 @@ mod tests {
         assert_eq!(active, 0);
         assert!(!date_1904);
 
-        let sheet = parse_sheet(r#"<sheet name="One &amp; Two" sheetId="2" r:id="r9"/>"#)
-            .unwrap()
-            .unwrap();
+        let sheet = parse_sheet(
+            r#"<sheet name="One &amp; Two" sheetId="2" r:id="r9"/>"#,
+            &litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(sheet.name, "One & Two");
         assert_eq!(sheet.relationship_id, "r9");
     }

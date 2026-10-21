@@ -107,21 +107,6 @@ macro_rules! record_family {
 
 pub(crate) use record_family;
 
-/// The typed budgets of a record family that has none of its own: its fixed
-/// bounds are still reported as `Error::Invalid` (record 0360 gap).
-macro_rules! no_limits {
-    ($what:literal) => {
-        #[doc = concat!("The typed budgets of the ", $what, " family.")]
-        ///
-        /// The family has none yet: its fixed bounds are reported as
-        /// `Error::Invalid`, so this enum has no variant.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum LimitKind {}
-    };
-}
-
-pub(crate) use no_limits;
-
 /// The typed bounds of a record family: each variant names one bound and its
 /// structural description, reported by `Error::Limit` through the crate's
 /// `LimitKind::$crate_variant`.

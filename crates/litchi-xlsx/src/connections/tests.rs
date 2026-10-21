@@ -213,10 +213,13 @@ fn bounded_serializer_rejects_oversized_output_before_appending() {
     let error = output
         .push_bytes(&vec![b'x'; MAX_XML_BYTES + 1])
         .unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "invalid XLSX structure: serialized connections part exceeds 16 MiB"
-    );
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::OutputBytes),
+            ..
+        }
+    ));
     assert!(output.bytes.is_empty());
 }
 

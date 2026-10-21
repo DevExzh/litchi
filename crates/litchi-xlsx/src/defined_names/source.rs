@@ -130,7 +130,7 @@ impl Edit {
             return Ok(false);
         }
         let candidate = raw::catalog_edit::replace_defined_names(self.before.source_xml(), &names)?;
-        if raw::parse_catalog(&candidate)?.defined_names != names {
+        if raw::parse_catalog(&candidate, &self.before.limits)?.defined_names != names {
             return Err(invalid("defined-name authoring verification failed"));
         }
         self.names = names;

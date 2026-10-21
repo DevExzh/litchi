@@ -58,7 +58,7 @@ pub fn write_refresh_intervals(value: &RefreshIntervals) -> Result<Vec<u8>> {
     validate_intervals(value.intervals())?;
     let size = refresh_xml_len(value)?;
     if size > MAX_OUTPUT_BYTES {
-        return Err(super::super::limit("refresh interval XML output bytes"));
+        return Err(super::limit("refresh interval XML output bytes"));
     }
     let mut output = Vec::new();
     output
@@ -90,7 +90,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
     // source-bound metadata.
     let _ = parse_document(xml)?;
     if xml.len() > MAX_XML_BYTES {
-        return Err(super::super::limit("rich-value types XML bytes"));
+        return Err(super::limit("rich-value types XML bytes"));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -474,7 +474,7 @@ pub(crate) fn rewrite(
         }
     }
     if output_len > MAX_OUTPUT_BYTES {
-        return Err(super::super::limit("rich-value refresh XML output bytes"));
+        return Err(super::limit("rich-value refresh XML output bytes"));
     }
 
     let mut edits = Vec::<Edit>::new();
@@ -981,7 +981,7 @@ fn resolve_namespace(value: ResolveResult<'_>) -> Result<String> {
 fn bounded_qname(element: &BytesStart<'_>) -> Result<Vec<u8>> {
     let name = element.name();
     if name.as_ref().len() > MAX_STRING_BYTES {
-        return Err(super::super::limit("rich-value extension name"));
+        return Err(super::limit("rich-value extension name"));
     }
     Ok(name.as_ref().to_vec())
 }
@@ -1002,7 +1002,7 @@ fn checked_position(origin: ReaderOrigin, position: u64, source_len: usize) -> R
 
 fn push_extension(values: &mut Vec<ExtensionLocation>, value: ExtensionLocation) -> Result<usize> {
     if values.len() >= MAX_INTERVALS {
-        return Err(super::super::limit("rich-value extension locations"));
+        return Err(super::limit("rich-value extension locations"));
     }
     values
         .try_reserve(1)
@@ -1018,7 +1018,7 @@ fn push_bounded<T>(
     resource: &'static str,
 ) -> Result<()> {
     if values.len() >= maximum {
-        return Err(super::super::limit(resource));
+        return Err(super::limit(resource));
     }
     values
         .try_reserve(1)

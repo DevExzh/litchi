@@ -22,7 +22,27 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
 }
 
 pub(super) fn limit(name: &str) -> Error {
-    invalid(format!("worksheet OLE {name} limit exceeded"))
+    use model::{
+        MAX_DEPTH, MAX_NODES, MAX_OBJECTS, MAX_PAYLOAD_BYTES, MAX_STRING_BYTES,
+        MAX_TOTAL_PAYLOAD_BYTES, MAX_XML_BYTES,
+    };
+
+    let (kind, maximum) = if name.contains("object") {
+        (LimitKind::Objects, MAX_OBJECTS)
+    } else if name.contains("total payload") {
+        (LimitKind::TotalPayloadBytes, MAX_TOTAL_PAYLOAD_BYTES)
+    } else if name.contains("payload") {
+        (LimitKind::PayloadBytes, MAX_PAYLOAD_BYTES)
+    } else if name.contains("depth") {
+        (LimitKind::Depth, MAX_DEPTH)
+    } else if name.contains("structure") || name.contains("node") {
+        (LimitKind::Nodes, MAX_NODES)
+    } else if name.contains("string") {
+        (LimitKind::StringBytes, MAX_STRING_BYTES)
+    } else {
+        (LimitKind::XmlBytes, MAX_XML_BYTES)
+    };
+    Error::limit(kind, maximum.saturating_add(1), maximum)
 }
 
 pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {

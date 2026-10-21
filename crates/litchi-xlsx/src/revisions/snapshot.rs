@@ -68,12 +68,6 @@ impl Snapshot {
         &self.source.workbook_part_name
     }
 
-    /// Return the workbook part that owns the revision relationships.
-    #[must_use]
-    pub fn workbook(&self) -> &str {
-        self.workbook_part_name()
-    }
-
     /// Return the conformance used for writes, defaulting new owners to
     /// Transitional `SpreadsheetML`.
     #[must_use]

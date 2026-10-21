@@ -9,7 +9,6 @@ use super::model::{
 use super::{codec, invalid};
 use crate::error::Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
-use litchi_core::Resource;
 use quick_xml::{events::Event, name::ResolveResult, reader::NsReader};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -149,12 +148,11 @@ fn query_table_connection_id_with_limits(
 ) -> XlsxResult<u32> {
     let maximum = max_bytes.min(MAX_XML_BYTES);
     if xml.len() > maximum {
-        return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-            resource: Resource::InputBytes,
-            observed: xml.len() as u64,
-            limit: maximum as u64,
-            scope: Arc::<str>::from("XLSX Custom Data query-table input XML bytes"),
-        }));
+        return Err(super::limit(
+            "query-table input XML bytes",
+            xml.len(),
+            maximum,
+        ));
     }
     codec::preflight_xml_with_limits(
         xml,
@@ -191,7 +189,7 @@ fn query_table_connection_id_with_limits(
         },
     )
     .map_err(|error| {
-        let mapped = codec::map_mce_error(
+        codec::map_mce_error(
             error,
             maximum,
             mce_output_limit,
@@ -200,32 +198,14 @@ fn query_table_connection_id_with_limits(
             max_events.min(4096),
             max_events.min(1024),
             "query-table",
-        );
-        if mce_output_limit < maximum
-            && matches!(
-                mapped,
-                XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-                    resource: Resource::OutputBytes,
-                    ..
-                })
-            )
-        {
-            query_table_temporary_limit(
-                mce_output_limit.saturating_add(1),
-                mce_output_limit,
-                "query-table MCE output bytes",
-            )
-        } else {
-            mapped
-        }
+        )
     })?;
     if processed.xml.len() > maximum {
-        return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-            resource: Resource::OutputBytes,
-            observed: processed.xml.len() as u64,
-            limit: maximum as u64,
-            scope: Arc::<str>::from("XLSX Custom Data query-table processed XML bytes"),
-        }));
+        return Err(super::limit(
+            "query-table processed XML bytes",
+            processed.xml.len(),
+            maximum,
+        ));
     }
     let root = codec::parse_dom_with_limits(
         processed.xml.as_ref(),
@@ -271,15 +251,6 @@ fn query_table_connection_id_with_limits(
     .map_err(|error| XlsxError::Invalid(error.to_string()))?;
     codec::kids(&root).map_err(|error| XlsxError::Invalid(error.to_string()))?;
     Ok(connection_id)
-}
-
-fn query_table_temporary_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: Resource::Memory,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
 }
 
 fn next_connections_part_name(package: &OpcPackage) -> Result<PackURI> {
@@ -569,12 +540,11 @@ pub(crate) fn validate_graph_with_limits(
         // each connections and query-table part is decoded here (ADR 0030).
         let part = package.get_part(part.partname())?;
         if part.blob().len() > limits.max_connections_bytes() {
-            return Err(XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-                resource: Resource::InputBytes,
-                observed: part.blob().len() as u64,
-                limit: limits.max_connections_bytes() as u64,
-                scope: Arc::<str>::from(format!("XLSX Custom Data graph XML {}", part.partname())),
-            }));
+            return Err(super::limit(
+                "connections graph XML bytes",
+                part.blob().len(),
+                limits.max_connections_bytes(),
+            ));
         }
     }
     let parse_connections = |xml: &[u8]| {
@@ -668,18 +638,9 @@ impl Snapshot {
         })
     }
 
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
-    }
-
     #[must_use]
     pub fn connections(&self) -> Option<&Connections> {
         self.connections.as_ref()
-    }
-
-    #[must_use]
-    pub fn catalog(&self) -> Option<&Connections> {
-        self.connections()
     }
 
     pub fn source_xml(&self) -> Option<&[u8]> {
@@ -854,7 +815,24 @@ fn detect_conformance(xml: &[u8]) -> Conformance {
 
 crate::record::record_family!("connections");
 
-crate::record::no_limits!("connections");
+crate::record::limit_kinds!("connections", Connections {
+    XmlBytes => "connections XML bytes",
+    ExtensionBytes => "connections extension bytes",
+    Depth => "connections XML depth",
+    Nodes => "connections XML nodes",
+    Connections => "connections",
+    Parameters => "connection parameters",
+    WebTables => "connection web tables",
+    TextFields => "connection text fields",
+    StringBytes => "connection string bytes",
+    TemporaryBytes => "connections temporary bytes",
+    OutputBytes => "connections output bytes",
+    RelationshipBytes => "connection relationship bytes",
+    RelationshipCount => "connection relationships",
+    Events => "connections XML events",
+    Attributes => "connections XML attributes",
+    NamespaceBytes => "connections XML namespace bytes",
+});
 
 /// A staged, failure-atomic edit of the workbook's inert connection catalog
 /// of one [`crate::Package`].

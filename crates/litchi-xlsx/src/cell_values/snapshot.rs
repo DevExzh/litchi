@@ -453,7 +453,7 @@ impl Snapshot {
         }
         let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
         validation::workbook_xml(workbook_xml.as_bytes())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -545,7 +545,7 @@ impl Snapshot {
         }
         let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
         validation::workbook_xml(workbook_xml.as_bytes())?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
         if require_single_sheet && catalog.sheets.len() != 1 {
             return Err(invalid(
@@ -1943,7 +1943,7 @@ fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCap
     }
     let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
     validation::workbook_xml(workbook_xml.as_bytes())?;
-    let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
     let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
     validate_workbook_relationships(workbook.rels(), false)?;
     let owner = unique_owner(package.rels())?;

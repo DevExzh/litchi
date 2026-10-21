@@ -12,6 +12,7 @@ use quick_xml::reader::NsReader;
 use crate::error::{Result, allocation, invalid};
 use crate::web::{Binding, Bindings, MAX_BINDINGS, MAX_STRING_BYTES};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 
 pub(crate) mod check;
 
@@ -30,7 +31,8 @@ pub(crate) const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_DEPTH: usize = 128;
 
 /// Read the checked worksheet binding collection embedded in `extLst`.
-pub fn read(worksheet_xml: &[u8]) -> Result<Bindings> {
+pub fn read(worksheet_xml: &[u8], limits: &SourceLimits) -> Result<Bindings> {
+    crate::raw::check_source_bytes(worksheet_xml.len(), limits)?;
     if worksheet_xml.len() > MAX_XML_BYTES {
         return Err(invalid(
             "worksheet XML exceeds the web-extension parser limit",
@@ -237,28 +239,41 @@ pub fn read(worksheet_xml: &[u8]) -> Result<Bindings> {
 }
 
 /// Write the complete transitional `SpreadsheetML` `ext` element.
-pub fn write(bindings: &Bindings) -> Result<Vec<u8>> {
-    write_for_namespace(bindings, SML)
+pub fn write(bindings: &Bindings, limits: &SourceLimits) -> Result<Vec<u8>> {
+    let output = write_for_namespace(bindings, SML)?;
+    crate::raw::check_source_bytes(output.len(), limits)?;
+    Ok(output)
 }
 
 /// Replace, insert, or remove the binding extension without rebuilding
 /// unrelated worksheet XML.
-pub fn replace(worksheet_xml: &[u8], bindings: &Bindings) -> Result<Vec<u8>> {
+pub fn replace(
+    worksheet_xml: &[u8],
+    bindings: &Bindings,
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
+    crate::raw::check_source_bytes(worksheet_xml.len(), limits)?;
     // Validate the selected vocabulary before doing a byte-span mutation.
-    let _ = read(worksheet_xml)?;
+    let _ = read(worksheet_xml, limits)?;
     let scan = scan_extension_spans(worksheet_xml)?;
     if bindings.is_empty() {
-        return match scan.extension {
+        let output = match scan.extension {
             Some(range) => apply_edit(worksheet_xml, range, &[]),
             None => copy_bytes(worksheet_xml),
-        };
+        }?;
+        crate::raw::check_source_bytes(output.len(), limits)?;
+        return Ok(output);
     }
     let extension = write_for_namespace(bindings, &scan.spreadsheet_namespace)?;
     if let Some(range) = scan.extension {
-        return apply_edit(worksheet_xml, range, &extension);
+        let output = apply_edit(worksheet_xml, range, &extension)?;
+        crate::raw::check_source_bytes(output.len(), limits)?;
+        return Ok(output);
     }
     if let Some(position) = scan.ext_list_close {
-        return apply_edit(worksheet_xml, position..position, &extension);
+        let output = apply_edit(worksheet_xml, position..position, &extension)?;
+        crate::raw::check_source_bytes(output.len(), limits)?;
+        return Ok(output);
     }
     let position = scan
         .worksheet_close
@@ -277,7 +292,9 @@ pub fn replace(worksheet_xml: &[u8], bindings: &Bindings) -> Result<Vec<u8>> {
     wrapper.extend_from_slice(b"<extLst>");
     wrapper.extend_from_slice(&extension);
     wrapper.extend_from_slice(b"</extLst>");
-    apply_edit(worksheet_xml, position..position, &wrapper)
+    let output = apply_edit(worksheet_xml, position..position, &wrapper)?;
+    crate::raw::check_source_bytes(output.len(), limits)?;
+    Ok(output)
 }
 
 fn push_formula(binding: &mut Option<(String, String, bool)>, value: &str) -> Result<()> {
@@ -608,14 +625,14 @@ mod tests {
     fn parses_fixture_and_roundtrips_canonical_xml() {
         let xml =
             include_bytes!("../../../../test-data/ooxml/web_extensions/worksheet_bindings.xml");
-        let parsed = read(xml).unwrap();
+        let parsed = read(xml, &SourceLimits::default()).unwrap();
         assert_eq!(parsed.len(), 2);
         assert_eq!(
             parsed.get(0).map(Binding::formula),
             Some("Sheet1!$A$1:$B$4")
         );
         assert_eq!(parsed.get(1).map(Binding::formula), Some("'Sales 2026'!C3"));
-        let encoded = write(&parsed).unwrap();
+        let encoded = write(&parsed, &SourceLimits::default()).unwrap();
         let reparsed = read(
             &[
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><extLst>"#
@@ -624,6 +641,7 @@ mod tests {
                 b"</extLst></worksheet>",
             ]
             .concat(),
+            &SourceLimits::default(),
         )
         .unwrap();
         assert_eq!(reparsed, parsed);
@@ -638,7 +656,13 @@ mod tests {
             br#"<x15:webExtension appRef="a"><xm:f>A1</xm:f></x15:webExtension>"#,
             br#"<x15:webExtension appRef="a"><xm:f>Sheet1!A1</xm:f><xm:f>Sheet1!A2</xm:f></x15:webExtension>"#,
         ] {
-            assert!(read(&[prefix.as_slice(), body, suffix].concat()).is_err());
+            assert!(
+                read(
+                    &[prefix.as_slice(), body, suffix].concat(),
+                    &SourceLimits::default(),
+                )
+                .is_err()
+            );
         }
         let duplicate = [
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><extLst><ext uri="{F7C9EE02-42E1-4005-9D12-6889AFFD525C}"><x15:webExtensions xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">"#.as_slice(),
@@ -646,15 +670,15 @@ mod tests {
             b"</x15:webExtensions></ext></extLst></worksheet>",
         ]
         .concat();
-        assert!(read(&duplicate).is_err());
-        assert!(write(&Bindings::new()).is_err());
+        assert!(read(&duplicate, &SourceLimits::default()).is_err());
+        assert!(write(&Bindings::new(), &SourceLimits::default()).is_err());
     }
 
     #[test]
     fn replaces_inserts_and_removes_without_touching_unrelated_xml() {
         let source = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"/></sheetData><extLst><ext uri="opaque"><foreign/></ext></extLst></worksheet>"#;
         let bindings = Bindings::try_from(vec![binding("binding", "Sheet1!A1")]).unwrap();
-        let inserted = replace(source, &bindings).unwrap();
+        let inserted = replace(source, &bindings, &SourceLimits::default()).unwrap();
         assert!(
             inserted
                 .windows(b"<row r=\"1\"/>".len())
@@ -665,25 +689,28 @@ mod tests {
                 .windows(b"uri=\"opaque\"".len())
                 .any(|value| value == b"uri=\"opaque\"")
         );
-        assert_eq!(read(&inserted).unwrap(), bindings);
+        assert_eq!(read(&inserted, &SourceLimits::default()).unwrap(), bindings);
 
-        let removed = replace(&inserted, &Bindings::new()).unwrap();
-        assert!(read(&removed).unwrap().is_empty());
+        let removed = replace(&inserted, &Bindings::new(), &SourceLimits::default()).unwrap();
+        assert!(read(&removed, &SourceLimits::default()).unwrap().is_empty());
         assert!(
             removed
                 .windows(b"uri=\"opaque\"".len())
                 .any(|value| value == b"uri=\"opaque\"")
         );
-        assert_eq!(replace(&removed, &Bindings::new()).unwrap(), removed);
+        assert_eq!(
+            replace(&removed, &Bindings::new(), &SourceLimits::default()).unwrap(),
+            removed
+        );
     }
 
     #[test]
     fn retains_strict_spreadsheetml_namespace() {
         let source = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetData/></worksheet>"#;
         let bindings = Bindings::try_from(vec![binding("strict", "Sheet1!A1")]).unwrap();
-        let replaced = replace(source, &bindings).unwrap();
+        let replaced = replace(source, &bindings, &SourceLimits::default()).unwrap();
         let text = std::str::from_utf8(&replaced).unwrap();
         assert!(text.contains("xmlns=\"http://purl.oclc.org/ooxml/spreadsheetml/main\""));
-        assert_eq!(read(&replaced).unwrap(), bindings);
+        assert_eq!(read(&replaced, &SourceLimits::default()).unwrap(), bindings);
     }
 }

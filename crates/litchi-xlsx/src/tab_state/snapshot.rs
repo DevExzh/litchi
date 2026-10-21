@@ -75,7 +75,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let catalog = raw::parse_catalog(workbook_bytes.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_bytes.as_bytes(), &package.read_limits())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
         let snapshot = Self {
@@ -104,7 +104,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_bytes = workbook.blob_arc();
-        let catalog = raw::parse_catalog(workbook_bytes.as_slice())?;
+        let catalog = raw::parse_catalog(workbook_bytes.as_slice(), &package.read_limits())?;
         let graph = capture_owned_graph(package, workbook, &catalog.sheets)?;
         let touched = capture_owned_touched(package, &graph, positions)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
@@ -146,7 +146,7 @@ impl Snapshot {
         workbook: Vec<u8>,
         touched: Vec<(usize, Vec<u8>)>,
     ) -> Result<Self> {
-        let catalog = raw::parse_catalog(&workbook)?;
+        let catalog = raw::parse_catalog(&workbook, &litchi_opc::SourceLimits::default())?;
         let (tabs, active) = semantic_tabs(&catalog)?;
         if catalog.sheets.len() != before.source.graph.sheets.len()
             || catalog
@@ -283,7 +283,7 @@ impl Snapshot {
         {
             return Ok(false);
         }
-        let catalog = raw::parse_catalog(bytes.as_bytes())?;
+        let catalog = raw::parse_catalog(bytes.as_bytes(), &package.read_limits())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         if graph != *self.source.graph {
             return Ok(false);

@@ -35,13 +35,8 @@ fn invalid(value: impl std::fmt::Display) -> Error {
     crate::error::invalid(value.to_string())
 }
 
-fn limit(resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
-    Error::ResourceLimit(litchi_core::ResourceLimit {
-        resource,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn limit(_resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
+    super::limit(name, observed, maximum)
 }
 
 #[derive(Clone, PartialEq, Eq)]

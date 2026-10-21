@@ -52,7 +52,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = workbook.blob();
-        let catalog = raw::parse_catalog(workbook_xml)?;
+        let catalog = raw::parse_catalog(workbook_xml, &package.read_limits())?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("hyperlink worksheet selector did not resolve"))?;
         let catalog_sheet = catalog.sheets.get(sheet_position).ok_or_else(|| {
@@ -113,7 +113,7 @@ impl Snapshot {
         require_workbook_content_type(workbook.content_type())?;
         let workbook_payload = SourcePayload::from_part_data(package, workbook.data()?)?;
         let workbook_xml = workbook_payload.as_bytes();
-        let catalog = raw::parse_catalog(workbook_xml)?;
+        let catalog = raw::parse_catalog(workbook_xml, &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("hyperlink worksheet selector did not resolve"))?;

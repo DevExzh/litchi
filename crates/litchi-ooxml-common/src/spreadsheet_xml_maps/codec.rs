@@ -4,9 +4,8 @@ use std::collections::{HashMap, HashSet};
 
 use super::invalid;
 use super::model::{
-    DataBindingRef, NS, NS_TEXT, ParsedXmlMapInfo, STRICT_NS, STRICT_NS_TEXT, XmlMap,
-    XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapInfoRef, XmlMapLimits, XmlMapRef,
-    XmlMapSchema, XmlSchemaRef,
+    DataBinding, DataBindingRef, NS, NS_TEXT, ParsedXmlMapInfo, STRICT_NS, STRICT_NS_TEXT, XmlMap,
+    XmlMapConformance, XmlMapInfo, XmlMapInfoRef, XmlMapLimits, XmlMapRef, XmlSchema, XmlSchemaRef,
 };
 use super::validation::{validate_xml_map_info, validate_xml_map_info_ref};
 use crate::Result;
@@ -233,11 +232,11 @@ struct Capture {
     writer: Writer<Vec<u8>>,
 }
 struct SchemaBuilder {
-    value: XmlMapSchema,
+    value: XmlSchema,
     bindings: Vec<(String, String)>,
 }
 struct BindingBuilder {
-    value: XmlMapDataBinding,
+    value: DataBinding,
     bindings: Vec<(String, String)>,
 }
 struct MapBuilder {
@@ -529,12 +528,12 @@ fn handle_empty(
     Ok(())
 }
 
-fn parse_schema(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapSchema> {
+fn parse_schema(e: &BytesStart<'_>, d: Decoder) -> Result<XmlSchema> {
     let id = required_attr(e, d, b"ID")?;
     let schema_reference = optional_attr(e, d, b"SchemaRef")?;
     let namespace = optional_attr(e, d, b"Namespace")?;
     only_attrs(e, &[b"ID", b"SchemaRef", b"Namespace", b"SchemaLanguage"])?;
-    Ok(XmlMapSchema {
+    Ok(XmlSchema {
         id,
         schema_reference,
         namespace,
@@ -579,7 +578,7 @@ fn parse_map(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMap> {
         data_binding: None,
     })
 }
-fn parse_binding(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapDataBinding> {
+fn parse_binding(e: &BytesStart<'_>, d: Decoder) -> Result<DataBinding> {
     let data_binding_name = optional_attr(e, d, b"DataBindingName")?;
     let file_binding = parse_bool_attr(e, d, b"FileBinding", false)?;
     let connection_id = parse_u32_attr(e, d, b"ConnectionID", false)?;
@@ -595,7 +594,7 @@ fn parse_binding(e: &BytesStart<'_>, d: Decoder) -> Result<XmlMapDataBinding> {
             b"DataBindingLoadMode",
         ],
     )?;
-    Ok(XmlMapDataBinding {
+    Ok(DataBinding {
         data_binding_name,
         file_binding,
         connection_id,

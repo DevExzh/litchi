@@ -22,15 +22,11 @@ mod snapshot;
 mod tests;
 
 pub use codec::{parse_xml_map_info, serialize_xml_map_info};
-pub use codec::{
-    parse_xml_map_info as parse_map_info, serialize_xml_map_info as serialize_map_info,
-};
 #[cfg(test)]
 pub(crate) use edit::Transaction;
 pub use edit::{Edit, EditOptions};
 pub use model::{
-    DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapLimits,
-    XmlMapSchema, XmlSchema,
+    XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapLimits, XmlMapSchema,
 };
 pub use package::{load_from_package, load_from_package_with_conformance};
 #[cfg(test)]

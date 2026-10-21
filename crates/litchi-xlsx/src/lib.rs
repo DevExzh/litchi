@@ -209,8 +209,7 @@ pub use conditional_formatting::{
 };
 pub use custom_data::{
     CustomData, ExtensionList, Limits as CustomDataLimits, Part as CustomDataPart, Properties,
-    Snapshot as CustomDataSnapshot, Store, parse_properties, validate_workbook_root,
-    write_properties,
+    Snapshot as CustomDataSnapshot, parse_properties, validate_workbook_root, write_properties,
 };
 pub use data_consolidation::{
     DataConsolidation, Function, RangeReference, Reference, ReferenceSource, References,

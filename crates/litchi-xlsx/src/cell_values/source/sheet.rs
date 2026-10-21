@@ -92,9 +92,10 @@ impl Patch {
     ///
     /// Returns an error when the payload exceeds the bound.
     pub fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
-        Ok(Self(std::sync::Arc::new(
-            self.0.materialized(maximum_bytes)?,
-        )))
+        Ok(Self(
+            std::sync::Arc::new(self.0.materialized(maximum_bytes)?),
+            None,
+        ))
     }
 }
 

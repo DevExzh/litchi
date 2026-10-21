@@ -175,7 +175,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         },
     )?;
     after_workbook = raw::recalc::invalidate(&after_workbook)?;
-    let catalog = raw::parse_catalog(&after_workbook)?;
+    let catalog = raw::parse_catalog(&after_workbook, &base.inner.package.read_limits())?;
     if catalog.sheets.len() != retained_len || catalog.active_sheet_index != final_active_position {
         return Err(invalid("workbook worksheet-removal verification failed"));
     }

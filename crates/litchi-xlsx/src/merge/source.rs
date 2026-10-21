@@ -87,10 +87,13 @@ impl Patch {
     ///
     /// Returns a limit or allocation error when a payload exceeds the bound.
     pub fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
-        Ok(Self(Arc::new(Record::new(
-            self.0.before.clone(),
-            self.0.after.materialized(maximum_bytes)?,
-        ))))
+        Ok(Self(
+            Arc::new(Record::new(
+                self.0.before.clone(),
+                self.0.after.materialized(maximum_bytes)?,
+            )),
+            None,
+        ))
     }
 }
 
@@ -314,7 +317,7 @@ impl Snapshot {
         require_workbook_content_type(workbook.content_type())?;
         let workbook_data = workbook.data()?;
         let workbook_xml = SourcePayload::from_part_data(package, workbook_data)?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let Some(sheet_position) = resolve_selector(&catalog.sheets, selector.into())? else {
             package.check_execution()?;
@@ -579,7 +582,7 @@ impl SourceState {
             return Ok(false);
         }
         let workbook_xml = workbook.data()?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let Some(catalog_sheet) = catalog.sheets.get(sheet_position) else {
             return Ok(false);

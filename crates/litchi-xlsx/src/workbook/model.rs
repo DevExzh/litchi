@@ -1336,7 +1336,7 @@ impl Worksheet {
         }
         self.data.web_bindings.get_or_try_init(|| {
             let part = self.owner.package.get_part(&self.data.part_uri)?;
-            raw::web::read(part.blob())
+            raw::web::read(part.blob(), &self.owner.package.read_limits())
         })
     }
 

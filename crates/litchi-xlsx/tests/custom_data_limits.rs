@@ -1196,7 +1196,10 @@ fn query_table_empty_elements_honor_the_xml_depth_cap() {
         .expect_err("empty query-table child must count toward XML depth");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Depth
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
+            ..
+        }
     ));
     assert_eq!(package_bytes(&fixture.package), before);
 }
@@ -2071,7 +2074,12 @@ fn connection_namespace_declarations_consume_attribute_budget() {
         .expect_err("unused namespace declarations must count as attributes");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Objects
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::Attributes
+            ),
+            ..
+        }
     ));
 }
 
@@ -2093,7 +2101,12 @@ fn connection_namespace_budget_includes_prefix_bytes() {
         .expect_err("namespace prefixes must consume the byte budget");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::NamespaceBytes
+            ),
+            ..
+        }
     ));
 }
 
@@ -2109,7 +2122,12 @@ fn connection_in_root_cdata_counts_against_xml_string_bytes() {
         .expect_err("in-root CDATA must consume the XML string budget");
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::InputBytes
+        Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::StringBytes
+            ),
+            ..
+        }
     ));
 }
 

@@ -192,9 +192,7 @@ fn capture_incoming(package: &OpcPackage, target: &PackURI) -> Result<Vec<Relati
 
 fn push_incoming(values: &mut Vec<RelationshipState>, value: RelationshipState) -> Result<()> {
     if values.len() >= MAX_INCOMING_RELATIONSHIPS {
-        return Err(invalid(
-            "rich-value incoming relationship count exceeds the limit",
-        ));
+        return Err(super::limit("rich-value refresh intervals"));
     }
     values.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "rich-value incoming relationship closure",
@@ -206,7 +204,15 @@ fn push_incoming(values: &mut Vec<RelationshipState>, value: RelationshipState) 
 
 crate::record::record_family!("rich-value refresh-interval");
 
-crate::record::no_limits!("rich-value refresh-interval");
+crate::record::limit_kinds!("rich-value refresh-interval", RichValueRefresh {
+    XmlBytes => "rich-value refresh XML bytes",
+    OutputBytes => "rich-value refresh output bytes",
+    StringBytes => "rich-value refresh string bytes",
+    Types => "rich-value types",
+    Intervals => "rich-value refresh intervals",
+    ExtensionLocations => "rich-value refresh extension locations",
+    Depth => "rich-value XML depth",
+});
 
 /// A staged, failure-atomic edit of the rich-value types owner's refresh
 /// intervals of one [`crate::Package`]. Dropping it discards it;
@@ -269,9 +275,7 @@ impl Edit {
             .map(|intervals| intervals.intervals().to_vec())
             .unwrap_or_default();
         if values.len() >= MAX_INTERVALS {
-            return Err(invalid(
-                "rich-value refresh interval count exceeds the limit",
-            ));
+            return Err(super::limit("rich-value refresh intervals"));
         }
         values.try_reserve(1).map_err(|source| Error::Allocation {
             resource: "rich-value refresh interval edit",

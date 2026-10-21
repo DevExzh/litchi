@@ -11,7 +11,7 @@ pub(crate) mod bindings;
 
 pub use litchi_ooxml_common::custom_data::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, ExtensionList,
-    PROPERTIES_CONTENT_TYPE, PROPERTIES_RELATIONSHIP_TYPE, Properties, RemovalDisposition, Store,
+    PROPERTIES_CONTENT_TYPE, PROPERTIES_RELATIONSHIP_TYPE, Properties, RemovalDisposition,
 };
 pub use litchi_ooxml_common::custom_data::{
     parse_properties, validate_workbook_root, write_properties,

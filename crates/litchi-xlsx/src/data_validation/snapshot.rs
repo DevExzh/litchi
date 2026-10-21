@@ -38,7 +38,7 @@ impl Snapshot {
         }
 
         let workbook_part = package.main_document_part()?;
-        let catalog = raw::parse_catalog(workbook_part.blob())?;
+        let catalog = raw::parse_catalog(workbook_part.blob(), &package.read_limits())?;
         let catalog_sheet = catalog.sheets.get(sheet.position()).ok_or_else(|| {
             invalid("data-validation worksheet position is absent from the workbook catalog")
         })?;
@@ -82,7 +82,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("data-validation worksheet selector did not resolve"))?;

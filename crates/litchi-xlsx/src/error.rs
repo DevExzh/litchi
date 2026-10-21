@@ -329,6 +329,16 @@ pub enum LimitKind {
     Revisions(crate::revisions::LimitKind),
     /// Data-type-icon XML and relationship budgets.
     DataTypeIcons(crate::data_type_icons::LimitKind),
+    /// Workbook Data Model XML and payload budgets.
+    DataModel(crate::workbook::data_model::LimitKind),
+    /// External-link XML and cache budgets.
+    ExternalLinks(crate::external_links::LimitKind),
+    /// Worksheet OLE-object XML and payload budgets.
+    OleObjects(crate::ole_objects::LimitKind),
+    /// Workbook connection XML and collection budgets.
+    Connections(crate::connections::LimitKind),
+    /// Rich-value refresh interval XML and collection budgets.
+    RichValueRefresh(crate::rich_values::refresh_intervals::LimitKind),
 }
 
 impl LimitKind {
@@ -377,6 +387,11 @@ impl LimitKind {
             Self::RowVisibility(kind) => kind.as_str(),
             Self::Revisions(kind) => kind.as_str(),
             Self::DataTypeIcons(kind) => kind.as_str(),
+            Self::DataModel(kind) => kind.as_str(),
+            Self::ExternalLinks(kind) => kind.as_str(),
+            Self::OleObjects(kind) => kind.as_str(),
+            Self::Connections(kind) => kind.as_str(),
+            Self::RichValueRefresh(kind) => kind.as_str(),
         }
     }
 }

@@ -108,7 +108,15 @@ impl Patch {
 
 crate::record::record_family!("OLE-object");
 
-crate::record::no_limits!("OLE-object");
+crate::record::limit_kinds!("OLE-object", OleObjects {
+    XmlBytes => "worksheet OLE XML bytes",
+    Nodes => "worksheet OLE XML nodes",
+    Depth => "worksheet OLE XML depth",
+    Objects => "worksheet OLE objects",
+    PayloadBytes => "worksheet OLE payload bytes",
+    TotalPayloadBytes => "worksheet OLE total payload bytes",
+    StringBytes => "worksheet OLE string bytes",
+});
 
 impl crate::record::Record for Patch {
     fn is_noop(&self) -> bool {

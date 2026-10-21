@@ -676,7 +676,7 @@ impl Edit {
             .package
             .get_part(&self.base.inner.workbook_uri)?;
         let candidate = raw::catalog_edit::replace_defined_names(workbook.blob(), &names)?;
-        let parsed = raw::parse_catalog(&candidate)?;
+        let parsed = raw::parse_catalog(&candidate, &self.base.inner.package.read_limits())?;
         if parsed.defined_names != names {
             return Err(invalid("defined-name authoring verification failed"));
         }
@@ -2536,7 +2536,11 @@ impl Edit {
             }
             if let Some(bindings) = &effective_web {
                 let input = after.as_deref().unwrap_or(&before);
-                after = Some(raw::web::replace(input, bindings)?);
+                after = Some(raw::web::replace(
+                    input,
+                    bindings,
+                    &base.inner.package.read_limits(),
+                )?);
             }
             if let Some(page_breaks) = &effective_page_breaks {
                 let input = after.as_deref().unwrap_or(&before);
@@ -3033,12 +3037,15 @@ impl Edit {
                             || base.inner.package.get_part(&data.part_uri).map(Part::blob),
                             |part| Ok(part.after.as_slice()),
                         )?;
-                    *after = raw::web::read(content)?;
+                    *after = raw::web::read(content, &base.inner.package.read_limits())?;
                 } else if let Some(created) = created
                     .iter()
                     .find(|created| created.name.as_str() == sheet.as_ref())
                 {
-                    *after = raw::web::read(created.graph.part.blob())?;
+                    *after = raw::web::read(
+                        created.graph.part.blob(),
+                        &base.inner.package.read_limits(),
+                    )?;
                 }
             }
         }
@@ -3136,7 +3143,7 @@ impl Edit {
             };
             let workbook_input = referenced_workbook.as_deref().unwrap_or(&before);
             let scope_source = (effective_order.is_some() || !created.is_empty())
-                .then(|| raw::parse_catalog(workbook_input))
+                .then(|| raw::parse_catalog(workbook_input, &base.inner.package.read_limits()))
                 .transpose()?;
             let raw_order = effective_order
                 .as_ref()
@@ -3330,7 +3337,7 @@ impl Edit {
                 || active_change.is_some()
                 || requested_defined_names.is_some()
             {
-                let catalog = raw::parse_catalog(&after)?;
+                let catalog = raw::parse_catalog(&after, &base.inner.package.read_limits())?;
                 if let Some(expected) = &requested_defined_names
                     && catalog.defined_names.as_slice() != expected.as_ref()
                 {

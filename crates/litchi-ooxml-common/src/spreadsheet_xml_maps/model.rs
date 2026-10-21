@@ -76,7 +76,7 @@ pub struct XmlMap {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct XmlMapInfo {
     pub selection_namespaces: String,
-    pub schemas: Vec<XmlMapSchema>,
+    pub schemas: Vec<XmlSchema>,
     pub maps: Vec<XmlMap>,
 }
 
@@ -86,11 +86,6 @@ pub struct ParsedXmlMapInfo {
     pub info: XmlMapInfo,
     pub conformance: XmlMapConformance,
 }
-
-/// Backward-compatible `SpreadsheetML` name for [`XmlSchema`].
-pub type XmlMapSchema = XmlSchema;
-/// Backward-compatible `SpreadsheetML` name for [`DataBinding`].
-pub type XmlMapDataBinding = DataBinding;
 
 /// Fixed resource ceilings enforced by the bounded XML Maps codec.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

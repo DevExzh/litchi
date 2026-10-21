@@ -825,13 +825,6 @@ impl Snapshot {
         })
     }
 
-    pub fn read<'a>(
-        package: &OpcPackage,
-        selector: impl Into<PivotTableSelector<'a>>,
-    ) -> Result<Self> {
-        Self::load(package, selector)
-    }
-
     #[must_use]
     pub fn data(&self) -> &PivotTableDataView {
         &self.value

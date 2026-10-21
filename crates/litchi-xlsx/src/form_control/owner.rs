@@ -2162,8 +2162,8 @@ impl SourceBackedFormControlOwner {
         let workbook = self.package.main_document_part()?;
         let workbook_data =
             source_part_data_with_limit(&workbook, self.limits.max_mce_bytes, "workbook bytes")?;
-        let catalog =
-            raw::parse_catalog(workbook_data.as_bytes()).map_err(FormControlOwnerError::Xlsx)?;
+        let catalog = raw::parse_catalog(workbook_data.as_bytes(), &self.package.read_limits())
+            .map_err(FormControlOwnerError::Xlsx)?;
         let sheet_parts = validate_sheet_graph(&self.package, &workbook, &catalog.sheets)
             .map_err(FormControlOwnerError::Xlsx)?;
         let position = resolve_sheet_position(&catalog.sheets, selector.into())?;

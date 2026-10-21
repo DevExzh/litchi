@@ -1780,9 +1780,15 @@ mod tests {
             if allowed {
                 assert!(result.is_ok());
             } else {
-                assert!(
-                    matches!(result, Err(Error::Invalid(message)) if message.contains("namespace count"))
-                );
+                assert!(matches!(
+                    result,
+                    Err(Error::Limit {
+                        kind: crate::LimitKind::DataModel(
+                            crate::workbook::data_model::LimitKind::NamespaceBytes,
+                        ),
+                        ..
+                    })
+                ));
             }
         }
     }

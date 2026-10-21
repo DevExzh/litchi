@@ -22,7 +22,7 @@ const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
 /// object; worksheets without shapes are omitted.
 pub fn load_shapes(package: &OpcPackage) -> Result<Vec<Shapes>> {
     let workbook_part = package.main_document_part()?;
-    let sheets = parse_workbook_sheets(workbook_part.blob())?;
+    let sheets = parse_workbook_sheets(workbook_part.blob(), &package.read_limits())?;
     let mut output = Vec::new();
     for sheet in &sheets {
         let shapes = load_shapes_for_sheet(package, workbook_part, sheet)?;
@@ -36,7 +36,7 @@ pub fn load_shapes(package: &OpcPackage) -> Result<Vec<Shapes>> {
 /// Load the shape inventory of one worksheet, addressed by sheet name.
 pub fn load_sheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<Shapes> {
     let workbook_part = package.main_document_part()?;
-    let sheets = parse_workbook_sheets(workbook_part.blob())?;
+    let sheets = parse_workbook_sheets(workbook_part.blob(), &package.read_limits())?;
     let sheet = sheets
         .iter()
         .find(|sheet| sheet.name == sheet_name)
@@ -44,11 +44,11 @@ pub fn load_sheet_shapes(package: &OpcPackage, sheet_name: &str) -> Result<Shape
     load_shapes_for_sheet(package, workbook_part, sheet)
 }
 
-fn parse_workbook_sheets(xml: &[u8]) -> Result<Vec<Sheet>> {
+fn parse_workbook_sheets(xml: &[u8], limits: &litchi_opc::SourceLimits) -> Result<Vec<Sheet>> {
     if xml.len() > MAX_WORKBOOK_BYTES {
         return Err(limit("workbook XML bytes"));
     }
-    Ok(parse_catalog(xml)?.sheets)
+    Ok(parse_catalog(xml, limits)?.sheets)
 }
 
 fn load_shapes_for_sheet(

@@ -146,7 +146,7 @@ impl Connections {
             },
         )
         .map_err(|error| {
-            let mapped = map_mce_error(
+            map_mce_error(
                 error,
                 maximum,
                 mce_output_limit,
@@ -155,24 +155,7 @@ impl Connections {
                 events.min(4096),
                 events.min(1024),
                 "connections",
-            );
-            if mce_output_limit < maximum
-                && matches!(
-                    mapped,
-                    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-                        resource: litchi_core::Resource::OutputBytes,
-                        ..
-                    })
-                )
-            {
-                temporary_limit(
-                    mce_output_limit.saturating_add(1),
-                    mce_output_limit,
-                    "connections MCE output bytes",
-                )
-            } else {
-                mapped
-            }
+            )
         })?;
         if processed.xml.len() > maximum {
             return Err(xml_resource_limit(
@@ -216,21 +199,11 @@ impl Connections {
 }
 
 fn connection_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: litchi_core::Resource::InputBytes,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+    super::limit(name, observed, maximum)
 }
 
 fn temporary_limit(observed: usize, maximum: usize, name: &'static str) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: litchi_core::Resource::Memory,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+    super::limit(name, observed, maximum)
 }
 
 fn xml_resource_limit(
@@ -239,12 +212,8 @@ fn xml_resource_limit(
     maximum: usize,
     name: &'static str,
 ) -> XlsxError {
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+    let _resource = resource;
+    super::limit(name, observed, maximum)
 }
 
 pub(super) fn map_mce_error(
@@ -255,26 +224,21 @@ pub(super) fn map_mce_error(
     namespace_bindings: usize,
     directive_tokens: usize,
     choices: usize,
-    scope: &'static str,
+    _scope: &'static str,
 ) -> XlsxError {
     let litchi_ooxml_common::mce::Error::LimitExceeded(resource) = &error else {
         return XlsxError::MarkupCompatibility(error);
     };
-    let (kind, maximum) = match resource.as_str() {
-        "input bytes" => (litchi_core::Resource::InputBytes, input_bytes),
-        "output bytes" => (litchi_core::Resource::OutputBytes, output_bytes),
-        "depth" => (litchi_core::Resource::Depth, depth),
-        "namespace bindings" => (litchi_core::Resource::Objects, namespace_bindings),
-        "directive tokens" => (litchi_core::Resource::Objects, directive_tokens),
-        "choices" => (litchi_core::Resource::Objects, choices),
+    let (name, maximum) = match resource.as_str() {
+        "input bytes" => ("connections MCE input XML bytes", input_bytes),
+        "output bytes" => ("connections MCE output bytes", output_bytes),
+        "depth" => ("connections MCE XML depth", depth),
+        "namespace bindings" => ("connections MCE namespace bytes", namespace_bindings),
+        "directive tokens" => ("connections MCE events", directive_tokens),
+        "choices" => ("connections MCE events", choices),
         _ => return XlsxError::MarkupCompatibility(error),
     };
-    XlsxError::ResourceLimit(litchi_core::ResourceLimit {
-        resource: kind,
-        observed: maximum.saturating_add(1) as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {scope} MCE {resource}")),
-    })
+    super::limit(name, maximum.saturating_add(1), maximum)
 }
 
 /// Admit the borrowed lexical shape before any PI copy, MCE expansion, or
@@ -4380,10 +4344,13 @@ mod tests {
             }],
         )
         .unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "invalid XLSX structure: connection source output exceeds 16 MiB"
-        );
+        assert!(matches!(
+            error,
+            crate::Error::Limit {
+                kind: crate::LimitKind::Connections(crate::connections::LimitKind::OutputBytes),
+                ..
+            }
+        ));
     }
 
     #[test]

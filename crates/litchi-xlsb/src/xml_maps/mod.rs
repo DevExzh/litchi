@@ -37,8 +37,7 @@ pub use host_api::{
     serialize_xml_map_info, validate_xml_map_info,
 };
 pub use litchi_ooxml_common::spreadsheet_xml_maps::{
-    DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapLimits,
-    XmlMapSchema, XmlSchema,
+    DataBinding, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapLimits, XmlSchema,
 };
 
 pub use crate::package::error::{Error, Result};

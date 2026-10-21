@@ -266,7 +266,7 @@ fn worksheet_metadata_deduplicates_canonical_target_edges() {
         .unwrap();
 
     let workbook = package.main_document_part().unwrap();
-    let catalog = raw::parse_catalog(workbook.blob()).unwrap();
+    let catalog = raw::parse_catalog(workbook.blob(), &SourceLimits::default()).unwrap();
     let relationship_index = RelationshipIndex::build(&package).unwrap();
     let names = worksheet_pivot_names(&package, &catalog, &relationship_index).unwrap();
     assert_eq!(names, vec!["Pivot"]);

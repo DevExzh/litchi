@@ -318,15 +318,6 @@ pub enum IndexBoundStatus {
     Unresolved,
 }
 
-/// Canonical advanced-layer cache selector name.
-pub type CacheSelector = PivotCacheSelector;
-
-/// Canonical advanced-layer field selector name.
-pub type FieldSelector<'a> = PivotCacheFieldSelector<'a>;
-
-/// Canonical advanced-layer diagnostic status name.
-pub type DiagnosticStatus = IndexBoundStatus;
-
 /// One typed `x15:cachedUniqueName` leaf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CachedUniqueName {
@@ -375,18 +366,6 @@ impl CachedUniqueNames {
     #[must_use]
     pub const fn index_bound_status(&self) -> IndexBoundStatus {
         self.index_bound
-    }
-
-    /// Canonical advanced-layer diagnostic status accessor.
-    #[must_use]
-    pub const fn diagnostic_status(&self) -> DiagnosticStatus {
-        self.index_bound_status()
-    }
-
-    /// Canonical advanced-layer entry accessor.
-    #[must_use]
-    pub fn entries(&self) -> &[CachedUniqueName] {
-        self.names()
     }
 }
 
@@ -489,18 +468,6 @@ impl Snapshot {
     #[must_use]
     pub const fn index_bound_status(&self) -> IndexBoundStatus {
         self.value.index_bound_status()
-    }
-
-    /// Canonical advanced-layer diagnostic status accessor.
-    #[must_use]
-    pub const fn diagnostic_status(&self) -> DiagnosticStatus {
-        self.value.diagnostic_status()
-    }
-
-    /// Canonical advanced-layer entry accessor.
-    #[must_use]
-    pub fn entries(&self) -> &[CachedUniqueName] {
-        self.cached_unique_names().names()
     }
 
     /// Whether the recognized payload was selected through an MCE branch.

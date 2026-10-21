@@ -86,6 +86,10 @@ struct State {
     content_type: String,
     blob: Arc<Vec<u8>>,
     relationships: Vec<Relationship>,
+    /// Exact source or authored relationship-member XML for this owner.
+    /// Semantic relationship equality alone cannot preserve lexical source
+    /// bytes across a replay.
+    relationship_xml: OwnedRelationships,
 }
 
 impl PartialEq for State {
@@ -93,32 +97,42 @@ impl PartialEq for State {
         self.content_type == other.content_type
             && (Arc::ptr_eq(&self.blob, &other.blob) || self.blob == other.blob)
             && self.relationships == other.relationships
+            && self.relationship_xml == other.relationship_xml
     }
 }
 
 impl Eq for State {}
 
 impl State {
-    fn read(part: &dyn Part) -> Self {
-        Self {
+    fn read(package: &OpcPackage, part: &dyn Part) -> Result<Self> {
+        Ok(Self {
             content_type: part.content_type().to_owned(),
             blob: part.blob_arc(),
             relationships: relationships(part.rels()),
-        }
+            relationship_xml: package
+                .source_relationships_with_limits(part.partname(), package.read_limits())?,
+        })
     }
 
-    fn of(package: &OpcPackage, name: &PackURI) -> Option<Self> {
-        package.get_part(name).ok().map(Self::read)
+    fn of(package: &OpcPackage, name: &PackURI) -> Result<Option<Self>> {
+        package
+            .get_part(name)
+            .ok()
+            .map(|part| Self::read(package, part))
+            .transpose()
     }
 
     /// Whether `part` holds exactly this state, without copying its payload.
-    fn matches(&self, part: &dyn Part) -> bool {
-        self.content_type == part.content_type()
+    fn matches(&self, package: &OpcPackage, part: &dyn Part) -> Result<bool> {
+        Ok(self.content_type == part.content_type()
             && {
                 let blob = part.blob();
                 std::ptr::eq(self.blob.as_slice(), blob) || self.blob.as_slice() == blob
             }
             && self.relationships == relationships(part.rels())
+            && self.relationship_xml
+                == package
+                    .source_relationships_with_limits(part.partname(), package.read_limits())?)
     }
 
     fn to_part(&self, name: PackURI) -> Result<BlobPart> {
@@ -129,13 +143,21 @@ impl State {
     }
 }
 
-fn same_part(before: &dyn Part, after: &dyn Part) -> bool {
-    before.content_type() == after.content_type()
+fn same_part(
+    before_package: &OpcPackage,
+    before: &dyn Part,
+    after_package: &OpcPackage,
+    after: &dyn Part,
+) -> Result<bool> {
+    Ok(before.content_type() == after.content_type()
         && {
             let (left, right) = (before.blob(), after.blob());
             std::ptr::eq(left, right) || left == right
         }
         && relationships_equal(before.rels(), after.rels())
+        // The retained-token comparison is pointer-fast for the usual clone
+        // case.  Only a changed token falls through to source capture below.
+        && before_package.same_retained_relationships(after_package, before.partname())?)
 }
 
 fn optional_part<'a>(package: &'a OpcPackage, name: &PackURI) -> Result<Option<&'a dyn Part>> {
@@ -158,12 +180,21 @@ struct Delta {
 /// the same manifest spelling as the commit it was captured from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Manifests {
-    content_types: OwnedContentTypes,
+    /// Retained only when this patch changes the content-types publication
+    /// view.  A relationship-only patch must not make replay depend on the
+    /// caller's unrelated content-type additions.
+    content_types: Option<OwnedContentTypes>,
     relationships: Vec<OwnedRelationships>,
 }
 
 impl Manifests {
-    fn capture(package: &OpcPackage, deltas: &[Delta], after: bool, root: bool) -> Result<Self> {
+    fn capture(
+        package: &OpcPackage,
+        deltas: &[Delta],
+        after: bool,
+        root: bool,
+        content_types: bool,
+    ) -> Result<Self> {
         let mut relationships = Vec::new();
         for delta in deltas {
             let present = if after {
@@ -172,15 +203,20 @@ impl Manifests {
                 delta.before.is_some()
             };
             if present {
-                relationships.push(package.source_relationships(&delta.name)?);
+                relationships.push(
+                    package.source_relationships_with_limits(&delta.name, package.read_limits())?,
+                );
             }
         }
         if root {
             let owner = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
-            relationships.push(package.source_relationships(&owner)?);
+            relationships
+                .push(package.source_relationships_with_limits(&owner, package.read_limits())?);
         }
         Ok(Self {
-            content_types: package.source_content_types()?,
+            content_types: content_types
+                .then(|| package.source_content_types_with_limits(package.read_limits()))
+                .transpose()?,
             relationships,
         })
     }
@@ -188,12 +224,15 @@ impl Manifests {
     /// Publish these manifest views on `package`, whose typed graph is the
     /// one they were captured from.
     fn restore(&self, package: &mut OpcPackage) -> Result<()> {
-        let current = package.source_content_types()?;
-        if current.bytes() != self.content_types.bytes() {
-            package.try_replace_content_types(current.bytes(), &self.content_types)?;
+        if let Some(expected) = &self.content_types {
+            let current = package.source_content_types_with_limits(package.read_limits())?;
+            if current.bytes() != expected.bytes() {
+                package.try_replace_content_types(current.bytes(), expected)?;
+            }
         }
         for relationships in &self.relationships {
-            let current = package.source_relationships(relationships.owner())?;
+            let current = package
+                .source_relationships_with_limits(relationships.owner(), package.read_limits())?;
             if current != *relationships {
                 package.try_replace_relationships(&current, relationships)?;
             }
@@ -214,13 +253,27 @@ pub(crate) struct PartPatch {
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
-        self.deltas.is_empty() && self.root.is_none()
+        self.deltas.is_empty()
+            && self.root.is_none()
+            && self
+                .manifests
+                .as_ref()
+                .is_none_or(|(before, after)| before == after)
     }
 
     /// The number of parts (and the package-level relationship set) the
     /// patch changes.
     pub(crate) fn parts(&self) -> usize {
-        self.deltas.len() + usize::from(self.root.is_some())
+        let changed = self.deltas.len() + usize::from(self.root.is_some());
+        if changed == 0 {
+            usize::from(
+                self.manifests
+                    .as_ref()
+                    .is_some_and(|(before, after)| before != after),
+            )
+        } else {
+            changed
+        }
     }
 
     pub(crate) fn inverse(&self) -> Self {
@@ -247,24 +300,55 @@ impl PartPatch {
 
     /// Attach the manifest views of both sides to a changed patch.
     fn with_manifests(mut self, before: &OpcPackage, after: &OpcPackage) -> Result<Self> {
-        if !self.is_noop() {
-            let root = self.root.is_some();
-            self.manifests = Some((
-                Manifests::capture(before, &self.deltas, false, root)?,
-                Manifests::capture(after, &self.deltas, true, root)?,
-            ));
+        // A payload-only edit does not change publication manifests.  Keep
+        // the common path lazy: the retained-token comparison avoids parsing
+        // or allocating any manifest XML.  A typed relationship/content-type
+        // change still needs the authored fallback even when both sides have
+        // no retained source token.
+        let typed_manifest_change = self.root.is_some()
+            || self
+                .deltas
+                .iter()
+                .any(|delta| match (&delta.before, &delta.after) {
+                    (Some(before), Some(after)) => {
+                        before.content_type != after.content_type
+                            || before.relationships != after.relationships
+                    },
+                    _ => true,
+                });
+        if !typed_manifest_change && before.same_retained_publication_manifests(after)? {
+            return Ok(self);
         }
+        let content_types_changed =
+            self.deltas
+                .iter()
+                .any(|delta| match (&delta.before, &delta.after) {
+                    (Some(before), Some(after)) => before.content_type != after.content_type,
+                    _ => true,
+                })
+                || !before.same_retained_content_types(after)?;
+        let root = self.root.is_some();
+        self.manifests = Some((
+            Manifests::capture(before, &self.deltas, false, root, content_types_changed)?,
+            Manifests::capture(after, &self.deltas, true, root, content_types_changed)?,
+        ));
         Ok(self)
     }
 
     fn root(
         before: &OpcPackage,
         after: &OpcPackage,
-    ) -> Option<(Vec<Relationship>, Vec<Relationship>)> {
-        if relationships_equal(before.rels(), after.rels()) {
-            None
+    ) -> Result<Option<(Vec<Relationship>, Vec<Relationship>)>> {
+        let owner = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
+        if relationships_equal(before.rels(), after.rels())
+            && before.same_retained_relationships(after, &owner)?
+        {
+            Ok(None)
         } else {
-            Some((relationships(before.rels()), relationships(after.rels())))
+            Ok(Some((
+                relationships(before.rels()),
+                relationships(after.rels()),
+            )))
         }
     }
 
@@ -274,8 +358,8 @@ impl PartPatch {
         let mut deltas = Vec::new();
         for name in names {
             let name = PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;
-            let before = State::of(before, &name);
-            let after = State::of(after, &name);
+            let before = State::of(before, &name)?;
+            let after = State::of(after, &name)?;
             if before != after {
                 deltas.push(Delta {
                     name,
@@ -286,7 +370,7 @@ impl PartPatch {
         }
         Self {
             deltas,
-            root: Self::root(before, after),
+            root: Self::root(before, after)?,
             manifests: None,
         }
         .with_manifests(before, after)
@@ -320,11 +404,11 @@ impl PartPatch {
             let part = part?;
             let name = part.partname();
             match optional_part(after, name)? {
-                Some(other) if same_part(part, other) => {},
+                Some(other) if same_part(before, part, after, other)? => {},
                 other => push(Delta {
                     name: name.clone(),
-                    before: Some(State::read(part)),
-                    after: other.map(State::read),
+                    before: Some(State::read(before, part)?),
+                    after: other.map(|part| State::read(after, part)).transpose()?,
                 })?,
             }
         }
@@ -334,14 +418,14 @@ impl PartPatch {
                 push(Delta {
                     name: part.partname().clone(),
                     before: None,
-                    after: Some(State::read(part)),
+                    after: Some(State::read(after, part)?),
                 })?;
             }
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         Self {
             deltas,
-            root: Self::root(before, after),
+            root: Self::root(before, after)?,
             manifests: None,
         }
         .with_manifests(before, after)
@@ -368,11 +452,38 @@ impl PartPatch {
                 part: "/_rels/.rels".to_owned(),
             });
         }
+        if let Some((before, _)) = &self.manifests {
+            if let Some(expected) = &before.content_types
+                && source
+                    .source_content_types_with_limits(source.read_limits())?
+                    .bytes()
+                    != expected.bytes()
+            {
+                return Err(Error::PatchConflict {
+                    part: "[Content_Types].xml".to_owned(),
+                });
+            }
+            for expected in &before.relationships {
+                if source
+                    .source_relationships_with_limits(expected.owner(), source.read_limits())?
+                    != *expected
+                {
+                    return Err(Error::PatchConflict {
+                        part: expected
+                            .owner()
+                            .rels_uri()
+                            .map_err(invalid)?
+                            .as_str()
+                            .to_owned(),
+                    });
+                }
+            }
+        }
         for delta in &self.deltas {
             let current = optional_part(source, &delta.name)?;
             let matches = match (&delta.before, current) {
                 (None, None) => true,
-                (Some(state), Some(part)) => state.matches(part),
+                (Some(state), Some(part)) => state.matches(source, part)?,
                 _ => false,
             };
             if !matches {
@@ -565,6 +676,134 @@ impl Staged {
         crate::signature_policy::ensure_unsigned(&staged)?;
         let package = self.source.derive(staged)?;
         Ok((package, patch))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PartPatch;
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
+    use soapberry_zip::office::StreamingArchiveWriter;
+
+    const CONTENT_TYPES_A: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+</Types>
+"#;
+
+    const CONTENT_TYPES_B: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default ContentType="application/xml" Extension="xml"/><Default ContentType="application/vnd.openxmlformats-package.relationships+xml" Extension="rels"/><Override ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml" PartName="/xl/workbook.xml"/></Types>"#;
+
+    const ROOT_RELS_A: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>
+"#;
+
+    const ROOT_RELS_B: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="xl/workbook.xml" TargetMode="Internal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Id="rId1"/></Relationships>"#;
+
+    fn package(content_types: &[u8], root_relationships: &[u8]) -> OpcPackage {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("[Content_Types].xml", content_types)
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships)
+            .unwrap();
+        writer
+            .write_stored(
+                "xl/workbook.xml",
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+            )
+            .unwrap();
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn lexical_publication_manifests_are_replayed_and_inverted_exactly() {
+        let before = package(CONTENT_TYPES_A, ROOT_RELS_A);
+        let after = package(CONTENT_TYPES_B, ROOT_RELS_B);
+        let patch = PartPatch::capture_all(&before, &after).unwrap();
+
+        assert!(!patch.is_noop());
+        assert_eq!(patch.parts(), 1);
+
+        let forward = patch.apply_graph(&before).unwrap();
+        assert_eq!(
+            forward.source_content_types().unwrap().bytes(),
+            after.source_content_types().unwrap().bytes()
+        );
+        let root = PackURI::new("/").unwrap();
+        assert_eq!(
+            forward.source_relationships(&root).unwrap().bytes(),
+            after.source_relationships(&root).unwrap().bytes()
+        );
+
+        let restored = patch.inverse().apply_graph(&forward).unwrap();
+        assert_eq!(
+            restored.source_content_types().unwrap().bytes(),
+            before.source_content_types().unwrap().bytes()
+        );
+        assert_eq!(
+            restored.source_relationships(&root).unwrap().bytes(),
+            before.source_relationships(&root).unwrap().bytes()
+        );
+    }
+
+    #[test]
+    fn relationship_patch_keeps_unrelated_content_type_additions() {
+        let before = package(CONTENT_TYPES_A, ROOT_RELS_A);
+        let mut after = before.clone();
+        let workbook = PackURI::new("/xl/workbook.xml").unwrap();
+        after
+            .get_part_mut(&workbook)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:litchi:test".to_owned(),
+                "https://example.test/".to_owned(),
+                "rIdExternal".to_owned(),
+                TargetMode::External,
+            )
+            .unwrap();
+        let patch = PartPatch::capture_all(&before, &after).unwrap();
+
+        let mut composed = before.clone();
+        composed.add_part(Box::new(BlobPart::new(
+            PackURI::new("/custom/unrelated.bin").unwrap(),
+            "application/octet-stream".to_owned(),
+            vec![1, 2, 3],
+        )));
+        let forward = patch.apply_graph(&composed).unwrap();
+        assert!(
+            forward
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .is_ok()
+        );
+        assert!(
+            forward
+                .get_part(&workbook)
+                .unwrap()
+                .rels()
+                .get("rIdExternal")
+                .is_some()
+        );
+
+        let restored = patch.inverse().apply_graph(&forward).unwrap();
+        assert!(
+            restored
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .is_ok()
+        );
+        assert!(
+            restored
+                .get_part(&workbook)
+                .unwrap()
+                .rels()
+                .get("rIdExternal")
+                .is_none()
+        );
     }
 }
 

@@ -13,7 +13,7 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 use super::codec::{parse_external_link, patch_source};
 use super::model::{
     AlternateUrl, AlternateUrls, Conformance, Link, MAX_CACHE_TEXT_BYTES,
-    MAX_EXTERNAL_TARGET_BYTES, Target,
+    MAX_EXTERNAL_TARGET_BYTES, MAX_RELATIONSHIP_ID_BYTES, Target,
 };
 use super::{invalid, limit, validation};
 
@@ -151,7 +151,11 @@ fn validate_external_target(
         return Err(invalid(format!("{description} target must not be empty")));
     }
     if target.target().len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(crate::error::Error::limit(
+            super::LimitKind::TargetUri,
+            target.target().len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if target.target().chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -160,9 +164,14 @@ fn validate_external_target(
             "{description} target URI contains an invalid character"
         )));
     }
-    if target.relationship_id().len() > 1024
-        || target.relationship_id().chars().any(char::is_control)
-    {
+    if target.relationship_id().len() > MAX_RELATIONSHIP_ID_BYTES {
+        return Err(crate::error::Error::limit(
+            super::LimitKind::RelationshipIdBytes,
+            target.relationship_id().len(),
+            MAX_RELATIONSHIP_ID_BYTES,
+        ));
+    }
+    if target.relationship_id().chars().any(char::is_control) {
         return Err(invalid(format!("{description} relationship ID is invalid")));
     }
     if !allowed_types.contains(&target.relationship_type()) {
@@ -281,7 +290,11 @@ fn resolve_external_target(
     }
     let target_ref = relationship.target_ref();
     if target_ref.len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(crate::error::Error::limit(
+            super::LimitKind::TargetUri,
+            target_ref.len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if target_ref.chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'

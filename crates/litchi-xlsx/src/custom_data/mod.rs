@@ -31,7 +31,7 @@ mod model;
 mod package;
 
 pub use codec::{XmlLimits, parse_properties, validate_workbook_root, write_properties};
-pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store};
+pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition};
 pub use package::{
     Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Limits, Part, Patch, Snapshot,
 };

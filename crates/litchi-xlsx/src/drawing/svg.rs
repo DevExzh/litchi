@@ -30,11 +30,6 @@ pub struct SvgInput<'a>(&'a [u8]);
 
 impl<'a> SvgInput<'a> {
     /// Wrap caller-owned bytes without copying them.
-    pub const fn new(bytes: &'a [u8]) -> Self {
-        Self::borrowed(bytes)
-    }
-
-    /// Wrap caller-owned bytes without copying them.
     pub const fn borrowed(bytes: &'a [u8]) -> Self {
         Self(bytes)
     }

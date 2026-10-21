@@ -18,7 +18,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
     let workbook_part = package.main_document_part()?;
     let workbook_xml = workbook_part.blob();
 
-    let workbook = parse_catalog(workbook_xml)?;
+    let workbook = parse_catalog(workbook_xml, &package.read_limits())?;
 
     let workbook_rels = workbook_part.rels();
     let mut worksheet_uris = HashMap::with_capacity(workbook.sheets.len());

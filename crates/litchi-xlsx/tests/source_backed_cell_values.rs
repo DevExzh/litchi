@@ -487,14 +487,6 @@ fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::shee
     commit
 }
 
-fn content_type_entries(xml: &[u8]) -> std::collections::BTreeSet<String> {
-    let xml = String::from_utf8_lossy(xml);
-    xml.split('<')
-        .filter(|tag| tag.starts_with("Override ") || tag.starts_with("Default "))
-        .map(|tag| tag.trim_end_matches(['/', '>', ' ']).to_owned())
-        .collect()
-}
-
 fn zip_member(bytes: &[u8], member: &str) -> Vec<u8> {
     ArchiveReader::new(bytes).unwrap().read(member).unwrap()
 }
@@ -701,6 +693,87 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
             .value(address("C3")),
         Some(&Value::Error(ErrorValue::NotAvailable))
     );
+}
+
+#[test]
+fn deferred_replay_uses_the_recipient_context_and_source_limits() {
+    let source_bytes = three_cells();
+    let original_bytes = source_bytes.clone();
+    let (_source_budget, _source_cancellation, source_context) = managed_context(u64::MAX);
+    let source = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes.clone())),
+        litchi_xlsx::SourceLimits::default(),
+        source_context,
+    )
+    .unwrap();
+    let commit = changed_commit(&source);
+
+    // Open an independent equal copy with a distinct, tighter ingress profile.
+    // Its context is cancelled only after replay has built the deferred owner,
+    // so the write must authenticate and publish through this recipient.
+    let tighter_limits = litchi_xlsx::SourceLimits::builder()
+        .max_input_bytes(source_bytes.len() as u64 + 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let (_target_budget, target_cancellation, target_context) = managed_context(u64::MAX);
+    let target = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes)),
+        tighter_limits,
+        target_context,
+    )
+    .unwrap();
+    let replayed = target
+        .workbook()
+        .apply_sheet_values(commit.patch())
+        .unwrap();
+
+    let mut expected_changed = Vec::new();
+    commit.package().write_to(&mut expected_changed).unwrap();
+    let mut replayed_bytes = Vec::new();
+    replayed.package().write_to(&mut replayed_bytes).unwrap();
+    assert_eq!(replayed_bytes, expected_changed);
+
+    target_cancellation.cancel();
+
+    let mut output = Vec::new();
+    assert!(matches!(
+        replayed.package().write_to(&mut output),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+
+    let mut changed_bytes = Vec::new();
+    commit.package().write_to(&mut changed_bytes).unwrap();
+    let inverse_limits = litchi_xlsx::SourceLimits::builder()
+        .max_input_bytes(changed_bytes.len() as u64 + 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let (_inverse_budget, inverse_cancellation, inverse_context) = managed_context(u64::MAX);
+    let inverse_target = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(changed_bytes.clone())),
+        inverse_limits,
+        inverse_context,
+    )
+    .unwrap();
+    let inverse = inverse_target
+        .workbook()
+        .apply_sheet_values(&commit.patch().inverse())
+        .unwrap();
+
+    let mut inverse_bytes = Vec::new();
+    inverse.package().write_to(&mut inverse_bytes).unwrap();
+    assert_eq!(inverse_bytes, original_bytes);
+
+    inverse_cancellation.cancel();
+
+    let mut inverse_output = Vec::new();
+    assert!(matches!(
+        inverse.package().write_to(&mut inverse_output),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(inverse_output.is_empty());
 }
 
 #[test]
@@ -1014,11 +1087,9 @@ fn insert_invalidates_calculation_properties_and_chain() {
         original_workbook.as_slice(),
     );
     let restored = PackageWriter::to_bytes(&replay).unwrap();
-    // The inverse replays through the source topology writer, which may
-    // order the restored override differently (record 0360): compare entries.
     assert_eq!(
-        content_type_entries(&zip_member(&restored, "[Content_Types].xml")),
-        content_type_entries(&original_content_types),
+        zip_member(&restored, "[Content_Types].xml"),
+        original_content_types,
     );
 }
 
@@ -2561,11 +2632,9 @@ fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
         original_chain.as_slice(),
     );
     let restored = PackageWriter::to_bytes(&replay).unwrap();
-    // The inverse replays through the source topology writer, which may
-    // order the restored override differently (record 0360): compare entries.
     assert_eq!(
-        content_type_entries(&zip_member(&restored, "[Content_Types].xml")),
-        content_type_entries(&original_content_types),
+        zip_member(&restored, "[Content_Types].xml"),
+        original_content_types,
     );
     let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1").unwrap();
     assert!(matches!(

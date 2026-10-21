@@ -40,6 +40,23 @@ pub mod selected_worksheet {
 pub(crate) use catalog::parse_catalog_repairing;
 pub use catalog::{parse_catalog, parse_catalog_with_mce, parse_sheet};
 
+/// Check the caller's source budget before a raw parser materializes XML.
+pub(crate) fn check_source_bytes(
+    actual: usize,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    let maximum = limits.max_part_bytes().min(usize::MAX as u64);
+    let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
+    if actual > maximum {
+        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::PartBytes,
+            observed: actual as u64,
+            maximum: maximum as u64,
+        }));
+    }
+    Ok(())
+}
+
 /// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.
 ///
 /// This focused read path shares the canonical [`crate::layout::Defaults`]
@@ -47,7 +64,11 @@ pub use catalog::{parse_catalog, parse_catalog_with_mce, parse_sheet};
 /// cells, rows, columns, or merges. Markup compatibility and the supported
 /// `x14ac:dyDescent` extension are processed using the same bounded rules as
 /// the full parser.
-pub fn parse_worksheet_defaults(content: &[u8]) -> crate::Result<Option<crate::layout::Defaults>> {
+pub fn parse_worksheet_defaults(
+    content: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<Option<crate::layout::Defaults>> {
+    check_source_bytes(content.len(), limits)?;
     worksheet::parse_defaults(content)
 }
 

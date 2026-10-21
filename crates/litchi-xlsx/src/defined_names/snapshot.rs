@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, ExecutionError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI, PartView, Relationship, SourceBackedPackage, TargetMode};
+use litchi_opc::{
+    OpcPackage, PackURI, PartView, Relationship, SourceBackedPackage, SourceLimits, TargetMode,
+};
 
 use crate::error::{Error, Result, invalid};
 use crate::raw::{self, DefinedName};
@@ -16,6 +18,7 @@ pub struct Snapshot {
     names: Box<[DefinedName]>,
     source: SourceState,
     context: Option<ExecutionContext>,
+    pub(super) limits: SourceLimits,
 }
 
 impl Snapshot {
@@ -31,6 +34,7 @@ impl Snapshot {
             SourcePayload::Owned(workbook.blob_arc()),
             owner,
             None,
+            package.read_limits(),
         )
     }
 
@@ -42,8 +46,13 @@ impl Snapshot {
         let bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
         let owner = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        let snapshot =
-            Self::from_source_backed_parts(&workbook, bytes, owner, package.execution_context())?;
+        let snapshot = Self::from_source_backed_parts(
+            &workbook,
+            bytes,
+            owner,
+            package.execution_context(),
+            package.read_limits(),
+        )?;
         package.check_execution()?;
         if package.source_version()? != source_version {
             return Err(invalid(
@@ -58,6 +67,7 @@ impl Snapshot {
         bytes: SourcePayload,
         owner: &Relationship,
         context: Option<ExecutionContext>,
+        limits: SourceLimits,
     ) -> Result<Self> {
         Self::from_parts(
             workbook.partname().clone(),
@@ -65,6 +75,7 @@ impl Snapshot {
             bytes,
             owner,
             context,
+            limits,
         )
     }
 
@@ -74,8 +85,9 @@ impl Snapshot {
         bytes: SourcePayload,
         owner: &Relationship,
         context: Option<ExecutionContext>,
+        limits: SourceLimits,
     ) -> Result<Self> {
-        let names = raw::parse_catalog(bytes.as_bytes())?
+        let names = raw::parse_catalog(bytes.as_bytes(), &limits)?
             .defined_names
             .into_boxed_slice();
         Ok(Self {
@@ -87,11 +99,14 @@ impl Snapshot {
                 owner_relationship: SourceRelationship::capture(owner)?,
             },
             context,
+            limits,
         })
     }
 
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
-        let names = raw::parse_catalog(&bytes)?.defined_names.into_boxed_slice();
+        let names = raw::parse_catalog(&bytes, &source.limits)?
+            .defined_names
+            .into_boxed_slice();
         let mut rewritten = source.clone();
         rewritten.names = names;
         rewritten.source.bytes = SourcePayload::Owned(Arc::new(bytes));

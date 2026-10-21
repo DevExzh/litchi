@@ -19,8 +19,8 @@ use super::model::{
     DdeItem, DdeValue, DdeValueType, DdeValues, DefinedName, ItemSource, Link,
     MAX_ALTERNATE_URL_METADATA_BYTES, MAX_CACHE_TEXT_BYTES, MAX_CACHED_CELLS, MAX_CACHED_ROWS,
     MAX_CACHED_SHEETS, MAX_CELL_COLUMN, MAX_CELL_ROW, MAX_COLUMN_LETTERS, MAX_DEFINED_NAMES,
-    MAX_EXTERNAL_TARGET_BYTES, MAX_LINK_ITEMS, MAX_SHEET_NAMES, Ole, OleItem, Row, SheetData,
-    Target, Workbook, X14,
+    MAX_EXTERNAL_TARGET_BYTES, MAX_LINK_ITEMS, MAX_RELATIONSHIP_ID_BYTES, MAX_SHEET_NAMES, Ole,
+    OleItem, Row, SheetData, Target, Workbook, X14,
 };
 use super::{invalid, limit};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -59,7 +59,11 @@ impl Link {
         }
         xml.push_str("</externalLink>");
         if xml.len() > MAX_CACHE_TEXT_BYTES {
-            return Err(limit("serialized XML"));
+            return Err(Error::limit(
+                super::LimitKind::CacheTextBytes,
+                xml.len(),
+                MAX_CACHE_TEXT_BYTES,
+            ));
         }
         Ok(xml.into_bytes())
     }
@@ -79,7 +83,11 @@ fn validate_external_target(
         return Err(invalid(format!("{description} target must not be empty")));
     }
     if target.target.len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(Error::limit(
+            super::LimitKind::TargetUri,
+            target.target.len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if target.target.chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -88,7 +96,14 @@ fn validate_external_target(
             "{description} target URI contains an invalid character"
         )));
     }
-    if target.relationship_id.len() > 1024 || target.relationship_id.chars().any(char::is_control) {
+    if target.relationship_id.len() > 1024 {
+        return Err(Error::limit(
+            super::LimitKind::RelationshipIdBytes,
+            target.relationship_id.len(),
+            1024,
+        ));
+    }
+    if target.relationship_id.chars().any(char::is_control) {
         return Err(invalid(format!("{description} relationship ID is invalid")));
     }
     if !allowed_types.contains(&target.relationship_type.as_str()) {
@@ -319,9 +334,14 @@ fn validate_alternate_url_target(value: &impl AlternateUrlTarget, description: &
             "{description} relationship ID must not be empty"
         )));
     }
-    if !is_ncname(value.relationship_id())
-        || value.relationship_id().len() > 1024
-        || value.relationship_id().chars().any(char::is_control)
+    if value.relationship_id().len() > MAX_RELATIONSHIP_ID_BYTES {
+        return Err(Error::limit(
+            super::LimitKind::RelationshipIdBytes,
+            value.relationship_id().len(),
+            MAX_RELATIONSHIP_ID_BYTES,
+        ));
+    }
+    if !is_ncname(value.relationship_id()) || value.relationship_id().chars().any(char::is_control)
     {
         return Err(invalid(format!("{description} relationship ID is invalid")));
     }
@@ -2783,7 +2803,14 @@ fn parse_alternate_relationship_id(
     let value = bounded_relationship_attribute_value(element, b"id", decoder, resolver, name)?
         .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid(format!("{name} is missing relationship ID")))?;
-    if !is_ncname(&value) || value.len() > 1024 || value.chars().any(char::is_control) {
+    if value.len() > MAX_RELATIONSHIP_ID_BYTES {
+        return Err(Error::limit(
+            super::LimitKind::RelationshipIdBytes,
+            value.len(),
+            MAX_RELATIONSHIP_ID_BYTES,
+        ));
+    }
+    if !is_ncname(&value) || value.chars().any(char::is_control) {
         return Err(invalid(format!("{name} relationship ID is invalid")));
     }
     Ok(value)
@@ -2794,7 +2821,7 @@ fn bounded_relationship_attribute_value(
     name: &[u8],
     decoder: Decoder,
     resolver: &NamespaceResolver,
-    description: &str,
+    _description: &str,
 ) -> Result<Option<String>> {
     let mut value = None;
     for attribute in element.checked_attributes() {
@@ -2817,14 +2844,22 @@ fn bounded_relationship_attribute_value(
                 String::from_utf8_lossy(name)
             )));
         }
-        if attribute.value.len() > 1024 {
-            return Err(limit(&format!("{description} relationship ID")));
+        if attribute.value.len() > MAX_RELATIONSHIP_ID_BYTES {
+            return Err(Error::limit(
+                super::LimitKind::RelationshipIdBytes,
+                attribute.value.len(),
+                MAX_RELATIONSHIP_ID_BYTES,
+            ));
         }
         let decoded = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Invalid(error.to_string()))?;
-        if decoded.len() > 1024 {
-            return Err(limit(&format!("{description} relationship ID")));
+        if decoded.len() > MAX_RELATIONSHIP_ID_BYTES {
+            return Err(Error::limit(
+                super::LimitKind::RelationshipIdBytes,
+                decoded.len(),
+                MAX_RELATIONSHIP_ID_BYTES,
+            ));
         }
         value = Some(decoded.into_owned());
     }
@@ -2923,22 +2958,46 @@ fn validate_cell_reference(value: &str) -> Result<()> {
             break;
         }
         if split == MAX_COLUMN_LETTERS {
-            return Err(malformed());
+            return Err(Error::limit(
+                super::LimitKind::ColumnLetters,
+                split.saturating_add(1),
+                MAX_COLUMN_LETTERS,
+            ));
         }
         column = column
             .checked_mul(26)
             .and_then(|n| n.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1)))
-            .ok_or_else(|| invalid("external cell column overflow"))?;
+            .ok_or_else(|| {
+                Error::limit(
+                    super::LimitKind::CellColumn,
+                    MAX_CELL_COLUMN as usize + 1,
+                    MAX_CELL_COLUMN as usize,
+                )
+            })?;
         split += 1;
     }
-    if split == 0 || split == value.len() || column > MAX_CELL_COLUMN {
+    if split == 0 || split == value.len() {
         return Err(malformed());
+    }
+    if column > MAX_CELL_COLUMN {
+        return Err(Error::limit(
+            super::LimitKind::CellColumn,
+            column as usize,
+            MAX_CELL_COLUMN as usize,
+        ));
     }
     let row = value[split..]
         .parse::<u32>()
         .map_err(|_source| malformed())?;
-    if row == 0 || row > MAX_CELL_ROW {
+    if row == 0 {
         return Err(malformed());
+    }
+    if row > MAX_CELL_ROW {
+        return Err(Error::limit(
+            super::LimitKind::CellRow,
+            row as usize,
+            MAX_CELL_ROW as usize,
+        ));
     }
     Ok(())
 }

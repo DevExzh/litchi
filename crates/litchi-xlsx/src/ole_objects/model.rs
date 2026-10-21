@@ -265,7 +265,11 @@ pub(super) fn validate_value(value: &OleObjects, require_targets: bool) -> Resul
         if let Some(value) = &object.link {
             bounded(value)?;
             if value.len() > 8192 {
-                return Err(invalid("OLE link moniker exceeds Office's limit"));
+                return Err(Error::limit(
+                    super::LimitKind::StringBytes,
+                    value.len(),
+                    8192,
+                ));
             }
         }
         if require_targets && object.target.is_none() {

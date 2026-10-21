@@ -23,13 +23,21 @@ pub use model::{
 };
 pub use package::{Commit, Diagnostics, Edit, Error, Patch, Snapshot, load_data_model};
 
-/// The typed budgets of the Data Model family.
-///
-/// The family has none yet: its fixed XML, extension and payload bounds are
-/// still reported as [`Error::Invalid`] (record 0360 gap), so this
-/// enum has no variant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LimitKind {}
+crate::record::limit_kinds!("Data Model", DataModel {
+    XmlBytes => "Data Model XML bytes",
+    RewriteBytes => "Data Model rewrite bytes",
+    ExtensionBytes => "Data Model extension bytes",
+    NamespaceBytes => "Data Model namespace bytes",
+    PayloadBytes => "Data Model payload bytes",
+    StringBytes => "Data Model string bytes",
+    TotalStringBytes => "Data Model total string bytes",
+    Nodes => "Data Model XML nodes",
+    Depth => "Data Model XML depth",
+    Tables => "Data Model tables",
+    Relationships => "Data Model relationships",
+    TimeGroupings => "Data Model time groupings",
+    CalculatedTimeColumns => "Data Model calculated time columns",
+});
 
 /// OPC content type for an MS-XLDM payload.
 pub const DATA_MODEL_CONTENT_TYPE: &str =
@@ -72,7 +80,43 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 }
 
 pub(crate) fn limit(name: &str) -> Error {
-    invalid(format!("Data Model {name} limit exceeded"))
+    let (kind, maximum) = if name.contains("payload") {
+        (LimitKind::PayloadBytes, MAX_PAYLOAD_BYTES)
+    } else if name.contains("rewrite") {
+        (LimitKind::RewriteBytes, MAX_REWRITE_BYTES)
+    } else if name.contains("calculatedTimeColumn") {
+        (
+            LimitKind::CalculatedTimeColumns,
+            MAX_CALCULATED_TIME_COLUMNS,
+        )
+    } else if name.contains("modelTimeGrouping") || name.contains("time grouping") {
+        if name.contains("count") {
+            (LimitKind::TimeGroupings, MAX_TIME_GROUPINGS)
+        } else {
+            (LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES)
+        }
+    } else if name.contains("table") {
+        (LimitKind::Tables, MAX_TABLES)
+    } else if name.contains("relationship") {
+        (LimitKind::Relationships, MAX_RELATIONSHIPS)
+    } else if name.contains("depth") {
+        (LimitKind::Depth, MAX_DEPTH)
+    } else if name.contains("structure") || name.contains("node") {
+        (LimitKind::Nodes, MAX_NODES)
+    } else if name.contains("string") || name.contains("attribute") {
+        if name.contains("total") {
+            (LimitKind::TotalStringBytes, MAX_TOTAL_STRING_BYTES)
+        } else {
+            (LimitKind::StringBytes, MAX_STRING_BYTES)
+        }
+    } else if name.contains("namespace") {
+        (LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES)
+    } else if name.contains("extension") || name.contains("context") || name.contains("opaque") {
+        (LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES)
+    } else {
+        (LimitKind::XmlBytes, MAX_XML_BYTES)
+    };
+    Error::limit(kind, maximum.saturating_add(1), maximum)
 }
 
 pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {

@@ -11,8 +11,8 @@ pub use codec::{
 pub use model::{
     CONTENT_TYPE, DataBinding, DataBindingRef, MAX_DEPTH, MAX_EVENTS, MAX_MAPS, MAX_OPAQUE_BYTES,
     MAX_PART_BYTES, MAX_SCHEMAS, MAX_STRING_BYTES, NS, NS_TEXT, ParsedXmlMapInfo, REL, STRICT_NS,
-    STRICT_NS_TEXT, STRICT_REL, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo,
-    XmlMapInfoRef, XmlMapLimits, XmlMapRef, XmlMapSchema, XmlSchema, XmlSchemaRef,
+    STRICT_NS_TEXT, STRICT_REL, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapInfoRef, XmlMapLimits,
+    XmlMapRef, XmlSchema, XmlSchemaRef,
 };
 pub use validation::{validate_xml_map_info, validate_xml_map_info_ref};
 

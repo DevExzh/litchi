@@ -19,13 +19,6 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 pub use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
 
-/// Backwards-compatible XLSX spelling for [`SparklineType`].
-pub type Type = SparklineType;
-/// Backwards-compatible XLSX spelling for [`EmptyCells`].
-pub type DisplayEmptyCellsAs = EmptyCells;
-/// Backwards-compatible XLSX spelling for [`AxisType`].
-pub type AxisMinMax = AxisType;
-
 fn sparkline_type_as_str(value: SparklineType) -> &'static str {
     match value {
         SparklineType::Line => "line",
@@ -128,7 +121,7 @@ impl Default for GroupColors {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroupOptions {
-    pub display_empty_cells_as: DisplayEmptyCellsAs,
+    pub display_empty_cells_as: EmptyCells,
     pub date_axis: bool,
     pub display_hidden: bool,
     pub display_x_axis: bool,
@@ -139,8 +132,8 @@ pub struct GroupOptions {
     pub last: bool,
     pub negative: bool,
     pub right_to_left: bool,
-    pub min_axis_type: AxisMinMax,
-    pub max_axis_type: AxisMinMax,
+    pub min_axis_type: AxisType,
+    pub max_axis_type: AxisType,
     pub manual_min: Option<f64>,
     pub manual_max: Option<f64>,
     pub line_weight: Option<f64>,
@@ -149,7 +142,7 @@ pub struct GroupOptions {
 impl Default for GroupOptions {
     fn default() -> Self {
         Self {
-            display_empty_cells_as: DisplayEmptyCellsAs::Zero,
+            display_empty_cells_as: EmptyCells::Zero,
             date_axis: false,
             display_hidden: false,
             display_x_axis: false,
@@ -160,8 +153,8 @@ impl Default for GroupOptions {
             last: false,
             negative: false,
             right_to_left: false,
-            min_axis_type: AxisMinMax::Individual,
-            max_axis_type: AxisMinMax::Individual,
+            min_axis_type: AxisType::Individual,
+            max_axis_type: AxisType::Individual,
             manual_min: None,
             manual_max: None,
             line_weight: None,
@@ -177,7 +170,7 @@ pub struct Item {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
-    pub sparkline_type: Type,
+    pub sparkline_type: SparklineType,
     pub sparklines: Vec<Item>,
     pub options: GroupOptions,
     pub colors: GroupColors,
@@ -186,7 +179,7 @@ pub struct Group {
 
 impl Group {
     #[must_use]
-    pub fn new(sparkline_type: Type) -> Self {
+    pub fn new(sparkline_type: SparklineType) -> Self {
         Self {
             sparkline_type,
             sparklines: Vec::new(),
@@ -231,7 +224,7 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
         xml.push_str("<x14:sparklineGroup");
 
         // Excel omits the attribute for the default type (line).
-        if group.sparkline_type != Type::Line {
+        if group.sparkline_type != SparklineType::Line {
             xml.push_str(" type=\"");
             xml.push_str(sparkline_type_as_str(group.sparkline_type));
             xml.push('"');
@@ -274,19 +267,19 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
         if group.options.right_to_left && !has_attr("rightToLeft") {
             xml.push_str(" rightToLeft=\"1\"");
         }
-        if group.options.min_axis_type != AxisMinMax::Individual && !has_attr("minAxisType") {
+        if group.options.min_axis_type != AxisType::Individual && !has_attr("minAxisType") {
             xml.push_str(" minAxisType=\"");
             xml.push_str(axis_type_as_str(group.options.min_axis_type));
             xml.push('"');
         }
-        if group.options.max_axis_type != AxisMinMax::Individual && !has_attr("maxAxisType") {
+        if group.options.max_axis_type != AxisType::Individual && !has_attr("maxAxisType") {
             xml.push_str(" maxAxisType=\"");
             xml.push_str(axis_type_as_str(group.options.max_axis_type));
             xml.push('"');
         }
 
         if let Some(min) = group.options.manual_min {
-            if group.options.min_axis_type != AxisMinMax::Custom && !has_attr("minAxisType") {
+            if group.options.min_axis_type != AxisType::Custom && !has_attr("minAxisType") {
                 return Err(invalid("manualMin requires minAxisType=custom"));
             }
             if !has_attr("manualMin") {
@@ -297,7 +290,7 @@ pub fn write_groups_ext(xml: &mut String, groups: &[Group]) -> SheetResult<()> {
             }
         }
         if let Some(max) = group.options.manual_max {
-            if group.options.max_axis_type != AxisMinMax::Custom && !has_attr("maxAxisType") {
+            if group.options.max_axis_type != AxisType::Custom && !has_attr("maxAxisType") {
                 return Err(invalid("manualMax requires maxAxisType=custom"));
             }
             if !has_attr("manualMax") {
@@ -725,7 +718,7 @@ impl Parser {
             "sparkline type",
             parse_sparkline_type,
         )?
-        .unwrap_or(Type::Line);
+        .unwrap_or(SparklineType::Line);
         let mut group = Group::new(sparkline_type);
         group.options.display_empty_cells_as = parse_enum_attribute(
             element,
@@ -734,7 +727,7 @@ impl Parser {
             "sparkline empty-cell mode",
             parse_empty_cells,
         )?
-        .unwrap_or(DisplayEmptyCellsAs::Zero);
+        .unwrap_or(EmptyCells::Zero);
         group.options.date_axis = sparkline_bool(element, b"dateAxis", decoder)?.unwrap_or(false);
         group.options.display_hidden =
             sparkline_bool(element, b"displayHidden", decoder)?.unwrap_or(false);
@@ -755,7 +748,7 @@ impl Parser {
             "sparkline minimum-axis type",
             parse_axis_type,
         )?
-        .unwrap_or(AxisMinMax::Individual);
+        .unwrap_or(AxisType::Individual);
         group.options.max_axis_type = parse_enum_attribute(
             element,
             b"maxAxisType",
@@ -763,7 +756,7 @@ impl Parser {
             "sparkline maximum-axis type",
             parse_axis_type,
         )?
-        .unwrap_or(AxisMinMax::Individual);
+        .unwrap_or(AxisType::Individual);
         group.options.manual_min = sparkline_f64(element, b"manualMin", decoder)?;
         group.options.manual_max = sparkline_f64(element, b"manualMax", decoder)?;
         group.options.line_weight = sparkline_f64(element, b"lineWeight", decoder)?;
@@ -1021,10 +1014,10 @@ fn parse_enum_attribute<T>(
 }
 
 fn validate_group_options(options: &GroupOptions) -> SheetResult<()> {
-    if options.manual_min.is_some() && options.min_axis_type != AxisMinMax::Custom {
+    if options.manual_min.is_some() && options.min_axis_type != AxisType::Custom {
         return Err(invalid("manualMin requires minAxisType=custom"));
     }
-    if options.manual_max.is_some() && options.max_axis_type != AxisMinMax::Custom {
+    if options.manual_max.is_some() && options.max_axis_type != AxisType::Custom {
         return Err(invalid("manualMax requires maxAxisType=custom"));
     }
     for (name, value) in [
@@ -1133,19 +1126,16 @@ mod tests {
 
         assert_eq!(groups.len(), 1);
         let group = &groups[0];
-        assert_eq!(group.sparkline_type, Type::WinLoss);
-        assert_eq!(
-            group.options.display_empty_cells_as,
-            DisplayEmptyCellsAs::Span
-        );
+        assert_eq!(group.sparkline_type, SparklineType::WinLoss);
+        assert_eq!(group.options.display_empty_cells_as, EmptyCells::Span);
         assert!(group.options.date_axis);
         assert!(group.options.display_hidden);
         assert!(group.options.display_x_axis);
         assert!(group.options.markers);
         assert!(group.options.high);
         assert!(!group.options.low);
-        assert_eq!(group.options.min_axis_type, AxisMinMax::Custom);
-        assert_eq!(group.options.max_axis_type, AxisMinMax::Group);
+        assert_eq!(group.options.min_axis_type, AxisType::Custom);
+        assert_eq!(group.options.max_axis_type, AxisType::Group);
         assert_eq!(group.options.manual_min, Some(-2.5));
         assert_eq!(group.options.line_weight, Some(1.25));
         assert_eq!(group.colors.series.as_ref().unwrap().rgb, "FF102030");
@@ -1228,7 +1218,7 @@ mod tests {
 
     #[test]
     fn writer_preserves_group_membership_and_round_trips() {
-        let mut group = Group::new(Type::WinLoss);
+        let mut group = Group::new(SparklineType::WinLoss);
         group.options.date_axis = true;
         group.colors.axis = Some(Color {
             rgb: String::new(),
@@ -1260,7 +1250,7 @@ mod tests {
         let parsed = parse_groups(&xml).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].sparklines.len(), 2);
-        assert_eq!(parsed[0].sparkline_type, Type::WinLoss);
+        assert_eq!(parsed[0].sparkline_type, SparklineType::WinLoss);
         assert!(parsed[0].options.date_axis);
         assert_eq!(parsed[0].colors.axis.as_ref().unwrap().theme, Some(4));
         assert_eq!(parsed[0].colors.axis.as_ref().unwrap().tint, Some(-0.25));
@@ -1268,11 +1258,11 @@ mod tests {
 
     #[test]
     fn writer_rejects_invalid_groups() {
-        let empty = Group::new(Type::Line);
+        let empty = Group::new(SparklineType::Line);
         let mut xml = String::new();
         assert!(write_groups_ext(&mut xml, &[empty]).is_err());
 
-        let mut invalid = Group::new(Type::Line);
+        let mut invalid = Group::new(SparklineType::Line);
         invalid.options.manual_min = Some(1.0);
         invalid.push(Item {
             data_range: "Sheet1!A1:A2".to_string(),
@@ -1281,7 +1271,7 @@ mod tests {
         let mut xml = String::new();
         assert!(write_groups_ext(&mut xml, &[invalid]).is_err());
 
-        let mut valid = Group::new(Type::Line);
+        let mut valid = Group::new(SparklineType::Line);
         valid.push(Item {
             data_range: "Sheet1!A1:A2".to_string(),
             location: "B2".to_string(),

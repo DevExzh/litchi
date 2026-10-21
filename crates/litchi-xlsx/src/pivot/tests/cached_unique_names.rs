@@ -14,8 +14,8 @@
 
 use crate::Error;
 use crate::pivot::cached_unique_names::{
-    CacheSelector, CachedUniqueName, DiagnosticStatus, FieldSelector, PivotCacheId, Snapshot,
-    Transaction,
+    CachedUniqueName, IndexBoundStatus, PivotCacheFieldSelector, PivotCacheId, PivotCacheSelector,
+    Snapshot, Transaction,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
@@ -823,16 +823,16 @@ fn unique_name_leaves(options: &FixtureOptions) -> String {
     }
 }
 
-fn cache_selector() -> CacheSelector {
-    CacheSelector::Id(PivotCacheId(CACHE_ID))
+fn cache_selector() -> PivotCacheSelector {
+    PivotCacheSelector::Id(PivotCacheId(CACHE_ID))
 }
 
-fn field_selector() -> FieldSelector<'static> {
-    FieldSelector::Ordinal(0)
+fn field_selector() -> PivotCacheFieldSelector<'static> {
+    PivotCacheFieldSelector::Ordinal(0)
 }
 
-fn field_name_selector() -> FieldSelector<'static> {
-    FieldSelector::Name("Region")
+fn field_name_selector() -> PivotCacheFieldSelector<'static> {
+    PivotCacheFieldSelector::Name("Region")
 }
 
 fn cache_blob(package: &OpcPackage) -> Vec<u8> {
@@ -1056,18 +1056,34 @@ fn reads_by_semantic_cache_id_and_field_ordinal_or_name_and_reports_unresolved_b
     let ordinal = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
     let by_name = Snapshot::load(&package, cache_selector(), field_name_selector()).unwrap();
 
-    assert_eq!(ordinal.entries(), by_name.entries());
-    assert_eq!(ordinal.entries().len(), 2);
-    assert_eq!(ordinal.entries()[0].index, 0);
-    assert_eq!(ordinal.entries()[0].name, "North & South");
-    assert_eq!(ordinal.entries()[1].index, 7);
-    assert_eq!(ordinal.entries()[1].name, "North & South");
-    assert_eq!(ordinal.diagnostic_status(), DiagnosticStatus::Unresolved);
-    assert!(Snapshot::load(&package, cache_selector(), FieldSelector::Ordinal(1)).is_err());
+    assert_eq!(
+        ordinal.cached_unique_names().names(),
+        by_name.cached_unique_names().names()
+    );
+    assert_eq!(ordinal.cached_unique_names().names().len(), 2);
+    assert_eq!(ordinal.cached_unique_names().names()[0].index, 0);
+    assert_eq!(
+        ordinal.cached_unique_names().names()[0].name,
+        "North & South"
+    );
+    assert_eq!(ordinal.cached_unique_names().names()[1].index, 7);
+    assert_eq!(
+        ordinal.cached_unique_names().names()[1].name,
+        "North & South"
+    );
+    assert_eq!(ordinal.index_bound_status(), IndexBoundStatus::Unresolved);
     assert!(
         Snapshot::load(
             &package,
-            CacheSelector::Id(PivotCacheId(41)),
+            cache_selector(),
+            PivotCacheFieldSelector::Ordinal(1)
+        )
+        .is_err()
+    );
+    assert!(
+        Snapshot::load(
+            &package,
+            PivotCacheSelector::Id(PivotCacheId(41)),
             field_selector()
         )
         .is_err()
@@ -1087,8 +1103,11 @@ fn strict_and_transitional_roots_and_prefixed_aliases_have_same_semantics() {
     let first =
         Snapshot::load(&transitional.package(), cache_selector(), field_selector()).unwrap();
     let second = Snapshot::load(&strict.package(), cache_selector(), field_selector()).unwrap();
-    assert_eq!(first.entries(), second.entries());
-    assert_eq!(first.diagnostic_status(), second.diagnostic_status());
+    assert_eq!(
+        first.cached_unique_names().names(),
+        second.cached_unique_names().names()
+    );
+    assert_eq!(first.index_bound_status(), second.index_bound_status());
 }
 
 #[test]
@@ -1126,7 +1145,10 @@ fn entity_escaped_namespace_uris_normalize_for_direct_and_mce_owners() {
     )));
     let direct_snapshot =
         Snapshot::load(&direct_package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(direct_snapshot.entries()[0].name, "North & South");
+    assert_eq!(
+        direct_snapshot.cached_unique_names().names()[0].name,
+        "North & South"
+    );
 
     let mut edited_package = direct.package();
     let before = cache_blob(&edited_package);
@@ -1134,14 +1156,18 @@ fn entity_escaped_namespace_uris_normalize_for_direct_and_mce_owners() {
         Transaction::new(&mut edited_package, cache_selector(), field_selector()).unwrap();
     assert!(transaction.set_cached_unique_name(7, "Escaped").unwrap());
     let commit = transaction.commit().unwrap();
-    assert_eq!(commit.snapshot().entries()[1].name, "Escaped");
+    assert_eq!(
+        commit.snapshot().cached_unique_names().names()[1].name,
+        "Escaped"
+    );
     let inverse = commit.patch().inverse();
     inverse.apply(&mut edited_package).unwrap();
     assert_eq!(cache_blob(&edited_package), before);
     assert_eq!(
         Snapshot::load(&edited_package, cache_selector(), field_selector())
             .unwrap()
-            .entries()[1]
+            .cached_unique_names()
+            .names()[1]
             .name,
         "North & South"
     );
@@ -1154,7 +1180,10 @@ fn entity_escaped_namespace_uris_normalize_for_direct_and_mce_owners() {
     assert!(mce.cache_xml.contains(r#"Requires="x15""#));
     let mce_snapshot = Snapshot::load(&mce.package(), cache_selector(), field_selector()).unwrap();
     assert!(mce_snapshot.has_ambiguous_mce_owner());
-    assert_eq!(mce_snapshot.entries(), direct_snapshot.entries());
+    assert_eq!(
+        mce_snapshot.cached_unique_names().names(),
+        direct_snapshot.cached_unique_names().names()
+    );
 }
 
 #[test]
@@ -1187,7 +1216,10 @@ fn extension_uri_token_padding_is_semantic_but_raw_source_bound() {
         assert!(connections_source.contains(&format!(r#"uri="{model_token}""#)));
 
         let snapshot = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-        assert_eq!(snapshot.entries()[0].name, "North & South");
+        assert_eq!(
+            snapshot.cached_unique_names().names()[0].name,
+            "North & South"
+        );
 
         let no_op = Transaction::new(&mut package, cache_selector(), field_selector())
             .unwrap()
@@ -1201,7 +1233,10 @@ fn extension_uri_token_padding_is_semantic_but_raw_source_bound() {
             Transaction::new(&mut package, cache_selector(), field_selector()).unwrap();
         assert!(transaction.set_cached_unique_name(7, "Padded").unwrap());
         let commit = transaction.commit().unwrap();
-        assert_eq!(commit.snapshot().entries()[1].name, "Padded");
+        assert_eq!(
+            commit.snapshot().cached_unique_names().names()[1].name,
+            "Padded"
+        );
         commit.patch().inverse().apply(&mut package).unwrap();
         assert_eq!(cache_blob(&package), before_cache);
         assert_eq!(connections_blob(&package), before_connections);
@@ -1267,7 +1302,7 @@ fn mce_requires_accepts_only_xml_whitespace_and_legal_prefix_aliases() {
             "legal MCE Requires form was rejected: {mode:?}"
         );
         let snapshot = snapshot.unwrap();
-        assert_eq!(snapshot.entries().len(), 2);
+        assert_eq!(snapshot.cached_unique_names().names().len(), 2);
         assert!(snapshot.has_ambiguous_mce_owner());
     }
 
@@ -1339,7 +1374,10 @@ fn opaque_cdata_comments_and_entity_encoded_xml_prefix_are_preserved() {
     );
     let before = cache_blob(&opaque_with_misc);
     let snapshot = Snapshot::load(&opaque_with_misc, cache_selector(), field_selector()).unwrap();
-    assert_eq!(snapshot.entries()[0].name, "North & South");
+    assert_eq!(
+        snapshot.cached_unique_names().names()[0].name,
+        "North & South"
+    );
 
     let mut edited = opaque_with_misc;
     let mut transaction =
@@ -1408,7 +1446,7 @@ fn same_qname_under_unknown_or_inactive_mce_is_opaque_and_not_fragment_capped() 
         let snapshot = Snapshot::load(&package, cache_selector(), field_selector())
             .unwrap_or_else(|error| panic!("{label} same-QName payload was inferred: {error:?}"));
         assert_eq!(
-            snapshot.entries().len(),
+            snapshot.cached_unique_names().names().len(),
             2,
             "{label} changed typed entry count"
         );
@@ -1592,8 +1630,11 @@ fn unsigned_indices_accept_plus_one_and_negative_zero_lexicals_source_bound() {
         let mut package = fixture.package();
         let before = cache_blob(&package);
         let snapshot = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-        assert_eq!(snapshot.entries().len(), 1);
-        assert_eq!(snapshot.entries()[0].index, semantic_index);
+        assert_eq!(snapshot.cached_unique_names().names().len(), 1);
+        assert_eq!(
+            snapshot.cached_unique_names().names()[0].index,
+            semantic_index
+        );
         assert!(
             String::from_utf8(before.clone())
                 .unwrap()
@@ -1615,12 +1656,21 @@ fn unsigned_indices_accept_plus_one_and_negative_zero_lexicals_source_bound() {
                 .unwrap()
         );
         let commit = transaction.commit().unwrap();
-        assert_eq!(commit.snapshot().entries()[0].index, semantic_index);
-        assert_eq!(commit.snapshot().entries()[0].name, "Edited");
+        assert_eq!(
+            commit.snapshot().cached_unique_names().names()[0].index,
+            semantic_index
+        );
+        assert_eq!(
+            commit.snapshot().cached_unique_names().names()[0].name,
+            "Edited"
+        );
         commit.patch().inverse().apply(&mut package).unwrap();
         assert_eq!(cache_blob(&package), before);
         let restored = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-        assert_eq!(restored.entries()[0].index, semantic_index);
+        assert_eq!(
+            restored.cached_unique_names().names()[0].index,
+            semantic_index
+        );
     }
 }
 
@@ -1695,7 +1745,7 @@ fn cached_unique_names_parent_sequence_requires_xml_whitespace_between_children(
     );
     let snapshot = Snapshot::load(&whitespace, cache_selector(), field_selector())
         .expect("XML whitespace between cachedUniqueName children is legal");
-    assert_eq!(snapshot.entries().len(), 2);
+    assert_eq!(snapshot.cached_unique_names().names().len(), 2);
 
     for marker in ["payload", "<![CDATA[&#x20;]]>", "<![CDATA[&#x9;]]>"] {
         let inserted = format!("<x15:cachedUniqueNames>{marker}<x15:cachedUniqueName");
@@ -1721,7 +1771,7 @@ fn cached_unique_name_leaves_are_attribute_only_and_empty_name_is_valid() {
     });
     let snapshot = Snapshot::load(&empty_name.package(), cache_selector(), field_selector())
         .expect("an empty cachedUniqueName name attribute is valid");
-    assert_eq!(snapshot.entries()[0].name, "");
+    assert_eq!(snapshot.cached_unique_names().names()[0].name, "");
 
     for marker in ["payload", "<![CDATA[payload]]>"] {
         let inserted = format!(
@@ -1847,8 +1897,11 @@ fn entities_and_spreadsheet_escape_suppression_are_decoded_as_xstring() {
         ..FixtureOptions::default()
     });
     let snapshot = Snapshot::load(&fixture.package(), cache_selector(), field_selector()).unwrap();
-    assert_eq!(snapshot.entries()[0].name, "A&B \"quoted\"");
-    assert_eq!(snapshot.entries()[1].name, "_x0041_");
+    assert_eq!(
+        snapshot.cached_unique_names().names()[0].name,
+        "A&B \"quoted\""
+    );
+    assert_eq!(snapshot.cached_unique_names().names()[1].name, "_x0041_");
 }
 
 #[test]
@@ -1864,8 +1917,11 @@ fn scalar_edit_round_trips_decoded_control_as_spreadsheet_escape() {
     let source = String::from_utf8(cache_blob(&package)).unwrap();
     assert!(source.contains(r#"name="_x0001_""#));
     let reopened = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(reopened.entries()[0].name, "\u{1}");
-    assert_eq!(reopened.entries()[1].name, "North & South");
+    assert_eq!(reopened.cached_unique_names().names()[0].name, "\u{1}");
+    assert_eq!(
+        reopened.cached_unique_names().names()[1].name,
+        "North & South"
+    );
 }
 
 #[test]
@@ -1884,7 +1940,8 @@ fn decoded_utf16_name_limit_counts_supplementary_scalars_and_is_atomic() {
     assert_eq!(
         Snapshot::load(&package, cache_selector(), field_selector())
             .unwrap()
-            .entries()[0]
+            .cached_unique_names()
+            .names()[0]
             .name
             .encode_utf16()
             .count(),
@@ -1923,7 +1980,10 @@ fn scalar_edit_is_existing_name_only_and_preserves_source_geometry() {
     assert!(transaction.set_cached_unique_name(0, "West").unwrap());
     let commit = transaction.commit().unwrap();
     assert!(commit.changed());
-    assert_eq!(commit.snapshot().entries()[0].name, "West");
+    assert_eq!(
+        commit.snapshot().cached_unique_names().names()[0].name,
+        "West"
+    );
     assert!(!commit.patch().is_empty());
     let after = cache_blob(&package);
     let expected = String::from_utf8(before.clone())
@@ -1947,7 +2007,7 @@ fn scalar_edit_is_existing_name_only_and_preserves_source_geometry() {
         fixture.connections_xml.as_bytes()
     );
     let reopened = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(reopened.entries()[0].name, "West");
+    assert_eq!(reopened.cached_unique_names().names()[0].name, "West");
 }
 
 #[test]
@@ -1992,7 +2052,8 @@ fn patch_inverse_restores_exact_bytes_and_stale_or_signed_targets_are_atomic() {
     assert_eq!(
         Snapshot::load(&target, cache_selector(), field_selector())
             .unwrap()
-            .entries()[1]
+            .cached_unique_names()
+            .names()[1]
             .name,
         "South"
     );
@@ -2075,13 +2136,19 @@ fn existing_name_edits_allow_empty_xstring_but_reject_structure_and_unknown_inde
     assert!(commit.changed());
     let inverse = commit.patch().inverse();
     let reopened = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(reopened.entries()[0].name, "");
-    assert_eq!(reopened.entries()[1].name, "North & South");
+    assert_eq!(reopened.cached_unique_names().names()[0].name, "");
+    assert_eq!(
+        reopened.cached_unique_names().names()[1].name,
+        "North & South"
+    );
     assert_ne!(cache_blob(&package), original_cache);
     inverse.apply(&mut package).unwrap();
     assert_eq!(cache_blob(&package), original_cache);
     let reverted = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(reverted.entries()[0].name, "North & South");
+    assert_eq!(
+        reverted.cached_unique_names().names()[0].name,
+        "North & South"
+    );
 
     let fixture = Fixture::build(FixtureOptions::default());
     let mut package = fixture.package();
@@ -2165,7 +2232,7 @@ fn mce_inactive_fallback_with_identical_payload_is_not_a_duplicate() {
     });
     let package = fixture.package();
     let snapshot = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(snapshot.entries().len(), 2);
+    assert_eq!(snapshot.cached_unique_names().names().len(), 2);
     assert!(snapshot.has_ambiguous_mce_owner());
 
     let mut package = fixture.package();
@@ -2186,7 +2253,7 @@ fn mce_nested_selected_choice_is_readable_but_edit_refused() {
     });
     let package = fixture.package();
     let snapshot = Snapshot::load(&package, cache_selector(), field_selector()).unwrap();
-    assert_eq!(snapshot.entries().len(), 2);
+    assert_eq!(snapshot.cached_unique_names().names().len(), 2);
     assert!(snapshot.has_ambiguous_mce_owner());
 
     let mut package = fixture.package();
@@ -2230,10 +2297,13 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
     assert_eq!(by_ordinal.cache_id(), PivotCacheId(CACHE_ID));
     assert_eq!(by_ordinal.field_ordinal(), 0);
     assert_eq!(by_ordinal.field_name(), "Region");
-    assert_eq!(by_ordinal.entries(), by_name.entries());
-    assert_eq!(by_ordinal.entries()[0].name, "North & South");
-    assert_eq!(by_ordinal.entries()[1].index, 7);
-    assert_eq!(by_ordinal.diagnostic_status(), DiagnosticStatus::Unresolved);
+    assert_eq!(by_ordinal.names(), by_name.names());
+    assert_eq!(by_ordinal.names()[0].name, "North & South");
+    assert_eq!(by_ordinal.names()[1].index, 7);
+    assert_eq!(
+        by_ordinal.index_bound_status(),
+        IndexBoundStatus::Unresolved
+    );
 
     let source = workbook
         .workbook_ref()
@@ -2241,7 +2311,7 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
         .field(field_selector())
         .cached_unique_names_source()
         .unwrap();
-    assert_eq!(source.entries(), by_ordinal.entries());
+    assert_eq!(source.cached_unique_names().names(), by_ordinal.names());
 }
 
 #[test]
@@ -2255,7 +2325,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
     assert!(edit.set_cached_unique_name(7, "South").unwrap());
     let committed = edit.commit().unwrap();
     assert!(committed.diagnostics().changed());
-    assert_eq!(committed.patch().after().entries()[1].name, "South");
+    assert_eq!(committed.patch().after().names()[1].name, "South");
 
     assert_eq!(original.to_bytes().unwrap(), original_bytes);
     assert_eq!(
@@ -2265,7 +2335,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
             .field(field_selector())
             .cached_unique_names()
             .unwrap()
-            .entries()[1]
+            .names()[1]
             .name,
         "North & South"
     );
@@ -2280,7 +2350,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
             .field(field_selector())
             .cached_unique_names()
             .unwrap()
-            .entries()[1]
+            .names()[1]
             .name,
         "South"
     );

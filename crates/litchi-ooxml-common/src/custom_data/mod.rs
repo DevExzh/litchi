@@ -11,7 +11,7 @@ pub use codec::{
     Limits, canonical_extension, parse_properties, rewrite_extension_list, rewrite_id,
     validate_source_properties, validate_workbook_root, write_properties,
 };
-pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store};
+pub use model::{CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition};
 
 /// Custom Data Properties part content type.
 pub const PROPERTIES_CONTENT_TYPE: &str =
