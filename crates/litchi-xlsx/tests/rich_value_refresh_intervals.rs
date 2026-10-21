@@ -1,15 +1,24 @@
 use std::sync::Arc;
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 use litchi_xlsx::{
     Error, Package, REFRESH_INTERVALS_NAMESPACE, RefreshInterval, RefreshIntervals,
-    TypeRefreshIntervals, load_rich_value_refresh, parse_refresh_intervals,
-    write_refresh_intervals,
+    TypeRefreshIntervals, load_rich_value_refresh as load_rich_value_refresh_raw,
+    parse_refresh_intervals as parse_refresh_intervals_raw,
+    write_refresh_intervals as write_refresh_intervals_raw,
 };
 
 const RICH_DATA_2: &str = "http://schemas.microsoft.com/office/spreadsheetml/2017/richdata2";
 const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const RICH_TYPES_CONTENT_TYPE: &str = "application/vnd.ms-excel.rdRichValuetypes+xml";
+
+fn parse_refresh_intervals(xml: &[u8]) -> Result<RefreshIntervals, Error> {
+    parse_refresh_intervals_raw(xml, &SourceLimits::default())
+}
+
+fn write_refresh_intervals(value: &RefreshIntervals) -> Result<Vec<u8>, Error> {
+    write_refresh_intervals_raw(value, &SourceLimits::default())
+}
 
 fn types_xml() -> Vec<u8> {
     format!(
@@ -125,7 +134,33 @@ fn spec_codec_enforces_identity_and_preserves_interval_semantics() {
     let malformed_owner = format!(
         r#"<rd2:rvTypesInfo xmlns:rd2="{RICH_DATA_2}" xmlns:x="{SPREADSHEETML}" xmlns:rr="{REFRESH_INTERVALS_NAMESPACE}"><rd2:types><rd2:type name="entity"><x:extLst><x:ext><rr:refreshIntervals><rr:refreshInterval resourceIdInt="1" interval="1"><rr:unexpected/></rr:refreshInterval></rr:refreshIntervals></x:ext></x:extLst></rd2:type></rd2:types></rd2:rvTypesInfo>"#
     );
-    assert!(load_rich_value_refresh(&package_from_xml(malformed_owner)).is_err());
+    assert!(
+        load_rich_value_refresh_raw(&package_from_xml(malformed_owner), &SourceLimits::default())
+            .is_err()
+    );
+}
+
+#[test]
+fn source_limits_bound_refresh_codec_and_owner_input() {
+    let limits = SourceLimits::builder()
+        .max_part_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    let xml = format!(r#"<rr:refreshIntervals xmlns:rr="{REFRESH_INTERVALS_NAMESPACE}"/>"#);
+    assert!(matches!(
+        parse_refresh_intervals_raw(xml.as_bytes(), &limits),
+        Err(Error::Limit { maximum: 16, .. })
+    ));
+    let intervals = RefreshIntervals::new(vec![interval_int(1, 30)]).unwrap();
+    assert!(matches!(
+        write_refresh_intervals_raw(&intervals, &limits),
+        Err(Error::Limit { maximum: 16, .. })
+    ));
+    assert!(matches!(
+        load_rich_value_refresh_raw(&package(), &limits),
+        Err(Error::Limit { maximum: 16, .. })
+    ));
 }
 
 #[test]
@@ -167,7 +202,7 @@ fn assert_rejected_owner(xml: String) {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(load_rich_value_refresh(&package).is_err());
+    assert!(load_rich_value_refresh_raw(&package, &SourceLimits::default()).is_err());
     assert!(
         Package::from_opc(package.clone())
             .and_then(|package| package.edit_rich_value_refresh())
@@ -197,7 +232,7 @@ fn package_from_xml(xml: String) -> OpcPackage {
 #[test]
 fn snapshot_and_noop_are_rich_types_scoped_and_source_shared() {
     let mut package = package();
-    let before = load_rich_value_refresh(&package).unwrap();
+    let before = load_rich_value_refresh_raw(&package, &SourceLimits::default()).unwrap();
     assert_eq!(before.types().len(), 2);
     assert_eq!(before.types()[0].name(), "entity");
     assert_eq!(before.types()[0].intervals().unwrap().len(), 2);
@@ -215,7 +250,7 @@ fn snapshot_and_noop_are_rich_types_scoped_and_source_shared() {
             .into_bytes(),
         )))
         .unwrap();
-    let before = load_rich_value_refresh(&package).unwrap();
+    let before = load_rich_value_refresh_raw(&package, &SourceLimits::default()).unwrap();
     let source = before.source_arc().unwrap();
     let commit = adopt(package)
         .edit_rich_value_refresh()
@@ -223,7 +258,9 @@ fn snapshot_and_noop_are_rich_types_scoped_and_source_shared() {
         .commit()
         .unwrap();
     assert!(!commit.diagnostics().changed());
-    let after = load_rich_value_refresh(&plain(commit.into_package())).unwrap();
+    let after =
+        load_rich_value_refresh_raw(&plain(commit.into_package()), &SourceLimits::default())
+            .unwrap();
     assert!(Arc::ptr_eq(&source, &after.source_arc().unwrap()));
 }
 
@@ -262,7 +299,9 @@ fn add_remove_and_inverse_preserve_unknown_extension_bytes_and_relationships() {
             .any(|window| window == b"resourceIdInt=\"99\"")
     );
     assert_eq!(
-        load_rich_value_refresh(&package).unwrap().types()[1]
+        load_rich_value_refresh_raw(&package, &SourceLimits::default())
+            .unwrap()
+            .types()[1]
             .intervals()
             .unwrap()
             .len(),

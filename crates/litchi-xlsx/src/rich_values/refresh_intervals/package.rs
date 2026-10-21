@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part as OpcPart};
+use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part as OpcPart, SourceLimits};
 
 use crate::error::{Result, invalid};
 
@@ -25,7 +25,7 @@ impl Snapshot {
     ///
     /// The loader captures only the owner part and its incoming/outgoing OPC
     /// relationship closure.  It never opens a target or executes a refresh.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
+    pub fn load(package: &OpcPackage, limits: &SourceLimits) -> Result<Self> {
         let mut owner = None;
         for part in package.iter_parts() {
             if part.content_type() == TYPES_CONTENT_TYPE {
@@ -43,7 +43,7 @@ impl Snapshot {
         };
         // Only the owner's payload is read, so only it is decoded (ADR 0030).
         let owner = package.get_part(owner.partname())?;
-        let inspection = codec::inspect(owner.blob())?;
+        let inspection = codec::inspect(owner.blob(), limits)?;
         let source = SourceState::capture(package, owner)?;
         Ok(Self {
             types: inspection
@@ -227,7 +227,8 @@ pub struct Edit {
 impl Edit {
     /// Start a source-bound edit.
     fn start(target: crate::record::Source) -> Result<Self> {
-        let before = Snapshot::load(&target)?;
+        let limits = target.read_limits();
+        let before = Snapshot::load(&target, &limits)?;
         Ok(Self {
             draft: before.types.clone(),
             target,
@@ -354,7 +355,8 @@ impl Edit {
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(&self.target)?;
+        let limits = self.target.read_limits();
+        let current = Snapshot::load(&self.target, &limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals source closure".to_owned(),
@@ -366,13 +368,13 @@ impl Edit {
             .part
             .as_ref()
             .ok_or_else(|| invalid("rich-value types part is required for a changed edit"))?;
-        let inspection = codec::inspect(source.bytes.as_slice())?;
-        let output = codec::rewrite(source.bytes.as_slice(), &inspection, &self.draft)?;
+        let inspection = codec::inspect(source.bytes.as_slice(), &limits)?;
+        let output = codec::rewrite(source.bytes.as_slice(), &inspection, &self.draft, &limits)?;
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
             .get_part_mut(&source.name)?
             .set_blob_shared(Arc::new(output));
-        let snapshot = Snapshot::load(&candidate)?;
+        let snapshot = Snapshot::load(&candidate, &limits)?;
         if snapshot.types != self.draft || !snapshot.same_closure(&self.before) {
             return Err(invalid(
                 "rich-value refresh publication changed staged metadata or its relationship closure",
@@ -428,7 +430,8 @@ impl Patch {
 
     /// Apply atomically after checking the complete owner relationship closure.
     pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
-        let current = Snapshot::load(target)?;
+        let limits = target.read_limits();
+        let current = Snapshot::load(target, &limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals source closure".to_owned(),
@@ -450,7 +453,7 @@ impl Patch {
         candidate
             .get_part_mut(&source.name)?
             .set_blob_shared(Arc::clone(&source.bytes));
-        let resulting = Snapshot::load(&candidate)?;
+        let resulting = Snapshot::load(&candidate, &limits)?;
         if !resulting.same_source(&self.after) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals patch result".to_owned(),
@@ -496,6 +499,6 @@ impl crate::Package {
 }
 
 /// Load rich-value refresh metadata from an OPC package.
-pub fn load(package: &OpcPackage) -> Result<Snapshot> {
-    Snapshot::load(package)
+pub fn load(package: &OpcPackage, limits: &SourceLimits) -> Result<Snapshot> {
+    Snapshot::load(package, limits)
 }
