@@ -94,20 +94,21 @@ impl Revision {
 /// A staged metadata edit of one [`SourceBackedWorkbook`].
 ///
 /// Dropping the edit discards it.
-pub struct Edit<'a> {
-    workbook: &'a SourceBackedWorkbook,
+pub struct Edit {
+    /// The source owner this edit stages over (a share of it).
+    workbook: SourceBackedWorkbook,
     /// The properties this edit started from.
     start: Snapshot,
     inner: properties::Plan,
 }
 
-impl std::fmt::Debug for Edit<'_> {
+impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.debug_struct("Edit").finish_non_exhaustive()
     }
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged metadata.
     ///
     /// # Errors
@@ -152,6 +153,11 @@ impl Edit<'_> {
         self
     }
 
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.inner = self.start.plan();
+    }
+
     /// Compute the patch and publish it over the source.
     ///
     /// An exact no-op returns the same owner. A changed edit plans the
@@ -168,7 +174,7 @@ impl Edit<'_> {
         let (current, patch, diagnostics) = self.inner.finish()?;
         if patch.is_noop() {
             return Ok(Commit {
-                package: self.workbook.clone(),
+                package: self.workbook,
                 patch,
                 diagnostics,
             });
@@ -286,10 +292,10 @@ impl SourceBackedWorkbook {
     /// # Errors
     ///
     /// The errors of [`Self::metadata`].
-    pub fn edit_metadata(&self) -> Result<Edit<'_>> {
+    pub fn edit_metadata(&self) -> Result<Edit> {
         let start = self.metadata_snapshot()?;
         Ok(Edit {
-            workbook: self,
+            workbook: self.clone(),
             inner: start.plan(),
             start,
         })
