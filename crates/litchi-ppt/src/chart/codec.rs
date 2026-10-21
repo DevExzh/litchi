@@ -101,9 +101,12 @@ pub(super) fn parse(
     let package_bytes = decode(storage, limits)?;
     match kind {
         Kind::Graph => {
-            let package = OgraphPackage::with_limits(package_bytes, limits)?;
+            let package = OgraphPackage::open_with_options(
+                package_bytes,
+                litchi_ograph::OpenOptions::new().limits(limits),
+            )?;
             let workbook = package.workbook()?.into_bytes();
-            let book = Book::with_limits(workbook, limits)?;
+            let book = Book::open(workbook, limits)?;
             ensure_kind(&book, litchi_ograph::chart::Kind::Graph)?;
             Ok(Parsed::Graph {
                 package: Box::new(package),
@@ -113,7 +116,7 @@ pub(super) fn parse(
         },
         Kind::Excel => {
             let workbook = extract_excel_workbook(package_bytes, limits)?;
-            let book = Book::with_limits(workbook, limits)?;
+            let book = Book::open(workbook, limits)?;
             ensure_kind(&book, litchi_ograph::chart::Kind::Excel)?;
             Ok(Parsed::Excel { book })
         },

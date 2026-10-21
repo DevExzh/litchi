@@ -222,7 +222,7 @@ fn bounded_history_evicts_oldest_transition_and_supports_redo() -> Result<()> {
         HistoryLimits::new(1, 512 * 1024 * 1024),
     );
     let base = Package::from_bytes(&source()?)?;
-    let mut history = History::with_limits(base, limits);
+    let mut history = History::with_options(base, litchi_ods::EditOptions::new().limits(limits));
 
     let mut first_edit = history.current().edit()?;
     first_edit.worksheets(|worksheets| {

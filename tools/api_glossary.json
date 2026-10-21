@@ -6429,6 +6429,11 @@
           "replacement": "record 0359a: source-backed family names are unprefixed",
           "match": "prefix",
           "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_xls",
+          "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
         }
       ],
       "families": [
@@ -7213,17 +7218,17 @@
         {
           "name": "PackageEditor",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::GraphPackage (Graph::draft_package)"
+          "replacement": "builder::graph::Draft (Graph::draft_package)"
         },
         {
           "name": "finish",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::GraphPackage::into_bytes"
+          "replacement": "builder::graph::Draft::into_bytes"
         },
         {
           "name": "Snapshot",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::View (GraphPackage::view)"
+          "replacement": "builder::graph::View (Draft::view)"
         },
         {
           "name": "Editor",
@@ -7253,13 +7258,39 @@
         },
         {
           "name": "snapshot",
-          "scope": "litchi_ppt::chart::GraphPackage",
-          "replacement": "GraphPackage::view"
+          "scope": "litchi_ppt::builder::graph::Draft",
+          "replacement": "Draft::view"
         },
         {
           "name": "is_changed",
           "scope": "litchi_ppt::text_edit",
           "replacement": "use commit.diagnostics().changed() (record 0357a)"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
+        },
+        {
+          "name": "GraphPackage",
+          "scope": "litchi_ppt",
+          "replacement": "use builder::graph::Draft (record 0362b)"
+        },
+        {
+          "name": "View",
+          "scope": "litchi_ppt::chart",
+          "recursive": false,
+          "replacement": "the standalone Graph draft read view is builder::graph::View (record 0362b)"
+        },
+        {
+          "name": "SemanticChart",
+          "scope": "litchi_ppt",
+          "replacement": "use chart::semantic::Model (record 0362b)"
+        },
+        {
+          "name": "SemanticCharts",
+          "scope": "litchi_ppt",
+          "replacement": "use chart::semantic::Models (record 0362b)"
         }
       ],
       "families": [
@@ -8052,17 +8083,17 @@
         {
           "name": "PackageEditor",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::GraphPackage (Graph::draft_package)"
+          "replacement": "builder::graph::Draft (Graph::draft_package)"
         },
         {
           "name": "finish",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::GraphPackage::into_bytes"
+          "replacement": "builder::graph::Draft::into_bytes"
         },
         {
           "name": "Snapshot",
           "scope": "litchi_ppt::chart",
-          "replacement": "chart::View (GraphPackage::view)"
+          "replacement": "builder::graph::View (Draft::view)"
         },
         {
           "name": "Editor",
@@ -8092,13 +8123,39 @@
         },
         {
           "name": "snapshot",
-          "scope": "litchi_ppt::chart::GraphPackage",
-          "replacement": "GraphPackage::view"
+          "scope": "litchi_ppt::builder::graph::Draft",
+          "replacement": "Draft::view"
         },
         {
           "name": "is_changed",
           "scope": "litchi_ppt::text_edit",
           "replacement": "use commit.diagnostics().changed() (record 0357a)"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_ppt",
+          "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
+        },
+        {
+          "name": "GraphPackage",
+          "scope": "litchi_ppt",
+          "replacement": "use builder::graph::Draft (record 0362b)"
+        },
+        {
+          "name": "View",
+          "scope": "litchi_ppt::chart",
+          "recursive": false,
+          "replacement": "the standalone Graph draft read view is builder::graph::View (record 0362b)"
+        },
+        {
+          "name": "SemanticChart",
+          "scope": "litchi_ppt",
+          "replacement": "use chart::semantic::Model (record 0362b)"
+        },
+        {
+          "name": "SemanticCharts",
+          "scope": "litchi_ppt",
+          "replacement": "use chart::semantic::Models (record 0362b)"
         }
       ],
       "families": [
@@ -8905,6 +8962,11 @@
           "scope": "litchi_ograph::chart",
           "replacement": "use chart::Model (record 0359)",
           "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_ograph",
+          "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
         }
       ],
       "families": [],
@@ -9829,6 +9891,11 @@
           "scope": "litchi_ods::source_backed",
           "replacement": "a family Commit holds the new SourceBackedSpreadsheet, its Patch and Diagnostics (record 0358a)",
           "match": "suffix"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_ods",
+          "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
         }
       ],
       "families": [

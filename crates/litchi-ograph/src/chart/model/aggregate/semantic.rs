@@ -547,7 +547,7 @@ impl Model {
                     self.validate_graph_authoring()?;
                 }
                 let bytes = codec::encode(&self, limits)?;
-                Stream::with_limits(bytes, limits)
+                Stream::open(bytes, limits)
             },
         }
     }

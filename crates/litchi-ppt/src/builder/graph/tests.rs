@@ -9,7 +9,7 @@ use std::io::Cursor;
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ograph::PackageRef;
 
-use super::GraphPackage;
+use super::Draft;
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -85,7 +85,7 @@ fn clean_commit_preserves_the_original_package_bytes() {
     let chart = chart_stream(1, &[2]);
     let bytes = package(&chart);
     let original = bytes.clone();
-    let editor = GraphPackage::open(bytes).expect("open Graph package");
+    let editor = Draft::open(bytes).expect("open Graph package");
 
     let snapshot = editor.view().expect("snapshot");
     assert!(!snapshot.is_dirty());
@@ -106,11 +106,15 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
     let original_chart = chart_stream(1, &[2]);
     let replacement = chart_stream(3, &[4, 5, 6, 7]);
     let original_package = package(&original_chart);
-    let mut editor = GraphPackage::open(original_package.clone()).expect("open package");
+    let mut editor = Draft::open(original_package.clone()).expect("open package");
 
     editor
         .replace_chart(
-            litchi_ograph::chart::Stream::open(replacement.clone()).expect("typed chart stream"),
+            litchi_ograph::chart::Stream::open(
+                replacement.clone(),
+                litchi_ograph::Limits::default(),
+            )
+            .expect("typed chart stream"),
         )
         .expect("replace chart");
     let snapshot = editor.view().expect("edited snapshot");
@@ -139,14 +143,17 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
 fn rejecting_an_excel_stream_leaves_the_transaction_untouched() {
     let chart = chart_stream(9, &[8]);
     let original = package(&chart);
-    let mut editor = GraphPackage::open(original.clone()).expect("open package");
+    let mut editor = Draft::open(original.clone()).expect("open package");
     let before = editor.view().expect("before snapshot");
     let before_workbook = before.workbook().to_vec();
 
     let error = editor
         .replace_chart(
-            litchi_ograph::chart::Stream::open(excel_chart_stream())
-                .expect("typed Excel chart stream"),
+            litchi_ograph::chart::Stream::open(
+                excel_chart_stream(),
+                litchi_ograph::Limits::default(),
+            )
+            .expect("typed Excel chart stream"),
         )
         .expect_err("Excel chart must not enter a Graph package");
     assert!(matches!(error, crate::package::Error::InvalidFormat(_)));
@@ -159,7 +166,7 @@ fn rejecting_an_excel_stream_leaves_the_transaction_untouched() {
 #[test]
 fn semantic_replacement_refuses_unproven_authoring_atomically() {
     let original = package(&chart_stream(11, &[12]));
-    let mut editor = GraphPackage::open(original.clone()).expect("open package");
+    let mut editor = Draft::open(original.clone()).expect("open package");
     let before = editor.view().expect("before snapshot");
     let before_workbook = before.workbook().to_vec();
 

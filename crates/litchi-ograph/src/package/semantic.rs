@@ -4,7 +4,7 @@ use litchi_biff::{Encoder, Records};
 use litchi_cfb::OleWriter;
 
 use crate::chart;
-use crate::{Limits, Result};
+use crate::{Limits, OpenOptions, Result};
 
 use super::validation::WorkbookLayout;
 use super::{codec, validation};
@@ -63,11 +63,12 @@ pub struct PackageRef<'a> {
 impl<'a> PackageRef<'a> {
     /// Validates borrowed bytes with conservative default limits.
     pub fn open(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Validates borrowed bytes with explicit resource limits.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
         let limits = limits.validate()?;
         validation::check_limit("package bytes", bytes.len(), limits.max_package_bytes)?;
         let validated = validation::validate(bytes, limits)?;
@@ -138,17 +139,18 @@ impl Package {
         writer.write_to(&mut output)?;
         let output = output.into_inner();
         validation::check_limit("package bytes", output.len(), limits.max_package_bytes)?;
-        Self::with_limits(output, limits)
+        Self::open_with_options(output, OpenOptions::new().limits(limits))
     }
 
     /// Takes ownership and validates without copying the input allocation.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Takes ownership and validates with explicit resource limits.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let validated = PackageRef::with_limits(&bytes, limits)?;
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        let validated = PackageRef::open_with_options(&bytes, OpenOptions::new().limits(limits))?;
         let topology = validated.topology;
         let workbook = validated.workbook;
         let limits = validated.limits;
@@ -240,8 +242,9 @@ impl Payload {
     }
 
     /// Takes ownership and validates bytes with explicit resource limits.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Package::with_limits(bytes, limits).map(Package::finish)
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        Package::open_with_options(bytes, OpenOptions::new().limits(limits)).map(Package::finish)
     }
 
     /// Borrows the validated attachment bytes.
@@ -279,11 +282,12 @@ pub struct WorkbookRef<'a> {
 impl<'a> WorkbookRef<'a> {
     /// Validates the exact standalone globals-plus-chart topology.
     pub fn open(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Validates the standalone topology with explicit resource bounds.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
         let limits = limits.validate()?;
         validation::check_limit("Workbook bytes", bytes.len(), limits.max_workbook_bytes)?;
         let layout = validation::validate_workbook(bytes, limits)?;
@@ -336,12 +340,13 @@ pub struct Workbook {
 impl Workbook {
     /// Takes ownership and validates without copying the input allocation.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Takes ownership and validates under explicit resource bounds.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let workbook = WorkbookRef::with_limits(&bytes, limits)?;
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits_value();
+        let workbook = WorkbookRef::open_with_options(&bytes, OpenOptions::new().limits(limits))?;
         let layout = workbook.layout;
         let limits = workbook.limits;
         Ok(Self {

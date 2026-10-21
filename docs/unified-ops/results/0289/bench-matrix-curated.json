@@ -2821,7 +2821,7 @@
   },
   {
    "record": "0362b",
-   "reason": "the first slice records validation counts and the byte-identical raw-wire constructor body hash; it contains no paired timing samples. Later constructor migrations remain required work."
+   "reason": "constructor API migrations with validation counts and unchanged raw constructor body hashes; no paired timing samples. Remaining shared-helper migrations are still required work."
   }
  ]
 }

@@ -21,7 +21,8 @@ pub(super) struct Parts {
 
 /// Validate a standalone `OGraph` package and copy its logical root streams.
 pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
-    let package = PackageRef::with_limits(bytes, limits)?;
+    let package =
+        PackageRef::open_with_options(bytes, litchi_ograph::OpenOptions::new().limits(limits))?;
     let workbook = package.workbook()?;
     let chart = workbook.chart();
     let chart_start = chart.offset();
@@ -74,6 +75,6 @@ pub(super) fn write(
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     let bytes = output.into_inner();
-    PackageRef::with_limits(&bytes, limits)?;
+    PackageRef::open_with_options(&bytes, litchi_ograph::OpenOptions::new().limits(limits))?;
     Ok(bytes)
 }

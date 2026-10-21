@@ -940,6 +940,8 @@ Work packages, in waves of up to four agents:
 
 - Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), first slice: the inventory now detects exact `with_limits` names as well as the suffix. `RawWireFields::new` requires its limits and every iWork consumer migrates; native/focused tests, clippy and the exact-name gate pass. Other exact-name constructors remain required closure work, recorded in 0362b.
 
+- Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), Graph/XLS/PPT/ODS slice: owner ingress/history use options; raw chart scans and embedded payloads require limits. The PPT Graph draft moves to `builder::graph::Draft`, with semantic models under `chart::semantic`. All consumers migrate; 149 tests, all-target clippy, the locked harness and five glossary profiles pass. The remaining shared-helper constructors and final integrated gate remain open.
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;

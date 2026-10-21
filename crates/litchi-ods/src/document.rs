@@ -216,6 +216,11 @@ impl EditOptions {
         self.limits = limits;
         self
     }
+
+    /// The selected transaction, patch, composition and history bounds.
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
 }
 
 impl Package {
@@ -3575,9 +3580,10 @@ impl History {
         }
     }
 
-    /// Start history whose recorded packages use explicit transaction bounds.
+    /// Start history whose recorded packages use the selected edit options.
     #[must_use]
-    pub fn with_limits(package: Package, limits: Limits) -> Self {
+    pub fn with_options(package: Package, options: EditOptions) -> Self {
+        let limits = options.limits_value();
         let mut package = package;
         package.limits = limits;
         Self {

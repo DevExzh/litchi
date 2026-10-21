@@ -32,7 +32,7 @@ mod package;
 pub mod record;
 
 pub use error::{Error, Result};
-pub use limits::Limits;
+pub use limits::{Limits, OpenOptions};
 pub use package::{
     Commit, Diagnostics, Edit, Package, PackageRef, Patch, Payload, Snapshot, Topology, Workbook,
     WorkbookRef,

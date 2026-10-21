@@ -1296,7 +1296,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
     for sheet in &sheets {
         if sheet.kind == 2 {
             let bytes = &input[sheet.start..sheet.end];
-            let chart_ref = GraphChartRef::with_limits(bytes, chart_scan_limits(limits))
+            let chart_ref = GraphChartRef::open(bytes, chart_scan_limits(limits))
                 .map_err(|error| graph_error(BOF, error))?;
             if chart_ref.kind() != GraphChartKind::Excel {
                 return invalid(BOF, "chart sheet uses a non-Excel chart grammar");
@@ -1338,7 +1338,7 @@ fn parse_workbook_charts(input: &[u8], limits: Limits) -> Result<Vec<StoredChart
                 chart_objects.push((id, start, end));
             }
         }
-        let charts = GraphCharts::with_limits(bytes, chart_scan_limits(limits))
+        let charts = GraphCharts::open_workbook(bytes, chart_scan_limits(limits))
             .map_err(|error| graph_error(BOF, error))?;
         for chart_ref in charts {
             let chart_ref = chart_ref.map_err(|error| graph_error(BOF, error))?;

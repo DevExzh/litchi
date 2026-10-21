@@ -30,7 +30,7 @@ fn workbook_fixture(name: &str) -> Vec<u8> {
 fn discovers_and_replays_chart_substreams_from_real_excel_workbooks() {
     for name in ["SimpleChart.xls", "WithThreeCharts.xls"] {
         let workbook = workbook_fixture(name);
-        let charts = Refs::open_workbook(&workbook)
+        let charts = Refs::open_workbook(&workbook, litchi_ograph::Limits::default())
             .expect("real XLS workbook framing must be valid")
             .collect::<Result<Vec<_>, _>>()
             .unwrap_or_else(|error| panic!("{name} chart discovery failed: {error}"));

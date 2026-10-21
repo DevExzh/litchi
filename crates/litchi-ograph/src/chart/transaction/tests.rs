@@ -40,7 +40,7 @@ fn fixture(row: u16, col: u16, value: Value) -> Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {

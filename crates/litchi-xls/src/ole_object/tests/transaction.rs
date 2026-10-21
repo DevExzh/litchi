@@ -639,7 +639,8 @@ fn metadata_patch_rejects_stale_snapshot_without_mutation() {
 fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
     let input = workbook_cfb_with_unknown_root_stream();
     let payload_bytes = embedded_payload(b"payload-v1", b"unknown-v1");
-    let payload = EmbeddedPayload::new(payload_bytes).expect("payload CFB should validate");
+    let payload = EmbeddedPayload::new(payload_bytes, Limits::default())
+        .expect("payload CFB should validate");
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).expect("draft should validate");
     let snapshot = Snapshot::open(input.clone(), Limits::default()).expect("workbook should open");
     let mut transaction = snapshot.edit();
@@ -717,7 +718,8 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
 fn replacing_with_the_original_embedded_payload_is_an_exact_noop() {
     let input = workbook_cfb(&[]);
     let payload_bytes = embedded_payload(b"payload-v1", b"unknown-v1");
-    let payload = EmbeddedPayload::new(payload_bytes.clone()).expect("payload CFB should validate");
+    let payload = EmbeddedPayload::new(payload_bytes.clone(), Limits::default())
+        .expect("payload CFB should validate");
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).expect("draft should validate");
     let snapshot = Snapshot::open(input, Limits::default()).expect("workbook should open");
     let mut add = snapshot.edit();
@@ -731,7 +733,8 @@ fn replacing_with_the_original_embedded_payload_is_an_exact_noop() {
         .replace_embedded_payload(
             0,
             9,
-            EmbeddedPayload::new(payload_bytes).expect("payload CFB should validate"),
+            EmbeddedPayload::new(payload_bytes, Limits::default())
+                .expect("payload CFB should validate"),
         )
         .expect("same payload should be accepted");
     let commit = replace
@@ -754,7 +757,8 @@ fn replace_embedded_payload_retains_identity_and_replaces_only_selected_storage(
         .replace_embedded_payload(
             0,
             7,
-            EmbeddedPayload::new(replacement).expect("replacement CFB should validate"),
+            EmbeddedPayload::new(replacement, Limits::default())
+                .expect("replacement CFB should validate"),
         )
         .expect("replacement should publish");
     let commit = transaction.commit_record().expect("commit should validate");
@@ -838,12 +842,13 @@ fn removing_one_of_two_shared_mbd_references_keeps_storage_until_last_owner() {
 
 #[test]
 fn embedded_payload_api_rejects_dde_and_invalid_payloads_atomically() {
-    assert!(EmbeddedPayload::new(vec![1, 2, 3]).is_err());
+    assert!(EmbeddedPayload::new(vec![1, 2, 3], Limits::default()).is_err());
     assert!(
         EmbeddedObjectDraft::new(
             0,
             0x2A,
-            EmbeddedPayload::new(embedded_payload(b"payload", b"unknown")).unwrap(),
+            EmbeddedPayload::new(embedded_payload(b"payload", b"unknown"), Limits::default())
+                .unwrap(),
         )
         .is_err()
     );
@@ -887,7 +892,8 @@ fn embedded_payload_api_rejects_dde_and_invalid_payloads_atomically() {
             .replace_embedded_payload(
                 0,
                 7,
-                EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap(),
+                EmbeddedPayload::new(embedded_payload(b"new", b"unknown"), Limits::default())
+                    .unwrap(),
             )
             .is_err()
     );
@@ -921,7 +927,7 @@ fn add_embedded_payload_rejects_duplicate_object_or_storage_identity_atomically(
     let same_object = EmbeddedObjectDraft::new(
         7,
         0x2A,
-        EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap(),
+        EmbeddedPayload::new(embedded_payload(b"new", b"unknown"), Limits::default()).unwrap(),
     )
     .unwrap();
     assert!(transaction.add_embedded_payload(0, same_object).is_err());
@@ -938,7 +944,7 @@ fn add_embedded_payload_rejects_duplicate_object_or_storage_identity_atomically(
     let same_storage = EmbeddedObjectDraft::new(
         8,
         0x2A,
-        EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap(),
+        EmbeddedPayload::new(embedded_payload(b"new", b"unknown"), Limits::default()).unwrap(),
     )
     .unwrap();
     assert!(transaction.add_embedded_payload(0, same_storage).is_err());
@@ -963,7 +969,8 @@ fn malformed_opaque_obj_is_lossless_but_blocks_unproven_identity_edits() {
     assert_eq!(snapshot.objects(0).unwrap().len(), 1);
     assert_eq!(snapshot.finish(), input);
 
-    let payload = EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap();
+    let payload =
+        EmbeddedPayload::new(embedded_payload(b"new", b"unknown"), Limits::default()).unwrap();
     let draft = EmbeddedObjectDraft::new(9, 0x2B, payload).unwrap();
     let mut transaction = snapshot.edit();
     let before = transaction
@@ -1023,7 +1030,7 @@ fn duplicate_opaque_mbd_identity_within_one_sheet_blocks_topology_edits() {
     let draft = EmbeddedObjectDraft::new(
         11,
         0x2C,
-        EmbeddedPayload::new(embedded_payload(b"new", b"opaque")).unwrap(),
+        EmbeddedPayload::new(embedded_payload(b"new", b"opaque"), Limits::default()).unwrap(),
     )
     .unwrap();
     assert!(transaction.add_embedded_payload(0, draft).is_err());
@@ -1055,7 +1062,8 @@ fn add_embedded_payload_preflights_target_limit_before_payload_capture() {
         .map(RecordCommit::into_snapshot)
         .unwrap()
         .finish();
-    let payload = EmbeddedPayload::new(embedded_payload(b"new", b"unknown")).unwrap();
+    let payload =
+        EmbeddedPayload::new(embedded_payload(b"new", b"unknown"), Limits::default()).unwrap();
     let draft = EmbeddedObjectDraft::new(8, 0x2B, payload).unwrap();
     let error = transaction
         .add_embedded_payload(0, draft)
@@ -1090,7 +1098,8 @@ fn embedded_payload_api_refuses_protected_outer_and_nested_cfb() {
     };
     assert!(Snapshot::open(protected, Limits::default()).is_err());
 
-    let payload = EmbeddedPayload::new(protected_payload()).expect("payload CFB parses");
+    let payload =
+        EmbeddedPayload::new(protected_payload(), Limits::default()).expect("payload CFB parses");
     let draft = EmbeddedObjectDraft::new(7, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), Limits::default()).unwrap();
     let mut transaction = snapshot.edit();
@@ -1120,7 +1129,8 @@ fn embedded_payload_api_refuses_nested_pidssi_and_encryption() {
         nested_child_pidssi_with_signature(),
         payload_with_root_stream("encryption", b"opaque encrypted payload"),
     ] {
-        let payload = EmbeddedPayload::new(bytes).expect("nested CFB should parse");
+        let payload =
+            EmbeddedPayload::new(bytes, Limits::default()).expect("nested CFB should parse");
         let draft = EmbeddedObjectDraft::new(7, 0x2A, payload).unwrap();
         let mut transaction = snapshot.edit();
         let before = transaction
@@ -1157,7 +1167,7 @@ fn embedded_payload_checks_stream_bounds_before_parsing_nested_pidssi() {
         ..publication_limits()
     };
     let bytes = payload_with_root_stream("\u{0005}DocumentSummaryInformation", &vec![0xA5; 2_048]);
-    let payload = EmbeddedPayload::with_limits(bytes, limits).expect("header should be admitted");
+    let payload = EmbeddedPayload::new(bytes, limits).expect("header should be admitted");
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), limits).unwrap();
     let mut transaction = snapshot.edit();
@@ -1199,7 +1209,7 @@ fn embedded_payload_publication_applies_common_count_size_and_depth_limits() {
     ];
 
     for (name, limits, bytes) in cases {
-        let payload = EmbeddedPayload::with_limits(bytes, limits)
+        let payload = EmbeddedPayload::new(bytes, limits)
             .unwrap_or_else(|error| panic!("{name} should pass standalone admission: {error:?}"));
         let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).unwrap();
         let snapshot = Snapshot::open(workbook_cfb(&[]), limits)
@@ -1236,7 +1246,7 @@ fn embedded_payload_publication_bounds_wide_storage_siblings_before_capture() {
         max_streams: 32,
         ..publication_limits()
     };
-    let payload = EmbeddedPayload::with_limits(wide_payload(16), limits)
+    let payload = EmbeddedPayload::new(wide_payload(16), limits)
         .expect("standalone payload admission should only parse the CFB header");
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), limits).unwrap();
@@ -1273,7 +1283,7 @@ fn embedded_payload_uses_per_object_storage_ceiling_before_capture() {
         max_streams: 8,
         ..publication_limits()
     };
-    let payload = EmbeddedPayload::with_limits(wide_payload(2), limits)
+    let payload = EmbeddedPayload::new(wide_payload(2), limits)
         .expect("standalone payload header should be admitted");
     let draft = EmbeddedObjectDraft::new(9, 0x2A, payload).unwrap();
     let snapshot = Snapshot::open(workbook_cfb(&[]), limits).unwrap();

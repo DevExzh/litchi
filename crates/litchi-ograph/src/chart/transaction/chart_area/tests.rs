@@ -43,7 +43,7 @@ fn with_unknown(source: &crate::chart::Stream) -> crate::chart::Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    crate::chart::Stream::open(output.finish()).expect("framed fixture")
+    crate::chart::Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {

@@ -1,7 +1,7 @@
 //! A standalone Graph chart-package draft and its borrowed read view.
 
-use litchi_ograph::Limits;
-use litchi_ograph::chart::{Context, Model as SemanticChart};
+use litchi_ograph::chart::{Context, Model};
+use litchi_ograph::{Limits, OpenOptions};
 
 use super::codec;
 use crate::package::{Error, Result};
@@ -42,8 +42,8 @@ impl View<'_> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self) -> Result<SemanticChart> {
-        SemanticChart::parse(self.chart, Context::graph()).map_err(Into::into)
+    pub fn semantic_chart(&self) -> Result<Model> {
+        Model::parse(self.chart, Context::graph()).map_err(Into::into)
     }
 
     /// Whether a chart replacement has been staged since the draft was
@@ -58,7 +58,7 @@ impl View<'_> {
 ///
 /// The draft edits a package value and returns its bytes; it never writes a
 /// presentation. Stage the result into a presentation with
-/// [`super::super::Graph::replace_package`] on an
+/// [`crate::chart::Graph::replace_package`] on an
 /// [`crate::embedded::object::Edit`].
 ///
 /// `[MS-OGRAPH]` 2.1.7.3 requires exactly one `Workbook` stream containing a
@@ -68,7 +68,7 @@ impl View<'_> {
 /// `ExOleObjStg` records or the `[MS-ODRAW]` picture-frame shape that hosts the
 /// package.
 #[derive(Debug)]
-pub struct GraphPackage {
+pub struct Draft {
     original: Option<Vec<u8>>,
     workbook: Vec<u8>,
     comp_obj: Option<Vec<u8>>,
@@ -79,14 +79,14 @@ pub struct GraphPackage {
     dirty: bool,
 }
 
-impl GraphPackage {
+impl Draft {
     /// Open a validated package with conservative `OGraph` limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
+        Self::open_with_options(bytes, OpenOptions::default())
     }
 
     /// Open a validated package under explicit resource bounds.
@@ -94,8 +94,8 @@ impl GraphPackage {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let validated_limits = limits.validate()?;
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let validated_limits = options.limits_value().validate()?;
         let parts = codec::read(&bytes, validated_limits)?;
         Ok(Self {
             original: Some(bytes),
@@ -136,9 +136,8 @@ impl GraphPackage {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self) -> Result<SemanticChart> {
-        SemanticChart::parse_with(self.chart_ref()?, Context::graph(), self.limits)
-            .map_err(Into::into)
+    pub fn semantic_chart(&self) -> Result<Model> {
+        Model::parse_with(self.chart_ref()?, Context::graph(), self.limits).map_err(Into::into)
     }
 
     /// Borrow the current state without copying its bounded buffers.
@@ -172,7 +171,7 @@ impl GraphPackage {
             ));
         }
         let bytes = chart.into_bytes();
-        let checked = litchi_ograph::chart::Ref::with_limits(&bytes, self.limits)?;
+        let checked = litchi_ograph::chart::Ref::open(&bytes, self.limits)?;
         if checked.kind() != litchi_ograph::chart::Kind::Graph {
             return Err(Error::InvalidFormat(
                 "standalone Graph packages require a Graph chart stream".to_string(),
@@ -247,7 +246,7 @@ impl GraphPackage {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn replace_semantic_chart(&mut self, chart: SemanticChart) -> Result<()> {
+    pub fn replace_semantic_chart(&mut self, chart: Model) -> Result<()> {
         if chart.context().kind() != litchi_ograph::chart::Kind::Graph {
             return Err(Error::InvalidFormat(
                 "standalone Graph packages require a Graph semantic chart".to_string(),
@@ -276,7 +275,7 @@ impl GraphPackage {
     }
 
     fn chart_ref(&self) -> Result<litchi_ograph::chart::Ref<'_>> {
-        let mut charts = litchi_ograph::chart::Refs::with_limits(&self.workbook, self.limits)?;
+        let mut charts = litchi_ograph::chart::Refs::open_workbook(&self.workbook, self.limits)?;
         let chart = charts
             .next()
             .ok_or_else(|| Error::Corrupted("Graph Workbook has no chart stream".to_string()))??;

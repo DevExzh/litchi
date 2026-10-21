@@ -3,24 +3,15 @@
 use std::iter::FusedIterator;
 use std::num::{NonZeroU32, NonZeroUsize};
 
-use litchi_ograph::chart::{Book, Context, Refs};
+use litchi_ograph::chart::{Book, Context, Model, Refs};
 use litchi_ograph::{Package as OgraphPackage, PackageRef};
 
 use super::codec::encode_storage;
-use super::draft::GraphPackage;
 use super::package::classify;
+use crate::builder::graph::Draft;
 use crate::embedded::object::{self, Collection, ContainerKind, ExternalObject};
 use crate::embedded::storage::Compression;
 use crate::package::{Error, Result as PackageResult};
-
-/// Owned host-neutral semantic view of one validated chart substream.
-///
-/// This is the MS-OGRAPH model from `litchi-ograph`, exposed from the PPT
-/// chart host with the producer context selected from [`Kind`]. Parsed values
-/// retain an exact bounded source stream and can replay it unchanged; parsed
-/// mutation and fresh emission remain subject to the neutral model's explicit
-/// safety errors.
-pub type SemanticChart = litchi_ograph::chart::Model;
 
 /// Fallible semantic views over every chart substream in one PPT chart object.
 ///
@@ -28,27 +19,27 @@ pub type SemanticChart = litchi_ograph::chart::Model;
 /// bounded semantic copy because the neutral semantic model must retain the
 /// source stream for lossless pristine replay.
 #[derive(Debug)]
-pub struct SemanticCharts<'a> {
+pub struct Models<'a> {
     charts: Refs<'a>,
     context: Context,
     limits: litchi_ograph::Limits,
 }
 
-impl Iterator for SemanticCharts<'_> {
-    type Item = PackageResult<SemanticChart>;
+impl Iterator for Models<'_> {
+    type Item = PackageResult<Model>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let next_chart = self.charts.next()?;
         Some(match next_chart {
             Ok(chart_ref) => {
-                SemanticChart::parse_with(chart_ref, self.context, self.limits).map_err(Into::into)
+                Model::parse_with(chart_ref, self.context, self.limits).map_err(Into::into)
             },
             Err(error) => Err(error.into()),
         })
     }
 }
 
-impl FusedIterator for SemanticCharts<'_> {}
+impl FusedIterator for Models<'_> {}
 
 /// The producer grammar and host topology behind a chart object.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -172,7 +163,7 @@ impl Graph {
     /// Iterate the single chart-sheet substream through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
     #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> Models<'_> {
         semantic_charts(&self.book, Kind::Graph)
     }
 
@@ -185,7 +176,7 @@ impl Graph {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self) -> PackageResult<SemanticChart> {
+    pub fn semantic_chart(&self) -> PackageResult<Model> {
         let mut charts = self.semantic_charts();
         let chart = charts
             .next()
@@ -208,9 +199,12 @@ impl Graph {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn draft_package(&self) -> PackageResult<GraphPackage> {
+    pub fn draft_package(&self) -> PackageResult<Draft> {
         let package = self.package.as_ref().as_ref();
-        GraphPackage::with_limits(package.as_bytes().to_vec(), package.limits())
+        Draft::open_with_options(
+            package.as_bytes().to_vec(),
+            litchi_ograph::OpenOptions::new().limits(package.limits()),
+        )
     }
 
     /// Move this Graph object into a package draft without cloning its
@@ -219,11 +213,14 @@ impl Graph {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn into_draft_package(self) -> PackageResult<GraphPackage> {
+    pub fn into_draft_package(self) -> PackageResult<Draft> {
         let Self { package, .. } = self;
         let graph_package = *package;
         let limits = graph_package.as_ref().limits();
-        GraphPackage::with_limits(graph_package.finish().into_bytes(), limits)
+        Draft::open_with_options(
+            graph_package.finish().into_bytes(),
+            litchi_ograph::OpenOptions::new().limits(limits),
+        )
     }
 
     /// Stage a Graph package draft back into its owning PPT object on a
@@ -246,11 +243,7 @@ impl Graph {
     /// [`litchi_core::edit::RefusalKind::UnsupportedTarget`] when that object
     /// is no longer this embedded Graph object, and [`object::Error::Package`]
     /// when the draft cannot be encoded as a storage.
-    pub fn replace_package(
-        &self,
-        edit: &mut object::Edit,
-        package: GraphPackage,
-    ) -> object::Result<()> {
+    pub fn replace_package(&self, edit: &mut object::Edit, package: Draft) -> object::Result<()> {
         validate_replacement_target(edit.objects(), &self.info)?;
         let bytes = package.into_bytes()?;
         let storage = encode_storage(bytes, self.compression)?;
@@ -295,7 +288,7 @@ impl Excel {
     /// Iterate the Workbook's chart substreams through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
     #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> Models<'_> {
         semantic_charts(&self.book, Kind::Excel)
     }
 
@@ -304,7 +297,7 @@ impl Excel {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
         self.semantic_charts().nth(index).transpose()
     }
 
@@ -356,7 +349,7 @@ impl Chart {
     /// raw view and therefore preserves the existing permissive inventory
     /// contract for callers that only need framed records.
     #[must_use]
-    pub fn semantic_charts(&self) -> SemanticCharts<'_> {
+    pub fn semantic_charts(&self) -> Models<'_> {
         match self {
             Self::Graph(chart) => semantic_charts(&chart.book, Kind::Graph),
             Self::Excel(chart) => semantic_charts(&chart.book, Kind::Excel),
@@ -369,7 +362,7 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<SemanticChart>> {
+    pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
         self.semantic_charts().nth(index).transpose()
     }
 
@@ -400,7 +393,7 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn draft_package(&self) -> PackageResult<GraphPackage> {
+    pub fn draft_package(&self) -> PackageResult<Draft> {
         match self {
             Self::Graph(chart) => chart.draft_package(),
             Self::Excel(_) => Err(Error::InvalidFormat(
@@ -535,8 +528,8 @@ fn semantic_context(kind: Kind) -> Context {
     }
 }
 
-fn semantic_charts(book: &Book, kind: Kind) -> SemanticCharts<'_> {
-    SemanticCharts {
+fn semantic_charts(book: &Book, kind: Kind) -> Models<'_> {
+    Models {
         charts: book.charts(),
         context: semantic_context(kind),
         limits: book.limits(),

@@ -284,8 +284,11 @@ fn graph_package_replacement_publishes_through_the_object_edit() {
     let mut chart_package = graph.draft_package().expect("open chart package draft");
     chart_package
         .replace_chart(
-            litchi_ograph::chart::Stream::open(replacement.clone())
-                .expect("typed Graph chart stream"),
+            litchi_ograph::chart::Stream::open(
+                replacement.clone(),
+                litchi_ograph::Limits::default(),
+            )
+            .expect("typed Graph chart stream"),
         )
         .expect("stage chart replacement");
     assert_eq!(

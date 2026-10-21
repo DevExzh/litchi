@@ -55,17 +55,12 @@ pub struct Ref<'a> {
 }
 
 impl<'a> Ref<'a> {
-    /// Validates one exact chart substream with conservative limits.
-    pub fn open(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
-    }
-
     /// Validates one exact chart substream with explicit limits.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn open(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_bytes(bytes, limits)?;
 
-        let mut refs = Refs::with_limits(bytes, limits)?;
+        let mut refs = Refs::open_workbook(bytes, limits)?;
         let chart = refs.next().ok_or(Error::InvalidChart {
             offset: 0,
             reason: "missing chart BOF",
@@ -135,7 +130,7 @@ impl<'a> Ref<'a> {
     /// Copies this substream under explicit bounds.
     pub fn own_with(self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
-        Ref::with_limits(self.bytes, limits)?;
+        Ref::open(self.bytes, limits)?;
         if self.bytes.len() > limits.biff.max_output_bytes {
             return Err(Error::LimitExceeded {
                 resource: "output bytes",
@@ -170,14 +165,9 @@ pub struct Stream {
 }
 
 impl Stream {
-    /// Takes ownership and validates without copying the input allocation.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
-    }
-
     /// Takes ownership and validates under explicit resource bounds.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let chart = Ref::with_limits(&bytes, limits)?;
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        let chart = Ref::open(&bytes, limits)?;
         let kind = chart.kind;
         let limits = chart.limits;
         Ok(Self {
@@ -230,7 +220,7 @@ impl Stream {
 
     pub(crate) fn relimit(mut self, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        Ref::with_limits(&self.bytes, limits)?;
+        Ref::open(&self.bytes, limits)?;
         if self.bytes.len() > limits.biff.max_output_bytes {
             return Err(Error::LimitExceeded {
                 resource: "output bytes",
@@ -256,15 +246,10 @@ pub struct Book {
 }
 
 impl Book {
-    /// Takes ownership, validates every discovered chart, and requires one.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
-    }
-
     /// Takes ownership and validates every chart under explicit bounds.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        let mut charts = Refs::with_limits(&bytes, limits)?;
+        let mut charts = Refs::open_workbook(&bytes, limits)?;
         let mut count = 0usize;
         for chart in &mut charts {
             chart?;
@@ -343,13 +328,8 @@ struct Active {
 }
 
 impl<'a> Refs<'a> {
-    /// Scans any BIFF Workbook stream for standalone or Excel chart BOFs.
-    pub fn open_workbook(bytes: &'a [u8]) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
-    }
-
     /// Scans a BIFF Workbook stream with explicit resource bounds.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn open_workbook(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_bytes(bytes, limits)?;
         let records = Records::with_limits(bytes, limits.biff)?;
@@ -600,7 +580,7 @@ mod tests {
         let (bytes, first_offset, first_bytes, second_offset, second_bytes) = hosted_workbook();
         let pointer = bytes.as_ptr();
         let capacity = bytes.capacity();
-        let book = Book::open(bytes).expect("host Workbook");
+        let book = Book::open(bytes, Limits::default()).expect("host Workbook");
         assert_eq!(book.as_bytes().as_ptr(), pointer);
         assert_eq!(book.len(), 2);
         assert!(!book.is_empty());
@@ -634,7 +614,7 @@ mod tests {
         let bytes = chart(Kind::Graph, &[0xCA, 0xFE, 0xBA, 0xBE]);
         let pointer = bytes.as_ptr();
         let capacity = bytes.capacity();
-        let owned = Stream::open(bytes).expect("chart");
+        let owned = Stream::open(bytes, Limits::default()).expect("chart");
         assert_eq!(owned.as_bytes().as_ptr(), pointer);
         assert_eq!(
             owned.as_bytes().len(),
@@ -678,7 +658,7 @@ mod tests {
         push(&mut nested, BOF, &chart_bof);
         push(&mut nested, EOF, &[]);
         assert!(matches!(
-            Refs::open_workbook(&nested.finish())
+            Refs::open_workbook(&nested.finish(), Limits::default())
                 .expect("scanner")
                 .next(),
             Some(Err(Error::InvalidChart {
@@ -691,7 +671,7 @@ mod tests {
         push(&mut missing, BOF, &chart_bof);
         push(&mut missing, UNKNOWN, &[1]);
         assert!(matches!(
-            Refs::open_workbook(&missing.finish())
+            Refs::open_workbook(&missing.finish(), Limits::default())
                 .expect("scanner")
                 .next(),
             Some(Err(Error::InvalidChart {
@@ -704,7 +684,7 @@ mod tests {
         push(&mut nonempty, BOF, &chart_bof);
         push(&mut nonempty, EOF, &[1]);
         assert!(matches!(
-            Book::open(nonempty.finish()),
+            Book::open(nonempty.finish(), Limits::default()),
             Err(Error::InvalidChart {
                 reason: "chart EOF has a non-empty payload",
                 ..
@@ -714,7 +694,7 @@ mod tests {
         let mut short = Encoder::new();
         push(&mut short, BOF, &[0, 6, 0x20]);
         assert!(matches!(
-            Book::open(short.finish()),
+            Book::open(short.finish(), Limits::default()),
             Err(Error::InvalidChart {
                 reason: "BOF payload is shorter than four bytes",
                 ..
@@ -724,7 +704,7 @@ mod tests {
         let mut version = Encoder::new();
         push(&mut version, BOF, &bof(0x0500, EXCEL_DOC_TYPE, 0));
         assert!(matches!(
-            Book::open(version.finish()),
+            Book::open(version.finish(), Limits::default()),
             Err(Error::InvalidChart {
                 reason: "chart BOF has an unsupported BIFF version",
                 ..
@@ -735,7 +715,7 @@ mod tests {
     #[test]
     fn enforces_workbook_chart_and_per_chart_bounds() {
         let (bytes, _, _, _, _) = hosted_workbook();
-        let mut count = Refs::with_limits(
+        let mut count = Refs::open_workbook(
             &bytes,
             Limits {
                 max_charts: 1,
@@ -755,7 +735,7 @@ mod tests {
 
         let one = chart(Kind::Excel, &[1]);
         assert!(matches!(
-            Book::with_limits(
+            Book::open(
                 one,
                 Limits {
                     max_chart_records: 2,
@@ -769,7 +749,7 @@ mod tests {
         ));
 
         assert!(matches!(
-            Refs::with_limits(
+            Refs::open_workbook(
                 &bytes,
                 Limits {
                     max_workbook_bytes: bytes.len() - 1,
@@ -783,7 +763,7 @@ mod tests {
         ));
 
         assert!(matches!(
-            Book::open(vec![0x0A, 0, 0, 0]),
+            Book::open(vec![0x0A, 0, 0, 0], Limits::default()),
             Err(Error::InvalidChart {
                 reason: "Workbook contains no chart substream",
                 ..

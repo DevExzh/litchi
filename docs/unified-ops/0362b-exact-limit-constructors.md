@@ -1,7 +1,8 @@
 # 0362b — Exact limit-constructor names
 
 - Date: 2026-10-21.
-- Status: in progress; the iWork raw-wire slice and inventory fix are complete.
+- Status: in progress; the iWork raw-wire, Graph/XLS/PPT/ODS constructor slices
+  and inventory fix are complete.
   The remaining constructors below are required work, not exceptions.
 - Contract: 0351 §2.5 requires options on owner ingress/edit routes and an
   explicit limits argument on raw/record APIs, with no limit-less twin.
@@ -37,15 +38,48 @@ all six crates and the `iwa-common` glossary profile passes. The migrated Pages
 hidden-axis fuzz target compiles with its separate manifest (`cargo check
 --offline`); its generated lock file remains ignored.
 
+## Graph, XLS, PPT and ODS constructors
+
+Graph's `Package`, `PackageRef`, `Workbook`, `WorkbookRef` and `Payload` now
+share `OpenOptions` and `open_with_options`. Defaults retain the previous
+bounds. The PPT `builder::graph::Draft` uses these same Graph ingress
+options. Getter `limits_value()` exposes the configured value. The draft and
+its `View` move from `chart` into `builder::graph`; the former `GraphPackage`
+name and `chart::View` export are deleted. The read projection still constructs
+the draft through `draft_package`/`into_draft_package`, and its replacement
+still stages through the embedded-object edit. The redundant `SemanticChart`
+public alias is removed in favor of `chart::semantic::Model`; its iterator is
+`chart::semantic::Models`, with the former prefixed public name removed.
+
+The raw chart `Ref`, `Stream` and `Book` constructors take `Limits` in their
+sole `open` entry; discovery uses `Refs::open_workbook(bytes, limits)`. XLS
+`ole_object::EmbeddedPayload::new(bytes, limits)` likewise requires its object
+bounds. ODS `document::History::with_options(package, EditOptions)` preserves
+its selected package/patch/composition/history bounds; `EditOptions` gains its
+`limits_value()` getter. Every constructor consumer migrates in this slice.
+
+The four Graph raw constructor bodies are identical after updating their calls
+to the canonical names; the XLS payload constructor body is byte-identical. Their normalized body hashes are recorded alongside
+validation in `results/0362b/owner-validation.json`. No parsing, graph traversal,
+allocation, ownership or publication algorithm changes. Existing tests cover
+configured bounds, zero-copy pointer/capacity preservation, exact unknown-record
+replay, nested OLE payload admission and history eviction/redo.
+
+All affected targets compile with every feature. The full Graph suite (70),
+XLS OLE tests (53), PPT chart tests (14 unit + 5 integration) and ODS history
+suite (7) pass: 149 tests, none ignored. All-target/all-feature clippy passes for
+the four crates, and the independently locked performance harness compiles.
+The exact-name ban is registered in their five glossary profiles.
+
 ## Remaining required constructors
 
 The source sweep also found exact-name constructors/setters in the legacy
-shared/raw layers (BIFF, OGraph, ODraw, OLE user properties), ODS history, XLS
-embedded payloads, the PPT Graph draft, signing and DrawingML helpers. These
-need canonical required-limit raw calls or options-based owner/edit routes,
-with every consumer migrated. Existing option setters need noun setters and
-`*_value()` getters. The low-level ZIP and CFB writer setters also need review
-for public reachability and the applicable raw/writer configuration contract.
+shared/raw layers (BIFF, ODraw, OLE user properties), signing and DrawingML
+helpers. These need canonical required-limit raw calls or options-based
+owner/edit routes, with every consumer migrated. Existing option setters need
+noun setters and `*_value()` getters. The low-level ZIP and CFB writer setters
+also need review for public reachability and the applicable raw/writer
+configuration contract.
 
 W4 owns its remaining form-control owner policy setter. W8 owns the two DOCX
 source-tail edit setters alongside its OPC API migration. Root coordinates the

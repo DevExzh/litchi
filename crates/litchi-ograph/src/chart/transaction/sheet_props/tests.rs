@@ -57,7 +57,7 @@ fn with_unknown(source: &Stream) -> Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn with_prefix_unknown(source: &Stream) -> Stream {
@@ -69,7 +69,7 @@ fn with_prefix_unknown(source: &Stream) -> Stream {
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {

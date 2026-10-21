@@ -1,6 +1,31 @@
 use crate::{Error, Result};
 use litchi_biff::{Limits as BiffLimits, MAX_RECORD_BYTES};
 
+/// Ingress options for a standalone Graph package and its projections.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct OpenOptions {
+    limits: Limits,
+}
+
+impl OpenOptions {
+    /// Conservative default ingress bounds.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the bounds used to validate the package.
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// The selected ingress bounds.
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+}
+
 /// Resource bounds applied before allocation or traversal.
 ///
 /// Fields are public so callers can concisely override a few values with

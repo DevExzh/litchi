@@ -42,7 +42,7 @@ fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> S
         }
         output.push_ref(record).expect("record replay");
     }
-    Stream::open(output.finish()).expect("framed fixture")
+    Stream::open(output.finish(), crate::Limits::default()).expect("framed fixture")
 }
 
 fn series_payload(bytes: &[u8]) -> Vec<u8> {

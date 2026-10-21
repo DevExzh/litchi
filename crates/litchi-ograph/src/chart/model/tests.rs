@@ -159,7 +159,7 @@ fn omit(stream: &Stream, target: RecordKind) -> Vec<u8> {
 }
 
 fn excel_input(bytes: &[u8]) -> Ref<'_> {
-    Ref::open(bytes).expect("well-framed chart rewrite")
+    Ref::open(bytes, Limits::default()).expect("well-framed chart rewrite")
 }
 
 fn excel_chart() -> Model {
@@ -290,7 +290,7 @@ fn parsed_mutation_is_refused_and_unknown_order_replays_exactly() {
     }
     let bytes = out.finish();
     let pointer = bytes.as_ptr();
-    let stream = Stream::open(bytes).expect("raw chart");
+    let stream = Stream::open(bytes, Limits::default()).expect("raw chart");
     let parsed =
         Model::open(stream, Context::excel().with_external_sheets(1)).expect("semantic chart");
     assert_eq!(parsed.unknown().len(), 1);
@@ -468,7 +468,7 @@ fn rejects_missing_collection_begin_and_nesting_over_limit() {
     }
     assert!(removed);
     let malformed = out.finish();
-    let input = Ref::open(&malformed).expect("raw boundaries remain valid");
+    let input = Ref::open(&malformed, Limits::default()).expect("raw boundaries remain valid");
     assert!(matches!(
         Model::parse(input, Context::excel().with_external_sheets(1)),
         Err(Error::InvalidChart {
@@ -758,7 +758,7 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
     let stream = fixture(Model::new(Context::graph()).expect("Graph chart"));
     let without_excel_scl = omit(&stream, RecordKind::from_wire(0x00A0));
     let parsed = Model::parse(
-        Ref::open(&without_excel_scl).expect("Graph rewrite"),
+        Ref::open(&without_excel_scl, Limits::default()).expect("Graph rewrite"),
         Context::graph(),
     )
     .expect("Graph does not require Excel CHARTFOMATS order");
@@ -770,7 +770,7 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
 
     let without_excel_crt_link = omit(&stream, RecordKind::from_wire(0x1022));
     let parsed = Model::parse(
-        Ref::open(&without_excel_crt_link).expect("Graph rewrite"),
+        Ref::open(&without_excel_crt_link, Limits::default()).expect("Graph rewrite"),
         Context::graph(),
     )
     .expect("Graph does not require the Excel-mandatory CrtLink");
@@ -789,7 +789,7 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
         out.push_ref(record).expect("record replay");
     }
     let malformed = out.finish();
-    let input = Ref::open(&malformed).expect("Graph SIIndex framing");
+    let input = Ref::open(&malformed, Limits::default()).expect("Graph SIIndex framing");
     assert!(matches!(
         Model::parse(input, Context::graph()),
         Err(Error::InvalidChart {

@@ -28,7 +28,10 @@ pub(super) fn read_workbook(
 
 pub(super) fn read_chart(source: &Snapshot) -> Result<chart::Model> {
     let bytes = read_workbook(source.source_bytes(), source.workbook, source.limits)?;
-    let workbook = super::semantic::Workbook::with_limits(bytes, source.limits)?;
+    let workbook = super::semantic::Workbook::open_with_options(
+        bytes,
+        crate::OpenOptions::new().limits(source.limits),
+    )?;
     chart::Model::parse(workbook.chart(), chart::Context::graph())
 }
 

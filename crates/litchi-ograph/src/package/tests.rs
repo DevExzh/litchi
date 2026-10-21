@@ -296,7 +296,7 @@ fn checks_package_and_workbook_limits_before_exposing_data() {
         ..Limits::default()
     };
     assert!(matches!(
-        PackageRef::with_limits(&bytes, package_limits),
+        PackageRef::open_with_options(&bytes, crate::OpenOptions::new().limits(package_limits)),
         Err(Error::LimitExceeded {
             resource: "package bytes",
             ..
@@ -308,7 +308,7 @@ fn checks_package_and_workbook_limits_before_exposing_data() {
         ..Limits::default()
     };
     assert!(matches!(
-        PackageRef::with_limits(&bytes, workbook_limits),
+        PackageRef::open_with_options(&bytes, crate::OpenOptions::new().limits(workbook_limits)),
         Err(Error::LimitExceeded {
             resource: "Workbook bytes",
             ..

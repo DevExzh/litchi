@@ -11,3 +11,6 @@
 
 pub use crate::writer::Builder;
 pub use crate::writer::chart::{Chart, ChartKind, ChartSeries};
+
+/// Bounded drafts of standalone Graph chart packages.
+pub mod graph;

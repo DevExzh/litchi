@@ -24,21 +24,6 @@ pub struct EmbeddedPayload {
 }
 
 impl EmbeddedPayload {
-    /// Creates an inert payload from a standalone CFB compound file.
-    ///
-    /// This constructor checks only the CFB container header and structural
-    /// admission. The attached workbook operation applies its explicit object
-    /// limits and rejects protected or malformed nested containers before
-    /// publication.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the input is empty, exceeds the default bounded
-    /// object size, or is not a valid CFB compound file.
-    pub fn new(compound_file: Vec<u8>) -> Result<Self> {
-        Self::with_limits(compound_file, super::super::Limits::default())
-    }
-
     /// Creates an inert payload under an explicit retained-object byte limit.
     ///
     /// The payload remains opaque after this check. It is never interpreted as
@@ -53,7 +38,7 @@ impl EmbeddedPayload {
     ///
     /// Returns an error when the input is empty, exceeds
     /// `limits.max_object_size`, or is not accepted by the bounded CFB parser.
-    pub fn with_limits(compound_file: Vec<u8>, limits: super::super::Limits) -> Result<Self> {
+    pub fn new(compound_file: Vec<u8>, limits: super::super::Limits) -> Result<Self> {
         if compound_file.is_empty() {
             return Err(Error::InvalidData(
                 "embedded payload CFB must not be empty".into(),
