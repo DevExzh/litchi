@@ -21,8 +21,6 @@
 )]
 
 mod properties;
-/// Positional, source-backed same-length Unicode paragraph edits.
-pub mod source;
 
 use properties::MarkChange;
 pub use properties::{FieldPart, HyperlinkInsert, SectionValue};

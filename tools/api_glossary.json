@@ -5411,6 +5411,39 @@
           "scope": "litchi_doc::body_text",
           "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
           "recursive": false
+        },
+        {
+          "name": "SourceSnapshot",
+          "scope": "litchi_doc",
+          "replacement": "record 0359a: the source-backed DOC owner is litchi_doc::source_backed::Package"
+        },
+        {
+          "name": "source",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: source-backed paragraph edits live in litchi_doc::source_backed",
+          "recursive": false
+        },
+        {
+          "name": "SourceBackedOptions",
+          "scope": "litchi_doc::source_backed",
+          "replacement": "record 0359a: use source_backed::OpenOptions"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_doc::source_backed::Package",
+          "replacement": "record 0359a: use Package::edit_paragraph",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_doc::source_backed::Package",
+          "replacement": "record 0359a: use Package::edit_paragraph",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_doc::source_backed::paragraph::Patch",
+          "replacement": "record 0359a: use is_noop()"
         }
       ],
       "families": [
@@ -5427,11 +5460,13 @@
         "litchi_doc::parts::captions",
         "litchi_doc::parts::command_bars",
         "litchi_doc::parts::annotation_bookmarks",
-        "litchi_doc::parts::subdocuments"
+        "litchi_doc::parts::subdocuments",
+        "litchi_doc::source_backed::paragraph"
       ],
       "immutable_owners": [
         "litchi_doc::Package",
-        "litchi_doc::Document"
+        "litchi_doc::Document",
+        "litchi_doc::source_backed::Package"
       ],
       "family_methods": true
     },
@@ -5845,6 +5880,39 @@
           "scope": "litchi_doc::body_text",
           "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
           "recursive": false
+        },
+        {
+          "name": "SourceSnapshot",
+          "scope": "litchi_doc",
+          "replacement": "record 0359a: the source-backed DOC owner is litchi_doc::source_backed::Package"
+        },
+        {
+          "name": "source",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: source-backed paragraph edits live in litchi_doc::source_backed",
+          "recursive": false
+        },
+        {
+          "name": "SourceBackedOptions",
+          "scope": "litchi_doc::source_backed",
+          "replacement": "record 0359a: use source_backed::OpenOptions"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_doc::source_backed::Package",
+          "replacement": "record 0359a: use Package::edit_paragraph",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_doc::source_backed::Package",
+          "replacement": "record 0359a: use Package::edit_paragraph",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_doc::source_backed::paragraph::Patch",
+          "replacement": "record 0359a: use is_noop()"
         }
       ],
       "families": [
@@ -5861,11 +5929,13 @@
         "litchi_doc::parts::captions",
         "litchi_doc::parts::command_bars",
         "litchi_doc::parts::annotation_bookmarks",
-        "litchi_doc::parts::subdocuments"
+        "litchi_doc::parts::subdocuments",
+        "litchi_doc::source_backed::paragraph"
       ],
       "immutable_owners": [
         "litchi_doc::Package",
-        "litchi_doc::Document"
+        "litchi_doc::Document",
+        "litchi_doc::source_backed::Package"
       ],
       "family_methods": true
     },
@@ -8484,42 +8554,6 @@
           "recursive": false
         },
         {
-          "name": "append_plain_paragraphs",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
-          "name": "append_plain_runs",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
-          "name": "plan_publication",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
-          "name": "plan_publication_with_limits",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
-          "name": "plan_publication_with_context",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
-          "name": "plan_publication_with_limits_and_context",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
-          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
-          "recursive": false
-        },
-        {
           "name": "TailAppendLimits",
           "scope": "litchi_rtf",
           "replacement": "use checked tail_append::SemanticLimits",
@@ -8540,12 +8574,6 @@
         {
           "name": "with_limits",
           "scope": "litchi_rtf::tail_append::Edit",
-          "replacement": "use checked SemanticLimits and EditOptions",
-          "recursive": false
-        },
-        {
-          "name": "with_limits",
-          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
           "replacement": "use checked SemanticLimits and EditOptions",
           "recursive": false
         },
@@ -8613,14 +8641,36 @@
           "name": "RtfDocument",
           "scope": "litchi_rtf",
           "replacement": "use raw::Tree (record 0359)"
+        },
+        {
+          "name": "TailAppendSourceEdit",
+          "scope": "litchi_rtf",
+          "replacement": "record 0359a: use source_backed::Package::edit_tail_append (litchi_rtf::source_backed::tail_append)"
+        },
+        {
+          "name": "TailAppendSourceProof",
+          "scope": "litchi_rtf",
+          "replacement": "record 0359a: use source_backed::Package::edit_tail_append (litchi_rtf::source_backed::tail_append)"
+        },
+        {
+          "name": "TailAppendSourcePublicationPlan",
+          "scope": "litchi_rtf",
+          "replacement": "record 0359a: use source_backed::Package::edit_tail_append (litchi_rtf::source_backed::tail_append)"
+        },
+        {
+          "name": "TailAppendSourcePublicationReport",
+          "scope": "litchi_rtf",
+          "replacement": "record 0359a: use source_backed::Package::edit_tail_append (litchi_rtf::source_backed::tail_append)"
         }
       ],
       "families": [
-        "litchi_rtf::tail_append"
+        "litchi_rtf::tail_append",
+        "litchi_rtf::source_backed::tail_append"
       ],
       "immutable_owners": [
         "litchi_rtf::Package",
-        "litchi_rtf::Document"
+        "litchi_rtf::Document",
+        "litchi_rtf::source_backed::Package"
       ],
       "family_methods": true
     },

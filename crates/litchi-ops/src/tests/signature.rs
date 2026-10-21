@@ -423,13 +423,13 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                 .find_map(|index| {
                     let position = Position::new(index);
                     let text = same_width(snapshot.paragraph(position).ok()?.text())?;
-                    let mut transaction = snapshot.edit(position).ok()?;
+                    let mut transaction = snapshot.edit_paragraph(position).ok()?;
                     transaction.set_text(text.clone()).ok()?;
                     Some((transaction.commit().ok()?, text))
                 })
                 .expect("an editable DOC paragraph");
             let mut output = Vec::new();
-            commit.write_to(&mut output).unwrap();
+            commit.package().write_to(&mut output).unwrap();
             (output, text.trim().to_owned())
         },
         #[cfg(feature = "xls")]
@@ -603,7 +603,7 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "doc")]
         FileFormat::Doc => assert!(
-            litchi_doc::body_text::source::SourceSnapshot::from_bytes(bytes.clone()).is_err(),
+            litchi_doc::source_backed::Package::from_bytes(bytes.clone()).is_err(),
             "{label}: the DOC editor admitted a signed container"
         ),
         #[cfg(feature = "xls")]

@@ -152,6 +152,7 @@ pub mod hyperlink;
 pub mod image;
 pub mod leniency;
 pub mod package;
+pub mod source_backed;
 /// Low-level cursor-backed CFB access for format-specific callers.
 pub mod raw {
     pub use crate::package::raw::Reader;
