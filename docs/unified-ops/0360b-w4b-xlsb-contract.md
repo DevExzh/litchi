@@ -1,8 +1,10 @@
 # 0360b — W4b: XLSB on the record 0351 contract
 
 - Status: implemented on `uo2/w4b-xlsb`, cut from `uo2/w4-xlsx` at
-  `ba96140de3`; merged with `uo2/w4-xlsx` at `635b884c7c` (`b45809564b`) and
-  with trunk `feat/unified-ops-api` (`9560448a9e`).
+  `ba96140de3`; merged with `uo2/w4-xlsx` at `635b884c7c` (`b45809564b`),
+  with trunk `feat/unified-ops-api` (`9560448a9e`) and with the rewritten
+  `uo2/w4-xlsx` tip `698fd6c5f0` (`b72c6a760b`; its XLSX files taken as is,
+  `c89d0972c3` keeps trunk's ODP perf harness).
 - Date: 2026-10-21.
 - Input: owner decision [0350](0350-owner-api-debt-decision.md); contract
   [0351](0351-api-contract.md) §2, §4.3, §5 (wave W4, XLSB half); the
@@ -145,7 +147,8 @@ unchanged (no re-bless).
 | `b45809564b`, `9560448a9e` | merges of `uo2/w4-xlsx` and trunk |
 | `be1538b639` | owning source-backed metadata `Edit` with `reset`; `xlsb_w4b_probe` |
 | `1af8b42cb6` | shared package graph; part patches capture manifests on first replay |
-| this record | record, evidence, `p0360b` |
+| `4e0d748bf7` | record, evidence, `p0360b` |
+| `b72c6a760b`, `c89d0972c3` | merge of the rewritten `uo2/w4-xlsx` tip; trunk's ODP harness kept |
 
 ## 6. Performance
 
@@ -210,8 +213,7 @@ the note add is 0.36 M after it.
 | Command | Exit |
 |---|---|
 | `cargo fmt --all --check` | 0 |
-| `cargo clippy --no-deps -p litchi-xlsb -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
-| the same without `--no-deps` | 101: one `needless_borrow` in `crates/litchi-xlsx/src/form_control/scalar_edit.rs:897`, merged from `uo2/w4-xlsx` `635b884c7c` (not this wave's crate) |
+| `cargo clippy -p litchi-xlsb -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 (after the `698fd6c5f0` merge; before it, 101 on one `needless_borrow` in the merged `litchi-xlsx` form-control code, with `--no-deps` 0) |
 | `cargo clippy --no-deps -p litchi-ops --no-default-features --all-targets -- -D warnings`; the same `--features xlsb` | 0; 0 |
 | `cargo clippy -p litchi-xlsb --all-targets` with no features, `sign`, `vba-inspection`, all features | 0 each |
 | `cargo test -p litchi-xlsb --all-features` | 0 (56 targets) |
@@ -235,4 +237,4 @@ The OfficeCLI corpus needs no re-bless: no behaviour visible to it changed.
 - 29 families on the 0351 §2.3 shape registered with `family_methods`; no `Transaction`/`rollback`/`is_changed`/snapshot publication/`*_with_limits`; `builder::` drafts replace `writer::Mutable*`.
 - Errors: `Refused`, `InvalidLimit`, typed `Limit { kind }` replacing `LimitExceeded { resource }`; `Signed`; litchi-ops classifies by kind.
 - Consumers ported (ops, facade, perf-baseline, unified harnesses); every round-trip, corpus and golden unchanged.
-- ABBA twice: all routes ≤ 1.05 (eager set 0.85), 1k batch 1.52/1.97 × leaf; `p0360b`; gates 0 except the merged XLSX clippy lint.
+- ABBA twice: all routes ≤ 1.05 (eager set 0.85), 1k batch 1.52/1.97 × leaf; `p0360b`; every gate 0.
