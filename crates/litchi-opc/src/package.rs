@@ -812,20 +812,13 @@ impl OpcPackage {
         }
     }
 
-    /// Compare the original content-types members even when either is no
-    /// longer compatible with its typed graph. Unlike publication comparison,
-    /// this distinguishes replacement of the raw member from a structural
-    /// edit that only invalidated its coverage. No XML is parsed or authored.
+    /// Share the original content-types member, even when structural edits
+    /// have made its coverage incompatible with the current graph. This is
+    /// provenance data, not the current publication view or a replacement
+    /// token. No XML is parsed or authored.
     #[must_use]
-    pub fn same_content_types_source(&self, other: &Self) -> bool {
-        match (
-            &self.source_content_types_xml,
-            &other.source_content_types_xml,
-        ) {
-            (None, None) => true,
-            (Some(left), Some(right)) => Arc::ptr_eq(left, right) || left == right,
-            _ => false,
-        }
+    pub fn content_types_source_bytes(&self) -> Option<Arc<Vec<u8>>> {
+        self.source_content_types_xml.clone()
     }
 
     /// Serialize the typed content-type graph under required output limits.
@@ -4003,7 +3996,10 @@ mod tests {
                 crate::TargetMode::External,
             )
             .unwrap();
-        assert!(package.same_content_types_source(&original));
+        assert_eq!(
+            package.content_types_source_bytes(),
+            original.content_types_source_bytes()
+        );
         assert!(package.retained_content_types_xml().unwrap().is_none());
         assert!(package.retained_relationships_xml(&root).unwrap().is_none());
         assert_eq!(
