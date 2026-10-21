@@ -57,14 +57,23 @@ Validation completed on the final source tree:
   source manifest is recorded below; its release and counting binaries must be
   rebuilt before performance acceptance.
 
-The post-policy candidate source manifest is:
+The final source validation on candidate `a5935d50d5` passed 104 ODraw tests
+and all-target/all-feature Clippy with `-D warnings`.  The matched external
+workspace used baseline `61515148e1`, candidate code `33f4981030`, the same
+driver (`probe-main.rs`, SHA-256
+`5025821f9af1986d1caf7fb9c2f631875ca30ab725e33487681f4aeac1ef2efa`), and
+the same lock/profile.  The candidate source manifest is
+`57f627ce87c8a9b32a80a8c3f3f03d998b4f08b463c401585d8654eb239c4c3e`.
 
-`947f989f88587c0d70378930f42683348617c7463ec2deb0f616280ad35fca0c`
-
-The binaries and raw preflight captures are retained outside the checkout
-under `/home/zhuhe/code/litchi-worktrees/.coord/odraw-limits-v2/`; none are
-committed.  Earlier compact-candidate binaries remain historical evidence and
-must not be presented as binaries for this final source.  No native timing or
-profiling result is claimed by this record.  The coordinator must rebuild and
-qualify the final candidate against the matched baseline in a quiet window
-before accepting performance.
+Twelve-route untimed fidelity preflight checksums matched.  The counting
+allocator preflight matched all twelve routes exactly; recursive remained 256
+allocated bytes with 2,113,611 peak live bytes, and scan remained 704 with
+2,110,086 peak live bytes.  The protected release and allocator binaries and
+raw captures are retained outside the checkout under
+`/home/zhuhe/code/litchi-worktrees/.coord/odraw-policy-final-20261021/`; none
+are committed.  Candidate release SHA-256 is
+`b6a3496aaf8298dc2d9413429ad7fb0bdaf008015daa0a26ba3df3230d2e825c`, and
+candidate allocator SHA-256 is
+`6073d882dfc470e085a4bc3bc4ea7ab1965be1c390e0ff76038047f784425903`.
+Native timing is still pending a coordinator quiet window; no performance
+acceptance is claimed before that paired run.
