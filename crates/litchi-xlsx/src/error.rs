@@ -327,6 +327,8 @@ pub enum LimitKind {
     RowVisibility(crate::row_visibility::source::LimitKind),
     /// Workbook revision metadata ([`crate::revisions::LimitKind`]).
     Revisions(crate::revisions::LimitKind),
+    /// Data-type-icon XML and relationship budgets.
+    DataTypeIcons(crate::data_type_icons::LimitKind),
 }
 
 impl LimitKind {
@@ -374,6 +376,7 @@ impl LimitKind {
             Self::CellValues(kind) => kind.as_str(),
             Self::RowVisibility(kind) => kind.as_str(),
             Self::Revisions(kind) => kind.as_str(),
+            Self::DataTypeIcons(kind) => kind.as_str(),
         }
     }
 }

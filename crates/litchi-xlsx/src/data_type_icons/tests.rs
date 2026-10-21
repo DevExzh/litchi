@@ -334,3 +334,76 @@ fn source_transaction_edits_custom_sheet_view_without_rebuilding_other_views() {
         named_before.as_slice()
     );
 }
+
+#[test]
+fn every_icon_traversal_enforces_the_same_element_depth() {
+    for leaf in ["<leaf/>", "<leaf></leaf>"] {
+        for over_limit in [false, true] {
+            let depth = super::MAX_DEPTH + usize::from(over_limit);
+            let nested = |parents: usize| {
+                format!(
+                    "{}{}{}",
+                    "<node>".repeat(parents),
+                    leaf,
+                    "</node>".repeat(parents)
+                )
+            };
+            let extension = format!("<ext>{}</ext>", nested(depth - 2));
+            let worksheet = format!(
+                r#"<worksheet xmlns="{SML}"><sheetViews><sheetView workbookViewId="0"><extLst><ext uri="urn:test">{}</ext></extLst></sheetView></sheetViews></worksheet>"#,
+                nested(depth - 6)
+            );
+            let results = [
+                codec::inspect_extension(extension.as_bytes(), Target::Worksheet).map(|_| ()),
+                codec::rewrite_extension(extension.as_bytes(), Target::Worksheet, None).map(
+                    |output| {
+                        assert_eq!(output, extension.as_bytes());
+                    },
+                ),
+                codec::rewrite(worksheet.as_bytes(), OwnerKind::WorksheetView, 0, None).map(
+                    |output| {
+                        assert_eq!(output, worksheet.as_bytes());
+                    },
+                ),
+            ];
+            for result in results {
+                if over_limit {
+                    let error = result.expect_err("depth budget must refuse both XML spellings");
+                    assert!(
+                        matches!(error, crate::Error::Limit {
+                        kind: crate::LimitKind::DataTypeIcons(super::LimitKind::XmlDepth),
+                        observed,
+                        maximum,
+                    } if observed == depth as u64 && maximum == super::MAX_DEPTH as u64),
+                        "{error:?}"
+                    );
+                } else {
+                    result.expect("the exact depth boundary remains readable and writable");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn icon_extension_byte_limit_is_distinct_from_empty_input() {
+    let oversized = vec![b' '; super::MAX_EXTENSION_BYTES + 1];
+    for result in [
+        codec::inspect_extension(&oversized, Target::Worksheet).map(|_| ()),
+        codec::rewrite_extension(&oversized, Target::Worksheet, None).map(|_| ()),
+    ] {
+        assert!(matches!(result, Err(crate::Error::Limit {
+            kind: crate::LimitKind::DataTypeIcons(super::LimitKind::ExtensionBytes),
+            observed,
+            maximum,
+        }) if observed == oversized.len() as u64 && maximum == super::MAX_EXTENSION_BYTES as u64));
+    }
+    assert!(matches!(
+        codec::inspect_extension(b"", Target::Worksheet),
+        Err(crate::Error::Invalid(_))
+    ));
+    assert!(matches!(
+        codec::rewrite_extension(b"", Target::Worksheet, None),
+        Err(crate::Error::Invalid(_))
+    ));
+}

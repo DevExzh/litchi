@@ -36,8 +36,10 @@ impl Snapshot {
             return Err(invalid(format!("part '{}' is not a worksheet", worksheet)));
         }
         if part.blob().len() > MAX_PART_BYTES {
-            return Err(invalid(
-                "worksheet data-type-icon source part exceeds its byte limit",
+            return Err(Error::limit(
+                LimitKind::PartBytes,
+                part.blob().len(),
+                MAX_PART_BYTES,
             ));
         }
         let views = parse_worksheet_views(part.blob())?;
@@ -221,8 +223,10 @@ fn capture_incoming(package: &OpcPackage, target: &PackURI) -> Result<Vec<Relati
 
 fn push_incoming(values: &mut Vec<RelationshipState>, value: RelationshipState) -> Result<()> {
     if values.len() >= MAX_INCOMING_RELATIONSHIPS {
-        return Err(invalid(
-            "data-type-icon incoming relationship count exceeds limit",
+        return Err(Error::limit(
+            LimitKind::IncomingRelationships,
+            values.len().saturating_add(1),
+            MAX_INCOMING_RELATIONSHIPS,
         ));
     }
     values.try_reserve(1).map_err(|source| Error::Allocation {
@@ -268,7 +272,18 @@ fn named_part<'a>(package: &'a OpcPackage, worksheet: &PackURI) -> Result<Option
 
 crate::record::record_family!("data-type-icon");
 
-crate::record::no_limits!("data-type-icon");
+crate::record::limit_kinds!("data-type-icon", DataTypeIcons {
+    /// Bytes in an extension element.
+    ExtensionBytes => "data-type-icon extension bytes",
+    /// Bytes in one source or output XML part.
+    PartBytes => "data-type-icon part bytes",
+    /// XML events in one bounded traversal.
+    XmlNodes => "data-type-icon XML nodes",
+    /// Nested XML elements.
+    XmlDepth => "data-type-icon XML depth",
+    /// Relationships that target an owned part.
+    IncomingRelationships => "data-type-icon incoming relationships",
+});
 
 /// A staged, failure-atomic edit of one worksheet's source-bound
 /// data-type-icon metadata of one [`crate::Package`]. Dropping it discards
@@ -425,8 +440,10 @@ fn rewrite_worksheet(before: &Snapshot, values: &[Option<ShowDataTypeIcons>]) ->
         }
         output = codec::rewrite(&output, OwnerKind::WorksheetView, index, value)?;
         if output.len() > MAX_PART_BYTES {
-            return Err(invalid(
-                "worksheet data-type-icon output exceeds part limit",
+            return Err(Error::limit(
+                LimitKind::PartBytes,
+                output.len(),
+                MAX_PART_BYTES,
             ));
         }
     }
@@ -445,8 +462,10 @@ fn rewrite_named(
         }
         output = codec::rewrite(&output, OwnerKind::CustomSheetView, index, value)?;
         if output.len() > MAX_PART_BYTES {
-            return Err(invalid(
-                "Named Sheet Views data-type-icon output exceeds part limit",
+            return Err(Error::limit(
+                LimitKind::PartBytes,
+                output.len(),
+                MAX_PART_BYTES,
             ));
         }
     }

@@ -83,14 +83,29 @@ The additional exact-forwarder audit remains part of the final naming review;
 constructors using `Default` and public entry points calling private helpers
 are not duplicate public operations.
 
+## Data-type-icon resource failures and depth enforcement
+
+The family now exposes typed `LimitKind` dimensions for extension/part bytes,
+XML events/depth and incoming relationships, carried by the crate's `Error::Limit`
+with observed and maximum counts. Allocation failures preserve their source
+through `Error::Allocation`. Empty extension input remains malformed input.
+
+The extension reader, extension rewriter and part rewriter now all enforce
+the declared depth ceiling for start and empty elements. Tests cover both XML
+spellings exactly at the ceiling and one level beyond, preserving byte-exact
+no-op output for accepted input. All 11 family tests pass, together with the
+sheet-view tests, XLSX/ops all-target clippy, rustdoc and both XLSX glossary
+profiles; commands and log digests are in the
+[verification receipt](results/0360/data-type-icon-limits.json).
+
 ## Required work before acceptance
 
 - Finish typed limits for every remaining family whose empty `LimitKind`
   still conceals an `Invalid` resource failure, including Data Model,
-  external links, OLE objects, connections, data-type icons and rich-value
-  refresh intervals. Check shared error kinds are preserved at each host.
-- Remove remaining convenience aliases in changed XLSX/shared OOXML APIs,
-  migrate their consumers, and check option accessors and retained limits.
+  external links, OLE objects, connections and rich-value refresh intervals. Check shared error kinds are preserved at each host.
+- Remove remaining convenience and compatibility aliases in changed XLSX/shared
+  OOXML APIs and migrate their consumers. Complete the raw/record required-limit
+  argument audit and the OpenOptions/EditOptions retention and accessor audit.
 - Complete the fresh public inventory and all glossary profiles; inspect
   every remaining row and preserve all capabilities.
 - Complete crate/consumer tests, feature checks, clippy, rustdoc, harness,
