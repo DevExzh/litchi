@@ -252,9 +252,11 @@ impl Edit {
         for edit in edits {
             self.before.check_execution()?;
             if self.staged.len() + pending.len() >= MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
+                return Err(Error::limit(
+                    LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             let address = edit.address();
             if self
@@ -364,9 +366,11 @@ impl Edit {
         self.before.check_execution()?;
         let expected_actions = effective_action_count(&self.before, &self.staged)?;
         if expected_actions > MAX_BATCH_EDITS {
-            return Err(invalid(format!(
-                "value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
-            )));
+            return Err(Error::limit(
+                LimitKind::BatchEdits,
+                expected_actions,
+                MAX_BATCH_EDITS,
+            ));
         }
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {

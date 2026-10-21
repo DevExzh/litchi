@@ -112,9 +112,11 @@ pub(super) fn checked_multi_bytes(total: usize, next: usize, maximum: usize) -> 
         .checked_add(next)
         .ok_or_else(|| invalid("multi-sheet worksheet XML size overflows usize"))?;
     if updated > maximum {
-        return Err(invalid(format!(
-            "multi-sheet worksheet XML exceeds {maximum} bytes"
-        )));
+        return Err(Error::limit(
+            super::LimitKind::WorksheetBytes,
+            updated,
+            maximum,
+        ));
     }
     Ok(updated)
 }
@@ -956,9 +958,11 @@ impl Snapshot {
             .checked_mul(columns)
             .ok_or_else(|| invalid("shared formula range area overflows usize"))?;
         if area > maximum_members {
-            return Err(invalid(format!(
-                "shared formula group exceeds the bounded {maximum_members}-cell edit limit"
-            )));
+            return Err(Error::limit(
+                super::LimitKind::SharedFormulaMembers,
+                area,
+                maximum_members,
+            ));
         }
 
         let mut members = Vec::new();

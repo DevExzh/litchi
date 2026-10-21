@@ -1391,7 +1391,24 @@ pub(crate) fn view_workbook<'selector>(
 
 crate::record::record_family!("PivotTable server-format");
 
-crate::record::no_limits!("PivotTable server-format");
+crate::record::limit_kinds!("PivotTable server-format", PivotServerFormats {
+    /// Bytes of one attribute value.
+    AttributeBytes => "bytes of one PivotTable attribute",
+    /// Bytes of one element name.
+    NameBytes => "bytes of one PivotTable element name",
+    /// Bytes of one namespace URI.
+    NamespaceBytes => "bytes of one PivotTable namespace URI",
+    /// Bytes of one PivotTable part read.
+    PartBytes => "bytes of one PivotTable part",
+    /// Bytes of one PivotTable part written.
+    OutputBytes => "bytes of one written PivotTable part",
+    /// XML events of one PivotTable part.
+    Events => "XML events of one PivotTable part",
+    /// XML nodes of one PivotTable part.
+    Nodes => "XML nodes of one PivotTable part",
+    /// Bytes of the retained workbook root context.
+    FragmentBytes => "bytes of the retained PivotTable owner context",
+});
 
 fn package_commit(workbook: Workbook, patch: Patch, changed: bool) -> Commit {
     Commit::new(
@@ -1898,8 +1915,13 @@ fn validate_text(value: &Option<String>, maximum_text_bytes: usize) -> Result<()
 }
 
 fn validate_text_value(value: &str, maximum_text_bytes: usize) -> Result<()> {
-    if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > maximum_text_bytes {
-        return Err(invalid("server-format attribute exceeds its text limit"));
+    let maximum = MAX_ATTRIBUTE_TEXT_BYTES.min(maximum_text_bytes);
+    if value.len() > maximum {
+        return Err(Error::limit(
+            LimitKind::AttributeBytes,
+            value.len(),
+            maximum,
+        ));
     }
     Ok(())
 }
@@ -2040,8 +2062,9 @@ fn rewrite_scalar_table(
             "rewritten pivotTableServerFormats owner fragment exceeds limit",
         ));
     }
-    if output_len > MAX_PART_BYTES || output_len > maximum_output_bytes {
-        return Err(invalid("PivotTable output exceeds the caller's Part limit"));
+    let maximum = MAX_PART_BYTES.min(maximum_output_bytes);
+    if output_len > maximum {
+        return Err(Error::limit(LimitKind::OutputBytes, output_len, maximum));
     }
     let output_len_u64 = u64::try_from(output_len).unwrap_or(u64::MAX);
     let source_len = u64::try_from(source.len()).unwrap_or(u64::MAX);
@@ -2942,7 +2965,11 @@ fn apply_planned_attribute_delta(
             .checked_add(encoded_len)
             .ok_or_else(|| invalid("server-format attribute length overflows"))?;
         if attribute_bytes > maximum_attribute_bytes {
-            return Err(invalid("server-format attribute exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                attribute_bytes,
+                maximum_attribute_bytes,
+            ));
         }
     }
     *output_len = output_len
@@ -3635,7 +3662,11 @@ fn parse_workbook_references(
         .get(root.start.clone())
         .ok_or_else(|| invalid("workbook root context range is invalid"))?;
     if root_context.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("workbook root context exceeds limit"));
+        return Err(Error::limit(
+            LimitKind::FragmentBytes,
+            root_context.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut context_copy = Vec::new();
     context_copy
@@ -4960,8 +4991,12 @@ fn source_element_qname(
         .iter()
         .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
         .ok_or_else(|| invalid("serverFormat start tag has no QName"))?;
-    if name_len == 0 || name_len > MAX_NAME_BYTES || name_len > maximum_name_bytes {
-        return Err(invalid("serverFormat QName exceeds its source limit"));
+    if name_len == 0 {
+        return Err(invalid("serverFormat start tag has an empty QName"));
+    }
+    let maximum = MAX_NAME_BYTES.min(maximum_name_bytes);
+    if name_len > maximum {
+        return Err(Error::limit(LimitKind::NameBytes, name_len, maximum));
     }
     let mut qname = Vec::new();
     qname
@@ -5136,7 +5171,11 @@ struct NamespaceInterner {
 impl NamespaceInterner {
     fn intern(&mut self, value: &[u8], limits: XmlScanLimits) -> Result<NamespaceRef> {
         if value.len() > limits.namespace_bytes {
-            return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+            return Err(Error::limit(
+                LimitKind::NamespaceBytes,
+                value.len(),
+                limits.namespace_bytes,
+            ));
         }
         validate_xml_characters(value)?;
         if let Some(existing) = self.values.get(value) {
@@ -5233,8 +5272,15 @@ fn scan_xml_config(
     parse_mce_branches: bool,
 ) -> Result<XmlScan> {
     let limits = XmlScanLimits::from_read_limits(read_limits);
-    if bytes.is_empty() || bytes.len() > limits.part_bytes {
-        return Err(invalid("PivotTable XML exceeds its Part limit"));
+    if bytes.is_empty() {
+        return Err(invalid("PivotTable XML part is empty"));
+    }
+    if bytes.len() > limits.part_bytes {
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            bytes.len(),
+            limits.part_bytes,
+        ));
     }
     validate_xml_characters(bytes)?;
     // Use the plain reader here instead of `NsReader`.  `NsReader` resolves
@@ -5271,7 +5317,7 @@ fn scan_xml_config(
             .checked_add(1)
             .ok_or_else(|| invalid("PivotTable XML event count overflows"))?;
         if events > limits.events {
-            return Err(invalid("PivotTable XML event count exceeds caller limit"));
+            return Err(Error::limit(LimitKind::Events, events, limits.events));
         }
         let before = origin
             .offset(reader.buffer_position())
@@ -5287,7 +5333,7 @@ fn scan_xml_config(
                 .checked_add(1)
                 .ok_or_else(|| invalid("PivotTable XML node count overflow"))?;
             if nodes > MAX_NODES {
-                return Err(invalid("PivotTable XML node count exceeds limit"));
+                return Err(Error::limit(LimitKind::Nodes, nodes, MAX_NODES));
             }
         }
         let is_start = matches!(&event, Event::Start(_));
@@ -6032,13 +6078,21 @@ fn parse_ignorable_namespaces(
             continue;
         }
         if attribute.value.len() > limits.attribute_bytes {
-            return Err(invalid("mc:Ignorable exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                attribute.value.len(),
+                limits.attribute_bytes,
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| invalid(error.to_string()))?;
         if value.len() > limits.attribute_bytes {
-            return Err(invalid("mc:Ignorable exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                value.len(),
+                limits.attribute_bytes,
+            ));
         }
         for prefix in value.split([' ', '\t', '\r', '\n']) {
             if prefix.is_empty() {
@@ -6144,7 +6198,11 @@ fn resolved_name(
     }
     let (resolved, local_name) = resolver.resolve_element(name)?;
     if local_name.as_ref().len() > limits.name_bytes {
-        return Err(invalid("PivotTable XML local name exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NameBytes,
+            local_name.as_ref().len(),
+            limits.name_bytes,
+        ));
     }
     let ns = match resolved {
         NamespaceResolution::Bound(value) => value,
@@ -6218,7 +6276,11 @@ fn parse_attrs(
                 ));
             }
             if attribute.value.len() > limits.namespace_bytes {
-                return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+                return Err(Error::limit(
+                    LimitKind::NamespaceBytes,
+                    attribute.value.len(),
+                    limits.namespace_bytes,
+                ));
             }
             continue;
         }
@@ -6276,8 +6338,13 @@ fn parse_attrs(
             .map_err(|error| invalid(error.to_string()))?
             .into_owned();
         validate_xml_characters(value.as_bytes())?;
-        if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > limits.attribute_bytes {
-            return Err(invalid("PivotTable attribute exceeds its text limit"));
+        let maximum = MAX_ATTRIBUTE_TEXT_BYTES.min(limits.attribute_bytes);
+        if value.len() > maximum {
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                value.len(),
+                maximum,
+            ));
         }
         let value_range = value_span(bytes, attribute.value.as_ref())?;
         let key_start = ptr_offset(bytes, attribute.key.0.as_ptr())?;
@@ -6310,7 +6377,11 @@ fn parse_attrs(
 
 fn decode_namespace_uri(value: &[u8], limits: XmlScanLimits) -> Result<Vec<u8>> {
     if value.len() > limits.namespace_bytes {
-        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NamespaceBytes,
+            value.len(),
+            limits.namespace_bytes,
+        ));
     }
     let value = std::str::from_utf8(value).map_err(|error| {
         invalid(format!(
@@ -6321,7 +6392,11 @@ fn decode_namespace_uri(value: &[u8], limits: XmlScanLimits) -> Result<Vec<u8>> 
         .map_err(|error| invalid(format!("PivotTable XML namespace URI is invalid: {error}")))?;
     validate_xml_characters(decoded.as_bytes())?;
     if decoded.len() > limits.namespace_bytes {
-        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NamespaceBytes,
+            decoded.len(),
+            limits.namespace_bytes,
+        ));
     }
     let mut result = Vec::new();
     result

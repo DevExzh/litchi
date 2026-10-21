@@ -243,18 +243,22 @@ impl SourceBackedWorkbook {
         for request in requests {
             self.edit_package()?.check_execution()?;
             if pending.len() >= MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
+                return Err(Error::limit(
+                    super::LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             if !selectors
                 .iter()
                 .any(|selector| selector == &request.selector)
             {
                 if selectors.len() >= MAX_SHEET_OWNERS {
-                    return Err(invalid(format!(
-                        "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
-                    )));
+                    return Err(Error::limit(
+                        super::LimitKind::SheetOwners,
+                        MAX_SHEET_OWNERS + 1,
+                        MAX_SHEET_OWNERS,
+                    ));
                 }
                 selectors.push(request.selector.clone());
             }
@@ -443,9 +447,11 @@ impl Edit {
         for request in edits {
             self.before.check_execution()?;
             if pending.len() >= remaining {
-                return Err(invalid(format!(
-                    "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
+                return Err(Error::limit(
+                    super::LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             let position = resolve_snapshot_selector(&self.before, &request.selector)?;
             let snapshot = self
@@ -614,9 +620,11 @@ impl Edit {
                     .checked_add(effective_action_count(snapshot, staged)?)
                     .ok_or_else(|| invalid("expanded value-only action count overflows usize"))?;
                 if expected_actions > MAX_BATCH_EDITS {
-                    return Err(invalid(format!(
-                        "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
-                    )));
+                    return Err(Error::limit(
+                        super::LimitKind::BatchEdits,
+                        expected_actions,
+                        MAX_BATCH_EDITS,
+                    ));
                 }
             }
         }

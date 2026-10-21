@@ -75,19 +75,18 @@ crate::workbook::source::deferred::source_family!(
     own_diagnostics
 );
 
-/// The configured budgets of the source-backed cell-value families. They have
-/// none of their own: the workbook's source limits and the fixed batch bounds
-/// ([`MAX_BATCH_EDITS`], [`MAX_SHEET_OWNERS`], [`MAX_MULTI_WORKSHEET_BYTES`])
-/// bound every edit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {}
-
-impl std::fmt::Display for LimitKind {
-    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
-    }
-}
+crate::record::limit_kinds!("source-backed cell-value", CellValues {
+    /// Unique cells or expanded cell actions of one batch
+    /// ([`MAX_BATCH_EDITS`]).
+    BatchEdits => "cells of one value-only batch",
+    /// Worksheets one multi-sheet edit selects ([`MAX_SHEET_OWNERS`]).
+    SheetOwners => "worksheets of one multi-sheet value edit",
+    /// Worksheet XML bytes one multi-sheet edit retains
+    /// ([`MAX_MULTI_WORKSHEET_BYTES`]).
+    WorksheetBytes => "worksheet XML bytes of one multi-sheet value edit",
+    /// Members of one shared-formula group an edit expands.
+    SharedFormulaMembers => "members of one shared-formula group",
+});
 
 impl Patch {
     /// The exact source state of every selected worksheet.

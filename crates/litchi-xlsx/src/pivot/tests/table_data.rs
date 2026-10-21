@@ -821,10 +821,9 @@ fn assert_data_error(options: FixtureOptions) {
 
 fn assert_resource_limit(error: &Error, expected_scope: &str) {
     match error {
-        Error::ResourceLimit(limit) => assert!(
-            limit.scope.contains(expected_scope),
-            "resource limit scope {:?} did not contain {expected_scope:?}",
-            limit.scope
+        Error::Limit { kind, .. } => assert!(
+            kind.as_str().contains(expected_scope),
+            "limit {kind:?} did not name {expected_scope:?}"
         ),
         other => panic!("expected a typed resource refusal, got {other:?}"),
     }
@@ -834,7 +833,7 @@ fn retained_limit_admits(package: &OpcPackage, maximum: usize) -> bool {
     let limits = Limits::new().with_max_retained_bytes(maximum);
     match load_pivot_table_data_with_limits(package, "Pivot", &limits) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("retained-limit search hit an unrelated error: {error:?}"),
     }
 }
@@ -866,7 +865,7 @@ fn transaction_limit_admits(fixture: &Fixture, maximum: usize) -> bool {
         crate::pivot::table_data::EditOptions::default().limits(limits),
     ) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("transaction-limit search hit an unrelated error: {error:?}"),
     }
 }
@@ -883,12 +882,12 @@ fn setter_limit_admits(fixture: &Fixture, replacement: &str, maximum: usize) -> 
         crate::pivot::table_data::EditOptions::default().limits(limits),
     ) {
         Ok(edit) => edit,
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("setter-limit search hit an unrelated error: {error:?}"),
     };
     match edit.set_text((0, 0), replacement) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("setter-limit search hit an unrelated error: {error:?}"),
     }
 }
@@ -917,12 +916,12 @@ fn owned_setter_limit_admits(
         crate::pivot::table_data::EditOptions::default().limits(limits),
     ) {
         Ok(edit) => edit,
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("owned setter-limit search hit an unrelated error: {error:?}"),
     };
     match edit.set_value((0, 0), owned_text_with_capacity(length, capacity)) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("owned setter-limit search hit an unrelated error: {error:?}"),
     }
 }
@@ -944,27 +943,27 @@ fn repeated_replacement_limit_admits(
         crate::pivot::table_data::EditOptions::default().limits(limits),
     ) {
         Ok(edit) => edit,
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("repeated-limit search hit an unrelated error: {error:?}"),
     };
     match edit.set_text((0, 0), first) {
         Ok(_) => {},
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("repeated-limit first replacement failed: {error:?}"),
     }
     match edit.set_text((0, 0), "short") {
         Ok(_) => {},
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("repeated-limit shrink replacement failed: {error:?}"),
     }
     match edit.set_text((0, 0), second) {
         Ok(_) => {},
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("repeated-limit second replacement failed: {error:?}"),
     }
     match edit.commit() {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("repeated-limit publication failed: {error:?}"),
     }
 }
@@ -980,7 +979,7 @@ fn low_level_transaction_limit_admits(fixture: &Fixture, maximum: usize) -> bool
     let limits = Limits::new().with_max_retained_bytes(maximum);
     match edit_pivot_table_data_with_limits(&mut package, "Pivot", &limits) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => {
             panic!("low-level transaction-limit search hit an unrelated error: {error:?}")
         },
@@ -996,12 +995,12 @@ fn low_level_setter_limit_admits(fixture: &Fixture, replacement: &str, maximum: 
     let limits = Limits::new().with_max_retained_bytes(maximum);
     let mut edit = match edit_pivot_table_data_with_limits(&mut package, "Pivot", &limits) {
         Ok(edit) => edit,
-        Err(Error::ResourceLimit(_)) => return false,
+        Err(Error::Limit { .. }) => return false,
         Err(error) => panic!("low-level setter-limit search hit an unrelated error: {error:?}"),
     };
     match edit.set_text((0, 0), replacement) {
         Ok(_) => true,
-        Err(Error::ResourceLimit(_)) => false,
+        Err(Error::Limit { .. }) => false,
         Err(error) => panic!("low-level setter-limit search hit an unrelated error: {error:?}"),
     }
 }
@@ -2504,7 +2503,7 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
         Err(error) => error,
         Ok(_) => panic!("exact retained limit unexpectedly admitted staged transaction"),
     };
-    assert_resource_limit(&transaction_error, "Workbook pivotTableData staged state");
+    assert_resource_limit(&transaction_error, "pivotTableData retained bytes");
     assert_eq!(workbook.to_bytes().unwrap(), before);
 }
 

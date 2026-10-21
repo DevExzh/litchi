@@ -1414,8 +1414,13 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
     let over = format!("A{}", MAX_BATCH_EDITS + 1);
     assert!(matches!(
         edit.insert(address(&over), Number::new("0").unwrap()),
-        Err(Error::Invalid(message))
-            if message == format!("value-only batch exceeds {MAX_BATCH_EDITS} unique cells")
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::CellValues(
+                litchi_xlsx::cell_values::LimitKind::BatchEdits
+            ),
+            maximum,
+            ..
+        }) if maximum == MAX_BATCH_EDITS as u64
     ));
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
 }

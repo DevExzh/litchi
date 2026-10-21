@@ -25,18 +25,10 @@ crate::workbook::source::deferred::source_family!(
     own_diagnostics
 );
 
-/// The configured budgets of the source-backed row-visibility family. It has
-/// none of its own: the workbook's source limits and [`MAX_BATCH_EDITS`]
-/// bound every edit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {}
-
-impl std::fmt::Display for LimitKind {
-    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
-    }
-}
+crate::record::limit_kinds!("source-backed row-visibility", RowVisibility {
+    /// Unique rows of one batch ([`MAX_BATCH_EDITS`]).
+    BatchEdits => "rows of one row-visibility batch",
+});
 
 /// What a committed row-visibility change changed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -245,9 +237,11 @@ impl Edit {
         for edit in edits {
             self.before.check_execution()?;
             if self.staged.len() + pending.len() == MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "row-visibility batch exceeds {MAX_BATCH_EDITS} unique rows"
-                )));
+                return Err(Error::limit(
+                    LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             if self
                 .staged

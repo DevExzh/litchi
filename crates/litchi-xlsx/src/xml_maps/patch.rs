@@ -80,7 +80,14 @@ impl Patch {
 
 crate::record::record_family!("Custom XML Maps");
 
-crate::record::no_limits!("Custom XML Maps");
+crate::record::limit_kinds!("Custom XML Maps", XmlMaps {
+    /// Bytes of the Custom XML Maps part.
+    PartBytes => "bytes of the Custom XML Maps part",
+    /// Schemas of the Custom XML Maps part.
+    Schemas => "schemas of the Custom XML Maps part",
+    /// Maps of the Custom XML Maps part.
+    Maps => "maps of the Custom XML Maps part",
+});
 
 impl crate::record::Record for Patch {
     fn is_noop(&self) -> bool {

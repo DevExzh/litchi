@@ -62,7 +62,11 @@ pub(super) fn store_xml_in_package(
     conformance: XmlMapConformance,
 ) -> Result<()> {
     if xml.len() > MAX_PART_BYTES {
-        return Err(invalid("custom XML maps part exceeds 32 MiB"));
+        return Err(crate::Error::limit(
+            super::LimitKind::PartBytes,
+            xml.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let workbook_uri = main_workbook_uri(package)?;
     let existing = xml_maps_relationship(package, &workbook_uri)?;

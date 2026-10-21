@@ -218,10 +218,18 @@ impl XmlMapInfo {
 
         let limits = XmlMapLimits::DEFAULT;
         if self.schemas.len() > limits.max_schemas {
-            return Err(invalid("custom XML maps schema limit exceeded"));
+            return Err(crate::Error::limit(
+                super::LimitKind::Schemas,
+                self.schemas.len(),
+                limits.max_schemas,
+            ));
         }
         if self.maps.len() > limits.max_maps {
-            return Err(invalid("custom XML maps map limit exceeded"));
+            return Err(crate::Error::limit(
+                super::LimitKind::Maps,
+                self.maps.len(),
+                limits.max_maps,
+            ));
         }
         let mut schemas = Vec::new();
         schemas

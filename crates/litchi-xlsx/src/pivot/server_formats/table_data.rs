@@ -13,7 +13,6 @@ use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
 
-use litchi_core::{Resource, ResourceLimit};
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 use super::cached_unique_names::PivotCacheId;
@@ -198,54 +197,43 @@ impl RetainedBudget {
             .checked_add(amount)
             .ok_or_else(|| invalid(format!("{resource} retained bytes overflow")))?;
         if observed > self.maximum {
-            return Err(Error::ResourceLimit(ResourceLimit {
-                resource: Resource::Memory,
-                observed: u64::try_from(observed).unwrap_or(u64::MAX),
-                limit: u64::try_from(self.maximum).unwrap_or(u64::MAX),
-                scope: Arc::from(resource),
-            }));
+            return Err(Error::limit(
+                LimitKind::RetainedBytes,
+                observed,
+                self.maximum,
+            ));
         }
         self.retained = observed;
         Ok(())
     }
 
-    fn charge_count(
-        &mut self,
-        observed: usize,
-        maximum: usize,
-        resource: &'static str,
-    ) -> Result<()> {
+    fn charge_count(&mut self, observed: usize, maximum: usize, kind: LimitKind) -> Result<()> {
         if observed > maximum {
-            return Err(Error::ResourceLimit(ResourceLimit {
-                resource: Resource::Objects,
-                observed: u64::try_from(observed).unwrap_or(u64::MAX),
-                limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                scope: Arc::from(resource),
-            }));
+            return Err(Error::limit(kind, observed, maximum));
         }
         Ok(())
     }
 
     fn check_row_count(&self, value: u32) -> Result<()> {
-        if usize::try_from(value).unwrap_or(usize::MAX) > self.max_row_count {
-            return Err(Error::ResourceLimit(ResourceLimit {
-                resource: Resource::Objects,
-                observed: u64::from(value),
-                limit: u64::try_from(self.max_row_count).unwrap_or(u64::MAX),
-                scope: Arc::from("pivotTableData rowCount"),
-            }));
+        let observed = usize::try_from(value).unwrap_or(usize::MAX);
+        if observed > self.max_row_count {
+            return Err(Error::limit(
+                LimitKind::RowCount,
+                observed,
+                self.max_row_count,
+            ));
         }
         Ok(())
     }
 
     fn check_column_count(&self, value: u32) -> Result<()> {
-        if usize::try_from(value).unwrap_or(usize::MAX) > self.max_column_count {
-            return Err(Error::ResourceLimit(ResourceLimit {
-                resource: Resource::Objects,
-                observed: u64::from(value),
-                limit: u64::try_from(self.max_column_count).unwrap_or(u64::MAX),
-                scope: Arc::from("pivotTableData columnCount"),
-            }));
+        let observed = usize::try_from(value).unwrap_or(usize::MAX);
+        if observed > self.max_column_count {
+            return Err(Error::limit(
+                LimitKind::ColumnCount,
+                observed,
+                self.max_column_count,
+            ));
         }
         Ok(())
     }
@@ -297,11 +285,7 @@ fn admit_staged_text(
         .and_then(|bytes| bytes.checked_add(staged_text_bytes_after))
         .and_then(|bytes| bytes.checked_add(transient_bytes))
         .ok_or_else(|| invalid("pivotTableData staged retained bytes overflow"))?;
-    enforce_retained_limit(
-        observed,
-        before.limits.max_retained_bytes,
-        "pivotTableData staged scalar text",
-    )
+    enforce_retained_limit(observed, before.limits.max_retained_bytes)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -333,14 +317,9 @@ fn build_cell_positions(before: &Snapshot) -> Result<HashMap<PivotCellAddress, C
     Ok(positions)
 }
 
-fn enforce_retained_limit(observed: usize, maximum: usize, scope: &'static str) -> Result<()> {
+fn enforce_retained_limit(observed: usize, maximum: usize) -> Result<()> {
     if observed > maximum {
-        return Err(Error::ResourceLimit(ResourceLimit {
-            resource: Resource::Memory,
-            observed: u64::try_from(observed).unwrap_or(u64::MAX),
-            limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-            scope: Arc::from(scope),
-        }));
+        return Err(Error::limit(LimitKind::RetainedBytes, observed, maximum));
     }
     Ok(())
 }
@@ -1109,7 +1088,7 @@ fn parse_data_payload(
     retained.charge_count(
         row_count_actual,
         retained.max_authored_rows,
-        "pivotTableData authored rows",
+        LimitKind::AuthoredRows,
     )?;
     let mut authored_cells = 0usize;
     for row in direct_children(scan, payload) {
@@ -1121,7 +1100,7 @@ fn parse_data_payload(
     retained.charge_count(
         authored_cells,
         retained.max_authored_cells,
-        "pivotTableData authored cells",
+        LimitKind::AuthoredCells,
     )?;
     let structural_bytes = structural_retained_bytes(row_count_actual, authored_cells)?;
     retained.charge(structural_bytes, "pivotTableData authored indexes")?;
@@ -1509,8 +1488,13 @@ fn parse_extra(element: &XmlElement, limits: SourceLimits) -> Result<ExtraState>
         (BOLD_ATTRIBUTE, &mut result.bold),
     ] {
         if let Some(attribute) = unique_attribute(element, name)? {
-            if attribute.value.len() > caller_attribute_limit(limits) {
-                return Err(invalid("pivot value cell extra boolean exceeds its limit"));
+            let maximum = caller_attribute_limit(limits);
+            if attribute.value.len() > maximum {
+                return Err(Error::limit(
+                    LimitKind::AttributeBytes,
+                    attribute.value.len(),
+                    maximum,
+                ));
             }
             *slot = Some(parse_bool(
                 &attribute.value,
@@ -1603,7 +1587,11 @@ fn validate_cell_value(kind: PivotCellType, value: &str) -> Result<()> {
                 .count()
                 > MAX_UTF16_TEXT =>
         {
-            Err(invalid("pivot string cell exceeds its UTF-16 text limit"))
+            Err(Error::limit(
+                LimitKind::TextUnits,
+                MAX_UTF16_TEXT.saturating_add(1),
+                MAX_UTF16_TEXT,
+            ))
         },
         PivotCellType::Blank if !value.is_empty() => {
             Err(invalid("pivot blank cell must have an empty v value"))
@@ -1630,8 +1618,10 @@ fn preflight_xstring_utf16(
     let content = source
         .get(element.start.end..element.end)
         .ok_or_else(|| invalid("pivot value element content range is invalid"))?;
-    if text_body_len(content)? > caller_attribute_limit(limits) {
-        return Err(invalid("pivot value cell text exceeds its caller limit"));
+    let body_len = text_body_len(content)?;
+    let maximum = caller_attribute_limit(limits);
+    if body_len > maximum {
+        return Err(Error::limit(LimitKind::TextBytes, body_len, maximum));
     }
     let mut counter = XStringCounter::default();
     let mut cursor = 0usize;
@@ -1878,7 +1868,11 @@ impl XStringCounter {
             .checked_add(character.encode_utf16(&mut [0; 2]).len())
             .ok_or_else(|| invalid("pivot string UTF-16 length overflows"))?;
         if self.units > MAX_UTF16_TEXT {
-            return Err(invalid("pivot string cell exceeds its UTF-16 text limit"));
+            return Err(Error::limit(
+                LimitKind::TextUnits,
+                self.units,
+                MAX_UTF16_TEXT,
+            ));
         }
         Ok(())
     }
@@ -1908,7 +1902,11 @@ impl XStringCounter {
                 .ok_or_else(|| invalid("pivot string UTF-16 length overflows"))?;
         }
         if self.units > MAX_UTF16_TEXT {
-            return Err(invalid("pivot string cell exceeds its UTF-16 text limit"));
+            return Err(Error::limit(
+                LimitKind::TextUnits,
+                self.units,
+                MAX_UTF16_TEXT,
+            ));
         }
         Ok(())
     }
@@ -1940,7 +1938,7 @@ fn decode_element_text(
     let maximum = caller_attribute_limit(limits);
     let body_len = text_body_len(content)?;
     if body_len > maximum {
-        return Err(invalid("pivot value cell text exceeds its caller limit"));
+        return Err(Error::limit(LimitKind::TextBytes, body_len, maximum));
     }
     let mut text = Vec::new();
     text.try_reserve_exact(body_len)
@@ -2065,8 +2063,11 @@ fn source_element_qname_len(source: &[u8], start: &Range<usize>, maximum: usize)
         .iter()
         .position(|byte| is_xml_space(*byte) || matches!(byte, b'/' | b'>'))
         .ok_or_else(|| invalid("pivot element start tag has no QName"))?;
-    if end == 0 || end > maximum {
-        return Err(invalid("pivot element QName exceeds its limit"));
+    if end == 0 {
+        return Err(invalid("pivot element start tag has an empty QName"));
+    }
+    if end > maximum {
+        return Err(Error::limit(LimitKind::NameBytes, end, maximum));
     }
     Ok(end)
 }
@@ -2126,11 +2127,7 @@ impl<'a> Transaction<'a> {
             .retained_bytes
             .checked_add(staging_bytes)
             .ok_or_else(|| invalid("pivotTableData staged bytes overflow"))?;
-        enforce_retained_limit(
-            retained_with_staging,
-            limits.max_retained_bytes,
-            "pivotTableData staged state",
-        )?;
+        enforce_retained_limit(retained_with_staging, limits.max_retained_bytes)?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(before.cells.len())
@@ -2313,16 +2310,16 @@ fn states_equal(snapshot: &Snapshot, staged: &[CellState]) -> bool {
 }
 
 fn validate_edited_text(value: &str, limits: SourceLimits) -> Result<()> {
-    if value.len() > caller_attribute_limit(limits) {
-        return Err(invalid("pivotTableData text exceeds its caller limit"));
+    let maximum = caller_attribute_limit(limits);
+    if value.len() > maximum {
+        return Err(Error::limit(LimitKind::TextBytes, value.len(), maximum));
     }
-    if value
+    let units = value
         .encode_utf16()
         .take(MAX_UTF16_TEXT.saturating_add(1))
-        .count()
-        > MAX_UTF16_TEXT
-    {
-        return Err(invalid("pivotTableData text exceeds its caller limit"));
+        .count();
+    if units > MAX_UTF16_TEXT {
+        return Err(Error::limit(LimitKind::TextUnits, units, MAX_UTF16_TEXT));
     }
     // `ST_Xstring` serializes XML-illegal controls as SpreadsheetML
     // `_xHHHH_` escapes.  Literal controls are still rejected on source
@@ -2349,8 +2346,13 @@ fn apply_hex_edit(
         Attribute::Keep => {},
         Attribute::Clear => *slot = None,
         Attribute::Set(value) => {
-            if value.len() > caller_attribute_limit(limits) {
-                return Err(invalid("pivotTableData color exceeds its caller limit"));
+            let maximum = caller_attribute_limit(limits);
+            if value.len() > maximum {
+                return Err(Error::limit(
+                    LimitKind::AttributeBytes,
+                    value.len(),
+                    maximum,
+                ));
             }
             *slot = Some(parse_hex_u32(&value, "pivotTableData color")?);
         },
@@ -2668,7 +2670,11 @@ fn rewrite_data(
         .get(before.extension_owner.clone())
         .ok_or_else(|| invalid("pivotTableData owner range is invalid"))?;
     if owner.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("pivotTableData owner fragment exceeds limit"));
+        return Err(Error::limit(
+            LimitKind::FragmentBytes,
+            owner.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut edits = Vec::<(Range<usize>, Vec<u8>)>::new();
     let mut output_len = source.len();
@@ -2676,15 +2682,20 @@ fn rewrite_data(
     for (record, next) in before.cells.iter().zip(staged) {
         let previous = &record.state;
         if previous.value_text != next.value_text {
-            if next.value_text.len() > maximum_attribute_bytes
-                || next
-                    .value_text
-                    .encode_utf16()
-                    .take(MAX_UTF16_TEXT.saturating_add(1))
-                    .count()
-                    > MAX_UTF16_TEXT
-            {
-                return Err(invalid("pivotTableData text exceeds its caller limit"));
+            if next.value_text.len() > maximum_attribute_bytes {
+                return Err(Error::limit(
+                    LimitKind::TextBytes,
+                    next.value_text.len(),
+                    maximum_attribute_bytes,
+                ));
+            }
+            let units = next
+                .value_text
+                .encode_utf16()
+                .take(MAX_UTF16_TEXT.saturating_add(1))
+                .count();
+            if units > MAX_UTF16_TEXT {
+                return Err(Error::limit(LimitKind::TextUnits, units, MAX_UTF16_TEXT));
             }
             let replacement_len =
                 encoded_value_element_len(source, &record.source, &next.value_text)?;
@@ -2993,8 +3004,13 @@ fn plan_typed_attribute_length(
     }
     if let Some(next) = next {
         let encoded = planned_attribute_encoded_len(next)?;
-        if name.len().checked_add(encoded).unwrap_or(usize::MAX) > maximum_attribute_bytes {
-            return Err(invalid("pivotTableData attribute exceeds its caller limit"));
+        let observed = name.len().checked_add(encoded).unwrap_or(usize::MAX);
+        if observed > maximum_attribute_bytes {
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                observed,
+                maximum_attribute_bytes,
+            ));
         }
     }
     let (range, replacement_len) = match (current, next) {
@@ -3145,8 +3161,13 @@ fn append_attr_edit(
     }
     let encoded = next.map(try_escaped_xstring).transpose()?;
     if let Some(encoded) = &encoded {
-        if name.len().checked_add(encoded.len()).unwrap_or(usize::MAX) > maximum_attribute_bytes {
-            return Err(invalid("pivotTableData attribute exceeds its caller limit"));
+        let observed = name.len().checked_add(encoded.len()).unwrap_or(usize::MAX);
+        if observed > maximum_attribute_bytes {
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                observed,
+                maximum_attribute_bytes,
+            ));
         }
     }
     let (range, replacement) = match (current, encoded) {
@@ -3220,7 +3241,59 @@ pub(crate) fn view_workbook_with_limits<'a>(
 
 crate::record::record_family!("pivotTableData");
 
-crate::record::no_limits!("pivotTableData");
+/// A bounded dimension of `pivotTableData` reads and edits: the configured
+/// [`Limits`], the source XML attribute budget and the fixed SpreadsheetML
+/// text bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Authored `pivotRow` elements ([`Limits::max_authored_rows`]).
+    AuthoredRows,
+    /// Authored cells across all rows ([`Limits::max_authored_cells`]).
+    AuthoredCells,
+    /// The declared `rowCount` ([`Limits::max_row_count`]).
+    RowCount,
+    /// The declared `columnCount` ([`Limits::max_column_count`]).
+    ColumnCount,
+    /// Bytes retained by a read or staged by an edit
+    /// ([`Limits::max_retained_bytes`]).
+    RetainedBytes,
+    /// Bytes of one cell text value (the source XML attribute budget).
+    TextBytes,
+    /// UTF-16 code units of one string value (SpreadsheetML `ST_Xstring`).
+    TextUnits,
+    /// Bytes of one attribute value (the source XML attribute budget).
+    AttributeBytes,
+    /// Bytes of one element name.
+    NameBytes,
+    /// Bytes of the retained extension owner fragment.
+    FragmentBytes,
+}
+
+impl LimitKind {
+    /// A short structural description of the dimension.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AuthoredRows => "pivotTableData authored rows",
+            Self::AuthoredCells => "pivotTableData authored cells",
+            Self::RowCount => "pivotTableData rowCount",
+            Self::ColumnCount => "pivotTableData columnCount",
+            Self::RetainedBytes => "pivotTableData retained bytes",
+            Self::TextBytes => "bytes of one pivotTableData text value",
+            Self::TextUnits => "UTF-16 units of one pivotTableData string",
+            Self::AttributeBytes => "bytes of one pivotTableData attribute",
+            Self::NameBytes => "bytes of one pivotTableData element name",
+            Self::FragmentBytes => "bytes of the pivotTableData extension owner",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
 
 /// The configuration of a `pivotTableData` edit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -3286,11 +3359,7 @@ impl Edit {
             .retained_bytes
             .checked_add(staging_bytes)
             .ok_or_else(|| invalid("Workbook pivotTableData staged bytes overflow"))?;
-        enforce_retained_limit(
-            retained_with_staging,
-            limits.max_retained_bytes,
-            "Workbook pivotTableData staged state",
-        )?;
+        enforce_retained_limit(retained_with_staging, limits.max_retained_bytes)?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(before.cells.len())
@@ -3721,7 +3790,7 @@ mod tests {
         let error = transaction
             .set_value((0, 0), CellChange::text("S".repeat(1_024)))
             .unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(_)));
+        assert!(matches!(error, Error::Limit { .. }));
         assert!(transaction.is_changed());
     }
 
@@ -3745,7 +3814,7 @@ mod tests {
             .unwrap();
         assert!(transaction.set_text((0, 0), &first).unwrap());
         let error = transaction.set_text((0, 0), "S".repeat(1_024)).unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(_)));
+        assert!(matches!(error, Error::Limit { .. }));
         assert!(transaction.is_changed());
     }
 

@@ -122,6 +122,44 @@ macro_rules! no_limits {
 
 pub(crate) use no_limits;
 
+/// The typed bounds of a record family: each variant names one bound and its
+/// structural description, reported by `Error::Limit` through the crate's
+/// `LimitKind::$crate_variant`.
+macro_rules! limit_kinds {
+    ($what:literal, $crate_variant:ident { $($(#[$doc:meta])* $variant:ident => $text:literal,)+ }) => {
+        #[doc = concat!("A bounded dimension of the ", $what, " family.")]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[non_exhaustive]
+        pub enum LimitKind {
+            $($(#[$doc])* $variant,)+
+        }
+
+        impl LimitKind {
+            /// A short structural description of the dimension.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $text,)+
+                }
+            }
+        }
+
+        impl std::fmt::Display for LimitKind {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(self.as_str())
+            }
+        }
+
+        impl From<LimitKind> for crate::LimitKind {
+            fn from(kind: LimitKind) -> Self {
+                Self::$crate_variant(kind)
+            }
+        }
+    };
+}
+
+pub(crate) use limit_kinds;
+
 /// A raw-graph route over a record family's `Edit`, for the unit tests that
 /// author bare graphs: `Transaction::new(&mut graph, ..)` adopts the graph as
 /// a package, starts `Package::$entry(..)`, and `commit` writes the

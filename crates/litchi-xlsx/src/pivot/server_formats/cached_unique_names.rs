@@ -73,13 +73,21 @@ pub(super) fn scan_mce_branch(
                         return Err(invalid("MCE Choice has duplicate Requires attributes"));
                     }
                     if attribute.value.len() > limits.attribute_bytes {
-                        return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                        return Err(Error::limit(
+                            LimitKind::AttributeBytes,
+                            attribute.value.len(),
+                            limits.attribute_bytes,
+                        ));
                     }
                     let decoded = attribute
                         .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
                         .map_err(|error| invalid(error.to_string()))?;
                     if decoded.len() > limits.attribute_bytes {
-                        return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                        return Err(Error::limit(
+                            LimitKind::AttributeBytes,
+                            decoded.len(),
+                            limits.attribute_bytes,
+                        ));
                     }
                     let mut owned = String::new();
                     owned
@@ -103,7 +111,11 @@ pub(super) fn scan_mce_branch(
             }
             let requires = requires.ok_or_else(|| invalid("MCE Choice requires Requires"))?;
             if requires.len() > limits.attribute_bytes {
-                return Err(invalid("MCE Choice Requires exceeds its text limit"));
+                return Err(Error::limit(
+                    LimitKind::AttributeBytes,
+                    requires.len(),
+                    limits.attribute_bytes,
+                ));
             }
             let mut namespaces: Vec<NamespaceRef> = Vec::new();
             for prefix in requires.split([' ', '\t', '\r', '\n']) {
@@ -1181,7 +1193,16 @@ pub(crate) fn edit_workbook<'a>(
 
 crate::record::record_family!("cached unique-name");
 
-crate::record::no_limits!("cached unique-name");
+crate::record::limit_kinds!("cached unique-name", CachedUniqueNames {
+    /// Bytes of one attribute value.
+    AttributeBytes => "bytes of one cached unique-name attribute",
+    /// Encoded bytes of one cached unique name.
+    TextBytes => "bytes of one cached unique name",
+    /// UTF-16 code units of one cached unique name.
+    TextUnits => "UTF-16 units of one cached unique name",
+    /// Bytes of the retained `cachedUniqueNames` owner fragment.
+    FragmentBytes => "bytes of the cachedUniqueNames owner",
+});
 
 fn package_commit(workbook: Workbook, patch: Patch, changed: bool) -> Commit {
     Commit::new(
@@ -2027,15 +2048,18 @@ fn validate_name_value(value: &str, limits: SourceLimits) -> Result<()> {
 }
 
 fn validate_decoded_name(value: &str, limits: SourceLimits) -> Result<()> {
-    if value.encode_utf16().count() > MAX_UNIQUE_NAME_UTF16 {
-        return Err(invalid(
-            "cached unique-name exceeds 65,535 decoded UTF-16 units",
+    let units = value.encode_utf16().count();
+    if units > MAX_UNIQUE_NAME_UTF16 {
+        return Err(Error::limit(
+            LimitKind::TextUnits,
+            units,
+            MAX_UNIQUE_NAME_UTF16,
         ));
     }
     let encoded = escaped_xstring_len(value)?;
-    let caller = caller_attribute_limit(limits);
-    if encoded > caller || encoded > MAX_ATTRIBUTE_TEXT_BYTES {
-        return Err(invalid("cached unique-name exceeds its caller text limit"));
+    let maximum = caller_attribute_limit(limits).min(MAX_ATTRIBUTE_TEXT_BYTES);
+    if encoded > maximum {
+        return Err(Error::limit(LimitKind::TextBytes, encoded, maximum));
     }
     Ok(())
 }
@@ -2057,7 +2081,11 @@ fn rewrite_cache(
         .get(before.owner.clone())
         .ok_or_else(|| invalid("cachedUniqueNames owner range is invalid"))?;
     if owner.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("cachedUniqueNames owner fragment exceeds limit"));
+        return Err(Error::limit(
+            LimitKind::FragmentBytes,
+            owner.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut output_len = source.len();
     let mut owner_len = owner.len();

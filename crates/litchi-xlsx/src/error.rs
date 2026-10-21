@@ -311,6 +311,20 @@ pub enum LimitKind {
     CalculationProperties(crate::calculation_properties::LimitKind),
     /// Worksheet page breaks ([`crate::page_breaks::LimitKind`]).
     PageBreaks(crate::page_breaks::LimitKind),
+    /// `pivotTableData` reads and edits
+    /// ([`crate::pivot::table_data::LimitKind`]).
+    PivotTableData(crate::pivot::table_data::LimitKind),
+    /// PivotTable server formats ([`crate::pivot::server_formats::LimitKind`]).
+    PivotServerFormats(crate::pivot::server_formats::LimitKind),
+    /// Cached unique names ([`crate::pivot::cached_unique_names::LimitKind`]).
+    CachedUniqueNames(crate::pivot::cached_unique_names::LimitKind),
+    /// Custom XML Maps ([`crate::xml_maps::LimitKind`]).
+    XmlMaps(crate::xml_maps::LimitKind),
+    /// Source-backed cell values ([`crate::cell_values::LimitKind`]).
+    CellValues(crate::cell_values::LimitKind),
+    /// Source-backed row visibility
+    /// ([`crate::row_visibility::source::LimitKind`]).
+    RowVisibility(crate::row_visibility::source::LimitKind),
 }
 
 impl LimitKind {
@@ -351,6 +365,12 @@ impl LimitKind {
             Self::PageBreaks(crate::page_breaks::LimitKind::VerticalBreaks) => {
                 "column breaks of one worksheet"
             },
+            Self::PivotTableData(kind) => kind.as_str(),
+            Self::PivotServerFormats(kind) => kind.as_str(),
+            Self::CachedUniqueNames(kind) => kind.as_str(),
+            Self::XmlMaps(kind) => kind.as_str(),
+            Self::CellValues(kind) => kind.as_str(),
+            Self::RowVisibility(kind) => kind.as_str(),
         }
     }
 }
@@ -384,6 +404,7 @@ limit_kind_from!(
     Survey(crate::survey::LimitKind),
     CalculationProperties(crate::calculation_properties::LimitKind),
     PageBreaks(crate::page_breaks::LimitKind),
+    PivotTableData(crate::pivot::table_data::LimitKind),
 );
 
 impl From<std::convert::Infallible> for Error {
