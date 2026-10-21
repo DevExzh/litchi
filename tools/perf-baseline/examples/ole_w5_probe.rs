@@ -15,15 +15,19 @@ use std::io::Cursor;
 use std::time::Instant;
 
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_doc::tracked_revision::{RevisionKind, RevisionMetadata};
+use litchi_doc::{Builder as DocBuilder, Package as DocPackage};
 use litchi_ole_common::object::{Edit as ObjectEdit, Limits as ObjectLimits, Targets};
+use litchi_ole_common::property_set::Value;
 use litchi_ole_common::property_set::user_defined::{
     Edit as UserEdit, Hyperlink, Hyperlinks, Limits as UserLimits, LinkBase,
     Properties as UserProperties,
 };
-use litchi_ole_common::property_set::{
-    CodePage, Section, USER_DEFINED_PROPERTIES_FMTID,
+use litchi_ole_common::property_set::{CodePage, Section, USER_DEFINED_PROPERTIES_FMTID};
+use litchi_xls::Package as XlsPackage;
+use litchi_xls::cell_values::{
+    Reference as XlsReference, Selector as XlsSelector, Value as XlsValue,
 };
-use litchi_ole_common::property_set::Value;
 
 #[cfg(feature = "current-owner-api")]
 use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage};
@@ -37,6 +41,10 @@ const TARGET_NAME: &str = "ole_w5_edit_target.bin";
 const ORIGINAL: &[u8] = b"ole-w5-original";
 const REPLACEMENT: &[u8] = b"ole-w5-replacement";
 const SIBLINGS: usize = 64;
+const DOC_HISTORY_STEPS: usize = 128;
+const XLS_HISTORY_STEPS: usize = 128;
+const DOC_REVISION_TEXT: &str = "ole-w5-tracked-revision ";
+const XLS_EDIT_VALUE: f64 = 4242.0;
 
 struct Corpus {
     archive: Vec<u8>,
@@ -46,6 +54,14 @@ struct Corpus {
     user_limits: UserLimits,
     link_base: LinkBase,
     hyperlinks: Hyperlinks,
+    doc_archive: Vec<u8>,
+    xls_archive: Vec<u8>,
+}
+
+struct HistoryRun<T, P> {
+    output: Vec<u8>,
+    packages: Vec<T>,
+    patches: Vec<P>,
 }
 
 fn main() -> Result<(), Box<dyn StdError>> {
@@ -54,6 +70,8 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let route_name = route.as_str();
     let mut prepared_owner = None;
     let mut prepared_section = None;
+    let mut prepared_doc = None;
+    let mut prepared_xls = None;
 
     if route_name == "begin_edit" {
         prepared_owner = Some(owner_open_source(&corpus)?);
@@ -61,6 +79,36 @@ fn main() -> Result<(), Box<dyn StdError>> {
     if route_name == "read" {
         prepared_section = Some(corpus.user_section.clone());
     }
+    if matches!(route_name, "doc_tracked_revision" | "doc_history") {
+        prepared_doc = Some(DocPackage::from_bytes(&corpus.doc_archive)?);
+    }
+    if matches!(route_name, "xls_cells" | "xls_history") {
+        prepared_xls = Some(XlsPackage::from_bytes(&corpus.xls_archive)?);
+    }
+
+    let expected_host_output = match route_name {
+        "doc_tracked_revision" => Some(doc_tracked_revision_expected(
+            prepared_doc
+                .as_ref()
+                .ok_or("DOC tracked-revision source was not prepared")?,
+        )?),
+        "xls_cells" => Some(xls_cells_expected(
+            prepared_xls
+                .as_ref()
+                .ok_or("XLS cell source was not prepared")?,
+        )?),
+        "doc_history" => Some(doc_history_expected(
+            prepared_doc
+                .as_ref()
+                .ok_or("DOC history source was not prepared")?,
+        )?),
+        "xls_history" => Some(xls_history_expected(
+            prepared_xls
+                .as_ref()
+                .ok_or("XLS history source was not prepared")?,
+        )?),
+        _ => None,
+    };
 
     println!("route,sample,nanoseconds,output_bytes");
     for iteration in 0..warmup.checked_add(samples).ok_or("sample count overflow")? {
@@ -110,6 +158,88 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 black_box(&section);
                 black_box(section_size(&section))
             },
+            "doc_tracked_revision" => {
+                let source = prepared_doc
+                    .as_ref()
+                    .ok_or("DOC tracked-revision source was not prepared")?;
+                let output = doc_tracked_revision_once(source)?.to_bytes()?;
+                let elapsed = started.elapsed().as_nanos();
+                let expected = expected_host_output
+                    .as_ref()
+                    .ok_or("DOC tracked-revision expected output was not prepared")?;
+                if output != *expected {
+                    return Err("DOC tracked-revision output differs from preflight".into());
+                }
+                if iteration >= warmup {
+                    println!(
+                        "{route_name},{},{elapsed},{}",
+                        iteration - warmup,
+                        output.len()
+                    );
+                }
+                continue;
+            },
+            "xls_cells" => {
+                let source = prepared_xls
+                    .as_ref()
+                    .ok_or("XLS cell source was not prepared")?;
+                let output = xls_cells_once(source)?.to_bytes()?;
+                let elapsed = started.elapsed().as_nanos();
+                let expected = expected_host_output
+                    .as_ref()
+                    .ok_or("XLS cell expected output was not prepared")?;
+                if output != *expected {
+                    return Err("XLS cell output differs from preflight".into());
+                }
+                if iteration >= warmup {
+                    println!(
+                        "{route_name},{},{elapsed},{}",
+                        iteration - warmup,
+                        output.len()
+                    );
+                }
+                continue;
+            },
+            "doc_history" => {
+                let source = prepared_doc
+                    .as_ref()
+                    .ok_or("DOC history source was not prepared")?;
+                let run = doc_history_once(source)?;
+                let elapsed = started.elapsed().as_nanos();
+                let expected = expected_host_output
+                    .as_ref()
+                    .ok_or("DOC history expected output was not prepared")?;
+                verify_doc_history(&run, source, expected)?;
+                let output_bytes = run.output.len();
+                black_box((&run.packages, &run.patches));
+                if iteration >= warmup {
+                    println!(
+                        "{route_name},{},{elapsed},{output_bytes}",
+                        iteration - warmup
+                    );
+                }
+                continue;
+            },
+            "xls_history" => {
+                let source = prepared_xls
+                    .as_ref()
+                    .ok_or("XLS history source was not prepared")?;
+                let run = xls_history_once(source)?;
+                let elapsed = started.elapsed().as_nanos();
+                let expected = expected_host_output
+                    .as_ref()
+                    .ok_or("XLS history expected output was not prepared")?;
+                verify_xls_history(&run, source, expected)?;
+                let output_bytes = run.output.len();
+                black_box((&run.packages, &run.patches));
+                if iteration >= warmup {
+                    println!(
+                        "{route_name},{},{elapsed},{output_bytes}",
+                        iteration - warmup
+                    );
+                }
+                continue;
+            },
             _ => return Err(format!("unknown route {route_name:?}").into()),
         };
         let elapsed = started.elapsed().as_nanos();
@@ -132,12 +262,10 @@ fn arguments() -> Result<(String, usize, usize), Box<dyn StdError>> {
         match argument.as_str() {
             "--route" => route = Some(arguments.next().ok_or("--route needs a value")?),
             "--warmup" => warmup = arguments.next().ok_or("--warmup needs a value")?.parse()?,
-            "--samples" => {
-                samples = arguments.next().ok_or("--samples needs a value")?.parse()?
-            },
+            "--samples" => samples = arguments.next().ok_or("--samples needs a value")?.parse()?,
             "--help" | "-h" => {
                 println!(
-                    "usage: ole_w5_probe --route <open|begin_edit|noop_commit|replace_stream|read|edit> [--warmup N] [--samples N]"
+                    "usage: ole_w5_probe --route <open|begin_edit|noop_commit|replace_stream|read|edit|doc_tracked_revision|xls_cells|doc_history|xls_history> [--warmup N] [--samples N]"
                 );
                 std::process::exit(0);
             },
@@ -194,6 +322,9 @@ fn build_corpus() -> Result<Corpus, Box<dyn StdError>> {
     // the section's existing content while replacing only its reserved names.
     user_section.add(42, Value::Blob(vec![0x5a; 128]))?;
 
+    let doc_archive = build_doc_archive()?;
+    let xls_archive = build_xls_archive()?;
+
     Ok(Corpus {
         archive: archive.into_inner(),
         limits,
@@ -202,18 +333,248 @@ fn build_corpus() -> Result<Corpus, Box<dyn StdError>> {
         user_limits,
         link_base,
         hyperlinks,
+        doc_archive,
+        xls_archive,
     })
+}
+
+fn build_doc_archive() -> Result<Vec<u8>, Box<dyn StdError>> {
+    let mut builder = DocBuilder::new();
+    for index in 0..256 {
+        builder.add_paragraph(&format!("ole-w5 tracked paragraph {index:03}"))?;
+    }
+    Ok(builder.build()?.to_bytes()?)
+}
+
+fn build_xls_archive() -> Result<Vec<u8>, Box<dyn StdError>> {
+    let mut builder = litchi_xls::writer::Builder::new();
+    let sheet = builder.add_worksheet("Cells")?;
+    for row in 0..256u32 {
+        builder.write_number(sheet, row, 0, f64::from(row))?;
+    }
+    let mut package = Cursor::new(Vec::new());
+    builder.build()?.write_to(&mut package)?;
+    let mut source = OleFile::open(Cursor::new(package.into_inner()))?;
+    let workbook = source.open_stream(&["Workbook"])?;
+
+    let mut writer = OleWriter::new();
+    writer.create_stream_owned(&["Workbook"], workbook)?;
+    writer.create_stream_owned(&["ole_w5_opaque_payload.bin"], vec![0x5a; 96 * 1024])?;
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output)?;
+    Ok(output.into_inner())
+}
+
+fn doc_tracked_revision_once(source: &DocPackage) -> Result<DocPackage, Box<dyn StdError>> {
+    let mut edit = source.edit_tracked_revisions()?;
+    edit.add_text(
+        0,
+        DOC_REVISION_TEXT,
+        RevisionKind::Insertion,
+        RevisionMetadata::new("W5Probe"),
+    )?;
+    Ok(edit.commit()?.into_package())
+}
+
+fn doc_tracked_revision_expected(source: &DocPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+    let mut edit = source.edit_tracked_revisions()?;
+    edit.add_text(
+        0,
+        DOC_REVISION_TEXT,
+        RevisionKind::Insertion,
+        RevisionMetadata::new("W5Probe"),
+    )?;
+    let commit = edit.commit()?;
+    let output = commit.package().to_bytes()?;
+    let replayed = source
+        .apply_tracked_revisions(commit.patch())?
+        .into_package()
+        .to_bytes()?;
+    if replayed != output {
+        return Err("DOC tracked-revision forward replay differs from commit".into());
+    }
+    let restored = commit
+        .package()
+        .apply_tracked_revisions(&commit.patch().inverse())?
+        .into_package()
+        .to_bytes()?;
+    if restored != source.to_bytes()? {
+        return Err("DOC tracked-revision inverse replay differs from source".into());
+    }
+    Ok(output)
+}
+
+fn xls_cells_once(source: &XlsPackage) -> Result<XlsPackage, Box<dyn StdError>> {
+    let mut edit = source.edit()?;
+    edit.set_value(
+        XlsSelector::Name("Cells"),
+        XlsReference::new(0, 0)?,
+        XlsValue::Number(XLS_EDIT_VALUE),
+    )?;
+    Ok(edit.commit()?.into_package())
+}
+
+fn xls_cells_expected(source: &XlsPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+    let mut edit = source.edit()?;
+    edit.set_value(
+        XlsSelector::Name("Cells"),
+        XlsReference::new(0, 0)?,
+        XlsValue::Number(XLS_EDIT_VALUE),
+    )?;
+    let commit = edit.commit()?;
+    let output = commit.package().to_bytes()?;
+    let replayed = source.apply(commit.patch())?.package().to_bytes()?;
+    if replayed != output {
+        return Err("XLS cell forward replay differs from commit".into());
+    }
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())?
+        .package()
+        .to_bytes()?;
+    if restored != source.to_bytes()? {
+        return Err("XLS cell inverse replay differs from source".into());
+    }
+    Ok(output)
+}
+
+fn doc_history_once(
+    source: &DocPackage,
+) -> Result<HistoryRun<DocPackage, litchi_doc::tracked_revision::Patch>, Box<dyn StdError>> {
+    let mut current = source.clone();
+    let mut packages = Vec::with_capacity(DOC_HISTORY_STEPS + 1);
+    let mut patches = Vec::with_capacity(DOC_HISTORY_STEPS);
+    packages.push(current.clone());
+    for index in 0..DOC_HISTORY_STEPS {
+        let mut edit = current.edit_tracked_revisions()?;
+        if index == 0 {
+            edit.add_text(
+                0,
+                &format!("{DOC_REVISION_TEXT}{index:03} "),
+                RevisionKind::Insertion,
+                RevisionMetadata::new("W5History"),
+            )?;
+        } else {
+            let revisions = edit.revisions()?;
+            if revisions.len() != 1 {
+                return Err("DOC history fixture did not retain one revision".into());
+            }
+            edit.replace(0, RevisionMetadata::new(format!("W5History{index:03}")))?;
+        }
+        let commit = edit.commit()?;
+        current = commit.package().clone();
+        patches.push(commit.patch().clone());
+        packages.push(current.clone());
+    }
+    let output = current.to_bytes()?;
+    Ok(HistoryRun {
+        output,
+        packages,
+        patches,
+    })
+}
+
+fn verify_doc_history(
+    run: &HistoryRun<DocPackage, litchi_doc::tracked_revision::Patch>,
+    source: &DocPackage,
+    expected: &[u8],
+) -> Result<(), Box<dyn StdError>> {
+    if run.output != expected
+        || run.packages.len() != DOC_HISTORY_STEPS + 1
+        || run.patches.len() != DOC_HISTORY_STEPS
+    {
+        return Err("DOC history output or retained cardinality differs from preflight".into());
+    }
+    let mut replayed = source.clone();
+    for patch in &run.patches {
+        replayed = replayed.apply_tracked_revisions(patch)?.into_package();
+    }
+    if replayed.to_bytes()? != expected {
+        return Err("DOC history forward replay differs from retained output".into());
+    }
+    for patch in run.patches.iter().rev() {
+        replayed = replayed
+            .apply_tracked_revisions(&patch.inverse())?
+            .into_package();
+    }
+    if replayed.to_bytes()? != source.to_bytes()? {
+        return Err("DOC history inverse replay differs from source".into());
+    }
+    Ok(())
+}
+
+fn doc_history_expected(source: &DocPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+    let run = doc_history_once(source)?;
+    let output = run.output.clone();
+    verify_doc_history(&run, source, &output)?;
+    Ok(output)
+}
+
+fn xls_history_once(
+    source: &XlsPackage,
+) -> Result<HistoryRun<XlsPackage, litchi_xls::Patch>, Box<dyn StdError>> {
+    let mut current = source.clone();
+    let mut packages = Vec::with_capacity(XLS_HISTORY_STEPS + 1);
+    let mut patches = Vec::with_capacity(XLS_HISTORY_STEPS);
+    packages.push(current.clone());
+    for row in 0..XLS_HISTORY_STEPS {
+        let mut edit = current.edit()?;
+        edit.set_value(
+            XlsSelector::Name("Cells"),
+            XlsReference::new(u32::try_from(row)?, 0)?,
+            XlsValue::Number(10_000.0 + row as f64),
+        )?;
+        let commit = edit.commit()?;
+        current = commit.package().clone();
+        patches.push(commit.patch().clone());
+        packages.push(current.clone());
+    }
+    let output = current.to_bytes()?;
+    Ok(HistoryRun {
+        output,
+        packages,
+        patches,
+    })
+}
+
+fn verify_xls_history(
+    run: &HistoryRun<XlsPackage, litchi_xls::Patch>,
+    source: &XlsPackage,
+    expected: &[u8],
+) -> Result<(), Box<dyn StdError>> {
+    if run.output != expected
+        || run.packages.len() != XLS_HISTORY_STEPS + 1
+        || run.patches.len() != XLS_HISTORY_STEPS
+    {
+        return Err("XLS history output or retained cardinality differs from preflight".into());
+    }
+    let mut replayed = source.clone();
+    for patch in &run.patches {
+        replayed = replayed.apply(patch)?.into_package();
+    }
+    if replayed.to_bytes()? != expected {
+        return Err("XLS history forward replay differs from retained output".into());
+    }
+    for patch in run.patches.iter().rev() {
+        replayed = replayed.apply(&patch.inverse())?.into_package();
+    }
+    if replayed.to_bytes()? != source.to_bytes()? {
+        return Err("XLS history inverse replay differs from source".into());
+    }
+    Ok(())
+}
+
+fn xls_history_expected(source: &XlsPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+    let run = xls_history_once(source)?;
+    let output = run.output.clone();
+    verify_xls_history(&run, source, &output)?;
+    Ok(output)
 }
 
 fn owner_open_source(corpus: &Corpus) -> Result<OwnerSource, Box<dyn StdError>> {
     #[cfg(all(feature = "legacy-owner-api", not(feature = "current-owner-api")))]
     {
-        Ok(ObjectEdit::open(
-            corpus.archive.clone(),
-            Targets::default(),
-            corpus.limits,
-        )?
-        .staged())
+        Ok(ObjectEdit::open(corpus.archive.clone(), Targets::default(), corpus.limits)?.staged())
     }
     #[cfg(feature = "current-owner-api")]
     {
