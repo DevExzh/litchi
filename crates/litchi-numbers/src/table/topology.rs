@@ -11,7 +11,7 @@
 //! publication.
 
 pub use crate::package::table_topology::{
-    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Unsupported,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,
 };
 
 /// A row insertion whose index is relative to a semantic table section.

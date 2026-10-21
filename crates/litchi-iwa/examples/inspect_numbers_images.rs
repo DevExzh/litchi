@@ -1,7 +1,5 @@
 //! List ordinary images owned by each Numbers sheet.
 
-#![allow(deprecated)]
-
 use std::env;
 
 use litchi_iwa::numbers;
@@ -10,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_numbers_images <input.numbers>")?;
-    let editor = numbers::Editor::open(input)?;
+    let editor = numbers::Draft::open(input)?;
     for sheet in editor.sheets()? {
         println!(
             "sheet={} object={} name={:?}",

@@ -204,7 +204,7 @@ fn decode_comment_storage_payload<'source>(
     }
     Ok((comment, reply_ids))
 }
-pub(super) fn numbers_document(package: &IWorkPackage) -> Result<tn::DocumentArchive> {
+pub(super) fn numbers_document(package: &HostPackage) -> Result<tn::DocumentArchive> {
     package.with_parsed_archive("Index/Document.iwa", |archive| {
         let object = archive
             .object(1)
@@ -357,13 +357,13 @@ pub(super) struct NumbersObjectCatalog {
 }
 
 impl NumbersObjectCatalog {
-    pub(super) fn build(package: &IWorkPackage) -> Result<Self> {
+    pub(super) fn build(package: &HostPackage) -> Result<Self> {
         Self::build_with_limits(package, NumbersObjectCatalogLimits::default())
     }
 
     #[allow(deprecated)]
     pub(super) fn build_with_limits(
-        package: &IWorkPackage,
+        package: &HostPackage,
         limits: NumbersObjectCatalogLimits,
     ) -> Result<Self> {
         limits.validate()?;
@@ -741,7 +741,7 @@ impl NumbersObjectCatalog {
 
     fn with_archive<T, F>(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         archive_name: &str,
         read: F,
     ) -> Result<T>
@@ -785,7 +785,7 @@ impl NumbersObjectCatalog {
             })
     }
 
-    fn ensure_current(&self, package: &IWorkPackage) -> Result<()> {
+    fn ensure_current(&self, package: &HostPackage) -> Result<()> {
         if package.mutation_revision() != self.package_revision {
             return Err(Error::InvalidFormat(
                 "Numbers object catalog is stale after package mutation".to_owned(),
@@ -796,7 +796,7 @@ impl NumbersObjectCatalog {
 
     pub(super) fn sheet_drawable_ids<'a>(
         &'a self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         sheet_id: u64,
     ) -> Result<&'a [u64]> {
         self.ensure_current(package)?;
@@ -818,7 +818,7 @@ impl NumbersObjectCatalog {
     #[cfg(test)]
     pub(super) fn text_box_graph(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         sheet_id: u64,
         drawable_id: u64,
     ) -> Result<NumbersTextBoxGraph> {
@@ -828,7 +828,7 @@ impl NumbersObjectCatalog {
 
     pub(super) fn text_box_graph_if_supported(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         sheet_id: u64,
         drawable_id: u64,
     ) -> Result<Option<NumbersTextBoxGraph>> {
@@ -859,7 +859,7 @@ impl NumbersObjectCatalog {
 
     pub(super) fn text_storage_info(
         &mut self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         storage_id: TextStorageId,
     ) -> Result<TextStorageInfo> {
         let native_storage_id = storage_id.get();
@@ -1096,7 +1096,7 @@ impl NumbersObjectCatalog {
     }
 }
 
-pub(super) fn numbers_sheet_drawable_owners(package: &IWorkPackage) -> Result<HashMap<u64, u64>> {
+pub(super) fn numbers_sheet_drawable_owners(package: &HostPackage) -> Result<HashMap<u64, u64>> {
     let document = numbers_document(package)?;
     let locations = object_locations(package)?;
     let mut owners = HashMap::new();
@@ -1122,7 +1122,7 @@ pub(super) fn numbers_sheet_drawable_owners(package: &IWorkPackage) -> Result<Ha
     Ok(owners)
 }
 
-pub(super) fn update_numbers_document<F>(package: &mut IWorkPackage, update: F) -> Result<()>
+pub(super) fn update_numbers_document<F>(package: &mut HostPackage, update: F) -> Result<()>
 where
     F: FnOnce(&mut tn::DocumentArchive) -> Result<()>,
 {
@@ -1238,7 +1238,7 @@ pub(super) fn decode_sheet(
 }
 
 pub(super) fn numbers_sheet(
-    package: &IWorkPackage,
+    package: &HostPackage,
     sheet_id: u64,
 ) -> Result<(String, usize, tn::SheetArchive)> {
     let document = numbers_document(package)?;
@@ -1268,7 +1268,7 @@ pub(super) fn numbers_sheet(
 
 #[allow(deprecated)]
 pub(super) fn numbers_text_box_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     sheet_id: u64,
     drawable_id: u64,
 ) -> Result<NumbersTextBoxGraph> {
@@ -1507,7 +1507,6 @@ pub(super) fn remap_numbers_reference_paths(
     })
 }
 
-#[allow(deprecated)]
 pub(super) fn remap_numbers_shape_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 1, 2],
@@ -1667,7 +1666,6 @@ pub(super) fn remap_numbers_storage_wire(
     Ok(data)
 }
 
-#[allow(deprecated)]
 fn remap_numbers_caption_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 1, 1, 2],
@@ -1867,7 +1865,7 @@ pub(super) fn remap_numbers_storage(storage: &mut tswp::StorageArchive, remap: &
 }
 
 pub(super) fn offset_numbers_drawable_clone(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     offset: f32,
@@ -1942,7 +1940,7 @@ pub(super) fn offset_numbers_drawable_clone(
 }
 
 pub(super) fn patch_numbers_sheet_drawable_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     sheet_id: u64,
     remove: Option<u64>,
@@ -2267,7 +2265,6 @@ pub(super) fn remap_optional_table_reference(
     }
 }
 
-#[allow(deprecated)]
 pub(super) fn prepare_empty_table_model(
     model: &mut TableModelArchive,
     remap: &HashMap<u64, u64>,
@@ -2665,7 +2662,7 @@ pub(super) struct TableOwner {
     pub(super) table_info_id: u64,
 }
 
-pub(super) fn find_table_owner(package: &IWorkPackage, table_id: u64) -> Result<TableOwner> {
+pub(super) fn find_table_owner(package: &HostPackage, table_id: u64) -> Result<TableOwner> {
     let document = numbers_document(package)?;
     let locations = object_locations(package)?;
     let mut owner = None;
@@ -2720,7 +2717,7 @@ pub(super) fn find_table_owner(package: &IWorkPackage, table_id: u64) -> Result<
 }
 
 pub(super) fn remove_object_or_empty_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<()> {
@@ -2743,7 +2740,7 @@ pub(super) fn remove_object_or_empty_entry(
 }
 
 pub(super) fn validate_and_trim_tiles(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     rows: usize,
@@ -2832,7 +2829,7 @@ pub(super) fn validate_and_trim_tiles(
 }
 
 pub(super) fn resize_header_buckets(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     rows: u32,
@@ -2895,7 +2892,7 @@ pub(super) fn resize_header_buckets(
 }
 
 pub(super) fn resize_uid_map(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     old_rows: usize,
@@ -3020,7 +3017,7 @@ pub(super) fn resize_uid_axis(
 }
 
 pub(super) fn resize_stroke_sidecar(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     rows: u32,
@@ -3070,7 +3067,7 @@ pub(super) struct TableDescriptor {
 }
 
 pub(super) fn formula_external_tables(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptors: &[TableDescriptor],
 ) -> Result<HashMap<u64, ExternalFormulaTable>> {
     let Some(component) = package.calculation_engine_entry_name()? else {
@@ -3109,7 +3106,7 @@ pub(super) fn formula_external_tables(
 }
 
 pub(super) fn formula_pivot_categories(
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<HashMap<PivotFormulaKey, ExternalPivotCategory>> {
     let Some(component) = package.calculation_engine_entry_name()? else {
         return Ok(HashMap::new());
@@ -3337,7 +3334,7 @@ pub(super) struct CellLocation {
 }
 
 pub(super) fn locate_cell(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -3350,7 +3347,7 @@ pub(super) fn locate_cell(
 }
 
 pub(super) fn locate_attached_cell(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -3360,7 +3357,7 @@ pub(super) fn locate_attached_cell(
 }
 
 fn locate_cell_in_descriptor(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: TableDescriptor,
     row: usize,
     column: usize,
@@ -3496,7 +3493,7 @@ fn validate_attached_table_info_role(
 }
 
 pub(super) fn attached_table_descriptor(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<TableDescriptor> {
     let locations = object_locations(package)?;
@@ -3550,7 +3547,7 @@ pub(super) fn attached_table_descriptor(
     })
 }
 
-pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<TableDescriptor>> {
+pub(super) fn attached_table_descriptors(package: &HostPackage) -> Result<Vec<TableDescriptor>> {
     let locations = object_locations(package)?;
     let archive_names = locations.values().collect::<HashSet<_>>();
     let mut descriptors = BTreeMap::<u64, TableDescriptor>::new();
@@ -3628,7 +3625,7 @@ pub(super) fn decode_attached_table_model_with_budget(
 }
 
 pub(super) fn rename_attached_table_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     name: &str,
 ) -> Result<()> {
@@ -3668,7 +3665,7 @@ pub(super) fn rename_attached_table_in_package(
 }
 
 pub(super) fn resize_attached_table_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     rows: usize,
     columns: usize,
@@ -3740,7 +3737,7 @@ pub(super) fn resize_attached_table_in_package(
 }
 
 pub(super) fn set_attached_cell_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -3753,7 +3750,7 @@ pub(super) fn set_attached_cell_in_package(
 
 /// Return whether an attached table cell stores a native formula reference.
 pub(super) fn attached_cell_is_formula(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -3782,7 +3779,7 @@ pub(super) fn attached_cell_is_formula(
 /// into the following row or column. Formula dependency coordinates must be
 /// updated before invoking this operation.
 pub(super) fn relocate_attached_cell_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     source_row: usize,
     source_column: usize,
@@ -3866,7 +3863,7 @@ pub(super) fn relocate_attached_cell_in_package(
 }
 
 pub(super) fn set_attached_cells_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     updates: Vec<TableCellUpdate>,
 ) -> Result<()> {
@@ -3893,7 +3890,7 @@ fn validate_batch_values(updates: &[TableCellUpdate]) -> Result<()> {
 }
 
 fn set_cells_for_descriptor(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     descriptor: TableDescriptor,
     updates: Vec<TableCellUpdate>,
 ) -> Result<()> {
@@ -3918,7 +3915,7 @@ fn set_cells_for_descriptor(
 }
 
 fn set_cell_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     row: usize,
     column: usize,
@@ -3943,7 +3940,7 @@ struct CellWriteContext<'a> {
 }
 
 fn set_cell_with_context(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     context: &CellWriteContext<'_>,
     row: usize,
     column: usize,
@@ -4147,7 +4144,7 @@ fn comment_storage_message_index(object: &ArchiveObject, storage_id: u64) -> Res
 }
 
 pub(super) fn comment_entry_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     identifier: u32,
@@ -4214,14 +4211,14 @@ pub(super) fn comment_entry_location(
 }
 
 pub(super) fn read_comment_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     entry: &CommentEntryLocation,
 ) -> Result<Comment> {
     read_comment_storage_object(package, &entry.storage_archive, entry.storage_id)
 }
 
 pub(super) fn read_comment_storage_object(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     storage_id: u64,
 ) -> Result<Comment> {
@@ -4265,7 +4262,7 @@ pub(super) fn read_comment_storage_object(
 }
 
 pub(super) fn read_comment_storage_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     storage_id: u64,
 ) -> Result<Comment> {
@@ -4278,7 +4275,7 @@ pub(super) fn read_comment_storage_by_id(
 }
 
 pub(super) fn cell_comment_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4288,7 +4285,7 @@ pub(super) fn cell_comment_in_package(
 }
 
 pub(super) fn attached_cell_comment_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4298,7 +4295,7 @@ pub(super) fn attached_cell_comment_in_package(
 }
 
 fn cell_comment_at_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -4335,7 +4332,7 @@ fn cell_comment_at_location(
 }
 
 pub(super) fn cell_comment_replies_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4345,7 +4342,7 @@ pub(super) fn cell_comment_replies_in_package(
 }
 
 pub(super) fn attached_cell_comment_replies_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4355,7 +4352,7 @@ pub(super) fn attached_cell_comment_replies_in_package(
 }
 
 fn cell_comment_replies_at_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -4387,7 +4384,7 @@ fn cell_comment_replies_at_location(
 }
 
 pub(super) fn validate_cell_comment_reply_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     root_storage_id: u64,
     root: &Comment,
@@ -4432,7 +4429,7 @@ pub(super) fn validate_cell_comment_reply_reference(
 }
 
 pub(super) fn ensure_comment_storage_metadata(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     storage_id: u64,
     author_id: Option<u64>,
@@ -4528,7 +4525,7 @@ pub(super) fn ensure_comment_storage_metadata(
 }
 
 pub(super) fn update_comment_storage_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     entry: &CommentEntryLocation,
     text: String,
 ) -> Result<()> {
@@ -4575,7 +4572,7 @@ pub(super) fn update_comment_storage_text(
 }
 
 pub(super) fn ensure_comment_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     table_id: u64,
 ) -> Result<(u64, String)> {
@@ -4675,7 +4672,7 @@ pub(super) fn ensure_comment_table(
 }
 
 pub(super) fn append_comment_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     storage_id: u64,
@@ -4737,7 +4734,7 @@ pub(super) fn append_comment_entry(
 }
 
 pub(super) fn update_comment_cell(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -4762,7 +4759,7 @@ pub(super) fn update_comment_cell(
 }
 
 pub(super) fn add_cell_comment_author_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     comment_archive: &str,
     author_archive: Option<&str>,
     author_id: Option<u64>,
@@ -4781,7 +4778,7 @@ pub(super) fn add_cell_comment_author_reference(
 }
 
 pub(super) fn add_cell_comment_storage_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     list_archive: &str,
     storage_archive: &str,
     storage_id: u64,
@@ -4797,7 +4794,7 @@ pub(super) fn add_cell_comment_storage_reference(
 }
 
 pub(super) fn replace_cell_comment_root(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -4850,7 +4847,7 @@ pub(super) fn replace_cell_comment_root(
 }
 
 pub(super) fn set_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4862,7 +4859,7 @@ pub(super) fn set_cell_comment_in_package(
 }
 
 pub(super) fn set_attached_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -4874,7 +4871,7 @@ pub(super) fn set_attached_cell_comment_in_package(
 }
 
 fn set_cell_comment_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     row: usize,
     column: usize,
@@ -5030,7 +5027,7 @@ fn set_cell_comment_at_location(
 }
 
 fn required_cell_comment_root_at_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -5069,7 +5066,7 @@ fn required_cell_comment_root_at_location(
 }
 
 pub(super) fn add_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5080,7 +5077,7 @@ pub(super) fn add_cell_comment_reply_in_package(
 }
 
 pub(super) fn add_attached_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5091,7 +5088,7 @@ pub(super) fn add_attached_cell_comment_reply_in_package(
 }
 
 fn add_cell_comment_reply_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -5150,7 +5147,7 @@ fn add_cell_comment_reply_at_location(
 }
 
 pub(super) fn set_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5170,7 +5167,7 @@ pub(super) fn set_cell_comment_reply_in_package(
 }
 
 pub(super) fn set_attached_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5191,7 +5188,7 @@ pub(super) fn set_attached_cell_comment_reply_in_package(
 
 #[allow(clippy::too_many_arguments)]
 fn set_cell_comment_reply_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -5262,7 +5259,7 @@ fn set_cell_comment_reply_at_location(
 }
 
 pub(super) fn remove_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5280,7 +5277,7 @@ pub(super) fn remove_cell_comment_reply_in_package(
 }
 
 pub(super) fn remove_attached_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5298,7 +5295,7 @@ pub(super) fn remove_attached_cell_comment_reply_in_package(
 }
 
 fn remove_cell_comment_reply_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -5353,7 +5350,7 @@ pub(super) fn cell_comment_modified_entries(
 
 #[cfg(test)]
 pub(super) fn clear_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5363,7 +5360,7 @@ pub(super) fn clear_cell_comment_in_package(
 }
 
 pub(super) fn clear_attached_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -5373,7 +5370,7 @@ pub(super) fn clear_attached_cell_comment_in_package(
 }
 
 fn clear_cell_comment_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     row: usize,
     column: usize,
@@ -5442,7 +5439,7 @@ pub(super) struct RemovedCellCommentGraph {
 }
 
 pub(super) fn remove_unreferenced_comment_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     root: u64,
 ) -> Result<RemovedCellCommentGraph> {
@@ -5488,7 +5485,7 @@ pub(super) fn remove_unreferenced_comment_graph(
 }
 
 pub(super) fn cleanup_removed_cell_comment_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     original_locations: &HashMap<u64, String>,
     removed: &mut RemovedCellCommentGraph,
     modified_entries: &mut Vec<String>,

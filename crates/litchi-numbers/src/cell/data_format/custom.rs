@@ -7,7 +7,7 @@
 /// Custom display format.
 pub mod transaction {
     pub use crate::package::table_cell_custom_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

@@ -748,52 +748,52 @@ fn selectors_unicode_invalid_names_and_final_collisions_are_typed() -> TestResul
     assert_eq!(sheet_name(commit.package(), 1), decomposed);
     assert!(matches!(
         package.edit_names().rename_sheet("missing", "x"),
-        Err(names::Error::SheetNotFound)
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
     ));
     assert!(matches!(
         package.edit_names().rename_table("Alpha", "missing", "x"),
-        Err(names::Error::TableNotFound)
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
     ));
     assert!(matches!(
         package.edit_names().rename_sheet("Alpha", ""),
-        Err(names::Error::InvalidName {
+        Err(names::Error::Refused(names::Refusal::InvalidName {
             reason: names::InvalidReason::Empty
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_table("Alpha", "One", "bad\0name"),
-        Err(names::Error::InvalidName {
+        Err(names::Error::Refused(names::Refusal::InvalidName {
             reason: names::InvalidReason::ContainsNul
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_sheet("Alpha", "same")?
             .rename_sheet("Beta", "same"),
-        Err(names::Error::DuplicateName {
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
             path: names::Path::Sheet { position: 1 }
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_table("Alpha", "One", "same")?
             .rename_table("Alpha", "Two", "same"),
-        Err(names::Error::DuplicateName {
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
             path: names::Path::Table { sheet: 0, table: 1 }
-        })
+        }))
     ));
     assert!(matches!(
         package
             .edit_names()
             .rename_sheet("Alpha", "first")?
             .rename_sheet("Alpha", "second"),
-        Err(names::Error::DuplicateTarget {
+        Err(names::Error::Refused(names::Refusal::DuplicateTarget {
             path: names::Path::Sheet { position: 0 }
-        })
+        }))
     ));
 
     let swapped = package
@@ -822,13 +822,13 @@ fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() ->
 
     assert!(matches!(
         package.edit_names().rename_sheet("alpha", "Changed"),
-        Err(names::Error::SheetNotFound)
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
     ));
     assert_eq!(bytes(&package)?, before);
 
     assert!(matches!(
         package.edit_names().rename_table("Alpha", "one", "Changed"),
-        Err(names::Error::TableNotFound)
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
     ));
     assert_eq!(bytes(&package)?, before);
 
@@ -871,7 +871,7 @@ fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_opera
         .expect_err("the third staged name must exceed the aggregate retained budget");
     assert!(matches!(
         error,
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind: names::LimitKind::NameBytes,
             observed: 257,
             maximum: 256,
@@ -962,9 +962,9 @@ fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> T
             .edit_names()
             .rename_table("Alpha", "One", "Denied")?
             .commit(),
-        Err(names::Error::TableLocked {
+        Err(names::Error::Refused(names::Refusal::TableLocked {
             path: names::Path::Table { sheet: 0, table: 0 }
-        })
+        }))
     ));
     assert_eq!(table_name(&locked, 0, 0), "One");
 
@@ -974,9 +974,11 @@ fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> T
             .edit_names()
             .rename_table("Alpha", "One", "Denied")?
             .commit(),
-        Err(names::Error::UnsupportedDependency {
-            path: names::Path::Table { sheet: 0, table: 0 }
-        })
+        Err(names::Error::Refused(
+            names::Refusal::UnsupportedDependency {
+                path: names::Path::Table { sheet: 0, table: 0 }
+            }
+        ))
     ));
     Ok(())
 }
@@ -1006,9 +1008,9 @@ fn calculation_engine_dependencies_are_checked_after_root_projection() -> TestRe
         .expect_err("volatile formula-owner dependencies must be fail-closed");
     assert!(matches!(
         error,
-        names::Error::UnsupportedDependency {
+        names::Error::Refused(names::Refusal::UnsupportedDependency {
             path: names::Path::Table { sheet: 0, table: 0 }
-        }
+        })
     ));
     assert_eq!(bytes(&volatile)?, before);
     Ok(())
@@ -1149,7 +1151,7 @@ fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
         .expect_err("the conservative changed-work guard must run before native rewrite");
     assert!(matches!(
         error,
-        names::Error::LimitExceeded {
+        names::Error::Limit {
             kind: names::LimitKind::WireWork,
             ..
         }

@@ -139,7 +139,7 @@ impl TransactionBudget {
 
     fn require_depth(self, depth: usize) -> Result<(), Error> {
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -188,11 +188,13 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::SoundtrackNotFound`] when no soundtrack settings exist,
+    /// Returns [`crate::soundtrack::Refusal::SoundtrackNotFound`] when no soundtrack settings exist,
     /// or another typed source, resource, or allocation error.
     pub fn edit_soundtrack_settings(&self) -> Result<Edit<'_>, Error> {
         let mut budget = TransactionBudget::new(self)?;
-        let selection = select(self, &mut budget)?.ok_or(Error::SoundtrackNotFound)?;
+        let selection = select(self, &mut budget)?.ok_or(Error::Refused(
+            crate::soundtrack::Refusal::SoundtrackNotFound,
+        ))?;
         let before = selection.settings;
         Ok(Edit {
             source: self,
@@ -311,7 +313,9 @@ fn validate_mutation_source(
     let catalog = physical_catalog(package)?;
     budget.charge_work(catalog.components().len())?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::soundtrack::Refusal::UnsupportedSource,
+        ));
     }
     for (object, index) in [
         (selection.root, selection.root_message_index),
@@ -795,14 +799,14 @@ fn remaining_wire_limits(
     budget: &TransactionBudget,
 ) -> Result<WireLimits, Error> {
     if budget.remaining_fields() == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: budget.max_fields.saturating_add(1) as u64,
             maximum: budget.max_fields as u64,
         });
     }
     if budget.remaining_work() == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.max_work.saturating_add(1) as u64,
             maximum: budget.max_work as u64,
@@ -822,7 +826,7 @@ fn checked_charge(
 ) -> Result<usize, Error> {
     let observed = current.saturating_add(amount);
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -838,7 +842,11 @@ fn checked_charge(
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
     let source = match &package.state.source {
         super::PhysicalSource::Package(source) => source,
-        super::PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+        super::PhysicalSource::Semantic(_) => {
+            return Err(Error::Refused(
+                crate::soundtrack::Refusal::UnsupportedSource,
+            ));
+        },
     };
     Ok(source.shared_source())
 }
@@ -850,7 +858,9 @@ fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         super::PhysicalSource::Package(source) => Ok(source),
-        super::PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        super::PhysicalSource::Semantic(_) => Err(Error::Refused(
+            crate::soundtrack::Refusal::UnsupportedSource,
+        )),
     }
 }
 
@@ -865,14 +875,14 @@ fn map_document_codec_error(
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_document_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: observed as u64,
                     maximum: maximum as u64,
                 }
             },
             keynote_document_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -882,14 +892,14 @@ fn map_document_codec_error(
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: budget.fields.saturating_add(observed) as u64,
             maximum: budget.fields.saturating_add(maximum) as u64,
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.work.saturating_add(maximum) as u64,
@@ -910,22 +920,22 @@ fn map_soundtrack_codec_error(
         return Error::InvalidSource;
     };
     match limit {
-        soundtrack_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        soundtrack_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: budget.fields.saturating_add(observed) as u64,
             maximum: budget.fields.saturating_add(maximum) as u64,
         },
-        soundtrack_codec::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.work.saturating_add(maximum) as u64,
         },
-        soundtrack_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        soundtrack_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -940,7 +950,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::SemanticLimitKind::Objects => LimitKind::Entries,
                 super::SemanticLimitKind::Slides => LimitKind::Slides,
@@ -957,7 +967,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -985,7 +995,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1024,7 +1034,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1067,7 +1077,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

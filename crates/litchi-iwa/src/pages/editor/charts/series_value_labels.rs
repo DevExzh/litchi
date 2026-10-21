@@ -12,7 +12,7 @@ use crate::charts::series_value_labels::{
 };
 use crate::charts::{ChartSeriesValueLabelLocation, Index, Visibility};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label visibility in native series order.
     pub fn body_chart_series_value_label_visibilities(
         &self,
@@ -115,7 +115,7 @@ impl Editor {
 }
 
 fn body_chart_series_value_label_visibilities(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<Visibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -137,7 +137,7 @@ fn body_chart_series_value_label_visibilities(
 }
 
 fn set_body_chart_series_value_label_visibilities(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     visibilities: &[Visibility],
 ) -> Result<()> {
@@ -176,7 +176,7 @@ fn set_body_chart_series_value_label_visibilities(
         graph.info.kind,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_value_label_visibilities(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series value-label update failed validation".to_owned(),
@@ -187,7 +187,7 @@ fn set_body_chart_series_value_label_visibilities(
 }
 
 fn body_chart_series_value_label_locations(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesValueLabelLocation>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -209,7 +209,7 @@ fn body_chart_series_value_label_locations(
 }
 
 fn set_body_chart_series_value_label_locations(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     locations: &[ChartSeriesValueLabelLocation],
 ) -> Result<()> {
@@ -249,7 +249,7 @@ fn set_body_chart_series_value_label_locations(
         series_count,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_value_label_locations(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart series value-label Location update failed validation".to_owned(),

@@ -4,7 +4,7 @@ use super::*;
 use crate::shapes::{ShapeFill, fill_from_native, fill_to_native, validate_image_asset};
 
 pub(super) fn cell_fill(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -27,7 +27,7 @@ pub(super) fn cell_fill(
 }
 
 pub(super) fn set_cell_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -44,7 +44,7 @@ pub(super) fn set_cell_fill(
 }
 
 pub(super) fn reset_cell_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,

@@ -8,7 +8,7 @@ const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 
 pub(super) fn paragraph_list(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -20,7 +20,7 @@ pub(super) fn paragraph_list(
 }
 
 pub(super) fn set_paragraph_list(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -31,7 +31,7 @@ pub(super) fn set_paragraph_list(
     }
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list(crate::text::native_storage_id(storage_id)?, list)?;
     staged = text.into_package();
     if paragraph_list(&staged, table_id, row, column)? != list {
@@ -44,7 +44,7 @@ pub(super) fn set_paragraph_list(
 }
 
 pub(super) fn reset_paragraph_list(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -57,7 +57,7 @@ pub(super) fn reset_paragraph_list(
 }
 
 pub(super) fn paragraph_lists(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -72,7 +72,7 @@ pub(super) fn paragraph_lists(
 }
 
 pub(super) fn set_paragraph_lists(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -80,10 +80,10 @@ pub(super) fn set_paragraph_lists(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_lists(crate::text::native_storage_id(storage_id)?, placements)?;
     staged = text.into_package();
-    let expected = IWorkTextEditor::from_package(staged.clone())
+    let expected = crate::text::Draft::from_package(staged.clone())
         .paragraph_lists(crate::text::native_storage_id(storage_id)?)?;
     if paragraph_lists(&staged, table_id, row, column)? != expected {
         return Err(Error::InvalidFormat(
@@ -95,7 +95,7 @@ pub(super) fn set_paragraph_lists(
 }
 
 pub(super) fn paragraph_list_levels(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -110,7 +110,7 @@ pub(super) fn paragraph_list_levels(
 }
 
 pub(super) fn paragraph_list_level(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -124,7 +124,7 @@ pub(super) fn paragraph_list_level(
 }
 
 pub(super) fn set_paragraph_list_level(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -138,7 +138,7 @@ pub(super) fn set_paragraph_list_level(
     }
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_level(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -155,7 +155,7 @@ pub(super) fn set_paragraph_list_level(
 }
 
 pub(super) fn reset_paragraph_list_level(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -172,7 +172,7 @@ pub(super) fn reset_paragraph_list_level(
     }
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     let changed =
         text.reset_paragraph_list_level(crate::text::native_storage_id(storage_id)?, paragraph)?;
     staged = text.into_package();
@@ -187,7 +187,7 @@ pub(super) fn reset_paragraph_list_level(
 }
 
 pub(super) fn paragraph_list_numbering(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -201,7 +201,7 @@ pub(super) fn paragraph_list_numbering(
 }
 
 pub(super) fn set_paragraph_list_numbering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -215,7 +215,7 @@ pub(super) fn set_paragraph_list_numbering(
     }
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_numbering(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -234,7 +234,7 @@ pub(super) fn set_paragraph_list_numbering(
 }
 
 pub(super) fn paragraph_list_number_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -250,7 +250,7 @@ pub(super) fn paragraph_list_number_format(
 }
 
 pub(super) fn set_paragraph_list_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -259,7 +259,7 @@ pub(super) fn set_paragraph_list_number_format(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_number_format(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -278,7 +278,7 @@ pub(super) fn set_paragraph_list_number_format(
 }
 
 pub(super) fn reset_paragraph_list_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -288,7 +288,7 @@ pub(super) fn reset_paragraph_list_number_format(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text.reset_paragraph_list_number_format(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -300,7 +300,7 @@ pub(super) fn reset_paragraph_list_number_format(
 }
 
 pub(super) fn paragraph_list_number_tiering(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -316,7 +316,7 @@ pub(super) fn paragraph_list_number_tiering(
 }
 
 pub(super) fn set_paragraph_list_number_tiering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -325,7 +325,7 @@ pub(super) fn set_paragraph_list_number_tiering(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_number_tiering(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -344,7 +344,7 @@ pub(super) fn set_paragraph_list_number_tiering(
 }
 
 pub(super) fn reset_paragraph_list_number_tiering(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -354,7 +354,7 @@ pub(super) fn reset_paragraph_list_number_tiering(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text.reset_paragraph_list_number_tiering(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -366,7 +366,7 @@ pub(super) fn reset_paragraph_list_number_tiering(
 }
 
 pub(super) fn paragraph_list_number_scale(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -382,7 +382,7 @@ pub(super) fn paragraph_list_number_scale(
 }
 
 pub(super) fn set_paragraph_list_number_scale(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -391,7 +391,7 @@ pub(super) fn set_paragraph_list_number_scale(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_number_scale(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -409,7 +409,7 @@ pub(super) fn set_paragraph_list_number_scale(
 }
 
 pub(super) fn reset_paragraph_list_number_scale(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -419,7 +419,7 @@ pub(super) fn reset_paragraph_list_number_scale(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text.reset_paragraph_list_number_scale(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -431,7 +431,7 @@ pub(super) fn reset_paragraph_list_number_scale(
 }
 
 pub(super) fn paragraph_list_bullet(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -447,7 +447,7 @@ pub(super) fn paragraph_list_bullet(
 }
 
 pub(super) fn set_paragraph_list_bullet(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -456,7 +456,7 @@ pub(super) fn set_paragraph_list_bullet(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_bullet(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -473,7 +473,7 @@ pub(super) fn set_paragraph_list_bullet(
 }
 
 pub(super) fn reset_paragraph_list_bullet(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -483,7 +483,7 @@ pub(super) fn reset_paragraph_list_bullet(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed =
         text.reset_paragraph_list_bullet(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
@@ -493,7 +493,7 @@ pub(super) fn reset_paragraph_list_bullet(
 }
 
 pub(super) fn paragraph_list_bullet_geometry(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -509,7 +509,7 @@ pub(super) fn paragraph_list_bullet_geometry(
 }
 
 pub(super) fn set_paragraph_list_bullet_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -518,7 +518,7 @@ pub(super) fn set_paragraph_list_bullet_geometry(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_bullet_geometry(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -537,7 +537,7 @@ pub(super) fn set_paragraph_list_bullet_geometry(
 }
 
 pub(super) fn reset_paragraph_list_bullet_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -547,7 +547,7 @@ pub(super) fn reset_paragraph_list_bullet_geometry(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text.reset_paragraph_list_bullet_geometry(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -559,7 +559,7 @@ pub(super) fn reset_paragraph_list_bullet_geometry(
 }
 
 pub(super) fn paragraph_list_indentation(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -575,7 +575,7 @@ pub(super) fn paragraph_list_indentation(
 }
 
 pub(super) fn set_paragraph_list_indentation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -584,7 +584,7 @@ pub(super) fn set_paragraph_list_indentation(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_indentation(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -603,7 +603,7 @@ pub(super) fn set_paragraph_list_indentation(
 }
 
 pub(super) fn reset_paragraph_list_indentation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -613,7 +613,7 @@ pub(super) fn reset_paragraph_list_indentation(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text
         .reset_paragraph_list_indentation(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
@@ -623,7 +623,7 @@ pub(super) fn reset_paragraph_list_indentation(
 }
 
 pub(super) fn paragraph_list_label_color(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -639,7 +639,7 @@ pub(super) fn paragraph_list_label_color(
 }
 
 pub(super) fn set_paragraph_list_label_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -648,7 +648,7 @@ pub(super) fn set_paragraph_list_label_color(
 ) -> Result<()> {
     let mut staged = package.clone();
     let storage_id = ensure_storage(&mut staged, table_id, row, column)?;
-    let mut text = IWorkTextEditor::from_package(staged);
+    let mut text = crate::text::Draft::from_package(staged);
     text.set_paragraph_list_label_color(
         crate::text::native_storage_id(storage_id)?,
         paragraph,
@@ -666,7 +666,7 @@ pub(super) fn set_paragraph_list_label_color(
 }
 
 pub(super) fn reset_paragraph_list_label_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -676,7 +676,7 @@ pub(super) fn reset_paragraph_list_label_color(
         require_plain_cell_paragraph_start(package, table_id, row, column, paragraph)?;
         return Ok(false);
     };
-    let mut text = IWorkTextEditor::from_package(package.clone());
+    let mut text = crate::text::Draft::from_package(package.clone());
     let changed = text
         .reset_paragraph_list_label_color(crate::text::native_storage_id(storage_id)?, paragraph)?;
     if changed {
@@ -686,7 +686,7 @@ pub(super) fn reset_paragraph_list_label_color(
 }
 
 fn existing_storage_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -720,7 +720,7 @@ fn existing_storage_id(
 }
 
 fn require_plain_cell_paragraph_start(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -753,7 +753,7 @@ fn require_plain_cell_paragraph_start(
 }
 
 fn plain_cell_text(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &model::CellLocation,
     stored: StoredValue,
 ) -> Result<String> {
@@ -853,7 +853,7 @@ fn first_cell_storage_text(storage_id: u64, source: &[u8]) -> Result<String> {
 }
 
 fn ensure_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -928,7 +928,7 @@ fn ensure_storage(
 }
 
 fn promote_plain_cell(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1104,7 +1104,7 @@ fn promote_plain_cell(
 }
 
 fn attach_rich_text_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     table_id: u64,
     list_id: u64,
@@ -1404,7 +1404,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_list(numbers_table, ROW, COLUMN, ParagraphList::Bullet)
             .unwrap();
-        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list(numbers_table, ROW, COLUMN)
@@ -1433,7 +1433,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_list(pages_table, ROW, COLUMN, ParagraphList::Numbered)
             .unwrap();
-        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list(pages_table, ROW, COLUMN)
@@ -1473,7 +1473,7 @@ mod tests {
                 ParagraphList::Bullet,
             )
             .unwrap();
-        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list(0, table.model_object_id, ROW, COLUMN,)
@@ -1483,7 +1483,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_copy_on_write() {
         let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
@@ -1541,7 +1540,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_lists(numbers_table, ROW, COLUMN, &expected)
             .unwrap();
-        let numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let numbers = Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_lists(numbers_table, ROW, COLUMN)
@@ -1565,7 +1564,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_lists(pages_table, ROW, COLUMN, &expected)
             .unwrap();
-        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_lists(pages_table, ROW, COLUMN)
@@ -1599,7 +1598,7 @@ mod tests {
         keynote
             .set_slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN, &expected)
             .unwrap();
-        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_lists(0, table.model_object_id, ROW, COLUMN,)
@@ -1658,7 +1657,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_bullet(numbers_table, ROW, COLUMN, paragraph)
@@ -1768,7 +1767,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_bullet(pages_table, ROW, COLUMN, paragraph)
@@ -1850,7 +1849,7 @@ mod tests {
                 indentation,
             )
             .unwrap();
-        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_bullet(
@@ -1890,7 +1889,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_custom_list_style_copy_on_write() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
         let arrow = ParagraphListBullet::new("➡").unwrap();
@@ -1974,7 +1972,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_mixed_list_copy_on_write() {
         let mut editor = numbers::Builder::new()
             .table_dimensions(3, 3)
@@ -2077,7 +2074,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_levels(numbers_table, ROW, COLUMN)
@@ -2120,7 +2117,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_levels(pages_table, ROW, COLUMN)
@@ -2170,7 +2167,7 @@ mod tests {
                 ParagraphListLevel::ONE,
             )
             .unwrap();
-        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_levels(0, table.model_object_id, ROW, COLUMN,)
@@ -2204,7 +2201,7 @@ mod tests {
         numbers
             .set_table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph, restart)
             .unwrap();
-        let mut numbers = Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+        let mut numbers = Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
         assert_eq!(
             numbers
                 .table_cell_paragraph_list_numbering(numbers_table, ROW, COLUMN, paragraph)
@@ -2246,7 +2243,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph, restart)
             .unwrap();
-        let pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages
                 .table_cell_paragraph_list_numbering(pages_table, ROW, COLUMN, paragraph)
@@ -2296,7 +2293,7 @@ mod tests {
                 restart,
             )
             .unwrap();
-        let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_paragraph_list_numbering(
@@ -2312,7 +2309,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_level_copy_on_write() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
         let mut editor = numbers::Builder::new()
@@ -2372,7 +2368,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn duplicated_rich_text_cells_are_list_numbering_copy_on_write() {
         let paragraph = TextPosition::from_utf16_index(16).unwrap();
         let restart =
@@ -2461,7 +2456,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn plain_cell_default_list_metadata_is_a_validated_no_op() {
         let paragraph = TextPosition::from_utf16_index(9).unwrap();
         let invalid = TextPosition::from_utf16_index(8).unwrap();

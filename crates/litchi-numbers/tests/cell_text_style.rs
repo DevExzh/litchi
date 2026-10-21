@@ -102,24 +102,32 @@ fn refusals_are_typed() -> TestResult {
         package
             .edit_table_cell_text_style(0, 0)?
             .set(At::new(0, 0), CharacterProperties::new()),
-        Err(Error::EmptyStyle)
+        Err(Error::Refused(
+            litchi_numbers::cell::text_style::Refusal::EmptyStyle
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cell_text_style(0, 0)?
             .set(At::new(99, 0), bold()),
-        Err(Error::CellNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::text_style::Refusal::CellNotFound
+        ))
     ));
     assert!(matches!(
         package
             .edit_table_cell_text_style(0, 0)?
             .set(At::new(3, 3), bold())?
             .commit(),
-        Err(Error::EmptyCell)
+        Err(Error::Refused(
+            litchi_numbers::cell::text_style::Refusal::EmptyCell
+        ))
     ));
     assert!(matches!(
         package.edit_table_cell_text_style(0, 0)?.commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_numbers::cell::text_style::Refusal::NoStagedOperation
+        ))
     ));
     Ok(())
 }
@@ -167,7 +175,12 @@ fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
                 assert_eq!(bytes(restored.package())?, source);
                 styled += 1;
             },
-            Err(error @ (Error::UnsupportedDependency | Error::EmptyCell)) => {
+            Err(
+                error @ (Error::Refused(
+                    litchi_numbers::cell::text_style::Refusal::UnsupportedDependency,
+                )
+                | Error::Refused(litchi_numbers::cell::text_style::Refusal::EmptyCell)),
+            ) => {
                 refused.push((path, error));
             },
             Err(error) => panic!("{}: {error:?}", path.display()),

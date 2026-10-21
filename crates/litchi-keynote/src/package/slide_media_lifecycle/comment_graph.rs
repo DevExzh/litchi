@@ -856,7 +856,7 @@ fn comment_decode_options(
     limits: WireLimits,
 ) -> Result<comment_storage_codec::DecodeOptions, Error> {
     if payload.len() > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: super::LimitKind::InputBytes,
             observed: payload.len() as u64,
             maximum: limits.max_input_bytes() as u64,
@@ -883,18 +883,18 @@ fn map_comment_decode_error(error: comment_storage_codec::DecodeError) -> Error 
         return Error::InvalidSource;
     };
     match limit {
-        DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: super::LimitKind::InputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::OutputBytes { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
             kind: super::LimitKind::OutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
         DecodeLimit::References { observed, maximum }
-        | DecodeLimit::Replies { observed, maximum } => Error::LimitExceeded {
+        | DecodeLimit::Replies { observed, maximum } => Error::Limit {
             kind: super::LimitKind::References,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -902,27 +902,27 @@ fn map_comment_decode_error(error: comment_storage_codec::DecodeError) -> Error 
         DecodeLimit::ReferenceBytes { observed, maximum }
         | DecodeLimit::Work { observed, maximum }
         | DecodeLimit::Scratch { observed, maximum }
-        | DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        | DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        DecodeLimit::Allocations { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Allocations { observed, maximum } => Error::Limit {
             kind: super::LimitKind::Allocations,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -946,7 +946,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
                 litchi_iwa_common::LimitKind::RewriteWork => super::LimitKind::WireWork,
                 _ => return Error::InvalidSource,
             };
-            Error::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: limit as u64,

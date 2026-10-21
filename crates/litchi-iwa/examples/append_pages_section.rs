@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse::<u64>()?;
     let name = arguments.next().ok_or("missing section name")?;
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let created = editor.append_section(source_id, &name)?;
     editor.save(output)?;
     println!(

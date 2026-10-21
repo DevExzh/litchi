@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn set_table_dimensions(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     rows: u32,

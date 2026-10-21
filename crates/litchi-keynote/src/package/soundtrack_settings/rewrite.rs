@@ -69,7 +69,7 @@ fn transaction_snappy_limits(
         .checked_sub(compressed_bytes)
         .map_or(0, |available| available / decoded_passes);
     if decoded_allowance == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget
                 .work
@@ -103,7 +103,7 @@ fn map_transaction_snappy_error(
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes,
             observed,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.max_work as u64,

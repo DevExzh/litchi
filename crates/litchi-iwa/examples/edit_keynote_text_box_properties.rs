@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     let mut properties = editor.slide_text_box_properties(slide_index, drawable_id)?;
     properties.locked = locked;
     properties.aspect_ratio_locked = aspect_ratio_locked;

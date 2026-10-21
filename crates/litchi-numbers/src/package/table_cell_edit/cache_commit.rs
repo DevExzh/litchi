@@ -2195,13 +2195,15 @@ fn map_cache_error(error: cache::Failure, path: Path, remaining: budget::Remaini
     match error {
         cache::Failure::InvalidSource => Error::InvalidSource { path },
         cache::Failure::UnsupportedDependency(cache::Unsupported::HeaderNameManager) => {
-            Error::UnsupportedDependency {
-                path,
-                kind: DependencyKind::HeaderNameIndex,
-            }
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::HeaderNameIndex,
+                },
+            )
         },
         cache::Failure::UnsupportedDependency(_) => cache_refusal(path),
-        cache::Failure::LimitExceeded { observed, .. } => Error::LimitExceeded {
+        cache::Failure::LimitExceeded { observed, .. } => Error::Limit {
             kind: LimitKind::FormulaWork,
             observed,
             maximum: remaining.formula_work,
@@ -2250,10 +2252,12 @@ fn sort_work(length: usize, path: Path) -> Result<usize, Error> {
 }
 
 fn cache_refusal(path: Path) -> Error {
-    Error::UnsupportedDependency {
-        path,
-        kind: DependencyKind::FormulaCache,
-    }
+    Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency {
+            path,
+            kind: DependencyKind::FormulaCache,
+        },
+    )
 }
 
 const fn as_u64(value: usize) -> u64 {
@@ -2411,7 +2415,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::RetainedElements,
                 observed: 16,
                 maximum: 15,

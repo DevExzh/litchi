@@ -12,7 +12,7 @@ use crate::charts::legend_style::{
 use crate::protobuf::tsch;
 use crate::shapes::{Stroke, empty_stroke_archive, stroke_from_native, stroke_to_native};
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschlegendmodeldefaultstroke` in `TSCH.Generated.LegendStyleArchive`.
 const LEGEND_STROKE_FIELD: u32 = 5;
@@ -31,7 +31,7 @@ pub enum ChartLegendStroke {
 
 /// Read the exact direct legend-stroke state of one native chart.
 pub(crate) fn chart_legend_stroke(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -47,7 +47,7 @@ pub(crate) fn chart_legend_stroke(
 
 /// Set or remove the direct legend-stroke override of one native chart.
 pub(crate) fn set_chart_legend_stroke(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

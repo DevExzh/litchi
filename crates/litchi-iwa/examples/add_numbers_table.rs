@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rows = arguments.next().ok_or("missing row count")?.parse()?;
     let columns = arguments.next().ok_or("missing column count")?.parse()?;
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     let table = editor.add_empty_table(SheetSelector::index(sheet_index), &name, rows, columns)?;
     editor.save(output)?;
     println!(

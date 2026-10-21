@@ -28,7 +28,7 @@ pub(super) fn object_data_references<'a>(
 }
 
 pub(super) fn registered_subset(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     identifiers: &[u64],
 ) -> Result<Vec<u64>> {
@@ -44,7 +44,7 @@ pub(super) fn registered_subset(
 }
 
 pub(super) fn remapped_registered_subset(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     identifiers: &[u64],
     remap: &HashMap<u64, u64>,
@@ -62,7 +62,7 @@ pub(super) fn remapped_registered_subset(
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn update_component_metadata(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slide_archive_name: &str,
     target_archive_name: &str,
     target_slide_id: u64,

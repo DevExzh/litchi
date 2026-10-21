@@ -250,7 +250,7 @@ fn oversized_body_table_entry_list_is_rejected_before_allocation() -> TestResult
 
     assert!(matches!(
         package.body_table_lock(BodyTableSelector::index(0)),
-        Err(BodyTableLockError::LimitExceeded {
+        Err(BodyTableLockError::Limit {
             kind: BodyTableLockLimitKind::PayloadItems,
             observed: 4_097,
             maximum: 4_096,
@@ -279,7 +279,7 @@ fn cumulative_table_info_wire_budget_has_a_bounded_boundary() -> TestResult<()> 
                 successful_fields = Some(fields);
                 break;
             },
-            Err(BodyTableLockError::LimitExceeded {
+            Err(BodyTableLockError::Limit {
                 kind: BodyTableLockLimitKind::WireFields,
                 ..
             }) if wire_field_boundary.is_none() => wire_field_boundary = Some(fields),
@@ -563,11 +563,15 @@ fn selectors_conflicts_and_unrelated_members_are_checked() -> TestResult<()> {
 
     assert!(matches!(
         package.body_table_lock(BodyTableSelector::name("Missing")),
-        Err(BodyTableLockError::TableNotFound)
+        Err(BodyTableLockError::Refused(
+            litchi_pages::table::lock::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_body_table_lock(BodyTableSelector::index(1)),
-        Err(BodyTableLockError::TableNotFound)
+        Err(BodyTableLockError::Refused(
+            litchi_pages::table::lock::Refusal::TableNotFound
+        ))
     ));
 
     let mut edit = package.edit_body_table_lock(BodyTableSelector::name("Revenue"))?;
@@ -1290,7 +1294,9 @@ fn stale_body_table_metadata_is_not_reported_as_a_missing_table() -> TestResult<
     let empty = Package::from_bytes(&synthetic_package_with_table_count(None, 0)?)?;
     assert!(matches!(
         empty.body_table_lock(BodyTableSelector::index(0)),
-        Err(BodyTableLockError::TableNotFound)
+        Err(BodyTableLockError::Refused(
+            litchi_pages::table::lock::Refusal::TableNotFound
+        ))
     ));
 
     let source = rewrite_document_archive(&synthetic_package(None)?, |archive| {

@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing section ID")?
         .parse::<u64>()?;
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let removed = editor.remove_section(section_id)?;
     editor.save(output)?;
     println!(

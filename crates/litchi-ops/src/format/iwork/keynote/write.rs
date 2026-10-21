@@ -1985,10 +1985,12 @@ pub(crate) fn remove(
             .count();
         let commit = chain
             .package
-            .remove_slide_media(
+            .edit_slide_media_lifecycle()
+            .remove(
                 SlideSelector::index(*slide),
                 litchi_keynote::MovieSelector::index(ordinal),
             )
+            .and_then(|edit| edit.commit())
             .map_err(|error| failure(LeafError::KeynoteMedia(error)))?;
         let patch = commit.patch().clone();
         push(&mut chain, commit.into_package(), Patch::Media(patch));

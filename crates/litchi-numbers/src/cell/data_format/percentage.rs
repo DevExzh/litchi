@@ -11,6 +11,6 @@ pub use super::number::{DecimalPlaces, NegativeStyle, Percentage, ThousandsSepar
 /// explicit Percentage format.
 pub mod transaction {
     pub use crate::package::table_cell_percentage_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

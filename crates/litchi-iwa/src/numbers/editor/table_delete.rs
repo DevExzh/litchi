@@ -40,7 +40,7 @@ impl TableAxis {
     }
 }
 
-impl Editor {
+impl Draft {
     /// Delete one row from a semantic table section and compact following rows.
     ///
     /// Stored values, comments, formula records, headers, stable UIDs, and
@@ -85,7 +85,7 @@ impl Editor {
 }
 
 pub(super) fn remove_attached_table_row(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
@@ -165,7 +165,7 @@ pub(super) fn remove_attached_table_row(
 }
 
 pub(super) fn remove_attached_table_column(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
@@ -258,7 +258,7 @@ pub(super) fn remove_attached_table_column(
 }
 
 fn validate_deletion_features(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     axis: TableAxis,
@@ -404,7 +404,7 @@ fn decremented_header_count(count: usize) -> Result<Option<HeaderCount>> {
 /// Move native merge anchors out of a deleted leading boundary before tile
 /// compaction removes their original cell storage.
 fn relocate_merge_anchors(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     relocations: &[MergeAnchorRelocation],
 ) -> Result<()> {
@@ -452,7 +452,7 @@ fn validated_merge_anchor_sources(
 /// Identify formula anchors whose dependency hosts must survive the deleted
 /// table axis until their exact cell payload is relocated.
 fn merge_anchor_formula_hosts(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     relocations: &[MergeAnchorRelocation],
 ) -> Result<Vec<FormulaHostCoordinate>> {
@@ -500,7 +500,7 @@ fn without_relocated_cells(
 }
 
 fn stored_cells_on_axis(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     axis: TableAxis,
@@ -583,7 +583,7 @@ fn stored_cells_on_axis(
 }
 
 fn clear_stored_cells(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     cells: &[(usize, usize, bool)],
 ) -> Result<()> {
@@ -597,7 +597,7 @@ fn clear_stored_cells(
 }
 
 fn verify_attached_dimensions(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     rows: usize,
     columns: usize,
@@ -616,13 +616,13 @@ fn verify_attached_dimensions(
 }
 
 fn verify_numbers_dimensions(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     rows: usize,
     columns: usize,
     source_built: bool,
 ) -> Result<()> {
-    let verified = Editor::from_validation_bytes(&package.to_bytes()?, source_built)?;
+    let verified = Draft::from_validation_bytes(&package.to_bytes()?, source_built)?;
     let table = verified
         .tables()?
         .into_iter()

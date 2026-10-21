@@ -120,7 +120,7 @@ pub enum Error {
     InvalidSource,
     /// A finite read resource ceiling was exceeded.
     #[error("Pages body-table cells {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -352,7 +352,7 @@ impl TableCellReadBudget for PagesCellReadBudget {
 
 fn check_materialized_cell_limit(observed: usize) -> Result<(), Error> {
     if observed > MAX_MATERIALIZED_CELLS {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),
@@ -442,7 +442,7 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
@@ -451,14 +451,14 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let fields = self.wire.remaining_wire_fields();
         let work = self.wire.remaining_wire_work();
         if fields == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
@@ -509,7 +509,7 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
@@ -518,14 +518,14 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let fields = self.wire.remaining_wire_fields();
         let work = self.wire.remaining_wire_work();
         if fields == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
@@ -568,7 +568,7 @@ impl SidecarReadBudget for PagesCellReadBudget {
         let limits = self.wire.wire_limits();
         let input = source.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
@@ -639,7 +639,7 @@ impl FormulaRenderBudget for PagesCellReadBudget {
     type Error = Error;
 
     fn output_limit(&self, observed: usize) -> Self::Error {
-        Error::LimitExceeded {
+        Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(self.wire.wire_limits().max_output_bytes()),
@@ -667,7 +667,7 @@ impl FormulaRenderBudget for PagesCellReadBudget {
     fn check_structure(&self, nodes: usize, parts: usize) -> Result<(), Self::Error> {
         let maximum = self.wire.remaining_wire_work();
         if nodes > maximum || parts > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: nodes.max(parts) as u64,
                 maximum: usize_as_u64(maximum),
@@ -689,7 +689,7 @@ impl FormulaRenderBudget for PagesCellReadBudget {
 impl FormulaEventRenderBudget for PagesCellReadBudget {
     fn check_render_depth(&self, depth: usize) -> Result<(), Self::Error> {
         if depth > self.wire.wire_limits().max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: usize_as_u64(depth),
                 maximum: usize_as_u64(self.wire.wire_limits().max_nesting()),
@@ -908,14 +908,14 @@ fn formula_name_wire_limits(
     let fields = budget.wire().remaining_wire_fields();
     let work = budget.wire().remaining_wire_work();
     if fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     if work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -923,7 +923,7 @@ fn formula_name_wire_limits(
     }
     let input = work.max(source_len);
     if input > litchi_iwa_common::WireLimits::MAX_INPUT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(input),
             maximum: usize_as_u64(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES),
@@ -1397,7 +1397,7 @@ impl PagesCellSidecarResolver<'_, '_, '_, '_> {
         let limits = self.budget.wire().wire_limits();
         let input = payload.len().max(1);
         if input > limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_as_u64(input),
                 maximum: usize_as_u64(limits.max_input_bytes()),
@@ -1406,14 +1406,14 @@ impl PagesCellSidecarResolver<'_, '_, '_, '_> {
         let fields = self.budget.wire().remaining_wire_fields();
         let work = self.budget.wire().remaining_wire_work();
         if fields == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: 1,
                 maximum: 0,
             });
         }
         if work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
@@ -1591,7 +1591,7 @@ fn map_sidecar_issue(issue: SidecarIssue) -> Error {
 fn map_coordinator_issue(issue: litchi_numbers_wire::table_data_list::CoordinatorIssue) -> Error {
     use litchi_numbers_wire::table_data_list::CoordinatorIssue;
     match issue {
-        CoordinatorIssue::EntryLimit { observed, maximum } => Error::LimitExceeded {
+        CoordinatorIssue::EntryLimit { observed, maximum } => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -1613,50 +1613,50 @@ fn map_coordinator_issue(issue: litchi_numbers_wire::table_data_list::Coordinato
 fn map_comment_decode_error(error: litchi_iwa_protos::comment_storage_codec::DecodeError) -> Error {
     use litchi_iwa_protos::comment_storage_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::References { observed, maximum })
         | Some(DecodeLimit::Replies { observed, maximum })
-        | Some(DecodeLimit::ReferenceBytes { observed, maximum }) => Error::LimitExceeded {
+        | Some(DecodeLimit::ReferenceBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
         Some(DecodeLimit::Allocations { observed, maximum })
-        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::LimitExceeded {
+        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Retained { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -1668,28 +1668,28 @@ fn map_comment_decode_error(error: litchi_iwa_protos::comment_storage_codec::Dec
 fn map_formula_decode_error(error: litchi_iwa_protos::numbers_formula_codec::DecodeError) -> Error {
     use litchi_iwa_protos::numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::Work { observed, maximum })
-        | Some(DecodeLimit::Nodes { observed, maximum }) => Error::LimitExceeded {
+        | Some(DecodeLimit::Nodes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        Some(DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -1704,44 +1704,44 @@ fn map_author_decode_error(
 ) -> Error {
     use litchi_iwa_protos::annotation_author_codec::DecodeLimit;
     match error.resource_limit() {
-        Some(DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::OutputBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
         Some(DecodeLimit::Work { observed, maximum })
         | Some(DecodeLimit::Allocations { observed, maximum })
-        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::LimitExceeded {
+        | Some(DecodeLimit::Scratch { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        Some(DecodeLimit::References { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::References { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Text { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Text { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        Some(DecodeLimit::Retained { observed, maximum }) => Error::LimitExceeded {
+        Some(DecodeLimit::Retained { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
@@ -1756,7 +1756,7 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -1783,7 +1783,7 @@ fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> Erro
             Error::Allocation { amount }
         },
         litchi_iwa_common::table::model::Error::BudgetExceeded { requested, maximum } => {
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(requested),
                 maximum: usize_as_u64(maximum),
@@ -1992,7 +1992,7 @@ fn storage_options(
     let limits = budget.wire_limits();
     let input = source.len().max(1);
     if input > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(input),
             maximum: usize_as_u64(limits.max_input_bytes()),
@@ -2000,7 +2000,7 @@ fn storage_options(
     }
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
@@ -2008,7 +2008,7 @@ fn storage_options(
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -2081,32 +2081,32 @@ fn map_storage_error(error: storage::DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        storage::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
-        storage::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -2122,15 +2122,23 @@ fn map_storage_error(error: storage::DecodeError) -> Error {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::TableNotFound
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::AmbiguousTableName
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
+        },
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
@@ -2244,7 +2252,7 @@ mod tests {
             .expect_err("selection and cell traversal must exceed the shared field ceiling");
         assert!(matches!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireFields,
                 observed,
                 maximum,
@@ -2276,7 +2284,7 @@ mod tests {
             .expect_err("the next cumulative cell must be refused");
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
                 maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),

@@ -85,7 +85,7 @@ use litchi_keynote::{
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
 
-pub(super) fn focused_chart_catalog(editor: &Editor, slide_index: usize) -> Result<ChartCatalog> {
+pub(super) fn focused_chart_catalog(editor: &Draft, slide_index: usize) -> Result<ChartCatalog> {
     let bytes = editor.to_bytes()?;
     let package = litchi_keynote::Package::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -120,7 +120,7 @@ pub struct RemovedKeynoteSlideChart {
     pub chart: SlideChartInfo,
 }
 
-impl Editor {
+impl Draft {
     /// List charts owned directly by one slide in z-order.
     pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<SlideChartInfo>> {
         let (mut charts, chart_positions) = self.slide_charts_without_arrangements(slide_index)?;
@@ -620,7 +620,6 @@ impl Editor {
 
     /// Remove a standalone slide chart and its private title, caption, and styles.
     /// `selector` uses checked chart order or an exact visible chart title.
-    #[allow(deprecated)]
     pub fn remove_slide_chart(
         &mut self,
         slide_index: usize,
@@ -636,7 +635,7 @@ impl Editor {
         )?;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -779,7 +778,7 @@ fn chart_data_shape_and_labels_match(before: &ChartData, after: &ChartData) -> b
 }
 
 fn set_focused_slide_chart_data(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     chart_position: usize,
     data: ChartData,
@@ -810,7 +809,7 @@ fn set_focused_slide_chart_data(
                 "focused Keynote chart data package write failed: {error}"
             ))
         })?;
-    let verified = Editor::from_bytes(&target_bytes)?;
+    let verified = Draft::from_bytes(&target_bytes)?;
     *editor = verified;
     Ok(())
 }
@@ -832,7 +831,7 @@ fn map_chart_selector_error(slide_index: usize, error: ChartSelectorError) -> Er
 }
 
 #[cfg(test)]
-pub(crate) fn chart_selector(editor: &Editor, chart: &SlideChartInfo) -> ChartSelector<'static> {
+pub(crate) fn chart_selector(editor: &Draft, chart: &SlideChartInfo) -> ChartSelector<'static> {
     let index = editor
         .slide_charts(chart.slide_index)
         .expect("chart selector test catalog")
@@ -843,7 +842,7 @@ pub(crate) fn chart_selector(editor: &Editor, chart: &SlideChartInfo) -> ChartSe
 }
 
 fn update_chart_payload(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     update: impl FnOnce(&mut IWorkChartArchive) -> Result<()>,
@@ -871,7 +870,7 @@ fn update_chart_payload(
 }
 
 fn update_chart_payload_with_grid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     encoded_grid: &litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput,

@@ -72,7 +72,9 @@ fn metadata_edits_round_trip_and_invert() -> TestResult {
     let mut refused = package.edit_metadata();
     assert!(matches!(
         refused.set_keywords(&["a, b".to_owned()]),
-        Err(MetadataError::InvalidKeyword)
+        Err(MetadataError::Refused(
+            litchi_pages::metadata::Refusal::InvalidKeyword
+        ))
     ));
 
     let restored = commit.package().apply_metadata(&commit.patch().inverse())?;
@@ -100,7 +102,9 @@ fn metadata_edits_round_trip_and_invert() -> TestResult {
     let mut invalid = package.edit_metadata();
     assert!(matches!(
         invalid.set_title(Some("a\0b")),
-        Err(MetadataError::InvalidValue)
+        Err(MetadataError::Refused(
+            litchi_pages::metadata::Refusal::InvalidValue
+        ))
     ));
     Ok(())
 }

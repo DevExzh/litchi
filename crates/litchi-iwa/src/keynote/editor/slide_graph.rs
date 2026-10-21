@@ -27,7 +27,7 @@ pub(super) struct ObjectGraph {
 }
 
 impl ObjectGraph {
-    pub(super) fn read(package: &IWorkPackage) -> Result<Self> {
+    pub(super) fn read(package: &HostPackage) -> Result<Self> {
         let mut objects = HashMap::new();
         let mut archives = HashMap::new();
         for name in package.iwa_entry_names() {
@@ -159,7 +159,7 @@ impl ObjectGraph {
 }
 
 pub(super) fn offset_keynote_drawable_clone(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     offset: f32,
@@ -234,7 +234,7 @@ pub(super) fn offset_keynote_drawable_clone(
 }
 
 pub(super) fn patch_slide_drawable_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     slide_id: u64,
     remove: Option<u64>,
@@ -369,7 +369,7 @@ pub(super) fn patch_slide_drawable_references(
     })
 }
 
-pub(super) fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<bool> {
+pub(super) fn package_references_object(package: &HostPackage, identifier: u64) -> Result<bool> {
     for name in package.iwa_entry_names() {
         for object in package.archive(name)?.objects {
             if object.archive_info.message_infos.iter().any(|info| {
@@ -480,7 +480,6 @@ pub(super) fn remap_reference_paths(
     })
 }
 
-#[allow(deprecated)]
 pub(super) fn remap_slide_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1],
@@ -515,7 +514,6 @@ pub(super) fn remap_slide_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -
     Ok(data)
 }
 
-#[allow(deprecated)]
 pub(super) fn remap_shape_info_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 1, 2],
@@ -683,7 +681,6 @@ pub(super) fn remap_storage_archive_wire(
     Ok(data)
 }
 
-#[allow(deprecated)]
 fn remap_caption_info_archive_wire(data: &[u8], remap: &HashMap<u64, u64>) -> Result<Vec<u8>> {
     const REFERENCE_PATHS: &[&[u32]] = &[
         &[1, 1, 1, 2],
@@ -1026,7 +1023,7 @@ pub(super) fn remap_storage_archive(storage: &mut tswp::StorageArchive, remap: &
 }
 
 pub(super) fn remove_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifier: u64,
 ) -> Result<()> {

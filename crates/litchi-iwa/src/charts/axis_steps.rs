@@ -18,7 +18,7 @@ use crate::charts::axis::{
 };
 use crate::protobuf::tsch;
 use crate::wire::patch_varint_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartaxisvaluenumberofmajorgridlines` in
 /// `TSCH.Generated.ChartAxisNonStyleArchive`.
@@ -28,7 +28,7 @@ const VALUE_AXIS_MAJOR_STEPS_FIELD: u32 = 5;
 const VALUE_AXIS_MINOR_STEPS_FIELD: u32 = 6;
 /// Read the scale steps of one native chart's primary value axis.
 pub(crate) fn chart_value_axis_steps(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -45,7 +45,7 @@ pub(crate) fn chart_value_axis_steps(
 
 /// Set the scale steps of one native chart's primary value axis.
 pub(crate) fn set_chart_value_axis_steps(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

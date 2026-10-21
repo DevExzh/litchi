@@ -8,7 +8,7 @@ use crate::charts::radar_series_style::{
     set_chart_radar_series_style as set_native_radar_style,
 };
 
-impl Editor {
+impl Draft {
     /// Read the chart-wide Radar `Style` selection.
     pub fn sheet_chart_radar_series_style(
         &self,
@@ -58,7 +58,7 @@ impl Editor {
             series_count,
             style,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_radar_series_style(sheet_id, drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Numbers Radar series-style update failed validation".to_owned(),

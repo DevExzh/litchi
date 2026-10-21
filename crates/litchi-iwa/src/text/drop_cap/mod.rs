@@ -13,14 +13,14 @@ use crate::package_metadata::{
     next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
 };
 use crate::shapes::{insert_style_variation, remove_style_variation};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use crate::text::style_registry::{
     register_private_style, unregister_owner_reference_if_unused, unregister_private_style,
 };
 
 pub(super) fn paragraph_drop_caps(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<Placement>> {
     let storage = storage::locate(package, storage_id)?;
@@ -54,7 +54,7 @@ pub(super) fn paragraph_drop_caps(
 }
 
 pub(super) fn paragraph_drop_cap(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<Option<DropCap>> {
@@ -65,7 +65,7 @@ pub(super) fn paragraph_drop_cap(
 }
 
 pub(super) fn set_paragraph_drop_cap(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     drop_cap: DropCap,
@@ -151,7 +151,7 @@ pub(super) fn set_paragraph_drop_cap(
 }
 
 pub(super) fn remove_paragraph_drop_cap(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<bool> {
@@ -225,7 +225,7 @@ fn validate_style_ownership(
 }
 
 fn validate_drop_cap(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     expected: Option<DropCap>,

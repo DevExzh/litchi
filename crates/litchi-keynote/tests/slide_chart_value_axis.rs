@@ -495,7 +495,12 @@ mod value_axis {
             .edit_slide_chart_value_axis_settings(SlideSelector::index(0), ChartSelector::index(0))?
             .set(invalid)
             .expect_err("logarithmic axes must have positive manual bounds");
-        assert!(matches!(error, ChartValueAxisError::InvalidSettings));
+        assert!(matches!(
+            error,
+            ChartValueAxisError::Refused(
+                litchi_keynote::chart::value_axis::Refusal::InvalidSettings
+            )
+        ));
         error_is_redacted(&error);
         assert_eq!(exact_bytes(&package)?, before);
         Ok(())
@@ -995,7 +1000,7 @@ mod value_axis {
         error_is_redacted(&error);
         assert!(matches!(
             error,
-            ChartValueAxisError::LimitExceeded {
+            ChartValueAxisError::Limit {
                 kind: ChartValueAxisLimitKind::OutputBytes,
                 ..
             }

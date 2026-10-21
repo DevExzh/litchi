@@ -7,7 +7,7 @@ use crate::package_metadata::{
     release_package_identifier_suffix, remove_component_external_references_to_object,
     remove_component_object_uuids, set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::editor::replace_storage_text;
 use super::number_attachment_object::{
@@ -30,7 +30,7 @@ use litchi_iwa_text::position::TextPosition;
 const OBJECT_REPLACEMENT_CHARACTER: &str = "\u{fffc}";
 
 pub(crate) fn text_number_attachments(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<TextNumberAttachment>> {
     let located = locate_attachment_storage_with_archive(package, storage_id)?;
@@ -64,7 +64,7 @@ pub(crate) fn text_number_attachments(
 }
 
 pub(crate) fn insert_text_number_attachment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     position: TextPosition,
     settings: &TextNumberAttachmentSettings,
@@ -106,7 +106,7 @@ pub(crate) fn insert_text_number_attachment(
 }
 
 pub(crate) fn update_text_number_attachment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextNumberAttachmentId,
     settings: &TextNumberAttachmentSettings,
@@ -136,7 +136,7 @@ pub(crate) fn update_text_number_attachment(
 }
 
 pub(crate) fn remove_text_number_attachment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextNumberAttachmentId,
 ) -> Result<TextNumberAttachment> {
@@ -168,7 +168,7 @@ pub(crate) fn remove_text_number_attachment(
 }
 
 pub(crate) fn remove_unreferenced_number_attachment_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {
@@ -223,7 +223,7 @@ pub(crate) fn remove_unreferenced_number_attachment_objects(
 }
 
 fn number_attachment_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     id: TextNumberAttachmentId,
 ) -> Result<TextNumberAttachment> {
@@ -245,8 +245,8 @@ fn number_attachment_by_id(
     Ok(attachment)
 }
 
-fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
-    IWorkPackage::from_bytes(&package.to_bytes()?)
+fn roundtrip(package: &HostPackage) -> Result<HostPackage> {
+    HostPackage::from_bytes(&package.to_bytes()?)
 }
 
 #[cfg(test)]

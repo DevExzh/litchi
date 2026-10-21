@@ -12,6 +12,6 @@ pub use super::number::{Fraction, FractionAccuracy};
 /// explicit Fraction format.
 pub mod transaction {
     pub use crate::package::table_cell_fraction_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

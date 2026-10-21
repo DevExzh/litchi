@@ -7,7 +7,7 @@ use crate::charts::pie_start_angle::{
     set_chart_pie_start_angle as set_native_chart_pie_start_angle,
 };
 
-impl Editor {
+impl Draft {
     /// Read the Wedges rotation angle of one pie or donut chart.
     pub fn sheet_chart_pie_start_angle(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn sheet_chart_pie_start_angle(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<ChartPieStartAngle> {
@@ -44,7 +44,7 @@ fn sheet_chart_pie_start_angle(
 }
 
 fn set_sheet_chart_pie_start_angle(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     angle: ChartPieStartAngle,
@@ -68,7 +68,7 @@ fn set_sheet_chart_pie_start_angle(
         "Numbers",
         angle,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_pie_start_angle(sheet_id, drawable_object_id)? != angle {
         return Err(Error::InvalidFormat(
             "Numbers chart pie start-angle update failed validation".to_owned(),

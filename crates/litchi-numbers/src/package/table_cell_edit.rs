@@ -325,7 +325,7 @@ fn prepare_formula_dependency_tiles(
     plan_remaining.transaction_work = plan_remaining
         .transaction_work
         .checked_sub(structural_usage.transaction_work)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: structural_usage.transaction_work,
             maximum: remaining.transaction_work,
@@ -534,7 +534,7 @@ impl Package {
                 .ok_or(Error::InvalidSource { path: patch.path() })?,
         );
         if locality_byte_bound > locality_remaining.locality_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: locality_byte_bound,
                 maximum: locality_remaining.locality_bytes,
@@ -546,7 +546,7 @@ impl Package {
         let locality_work = locality_remaining
             .transaction_work
             .checked_sub(admitted_apply_work)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: admitted_apply_work,
                 maximum: locality_remaining.transaction_work,
@@ -629,10 +629,12 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
     for change in &changes {
         let position = change.position();
         if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
-            return Err(Error::OutOfBounds {
-                position,
-                dimensions,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::OutOfBounds {
+                    position,
+                    dimensions,
+                },
+            ));
         }
     }
 
@@ -655,7 +657,7 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
     let mut changed_owned_value_bytes = 0usize;
     for change in &changes {
         if !semantic_change_is_noop(selected.table, change) {
-            changed_count = changed_count.checked_add(1).ok_or(Error::LimitExceeded {
+            changed_count = changed_count.checked_add(1).ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::Updates,
                 observed: u64::MAX,
                 maximum: u64::MAX - 1,
@@ -663,7 +665,7 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
             })?;
             changed_owned_value_bytes = changed_owned_value_bytes
                 .checked_add(change.input_ref().map_or(0, Input::owned_bytes))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::OwnedValueBytes,
                     observed: u64::MAX,
                     maximum: u64::MAX - 1,
@@ -792,18 +794,21 @@ fn commit_existing_scalar_tiles(
     // formula/cache no-op can still be proved below; every remaining
     // non-formula mutation must retain the ordinary locked-table refusal.
     if target.native.locked == crate::table::lock::State::Locked && !has_formula_input {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::TableLocked { path },
+        ));
     }
     let needs_formula_context = has_formula_input || target.storage.lists.formula.entries != 0;
     let mut formula_context = if needs_formula_context {
-        let selected_owner =
-            target
-                .dependencies
-                .selected_formula_owner
-                .ok_or(Error::UnsupportedDependency {
+        let selected_owner = target
+            .dependencies
+            .selected_formula_owner
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
                     path,
                     kind: crate::package::table_cells::DependencyKind::Formula,
-                })?;
+                },
+            ))?;
         let local_path = formula_author::ReferencedTablePath {
             sheet: u32::try_from(sheet_position).map_err(|_| Error::InvalidSource { path })?,
             table: u32::try_from(table_position).map_err(|_| Error::InvalidSource { path })?,
@@ -992,10 +997,12 @@ fn commit_existing_scalar_tiles(
                     .binary_search_by_key(referenced, |(path, _)| *path)
                     .is_err()
         }) {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ));
         }
         let authored = formula_author::prepare(
             source,
@@ -1113,7 +1120,9 @@ fn commit_existing_scalar_tiles(
                 ));
             }
             if target.native.locked == crate::table::lock::State::Locked {
-                return Err(Error::TableLocked { path });
+                return Err(Error::Refused(
+                    crate::package::table_cells::Refusal::TableLocked { path },
+                ));
             }
             let orchestration_work = existing
                 .formula_list
@@ -1715,10 +1724,12 @@ fn commit_existing_scalar_tiles(
             .is_err()
     }) {
         if !cache_prepared.tiles.is_empty() {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::FormulaCache,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::FormulaCache,
+                },
+            ));
         }
         return sparse_commit::commit_sparse_scalar_tiles(
             source,
@@ -1806,10 +1817,12 @@ fn commit_existing_scalar_tiles(
         text_change_indices.push(change_index);
     }
     if !text_requests.is_empty() && !target.storage.lists.string.segments.is_empty() {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::SharedString,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::SharedString,
+            },
+        ));
     }
     let string_list_payload = message_payload(source, target.storage.lists.string.message, path)?;
     let mut string_keys = Vec::new();
@@ -1885,22 +1898,21 @@ fn commit_existing_scalar_tiles(
         .tiles
         .iter()
         .try_fold(0usize, |count, tile| count.checked_add(tile.changes.len()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_elements,
             path,
         })?;
-    let final_row_capacity =
-        changes
-            .len()
-            .checked_add(cache_row_capacity)
-            .ok_or(Error::LimitExceeded {
-                kind: crate::package::table_cells::LimitKind::RetainedElements,
-                observed: u64::MAX,
-                maximum: budget.limits().max_retained_elements,
-                path,
-            })?;
+    let final_row_capacity = changes
+        .len()
+        .checked_add(cache_row_capacity)
+        .ok_or(Error::Limit {
+            kind: crate::package::table_cells::LimitKind::RetainedElements,
+            observed: u64::MAX,
+            maximum: budget.limits().max_retained_elements,
+            path,
+        })?;
     let formula_list_binding_capacity = if prepared_formula_list.is_some() {
         target
             .storage
@@ -1933,7 +1945,7 @@ fn commit_existing_scalar_tiles(
         .and_then(|count| count.checked_add(cache_prepared.tiles.len()))
         .and_then(|count| count.checked_add(final_row_capacity))
         .and_then(|count| count.checked_add(1))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedElements,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_elements,
@@ -2017,10 +2029,12 @@ fn commit_existing_scalar_tiles(
             .binary_search_by_key(&tile_id, |route| route.tile_id)
             .ok()
             .and_then(|index| target.storage.tiles.get(index))
-            .ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::CellStorage,
-            })?;
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::CellStorage,
+                },
+            ))?;
         let source_payload = message_payload(source, route.message, path)?;
         let mut tile_changes = Vec::new();
         reserve_retained_vec::<tile::TileChange>(&mut budget, end - start, path)?;
@@ -2050,7 +2064,7 @@ fn commit_existing_scalar_tiles(
             });
         }
         let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
-        let maximum_work = maximum_wire.checked_mul(32).ok_or(Error::LimitExceeded {
+        let maximum_work = maximum_wire.checked_mul(32).ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::WireWork,
             observed: u64::MAX,
             maximum: usize_u64(maximum_wire),
@@ -2211,10 +2225,12 @@ fn commit_existing_scalar_tiles(
             .storage
             .row_headers
             .get(usize::try_from(bucket_index).map_err(|_error| Error::InvalidSource { path })?)
-            .ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::CellStorage,
-            })?;
+            .ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::CellStorage,
+                },
+            ))?;
         let remaining = budget.remaining()?;
         let limits = sparse_commit::sparse_limits(source, row_end - row_start, remaining, path)?;
         budget.authorize(remaining)?;
@@ -2261,10 +2277,12 @@ fn commit_existing_scalar_tiles(
     let mut prepared_string_list = None;
     if !text_requests.is_empty() || !releases.is_empty() {
         if !target.storage.lists.string.segments.is_empty() {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::SharedString,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::SharedString,
+                },
+            ));
         }
         let remaining = budget.remaining()?;
         let limits = string_list_limits(source, changes.len(), path, remaining)?;
@@ -4040,10 +4058,12 @@ fn ensure_formula_owner_context_coverage(
             .ok_or(Error::InvalidSource { path })?;
     budget.record_authorized(usage)?;
     if !external_valid || !owners_covered {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ));
     }
     Ok(())
 }
@@ -4190,10 +4210,12 @@ fn extend_formula_referenced_paths(
                     .ok()
                     .and_then(|index| owner_index.get(index))
                     .map(|entry| entry.1)
-                    .ok_or(Error::UnsupportedDependency {
-                        path,
-                        kind: crate::package::table_cells::DependencyKind::FormulaCache,
-                    })?;
+                    .ok_or(Error::Refused(
+                        crate::package::table_cells::Refusal::UnsupportedDependency {
+                            path,
+                            kind: crate::package::table_cells::DependencyKind::FormulaCache,
+                        },
+                    ))?;
                 final_paths.push(referenced);
             }
         }
@@ -4236,14 +4258,15 @@ fn prepare_formula_cache_registry<'source>(
     ),
     Error,
 > {
-    let selected_owner =
-        selected
-            .dependencies
-            .selected_formula_owner
-            .ok_or(Error::UnsupportedDependency {
+    let selected_owner = selected
+        .dependencies
+        .selected_formula_owner
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
                 path,
                 kind: crate::package::table_cells::DependencyKind::FormulaCache,
-            })?;
+            },
+        ))?;
     let table_count = context
         .external_targets
         .len()
@@ -4337,14 +4360,15 @@ fn prepare_formula_cache_registry<'source>(
                 .map_err(|_| Error::InvalidSource { path })?,
         });
         for (referenced, target) in &context.external_targets {
-            let owner =
-                target
-                    .dependencies
-                    .selected_formula_owner
-                    .ok_or(Error::UnsupportedDependency {
+            let owner = target
+                .dependencies
+                .selected_formula_owner
+                .ok_or(Error::Refused(
+                    crate::package::table_cells::Refusal::UnsupportedDependency {
                         path,
                         kind: crate::package::table_cells::DependencyKind::FormulaCache,
-                    })?;
+                    },
+                ))?;
             let table = source
                 .sheets()
                 .get(usize::try_from(referenced.sheet).map_err(|_| Error::InvalidSource { path })?)
@@ -4413,14 +4437,15 @@ fn prepare_narrow_formula_metadata<'source>(
     budget: &mut budget::TransactionBudget,
     path: crate::package::table_cells::Path,
 ) -> Result<formula_metadata::PreparedGraph<'source>, Error> {
-    let selected =
-        target
-            .dependencies
-            .selected_formula_owner
-            .ok_or(Error::UnsupportedDependency {
+    let selected = target
+        .dependencies
+        .selected_formula_owner
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
                 path,
                 kind: crate::package::table_cells::DependencyKind::Formula,
-            })?;
+            },
+        ))?;
     let owner = target
         .dependencies
         .formula_owners
@@ -4428,10 +4453,12 @@ fn prepare_narrow_formula_metadata<'source>(
         .find(|candidate| {
             candidate.formula_owner_object_id == Some(target.native.drawable_identifier)
         })
-        .ok_or(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        })?;
+        .ok_or(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ))?;
     let authored = context.authored.formulas.as_slice();
     for formula in authored {
         let coordinate = (formula.position.row(), formula.position.column());
@@ -4444,13 +4471,12 @@ fn prepare_narrow_formula_metadata<'source>(
             return Err(Error::Verification { path });
         }
     }
-    let engine_route = target
-        .dependencies
-        .engine
-        .ok_or(Error::UnsupportedDependency {
+    let engine_route = target.dependencies.engine.ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedDependency {
             path,
             kind: crate::package::table_cells::DependencyKind::Formula,
-        })?;
+        },
+    ))?;
     if selected.message != owner.message
         || selected.internal_owner_id != owner.internal_owner_id
         || selected.uid_lower != owner.uid_lower
@@ -4460,10 +4486,12 @@ fn prepare_narrow_formula_metadata<'source>(
         || !owner.range_precedent_tiles.is_empty()
         || !existing.formula_list.segments.is_empty()
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::Formula,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::Formula,
+            },
+        ));
     }
     let existing_host_count = existing.formula_list.hosts.len();
     let engine = metadata_source_message(source, engine_route, path)?;
@@ -4827,7 +4855,7 @@ fn prepare_narrow_formula_metadata<'source>(
         || precedent_upper > limits.max_precedents
         || source_fact_upper > limits.max_ranges
     {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             path,
             kind: crate::package::table_cells::LimitKind::FormulaWork,
             observed: usize_u64(
@@ -4920,14 +4948,12 @@ fn reserve_retained_vec<T>(
     capacity: usize,
     path: crate::package::table_cells::Path,
 ) -> Result<(), Error> {
-    let bytes = capacity
-        .checked_mul(size_of::<T>())
-        .ok_or(Error::LimitExceeded {
-            kind: crate::package::table_cells::LimitKind::RetainedBytes,
-            observed: u64::MAX,
-            maximum: budget.limits().max_retained_bytes,
-            path,
-        })?;
+    let bytes = capacity.checked_mul(size_of::<T>()).ok_or(Error::Limit {
+        kind: crate::package::table_cells::LimitKind::RetainedBytes,
+        observed: u64::MAX,
+        maximum: budget.limits().max_retained_bytes,
+        path,
+    })?;
     budget.reserve_retained(
         usize_u64(capacity),
         usize_u64(bytes),
@@ -5122,7 +5148,7 @@ fn preflight_usage(
     macro_rules! require {
         ($field:ident, $kind:expr) => {
             if usage.$field > remaining.$field {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: $kind,
                     observed: usage.$field,
                     maximum: remaining.$field,
@@ -5175,7 +5201,7 @@ fn caller_staging_usage(
         staging_usage
             .change_capacity()
             .checked_add(updates)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::RetainedElements,
                 observed: u64::MAX,
                 maximum: budget.limits().max_retained_elements,
@@ -5190,7 +5216,7 @@ fn caller_staging_usage(
                 .and_then(|live| bytes.checked_add(live))
         })
         .and_then(|bytes| bytes.checked_add(owned_value_bytes))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::RetainedBytes,
             observed: u64::MAX,
             maximum: budget.limits().max_retained_bytes,
@@ -5202,7 +5228,7 @@ fn caller_staging_usage(
         retained_elements: usize_u64(retained_elements),
         retained_bytes: usize_u64(retained_bytes),
         allocation_events: usize_u64(staging_usage.allocation_events().checked_add(1).ok_or(
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: budget.limits().max_allocation_events,
@@ -5226,7 +5252,7 @@ fn resolve_usage(
         .work
         .checked_add(report.ownership.transaction_work)
         .and_then(|work| work.checked_add(report.codecs.work_bytes))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: budget.limits().max_transaction_work,
@@ -5245,7 +5271,7 @@ fn resolve_usage(
                 .codecs
                 .references
                 .checked_add(report.ownership.references)
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::References,
                     observed: u64::MAX,
                     maximum: budget.limits().max_references,
@@ -5280,7 +5306,7 @@ fn tile_usage(
             .checked_add(report.cell_slots_scanned)
             .and_then(|work| work.checked_add(report.cell_slots_written))
             .and_then(|work| work.checked_add(report.output_bytes))
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: budget.limits().max_transaction_work,
@@ -5345,16 +5371,15 @@ fn formula_list_usage(
     report: formula_list::Report,
     path: crate::package::table_cells::Path,
 ) -> Result<budget::Usage, Error> {
-    let transaction_work =
-        report
-            .work
-            .checked_add(report.output_bytes)
-            .ok_or(Error::LimitExceeded {
-                kind: crate::package::table_cells::LimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::MAX,
-                path,
-            })?;
+    let transaction_work = report
+        .work
+        .checked_add(report.output_bytes)
+        .ok_or(Error::Limit {
+            kind: crate::package::table_cells::LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::MAX,
+            path,
+        })?;
     Ok(budget::Usage {
         wire_bytes: usize_u64(report.input_bytes),
         wire_fields: usize_u64(report.fields),
@@ -5458,7 +5483,7 @@ fn map_formula_list_error(
             resource,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 formula_list::Resource::InputBytes => {
                     crate::package::table_cells::LimitKind::WireBytes
@@ -5720,7 +5745,7 @@ fn map_formula_metadata_error(
             resource,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: if resource.contains("output") {
                 crate::package::table_cells::LimitKind::OutputBytes
             } else if resource.contains("field") {
@@ -5778,10 +5803,12 @@ fn rich_archive_reference_delta(
                 || rich.after.contains(identifier)
         })
     {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::RichText,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::RichText,
+            },
+        ));
     }
     let info = source
         .state
@@ -5792,10 +5819,12 @@ fn rich_archive_reference_delta(
         .and_then(|object| object.archive_info.message_infos.get(route.message_index))
         .ok_or(Error::InvalidSource { path })?;
     if !info.field_infos.is_empty() {
-        return Err(Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::RichText,
-        });
+        return Err(Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::RichText,
+            },
+        ));
     }
     for identifier in &rich.removed {
         if info
@@ -5845,10 +5874,12 @@ fn scalar_change(
 ) -> Result<tile::BncChange, Error> {
     Ok(match change.input_ref() {
         Some(Input::Formula { .. }) => {
-            return Err(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            });
+            return Err(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ));
         },
         None => tile::BncChange::Clear,
         Some(Input::Number(value)) => tile::BncChange::Set(tile::ScalarInput::Number(*value)),
@@ -5897,10 +5928,12 @@ fn validate_prepared_tile_transitions(
                         && !(owned_rich == transition.before_references.rich_text
                             && owned_rich == transition.after_references.rich_text)
                     {
-                        validation_error = Some(Error::UnsupportedDependency {
-                            path,
-                            kind: crate::package::table_cells::DependencyKind::RichText,
-                        });
+                        validation_error = Some(Error::Refused(
+                            crate::package::table_cells::Refusal::UnsupportedDependency {
+                                path,
+                                kind: crate::package::table_cells::DependencyKind::RichText,
+                            },
+                        ));
                         return;
                     }
                     let authorized_formula_replacement = formula_publication
@@ -5941,10 +5974,12 @@ fn validate_prepared_tile_transitions(
                                 tile::CellValue::Formula { .. } | tile::CellValue::Error(_)
                             ))
                     {
-                        validation_error = Some(Error::UnsupportedDependency {
-                            path,
-                            kind: crate::package::table_cells::DependencyKind::Formula,
-                        });
+                        validation_error = Some(Error::Refused(
+                            crate::package::table_cells::Refusal::UnsupportedDependency {
+                                path,
+                                kind: crate::package::table_cells::DependencyKind::Formula,
+                            },
+                        ));
                         return;
                     }
                     cursor += 1;
@@ -5979,7 +6014,7 @@ fn string_list_limits(
     remaining: budget::Remaining,
 ) -> Result<lists::ListLimits, Error> {
     let package_wire = source.state.options.archive().max_iwa_stream_bytes();
-    let package_work = package_wire.checked_mul(32).ok_or(Error::LimitExceeded {
+    let package_work = package_wire.checked_mul(32).ok_or(Error::Limit {
         kind: crate::package::table_cells::LimitKind::WireWork,
         observed: u64::MAX,
         maximum: usize_u64(package_wire),
@@ -6041,7 +6076,7 @@ fn string_list_prepare_usage(
         wire_bytes: usize_u64(
             root.source_bytes()
                 .checked_add(entries.source_bytes())
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::MAX,
@@ -6111,7 +6146,7 @@ fn assignment_usage(
         wire_bytes: usize_u64(
             root.source_bytes()
                 .checked_add(entries.source_bytes())
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: crate::package::table_cells::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: budget.limits().max_wire_bytes,
@@ -6160,7 +6195,7 @@ fn map_list_error(error: lists::Failure, path: crate::package::table_cells::Path
         },
         lists::Failure::LimitExceeded {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
@@ -6175,22 +6210,28 @@ fn map_list_error(error: lists::Failure, path: crate::package::table_cells::Path
 
 fn map_tile_error(error: tile::TileError, path: crate::package::table_cells::Path) -> Error {
     match error {
-        tile::TileError::NeedSparse { .. } => Error::UnsupportedDependency {
-            path,
-            kind: crate::package::table_cells::DependencyKind::CellStorage,
-        },
+        tile::TileError::NeedSparse { .. } => Error::Refused(
+            crate::package::table_cells::Refusal::UnsupportedDependency {
+                path,
+                kind: crate::package::table_cells::DependencyKind::CellStorage,
+            },
+        ),
         tile::TileError::Allocation { amount } => Error::Allocation {
             kind: crate::package::table_cells::LimitKind::PeakScratchBytes,
             amount,
         },
-        tile::TileError::LimitExceeded { observed, maximum } => Error::LimitExceeded {
+        tile::TileError::LimitExceeded { observed, maximum } => Error::Limit {
             kind: crate::package::table_cells::LimitKind::WireWork,
             observed,
             maximum,
             path,
         },
-        tile::TileError::UnsupportedValue { .. } => Error::UnsupportedSource { path },
-        tile::TileError::UnsupportedSource { .. } => Error::UnsupportedSource { path },
+        tile::TileError::UnsupportedValue { .. } => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
+        tile::TileError::UnsupportedSource { .. } => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
         tile::TileError::InvalidSource
         | tile::TileError::DuplicateOrUnsortedChange { .. }
         | tile::TileError::OutOfBounds { .. } => Error::InvalidSource { path },
@@ -6202,13 +6243,15 @@ fn map_rewrite_error(
     path: crate::package::table_cells::Path,
 ) -> Error {
     match error {
-        rewrite::RewriteError::UnsupportedSource => Error::UnsupportedSource { path },
+        rewrite::RewriteError::UnsupportedSource => {
+            Error::Refused(crate::package::table_cells::Refusal::UnsupportedSource { path })
+        },
         rewrite::RewriteError::InvalidSource => Error::InvalidSource { path },
         rewrite::RewriteError::Allocation { amount } => Error::Allocation {
             kind: crate::package::table_cells::LimitKind::PeakScratchBytes,
             amount,
         },
-        rewrite::RewriteError::Limit => Error::LimitExceeded {
+        rewrite::RewriteError::Limit => Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
@@ -6233,7 +6276,7 @@ fn verify_evidence_locality(
         .archive()
         .max_input_bytes()
         .checked_mul(64)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: crate::package::table_cells::LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: source.state.options.archive().max_input_bytes(),
@@ -6307,11 +6350,9 @@ fn verify_evidence_locality_with_report(
         }
         messages.push(locality_message);
     }
-    let source_catalog = source
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource { path })?;
+    let source_catalog = source.state.components.physical().ok_or(Error::Refused(
+        crate::package::table_cells::Refusal::UnsupportedSource { path },
+    ))?;
     let candidate_catalog = candidate
         .state
         .components
@@ -7710,7 +7751,7 @@ mod tests {
         });
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::Updates,
                 observed: 4_096,
                 maximum: 4_095,
@@ -7869,7 +7910,7 @@ mod tests {
             super::aggregate_testing::set_authorization_limits(limits);
             let (result, usage) = super::budget::testing::observe(None, run);
             match result {
-                Err(Error::LimitExceeded {
+                Err(Error::Limit {
                     kind,
                     observed,
                     maximum,
@@ -7951,7 +7992,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: crate::package::table_cells::LimitKind::TransactionWork,
                 observed,
                 maximum: reported_maximum,
@@ -8394,7 +8435,7 @@ mod tests {
             super::aggregate_testing::set_authorization_limits(limits);
             let (result, usage) = super::budget::testing::observe(None, run);
             assert!(
-                matches!(result, Err(Error::LimitExceeded { .. })),
+                matches!(result, Err(Error::Limit { .. })),
                 "{name} max-minus-one refuses"
             );
             assert_eq!(super::aggregate_testing::observation().1, 0, "{name}");
@@ -8480,10 +8521,12 @@ mod tests {
             .expect_err("unsupported reachable formula refuses");
         assert!(matches!(
             error,
-            Error::UnsupportedDependency {
-                kind: DependencyKind::FormulaCache,
-                ..
-            }
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    kind: DependencyKind::FormulaCache,
+                    ..
+                }
+            )
         ));
         assert_eq!(source.source_bytes(), before);
         Ok(())

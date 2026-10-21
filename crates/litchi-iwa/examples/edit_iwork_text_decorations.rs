@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextDecorations, TextStrikethrough, TextUnderline};
+use litchi_iwa::text::{TextDecorations, TextStrikethrough, TextUnderline};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     editor.set_text_decorations(storage_id, TextDecorations::new(underline, strikethrough))?;
     editor.save(output)?;
     Ok(())

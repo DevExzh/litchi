@@ -45,7 +45,7 @@ const ATTACHMENT_TABLE_FIELD: u32 = 9;
 /// The object-replacement character a drawable attachment anchors at.
 const ANCHOR: &str = "\u{fffc}";
 
-/// A new body table for [`Package::insert_body_table`]: its size, an
+/// A new body table for [`Edit::insert`]: its size, an
 /// optional name and seeded cell values.
 ///
 /// ```
@@ -147,6 +147,47 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The package cannot be edited safely (malformed or inconsistent).
+    #[error("the Pages source cannot be edited safely")]
+    InvalidSource,
+    /// A resource limit was exceeded.
+    #[error(
+        "Pages body-table creation {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// The exceeded resource.
+        kind: LimitKind,
+        /// The observed amount.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// An allocation failed.
+    #[error("could not allocate {amount} units for the Pages body-table creation")]
+    Allocation {
+        /// The requested amount.
+        amount: usize,
+    },
+    /// Writing a seeded cell failed.
+    #[error("a seeded cell of the new Pages table could not be written")]
+    Values(#[source] body_table_values::Error),
+    /// The published candidate did not verify.
+    #[error("the Pages body-table creation candidate failed verification")]
+    Verification,
+    /// The patch does not match the exact source package.
+    #[error("the Pages body-table creation patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package was not opened from an exact physical source.
     #[error("this Pages source does not support structural edits")]
     UnsupportedSource,
@@ -174,48 +215,49 @@ pub enum Error {
     /// not rewrite.
     #[error("the Pages table template or body is outside the creation transaction")]
     Unsupported,
-    /// The package cannot be edited safely (malformed or inconsistent).
-    #[error("the Pages source cannot be edited safely")]
-    InvalidSource,
-    /// A resource limit was exceeded.
-    #[error(
-        "Pages body-table creation {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// The exceeded resource.
-        kind: LimitKind,
-        /// The observed amount.
-        observed: u64,
-        /// The configured maximum.
-        maximum: u64,
-    },
-    /// An allocation failed.
-    #[error("could not allocate {amount} units for the Pages body-table creation")]
-    Allocation {
-        /// The requested amount.
-        amount: usize,
-    },
-    /// Writing a seeded cell failed.
-    #[error("a seeded cell of the new Pages table could not be written")]
-    Values(#[source] body_table_values::Error),
-    /// The published candidate did not verify.
-    #[error("the Pages body-table creation candidate failed verification")]
-    Verification,
-    /// The patch does not match the exact source package.
-    #[error("the Pages body-table creation patch does not match the exact source package")]
-    PatchConflict,
+    /// The edit already stages its one insertion.
+    #[error("the Pages body-table creation edit already stages an insertion")]
+    OperationAlreadyStaged,
+    /// The edit was committed without a staged insertion.
+    #[error("the Pages body-table creation edit stages no insertion")]
+    NoStagedOperation,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::NoTemplate { .. } | Self::Unsupported { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::InvalidSize { .. }
+            | Self::InvalidCell { .. }
+            | Self::PositionOutOfBounds { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<Fault> for Error {
     fn from(fault: Fault) -> Self {
         match fault {
-            Fault::Unsupported => Self::Unsupported,
+            Fault::Unsupported => Self::Refused(Refusal::Unsupported),
             Fault::Invalid | Fault::Dependency => Self::InvalidSource,
             Fault::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Self::LimitExceeded {
+            } => Self::Limit {
                 kind: match kind {
                     FaultLimit::PackageBytes => LimitKind::PackageBytes,
                     FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
@@ -265,12 +307,20 @@ impl Patch {
 /// Compact evidence for one verified body-table creation.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Diagnostics {
+    changed: bool,
     created_objects: usize,
     touched_components: usize,
     seeded_cells: usize,
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package (false only for a no-op patch
+    /// replay).
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
     /// How many native objects the creation inserted.
     #[must_use]
     pub const fn created_objects(self) -> usize {
@@ -338,12 +388,87 @@ impl Commit {
     }
 }
 
-impl Package {
-    /// Insert a new, empty body table anchored at UTF-16 code unit `anchor`
+/// One immutable edit that stages exactly one body-table insertion.
+///
+/// Start it with [`Package::edit_body_table_creation`]; the source package is
+/// never changed, and dropping the edit discards the staged insertion.
+pub struct Edit<'a> {
+    source: &'a Package,
+    insertion: Option<(Position, NewTable)>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field(
+                "insertion",
+                &self
+                    .insertion
+                    .as_ref()
+                    .map(|(anchor, table)| (anchor, table.rows, table.columns)),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit<'_> {
+    /// Stage a new, empty body table anchored at UTF-16 code unit `anchor`
     /// of the body story, cloned from the structure of the document's first
-    /// body table, as one exact-source transaction (record 0329). The
-    /// anchor character joins the paragraph holding `anchor`; seeded cells
-    /// are written with the body-table value writer.
+    /// body table (record 0329). The anchor character joins the paragraph
+    /// holding `anchor`; seeded cells are written with the body-table value
+    /// writer.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::OperationAlreadyStaged`] after one insertion,
+    /// [`Refusal::InvalidSize`] and [`Refusal::InvalidCell`] for a table this
+    /// transaction cannot create.
+    pub fn insert(mut self, anchor: Position, table: NewTable) -> Result<Self, Error> {
+        if self.insertion.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        if !table_create::admits_size(table.rows, table.columns) {
+            return Err(Error::Refused(Refusal::InvalidSize {
+                rows: table.rows,
+                columns: table.columns,
+            }));
+        }
+        if table.cells.iter().any(|(row, column, value)| {
+            *row >= table.rows
+                || *column >= table.columns
+                || matches!(value, body_table_values::Value::Number(number) if !number.is_finite())
+        }) {
+            return Err(Error::Refused(Refusal::InvalidCell));
+        }
+        self.insertion = Some((anchor, table));
+        Ok(self)
+    }
+
+    /// Validate, publish and reopen the staged insertion.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NoStagedOperation`] for an empty edit,
+    /// [`Refusal::UnsupportedSource`] for a source that is not exact,
+    /// [`Refusal::NoTemplate`] for a document without a body table,
+    /// [`Refusal::PositionOutOfBounds`], [`Refusal::Unsupported`] for a
+    /// template or body shape outside the transaction, and typed source,
+    /// limit, allocation and verification errors. Failure never publishes a
+    /// partial package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let (anchor, table) = self
+            .insertion
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
+        if !self.source.state.source.source_is_exact() {
+            return Err(Error::Refused(Refusal::UnsupportedSource));
+        }
+        create(self.source, anchor.get(), &table)
+    }
+}
+
+impl Package {
+    /// Start an immutable single-insertion body-table creation edit.
     ///
     /// ```no_run
     /// use litchi_core::Position;
@@ -352,7 +477,10 @@ impl Package {
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let package = Package::open("report.pages")?;
-    /// let commit = package.insert_body_table(Position::new(0), NewTable::new(3, 2))?;
+    /// let commit = package
+    ///     .edit_body_table_creation()
+    ///     .insert(Position::new(0), NewTable::new(3, 2))?
+    ///     .commit()?;
     /// assert_eq!(
     ///     commit.package().body_tables()?.len(),
     ///     package.body_tables()?.len() + 1
@@ -360,32 +488,12 @@ impl Package {
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// [`Error::NoTemplate`] for a document without a body table,
-    /// [`Error::InvalidSize`], [`Error::InvalidCell`],
-    /// [`Error::PositionOutOfBounds`], [`Error::Unsupported`] for a
-    /// template or body shape outside the transaction, and typed source,
-    /// limit, allocation and verification errors.
-    pub fn insert_body_table(&self, anchor: Position, table: NewTable) -> Result<Commit, Error> {
-        if !table_create::admits_size(table.rows, table.columns) {
-            return Err(Error::InvalidSize {
-                rows: table.rows,
-                columns: table.columns,
-            });
+    #[must_use]
+    pub const fn edit_body_table_creation(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            insertion: None,
         }
-        if table.cells.iter().any(|(row, column, value)| {
-            *row >= table.rows
-                || *column >= table.columns
-                || matches!(value, body_table_values::Value::Number(number) if !number.is_finite())
-        }) {
-            return Err(Error::InvalidCell);
-        }
-        if !self.state.source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
-        }
-        create(self, anchor.get(), &table)
     }
 
     /// Apply a body-table creation patch (or its inverse) only to its exact
@@ -400,7 +508,10 @@ impl Package {
         Ok(Commit {
             package,
             patch: patch.clone(),
-            diagnostics: Diagnostics::default(),
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+                ..Diagnostics::default()
+            },
         })
     }
 }
@@ -409,12 +520,12 @@ impl Package {
 fn single(object: &ArchiveObject, message_type: u32) -> Result<&[u8], Error> {
     match object.messages.as_slice() {
         [message] if message.type_ == message_type => Ok(&message.data),
-        _ => Err(Error::Unsupported),
+        _ => Err(Error::Refused(Refusal::Unsupported)),
     }
 }
 
 fn storage(_error: litchi_numbers_wire::table_write::WriteError) -> Error {
-    Error::Unsupported
+    Error::Refused(Refusal::Unsupported)
 }
 
 /// A new single-message object whose header copies `template`'s message
@@ -575,7 +686,7 @@ fn anchored_body(
         RewriteBehavior::PreserveOnEqualText,
         limits,
     )
-    .map_err(|_error| Error::Unsupported)?;
+    .map_err(|_error| Error::Refused(Refusal::Unsupported))?;
     let requirements = prepared.execution_requirements();
     let rewritten = prepared
         .execute(StorageRewriteExecutionLimits {
@@ -586,7 +697,7 @@ fn anchored_body(
             max_allocations: requirements.allocations(),
             max_work: requirements.work(),
         })
-        .map_err(|_error| Error::Unsupported)?
+        .map_err(|_error| Error::Refused(Refusal::Unsupported))?
         .into_bytes();
     // The attachment table, with the new entry in character order.
     let wire = WireLimits::default()
@@ -600,7 +711,7 @@ fn anchored_body(
         .map(|field| field.payload())
         .collect();
     if tables.len() > 1 {
-        return Err(Error::Unsupported);
+        return Err(Error::Refused(Refusal::Unsupported));
     }
     let mut entry = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut entry, 1, anchor as u64)
@@ -614,7 +725,7 @@ fn anchored_body(
             .map_err(|_error| Error::InvalidSource)?;
         for field in view.fields() {
             if field.number() != 1 || field.wire_type() != 2 {
-                return Err(Error::Unsupported);
+                return Err(Error::Refused(Refusal::Unsupported));
             }
             let index = repeated_varint_values(field.payload(), 1)
                 .map_err(|_error| Error::InvalidSource)?;
@@ -661,16 +772,16 @@ fn prepared_len(payload: &[u8]) -> Result<usize, Error> {
 fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, Error> {
     if source
         .body_tables()
-        .map_err(|_error| Error::Unsupported)?
+        .map_err(|_error| Error::Refused(Refusal::Unsupported))?
         .is_empty()
     {
-        return Err(Error::NoTemplate);
+        return Err(Error::Refused(Refusal::NoTemplate));
     }
     let mut budget = table_lock::WireBudget::new(source.state.source.limits())
         .map_err(|_| Error::InvalidSource)?;
     let targets = table_lock::native_body_table_targets_with_budget(source, &mut budget)
-        .map_err(|_error| Error::Unsupported)?;
-    let template = targets.first().ok_or(Error::NoTemplate)?;
+        .map_err(|_error| Error::Refused(Refusal::Unsupported))?;
+    let template = targets.first().ok_or(Error::Refused(Refusal::NoTemplate))?;
     let template_info = template.drawable_identifier.get();
     let template_model = template.model_identifier.get();
     let template_attachment = template.attachment_identifier.get();
@@ -680,7 +791,9 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
         None => format!("Table {}", source_tables + 1),
     };
     let mut working = Working::new(source)?;
-    let registry = working.registry()?.ok_or(Error::Unsupported)?;
+    let registry = working
+        .registry()?
+        .ok_or(Error::Refused(Refusal::Unsupported))?;
 
     let info_object = working.object(template_info)?.clone();
     let info_template = single(&info_object, TABLE_INFO_MESSAGE_TYPE)?.to_vec();
@@ -689,19 +802,19 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     }
     let body = table_create::drawable_parent(&info_template)
         .map_err(storage)?
-        .ok_or(Error::Unsupported)?;
+        .ok_or(Error::Refused(Refusal::Unsupported))?;
     let model_object = working.object(template_model)?.clone();
     let model_template = single(&model_object, TABLE_MODEL_MESSAGE_TYPE)?.to_vec();
     let owned: BTreeMap<u64, Role> =
         table_create::owned_storage(&model_template).map_err(storage)?;
     let attachment_object = working.object(template_attachment)?.clone();
     let [attachment_message] = attachment_object.messages.as_slice() else {
-        return Err(Error::Unsupported);
+        return Err(Error::Refused(Refusal::Unsupported));
     };
     if table_create::single_reference(&attachment_message.data, 1).map_err(storage)?
         != Some(template_info)
     {
-        return Err(Error::Unsupported);
+        return Err(Error::Refused(Refusal::Unsupported));
     }
 
     // Fresh identities.
@@ -725,7 +838,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     for (identifier, role) in &owned {
         let object = working.object(*identifier)?.clone();
         let [message] = object.messages.as_slice() else {
-            return Err(Error::Unsupported);
+            return Err(Error::Refused(Refusal::Unsupported));
         };
         let member = working.locate(*identifier)?.ok_or(Error::InvalidSource)?;
         let data = table_create::empty_storage(
@@ -766,10 +879,10 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     let geometry = OwnerGeometry::of(&model_data, table.rows, table.columns).map_err(storage)?;
     let row_height = double(&model_data, 16)
         .filter(|value| *value > 0.0)
-        .ok_or(Error::Unsupported)?;
+        .ok_or(Error::Refused(Refusal::Unsupported))?;
     let column_width = double(&model_data, 17)
         .filter(|value| *value > 0.0)
-        .ok_or(Error::Unsupported)?;
+        .ok_or(Error::Refused(Refusal::Unsupported))?;
     let model_references = declared(&model_object, &model_data, &|identifier| {
         remap.get(&identifier).copied()
     });
@@ -849,7 +962,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     let body_index = structure::unique_message(body_object, &BODY_STORAGE_TYPES)?;
     let body_payload = body_object.messages[body_index].data.clone();
     if anchor > prepared_len(&body_payload)? {
-        return Err(Error::PositionOutOfBounds);
+        return Err(Error::Refused(Refusal::PositionOutOfBounds));
     }
     let body_data = anchored_body(source, &body_payload, anchor, attachment)?;
     structure::replace(
@@ -979,6 +1092,7 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
         },
         package,
         diagnostics: Diagnostics {
+            changed: true,
             created_objects,
             touched_components,
             seeded_cells: table.cells.len(),

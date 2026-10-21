@@ -13,7 +13,9 @@ use std::result::Result;
 
 use crate::{Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult};
 
-pub use crate::package::show_settings::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::show_settings::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};
 
 const NORMAL_MODE: i32 = 0;
 const SELF_PLAYING_MODE: i32 = 1;

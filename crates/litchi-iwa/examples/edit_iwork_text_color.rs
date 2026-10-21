@@ -3,7 +3,6 @@
 use std::env;
 
 use litchi_iwa::shapes::{RgbColorSpace, RgbaColor};
-use litchi_iwa::text::IWorkTextEditor;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -27,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let color = RgbaColor::new(red, green, blue, alpha, color_space)?;
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     editor.set_text_color(storage_id, color)?;
     editor.save(output)?;
     Ok(())

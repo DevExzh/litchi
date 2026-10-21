@@ -668,14 +668,14 @@ macro_rules! structural_family {
             fn from(fault: $crate::package::structure::Fault) -> Self {
                 use $crate::package::structure::{Fault, FaultLimit};
                 match fault {
-                    Fault::Unsupported => Self::UnsupportedSource,
+                    Fault::Unsupported => Self::Refused(Refusal::UnsupportedSource),
                     Fault::Invalid => Self::InvalidSource,
-                    Fault::Dependency => Self::UnsupportedDependency,
+                    Fault::Dependency => Self::Refused(Refusal::UnsupportedDependency),
                     Fault::Limit {
                         kind,
                         observed,
                         maximum,
-                    } => Self::LimitExceeded {
+                    } => Self::Limit {
                         kind: match kind {
                             FaultLimit::PackageBytes => LimitKind::PackageBytes,
                             FaultLimit::PayloadBytes => LimitKind::PayloadBytes,

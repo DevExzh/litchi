@@ -8,7 +8,7 @@ use crate::pages;
 use crate::protobuf::tsp;
 use crate::protobuf::tswp::{self, object_attribute_table::ObjectAttribute};
 use crate::shapes::{DrawablePoint, DrawableSize, RgbColorSpace, RgbaColor};
-use crate::text::{IWorkTextEditor, TextPointSize, TextPosition};
+use crate::text::{TextPointSize, TextPosition};
 
 const POSITION: DrawablePoint = DrawablePoint { x: 40.0, y: 80.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -18,7 +18,7 @@ const SIZE: DrawableSize = DrawableSize {
 
 #[test]
 fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
-    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Draft::create_with_text("Lists").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -40,7 +40,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
             .unwrap(),
         ParagraphList::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list(pages_box.drawable_object_id)
@@ -73,7 +73,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
             ParagraphList::Numbered,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list(sheet_id, numbers_box.drawable_object_id)
@@ -93,7 +93,7 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
     keynote
         .set_slide_text_box_paragraph_list(0, keynote_box.drawable_object_id, ParagraphList::Bullet)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list(0, keynote_box.drawable_object_id)
@@ -112,7 +112,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let arrow = ParagraphListBullet::new("➡").unwrap();
 
-    let mut pages = pages::Editor::create_with_text("Bullets").unwrap();
+    let mut pages = pages::Draft::create_with_text("Bullets").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -123,7 +123,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
     pages
         .set_text_box_paragraph_list_bullet(pages_box.drawable_object_id, paragraph, &arrow)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_bullet(pages_box.drawable_object_id, paragraph)
@@ -157,7 +157,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
             &arrow,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_bullet(
@@ -184,7 +184,7 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
             &arrow,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_bullet(0, keynote_box.drawable_object_id, paragraph,)
@@ -201,7 +201,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
         ParagraphListBulletBaselineOffset::from_points(2.0).unwrap(),
     );
 
-    let mut pages = pages::Editor::create_with_text("Bullet Geometry").unwrap();
+    let mut pages = pages::Draft::create_with_text("Bullet Geometry").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -216,7 +216,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
             geometry,
         )
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_bullet_geometry(pages_box.drawable_object_id, paragraph,)
@@ -250,7 +250,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
             geometry,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_bullet_geometry(
@@ -277,7 +277,7 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
             geometry,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_bullet_geometry(
@@ -298,7 +298,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
         ParagraphListTextGap::from_points(18.0, TextPointSize::TWELVE).unwrap(),
     );
 
-    let mut pages = pages::Editor::create_with_text("List Indentation").unwrap();
+    let mut pages = pages::Draft::create_with_text("List Indentation").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -313,7 +313,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
             indentation,
         )
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_indentation(pages_box.drawable_object_id, paragraph)
@@ -347,7 +347,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
             indentation,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_indentation(
@@ -374,7 +374,7 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
             indentation,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_indentation(
@@ -394,7 +394,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
         RgbaColor::new(0.9, 0.2, 0.1, 0.8, RgbColorSpace::DisplayP3).unwrap(),
     );
 
-    let mut pages = pages::Editor::create_with_text("List Label Color").unwrap();
+    let mut pages = pages::Draft::create_with_text("List Label Color").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -405,7 +405,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
     pages
         .set_text_box_paragraph_list_label_color(pages_box.drawable_object_id, paragraph, color)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_label_color(pages_box.drawable_object_id, paragraph)
@@ -439,7 +439,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
             color,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_label_color(
@@ -466,7 +466,7 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
             color,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_label_color(
@@ -487,7 +487,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
         ParagraphListNumberPunctuation::Parentheses,
     );
 
-    let mut pages = pages::Editor::create_with_text("Number Format").unwrap();
+    let mut pages = pages::Draft::create_with_text("Number Format").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -498,7 +498,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
     pages
         .set_text_box_paragraph_list_number_format(pages_box.drawable_object_id, paragraph, format)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_number_format(pages_box.drawable_object_id, paragraph)
@@ -532,7 +532,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
             ParagraphListNumberFormat::Circled,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_number_format(
@@ -563,7 +563,7 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
             ParagraphListNumberFormat::HebrewBiblicalStandard,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_number_format(
@@ -581,7 +581,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let tiered = ParagraphListNumberTiering::Tiered;
 
-    let mut pages = pages::Editor::create_with_text("Number Tiering").unwrap();
+    let mut pages = pages::Draft::create_with_text("Number Tiering").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -592,7 +592,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
     pages
         .set_text_box_paragraph_list_number_tiering(pages_box.drawable_object_id, paragraph, tiered)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_number_tiering(pages_box.drawable_object_id, paragraph)
@@ -626,7 +626,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
             tiered,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_number_tiering(
@@ -657,7 +657,7 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
             tiered,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_number_tiering(
@@ -675,7 +675,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let scale = ParagraphListNumberScale::from_percent(135.0).unwrap();
 
-    let mut pages = pages::Editor::create_with_text("Number Scale").unwrap();
+    let mut pages = pages::Draft::create_with_text("Number Scale").unwrap();
     let pages_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -700,7 +700,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
     pages
         .set_text_box_paragraph_list_number_scale(pages_box.drawable_object_id, paragraph, scale)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_number_scale(pages_box.drawable_object_id, paragraph)
@@ -746,7 +746,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
             scale,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_number_scale(
@@ -777,7 +777,7 @@ fn text_boxes_round_trip_number_scale_in_every_suite() {
             scale,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_number_scale(
@@ -797,7 +797,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
         ParagraphListLabelIndent::from_points(20.0).unwrap(),
         ParagraphListTextGap::from_em(1.5).unwrap(),
     );
-    let mut pages = pages::Editor::create_with_text("Bullets").unwrap();
+    let mut pages = pages::Draft::create_with_text("Bullets").unwrap();
     let text_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -891,7 +891,7 @@ fn custom_list_updates_reject_nonlist_and_invalid_paragraphs_transactionally() {
 
 #[test]
 fn multiple_list_boundaries_are_rejected_transactionally() {
-    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Draft::create_with_text("Lists").unwrap();
     let text_box = pages
         .add_text_box(5, "First\nSecond", POSITION, SIZE)
         .unwrap();
@@ -936,7 +936,7 @@ fn multiple_list_boundaries_are_rejected_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

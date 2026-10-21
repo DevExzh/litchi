@@ -14,7 +14,7 @@ struct SheetContents {
 }
 
 impl SheetContents {
-    fn direct_object_ids(&self, editor: &Editor) -> Result<HashSet<u64>> {
+    fn direct_object_ids(&self, editor: &Draft) -> Result<HashSet<u64>> {
         let mut identifiers = HashSet::new();
         for &identifier in self
             .charts
@@ -44,7 +44,7 @@ impl SheetContents {
     }
 }
 
-impl Editor {
+impl Draft {
     /// Remove a sheet and every supported object graph owned exclusively by it.
     ///
     /// Tables, charts, media, shapes, and text boxes are deleted through their
@@ -89,7 +89,7 @@ impl Editor {
     }
 }
 
-fn sheet_contents(editor: &Editor, sheet_id: u64) -> Result<SheetContents> {
+fn sheet_contents(editor: &Draft, sheet_id: u64) -> Result<SheetContents> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let contents = SheetContents {
         charts: editor
@@ -159,11 +159,7 @@ fn sheet_contents(editor: &Editor, sheet_id: u64) -> Result<SheetContents> {
     Ok(contents)
 }
 
-fn delete_sheet_contents(
-    editor: &mut Editor,
-    sheet_id: u64,
-    contents: SheetContents,
-) -> Result<()> {
+fn delete_sheet_contents(editor: &mut Draft, sheet_id: u64, contents: SheetContents) -> Result<()> {
     for identifier in contents.charts {
         editor.remove_sheet_chart(sheet_id, identifier)?;
     }
@@ -195,7 +191,7 @@ fn delete_sheet_contents(
     Ok(())
 }
 
-fn detach_empty_sheet(editor: &mut Editor, sheet_id: u64) -> Result<()> {
+fn detach_empty_sheet(editor: &mut Draft, sheet_id: u64) -> Result<()> {
     let locations = object_locations(editor.package())?;
     let archive_name = locations
         .get(&sheet_id)
@@ -253,7 +249,7 @@ mod tests {
     const POSTER: &[u8] = b"\x89PNG\r\n\x1a\nsheet-delete-poster";
     const IMAGE: &[u8] = include_bytes!("../../../../../media/litchi_logo.png");
 
-    fn object_ids(package: &IWorkPackage) -> HashSet<u64> {
+    fn object_ids(package: &HostPackage) -> HashSet<u64> {
         package
             .iwa_entry_names()
             .flat_map(|entry| package.archive(entry).unwrap().objects)
@@ -337,12 +333,12 @@ mod tests {
         assert_eq!(editor.sheets().unwrap().len(), 1);
         assert_eq!(editor.tables().unwrap().len(), 1);
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn sheet_deletion_is_transactional_for_the_final_and_missing_sheet() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let baseline = editor.to_bytes().unwrap();
         let only_sheet = editor.sheets().unwrap()[0].object_id;
 

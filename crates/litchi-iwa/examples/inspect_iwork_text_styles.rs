@@ -2,7 +2,6 @@
 
 use std::env;
 
-use litchi_iwa::text::IWorkTextEditor;
 use litchi_iwa_text::comment::raw::comment_id_value;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = IWorkTextEditor::open(input)?;
+    let editor = litchi_iwa::text::Draft::open(input)?;
     for storage in editor.storages()? {
         if let Ok(languages) = editor.text_languages(storage.id) {
             println!("storage={} languages={languages:?}", storage.id);

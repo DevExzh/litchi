@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_text_boxes <input.key>")?;
-    let editor = keynote::Editor::open(input)?;
+    let editor = keynote::Draft::open(input)?;
     for slide in editor.slides()? {
         println!("slide={} name={:?}", slide.index, slide.name);
         let mut text_box_index = 0usize;

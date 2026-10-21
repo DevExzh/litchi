@@ -309,7 +309,7 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
 }
 
 fn limit_u64(kind: LimitKind, observed: u64, maximum: u64) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -528,7 +528,7 @@ mod tests {
             .expect_err("oversized input");
         assert!(matches!(
             input_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::InputBytes,
                 ..
             }
@@ -538,7 +538,7 @@ mod tests {
             .expect_err("oversized remap table");
         assert!(matches!(
             remap_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::References,
                 ..
             }
@@ -551,7 +551,7 @@ mod tests {
         let work_error = bounded_comment_options(work_length, 0).expect_err("work bound");
         assert!(matches!(
             work_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireWork,
                 ..
             }
@@ -560,7 +560,7 @@ mod tests {
         let huge_error = bounded_comment_options(usize::MAX, 0).expect_err("huge source");
         assert!(matches!(
             huge_error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::InputBytes,
                 ..
             }

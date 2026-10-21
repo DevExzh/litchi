@@ -1393,7 +1393,9 @@ fn add_table(
     }
     let error = |error| failure(LeafError::PagesTableCreation(error));
     let commit = with_paragraph
-        .insert_body_table(Position::new(anchor), table)
+        .edit_body_table_creation()
+        .insert(Position::new(anchor), table)
+        .and_then(|edit| edit.commit())
         .map_err(error)?;
     let ordinal = commit.table().get();
     let (next, table_patch) = commit.into_parts();
@@ -1561,7 +1563,9 @@ pub(crate) fn remove(
         let error = |error| failure(LeafError::PagesTableDeletion(error));
         let commit = chain
             .package
-            .remove_body_table(BodyTableSelector::index(*table))
+            .edit_body_table_deletion()
+            .remove(BodyTableSelector::index(*table))
+            .and_then(|edit| edit.commit())
             .map_err(error)?;
         let patch = commit.patch().clone();
         let next = commit.into_package();
@@ -1644,7 +1648,9 @@ fn raw_paragraph(package: &Package, section: usize, line: usize) -> Result<Strin
 /// sections.
 fn anchored() -> crate::Error {
     failure(LeafError::PagesParagraphs(
-        litchi_pages::section::paragraphs::Error::AnchoredParagraph,
+        litchi_pages::section::paragraphs::Error::Refused(
+            litchi_pages::section::paragraphs::Refusal::AnchoredParagraph,
+        ),
     ))
 }
 

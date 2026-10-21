@@ -628,26 +628,25 @@ impl MovieInfo {
     }
 }
 
-/// Compatibility alias emphasizing that a movie entry is a media drawable.
-pub type MediaInfo = MovieInfo;
-
 /// Exact-source transactions replacing one existing media payload.
 pub mod data {
     pub use crate::package::slide_media_replacement::{
-        Commit, Data, Diagnostics, Edit, Error, LimitKind, MediaPart, Patch,
+        Commit, Data, Diagnostics, Edit, Error, LimitKind, MediaPart, Patch, Refusal,
     };
 }
 
 /// Exact-source duplicate/remove transactions for slide media.
 pub mod lifecycle {
-    pub use crate::package::slide_media_lifecycle::{Commit, Diagnostics, Error, LimitKind, Patch};
+    pub use crate::package::slide_media_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        MediaInfo, MediaLoopMode, MediaPlaybackSettings, MediaVolume, MovieInfo, MovieKind, Point,
-        Size, geometry::MovieTransform,
+        MediaLoopMode, MediaPlaybackSettings, MediaVolume, MovieInfo, MovieKind, Point, Size,
+        geometry::MovieTransform,
     };
     use std::mem::size_of;
     use std::time::Duration;
@@ -689,8 +688,6 @@ mod tests {
         assert_eq!(movie.transform(), None);
         assert_eq!(movie.playback(), Some(playback));
         assert_eq!(movie.duration(), Some(Duration::from_secs(3)));
-        let _: MediaInfo = movie;
-        assert_eq!(size_of::<MovieInfo>(), size_of::<MediaInfo>());
     }
 
     #[test]

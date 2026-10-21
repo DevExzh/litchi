@@ -13,7 +13,7 @@ use crate::charts::source::{CHART_MESSAGE_TYPE, CHART_STYLE_MESSAGE_TYPE};
 use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::parse_wire_fields;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding the generated chart-style properties.
 pub(crate) const GENERATED_CHART_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -28,7 +28,7 @@ pub(crate) struct ChartStyleSlot {
 
 /// Resolve the native chart-style payload referenced by one chart.
 pub(crate) fn chart_style_slot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -106,7 +106,7 @@ impl ChartStyleSlot {
     /// Read the resolved chart-style bytes without allocating a rewritten archive.
     pub(crate) fn read<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
         let archive = package.archive(&self.archive_name)?;
@@ -131,7 +131,7 @@ impl ChartStyleSlot {
     /// Reject a mutation that would silently affect another chart.
     pub(crate) fn ensure_exclusive(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         drawable_object_id: u64,
         drawable_label: &str,
     ) -> Result<()> {
@@ -170,7 +170,7 @@ impl ChartStyleSlot {
     /// Transactionally rewrite the resolved style message.
     pub(crate) fn update(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {

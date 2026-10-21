@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|value| value.to_str())
     {
         Some("pages") => {
-            let mut editor = pages::Editor::create_with_text(PREFIX)?;
+            let mut editor = pages::Draft::create_with_text(PREFIX)?;
             editor.insert_body_date_time_field(position, display()?, settings()?)?;
             editor.save(output)?;
         },

@@ -14,8 +14,6 @@ use litchi_iwa_text::position::TextPosition;
 use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
-#[allow(deprecated)]
-use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::MediaAssetId;
 use crate::media::reachable_embedded_assets;
 use crate::package_metadata::{
@@ -34,16 +32,15 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use crate::text::{
-    Alignment, Background as TextAppearanceBackground, Borders, IWorkTextEditor, Indents,
-    LineSpacing, Outline, ParagraphBackground, ParagraphDecimalTabCharacter,
-    ParagraphDefaultTabInterval, ParagraphFlow, ParagraphList, ParagraphListBullet,
-    ParagraphListBulletGeometry, ParagraphListIndentation, ParagraphListLabelColor,
-    ParagraphListLevel, ParagraphListLevelPlacement, ParagraphListNumberFormat,
-    ParagraphListNumberScale, ParagraphListNumberTiering, ParagraphListNumbering,
-    ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody, TextCommentId,
-    TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations, TextFont,
-    TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
+    Alignment, Background as TextAppearanceBackground, Borders, Indents, LineSpacing, Outline,
+    ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
+    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
+    ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
+    ParagraphListNumbering, ParagraphTabStops, ParagraphWritingDirection, Shadow, Spacing,
+    TextBaselineShift, TextCapitalization, TextCharacterSpacing, TextComment, TextCommentBody,
+    TextCommentId, TextCommentReply, TextCommentReplyBody, TextCommentReplyId, TextDecorations,
+    TextFont, TextHighlight, TextHighlightId, TextHyperlink, TextHyperlinkId, TextHyperlinkTarget,
     TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
     TextStorageInfo, TextStyle,
 };
@@ -54,7 +51,7 @@ use crate::wire::{
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
-use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{EmbeddedMediaAsset, Error, HostPackage, Result};
 use litchi_iwa_index::ObjectId;
 use litchi_keynote::build as semantic_build;
 pub use litchi_keynote::build::{Acceleration as BuildAcceleration, Start as BuildStart};
@@ -1561,7 +1558,7 @@ impl CachedSlideGraph {
 /// Decode state shared by the reads that make up one editor operation.
 ///
 /// The cache owns no mutable package state and is never stored on
-/// [`Editor`]. Dropping this value at the end of the operation is the
+/// [`Draft`]. Dropping this value at the end of the operation is the
 /// invalidation boundary for all entries, including after a staged mutation.
 struct KeynoteOperation {
     graph: ObjectGraph,
@@ -1570,7 +1567,7 @@ struct KeynoteOperation {
 }
 
 impl KeynoteOperation {
-    fn new(package: &IWorkPackage) -> Result<Self> {
+    fn new(package: &HostPackage) -> Result<Self> {
         Ok(Self {
             graph: ObjectGraph::read(package)?,
             slide_cache: HashMap::with_capacity(MAX_OPERATION_CACHED_SLIDES),
@@ -1702,22 +1699,22 @@ impl KeynoteOperation {
 
 /// Transactional editor for a Keynote package.
 #[derive(Debug, Clone)]
-pub struct Editor {
-    text: IWorkTextEditor,
+pub struct Draft {
+    text: crate::text::Draft,
 }
 
-impl Editor {
+impl Draft {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(IWorkPackage::open(path)?)
+        Self::from_package(HostPackage::open(path)?)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_package(HostPackage::from_bytes(bytes)?)
     }
 
-    pub(crate) fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub(crate) fn from_package(package: HostPackage) -> Result<Self> {
         let editor = Self {
-            text: IWorkTextEditor::from_package(package),
+            text: crate::text::Draft::from_package(package),
         };
         editor.slides()?;
         Ok(editor)
@@ -4029,7 +4026,7 @@ impl Editor {
             new_drawable_id,
             DRAWABLE_DUPLICATE_OFFSET,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.set_text(new_storage_id, text)?;
         staged = text_editor.into_package();
         patch_slide_drawable_references(
@@ -4089,11 +4086,7 @@ impl Editor {
                 ))
             })?;
 
-        #[expect(
-            deprecated,
-            reason = "legacy direct-drawable comment cleanup remains on the migration-host compatibility path"
-        )]
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_slide_drawable_references(
@@ -4131,10 +4124,9 @@ impl Editor {
     }
 
     /// List supported direct-comment drawables owned by one slide.
-    #[allow(deprecated)]
     pub fn slide_drawables(&self, slide_index: usize) -> Result<Vec<DrawableInfo>> {
         let owned = self.slide_owned_drawable_ids(slide_index)?;
-        let mut drawables = IWorkDrawableCommentEditor::from_package(self.package().clone())?
+        let mut drawables = crate::comments::Draft::from_package(self.package().clone())?
             .drawables()?
             .into_iter()
             .filter(|drawable| owned.contains(&drawable.id.get()))
@@ -4412,7 +4404,7 @@ impl Editor {
                 "Keynote build creation failed round-trip validation".to_owned(),
             ));
         }
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(created)
     }
 
@@ -4523,7 +4515,7 @@ impl Editor {
                 "Keynote build update failed round-trip validation".to_owned(),
             ));
         }
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(())
     }
 
@@ -4620,7 +4612,7 @@ impl Editor {
                 "Keynote build removal failed round-trip validation".to_owned(),
             ));
         }
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(removed)
     }
 
@@ -4782,7 +4774,7 @@ impl Editor {
             set_package_last_object_identifier(&mut staged, next_identifier - 1)?;
         }
 
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         let created = verified
             .slides()?
             .into_iter()
@@ -4799,11 +4791,11 @@ impl Editor {
                 "Keynote duplicated slide has the wrong order".to_owned(),
             ));
         }
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(created)
     }
 
-    pub(crate) fn package(&self) -> &IWorkPackage {
+    pub(crate) fn package(&self) -> &HostPackage {
         self.text.package()
     }
 
@@ -4839,7 +4831,7 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Keynote object graph"
             )));
         }
-        IWorkMediaEditor::from_package(self.package().clone())?.extract(data_identifier)
+        crate::media::Draft::from_package(self.package().clone())?.extract(data_identifier)
     }
 
     /// Replace one reachable, materialized asset without changing its identifier.
@@ -4857,17 +4849,17 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Keynote object graph"
             )));
         }
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
+        let mut media = crate::media::Draft::from_package(self.package().clone())?;
         let old = media.replace(data_identifier, replacement)?;
         let staged = media.into_package();
         Self::from_package(staged.clone())?;
-        self.text = IWorkTextEditor::from_package(staged);
+        self.text = crate::text::Draft::from_package(staged);
         Ok(old)
     }
 
     // Used by crate-internal mutation fixtures; ordinary callers publish via `to_bytes`/`save`.
     #[allow(dead_code)]
-    pub(crate) fn into_package(self) -> IWorkPackage {
+    pub(crate) fn into_package(self) -> HostPackage {
         self.text.into_package()
     }
 
@@ -5180,14 +5172,8 @@ mod slide_tables;
 mod text_box_create;
 
 use builds::*;
-pub use litchi_keynote::Seconds;
-pub use litchi_keynote::show::{Mode, Settings, Size};
 pub use litchi_keynote::slide::media::MovieKind;
 pub use litchi_keynote::transition::Effect;
-pub use litchi_keynote::transition::{
-    Acceleration, AccelerationKind, AnimationParameters, CustomParameters, Direction, MosaicType,
-    TextDelivery, TextDeliveryKind,
-};
 pub use slide_charts::{RemovedKeynoteSlideChart, SlideChartInfo};
 use slide_graph::*;
 pub use slide_images::{RemovedKeynoteSlideImage, SlideImageInfo, SlideImageKind};

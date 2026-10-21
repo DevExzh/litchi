@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = pages::Editor::create_with_text("Multi-column text box")?;
+    let mut editor = pages::Draft::create_with_text("Multi-column text box")?;
     let anchor = editor.body_text()?.encode_utf16().count();
     let created = editor.add_text_box(
         anchor,

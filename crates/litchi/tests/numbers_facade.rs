@@ -215,7 +215,10 @@ fn table_cell_reads_reach_numbers_facade() -> Result<(), Box<dyn std::error::Err
             At::new(0, 0),
         )
         .expect_err("a missing selector must fail without exposing its text");
-    assert!(matches!(error, Error::SheetNotFound));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi::numbers::table::cells::Refusal::SheetNotFound)
+    ));
     let error_debug = format!("{error:?}");
     assert!(!error_debug.contains("private missing sheet selector"));
     assert!(!error_debug.contains("identifier"));

@@ -102,6 +102,43 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// Rooted ownership or wire framing is invalid.
+    #[error("the Numbers Percentage-format source is invalid at {path:?}")]
+    InvalidSource { path: Path },
+    /// A finite transaction resource ceiling was exceeded.
+    #[error(
+        "Numbers Percentage format {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+        /// Content-free failure location.
+        path: Path,
+    },
+    /// A bounded transaction allocation failed.
+    #[error("could not allocate {amount} units for the Numbers Percentage-format transaction")]
+    Allocation { amount: usize, path: Path },
+    /// Candidate reopening or semantic locality verification failed.
+    #[error("the edited Numbers Percentage format failed semantic verification")]
+    Verification,
+    /// A patch was created for another exact package artifact.
+    #[error("the Percentage-format patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// No rooted sheet matched the selector.
     #[error("the Numbers workbook has no sheet matching the requested selector")]
     SheetNotFound,
@@ -123,32 +160,30 @@ pub enum Error {
     /// The exact native owner is not available for this source.
     #[error("this Numbers source does not support exact Percentage-format editing")]
     UnsupportedSource,
-    /// Rooted ownership or wire framing is invalid.
-    #[error("the Numbers Percentage-format source is invalid at {path:?}")]
-    InvalidSource { path: Path },
-    /// A finite transaction resource ceiling was exceeded.
-    #[error(
-        "Numbers Percentage format {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-        /// Content-free failure location.
-        path: Path,
-    },
-    /// A bounded transaction allocation failed.
-    #[error("could not allocate {amount} units for the Numbers Percentage-format transaction")]
-    Allocation { amount: usize, path: Path },
-    /// Candidate reopening or semantic locality verification failed.
-    #[error("the edited Numbers Percentage format failed semantic verification")]
-    Verification,
-    /// A patch was created for another exact package artifact.
-    #[error("the Percentage-format patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } | Self::CellNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::WrongFormatFamily { .. } => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<popup::Error> for Error {
@@ -369,6 +404,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -387,7 +428,7 @@ impl Package {
     ///
     /// `None` denotes the inherited/no-explicit-Percentage state. An
     /// explicit Number, currency, date, duration, text, or interactive format
-    /// is a typed [`Error::WrongFormatFamily`] rather than an automatic value.
+    /// is a typed [`Refusal::WrongFormatFamily`] rather than an automatic value.
     pub fn table_cell_percentage_format<'sheet, 'table>(
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
@@ -430,7 +471,7 @@ impl Package {
     /// Apply a previously-created exact Percentage-format patch.
     pub fn apply_table_cell_percentage_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
@@ -517,7 +558,7 @@ fn no_op_commit(
     after: Option<Percentage>,
 ) -> Result<Commit, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     let owner = catalog.__source_owner();
     Ok(Commit {
         package: source.snapshot(),
@@ -546,9 +587,9 @@ fn rewrite(
         return Err(Error::InvalidSource { path });
     };
     let source_catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let source_owner = source_catalog.__source_owner();
     let mut budget = popup::TransactionBudget::for_cell_control(source);
@@ -590,7 +631,7 @@ fn rewrite(
     let mut compression_allocations = 3usize;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PayloadBytes,
                 observed: u64::try_from(member.archive_bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(native_bound.archive_bytes).unwrap_or(u64::MAX),
@@ -600,7 +641,7 @@ fn rewrite(
         let maximum_compressed = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
             .map_err(|_| Error::Verification)?;
         if maximum_compressed > native_bound.compressed_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::CompressedBytes,
                 observed: u64::try_from(maximum_compressed).unwrap_or(u64::MAX),
                 maximum: u64::try_from(native_bound.compressed_bytes).unwrap_or(u64::MAX),
@@ -800,32 +841,46 @@ fn from_native_path(path: popup::Path) -> Path {
 
 fn map_percentage_read_error(error: native::PercentageFormatReadError, path: Path) -> Error {
     match error {
-        native::PercentageFormatReadError::WrongFormatFamily => Error::WrongFormatFamily { path },
+        native::PercentageFormatReadError::WrongFormatFamily => {
+            Error::Refused(Refusal::WrongFormatFamily { path })
+        },
         native::PercentageFormatReadError::Native(error) => map_popup_error(error),
     }
 }
 
 fn map_popup_error(error: popup::Error) -> Error {
     match error {
-        popup::Error::SheetNotFound => Error::SheetNotFound,
-        popup::Error::TableNotFound => Error::TableNotFound,
-        popup::Error::CellNotFound => Error::CellNotFound,
-        popup::Error::TableLocked { path } => Error::TableLocked {
-            path: from_native_path(path),
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
         },
-        popup::Error::UnsupportedDependency { path } => Error::UnsupportedDependency {
-            path: from_native_path(path),
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
         },
-        popup::Error::UnsupportedSource => Error::UnsupportedSource,
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::CellNotFound) => {
+            Error::Refused(Refusal::CellNotFound)
+        },
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableLocked {
+            path,
+        }) => Error::Refused(Refusal::TableLocked {
+            path: from_native_path(path),
+        }),
+        popup::Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ) => Error::Refused(Refusal::UnsupportedDependency {
+            path: from_native_path(path),
+        }),
+        popup::Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         popup::Error::InvalidSource { path } => Error::InvalidSource {
             path: from_native_path(path),
         },
-        popup::Error::LimitExceeded {
+        popup::Error::Limit {
             kind,
             observed,
             maximum,
             path,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,

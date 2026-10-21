@@ -14,7 +14,7 @@ use crate::charts::non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultskiphiddendata` in
 /// `TSCH.Generated.ChartNonStyleArchive`.
@@ -22,7 +22,7 @@ const CHART_SKIP_HIDDEN_DATA_FIELD: u32 = 22;
 
 /// Read whether one native chart includes data from hidden rows and columns.
 pub(crate) fn chart_includes_hidden_data(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -38,7 +38,7 @@ pub(crate) fn chart_includes_hidden_data(
 
 /// Set whether one native chart includes data from hidden rows and columns.
 pub(crate) fn set_chart_includes_hidden_data(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

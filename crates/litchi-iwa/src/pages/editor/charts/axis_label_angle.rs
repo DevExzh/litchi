@@ -7,7 +7,7 @@ use crate::charts::axis_label_angle::{
 };
 use crate::charts::{Axis, LabelAngle};
 
-impl Editor {
+impl Draft {
     /// Read one body-chart axis' normalized label angle.
     pub fn body_chart_axis_label_angle(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn body_chart_axis_label_angle(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<LabelAngle> {
@@ -44,7 +44,7 @@ fn body_chart_axis_label_angle(
 }
 
 fn set_body_chart_axis_label_angle(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     axis: Axis,
     angle: LabelAngle,
@@ -59,7 +59,7 @@ fn set_body_chart_axis_label_angle(
         axis,
         angle,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_label_angle(drawable_object_id, axis)? != angle {
         return Err(Error::InvalidFormat(
             "Pages chart axis label-angle update failed validation".to_owned(),
@@ -103,7 +103,7 @@ mod tests {
         editor
             .set_body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value, expected)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_axis_label_angle(chart.drawable_object_id, Axis::Value)

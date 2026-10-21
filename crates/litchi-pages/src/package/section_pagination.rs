@@ -77,31 +77,13 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// More than one section matched an exact-name selector.
-    #[error(
-        "the Pages section-pagination selector is ambiguous at positions {first:?} and {duplicate:?}"
-    )]
-    AmbiguousSelector {
-        /// First matching source position.
-        first: Position,
-        /// Next matching source position.
-        duplicate: Position,
-    },
-    /// No section matched an exact-name selector.
-    #[error("the Pages section-pagination selector did not match a section")]
-    NameNotFound,
-    /// No section exists at the requested source position.
-    #[error("the Pages section position {position:?} does not exist")]
-    PositionNotFound {
-        /// Requested semantic source position.
-        position: Position,
-    },
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The requested pagination violates a public semantic invariant.
     #[error("invalid Pages section pagination: {0}")]
     InvalidPagination(#[source] section::pagination::Error),
-    /// The snapshot has no exact physical source suitable for a changed edit.
-    #[error("this Pages source does not support physical section-pagination edits")]
-    UnsupportedSource,
     /// The selected native section cannot be decoded or rewritten safely.
     #[error("the Pages source cannot be edited safely")]
     InvalidSource,
@@ -109,7 +91,7 @@ pub enum Error {
     #[error(
         "Pages section-pagination {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -129,6 +111,54 @@ pub enum Error {
     /// The patch does not belong to this exact immutable package artifact.
     #[error("the Pages section-pagination patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// More than one section matched an exact-name selector.
+    #[error(
+        "the Pages section-pagination selector is ambiguous at positions {first:?} and {duplicate:?}"
+    )]
+    AmbiguousSelector {
+        /// First matching source position.
+        first: Position,
+        /// Next matching source position.
+        duplicate: Position,
+    },
+    /// No section matched an exact-name selector.
+    #[error("the Pages section-pagination selector did not match a section")]
+    NameNotFound,
+    /// No section exists at the requested source position.
+    #[error("the Pages section position {position:?} does not exist")]
+    PositionNotFound {
+        /// Requested semantic source position.
+        position: Position,
+    },
+    /// The snapshot has no exact physical source suitable for a changed edit.
+    #[error("this Pages source does not support physical section-pagination edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A mutable pagination value staged against one immutable Pages package.
@@ -269,7 +299,7 @@ impl<'a> Edit<'a> {
         }
 
         if !self.source.state.source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let package =
             rewrite_package_pagination(self.source, self.position, self.before, self.pagination)?;
@@ -438,6 +468,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -545,8 +581,10 @@ fn resolve_position<'selector>(
         .select_section(selected_selector)
         .map_err(map_selector_error)?
         .ok_or(match selected_selector {
-            SectionSelector::Name(_) => Error::NameNotFound,
-            SectionSelector::Position(position) => Error::PositionNotFound { position },
+            SectionSelector::Name(_) => Error::Refused(Refusal::NameNotFound),
+            SectionSelector::Position(position) => {
+                Error::Refused(Refusal::PositionNotFound { position })
+            },
         })?;
     Ok(Position::new(selected.index()))
 }
@@ -646,7 +684,9 @@ fn section_identifier_at(package: &Package, position: Position) -> Result<NonZer
     let components = package.state.source.components();
     let limits = package.state.source.limits();
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
-    let body_identifier = root.body.ok_or(Error::UnsupportedSource)?;
+    let body_identifier = root
+        .body
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource)?;
     let max_text_bytes = effective_text_limit(limits);
     let (_storage, table_references) = decode_body_storage(
@@ -669,7 +709,7 @@ fn section_identifier_at(package: &Package, position: Position) -> Result<NonZer
 
 fn pagination_at(package: &Package, position: Position) -> Result<section::Pagination, Error> {
     if package.sections().get(position.get()).is_none() {
-        return Err(Error::PositionNotFound { position });
+        return Err(Error::Refused(Refusal::PositionNotFound { position }));
     }
     let identifier = section_identifier_at(package, position)?;
     let mut payload = None;
@@ -786,7 +826,7 @@ fn rewrite_pagination_payload(
         return Err(output_limit_error(output_length, limits));
     }
     if output_fields > limits.max_fields() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
@@ -910,13 +950,13 @@ fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
 )]
 fn map_selector_error(selection_error: crate::SelectorError) -> Error {
     match selection_error {
-        crate::SelectorError::EmptySectionName => Error::NameNotFound,
+        crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
         crate::SelectorError::AmbiguousSectionName {
             first, duplicate, ..
-        } => Error::AmbiguousSelector {
+        } => Error::Refused(Refusal::AmbiguousSelector {
             first: Position::new(first),
             duplicate: Position::new(duplicate),
-        },
+        }),
     }
 }
 
@@ -927,7 +967,7 @@ fn map_selector_error(selection_error: crate::SelectorError) -> Error {
 fn map_package_error(package_error: PackageError) -> Error {
     match package_error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::SemanticBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -936,13 +976,13 @@ fn map_package_error(package_error: PackageError) -> Error {
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
         | PackageError::InvalidLimit { .. }
-        | PackageError::Limit { .. } => Error::UnsupportedSource,
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::Entries,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -965,7 +1005,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1004,7 +1044,7 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -1047,7 +1087,7 @@ fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes
                 | litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireBytes,
@@ -1069,7 +1109,7 @@ fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
 }
 
 fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::WireBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_output_bytes()),
@@ -1077,7 +1117,7 @@ fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
 }
 
 fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::WireWork,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_rewrite_work()),

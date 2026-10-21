@@ -29,7 +29,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
         ParagraphListLevelPlacement::new(deep_start(), level_two),
     ];
 
-    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Draft::create_with_text("Lists").unwrap();
     let pages_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     pages
         .set_text_box_paragraph_list(pages_box.drawable_object_id, ParagraphList::Bullet)
@@ -50,7 +50,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             .unwrap(),
         expected
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_list_level(pages_box.drawable_object_id, deep_start())
@@ -102,7 +102,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             ParagraphListLevel::ONE,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_list_level(
@@ -127,7 +127,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
             level_two,
         )
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_list_level(0, keynote_box.drawable_object_id, deep_start())
@@ -138,7 +138,7 @@ fn list_levels_round_trip_coalesce_and_reset_in_every_suite() {
 
 #[test]
 fn non_paragraph_list_level_updates_are_rejected_transactionally() {
-    let mut pages = pages::Editor::create_with_text("Lists").unwrap();
+    let mut pages = pages::Draft::create_with_text("Lists").unwrap();
     let text_box = pages.add_text_box(5, TEXT, POSITION, SIZE).unwrap();
     let before = pages.to_bytes().unwrap();
     assert!(

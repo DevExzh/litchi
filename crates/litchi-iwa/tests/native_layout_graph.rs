@@ -229,7 +229,7 @@ fn metadata_facts(bytes: &[u8]) -> TestResult<MetadataFacts> {
     Ok(facts)
 }
 
-fn snapshot(bytes: &[u8], editor: &keynote::Editor) -> TestResult<SlideSnapshot> {
+fn snapshot(bytes: &[u8], editor: &keynote::Draft) -> TestResult<SlideSnapshot> {
     let catalog = SourceCatalog::from_bytes(bytes)?;
     let slide = editor
         .slides()?
@@ -327,7 +327,7 @@ fn component_ids_without_object(edges: &BTreeSet<Dependency>) -> BTreeSet<u64> {
         .collect()
 }
 
-fn first_image_media(editor: &keynote::Editor) -> TestResult<Vec<u8>> {
+fn first_image_media(editor: &keynote::Draft) -> TestResult<Vec<u8>> {
     let image = editor
         .slide_images(0)?
         .into_iter()
@@ -339,7 +339,7 @@ fn first_image_media(editor: &keynote::Editor) -> TestResult<Vec<u8>> {
 #[test]
 fn native_layout_reassignment_updates_metadata_and_preserves_slide_content() -> TestResult {
     let source = std::fs::read(SOURCE)?;
-    let source_editor = keynote::Editor::from_bytes(&source)?;
+    let source_editor = keynote::Draft::from_bytes(&source)?;
     let source_snapshot = snapshot(&source, &source_editor)?;
     let source_references = slide_references(&source)?;
     assert_eq!(
@@ -352,7 +352,7 @@ fn native_layout_reassignment_updates_metadata_and_preserves_slide_content() -> 
     );
     assert_roots_present(&source, source_references, &source_snapshot)?;
 
-    let mut editor = keynote::Editor::from_bytes(&source)?;
+    let mut editor = keynote::Draft::from_bytes(&source)?;
     let target_layout = editor
         .slide_layouts()?
         .into_iter()
@@ -372,7 +372,7 @@ fn native_layout_reassignment_updates_metadata_and_preserves_slide_content() -> 
         "reassigning the active layout must be an exact no-op"
     );
 
-    let candidate_editor = keynote::Editor::from_bytes(&candidate)?;
+    let candidate_editor = keynote::Draft::from_bytes(&candidate)?;
     let candidate_snapshot = snapshot(&candidate, &candidate_editor)?;
     assert_eq!(
         candidate_snapshot.layout_name.as_deref(),
@@ -384,7 +384,7 @@ fn native_layout_reassignment_updates_metadata_and_preserves_slide_content() -> 
     );
     assert_eq!(
         candidate_snapshot,
-        snapshot(&candidate, &keynote::Editor::from_bytes(&candidate)?)?,
+        snapshot(&candidate, &keynote::Draft::from_bytes(&candidate)?)?,
         "serialized candidate does not reopen to the same typed slide projection"
     );
     let candidate_references = slide_references(&candidate)?;
@@ -453,7 +453,7 @@ fn native_resaved_layout_fixture_preserves_typed_slide_and_media() -> TestResult
     const TITLE: &str = "Saved layout Native image adjustment marker";
 
     let bytes = std::fs::read(RESAVED_SOURCE)?;
-    let mut editor = keynote::Editor::from_bytes(&bytes)?;
+    let mut editor = keynote::Draft::from_bytes(&bytes)?;
     let slide = editor
         .slides()?
         .into_iter()
@@ -468,7 +468,7 @@ fn native_resaved_layout_fixture_preserves_typed_slide_and_media() -> TestResult
     assert_eq!(slide.is_body_visible, Some(false));
     assert_eq!(slide.title.as_deref(), Some(TITLE));
 
-    let source_editor = keynote::Editor::from_bytes(&std::fs::read(SOURCE)?)?;
+    let source_editor = keynote::Draft::from_bytes(&std::fs::read(SOURCE)?)?;
     assert_eq!(
         first_image_media(&editor)?,
         first_image_media(&source_editor)?
@@ -482,7 +482,7 @@ fn native_resaved_layout_fixture_preserves_typed_slide_and_media() -> TestResult
         "setting the active native layout must be an exact no-op"
     );
 
-    let reopened = keynote::Editor::from_bytes(&before)?;
+    let reopened = keynote::Draft::from_bytes(&before)?;
     let reopened_slide = reopened
         .slides()?
         .into_iter()

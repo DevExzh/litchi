@@ -193,7 +193,9 @@ fn selectors_read_and_stage_text_and_custom_marker_presence() -> TestResult {
     assert_eq!(by_position.custom_mark(), Some("‡"));
     assert!(matches!(
         package.edit_body_footnote_text(Selector::index(2)),
-        Err(FootnoteTextError::NotFound)
+        Err(FootnoteTextError::Refused(
+            litchi_pages::footnote::text::Refusal::NotFound
+        ))
     ));
     Ok(())
 }
@@ -273,7 +275,7 @@ fn low_iwa_limit_rejects_commit_atomically() -> TestResult {
     let error = edit
         .commit()
         .expect_err("the original decompressed-IWA ceiling must reject growth");
-    assert!(matches!(error, FootnoteTextError::LimitExceeded { .. }));
+    assert!(matches!(error, FootnoteTextError::Limit { .. }));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }

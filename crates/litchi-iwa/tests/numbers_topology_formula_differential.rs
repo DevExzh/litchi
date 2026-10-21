@@ -7,12 +7,10 @@
 //! by identifier, in every component but the package metadata). A case the
 //! host editor refuses must be refused by the leaf too, with a typed reason.
 
-#![allow(deprecated)]
-
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use litchi_iwa::numbers::{self, UnverifiedTopologyEdit};
+use litchi_iwa::numbers::{self, UnverifiedAxisChange};
 use litchi_iwa_archive::iwa::{Archive, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_archive::{ComponentCatalog, Limits};
@@ -134,7 +132,9 @@ enum Op {
 /// The body row and column counts, from the leaf's range refusal.
 fn body_lengths(package: &Package, sheet: usize, table: usize) -> TestResult<(usize, usize)> {
     let length = |result: Result<_, TopologyError>| match result {
-        Err(TopologyError::PositionOutOfRange { length, .. }) => Ok(length),
+        Err(TopologyError::Refused(
+            litchi_numbers::table::topology::Refusal::PositionOutOfRange { length, .. },
+        )) => Ok(length),
         _ => Err("no range refusal"),
     };
     let rows = length(
@@ -171,12 +171,12 @@ fn ops(body_rows: usize, body_columns: usize) -> Vec<Op> {
 }
 
 fn host(source: &[u8], table: &str, op: Op) -> Result<Vec<u8>, String> {
-    let mut editor = numbers::Editor::from_bytes(source).map_err(|error| error.to_string())?;
+    let mut editor = numbers::Draft::from_bytes(source).map_err(|error| error.to_string())?;
     let edit = match op {
-        Op::InsertRow(insertion) => UnverifiedTopologyEdit::InsertRow(insertion),
-        Op::InsertColumn(insertion) => UnverifiedTopologyEdit::InsertColumn(insertion),
-        Op::RemoveRow(deletion) => UnverifiedTopologyEdit::RemoveRow(deletion),
-        Op::RemoveColumn(deletion) => UnverifiedTopologyEdit::RemoveColumn(deletion),
+        Op::InsertRow(insertion) => UnverifiedAxisChange::InsertRow(insertion),
+        Op::InsertColumn(insertion) => UnverifiedAxisChange::InsertColumn(insertion),
+        Op::RemoveRow(deletion) => UnverifiedAxisChange::RemoveRow(deletion),
+        Op::RemoveColumn(deletion) => UnverifiedAxisChange::RemoveColumn(deletion),
     };
     editor
         .__edit_table_topology_unverified(TableSelector::name(table), edit)
@@ -909,7 +909,7 @@ fn leaf_topology_matches_the_host_editor_on_tables_with_formulas() -> TestResult
         let source = source.as_slice();
         let package = Package::from_bytes(source)?;
         let name = name.as_str();
-        if numbers::Editor::from_bytes(source).is_err() {
+        if numbers::Draft::from_bytes(source).is_err() {
             *summary
                 .entry(format!("skipped file: host cannot open {name}"))
                 .or_default() += 1;

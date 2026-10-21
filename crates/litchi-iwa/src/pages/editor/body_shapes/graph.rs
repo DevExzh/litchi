@@ -41,7 +41,7 @@ pub(super) fn new_shape_geometry(
     .validate()
 }
 
-pub(super) fn shape_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
+pub(super) fn shape_style_id(package: &HostPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
@@ -68,7 +68,7 @@ pub(super) fn shape_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no shape style preset".to_owned()))
 }
 
-pub(super) fn body_shape_infos(editor: &Editor) -> Result<Vec<BodyShapeInfo>> {
+pub(super) fn body_shape_infos(editor: &Draft) -> Result<Vec<BodyShapeInfo>> {
     let mut shapes = Vec::new();
     for text in editor.drawable_text_storages()? {
         let Some(shape) = shape_payload(editor.package(), text.drawable_object_id)? else {
@@ -82,7 +82,7 @@ pub(super) fn body_shape_infos(editor: &Editor) -> Result<Vec<BodyShapeInfo>> {
     Ok(shapes)
 }
 
-pub(super) fn body_shape_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyShapeGraph> {
+pub(super) fn body_shape_graph(editor: &Draft, drawable_object_id: u64) -> Result<BodyShapeGraph> {
     let text = editor
         .drawable_text_storages()?
         .into_iter()
@@ -102,7 +102,7 @@ pub(super) fn body_shape_graph(editor: &Editor, drawable_object_id: u64) -> Resu
 
 #[allow(deprecated)]
 fn body_shape_graph_from_text(
-    editor: &Editor,
+    editor: &Draft,
     text: DrawableTextInfo,
     shape: crate::protobuf::tswp::ShapeInfoArchive,
 ) -> Result<BodyShapeGraph> {
@@ -316,7 +316,7 @@ fn body_shape_graph_from_text(
 }
 
 fn shape_payload(
-    package: &IWorkPackage,
+    package: &HostPackage,
     drawable_object_id: u64,
 ) -> Result<Option<crate::protobuf::tswp::ShapeInfoArchive>> {
     let archive_name = find_object_archive(package, drawable_object_id)?;
@@ -342,7 +342,7 @@ fn shape_payload(
     )?))
 }
 
-fn shape_storage_owner_count(package: &IWorkPackage, storage_id: u64) -> Result<usize> {
+fn shape_storage_owner_count(package: &HostPackage, storage_id: u64) -> Result<usize> {
     let mut owners = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {

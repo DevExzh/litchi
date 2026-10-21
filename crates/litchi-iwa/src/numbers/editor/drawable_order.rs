@@ -3,7 +3,7 @@
 use super::*;
 use crate::drawable_order::{DrawableLayerMove, move_drawable_layer, validate_unique_drawables};
 
-impl Editor {
+impl Draft {
     /// List one sheet's drawable identifiers from the back-most to the front-most layer.
     pub fn sheet_drawable_order(&self, sheet_id: u64) -> Result<Vec<u64>> {
         let (_, _, sheet) = numbers_sheet(&self.package, sheet_id)?;
@@ -131,7 +131,7 @@ mod tests {
             .set_sheet_drawable_order(sheet_id, &reversed)
             .unwrap();
         assert_eq!(editor.sheet_drawable_order(sheet_id).unwrap(), reversed);
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_drawable_order(sheet_id).unwrap(), reversed);
 
         let bytes = editor.to_bytes().unwrap();
@@ -154,7 +154,7 @@ mod tests {
         );
     }
 
-    fn append_rectangle(editor: &mut Editor, sheet_id: u64, text: &str) -> u64 {
+    fn append_rectangle(editor: &mut Draft, sheet_id: u64, text: &str) -> u64 {
         editor
             .add_sheet_rectangle(sheet_id, text, OVERLAP_POSITION, OVERLAP_SIZE)
             .unwrap()

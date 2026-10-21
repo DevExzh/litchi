@@ -5,7 +5,7 @@
 use super::*;
 use crate::media::MediaAssetId;
 
-impl Editor {
+impl Draft {
     /// List metadata-backed media reachable from this spreadsheet package.
     pub fn media_assets(&self) -> Result<Vec<EmbeddedMediaAsset>> {
         reachable_embedded_assets(&self.package, [1])
@@ -36,7 +36,7 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Numbers object graph"
             )));
         }
-        IWorkMediaEditor::from_package(self.package.clone())?.extract(data_identifier)
+        crate::media::Draft::from_package(self.package.clone())?.extract(data_identifier)
     }
 
     /// Replace a referenced materialized asset without changing its data identifier.
@@ -54,7 +54,7 @@ impl Editor {
                 "Data identifier {data_identifier} is not reachable from the Numbers object graph"
             )));
         }
-        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let mut media = crate::media::Draft::from_package(self.package.clone())?;
         let old = media.replace(data_identifier, replacement)?;
         let staged = media.into_package();
         Self::from_package(staged.clone())?;
@@ -62,7 +62,7 @@ impl Editor {
         Ok(old)
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub fn into_package(self) -> HostPackage {
         self.package
     }
 

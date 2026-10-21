@@ -4,7 +4,9 @@ use std::{fmt::Debug, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::pages::{
-    footnote::body::transaction::Commit as BodyFootnoteCommit, footnote::body::transaction::Error as BodyFootnoteError, Package,
+    Package,
+    footnote::body::transaction::Commit as BodyFootnoteCommit,
+    footnote::body::transaction::Error as BodyFootnoteError,
     footnote::body::{Footnote, Position, Selector},
 };
 use litchi_iwa_archive::Limits;
@@ -25,7 +27,10 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
 
-    if let Ok(package) = Package::from_bytes_with_options(&source, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         exercise_package(&package, &source);
     }
 
@@ -99,8 +104,11 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()))
-            .unwrap_or_else(|error| panic!("native Pages lifecycle seed must open: {error}"));
+        let package = Package::from_bytes_with_options(
+            NATIVE_PAGES,
+            litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+        )
+        .unwrap_or_else(|error| panic!("native Pages lifecycle seed must open: {error}"));
         package
             .validate()
             .unwrap_or_else(|error| panic!("native Pages lifecycle seed must validate: {error}"));
@@ -127,12 +135,22 @@ fn exercise_package(package: &Package, data: &[u8]) {
 
     let missing = package.edit_body_footnote(Selector::index(notes.len()));
     if let Err(error) = missing {
-        assert!(matches!(error, BodyFootnoteError::NotFound));
+        assert!(matches!(
+            error,
+            BodyFootnoteError::Refused(
+                litchi::pages::footnote::body::transaction::Refusal::NotFound
+            )
+        ));
         observe_error(error);
     }
     if let Err(error) = package.edit_body_footnote(Selector::Anchor(Position::ZERO)) {
         if !notes.iter().any(|note| note.position == Position::ZERO) {
-            assert!(matches!(error, BodyFootnoteError::NotFound));
+            assert!(matches!(
+                error,
+                BodyFootnoteError::Refused(
+                    litchi::pages::footnote::body::transaction::Refusal::NotFound
+                )
+            ));
         }
         observe_error(error);
     }
@@ -343,7 +361,9 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
     let structural = package.insert_body_footnote(Position::ZERO, "bad\u{000e}", None);
     assert!(matches!(
         &structural,
-        Err(BodyFootnoteError::StructuralMarker)
+        Err(BodyFootnoteError::Refused(
+            litchi::pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
     ));
     if let Err(error) = structural {
         observe_error(error);
@@ -351,7 +371,12 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
     assert_eq!(package_bytes(package), source_before);
 
     let marker = package.insert_body_footnote(Position::ZERO, "ok", Some("bad\u{fffc}"));
-    assert!(matches!(&marker, Err(BodyFootnoteError::StructuralMarker)));
+    assert!(matches!(
+        &marker,
+        Err(BodyFootnoteError::Refused(
+            litchi::pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
+    ));
     if let Err(error) = marker {
         observe_error(error);
     }
@@ -363,7 +388,10 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_options(PRIVATE_MALFORMED_INPUT, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        PRIVATE_MALFORMED_INPUT,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => {
             let display = error.to_string();
             let debug = format!("{error:?}");
@@ -380,7 +408,10 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_options(bytes, litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
+    match Package::from_bytes_with_options(
+        bytes,
+        litchi::pages::OpenOptions::new().__archive_limits(fuzz_limits()),
+    ) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("oversized Pages input must be rejected"),
     }

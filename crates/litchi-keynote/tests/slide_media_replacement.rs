@@ -167,7 +167,9 @@ fn reads_content_poster_and_audio_without_native_ids() -> TestResult {
             MovieSelector::index(2),
             MediaPart::Poster
         ),
-        Err(SlideMediaDataError::AudioPoster)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
     Ok(())
 }
@@ -319,7 +321,9 @@ fn native_fixture_admits_shared_media_and_preserves_semantic_context() -> TestRe
             MovieSelector::index(0),
             MediaPart::Poster,
         ),
-        Err(SlideMediaDataError::AudioPoster)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
 
     // Read semantic inventory here: separate caption/geometry mutation owners
@@ -515,7 +519,9 @@ fn invalid_replacements_are_rejected_before_publication() -> TestResult {
     )?;
     assert!(matches!(
         content.set(&[]),
-        Err(SlideMediaDataError::EmptyReplacement)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::EmptyReplacement
+        ))
     ));
 
     let poster = package.edit_slide_media_data(
@@ -525,7 +531,9 @@ fn invalid_replacements_are_rejected_before_publication() -> TestResult {
     )?;
     assert!(matches!(
         poster.set(REPLACED_MOVIE_BYTES),
-        Err(SlideMediaDataError::ReplacementType)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::ReplacementType
+        ))
     ));
 
     assert!(matches!(
@@ -534,7 +542,9 @@ fn invalid_replacements_are_rejected_before_publication() -> TestResult {
             MovieSelector::index(2),
             MediaPart::Poster,
         ),
-        Err(SlideMediaDataError::AudioPoster)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
     Ok(())
 }
@@ -673,7 +683,9 @@ fn semantic_name_and_position_selectors_are_equivalent() -> TestResult {
             MovieSelector::index(0),
             MediaPart::Content
         ),
-        Err(SlideMediaDataError::EmptySlideName)
+        Err(SlideMediaDataError::Refused(
+            litchi_keynote::slide::media::data::Refusal::EmptySlideName
+        ))
     ));
     Ok(())
 }

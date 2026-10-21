@@ -228,7 +228,7 @@ pub(super) fn rewrite_visibility_payload(
     };
     let output_len = retained.checked_add(append).ok_or(Error::InvalidSource)?;
     if output_len > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: output_len as u64,
             maximum: limits.max_output_bytes() as u64,
@@ -241,7 +241,7 @@ pub(super) fn rewrite_visibility_payload(
         .and_then(|value| value.checked_add(view.len().saturating_mul(2)))
         .ok_or(Error::InvalidSource)?;
     if work > limits.max_rewrite_work() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: work as u64,
             maximum: limits.max_rewrite_work() as u64,
@@ -266,7 +266,9 @@ pub(super) fn rewrite_visibility_payload(
         && after == State::Visible
         && (remaining_owned_fields == 0 || remaining_z_order_fields == 0)
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     for field in view.fields() {
         let selected_list = matches!(field.number(), OWNED_DRAWABLES_FIELD | Z_ORDER_FIELD)
@@ -470,7 +472,7 @@ mod tests {
                 WireLimits::default(),
                 &mut budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed,
                 maximum,

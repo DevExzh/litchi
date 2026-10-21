@@ -6,7 +6,7 @@ use crate::charts::border::{
     set_chart_border_visible as set_native_chart_border_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Pages shows the chart-area border for one native body chart.
     pub fn body_chart_border_visible(&self, drawable_object_id: u64) -> Result<bool> {
         body_chart_border_visible(self, drawable_object_id)
@@ -22,7 +22,7 @@ impl Editor {
     }
 }
 
-fn body_chart_border_visible(editor: &Editor, drawable_object_id: u64) -> Result<bool> {
+fn body_chart_border_visible(editor: &Draft, drawable_object_id: u64) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_border_visible(
         editor.package(),
@@ -33,7 +33,7 @@ fn body_chart_border_visible(editor: &Editor, drawable_object_id: u64) -> Result
 }
 
 fn set_body_chart_border_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     visible: bool,
 ) -> Result<()> {
@@ -49,7 +49,7 @@ fn set_body_chart_border_visible(
         "Pages",
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_border_visible(drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart border update failed validation".to_owned(),

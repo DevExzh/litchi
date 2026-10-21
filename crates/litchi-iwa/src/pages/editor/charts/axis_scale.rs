@@ -7,7 +7,7 @@ use crate::charts::axis_scale::{
     set_chart_value_axis_scale as set_native_chart_value_axis_scale,
 };
 
-impl Editor {
+impl Draft {
     /// Read the primary value-axis scale of one native body chart.
     pub fn body_chart_value_axis_scale(&self, drawable_object_id: u64) -> Result<Scale> {
         body_chart_value_axis_scale(self, drawable_object_id)
@@ -23,7 +23,7 @@ impl Editor {
     }
 }
 
-fn body_chart_value_axis_scale(editor: &Editor, drawable_object_id: u64) -> Result<Scale> {
+fn body_chart_value_axis_scale(editor: &Draft, drawable_object_id: u64) -> Result<Scale> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_value_axis_scale(
         editor.package(),
@@ -34,7 +34,7 @@ fn body_chart_value_axis_scale(editor: &Editor, drawable_object_id: u64) -> Resu
 }
 
 fn set_body_chart_value_axis_scale(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     scale: Scale,
 ) -> Result<()> {
@@ -47,7 +47,7 @@ fn set_body_chart_value_axis_scale(
         "Pages",
         scale,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_value_axis_scale(drawable_object_id)? != scale {
         return Err(Error::InvalidFormat(
             "Pages chart value-axis scale update failed validation".to_owned(),

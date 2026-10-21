@@ -396,9 +396,11 @@ fn slide_number_visibility_transaction_reaches_the_root_facade()
     );
     assert!(matches!(
         package.slide_text(selector, kind),
-        Err(SlideTextError::UnsupportedKind {
-            kind: Kind::SlideNumber
-        })
+        Err(SlideTextError::Refused(
+            litchi::keynote::slide::text::Refusal::UnsupportedKind {
+                kind: Kind::SlideNumber
+            }
+        ))
     ));
 
     let edit = package.edit_slide_placeholder_visibility(selector, kind)?;
@@ -482,7 +484,9 @@ fn slide_notes_transaction_is_available_through_the_root_facade()
     } else {
         assert!(matches!(
             package.edit_slide_notes(selector),
-            Err(SlideNotesError::NotesStorageNotFound)
+            Err(SlideNotesError::Refused(
+                litchi::keynote::slide::notes::Refusal::NotesStorageNotFound
+            ))
         ));
         assert_eq!(package.exact_bytes(), source_snapshot);
     }

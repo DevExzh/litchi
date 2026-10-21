@@ -15,7 +15,7 @@ use crate::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl Editor {
+impl Draft {
     /// Read whether Numbers shows major gridlines for one native sheet-chart axis.
     pub fn sheet_chart_axis_major_gridlines_visible(
         &self,
@@ -109,7 +109,7 @@ impl Editor {
             gridline,
             stroke,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_axis_gridline_stroke(
             sheet_id,
             drawable_object_id,
@@ -127,7 +127,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_major_gridlines_visible(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -143,7 +143,7 @@ fn sheet_chart_axis_major_gridlines_visible(
 }
 
 fn set_sheet_chart_axis_major_gridlines_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -159,7 +159,7 @@ fn set_sheet_chart_axis_major_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_major_gridlines_visible(sheet_id, drawable_object_id, axis)?
         != visible
     {
@@ -172,7 +172,7 @@ fn set_sheet_chart_axis_major_gridlines_visible(
 }
 
 fn sheet_chart_axis_minor_gridlines_visible(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -188,7 +188,7 @@ fn sheet_chart_axis_minor_gridlines_visible(
 }
 
 fn set_sheet_chart_axis_minor_gridlines_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -204,7 +204,7 @@ fn set_sheet_chart_axis_minor_gridlines_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_minor_gridlines_visible(sheet_id, drawable_object_id, axis)?
         != visible
     {

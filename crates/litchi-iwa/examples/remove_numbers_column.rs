@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => return Err(format!("unsupported column section {section:?}").into()),
     };
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     editor.remove_table_column(TableSelector::index(table_index), deletion)?;
     editor.save(output)?;
     Ok(())

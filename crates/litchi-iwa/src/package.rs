@@ -115,7 +115,7 @@ fn allocation_error(resource: &'static str, amount: usize) -> Error {
 /// transaction is rejected and discarded. The first mutation of a shared
 /// package performs the required copy-on-write detachment.
 #[derive(Debug, Clone, Default)]
-pub struct IWorkPackage {
+pub struct Package {
     state: Arc<PackageState>,
     limits: PackageLimits,
     mutation_revision: u64,
@@ -477,7 +477,7 @@ fn own_bounded_source(bytes: &[u8], limits: PackageLimits) -> Result<Arc<[u8]>> 
     Ok(source.into())
 }
 
-impl IWorkPackage {
+impl Package {
     pub fn new() -> Self {
         Self::default()
     }
@@ -491,7 +491,7 @@ impl IWorkPackage {
     /// Flat packages retain the owned source bytes so an unchanged package
     /// can be written back byte-for-byte, including ZIP metadata and comments.
     /// Legacy nested packages still normalize through the archive adapter.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn open_with_limits<P: AsRef<Path>>(path: P, limits: PackageLimits) -> Result<Self> {
         let mut file = File::open(path.as_ref())?;
         let size = file.metadata()?.len();
         let source = read_bounded_source(&mut file, size, limits)?;
@@ -526,7 +526,10 @@ impl IWorkPackage {
     ///
     /// The physical archive owner checks the source length before allocating,
     /// snapshots through [`ReadAt`], and rejects a changed source revision.
-    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn from_read_at_with_limits(
+        source: &dyn ReadAt,
+        limits: PackageLimits,
+    ) -> Result<Self> {
         let catalog = litchi_iwa_archive::package::Catalog::from_read_at_with_limits(
             source,
             limits.physical_archive_limits()?,
@@ -541,13 +544,16 @@ impl IWorkPackage {
     /// embedded legacy `Index.zip` archive. The owned source baseline is
     /// retained for flat packages, so an unchanged package can be written
     /// back byte-for-byte without rebuilding the ZIP envelope.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
         Self::from_shared_bytes_with_limits(own_bounded_source(bytes, limits)?, limits)
     }
 
     /// Parse an already-owned package source under caller-selected ingress
     /// ceilings without copying the source bytes.
-    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: PackageLimits) -> Result<Self> {
+    pub(crate) fn from_shared_bytes_with_limits(
+        source: Arc<[u8]>,
+        limits: PackageLimits,
+    ) -> Result<Self> {
         let input_size = u64::try_from(source.len()).map_err(|_| {
             Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
         })?;
@@ -717,7 +723,7 @@ impl IWorkPackage {
     }
 
     /// Create or replace a package member.
-    pub fn insert_entry(
+    pub(crate) fn insert_entry(
         &mut self,
         name: impl Into<String>,
         data: Vec<u8>,
@@ -753,7 +759,7 @@ impl IWorkPackage {
     }
 
     /// Delete a package member.
-    pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
+    pub(crate) fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
         let normalized = normalize_entry_name(name);
         self.state.position(normalized)?;
         let state = Arc::make_mut(&mut self.state);
@@ -870,7 +876,11 @@ impl IWorkPackage {
     }
 
     /// Serialize and replace a parsed `.iwa` package member.
-    pub fn replace_archive(&mut self, name: &str, archive: &Archive) -> Result<Option<Vec<u8>>> {
+    pub(crate) fn replace_archive(
+        &mut self,
+        name: &str,
+        archive: &Archive,
+    ) -> Result<Option<Vec<u8>>> {
         let normalized = normalize_entry_name(name).to_string();
         validate_entry_name(&normalized)?;
         if !normalized.ends_with(".iwa") {
@@ -943,7 +953,7 @@ impl IWorkPackage {
 
     /// Parse, mutate, validate, and replace an IWA component as one operation.
     /// If the callback or serialization fails, the original package is unchanged.
-    pub fn update_archive<F>(&mut self, name: &str, update: F) -> Result<()>
+    pub(crate) fn update_archive<F>(&mut self, name: &str, update: F) -> Result<()>
     where
         F: FnOnce(&mut Archive) -> Result<()>,
     {
@@ -1152,7 +1162,7 @@ impl Snapshot {
     /// Validate this immutable snapshot without creating serialized output.
     ///
     /// The check borrows the shared package state and applies the same
-    /// resource and entry-name invariants as [`IWorkPackage::validate`].
+    /// resource and entry-name invariants as [`Package::validate`].
     pub fn validate(&self) -> Result<()> {
         self.edit().validate()
     }
@@ -1176,8 +1186,8 @@ impl Snapshot {
     }
 
     /// Start a mutable copy-on-write edit from this snapshot.
-    pub fn edit(&self) -> IWorkPackage {
-        IWorkPackage {
+    pub fn edit(&self) -> Package {
+        Package {
             state: Arc::clone(&self.state),
             limits: self.limits,
             mutation_revision: 0,
@@ -1193,7 +1203,7 @@ impl Snapshot {
     /// snapshot remains unchanged.
     pub fn edit_with<T, F>(&self, edit: F) -> Result<Commit<T>>
     where
-        F: FnOnce(&mut IWorkPackage) -> Result<T>,
+        F: FnOnce(&mut Package) -> Result<T>,
     {
         let mut candidate = self.edit();
         let value = edit(&mut candidate)?;
@@ -1362,9 +1372,9 @@ mod tests {
         ])
     }
 
-    fn empty_package_with_limits(limits: PackageLimits) -> IWorkPackage {
+    fn empty_package_with_limits(limits: PackageLimits) -> Package {
         let bytes = zip(&[]);
-        IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap()
+        Package::from_bytes_with_limits(&bytes, limits).unwrap()
     }
 
     #[test]
@@ -1376,7 +1386,7 @@ mod tests {
             .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         bytes.extend_from_slice(comment);
         let source: Arc<[u8]> = bytes.into();
-        let package = IWorkPackage::from_shared_bytes(source.clone()).unwrap();
+        let package = Package::from_shared_bytes(source.clone()).unwrap();
 
         let retained = package.exact_source_owner().expect("exact source owner");
         assert!(Arc::ptr_eq(&source, &retained));
@@ -1397,7 +1407,7 @@ mod tests {
             .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         bytes.extend_from_slice(comment);
 
-        let package = IWorkPackage::from_bytes(&bytes).unwrap();
+        let package = Package::from_bytes(&bytes).unwrap();
 
         assert_eq!(package.to_bytes().unwrap(), bytes);
         let mut written = Vec::new();
@@ -1416,7 +1426,7 @@ mod tests {
 
         let file = tempfile::NamedTempFile::new()?;
         std::fs::write(file.path(), &bytes)?;
-        let package = IWorkPackage::open(file.path())?;
+        let package = Package::open(file.path())?;
 
         assert_eq!(package.to_bytes()?, bytes);
         let mut written = Vec::new();
@@ -1443,7 +1453,7 @@ mod tests {
             .iter()
             .find(|entry| entry.name() == "preview.jpg")
             .ok_or_else(|| Error::Bundle("preview fixture entry is missing".to_owned()))?;
-        let mut package = IWorkPackage::from_bytes(&source)?;
+        let mut package = Package::from_bytes(&source)?;
         package.update_archive("Index/Document.iwa", |archive| {
             archive.objects[0].messages[0].data.push(4);
             Ok(())
@@ -1473,7 +1483,7 @@ mod tests {
         let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
         let source = zip(&[("Index/Document.iwa", &compressed)]);
         let profile = PackageLimits::new_with_limits(8_192, 2, 1_024, 4_096, 2_048)?;
-        let package = IWorkPackage::from_bytes_with_limits(&source, profile)?;
+        let package = Package::from_bytes_with_limits(&source, profile)?;
         let cached = package.parsed_archive("Index/Document.iwa")?;
         let weak = Arc::downgrade(&cached);
         let baseline = Arc::strong_count(&cached);
@@ -1518,7 +1528,7 @@ mod tests {
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),
         ]);
-        let mut package = IWorkPackage::from_bytes(&source)?;
+        let mut package = Package::from_bytes(&source)?;
         let before = package.to_bytes()?;
         let revision = package.mutation_revision();
         let existing = package.archive("Index/Document.iwa")?;
@@ -1539,7 +1549,7 @@ mod tests {
             ("preview.jpg", b"preview"),
         ])
         .into();
-        let mut package = IWorkPackage::from_shared_bytes(Arc::clone(&source))?;
+        let mut package = Package::from_shared_bytes(Arc::clone(&source))?;
         let state = Arc::clone(&package.state);
         let exact_source = package.source.clone().expect("flat source is retained");
         let revision = package.mutation_revision();
@@ -1625,7 +1635,7 @@ mod tests {
             .with_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
             .unwrap();
 
-        let error = IWorkPackage::from_bytes_with_limits(bytes, limits).unwrap_err();
+        let error = Package::from_bytes_with_limits(bytes, limits).unwrap_err();
         assert!(matches!(
             error,
             Error::InvalidFormat(message)
@@ -1652,7 +1662,7 @@ mod tests {
     fn reads_a_package_from_a_positional_source() {
         let bytes = zip(&[("preview.jpg", b"preview")]);
         let source = litchi_core::OwnedSource::new(bytes.clone());
-        let package = IWorkPackage::from_read_at(&source).unwrap();
+        let package = Package::from_read_at(&source).unwrap();
 
         assert_eq!(package.entry("preview.jpg"), Some(&b"preview"[..]));
         assert_eq!(package.to_bytes().unwrap(), bytes);
@@ -1727,7 +1737,7 @@ mod tests {
         .unwrap()
         .with_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
         .unwrap();
-        let error = IWorkPackage::from_bytes_with_limits(&bytes, input_limits).unwrap_err();
+        let error = Package::from_bytes_with_limits(&bytes, input_limits).unwrap_err();
         assert!(error.to_string().contains("iWork package input"));
 
         let stream_limits = PackageLimits::new(
@@ -1738,7 +1748,7 @@ mod tests {
         .unwrap()
         .with_iwa_stream_bytes(8)
         .unwrap();
-        let mut package = IWorkPackage::from_bytes_with_limits(&bytes, stream_limits).unwrap();
+        let mut package = Package::from_bytes_with_limits(&bytes, stream_limits).unwrap();
         assert_eq!(package.limits(), stream_limits);
         assert_eq!(package.snapshot().limits(), stream_limits);
         let error = package.archive("Index/Document.iwa").unwrap_err();
@@ -1760,7 +1770,7 @@ mod tests {
 
         let file = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(file.path(), &bytes).unwrap();
-        let error = IWorkPackage::open_with_limits(file.path(), input_limits).unwrap_err();
+        let error = Package::open_with_limits(file.path(), input_limits).unwrap_err();
         assert!(error.to_string().contains("iWork package input"));
     }
 
@@ -1773,13 +1783,13 @@ mod tests {
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
         let package_limits = PackageLimits::default().with_archive_limits(archive_limits)?;
-        let package = IWorkPackage::from_bytes_with_limits(&bytes, package_limits)?;
+        let package = Package::from_bytes_with_limits(&bytes, package_limits)?;
         let error = package.archive("Index/Document.iwa").unwrap_err();
         assert!(error.to_string().contains("IWA object limit exceeded"));
 
         let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
         let package_limits = PackageLimits::default().with_archive_limits(byte_limits)?;
-        let package = IWorkPackage::from_bytes_with_limits(&bytes, package_limits)?;
+        let package = Package::from_bytes_with_limits(&bytes, package_limits)?;
         let error = package.archive("Index/Document.iwa").unwrap_err();
         assert!(matches!(
             error,
@@ -1853,10 +1863,10 @@ mod tests {
             PackageLimits::MAX_TOTAL_BYTES,
         )
         .unwrap();
-        assert!(IWorkPackage::from_bytes_with_limits(&bytes, one_entry).is_err());
+        assert!(Package::from_bytes_with_limits(&bytes, one_entry).is_err());
 
         let small_entry = PackageLimits::new(10, 4, PackageLimits::MAX_TOTAL_BYTES).unwrap();
-        assert!(IWorkPackage::from_bytes_with_limits(&bytes, small_entry).is_err());
+        assert!(Package::from_bytes_with_limits(&bytes, small_entry).is_err());
     }
 
     #[test]
@@ -1874,7 +1884,7 @@ mod tests {
             PackageLimits::MAX_TOTAL_BYTES,
         )
         .unwrap();
-        let error = IWorkPackage::from_bytes_with_limits(&bytes, one_entry).unwrap_err();
+        let error = Package::from_bytes_with_limits(&bytes, one_entry).unwrap_err();
         assert!(
             error
                 .to_string()
@@ -1901,13 +1911,13 @@ mod tests {
             PackageLimits::MAX_TOTAL_BYTES,
         )
         .unwrap();
-        let error = IWorkPackage::from_bytes_with_limits(&bytes, limits).unwrap_err();
+        let error = Package::from_bytes_with_limits(&bytes, limits).unwrap_err();
         assert!(error.to_string().contains("entry count"));
     }
 
     #[test]
     fn package_entry_and_archive_crud_round_trip() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Metadata/Properties.plist", b"plist".to_vec())
             .unwrap();
@@ -1929,7 +1939,7 @@ mod tests {
             .unwrap();
 
         let bytes = package.to_bytes().unwrap();
-        let mut reparsed = IWorkPackage::from_bytes(&bytes).unwrap();
+        let mut reparsed = Package::from_bytes(&bytes).unwrap();
         let document = reparsed.archive("Index/Document.iwa").unwrap();
         assert_eq!(document.object(1).unwrap().messages[0].type_, 100);
         assert_eq!(document.object(1).unwrap().messages[0].data, [4, 5]);
@@ -1942,7 +1952,7 @@ mod tests {
 
     #[test]
     fn parsed_archive_cache_reuses_reads_and_invalidates_copy_on_write_mutations() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         let original = archive();
         package
             .replace_archive("Index/Document.iwa", &original)
@@ -2056,7 +2066,7 @@ mod tests {
 
     #[test]
     fn snapshots_share_storage_until_the_first_mutation() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Data/original", b"original".to_vec())
             .unwrap();
@@ -2081,7 +2091,7 @@ mod tests {
 
     #[test]
     fn snapshot_edit_with_publishes_a_validated_commit() -> crate::Result<()> {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.snapshot();
 
@@ -2126,7 +2136,7 @@ mod tests {
             .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         bytes.extend_from_slice(comment);
 
-        let source = IWorkPackage::from_bytes(&bytes)?.snapshot();
+        let source = Package::from_bytes(&bytes)?.snapshot();
         assert!(source.source.is_some());
         let commit = source.edit_with(|_| Ok(()))?;
         assert!(commit.patch().is_empty());
@@ -2160,7 +2170,7 @@ mod tests {
 
     #[test]
     fn package_patch_rejects_a_stale_source() -> crate::Result<()> {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.snapshot();
         let commit = source.edit_with(|edit| {
@@ -2168,7 +2178,7 @@ mod tests {
             Ok(())
         })?;
 
-        let mut stale = IWorkPackage::new();
+        let mut stale = Package::new();
         stale.insert_entry("Data/original", b"different".to_vec())?;
         let error = stale.snapshot().apply(commit.patch()).unwrap_err();
         assert!(error.to_string().contains("patch source does not match"));
@@ -2177,7 +2187,7 @@ mod tests {
 
     #[test]
     fn snapshot_edit_with_discards_callback_failures() -> crate::Result<()> {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.snapshot();
 
@@ -2212,7 +2222,7 @@ mod tests {
 
     #[test]
     fn cloning_a_package_does_not_copy_entries_before_mutation() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/asset", vec![7; 1024]).unwrap();
         let clone = package.clone();
 
@@ -2227,7 +2237,7 @@ mod tests {
 
     #[test]
     fn snapshots_expose_indexed_read_operations_without_editing() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Index/CalculationEngine-174.iwa", vec![1])
             .unwrap();
@@ -2260,7 +2270,7 @@ mod tests {
 
     #[test]
     fn structural_mutations_rebuild_the_shared_name_index() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         let expected_archive = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
         package.insert_entry("Data/a", vec![1]).unwrap();
         package.insert_entry("Data/b", vec![2]).unwrap();
@@ -2292,7 +2302,7 @@ mod tests {
 
     #[test]
     fn preserves_member_order() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/a", vec![1]).unwrap();
         package.insert_entry("Data/b", vec![2]).unwrap();
         package
@@ -2300,7 +2310,7 @@ mod tests {
             .unwrap();
 
         let bytes = package.to_bytes().unwrap();
-        let reparsed = IWorkPackage::from_bytes(&bytes).unwrap();
+        let reparsed = Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             reparsed.entry_names().collect::<Vec<_>>(),
             ["Index/Document.iwa", "Data/a", "Data/b"]
@@ -2314,7 +2324,7 @@ mod tests {
             ("Index/Unknown.iwa", b"opaque iwa bytes"),
             ("Data/last", b"\xffasset\0"),
         ]);
-        let package = IWorkPackage::from_bytes(&input).unwrap();
+        let package = Package::from_bytes(&input).unwrap();
         let expected = physical_entries(&input);
 
         assert_eq!(physical_entries(&package.to_bytes().unwrap()), expected);
@@ -2339,7 +2349,7 @@ mod tests {
 
     #[test]
     fn update_archive_failure_preserves_bytes_order_and_revision() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Data/asset", b"asset".to_vec())
             .unwrap();
@@ -2378,7 +2388,7 @@ mod tests {
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),
         ]);
-        let mut package = IWorkPackage::from_bytes(&source)?;
+        let mut package = Package::from_bytes(&source)?;
         let before = package.to_bytes()?;
         let before_revision = package.mutation_revision();
 
@@ -2399,7 +2409,7 @@ mod tests {
 
     #[test]
     fn write_to_matches_memory_encoding() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/a", vec![1, 2, 3]).unwrap();
         package
             .insert_entry("Metadata/Properties.plist", b"plist".to_vec())
@@ -2418,7 +2428,7 @@ mod tests {
     #[test]
     fn save_rejects_non_file_destinations() -> std::io::Result<()> {
         let directory = tempfile::tempdir()?;
-        let package = IWorkPackage::new();
+        let package = Package::new();
 
         let error = package.save(directory.path()).unwrap_err();
         assert!(error.to_string().contains("not a regular file"));
@@ -2441,7 +2451,7 @@ mod tests {
         std::fs::write(&target, b"sentinel")?;
         symlink(&target, &link)?;
 
-        let package = IWorkPackage::new();
+        let package = Package::new();
         let error = package.save(&link).unwrap_err();
 
         assert!(error.to_string().contains("symbolic link"));
@@ -2463,14 +2473,14 @@ mod tests {
         permissions.set_mode(0o640);
         std::fs::set_permissions(&destination, permissions)?;
 
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package.insert_entry("Data/a", b"new".to_vec()).unwrap();
         package.save(&destination).unwrap();
 
         let mode = std::fs::metadata(&destination)?.permissions().mode() & 0o777;
         assert_eq!(mode, 0o640);
         assert_eq!(
-            IWorkPackage::open(&destination).unwrap().entry("Data/a"),
+            Package::open(&destination).unwrap().entry("Data/a"),
             Some(&b"new"[..])
         );
         Ok(())
@@ -2482,7 +2492,7 @@ mod tests {
 
         let directory = tempfile::tempdir()?;
         let destination = directory.path().join(SECRET).join("document.pages");
-        let error = IWorkPackage::new().save(&destination).unwrap_err();
+        let error = Package::new().save(&destination).unwrap_err();
         let publication = error
             .publication_error()
             .expect("legacy I/O error should retain the publication source");
@@ -2504,7 +2514,7 @@ mod tests {
 
     #[test]
     fn rejects_unsafe_entry_names() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         assert!(package.insert_entry("../escape", Vec::new()).is_err());
         assert!(package.insert_entry("/absolute", Vec::new()).is_ok());
         assert!(package.insert_entry("bad\\name", Vec::new()).is_err());
@@ -2512,7 +2522,7 @@ mod tests {
 
     #[test]
     fn expands_legacy_nested_bundle_for_crud_without_losing_assets() {
-        let mut package = IWorkPackage::from_bytes(&legacy_package()).unwrap();
+        let mut package = Package::from_bytes(&legacy_package()).unwrap();
         assert_eq!(
             package.entry_names().collect::<Vec<_>>(),
             [
@@ -2533,7 +2543,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let reparsed = IWorkPackage::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let reparsed = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reparsed.archive("Index/Document.iwa").unwrap().objects[0].messages[0].type_,
             100
@@ -2544,7 +2554,7 @@ mod tests {
 
     #[test]
     fn excludes_legacy_operation_log_from_iwa_archive_scans() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Index/OperationStorage.iwa", b"bvxn log".to_vec())
             .unwrap();
@@ -2567,7 +2577,7 @@ mod tests {
             "Index/CalculationEngine-174.iwa",
             "Index/CalculationEngine-10-2.iwa",
         ] {
-            let mut package = IWorkPackage::new();
+            let mut package = Package::new();
             package.insert_entry(entry, vec![1]).unwrap();
             assert_eq!(
                 package.calculation_engine_entry_name().unwrap(),
@@ -2581,7 +2591,7 @@ mod tests {
             "Index/CalculationEngine-1-.iwa",
             "Index/CalculationEngine-1.txt",
         ] {
-            let mut package = IWorkPackage::new();
+            let mut package = Package::new();
             package.insert_entry(entry, vec![1]).unwrap();
             assert_eq!(package.calculation_engine_entry_name().unwrap(), None);
         }
@@ -2589,7 +2599,7 @@ mod tests {
 
     #[test]
     fn rejects_ambiguous_calculation_engines() {
-        let mut package = IWorkPackage::new();
+        let mut package = Package::new();
         package
             .insert_entry("Index/CalculationEngine.iwa", vec![1])
             .unwrap();

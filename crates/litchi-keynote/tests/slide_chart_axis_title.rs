@@ -430,27 +430,37 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_chart_axis_title(0usize, ChartSelector::name("missing"), Axis::Category),
-        Err(ChartAxisTitleError::ChartNameNotFound)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(SlideSelector::name("missing"), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::SlideNameNotFound)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(Position::new(9), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::SlidePositionNotFound { .. })
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(SlideSelector::name(""), 0usize, Axis::Category),
-        Err(ChartAxisTitleError::EmptySlideName)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_chart_axis_title(0usize, ChartSelector::name(""), Axis::Category),
-        Err(ChartAxisTitleError::EmptyChartName)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::EmptyChartName
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_axis_title(0usize, 4usize, Axis::Category),
-        Err(ChartAxisTitleError::ChartPositionNotFound { position })
+        Err(ChartAxisTitleError::Refused(litchi_keynote::chart::axis_title::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(4)
     ));
 
@@ -463,7 +473,9 @@ fn selectors_report_missing_and_ambiguous_chart_names() -> TestResult<()> {
     let duplicate = Package::from_bytes(&duplicate_chart_title)?;
     assert!(matches!(
         duplicate.slide_chart_axis_title(0usize, ChartSelector::name("Revenue"), Axis::Value),
-        Err(ChartAxisTitleError::AmbiguousSelector)
+        Err(ChartAxisTitleError::Refused(
+            litchi_keynote::chart::axis_title::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -749,7 +761,7 @@ fn output_limit_at_max_minus_one_rejects_atomically() -> TestResult<()> {
     assert!(
         matches!(
             result,
-            Err(ChartAxisTitleError::LimitExceeded {
+            Err(ChartAxisTitleError::Limit {
                 kind: ChartAxisTitleLimitKind::OutputBytes,
                 ..
             })

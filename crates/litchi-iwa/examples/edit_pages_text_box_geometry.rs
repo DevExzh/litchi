@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let mut geometry = editor.text_box_geometry(drawable_id)?;
     geometry.position = Some(DrawablePoint { x, y });
     geometry.size = Some(DrawableSize { width, height });

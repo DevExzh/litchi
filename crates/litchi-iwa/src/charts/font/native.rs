@@ -19,7 +19,7 @@ use crate::text::style_registry::{
     register_private_style, register_style_reference, unregister_owner_reference_if_unused,
     unregister_private_style,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::{ChartFont, ChartFontSize};
 
@@ -40,7 +40,7 @@ enum FontPropertyKind {
 
 /// Read the uniform effective font used across one chart's semantic text slots.
 pub(crate) fn chart_font(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -63,7 +63,7 @@ pub(crate) fn chart_font(
 
 /// Read the uniform effective point size used across a chart's text slots.
 pub(crate) fn chart_font_size(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -86,7 +86,7 @@ pub(crate) fn chart_font_size(
 
 /// Set the uniform chart font using copy-on-write style variations.
 pub(crate) fn set_chart_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -124,7 +124,7 @@ pub(crate) fn set_chart_font(
 
 /// Set the uniform chart point size using copy-on-write style variations.
 pub(crate) fn set_chart_font_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -162,7 +162,7 @@ pub(crate) fn set_chart_font_size(
 
 /// Reset chart font identity and face traits while preserving point size.
 pub(crate) fn reset_chart_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -178,7 +178,7 @@ pub(crate) fn reset_chart_font(
 
 /// Reset chart point size while preserving font identity and face traits.
 pub(crate) fn reset_chart_font_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -193,7 +193,7 @@ pub(crate) fn reset_chart_font_size(
 }
 
 fn set_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -255,7 +255,7 @@ fn set_property(
 }
 
 fn reset_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -317,7 +317,7 @@ fn reset_property(
 }
 
 fn apply_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     parent_style_id: u64,
     overrides: &mut ParagraphStyleOverrides,
     property: FontProperty<'_>,
@@ -383,7 +383,7 @@ fn allocate_replacement(
 }
 
 fn apply_replacements(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -436,7 +436,7 @@ struct StyleAddition {
     object: ArchiveObject,
 }
 
-fn effective_font(package: &IWorkPackage, style_id: u64) -> Result<ChartFont> {
+fn effective_font(package: &HostPackage, style_id: u64) -> Result<ChartFont> {
     let font = inherited_text_font(package, style_id)?;
     let style = inherited_text_style(package, style_id)?;
     Ok(ChartFont::new(font)
@@ -444,16 +444,16 @@ fn effective_font(package: &IWorkPackage, style_id: u64) -> Result<ChartFont> {
         .with_italic(style.italic))
 }
 
-fn effective_font_size(package: &IWorkPackage, style_id: u64) -> Result<ChartFontSize> {
+fn effective_font_size(package: &HostPackage, style_id: u64) -> Result<ChartFontSize> {
     inherited_text_style(package, style_id).map(|style| style.point_size.into())
 }
 
 fn uniform_property<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_ids: &[u64],
     drawable_object_id: u64,
     drawable_label: &str,
-    read: impl Fn(&IWorkPackage, u64) -> Result<T>,
+    read: impl Fn(&HostPackage, u64) -> Result<T>,
     property_label: &str,
 ) -> Result<T>
 where
@@ -471,7 +471,7 @@ where
 }
 
 fn chart_paragraph_style_ids(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -524,7 +524,7 @@ fn unique_ids(ids: &[u64]) -> Vec<u64> {
 }
 
 fn locate_chart(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -553,7 +553,7 @@ fn locate_chart(
 }
 
 fn patch_chart_style_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -602,7 +602,7 @@ fn patch_chart_style_references(
 }
 
 fn prune_replaced_variations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     identifiers: impl IntoIterator<Item = u64>,
 ) -> Result<()> {
@@ -646,7 +646,7 @@ fn prune_replaced_variations(
     Ok(())
 }
 
-fn style_has_consumers(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+fn style_has_consumers(package: &HostPackage, style_id: u64) -> Result<bool> {
     for archive_name in package.iwa_entry_names() {
         for object in &package.archive(archive_name)?.objects {
             for (message, info) in object

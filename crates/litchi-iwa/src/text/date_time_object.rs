@@ -5,7 +5,7 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsp, tswp};
 use crate::wire::{patch_length_delimited_field, patch_nested_fixed64_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
 use litchi_iwa_text::date_time::{
@@ -99,7 +99,7 @@ pub(super) fn new_date_time_object(identifier: u64, settings: &Settings) -> Resu
 }
 
 pub(super) fn patch_date_time_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifier: u64,
     settings: &Settings,

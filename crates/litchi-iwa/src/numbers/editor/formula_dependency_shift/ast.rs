@@ -16,7 +16,7 @@ struct FormulaRewrite {
 }
 
 pub(super) fn rewrite_formula_asts(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component: &str,
     table_info_id: u64,
     axis: DependencyAxis,

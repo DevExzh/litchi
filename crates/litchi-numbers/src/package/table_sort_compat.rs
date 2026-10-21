@@ -75,9 +75,11 @@ impl Package {
             return copy_bytes(source.state.source.as_ref());
         }
         if target.native.locked == LockState::Locked {
-            return Err(Error::TableLocked {
-                path: target.path(),
-            });
+            return Err(Error::Refused(
+                crate::package::table_sort::Refusal::TableLocked {
+                    path: target.path(),
+                },
+            ));
         }
         let output = rewrite_bytes(&source, &target, Some(&after))?;
         verify_candidate(&source, &output, &target, Some(&after))?;
@@ -97,9 +99,11 @@ impl Package {
             return copy_bytes(source.state.source.as_ref());
         }
         if target.native.locked == LockState::Locked {
-            return Err(Error::TableLocked {
-                path: target.path(),
-            });
+            return Err(Error::Refused(
+                crate::package::table_sort::Refusal::TableLocked {
+                    path: target.path(),
+                },
+            ));
         }
         let output = rewrite_bytes(&source, &target, None)?;
         verify_candidate(&source, &output, &target, None)?;
@@ -116,7 +120,9 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .map_err(map_package_error)?;
     let source = components
         .physical()
-        .ok_or(Error::UnsupportedSource)?
+        .ok_or(Error::Refused(
+            crate::package::table_sort::Refusal::UnsupportedSource,
+        ))?
         .__source_owner();
     let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_| invalid_source())?;
@@ -172,7 +178,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
             root.sheet_references()
                 .get(index)
                 .map(|_| index)
-                .ok_or(Error::SheetNotFound)
+                .ok_or(Error::Refused(
+                    crate::package::table_sort::Refusal::SheetNotFound,
+                ))
         },
         SheetSelector::Name(name) => {
             let mut found = None;
@@ -182,7 +190,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
                     return Err(invalid_source());
                 }
             }
-            found.ok_or(Error::SheetNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_sort::Refusal::SheetNotFound,
+            ))
         },
     }
 }
@@ -213,7 +223,9 @@ fn resolve_table_position(
                     return Err(invalid_source());
                 }
             }
-            found.ok_or(Error::TableNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_sort::Refusal::TableNotFound,
+            ))
         },
     }
 }
@@ -279,9 +291,9 @@ fn resolve_sheet_target(source: &Package, sheet_position: usize) -> Result<Sheet
         table_headers::resolve::repeated_length_payloads(&document_message.data, 1)
             .map_err(map_header_error)?;
     let sheet_identifier = table_headers::resolve::local_reference_identifier(
-        sheet_payloads
-            .get(sheet_position)
-            .ok_or(Error::SheetNotFound)?,
+        sheet_payloads.get(sheet_position).ok_or(Error::Refused(
+            crate::package::table_sort::Refusal::SheetNotFound,
+        ))?,
     )
     .map_err(map_header_error)?;
     let resolved = source
@@ -380,7 +392,9 @@ fn snapshot_from_order(order: &Order) -> Result<codec::SortOrderSnapshot> {
 fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Result<Vec<u8>> {
     let catalog = table_headers::rewrite::physical_source(source).map_err(map_header_error)?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_sort::Refusal::UnsupportedSource,
+        ));
     }
     let component = source
         .state
@@ -450,7 +464,7 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
     let compressed_bound =
         SnappyStream::maximum_compressed_len(rewritten.len()).map_err(map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::try_from(compressed_bound).unwrap_or(u64::MAX),
             maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
@@ -690,11 +704,11 @@ fn map_package_error(error: super::Error) -> Error {
                 amount,
                 path: Path::Package,
             },
-            super::ResourceError::LimitExceeded {
+            super::ResourceError::Limit {
                 kind,
                 observed,
                 maximum,
-            } => Error::LimitExceeded {
+            } => Error::Limit {
                 kind: match kind {
                     super::PayloadLimitKind::InputBytes => LimitKind::WireBytes,
                     super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -714,7 +728,7 @@ fn map_package_error(error: super::Error) -> Error {
     }
     match error {
         super::Error::Archive(error) => map_archive_error(error),
-        super::Error::InputTooLarge { observed, maximum } => Error::LimitExceeded {
+        super::Error::InputTooLarge { observed, maximum } => Error::Limit {
             kind: LimitKind::InputBytes,
             observed,
             maximum,
@@ -722,7 +736,7 @@ fn map_package_error(error: super::Error) -> Error {
         },
         super::Error::SemanticLimit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -762,7 +776,7 @@ fn map_model_codec_error(error: model_codec::DecodeError) -> Error {
             (LimitKind::WireScratchBytes, observed, maximum)
         },
         model_codec::DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -771,7 +785,7 @@ fn map_model_codec_error(error: model_codec::DecodeError) -> Error {
         },
         _ => return invalid_source(),
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

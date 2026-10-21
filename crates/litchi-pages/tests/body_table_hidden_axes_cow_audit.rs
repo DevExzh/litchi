@@ -478,7 +478,7 @@ mod fixture {
             .commit();
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
                 ..
             })

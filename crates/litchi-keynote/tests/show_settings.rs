@@ -1479,7 +1479,7 @@ fn focused_reader_reports_typed_slide_limit_before_publication() -> TestResult<(
     let package =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
 
-    let expected = ShowSettingsError::LimitExceeded {
+    let expected = ShowSettingsError::Limit {
         kind: ShowSettingsLimitKind::Slides,
         observed: 2,
         maximum: 1,
@@ -1946,7 +1946,7 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
     assert!(field_count < 100);
     assert!(matches!(
         package.edit_show_settings(),
-        Err(ShowSettingsError::LimitExceeded {
+        Err(ShowSettingsError::Limit {
             kind: ShowSettingsLimitKind::WireWork,
             ..
         })
@@ -1973,7 +1973,9 @@ fn legacy_source_accepts_exact_noop_and_refuses_changed_reassembly() -> TestResu
     settings.set_automatically_plays_upon_open(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -2002,7 +2004,9 @@ fn null_show_reader_matches_full_semantics_and_only_exact_noop_is_editable() -> 
     settings.set_loop_presentation(Some(true));
     assert!(matches!(
         changed.set(settings).commit(),
-        Err(ShowSettingsError::UnsupportedSource)
+        Err(ShowSettingsError::Refused(
+            litchi_keynote::show::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }

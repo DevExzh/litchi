@@ -16,7 +16,7 @@ use crate::wire::{
     append_repeated_length_delimited_field, patch_varint_field,
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_protos::package_metadata_codec::{
     ComponentDescriptor, DataReferenceDescriptor, DataReferenceOwnerDescriptor,
     PackageMetadataVisitor, RewriteError, RewriteOptions,
@@ -203,7 +203,7 @@ impl PackageMetadataVisitor for DataReferenceFactsVisitor {
 }
 
 pub(crate) fn add_component_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     data_identifier: u64,
     object_identifier: u64,
@@ -218,7 +218,7 @@ pub(crate) fn add_component_data_reference(
 }
 
 pub(crate) fn remove_component_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     data_identifier: u64,
     object_identifier: u64,
@@ -238,7 +238,7 @@ pub(crate) fn remove_component_data_reference(
 /// PackageMetadata keeps the corresponding embedded-data ownership separately,
 /// so those counts must be cloned along with the object graph.
 pub(crate) fn clone_component_data_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     object_remap: &HashMap<u64, u64>,
 ) -> Result<()> {
@@ -269,7 +269,7 @@ pub(crate) fn clone_component_data_references(
 /// Returns the affected data identifiers so callers can reclaim assets that
 /// became unreferenced after deleting the object graph.
 pub(crate) fn remove_component_data_references_for_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     object_identifiers: &[u64],
 ) -> Result<Vec<u64>> {
@@ -296,7 +296,7 @@ pub(crate) fn remove_component_data_references_for_objects(
 }
 
 fn adjust_component_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     data_identifier: u64,
     object_identifier: u64,
@@ -313,7 +313,7 @@ fn adjust_component_data_reference(
 }
 
 fn adjust_component_data_reference_by(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     component_identifier: u64,
     data_identifier: u64,
     object_identifier: u64,
@@ -565,7 +565,7 @@ fn adjust_data_reference_payload(
 }
 
 fn component_object_data_references(
-    package: &IWorkPackage,
+    package: &HostPackage,
     component_identifier: u64,
 ) -> Result<Vec<(u64, u64, u32)>> {
     let mut visitor = DataReferenceFactsVisitor::new(component_identifier);
@@ -682,8 +682,8 @@ mod tests {
         )
     }
 
-    fn package_with_metadata(source: Vec<u8>) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn package_with_metadata(source: Vec<u8>) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,
@@ -704,7 +704,7 @@ mod tests {
         package
     }
 
-    fn metadata_source(package: &IWorkPackage) -> Vec<u8> {
+    fn metadata_source(package: &HostPackage) -> Vec<u8> {
         package
             .archive(PACKAGE_METADATA_ENTRY)
             .unwrap()

@@ -11,7 +11,7 @@ pub(super) struct ChartThemeContext {
     pub(super) paragraph_style_id: u64,
 }
 
-pub(super) fn chart_theme_context(package: &IWorkPackage) -> Result<ChartThemeContext> {
+pub(super) fn chart_theme_context(package: &HostPackage) -> Result<ChartThemeContext> {
     let theme_id = numbers_document(package)?.theme.identifier;
     let locations = object_locations(package)?;
     let archive_name = locations
@@ -84,7 +84,7 @@ pub(super) fn chart_theme_context(package: &IWorkPackage) -> Result<ChartThemeCo
 }
 
 pub(super) fn patch_theme_chart_preset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     context: &ChartThemeContext,
     previous: Option<u64>,
     replacement: Option<u64>,

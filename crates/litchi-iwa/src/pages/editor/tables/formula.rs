@@ -13,7 +13,7 @@ pub type TableFormulaCachedValue = crate::numbers::FormulaCachedValue;
 /// A typed cell address used by a table formula.
 pub type TableFormulaCellReference = crate::numbers::FormulaCellReference;
 
-impl Editor {
+impl Draft {
     /// Read a cell's canonical formula source, including the leading equals sign.
     pub fn table_formula(
         &self,

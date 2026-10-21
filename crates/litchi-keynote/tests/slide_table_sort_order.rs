@@ -1002,7 +1002,9 @@ fn legacy_source_allows_exact_noop_but_refuses_changed_sort() -> TestResult {
         .commit();
     assert!(matches!(
         changed,
-        Err(SlideTableSortError::UnsupportedSource)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1623,11 +1625,15 @@ fn duplicate_slide_name_is_ambiguous_and_atomic() -> TestResult {
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_sort_order("Tables", TableSelector::index(0)),
-        Err(SlideTableSortError::AmbiguousSelector)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     assert!(matches!(
         package.edit_slide_table_sort_order("Tables", TableSelector::index(0)),
-        Err(SlideTableSortError::AmbiguousSelector)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1640,19 +1646,23 @@ fn missing_empty_and_out_of_range_selectors_are_typed_and_atomic() -> TestResult
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::name(""), TableSelector::index(0)),
-        Err(SlideTableSortError::EmptySlideName)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::name("missing"), TableSelector::index(0)),
-        Err(SlideTableSortError::SlideNameNotFound)
+        Err(SlideTableSortError::Refused(
+            litchi_keynote::slide::table::sort::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::index(9), TableSelector::index(0)),
-        Err(SlideTableSortError::SlidePositionNotFound { position }) if position.get() == 9
+        Err(SlideTableSortError::Refused(litchi_keynote::slide::table::sort::transaction::Refusal::SlidePositionNotFound { position })) if position.get() == 9
     ));
     assert!(matches!(
         package.slide_table_sort_order(SlideSelector::index(0), TableSelector::index(9)),
-        Err(SlideTableSortError::TablePositionNotFound { position }) if position.get() == 9
+        Err(SlideTableSortError::Refused(litchi_keynote::slide::table::sort::transaction::Refusal::TablePositionNotFound { position })) if position.get() == 9
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1779,7 +1789,7 @@ fn tight_publication_limit_rejects_changed_sort_atomically() -> TestResult {
         .edit_slide_table_sort_order(0usize, 0usize)
         .and_then(|edit| edit.set(order).commit());
     assert!(
-        matches!(result, Err(SlideTableSortError::LimitExceeded { .. })),
+        matches!(result, Err(SlideTableSortError::Limit { .. })),
         "unexpected tight-publication result: {result:?}"
     );
     assert_eq!(exact_bytes(&package)?, before);

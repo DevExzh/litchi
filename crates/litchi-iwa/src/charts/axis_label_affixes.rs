@@ -13,7 +13,7 @@ use crate::charts::number_format::{DualNumberFormatFields, patch_dual_affixes, r
 use crate::charts::{Axis, LabelAffixes, NumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AXIS_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields {
     legacy: 2,
@@ -24,7 +24,7 @@ const FORMAT_CONTEXT: &str = "chart axis-label";
 
 /// Read the text placed before and after labels on one native chart axis.
 pub(crate) fn chart_axis_label_affixes(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -42,7 +42,7 @@ pub(crate) fn chart_axis_label_affixes(
 
 /// Set or clear the text placed before and after labels on one chart axis.
 pub(crate) fn set_chart_axis_label_affixes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

@@ -8,7 +8,7 @@ use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
 
-impl Editor {
+impl Draft {
     /// List ordinary text boxes owned by a reachable Numbers sheet.
     pub fn sheet_text_boxes(&self, sheet_id: u64) -> Result<Vec<TextBoxInfo>> {
         let mut catalog = NumbersObjectCatalog::build(&self.package)?;
@@ -41,7 +41,7 @@ impl Editor {
         replacement: &str,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.replace_text(graph.storage_id, range, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         numbers_text_box_graph(verified.package(), sheet_id, drawable_object_id)?;
@@ -57,7 +57,7 @@ impl Editor {
         replacement: &str,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text(graph.storage_id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = verified
@@ -266,7 +266,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextStyle> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_style(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_style(graph.storage_id)
     }
 
     /// Atomically set uniform font size, bold, and italic formatting.
@@ -277,7 +277,7 @@ impl Editor {
         style: TextStyle,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_style(graph.storage_id, style)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_style(sheet_id, drawable_object_id)? != style {
@@ -296,7 +296,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_style(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -311,7 +311,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextFont> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_font(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_font(graph.storage_id)
     }
 
     /// Atomically set a typed font identity across a sheet-owned text box.
@@ -322,7 +322,7 @@ impl Editor {
         font: TextFont,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_font(graph.storage_id, font)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -335,7 +335,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_font(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -350,7 +350,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<TextLanguageRun>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_languages(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_languages(graph.storage_id)
     }
 
     /// Read the effective language at one UTF-16 text boundary.
@@ -361,7 +361,7 @@ impl Editor {
         position: TextPosition,
     ) -> Result<TextLanguage> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .text_language(graph.storage_id, position)
     }
 
@@ -374,7 +374,7 @@ impl Editor {
         language: TextLanguage,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_language(graph.storage_id, position, language)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -388,7 +388,7 @@ impl Editor {
         position: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.remove_text_language_boundary(graph.storage_id, position)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -403,7 +403,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_languages(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -418,7 +418,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<TextHyperlink>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_hyperlinks(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_hyperlinks(graph.storage_id)
     }
 
     /// Create a hyperlink over a nonempty, unoccupied UTF-16 text range.
@@ -430,7 +430,7 @@ impl Editor {
         target: TextHyperlinkTarget,
     ) -> Result<TextHyperlink> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let hyperlink = text.add_text_hyperlink(graph.storage_id, range, target)?;
         *self = Self::from_package(text.into_package())?;
         Ok(hyperlink)
@@ -446,7 +446,7 @@ impl Editor {
         target: TextHyperlinkTarget,
     ) -> Result<TextHyperlink> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let hyperlink = text.update_text_hyperlink(graph.storage_id, id, range, target)?;
         *self = Self::from_package(text.into_package())?;
         Ok(hyperlink)
@@ -460,7 +460,7 @@ impl Editor {
         id: TextHyperlinkId,
     ) -> Result<TextHyperlink> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let hyperlink = text.remove_text_hyperlink(graph.storage_id, id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(hyperlink)
@@ -473,7 +473,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<TextHighlight>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_highlights(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_highlights(graph.storage_id)
     }
 
     /// Create a plain highlight over a nonempty UTF-16 text range.
@@ -484,7 +484,7 @@ impl Editor {
         range: TextRange,
     ) -> Result<TextHighlight> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let highlight = text.add_text_highlight(graph.storage_id, range)?;
         *self = Self::from_package(text.into_package())?;
         Ok(highlight)
@@ -499,7 +499,7 @@ impl Editor {
         range: TextRange,
     ) -> Result<TextHighlight> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let highlight = text.update_text_highlight(graph.storage_id, id, range)?;
         *self = Self::from_package(text.into_package())?;
         Ok(highlight)
@@ -513,7 +513,7 @@ impl Editor {
         id: TextHighlightId,
     ) -> Result<TextHighlight> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let highlight = text.remove_text_highlight(graph.storage_id, id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(highlight)
@@ -526,7 +526,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<TextComment>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_comments(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_comments(graph.storage_id)
     }
 
     /// Create a ranged comment in a sheet-owned text box.
@@ -538,7 +538,7 @@ impl Editor {
         body: TextCommentBody,
     ) -> Result<TextComment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let comment = text.add_text_comment(graph.storage_id, range, body)?;
         *self = Self::from_package(text.into_package())?;
         Ok(comment)
@@ -554,7 +554,7 @@ impl Editor {
         body: TextCommentBody,
     ) -> Result<TextComment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let comment = text.update_text_comment(graph.storage_id, id, range, body)?;
         *self = Self::from_package(text.into_package())?;
         Ok(comment)
@@ -568,7 +568,7 @@ impl Editor {
         id: TextCommentId,
     ) -> Result<TextComment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let comment = text.remove_text_comment(graph.storage_id, id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(comment)
@@ -582,7 +582,7 @@ impl Editor {
         comment_id: TextCommentId,
     ) -> Result<Vec<TextCommentReply>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .text_comment_replies(graph.storage_id, comment_id)
     }
 
@@ -595,7 +595,7 @@ impl Editor {
         body: TextCommentReplyBody,
     ) -> Result<TextCommentReply> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let reply = text.add_text_comment_reply(graph.storage_id, comment_id, body)?;
         *self = Self::from_package(text.into_package())?;
         Ok(reply)
@@ -611,7 +611,7 @@ impl Editor {
         body: TextCommentReplyBody,
     ) -> Result<TextCommentReply> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let reply = text.update_text_comment_reply(graph.storage_id, comment_id, reply_id, body)?;
         *self = Self::from_package(text.into_package())?;
         Ok(reply)
@@ -626,7 +626,7 @@ impl Editor {
         reply_id: TextCommentReplyId,
     ) -> Result<TextCommentReply> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let reply = text.remove_text_comment_reply(graph.storage_id, comment_id, reply_id)?;
         *self = Self::from_package(text.into_package())?;
         Ok(reply)
@@ -639,7 +639,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphList> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_list(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_list(graph.storage_id)
     }
 
     /// Atomically apply a canonical list preset to a sheet-owned text box.
@@ -650,7 +650,7 @@ impl Editor {
         list: ParagraphList,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list(graph.storage_id, list)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -663,7 +663,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -678,7 +678,8 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<ParagraphListLevelPlacement>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_list_levels(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone())
+            .paragraph_list_levels(graph.storage_id)
     }
 
     /// Read one paragraph's effective list nesting level.
@@ -689,7 +690,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListLevel> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_level(graph.storage_id, paragraph)
     }
 
@@ -702,7 +703,7 @@ impl Editor {
         level: ParagraphListLevel,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_level(graph.storage_id, paragraph, level)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -716,7 +717,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_level(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -732,7 +733,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumbering> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_numbering(graph.storage_id, paragraph)
     }
 
@@ -745,7 +746,7 @@ impl Editor {
         numbering: ParagraphListNumbering,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_numbering(graph.storage_id, paragraph, numbering)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -759,7 +760,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberFormat> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_number_format(graph.storage_id, paragraph)
     }
 
@@ -772,7 +773,7 @@ impl Editor {
         format: ParagraphListNumberFormat,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_number_format(graph.storage_id, paragraph, format)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -786,7 +787,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_number_format(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -802,7 +803,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberTiering> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_number_tiering(graph.storage_id, paragraph)
     }
 
@@ -815,7 +816,7 @@ impl Editor {
         tiering: ParagraphListNumberTiering,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_number_tiering(graph.storage_id, paragraph, tiering)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -829,7 +830,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_number_tiering(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -845,7 +846,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListNumberScale> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_number_scale(graph.storage_id, paragraph)
     }
 
@@ -858,7 +859,7 @@ impl Editor {
         scale: ParagraphListNumberScale,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_number_scale(graph.storage_id, paragraph, scale)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -872,7 +873,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_number_scale(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -888,7 +889,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListBullet> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_bullet(graph.storage_id, paragraph)
     }
 
@@ -901,7 +902,7 @@ impl Editor {
         bullet: &ParagraphListBullet,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_bullet(graph.storage_id, paragraph, bullet)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -915,7 +916,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_bullet(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -931,7 +932,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListBulletGeometry> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_bullet_geometry(graph.storage_id, paragraph)
     }
 
@@ -944,7 +945,7 @@ impl Editor {
         geometry: ParagraphListBulletGeometry,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_bullet_geometry(graph.storage_id, paragraph, geometry)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -958,7 +959,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_bullet_geometry(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -974,7 +975,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListIndentation> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_indentation(graph.storage_id, paragraph)
     }
 
@@ -987,7 +988,7 @@ impl Editor {
         indentation: ParagraphListIndentation,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_indentation(graph.storage_id, paragraph, indentation)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -1001,7 +1002,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_indentation(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1017,7 +1018,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<ParagraphListLabelColor> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_list_label_color(graph.storage_id, paragraph)
     }
 
@@ -1030,7 +1031,7 @@ impl Editor {
         color: ParagraphListLabelColor,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_list_label_color(graph.storage_id, paragraph, color)?;
         *self = Self::from_package(text.into_package())?;
         Ok(())
@@ -1044,7 +1045,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_list_label_color(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1059,7 +1060,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextDecorations> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_decorations(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_decorations(graph.storage_id)
     }
 
     /// Atomically set uniform underline and strikethrough formatting.
@@ -1070,7 +1071,7 @@ impl Editor {
         decorations: TextDecorations,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_decorations(graph.storage_id, decorations)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_decorations(sheet_id, drawable_object_id)? != decorations {
@@ -1089,7 +1090,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_decorations(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1104,7 +1105,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<RgbaColor> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_color(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_color(graph.storage_id)
     }
 
     /// Atomically set one text color across a sheet-owned text box.
@@ -1115,7 +1116,7 @@ impl Editor {
         color: RgbaColor,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_color(graph.storage_id, color)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_color(sheet_id, drawable_object_id)? != color {
@@ -1134,7 +1135,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_color(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1149,7 +1150,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextCapitalization> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_capitalization(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_capitalization(graph.storage_id)
     }
 
     /// Atomically set one capitalization mode across a sheet-owned text box.
@@ -1160,7 +1161,7 @@ impl Editor {
         capitalization: TextCapitalization,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_capitalization(graph.storage_id, capitalization)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_capitalization(sheet_id, drawable_object_id)?
@@ -1181,7 +1182,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_capitalization(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1196,7 +1197,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextScript> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_script(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_script(graph.storage_id)
     }
 
     /// Atomically set normal, superscript, or subscript formatting.
@@ -1207,7 +1208,7 @@ impl Editor {
         script: TextScript,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_script(graph.storage_id, script)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_script(sheet_id, drawable_object_id)? != script {
@@ -1226,7 +1227,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_script(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1241,7 +1242,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextBaselineShift> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_baseline_shift(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_baseline_shift(graph.storage_id)
     }
 
     /// Atomically set a signed custom baseline displacement.
@@ -1252,7 +1253,7 @@ impl Editor {
         shift: TextBaselineShift,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_baseline_shift(graph.storage_id, shift)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_baseline_shift(sheet_id, drawable_object_id)? != shift {
@@ -1271,7 +1272,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_baseline_shift(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1286,7 +1287,8 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextCharacterSpacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_character_spacing(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone())
+            .text_character_spacing(graph.storage_id)
     }
 
     /// Atomically set character spacing across a sheet-owned text box.
@@ -1297,7 +1299,7 @@ impl Editor {
         spacing: TextCharacterSpacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_character_spacing(graph.storage_id, spacing)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_character_spacing(sheet_id, drawable_object_id)? != spacing
@@ -1317,7 +1319,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_character_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1332,7 +1334,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<TextLigatures> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_ligatures(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_ligatures(graph.storage_id)
     }
 
     /// Atomically set the ligature policy across a sheet-owned text box.
@@ -1343,7 +1345,7 @@ impl Editor {
         ligatures: TextLigatures,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_ligatures(graph.storage_id, ligatures)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_ligatures(sheet_id, drawable_object_id)? != ligatures {
@@ -1362,7 +1364,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_ligatures(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1377,7 +1379,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Outline> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_outline(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_outline(graph.storage_id)
     }
 
     /// Atomically set a typed outline across a sheet-owned text box.
@@ -1388,7 +1390,7 @@ impl Editor {
         outline: Outline,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_outline(graph.storage_id, outline)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_outline(sheet_id, drawable_object_id)? != outline {
@@ -1407,7 +1409,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_outline(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1422,7 +1424,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Shadow> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_shadow(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_shadow(graph.storage_id)
     }
 
     /// Atomically set a typed drop shadow across a sheet-owned text box.
@@ -1433,7 +1435,7 @@ impl Editor {
         shadow: Shadow,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_shadow(graph.storage_id, shadow)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_shadow(sheet_id, drawable_object_id)? != shadow {
@@ -1452,7 +1454,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_shadow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1467,7 +1469,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Background> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).text_background(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).text_background(graph.storage_id)
     }
 
     /// Atomically set a solid background across a sheet-owned text box.
@@ -1478,7 +1480,7 @@ impl Editor {
         background: Background,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text_background(graph.storage_id, background)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_text_background(sheet_id, drawable_object_id)? != background {
@@ -1497,7 +1499,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_text_background(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1512,7 +1514,8 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphBackground> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_background(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone())
+            .paragraph_background(graph.storage_id)
     }
 
     /// Atomically set the paragraph background across a sheet-owned text box.
@@ -1523,7 +1526,7 @@ impl Editor {
         background: ParagraphBackground,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_background(graph.storage_id, background)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_background(sheet_id, drawable_object_id)? != background
@@ -1543,7 +1546,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_background(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1558,7 +1561,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Borders> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_borders(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_borders(graph.storage_id)
     }
 
     /// Atomically set paragraph borders across a sheet-owned text box.
@@ -1569,7 +1572,7 @@ impl Editor {
         borders: Borders,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_borders(graph.storage_id, borders)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_borders(sheet_id, drawable_object_id)? != borders {
@@ -1588,7 +1591,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_borders(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1603,7 +1606,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphFlow> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_flow(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_flow(graph.storage_id)
     }
 
     /// Atomically set paragraph pagination and hyphenation controls.
@@ -1614,7 +1617,7 @@ impl Editor {
         flow: ParagraphFlow,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_flow(graph.storage_id, flow)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_flow(sheet_id, drawable_object_id)? != flow {
@@ -1633,7 +1636,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_flow(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1648,7 +1651,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphWritingDirection> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_writing_direction(graph.storage_id)
     }
 
@@ -1660,7 +1663,7 @@ impl Editor {
         direction: ParagraphWritingDirection,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_writing_direction(graph.storage_id, direction)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_writing_direction(sheet_id, drawable_object_id)?
@@ -1681,7 +1684,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_writing_direction(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1696,7 +1699,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Alignment> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_alignment(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_alignment(graph.storage_id)
     }
 
     /// Set one paragraph alignment across a sheet-owned text box.
@@ -1707,7 +1710,7 @@ impl Editor {
         alignment: Alignment,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_alignment(graph.storage_id, alignment)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_alignment(sheet_id, drawable_object_id)? != alignment {
@@ -1726,7 +1729,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_alignment(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1741,7 +1744,8 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<LineSpacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_line_spacing(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone())
+            .paragraph_line_spacing(graph.storage_id)
     }
 
     /// Set one typed line-spacing mode across a sheet-owned text box.
@@ -1752,7 +1756,7 @@ impl Editor {
         spacing: LineSpacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_line_spacing(graph.storage_id, spacing)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_line_spacing(sheet_id, drawable_object_id)? != spacing
@@ -1772,7 +1776,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_line_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1787,7 +1791,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Spacing> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_spacing(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_spacing(graph.storage_id)
     }
 
     /// Atomically set before/after paragraph spacing across a sheet-owned text box.
@@ -1798,7 +1802,7 @@ impl Editor {
         spacing: Spacing,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_spacing(graph.storage_id, spacing)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_spacing(sheet_id, drawable_object_id)? != spacing {
@@ -1817,7 +1821,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_spacing(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1832,7 +1836,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Indents> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_indents(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_indents(graph.storage_id)
     }
 
     /// Atomically set paragraph indentation across a sheet-owned text box.
@@ -1843,7 +1847,7 @@ impl Editor {
         indents: Indents,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_indents(graph.storage_id, indents)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_indents(sheet_id, drawable_object_id)? != indents {
@@ -1862,7 +1866,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_indents(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1877,7 +1881,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphDecimalTabCharacter> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_decimal_tab_character(graph.storage_id)
     }
 
@@ -1889,7 +1893,7 @@ impl Editor {
         character: ParagraphDecimalTabCharacter,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_decimal_tab_character(graph.storage_id, character)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_decimal_tab_character(sheet_id, drawable_object_id)?
@@ -1910,7 +1914,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_decimal_tab_character(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1925,7 +1929,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphDefaultTabInterval> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_default_tab_interval(graph.storage_id)
     }
 
@@ -1937,7 +1941,7 @@ impl Editor {
         interval: ParagraphDefaultTabInterval,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_default_tab_interval(graph.storage_id, interval)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_default_tab_interval(sheet_id, drawable_object_id)?
@@ -1958,7 +1962,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_default_tab_interval(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -1973,7 +1977,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<ParagraphTabStops> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_tab_stops(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_tab_stops(graph.storage_id)
     }
 
     /// Atomically replace every explicit ruler tab stop of a sheet text box.
@@ -1984,7 +1988,7 @@ impl Editor {
         stops: ParagraphTabStops,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_tab_stops(graph.storage_id, stops)?;
         let expected = text.paragraph_tab_stops(graph.storage_id)?;
         let verified = Self::from_package(text.into_package())?;
@@ -2004,7 +2008,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.reset_paragraph_tab_stops(graph.storage_id)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -2019,7 +2023,7 @@ impl Editor {
         drawable_object_id: u64,
     ) -> Result<Vec<Placement>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone()).paragraph_drop_caps(graph.storage_id)
+        crate::text::Draft::from_package(self.package.clone()).paragraph_drop_caps(graph.storage_id)
     }
 
     /// Read the Drop Cap attached to one text-box paragraph.
@@ -2030,7 +2034,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<Option<DropCap>> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        IWorkTextEditor::from_package(self.package.clone())
+        crate::text::Draft::from_package(self.package.clone())
             .paragraph_drop_cap(graph.storage_id, paragraph)
     }
 
@@ -2043,7 +2047,7 @@ impl Editor {
         drop_cap: DropCap,
     ) -> Result<()> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_paragraph_drop_cap(graph.storage_id, paragraph, drop_cap)?;
         let verified = Self::from_package(text.into_package())?;
         if verified.sheet_text_box_paragraph_drop_cap(sheet_id, drawable_object_id, paragraph)?
@@ -2065,7 +2069,7 @@ impl Editor {
         paragraph: TextPosition,
     ) -> Result<bool> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         let changed = text.remove_paragraph_drop_cap(graph.storage_id, paragraph)?;
         if changed {
             *self = Self::from_package(text.into_package())?;
@@ -2074,7 +2078,6 @@ impl Editor {
     }
 
     /// Remove an ordinary sheet-owned text box and its private object graph.
-    #[allow(deprecated)]
     pub fn remove_sheet_text_box(
         &mut self,
         sheet_id: u64,
@@ -2091,7 +2094,7 @@ impl Editor {
                 ))
             })?;
 
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
         patch_numbers_sheet_drawable_reference(

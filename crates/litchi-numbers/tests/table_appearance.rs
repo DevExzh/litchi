@@ -536,8 +536,14 @@ fn assert_appearance_read_rejects(source: &[u8]) -> TestResult {
         Err(_) => Ok(()),
         Ok(package) => match package.table_appearance(0usize, 0usize) {
             Err(Error::InvalidSource { .. })
-            | Err(Error::UnsupportedDependency { .. })
-            | Err(Error::UnsupportedSource) => Ok(()),
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedDependency {
+                    ..
+                },
+            ))
+            | Err(Error::Refused(
+                litchi_numbers::table::appearance::transaction::Refusal::UnsupportedSource,
+            )) => Ok(()),
             Ok(_) => Err(io::Error::other("malformed appearance graph was accepted").into()),
             Err(error) => Err(io::Error::other(format!("unexpected error: {error}")).into()),
         },
@@ -1216,7 +1222,10 @@ fn missing_metadata_and_locked_table_fail_atomically() -> TestResult {
         .set(custom_appearance())
         .commit()
         .expect_err("locked table must refuse changed appearance");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::appearance::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }

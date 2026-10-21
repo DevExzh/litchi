@@ -1493,7 +1493,9 @@ fn restore_original_size_rejects_missing_and_invalid_metadata_atomically() -> R<
         .unwrap_err();
     assert_eq!(
         missing_error,
-        SlideMovieGeometryError::UnsupportedDependency
+        SlideMovieGeometryError::Refused(
+            litchi_keynote::slide::movie::geometry::Refusal::UnsupportedDependency
+        )
     );
     assert_eq!(bytes(&missing_package)?, missing_before);
 

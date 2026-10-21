@@ -19,7 +19,7 @@ use crate::wire::{
     parse_wire_fields, patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
     repeated_fixed64_values, rewrite_repeated_fixed64_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const CUSTOM_NEGATIVE_VALUES_FIELD: u32 = 2;
 const CUSTOM_POSITIVE_VALUES_FIELD: u32 = 4;
@@ -39,7 +39,7 @@ const NATIVE_STANDARD_ERROR: i32 = 4;
 const NATIVE_CUSTOM_VALUES: i32 = 5;
 
 pub(crate) fn chart_series_error_bars(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -57,7 +57,7 @@ pub(crate) fn chart_series_error_bars(
 }
 
 pub(crate) fn set_chart_series_error_bars(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

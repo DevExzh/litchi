@@ -412,11 +412,15 @@ fn duration_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_duration_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_duration_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -450,11 +454,15 @@ fn duration_coordinate_boundaries_return_cell_not_found_without_mutation() -> Te
     for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_duration_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::duration::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_duration_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::duration::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -778,11 +786,11 @@ fn duration_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_duration_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert!(matches!(
             package.edit_table_cell_duration_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -791,33 +799,41 @@ fn duration_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
         Err(
-            litchi_numbers::cell::data_format::currency::transaction::Error::WrongFormatFamily { .. }
+            litchi_numbers::cell::data_format::currency::transaction::Error::Refused(litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. })
         )
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-        Err(scientific_transaction::Error::WrongFormatFamily { .. })
+        Err(scientific_transaction::Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_fraction_format(0usize, 0usize, selected_position()),
-        Err(fraction_transaction::Error::WrongFormatFamily { .. })
+        Err(fraction_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::fraction::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(date_time_transaction::Error::WrongFormatFamily { .. })
+        Err(date_time_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_text_format(0usize, 0usize, selected_position()),
-        Err(text_transaction::Error::WrongFormatFamily { .. })
+        Err(text_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::text::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -838,13 +854,13 @@ fn duration_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Duration edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::duration::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -1161,10 +1177,20 @@ fn duration_secondary_number_edge_is_validated_preserved_and_removed_with_primar
         .edit_table_cell_duration_format(0usize, 0usize, selected_position())?
         .set(baseline_duration())
         .commit();
-    assert!(matches!(unchanged_edit, Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        unchanged_edit,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::UnsupportedSource
+        ))
+    ));
     assert_eq!(non_exact.exact_bytes(), non_exact_before);
     let unchanged_apply = non_exact.apply_table_cell_duration_format(no_op.patch());
-    assert!(matches!(unchanged_apply, Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        unchanged_apply,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::duration::transaction::Refusal::UnsupportedSource
+        ))
+    ));
     assert_eq!(non_exact.exact_bytes(), non_exact_before);
     Ok(())
 }
@@ -1673,7 +1699,7 @@ fn duration_input_and_operation_budgets_reject_before_publication() -> TestResul
         .set(custom(Style::FullNames, Unit::Days, Unit::Seconds))
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);

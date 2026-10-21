@@ -79,6 +79,32 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Numbers Custom-format source is invalid at {path:?}")]
+    InvalidSource { path: Path },
+    #[error("Numbers Custom format {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+        path: Path,
+    },
+    #[error("could not allocate {amount} units for the Numbers Custom-format transaction")]
+    Allocation { amount: usize, path: Path },
+    #[error("the edited Numbers Custom format failed semantic verification")]
+    Verification,
+    #[error("the Custom-format patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("the Numbers workbook has no sheet matching the requested selector")]
     SheetNotFound,
     #[error("the selected Numbers sheet has no table matching the requested selector")]
@@ -93,21 +119,30 @@ pub enum Error {
     UnsupportedDependency { path: Path },
     #[error("this Numbers source does not support exact Custom-format editing")]
     UnsupportedSource,
-    #[error("the Numbers Custom-format source is invalid at {path:?}")]
-    InvalidSource { path: Path },
-    #[error("Numbers Custom format {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-        path: Path,
-    },
-    #[error("could not allocate {amount} units for the Numbers Custom-format transaction")]
-    Allocation { amount: usize, path: Path },
-    #[error("the edited Numbers Custom format failed semantic verification")]
-    Verification,
-    #[error("the Custom-format patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } | Self::CellNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::WrongFormatFamily { .. } => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 impl From<popup::Error> for Error {
@@ -309,6 +344,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -364,7 +405,7 @@ impl Package {
     /// Apply a previously-created exact Custom-format patch.
     pub fn apply_table_cell_custom_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
@@ -460,7 +501,7 @@ fn no_op_commit(
     after: Option<Custom>,
 ) -> Result<Commit, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     let owner = catalog.__source_owner();
     Ok(Commit {
         package: source.snapshot(),
@@ -489,9 +530,9 @@ fn rewrite(
         return Err(Error::InvalidSource { path });
     };
     let source_catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let source_owner = source_catalog.__source_owner();
     let mut budget = popup::TransactionBudget::for_cell_control(source);
@@ -534,7 +575,7 @@ fn rewrite(
     let mut compression_allocations = 3usize;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::PayloadBytes,
                 observed: member.archive_bytes.len() as u64,
                 maximum: native_bound.archive_bytes as u64,
@@ -544,7 +585,7 @@ fn rewrite(
         let maximum = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
             .map_err(|_| Error::Verification)?;
         if maximum > native_bound.compressed_bytes {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::CompressedBytes,
                 observed: maximum as u64,
                 maximum: native_bound.compressed_bytes as u64,
@@ -712,32 +753,46 @@ fn from_native_path(path: popup::Path) -> Path {
 
 fn map_custom_read_error(error: native::CustomFormatReadError, path: Path) -> Error {
     match error {
-        native::CustomFormatReadError::WrongFormatFamily => Error::WrongFormatFamily { path },
+        native::CustomFormatReadError::WrongFormatFamily => {
+            Error::Refused(Refusal::WrongFormatFamily { path })
+        },
         native::CustomFormatReadError::Native(error) => map_popup_error(error),
     }
 }
 
 fn map_popup_error(error: popup::Error) -> Error {
     match error {
-        popup::Error::SheetNotFound => Error::SheetNotFound,
-        popup::Error::TableNotFound => Error::TableNotFound,
-        popup::Error::CellNotFound => Error::CellNotFound,
-        popup::Error::TableLocked { path } => Error::TableLocked {
-            path: from_native_path(path),
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::SheetNotFound) => {
+            Error::Refused(Refusal::SheetNotFound)
         },
-        popup::Error::UnsupportedDependency { path } => Error::UnsupportedDependency {
-            path: from_native_path(path),
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
         },
-        popup::Error::UnsupportedSource => Error::UnsupportedSource,
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::CellNotFound) => {
+            Error::Refused(Refusal::CellNotFound)
+        },
+        popup::Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::TableLocked {
+            path,
+        }) => Error::Refused(Refusal::TableLocked {
+            path: from_native_path(path),
+        }),
+        popup::Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path },
+        ) => Error::Refused(Refusal::UnsupportedDependency {
+            path: from_native_path(path),
+        }),
+        popup::Error::Refused(
+            crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         popup::Error::InvalidSource { path } => Error::InvalidSource {
             path: from_native_path(path),
         },
-        popup::Error::LimitExceeded {
+        popup::Error::Limit {
             kind,
             observed,
             maximum,
             path,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,

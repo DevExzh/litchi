@@ -8,7 +8,7 @@ use crate::wire::{
     parse_wire_fields, patch_length_delimited_field, patch_varint_field,
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use crate::text::storage_wire::{
     LocatedStorage, StorageLocation,
@@ -44,12 +44,12 @@ pub(super) struct LocatedDropCapStorage {
     pub(super) storage: tswp::StorageArchive,
 }
 
-pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<DropCapStorageLocation> {
+pub(super) fn locate(package: &HostPackage, storage_id: u64) -> Result<DropCapStorageLocation> {
     locate_with_archive(package, storage_id).map(|located| located.location)
 }
 
 pub(super) fn locate_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedDropCapStorage> {
     let LocatedStorage { location, archive } =
@@ -147,7 +147,7 @@ pub(super) fn validate_paragraph_start(text: &str, start: TextPosition) -> Resul
 }
 
 pub(super) fn patch_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedDropCapStorage,
     paragraph: TextPosition,
     old_style_id: Option<u64>,

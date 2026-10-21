@@ -272,7 +272,7 @@ fn header_bucket_message(
 }
 
 pub(super) fn read_dimension_size(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     dimension: Dimension,
@@ -305,7 +305,7 @@ pub(super) fn read_dimension_size(
 }
 
 pub(super) fn write_dimension_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     dimension: Dimension,

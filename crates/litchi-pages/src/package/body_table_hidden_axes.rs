@@ -176,24 +176,16 @@ impl fmt::Display for LimitKind {
 #[derive(ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    #[error("more than one Pages body table has the requested name")]
-    AmbiguousTableName,
-    #[error("the selected Pages body-table selector is ambiguous")]
-    AmbiguousSelector,
-    #[error("this Pages source does not support exact body-table hidden-axis editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     #[error("the selected Pages body-table hidden-axis source is invalid")]
     InvalidSource,
-    #[error("the selected Pages body table is locked")]
-    TableLocked,
-    #[error("the selected Pages body-table hidden-axis dependency is unsupported")]
-    UnsupportedDependency,
     #[error(
         "Pages body-table hidden axes {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         kind: LimitKind,
         observed: u64,
         maximum: u64,
@@ -206,10 +198,53 @@ pub enum Error {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    #[error("more than one Pages body table has the requested name")]
+    AmbiguousTableName,
+    #[error("the selected Pages body-table selector is ambiguous")]
+    AmbiguousSelector,
+    #[error("this Pages source does not support exact body-table hidden-axis editing")]
+    UnsupportedSource,
+    #[error("the selected Pages body table is locked")]
+    TableLocked,
+    #[error("the selected Pages body-table hidden-axis dependency is unsupported")]
+    UnsupportedDependency,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 impl fmt::Debug for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::LimitExceeded {
+            Self::Limit {
                 kind,
                 observed,
                 maximum,
@@ -218,7 +253,7 @@ impl fmt::Debug for Error {
                 // no source fingerprint, payload, UUID, or native identity is
                 // ever included in this public representation.
                 formatter
-                    .debug_struct("Error::LimitExceeded")
+                    .debug_struct("Error::Limit")
                     .field("kind", kind)
                     .field("observed", observed)
                     .field("maximum", maximum)
@@ -228,13 +263,21 @@ impl fmt::Debug for Error {
                 .debug_struct("Error::Allocation")
                 .field("allocation_units", amount)
                 .finish_non_exhaustive(),
-            Self::TableNotFound => formatter.write_str("Error::TableNotFound"),
-            Self::AmbiguousTableName => formatter.write_str("Error::AmbiguousTableName"),
-            Self::AmbiguousSelector => formatter.write_str("Error::AmbiguousSelector"),
-            Self::UnsupportedSource => formatter.write_str("Error::UnsupportedSource"),
+            Self::Refused(Refusal::TableNotFound) => formatter.write_str("Error::TableNotFound"),
+            Self::Refused(Refusal::AmbiguousTableName) => {
+                formatter.write_str("Error::AmbiguousTableName")
+            },
+            Self::Refused(Refusal::AmbiguousSelector) => {
+                formatter.write_str("Error::AmbiguousSelector")
+            },
+            Self::Refused(Refusal::UnsupportedSource) => {
+                formatter.write_str("Error::UnsupportedSource")
+            },
             Self::InvalidSource => formatter.write_str("Error::InvalidSource"),
-            Self::TableLocked => formatter.write_str("Error::TableLocked"),
-            Self::UnsupportedDependency => formatter.write_str("Error::UnsupportedDependency"),
+            Self::Refused(Refusal::TableLocked) => formatter.write_str("Error::TableLocked"),
+            Self::Refused(Refusal::UnsupportedDependency) => {
+                formatter.write_str("Error::UnsupportedDependency")
+            },
             Self::Verification => formatter.write_str("Error::Verification"),
             Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
         }
@@ -487,6 +530,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -585,17 +634,11 @@ impl UidIndex {
             (usize::BITS - (entries.len() - 1).leading_zeros()) as usize
         };
         budget
-            .charge_payload_work(
-                entries
-                    .len()
-                    .checked_mul(levels)
-                    .ok_or(Error::LimitExceeded {
-                        kind: LimitKind::TransactionWork,
-                        observed: u64::MAX,
-                        maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                            .unwrap_or(u64::MAX),
-                    })?,
-            )
+            .charge_payload_work(entries.len().checked_mul(levels).ok_or(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+            })?)
             .map_err(map_lock_error)?;
         Ok(Self { entries })
     }
@@ -663,10 +706,10 @@ impl Package {
             });
         }
         if graph.target.explicit_locked == Some(true) {
-            return Err(Error::TableLocked);
+            return Err(Error::Refused(Refusal::TableLocked));
         }
         if graph.profile.is_native() && graph.model.owner.is_none() {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if !self.state.source.source_is_exact()
             || page_layout::fingerprint(patch.target.as_ref()) != patch.target_fingerprint
@@ -741,10 +784,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if edit.target.explicit_locked == Some(true) {
-        return Err(Error::TableLocked);
+        return Err(Error::Refused(Refusal::TableLocked));
     }
     let graph = resolve_graph(
         source,
@@ -757,10 +800,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if graph.profile.is_native() && graph.model.owner.is_none() {
         // Native kind-1 formula ownership is qualified for existing-owner
         // edits only. Native helper-owner creation remains unsupported.
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if graph.model.pivot || graph.info.pivot {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_axis_bounds(&graph, &edit.axes)?;
     let (candidate, touched_components, added_object_ids) =
@@ -1023,13 +1066,13 @@ fn resolve_graph(
         || model_location.object_index != target.model_object_index
         || model_location.identifier == target.drawable_identifier.get()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let drawable_location = object_location(&objects, target.drawable_identifier)?;
     if drawable_location.component_index != target.component_index
         || drawable_location.object_index != target.object_index
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let formula_owner_messages = formula_owner_messages(package, &objects, budget)?;
     let formula_owner_uid = formula_owner_for(
@@ -1434,7 +1477,7 @@ fn validate_aggregate_formula_owner_component(
         .get_index(component_index)
         .ok_or(Error::InvalidSource)?;
     if component.name() != CALCULATION_ENGINE_ENTRY_NAME {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let mut canonical_components = 0usize;
     for candidate in package.state.source.components().iter() {
@@ -1456,7 +1499,7 @@ fn validate_aggregate_formula_owner_component(
         .find(|entry| entry.name() == CALCULATION_ENGINE_ENTRY_NAME)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     Ok(())
 }
@@ -1544,7 +1587,7 @@ fn validate_aggregate_formula_owner_provenance(
         .components()
         .iter()
         .find(|component| component.name() == CALCULATION_ENGINE_ENTRY_NAME)
-        .ok_or(Error::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let mut qualified_engines = 0usize;
     for object in &component.archive().objects {
         for (message_index, message) in object.messages.iter().enumerate() {
@@ -1556,7 +1599,7 @@ fn validate_aggregate_formula_owner_provenance(
                 || message_index != 0
                 || object.archive_info.identifier == Some(formula_owner_identifier)
             {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             let info = validate_message_metadata(object, message_index, 4_000)?;
             charge_metadata_scan(info, 1, budget)?;
@@ -1564,7 +1607,7 @@ fn validate_aggregate_formula_owner_provenance(
                 || !info.data_references.is_empty()
                 || !info.field_infos.is_empty()
             {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             budget
                 .charge_payload_work(message.data.len())
@@ -1614,7 +1657,7 @@ fn validate_aggregate_formula_owner_provenance(
     if qualified_engines == 1 {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1645,7 +1688,7 @@ fn validate_aggregate_tracker_shape(
             3 => (0, 2),
             5 => (1, 0),
             6 => (2, 2),
-            _ => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::Refused(Refusal::UnsupportedDependency)),
         };
         if seen[index]
             || field.wire_type() != wire
@@ -1669,7 +1712,7 @@ fn charge_raw_wire_scan(
     fields: &RawWireFields<'_>,
     max_depth: usize,
 ) -> Result<(), Error> {
-    let max_depth = u32::try_from(max_depth).map_err(|_| Error::LimitExceeded {
+    let max_depth = u32::try_from(max_depth).map_err(|_| Error::Limit {
         kind: LimitKind::WireNesting,
         observed: u64::try_from(max_depth).unwrap_or(u64::MAX),
         maximum: u64::try_from(budget.wire_limits().max_nesting()).unwrap_or(u64::MAX),
@@ -1739,7 +1782,7 @@ fn validate_owner_id_map(
     if entries == 1 && matched && !unregistered {
         Ok(())
     } else {
-        Err(Error::UnsupportedDependency)
+        Err(Error::Refused(Refusal::UnsupportedDependency))
     }
 }
 
@@ -1824,7 +1867,7 @@ fn parse_cfuuid_words(
         );
         let number = field.number();
         if number == 1 {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if !(2..=5).contains(&number) {
             return Err(Error::InvalidSource);
@@ -1892,7 +1935,7 @@ fn validate_empty_formula_owner_dependencies(
                 || !field.length_is_canonical()
                 || field.wire_type() != 2
             {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             dependency_fields[number] = true;
             match field.number() {
@@ -1903,7 +1946,7 @@ fn validate_empty_formula_owner_dependencies(
                 )?,
                 9 => validate_empty_dependency_children(field.payload(), &[1], budget)?,
                 _ if !field.payload().is_empty() => {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 },
                 _ => {},
             }
@@ -1950,7 +1993,7 @@ fn validate_empty_dependency_children(
             .iter()
             .position(|number| *number == field.number())
         else {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
         if seen[index]
             || field.wire_type() != 2
@@ -1958,7 +2001,7 @@ fn validate_empty_dependency_children(
             || !field.length_is_canonical()
             || !field.payload().is_empty()
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         seen[index] = true;
     }
@@ -2364,7 +2407,7 @@ fn reject_reference_path_metadata(
 
 fn validate_reference_shape(reference: codec::ReferenceSnapshot) -> Result<(), Error> {
     if reference.deprecated_type().is_some() || reference.deprecated_is_external().is_some() {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2452,7 +2495,7 @@ fn reject_filter_rule_fields(
         if field.wire_type() != expected_wire {
             return Err(Error::InvalidSource);
         }
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -2531,28 +2574,28 @@ fn codec_options(
     let states = source_len.min(16_384);
     let recursion = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
     if source_len > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if required_output > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: u64::try_from(required_output).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_output_bytes()).unwrap_or(u64::MAX),
         });
     }
     if source_len > output || source_len > retained || source_len > scratch {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireOutputBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(output).unwrap_or(u64::MAX),
         });
     }
     if source_len != 0 && (fields == 0 || work == 0 || recursion == 0 || states == 0) {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: u64::try_from(work).unwrap_or(u64::MAX),
@@ -2575,14 +2618,14 @@ fn style_codec_options(
     let work = budget.remaining_wire_work();
     let recursion = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
     if source_len > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if source_len != 0 && (fields == 0 || work == 0 || recursion == 0) {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: u64::try_from(work).unwrap_or(u64::MAX),
@@ -2609,7 +2652,7 @@ fn charge_style_codec(
         .allocations()
         .checked_add(report.retained_bytes())
         .and_then(|value| value.checked_add(report.scratch_bytes()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2631,7 +2674,7 @@ fn charge_codec(
         .checked_add(report.allocations())
         .and_then(|value| value.checked_add(report.retained_bytes()))
         .and_then(|value| value.checked_add(report.scratch_bytes()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2684,7 +2727,7 @@ impl ReferenceInventory {
                     .checked_add(field.object_references.len())
                     .and_then(|value| value.checked_add(field.data_references.len()))
             })
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
@@ -2694,7 +2737,7 @@ impl ReferenceInventory {
             .len()
             .checked_add(info.data_references.len())
             .and_then(|count| count.checked_add(field_reference_count))
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
@@ -2714,7 +2757,7 @@ impl ReferenceInventory {
         .try_fold(0usize, |total, count| {
             total
                 .checked_add(reference_inventory_sort_work(count)?)
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -2724,7 +2767,7 @@ impl ReferenceInventory {
         let work = metadata_scan_work(info)?
             .checked_mul(2)
             .and_then(|scan| scan.checked_add(sorting_work))
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2780,7 +2823,7 @@ fn reference_inventory_sort_work(count: usize) -> Result<usize, Error> {
     count
         .checked_mul(levels)
         .and_then(|value| value.checked_add(count))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::MAX,
@@ -2833,7 +2876,7 @@ fn charge_metadata_scan(
 ) -> Result<(), Error> {
     let work = metadata_scan_work(info)?
         .checked_mul(passes)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2853,7 +2896,7 @@ fn global_objects(
         .try_fold(0usize, |count, component| {
             count.checked_add(component.archive().objects.len())
         })
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX,
@@ -2893,17 +2936,11 @@ fn global_objects(
         (usize::BITS - (objects.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(
-            objects
-                .len()
-                .checked_mul(levels)
-                .ok_or(Error::LimitExceeded {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
+        .charge_payload_work(objects.len().checked_mul(levels).ok_or(Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+        })?)
         .map_err(map_lock_error)?;
     Ok(objects)
 }
@@ -2920,7 +2957,7 @@ fn metadata_route(
         .find(|entry| entry.name() == METADATA_ENTRY_NAME)
     {
         if entry.is_opaque() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
     }
 
@@ -3019,13 +3056,11 @@ fn formula_owner_messages(
             // without consuming the shared transaction budget.
             budget.charge_payload_work(2).map_err(map_lock_error)?;
             if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
-                formula_messages = formula_messages
-                    .checked_add(1)
-                    .ok_or(Error::LimitExceeded {
-                        kind: LimitKind::PayloadMessages,
-                        observed: u64::MAX,
-                        maximum: u64::MAX,
-                    })?;
+                formula_messages = formula_messages.checked_add(1).ok_or(Error::Limit {
+                    kind: LimitKind::PayloadMessages,
+                    observed: u64::MAX,
+                    maximum: u64::MAX,
+                })?;
             }
         }
     }
@@ -3160,20 +3195,20 @@ fn decode_uid_map_at(
                 .checked_mul(3)
                 .and_then(|value| rows.checked_mul(3).and_then(|rows| value.checked_add(rows)))
         })
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: u64::MAX,
             maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
         })?;
     if message.data.len() > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: u64::try_from(message.data.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if element_count > fields || recursion == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: u64::try_from(element_count).unwrap_or(u64::MAX),
             maximum: u64::try_from(fields).unwrap_or(u64::MAX),
@@ -3205,7 +3240,7 @@ fn decode_uid_map_at(
                 .records()
                 .checked_add(report.elements())
                 .and_then(|value| value.checked_add(element_count))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -3280,7 +3315,7 @@ fn validate_cross_axis_uuid_identity(
         .len()
         .checked_mul(row_levels)
         .and_then(|value| value.checked_add(columns.len().checked_mul(column_levels)?))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -3293,29 +3328,29 @@ fn validate_cross_axis_uuid_identity(
             })
             .is_ok()
     }) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
 
 fn map_uid_codec_error(error: uid_codec::DecodeError) -> Error {
     match error.resource_limit() {
-        Some(uid_codec::DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(uid_codec::DecodeLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(uid_codec::DecodeLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+        Some(uid_codec::DecodeLimit::Work { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(uid_codec::DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -3324,15 +3359,13 @@ fn map_uid_codec_error(error: uid_codec::DecodeError) -> Error {
             Error::Allocation { amount: requested }
         },
         Some(uid_codec::DecodeLimit::OutputBytes { observed, maximum })
-        | Some(uid_codec::DecodeLimit::ScratchBytes { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::PayloadBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        | Some(uid_codec::DecodeLimit::ScratchBytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
         Some(uid_codec::DecodeLimit::Records { observed, maximum })
-        | Some(uid_codec::DecodeLimit::Elements { observed, maximum }) => Error::LimitExceeded {
+        | Some(uid_codec::DecodeLimit::Elements { observed, maximum }) => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -3399,7 +3432,7 @@ fn formula_owner_for(
             || owner.owner_kind().is_some()
             || owner.base_owner_uid().is_some()
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if let Some(reference) = owner.formula_owner() {
             validate_reference_shape(reference)?;
@@ -3416,7 +3449,7 @@ fn formula_owner_for(
                 || location.object.identifier == drawable.identifier
                 || location.object.identifier == model.identifier
             {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             validate_formula_owner_metadata(
                 object,
@@ -3492,7 +3525,7 @@ fn native_formula_owner_for(
             || !owner.has_dependencies()
             || owner.base_owner_uid().is_some()
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         // A forged aggregate edge is not sufficient provenance.  The
         // selected 4008 cannot be embedded in either selected object.  The
@@ -3505,7 +3538,7 @@ fn native_formula_owner_for(
             || location.object.identifier == drawable.identifier
             || location.object.identifier == model.identifier
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if profile.is_aggregate_only() {
             validate_aggregate_formula_owner_component(
@@ -3564,7 +3597,7 @@ fn validate_dependencies(
     if row_indices.index_of(owner.owner_uid()).is_some()
         || column_indices.index_of(owner.owner_uid()).is_some()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let active_uuid = active_uuid.ok_or(Error::InvalidSource)?;
     validate_uuid(active_uuid)?;
@@ -3588,17 +3621,11 @@ fn validate_dependencies(
         (usize::BITS - (state_uids.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(
-            state_uids
-                .len()
-                .checked_mul(levels)
-                .ok_or(Error::LimitExceeded {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
+        .charge_payload_work(state_uids.len().checked_mul(levels).ok_or(Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+        })?)
         .map_err(map_lock_error)?;
     let active = owner
         .hidden_states()
@@ -3628,7 +3655,7 @@ fn validate_dependencies(
             .needs_to_update_filter_set_for_import()
             == Some(true)
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     for state in owner.hidden_states() {
         validate_uuid(state.hidden_states_uid())?;
@@ -3661,7 +3688,7 @@ fn validate_dependencies(
                 .index_of(state.column_hidden_state_extent().hidden_state_extent_uid())
                 .is_some()
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     let expected_column_extent_uid = codec::UuidSnapshot::new(
@@ -3687,13 +3714,13 @@ fn validate_dependencies(
         .zip(active.row_hidden_state_extent().filter_set())
         .is_some_and(|(column, row)| column.identifier() == row.identifier())
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_extent_filters(package, target, owner, objects, model, profile, budget)?;
     let col_ref = model.formula_columns.ok_or(Error::InvalidSource)?;
     let row_ref = model.formula_rows.ok_or(Error::InvalidSource)?;
     if col_ref == row_ref {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_formula_object(
         package,
@@ -3761,17 +3788,11 @@ fn validate_extent_shape(
         (usize::BITS - (identities.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(
-            identities
-                .len()
-                .checked_mul(levels)
-                .ok_or(Error::LimitExceeded {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
+        .charge_payload_work(identities.len().checked_mul(levels).ok_or(Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+        })?)
         .map_err(map_lock_error)?;
     Ok(())
 }
@@ -3801,16 +3822,15 @@ fn validate_extent_filters(
     )?;
     let model_references = ReferenceInventory::new(model_info, budget)?;
     let mut filter_identifiers = Vec::new();
-    let filter_capacity =
-        owner
-            .hidden_states()
-            .len()
-            .checked_mul(2)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::PayloadItems,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
-            })?;
+    let filter_capacity = owner
+        .hidden_states()
+        .len()
+        .checked_mul(2)
+        .ok_or(Error::Limit {
+            kind: LimitKind::PayloadItems,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
+        })?;
     filter_identifiers
         .try_reserve_exact(filter_capacity)
         .map_err(|_| Error::Allocation {
@@ -3822,7 +3842,7 @@ fn validate_extent_filters(
             state.row_hidden_state_extent(),
         ] {
             if extent.needs_to_update_filter_set_for_import() == Some(true) {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             if let Some(reference) = extent.filter_set() {
                 validate_reference_shape(reference)?;
@@ -3832,7 +3852,7 @@ fn validate_extent_filters(
     }
     filter_identifiers.sort_unstable_by_key(|identifier| identifier.get());
     if filter_identifiers.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let levels = if filter_identifiers.len() <= 1 {
         0
@@ -3840,13 +3860,17 @@ fn validate_extent_filters(
         (usize::BITS - (filter_identifiers.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(filter_identifiers.len().checked_mul(levels).ok_or(
-            Error::LimitExceeded {
-                kind: LimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
+        .charge_payload_work(
+            filter_identifiers
+                .len()
+                .checked_mul(levels)
+                .ok_or(Error::Limit {
+                    kind: LimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })?,
+        )
         .map_err(map_lock_error)?;
     if profile.is_native() {
         // The native profile has one state and at most two filter edges.
@@ -3897,7 +3921,7 @@ fn validate_extent_filters(
                 .filter_type()
                 .is_some_and(|value| !matches!(value, 0 | 1))
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut offsets = Vec::new();
         offsets
@@ -3910,7 +3934,7 @@ fn validate_extent_filters(
         if offsets.windows(2).any(|pair| pair[0] == pair[1])
             || offsets.iter().any(|offset| *offset >= model.rows)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         budget
             .charge_payload_work(offsets.len())
@@ -3966,7 +3990,7 @@ fn validate_formula_object(
             .owner_id()
             .is_none_or(|owner| owner.uuid_bytes().is_some())
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let owner = decoded.owner_id().ok_or(Error::InvalidSource)?;
     let uuid = owner.words_uuid().ok_or(Error::InvalidSource)?;
@@ -4145,7 +4169,7 @@ fn validate_model_counts(
                 .len(),
         )
         .and_then(|count| count.checked_mul(5))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -4797,7 +4821,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -4839,7 +4863,7 @@ fn map_style_codec_error(error: style_codec::DecodeError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -4877,7 +4901,7 @@ fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -4886,16 +4910,24 @@ fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
 
 fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::Error::TableNotFound => Error::TableNotFound,
-        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
-        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::AmbiguousTableName)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousSelector) => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         table_lock::Error::InvalidSource => Error::InvalidSource,
-        table_lock::Error::LimitExceeded {
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
@@ -4930,14 +4962,16 @@ fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
 fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
         page_layout::Error::Allocation { amount } => Error::Allocation { amount },
-        page_layout::Error::LimitExceeded {
+        page_layout::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed,
             maximum,
         },
-        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        page_layout::Error::Refused(
+            crate::page_layout::transaction::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         _ => Error::InvalidSource,
     }
 }
@@ -4949,7 +4983,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -4978,7 +5012,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -5000,7 +5034,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -5019,12 +5053,12 @@ fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,
@@ -5073,7 +5107,7 @@ mod reference_inventory_tests {
 
         assert!(matches!(
             ReferenceInventory::new(&info, &mut budget(3)),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 observed: 4,
                 maximum: 3,
@@ -5103,7 +5137,7 @@ mod reference_inventory_tests {
             .expect("leave one fewer work unit");
         assert!(matches!(
             ReferenceInventory::new(&info, &mut exhausted),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 ..
             })

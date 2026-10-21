@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_pages_tables INPUT")?;
-    let editor = pages::Editor::open(&input)?;
+    let editor = pages::Draft::open(&input)?;
     let focused = Package::open(&input)?;
     for (position, table) in editor.tables()?.into_iter().enumerate() {
         let materialized = editor.table(table.model_object_id)?;

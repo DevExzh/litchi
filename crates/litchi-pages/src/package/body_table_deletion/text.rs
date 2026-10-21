@@ -34,7 +34,9 @@ pub(super) fn prepare(
     let target = &graph.request.target;
     let source_catalog = &source.state.source;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
 
     let body_component = source_catalog
@@ -451,7 +453,7 @@ fn map_text_wire_error(error: RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 "message bytes" => super::LimitKind::WireBytes,
                 "fields" => super::LimitKind::WireFields,

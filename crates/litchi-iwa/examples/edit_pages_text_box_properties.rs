@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let mut properties = editor.text_box_properties(drawable_id)?;
     properties.locked = locked;
     properties.aspect_ratio_locked = aspect_ratio_locked;

@@ -113,6 +113,41 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected payload is malformed.
+    #[error("the Numbers chart-arrangement source is invalid")]
+    InvalidSource,
+    /// A finite operation budget was exceeded.
+    #[error(
+        "Numbers chart arrangement {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A required temporary allocation could not be reserved.
+    #[error("could not allocate {amount} units for Numbers chart arrangement")]
+    Allocation { amount: usize },
+    /// Candidate reopening or semantic readback did not reproduce the target.
+    #[error("the edited Numbers chart arrangement failed semantic verification")]
+    Verification,
+    /// The patch was created from another exact package artifact.
+    #[error("the Numbers chart-arrangement patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The package does not retain an exact physical source suitable for an
     /// edit.
     #[error("this Numbers source does not support physical chart-arrangement edits")]
@@ -135,30 +170,31 @@ pub enum Error {
     /// No chart matched the requested position.
     #[error("the selected Numbers sheet has no chart at position {position:?}")]
     ChartPositionNotFound { position: Position },
-    /// The source graph or selected payload is malformed.
-    #[error("the Numbers chart-arrangement source is invalid")]
-    InvalidSource,
-    /// A finite operation budget was exceeded.
-    #[error(
-        "Numbers chart arrangement {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource that exceeded its ceiling.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A required temporary allocation could not be reserved.
-    #[error("could not allocate {amount} units for Numbers chart arrangement")]
-    Allocation { amount: usize },
-    /// Candidate reopening or semantic readback did not reproduce the target.
-    #[error("the edited Numbers chart arrangement failed semantic verification")]
-    Verification,
-    /// The patch was created from another exact package artifact.
-    #[error("the Numbers chart-arrangement patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySheetName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SheetNameNotFound { .. }
+            | Self::SheetPositionNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart Arrange-panel value staged against an immutable Numbers
@@ -400,6 +436,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -526,7 +568,7 @@ impl ChartBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -544,7 +586,7 @@ impl ChartBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -625,7 +667,7 @@ impl ChartBudget {
         self.fields(fields)?;
         self.work(payload.len())?;
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -655,7 +697,7 @@ impl ChartBudget {
             LimitKind::WireWork,
         )?;
         if report.max_depth() > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: report.max_depth() as u64,
                 maximum: self.max_nesting as u64,
@@ -814,7 +856,7 @@ impl ChartBudget {
         )?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -867,7 +909,7 @@ impl ChartBudget {
         self.work(report.cell_count())?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -923,7 +965,7 @@ impl ChartBudget {
         self.work(report.work_bytes())?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -965,7 +1007,7 @@ impl ChartBudget {
         self.work(requirements.work_bytes)?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -990,7 +1032,7 @@ impl ChartBudget {
         self.work(requirements.work_bytes)?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -1146,7 +1188,7 @@ fn resolve_sheet_position(
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySheetName);
+                return Err(Error::Refused(Refusal::EmptySheetName));
             }
             let mut matches = package
                 .workbook_ref()
@@ -1154,19 +1196,19 @@ fn resolve_sheet_position(
                 .iter()
                 .filter(|sheet| sheet.name() == name);
             let Some(sheet) = matches.next() else {
-                return Err(Error::SheetNameNotFound);
+                return Err(Error::Refused(Refusal::SheetNameNotFound));
             };
             if matches.next().is_some() {
-                return Err(Error::AmbiguousSelector);
+                return Err(Error::Refused(Refusal::AmbiguousSelector));
             }
             Ok(Position::new(sheet.index()))
         },
         SheetSelector::Position(index) => {
             let index = index.get();
             if package.workbook_ref().sheets().get(index).is_none() {
-                return Err(Error::SheetPositionNotFound {
+                return Err(Error::Refused(Refusal::SheetPositionNotFound {
                     position: Position::new(index),
-                });
+                }));
             }
             Ok(Position::new(index))
         },
@@ -1185,9 +1227,9 @@ pub(super) fn select_chart_with_budget(
     charts
         .into_iter()
         .nth(chart_selector.as_position().get())
-        .ok_or(Error::ChartPositionNotFound {
+        .ok_or(Error::Refused(Refusal::ChartPositionNotFound {
             position: chart_selector.as_position(),
-        })
+        }))
 }
 
 fn root_document_with_budget(
@@ -1265,12 +1307,11 @@ fn discover_sheet_charts(
     )?;
     budget.references(sheet_reference_count)?;
     budget.work(sheet_reference_count)?;
-    let sheet_reference =
-        sheet_references
-            .get(sheet_position.get())
-            .ok_or(Error::SheetPositionNotFound {
-                position: sheet_position,
-            })?;
+    let sheet_reference = sheet_references
+        .get(sheet_position.get())
+        .ok_or(Error::Refused(Refusal::SheetPositionNotFound {
+            position: sheet_position,
+        }))?;
     let sheet_identifier = sheet_reference.identifier();
     if sheet_identifier == 0 || sheet_reference.deprecated_is_external() == Some(true) {
         return Err(Error::InvalidSource);
@@ -1751,7 +1792,7 @@ fn commit_edit(
         });
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let candidate = rewrite_chart(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
@@ -1837,7 +1878,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .find(|entry| entry.name() == selection.component_name.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let component = package_component(source, selection.component_index)?;
     if component.name() != selection.component_name.as_ref() {
@@ -1888,7 +1929,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(|_| Error::InvalidSource)?;
     let (snappy_allocations, snappy_scratch) = snappy_compression_requirements(encoded_bound)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
@@ -2392,7 +2433,7 @@ pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Erro
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn rewritten_archive_bound(
@@ -2756,7 +2797,7 @@ fn map_common_error(error: CommonError) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 CommonLimitKind::InputBytes => LimitKind::WireBytes,
                 CommonLimitKind::Fields => LimitKind::WireFields,
@@ -2803,7 +2844,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,

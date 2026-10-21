@@ -8,12 +8,9 @@
 //! object must have one UUID registry entry, and removed comment objects must
 //! not leave stale registrations.
 
-#![allow(deprecated)]
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
-use litchi_iwa::comments::IWorkDrawableCommentEditor;
 use litchi_iwa::pages::{self};
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, Preset};
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, SnappyStream};
@@ -539,7 +536,7 @@ struct TableSnapshot {
     comments: Vec<((usize, usize), litchi_iwa_common::table::read::Comment)>,
 }
 
-fn table_snapshot(editor: &pages::Editor, model_object_id: u64) -> TestResult<TableSnapshot> {
+fn table_snapshot(editor: &pages::Draft, model_object_id: u64) -> TestResult<TableSnapshot> {
     let table = editor.table(model_object_id)?;
     Ok(TableSnapshot {
         info: table.info.clone(),
@@ -648,7 +645,7 @@ fn assert_thread(
     expected_root: &str,
     expected_replies: &[&str],
 ) -> TestResult<(StorageId, Vec<StorageId>)> {
-    let editor = IWorkDrawableCommentEditor::from_bytes(source)?;
+    let editor = litchi_iwa::comments::Draft::from_bytes(source)?;
     let root = editor
         .comment(drawable_id)?
         .ok_or_else(|| io::Error::other("drawable has no root comment"))?;
@@ -672,7 +669,7 @@ fn source_built_pages_comment_lifecycle_updates_physical_registry() -> TestResul
     let (source, drawable_id) = pages_shape_package()?;
     let source_objects = all_object_ids(&source)?;
 
-    let mut editor = IWorkDrawableCommentEditor::from_bytes(&source)?;
+    let mut editor = litchi_iwa::comments::Draft::from_bytes(&source)?;
     assert_eq!(
         editor.application(),
         litchi_iwa::application::Application::Pages
@@ -695,7 +692,7 @@ fn source_built_pages_comment_lifecycle_updates_physical_registry() -> TestResul
     assert_watermark_and_registry_shape(&source, &root_bytes)?;
     assert_unrelated_content_preserved(&source, &root_bytes, drawable_id)?;
 
-    editor = IWorkDrawableCommentEditor::from_bytes(&root_bytes)?;
+    editor = litchi_iwa::comments::Draft::from_bytes(&root_bytes)?;
     let reply_id = editor.add_reply(drawable_id, "first reply")?;
     let reply_bytes = editor.to_bytes()?;
     let (reply_root_id, replies) =
@@ -716,7 +713,7 @@ fn source_built_pages_comment_lifecycle_updates_physical_registry() -> TestResul
     assert_watermark_and_registry_shape(&root_bytes, &reply_bytes)?;
     assert_unrelated_content_preserved(&root_bytes, &reply_bytes, drawable_id)?;
 
-    editor = IWorkDrawableCommentEditor::from_bytes(&reply_bytes)?;
+    editor = litchi_iwa::comments::Draft::from_bytes(&reply_bytes)?;
     let replaced_reply_id = editor.set_reply(drawable_id, reply_id, "updated reply")?;
     let replaced_bytes = editor.to_bytes()?;
     let (replaced_root_id, _replies) = assert_thread(
@@ -737,7 +734,7 @@ fn source_built_pages_comment_lifecycle_updates_physical_registry() -> TestResul
     // The final bytes must be a real reopen, not just the in-memory editor's
     // projection.  This also checks that the newly registered IDs are usable
     // after the package writer has rebuilt the touched archives.
-    let reopened = IWorkDrawableCommentEditor::from_bytes(&replaced_bytes)?;
+    let reopened = litchi_iwa::comments::Draft::from_bytes(&replaced_bytes)?;
     let reopened_root = reopened
         .comment(drawable_id)?
         .ok_or_else(|| io::Error::other("reopened package lost root comment"))?;
@@ -753,7 +750,7 @@ fn source_built_pages_comment_lifecycle_updates_physical_registry() -> TestResul
 #[test]
 fn source_built_pages_comment_failures_are_atomic() -> TestResult<()> {
     let (source, drawable_id) = pages_shape_package()?;
-    let mut editor = IWorkDrawableCommentEditor::from_bytes(&source)?;
+    let mut editor = litchi_iwa::comments::Draft::from_bytes(&source)?;
     editor.set_comment(drawable_id, "root text")?;
     let reply_id = editor.add_reply(drawable_id, "reply text")?;
     let before = editor.to_bytes()?;
@@ -788,7 +785,7 @@ fn source_built_pages_comment_failures_are_atomic() -> TestResult<()> {
 #[test]
 fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> TestResult<()> {
     let (source, cities_id, unrelated_id, unrelated_info) = pages_table_package()?;
-    let baseline_editor = pages::Editor::from_bytes(&source)?;
+    let baseline_editor = pages::Draft::from_bytes(&source)?;
     let unrelated_before = table_snapshot(&baseline_editor, unrelated_id)?;
     assert_eq!(unrelated_before.info, unrelated_info);
 
@@ -857,7 +854,7 @@ fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> Tes
         "updating a Cities reply changed the unrelated table"
     );
 
-    let reopened = pages::Editor::from_bytes(&replaced_bytes)?;
+    let reopened = pages::Draft::from_bytes(&replaced_bytes)?;
     assert_eq!(table_snapshot(&reopened, unrelated_id)?, unrelated_before);
     let reopened_root = reopened
         .table_cell_comment(cities_id, 1, 1)?
@@ -894,7 +891,7 @@ fn source_built_pages_table_comment_lifecycle_preserves_unrelated_table() -> Tes
 #[test]
 fn source_built_pages_table_comment_failures_are_atomic() -> TestResult<()> {
     let (source, cities_id, unrelated_id, _) = pages_table_package()?;
-    let mut editor = pages::Editor::from_bytes(&source)?;
+    let mut editor = pages::Draft::from_bytes(&source)?;
     editor.set_table_cell_comment(cities_id, 1, 1, "Cities root")?;
     let reply_id = editor.add_table_cell_comment_reply(cities_id, 1, 1, "Cities reply")?;
     let before = editor.to_bytes()?;
@@ -942,7 +939,7 @@ fn native_saved_pages_hidden_axes_preserve_comment_thread_and_exact_reencode() -
     focused.write_to(&mut focused_bytes)?;
     assert_eq!(focused_bytes, source);
 
-    let editor = pages::Editor::from_bytes(source)?;
+    let editor = pages::Draft::from_bytes(source)?;
     assert!(editor.body_text()?.contains(NATIVE_COMMENT_BODY_MARKER));
     let tables = editor.tables()?;
     assert_eq!(tables.len(), 1);
@@ -989,7 +986,7 @@ fn native_saved_pages_hidden_axes_preserve_comment_thread_and_exact_reencode() -
     );
     assert_eq!(root.comment.reply_ids.as_ref(), [reply.storage_id]);
 
-    let reopened = pages::Editor::from_bytes(source)?;
+    let reopened = pages::Draft::from_bytes(source)?;
     let reopened_root = reopened
         .table_cell_comment(table.model_object_id, 1, 1)?
         .ok_or_else(|| io::Error::other("reopened native saved B2 root comment is missing"))?;

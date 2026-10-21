@@ -135,7 +135,9 @@ fn synthetic_absence_reads_none_and_edit_is_typed() -> TestResult<()> {
     assert_eq!(package.soundtrack_settings()?, None);
     assert!(matches!(
         package.edit_soundtrack_settings(),
-        Err(Error::SoundtrackNotFound)
+        Err(Error::Refused(
+            litchi_keynote::soundtrack::Refusal::SoundtrackNotFound
+        ))
     ));
     assert_eq!(bytes(&package)?, absent);
     Ok(())

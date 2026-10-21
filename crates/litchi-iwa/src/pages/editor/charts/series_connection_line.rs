@@ -7,7 +7,7 @@ use crate::charts::series_connection_line::{
 };
 use crate::charts::{ChartSeriesConnectionLine, Index};
 
-impl Editor {
+impl Draft {
     /// Read connection geometry in native series order.
     pub fn body_chart_series_connection_lines(
         &self,
@@ -58,7 +58,7 @@ impl Editor {
     }
 }
 
-fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ChartSeriesConnectionLine>> {
+fn read(editor: &Draft, drawable_object_id: u64) -> Result<Vec<ChartSeriesConnectionLine>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let count = value_label_series_count(
         graph.info.kind,
@@ -78,7 +78,7 @@ fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<ChartSeriesConne
 }
 
 fn set(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     values: &[ChartSeriesConnectionLine],
 ) -> Result<()> {
@@ -103,7 +103,7 @@ fn set(
         count,
         values,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_connection_lines(drawable_object_id)? != values {
         return Err(Error::InvalidFormat(
             "Pages chart series connection-line update failed validation".to_owned(),

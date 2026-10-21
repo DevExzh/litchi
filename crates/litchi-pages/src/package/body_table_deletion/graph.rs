@@ -1800,7 +1800,9 @@ fn check_inbound(
     if formula_source && selected_roots.contains(&target) {
         return Ok(());
     }
-    Err(Error::UnsupportedDependency)
+    Err(Error::Refused(
+        crate::table::deletion::Refusal::UnsupportedDependency,
+    ))
 }
 
 fn check_data_inbound(
@@ -1884,7 +1886,7 @@ fn storage_options(
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
     if input > limits.max_input_bytes() || fields == 0 || work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: if input > limits.max_input_bytes() {
                 super::LimitKind::WireBytes
             } else if fields == 0 {
@@ -1943,7 +1945,7 @@ fn comment_options(
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
     if input > limits.max_input_bytes() || fields == 0 || work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: if input > limits.max_input_bytes() {
                 super::LimitKind::WireBytes
             } else if fields == 0 {
@@ -1999,33 +2001,33 @@ fn map_storage_error(error: storage::DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        storage::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::References { observed, maximum } => Error::Limit {
             kind: super::LimitKind::PayloadReferences,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         storage::DecodeLimit::Work { observed, maximum }
-        | storage::DecodeLimit::Retained { observed, maximum } => Error::LimitExceeded {
+        | storage::DecodeLimit::Retained { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        storage::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        storage::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -2041,24 +2043,22 @@ fn map_comment_error(error: comment_storage_codec::DecodeError) -> Error {
     };
     match limit {
         comment_storage_codec::DecodeLimit::Bytes { observed, maximum }
-        | comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: if matches!(
-                    limit,
-                    comment_storage_codec::DecodeLimit::OutputBytes { .. }
-                ) {
-                    super::LimitKind::WireOutputBytes
-                } else {
-                    super::LimitKind::WireBytes
-                },
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        | comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+            kind: if matches!(
+                limit,
+                comment_storage_codec::DecodeLimit::OutputBytes { .. }
+            ) {
+                super::LimitKind::WireOutputBytes
+            } else {
+                super::LimitKind::WireBytes
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
         comment_storage_codec::DecodeLimit::References { observed, maximum }
         | comment_storage_codec::DecodeLimit::Replies { observed, maximum }
         | comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum } => {
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: super::LimitKind::PayloadReferences,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -2067,29 +2067,25 @@ fn map_comment_error(error: comment_storage_codec::DecodeError) -> Error {
         comment_storage_codec::DecodeLimit::Text { observed, maximum }
         | comment_storage_codec::DecodeLimit::Work { observed, maximum }
         | comment_storage_codec::DecodeLimit::Scratch { observed, maximum }
-        | comment_storage_codec::DecodeLimit::Retained { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: super::LimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        | comment_storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
-        comment_storage_codec::DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        comment_storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: super::LimitKind::WireWork,
-                observed: usize_to_u64(observed),
-                maximum: usize_to_u64(maximum),
-            }
+        comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => Error::Limit {
+            kind: super::LimitKind::WireWork,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
         },
         _ => Error::InvalidSource,
     }

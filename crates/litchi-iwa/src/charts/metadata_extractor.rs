@@ -541,7 +541,7 @@ fn own_labels<'source>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::IWorkPackage;
+    use crate::HostPackage;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
     use crate::bundle::Bundle;
     use crate::object_index::ObjectIndex;
@@ -592,7 +592,7 @@ mod tests {
                 chart_object(50, CHART_DRAWABLE_MESSAGE_TYPE, Vec::new()),
             ],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/SyntheticCharts.iwa", &archive)
             .expect("synthetic archive");
@@ -615,7 +615,7 @@ mod tests {
         let archive = Archive {
             objects: vec![chart_object(10, LEGACY_CHART_MESSAGE_TYPE, Vec::new())],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/MalformedCharts.iwa", &archive)
             .expect("synthetic archive");

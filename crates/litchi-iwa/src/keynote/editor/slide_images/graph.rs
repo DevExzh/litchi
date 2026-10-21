@@ -113,7 +113,7 @@ pub(super) fn image_creation_values(options: ImageOptions) -> Result<DrawableGeo
 }
 
 pub(super) fn image_creation_context(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
 ) -> Result<ImageCreationContext> {
     let slides = editor.slides()?;
@@ -204,7 +204,7 @@ fn caption_theme_style(
     })
 }
 
-pub(super) fn image_infos(editor: &Editor, slide_index: usize) -> Result<Vec<SlideImageInfo>> {
+pub(super) fn image_infos(editor: &Draft, slide_index: usize) -> Result<Vec<SlideImageInfo>> {
     let slides = editor.slides()?;
     let slide = slides.get(slide_index).ok_or_else(|| {
         Error::ParseError(format!(
@@ -241,7 +241,7 @@ fn image_root_ids(graph: &ObjectGraph, slide_id: u64) -> Result<Vec<u64>> {
 }
 
 pub(super) fn require_file_image(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideImageGraph> {
@@ -255,7 +255,7 @@ pub(super) fn require_file_image(
 }
 
 pub(super) fn image_title_caption(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -284,7 +284,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -355,7 +355,7 @@ fn image_caption_slot_from_reference(
 }
 
 pub(super) fn insert_image_caption(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -376,7 +376,7 @@ pub(super) fn insert_image_caption(
 }
 
 pub(super) fn insert_image_caption_standin(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -443,7 +443,7 @@ fn replace_image_caption_reference(
 }
 
 pub(super) fn image_graph(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideImageGraph> {
@@ -526,7 +526,7 @@ pub(super) fn image_graph(
     })
 }
 
-fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+fn image_adjustments_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -556,7 +556,7 @@ fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
 }
 
 fn image_info(
-    editor: &Editor,
+    editor: &Draft,
     graph: &ObjectGraph,
     slide_index: usize,
     identifier: u64,
@@ -706,7 +706,7 @@ pub(super) fn image_objects(
 }
 
 pub(super) fn set_image_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     geometry: DrawableGeometry,
@@ -744,7 +744,7 @@ pub(super) fn set_image_geometry(
 }
 
 pub(super) fn set_image_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     properties: &DrawableProperties,

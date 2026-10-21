@@ -6,7 +6,7 @@ use super::*;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn register_created_slide(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     layout: &ResolvedLayout,
     new_archive_name: &str,
     node_archive_name: &str,

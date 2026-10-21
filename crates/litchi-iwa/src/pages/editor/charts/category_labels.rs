@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl Editor {
+impl Draft {
     /// Read the complete category-label menu state for one body chart.
     pub fn body_chart_category_label_layout(&self, drawable_object_id: u64) -> Result<Layout> {
         body_chart_category_label_layout(self, drawable_object_id)
@@ -24,7 +24,7 @@ impl Editor {
     }
 }
 
-fn body_chart_category_label_layout(editor: &Editor, drawable_object_id: u64) -> Result<Layout> {
+fn body_chart_category_label_layout(editor: &Draft, drawable_object_id: u64) -> Result<Layout> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_category_label_layout(
         editor.package(),
@@ -35,7 +35,7 @@ fn body_chart_category_label_layout(editor: &Editor, drawable_object_id: u64) ->
 }
 
 fn set_body_chart_category_label_layout(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     layout: Layout,
 ) -> Result<()> {
@@ -48,7 +48,7 @@ fn set_body_chart_category_label_layout(
         "Pages",
         layout,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_category_label_layout(drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Pages chart category-label layout update failed validation".to_owned(),
@@ -107,7 +107,7 @@ mod tests {
         editor
             .set_body_chart_category_label_layout(chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_category_label_layout(chart.drawable_object_id)

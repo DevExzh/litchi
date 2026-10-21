@@ -27,13 +27,14 @@
 //! ```
 
 mod creation;
-pub mod editor;
+pub(crate) mod editor;
 
 pub use creation::Builder;
 pub use editor::{
-    AudioInfo, BodyChartInfo, BodyShapeInfo, CellValue, DrawableTextInfo, Editor, ImageInfo,
+    AudioInfo, BodyChartInfo, BodyShapeInfo, CellValue, Draft, DrawableTextInfo, ImageInfo,
     MovieInfo, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
-    RemovedPagesMovie, RemovedPagesTextBox, SectionInfo, Table, TableCellParagraphList,
+    RemovedPagesMovie, RemovedPagesTextBox, SectionInfo, Table, TableCellConditionalHighlightInfo,
+    TableCellInset, TableCellInsets, TableCellLayout, TableCellParagraphList,
     TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
     TableCellParagraphListIndentation, TableCellParagraphListLabelColor,
     TableCellParagraphListLevel, TableCellParagraphListLevelPlacement,
@@ -43,9 +44,9 @@ pub use editor::{
     TableCellTextBaselineShift, TableCellTextCapitalization, TableCellTextCharacterSpacing,
     TableCellTextColor, TableCellTextDecorations, TableCellTextFont, TableCellTextLigatures,
     TableCellTextOutline, TableCellTextScript, TableCellTextShadow, TableCellTextStyle,
-    TableCellUpdate, TableFormulaAxisReference, TableFormulaBinaryOperator,
-    TableFormulaCachedValue, TableFormulaCellReference, TableFormulaExpression, TableInfo,
-    TableSortRowRange,
+    TableCellTextWrap, TableCellUpdate, TableCellVerticalAlignment, TableFormulaAxisReference,
+    TableFormulaBinaryOperator, TableFormulaCachedValue, TableFormulaCellReference,
+    TableFormulaExpression, TableInfo, TableSortRowRange,
 };
 pub use litchi_pages::footnote::body::{Footnote, Position, Selector};
 pub use litchi_pages::{Section, SectionType};

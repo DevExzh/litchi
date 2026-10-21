@@ -7,7 +7,7 @@ use crate::charts::pie_leader_lines::{
 };
 use crate::charts::{ChartPieWedgeIndex, LeaderLineVisibility};
 
-impl Editor {
+impl Draft {
     /// Read every pie or donut wedge's leader-line visibility.
     pub fn body_chart_pie_leader_line_visibilities(
         &self,
@@ -61,7 +61,7 @@ impl Editor {
 }
 
 fn body_chart_pie_leader_line_visibilities(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<LeaderLineVisibility>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -82,7 +82,7 @@ fn body_chart_pie_leader_line_visibilities(
 }
 
 fn set_body_chart_pie_leader_line_visibilities(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     visibilities: &[LeaderLineVisibility],
 ) -> Result<()> {
@@ -119,7 +119,7 @@ fn set_body_chart_pie_leader_line_visibilities(
         "Pages",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_pie_leader_line_visibilities(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart pie leader-line visibility update failed validation".to_owned(),

@@ -52,7 +52,7 @@ fn order_from_native(sort: &codec::SortOrderSnapshot) -> Result<Option<Order>> {
         .map_err(invalid_stored_sort)
 }
 
-impl Editor {
+impl Draft {
     /// Read an attached table's persisted sort-rule configuration.
     ///
     /// An empty native order is reported as `None`, matching the state shown
@@ -217,7 +217,7 @@ fn focused_sort_error(error: litchi_numbers::table::sort::transaction::Error) ->
 
 #[cfg(test)]
 fn focused_table_sort_source(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
 ) -> Result<(
     FocusedNumbersPackage,
@@ -234,7 +234,7 @@ fn focused_table_sort_source(
     Ok((source, sheet, table))
 }
 
-fn focused_table_sort_order_for_apply(editor: &Editor, table_id: u64) -> Result<Option<Order>> {
+fn focused_table_sort_order_for_apply(editor: &Draft, table_id: u64) -> Result<Option<Order>> {
     let source_built = !editor.package.source_is_exact();
     let (sheet, table) = super::selectors::focused_table_location(editor, table_id)?;
     let bytes = editor.to_bytes()?;
@@ -268,18 +268,18 @@ fn focused_table_sort_order_for_apply(editor: &Editor, table_id: u64) -> Result<
 #[cfg(test)]
 fn focused_sort_commit_editor(
     commit: &litchi_numbers::table::sort::transaction::Commit,
-) -> Result<Editor> {
+) -> Result<Draft> {
     let mut bytes = Vec::new();
     commit
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    Editor::from_bytes(&bytes)
+    Draft::from_bytes(&bytes)
 }
 
 /// Read an attached native iWork table's persisted sort-rule configuration.
 pub(crate) fn table_sort_order_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<Option<Order>> {
     read_attached_table_sort_order(package, table_id)
@@ -291,7 +291,7 @@ pub(crate) fn table_sort_order_in_package(
 /// to the table so presentation-specific editors can preserve it while they
 /// validate their own ownership graph.
 pub(crate) fn apply_table_sort_order_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     order: &Order,
 ) -> Result<bool> {
@@ -300,7 +300,7 @@ pub(crate) fn apply_table_sort_order_in_package(
 
 /// Execute a validated selected-row sort on an attached native iWork table.
 pub(crate) fn apply_table_sort_order_to_rows_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     order: &Order,
     rows: RowRange,
@@ -309,7 +309,7 @@ pub(crate) fn apply_table_sort_order_to_rows_in_package(
 }
 
 pub(super) fn read_attached_table_sort_order(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<Option<Order>> {
     let descriptor = attached_table_descriptor(package, table_id)?;
@@ -322,7 +322,7 @@ pub(super) fn read_attached_table_sort_order(
 }
 
 fn read_native_table_sort_order(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &TableDescriptor,
 ) -> Result<Option<codec::SortOrderSnapshot>> {
     let locations = object_locations(package)?;
@@ -346,7 +346,7 @@ fn read_native_table_sort_order(
     )
 }
 
-fn update_table_sort_order<F>(package: &mut IWorkPackage, table_id: u64, update: F) -> Result<()>
+fn update_table_sort_order<F>(package: &mut HostPackage, table_id: u64, update: F) -> Result<()>
 where
     F: FnOnce(&[u8], &TableModelArchive) -> Result<Vec<u8>>,
 {
@@ -389,7 +389,7 @@ fn validate_sort_order(model: &TableModelArchive, order: &Order) -> Result<()> {
 
 /// Validate that a table has either no sort order or a supported full-table order.
 pub(super) fn validate_table_sort_order_for_topology(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<()> {
     let descriptor = attached_table_descriptor(package, table_id)?;
@@ -414,7 +414,7 @@ pub(super) fn validate_table_sort_order_for_topology(
 /// deleted earlier column. A rule therefore belongs to its physical slot
 /// rather than following the cells that shift through that slot.
 pub(super) fn delete_table_sort_column(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     column: usize,
     new_columns: usize,

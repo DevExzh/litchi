@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("audio path has no UTF-8 basename")?;
     let body = "Source-built Pages audio";
     let anchor = body.encode_utf16().count();
-    let mut editor = pages::Editor::create_with_text(body)?;
+    let mut editor = pages::Draft::create_with_text(body)?;
     let created = editor.add_body_audio(
         anchor,
         preferred_filename,

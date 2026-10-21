@@ -2,7 +2,7 @@
 //!
 //! These helpers keep archive traversal, wire updates, and package graph
 //! mutations behind the semantic editor facade. They are crate-visible only;
-//! consumers operate through the typed [`super::Editor`] API.
+//! consumers operate through the typed [`super::Draft`] API.
 
 use super::*;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
@@ -11,7 +11,7 @@ use litchi_iwa_common::table::cell::{BorderSide, Borders, layout::Layout};
 use litchi_numbers::table::dimension::{Dimension, Size};
 
 pub(crate) fn set_table_cell_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -23,7 +23,7 @@ pub(crate) fn set_table_cell_in_package(
 }
 
 pub(crate) fn table_cell_borders_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -32,7 +32,7 @@ pub(crate) fn table_cell_borders_in_package(
 }
 
 pub(crate) fn table_cell_fill_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -41,7 +41,7 @@ pub(crate) fn table_cell_fill_in_package(
 }
 
 pub(crate) fn table_cell_layout_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -50,7 +50,7 @@ pub(crate) fn table_cell_layout_in_package(
 }
 
 pub(crate) fn table_cell_text_alignment_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -59,7 +59,7 @@ pub(crate) fn table_cell_text_alignment_in_package(
 }
 
 pub(crate) fn set_table_cell_text_alignment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -69,7 +69,7 @@ pub(crate) fn set_table_cell_text_alignment_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_alignment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -78,7 +78,7 @@ pub(crate) fn reset_table_cell_text_alignment_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_line_spacing_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -87,7 +87,7 @@ pub(crate) fn table_cell_paragraph_line_spacing_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -97,7 +97,7 @@ pub(crate) fn set_table_cell_paragraph_line_spacing_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_line_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -106,7 +106,7 @@ pub(crate) fn reset_table_cell_paragraph_line_spacing_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_spacing_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -115,7 +115,7 @@ pub(crate) fn table_cell_paragraph_spacing_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -125,7 +125,7 @@ pub(crate) fn set_table_cell_paragraph_spacing_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -134,7 +134,7 @@ pub(crate) fn reset_table_cell_paragraph_spacing_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -143,7 +143,7 @@ pub(crate) fn table_cell_paragraph_list_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -153,7 +153,7 @@ pub(crate) fn set_table_cell_paragraph_list_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -162,7 +162,7 @@ pub(crate) fn reset_table_cell_paragraph_list_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_lists_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -171,7 +171,7 @@ pub(crate) fn table_cell_paragraph_lists_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_lists_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -181,7 +181,7 @@ pub(crate) fn set_table_cell_paragraph_lists_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_levels_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -190,7 +190,7 @@ pub(crate) fn table_cell_paragraph_list_levels_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_level_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -201,7 +201,7 @@ pub(crate) fn set_table_cell_paragraph_list_level_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -211,7 +211,7 @@ pub(crate) fn reset_table_cell_paragraph_list_level_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_numbering_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -221,7 +221,7 @@ pub(crate) fn table_cell_paragraph_list_numbering_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -234,7 +234,7 @@ pub(crate) fn set_table_cell_paragraph_list_numbering_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_number_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -244,7 +244,7 @@ pub(crate) fn table_cell_paragraph_list_number_format_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -257,7 +257,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -269,7 +269,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_format_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -279,7 +279,7 @@ pub(crate) fn table_cell_paragraph_list_number_tiering_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -292,7 +292,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_tiering_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -304,7 +304,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_tiering_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -314,7 +314,7 @@ pub(crate) fn table_cell_paragraph_list_number_scale_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -327,7 +327,7 @@ pub(crate) fn set_table_cell_paragraph_list_number_scale_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -339,7 +339,7 @@ pub(crate) fn reset_table_cell_paragraph_list_number_scale_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_bullet_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -349,7 +349,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -362,7 +362,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -372,7 +372,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -382,7 +382,7 @@ pub(crate) fn table_cell_paragraph_list_bullet_geometry_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -395,7 +395,7 @@ pub(crate) fn set_table_cell_paragraph_list_bullet_geometry_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -407,7 +407,7 @@ pub(crate) fn reset_table_cell_paragraph_list_bullet_geometry_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_indentation_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -417,7 +417,7 @@ pub(crate) fn table_cell_paragraph_list_indentation_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_indentation_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -435,7 +435,7 @@ pub(crate) fn set_table_cell_paragraph_list_indentation_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -445,7 +445,7 @@ pub(crate) fn reset_table_cell_paragraph_list_indentation_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_list_label_color_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -455,7 +455,7 @@ pub(crate) fn table_cell_paragraph_list_label_color_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -468,7 +468,7 @@ pub(crate) fn set_table_cell_paragraph_list_label_color_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -478,7 +478,7 @@ pub(crate) fn reset_table_cell_paragraph_list_label_color_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_indents_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -487,7 +487,7 @@ pub(crate) fn table_cell_paragraph_indents_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_indents_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -497,7 +497,7 @@ pub(crate) fn set_table_cell_paragraph_indents_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_indents_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -506,7 +506,7 @@ pub(crate) fn reset_table_cell_paragraph_indents_in_package(
 }
 
 pub(crate) fn table_cell_paragraph_tab_stops_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -515,7 +515,7 @@ pub(crate) fn table_cell_paragraph_tab_stops_in_package(
 }
 
 pub(crate) fn set_table_cell_paragraph_tab_stops_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -525,7 +525,7 @@ pub(crate) fn set_table_cell_paragraph_tab_stops_in_package(
 }
 
 pub(crate) fn reset_table_cell_paragraph_tab_stops_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -534,7 +534,7 @@ pub(crate) fn reset_table_cell_paragraph_tab_stops_in_package(
 }
 
 pub(crate) fn table_cell_text_background_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -543,7 +543,7 @@ pub(crate) fn table_cell_text_background_in_package(
 }
 
 pub(crate) fn set_table_cell_text_background_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -553,7 +553,7 @@ pub(crate) fn set_table_cell_text_background_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_background_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -562,7 +562,7 @@ pub(crate) fn reset_table_cell_text_background_in_package(
 }
 
 pub(crate) fn table_cell_text_baseline_shift_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -571,7 +571,7 @@ pub(crate) fn table_cell_text_baseline_shift_in_package(
 }
 
 pub(crate) fn set_table_cell_text_baseline_shift_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -581,7 +581,7 @@ pub(crate) fn set_table_cell_text_baseline_shift_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_baseline_shift_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -590,7 +590,7 @@ pub(crate) fn reset_table_cell_text_baseline_shift_in_package(
 }
 
 pub(crate) fn table_cell_text_capitalization_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -599,7 +599,7 @@ pub(crate) fn table_cell_text_capitalization_in_package(
 }
 
 pub(crate) fn set_table_cell_text_capitalization_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -609,7 +609,7 @@ pub(crate) fn set_table_cell_text_capitalization_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_capitalization_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -618,7 +618,7 @@ pub(crate) fn reset_table_cell_text_capitalization_in_package(
 }
 
 pub(crate) fn table_cell_text_character_spacing_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -627,7 +627,7 @@ pub(crate) fn table_cell_text_character_spacing_in_package(
 }
 
 pub(crate) fn set_table_cell_text_character_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -637,7 +637,7 @@ pub(crate) fn set_table_cell_text_character_spacing_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_character_spacing_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -646,7 +646,7 @@ pub(crate) fn reset_table_cell_text_character_spacing_in_package(
 }
 
 pub(crate) fn table_cell_text_color_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -655,7 +655,7 @@ pub(crate) fn table_cell_text_color_in_package(
 }
 
 pub(crate) fn set_table_cell_text_color_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -665,7 +665,7 @@ pub(crate) fn set_table_cell_text_color_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_color_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -674,7 +674,7 @@ pub(crate) fn reset_table_cell_text_color_in_package(
 }
 
 pub(crate) fn table_cell_text_decorations_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -683,7 +683,7 @@ pub(crate) fn table_cell_text_decorations_in_package(
 }
 
 pub(crate) fn set_table_cell_text_decorations_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -693,7 +693,7 @@ pub(crate) fn set_table_cell_text_decorations_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_decorations_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -702,7 +702,7 @@ pub(crate) fn reset_table_cell_text_decorations_in_package(
 }
 
 pub(crate) fn table_cell_text_font_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -711,7 +711,7 @@ pub(crate) fn table_cell_text_font_in_package(
 }
 
 pub(crate) fn set_table_cell_text_font_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -721,7 +721,7 @@ pub(crate) fn set_table_cell_text_font_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_font_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -730,7 +730,7 @@ pub(crate) fn reset_table_cell_text_font_in_package(
 }
 
 pub(crate) fn table_cell_text_ligatures_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -739,7 +739,7 @@ pub(crate) fn table_cell_text_ligatures_in_package(
 }
 
 pub(crate) fn set_table_cell_text_ligatures_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -749,7 +749,7 @@ pub(crate) fn set_table_cell_text_ligatures_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_ligatures_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -758,7 +758,7 @@ pub(crate) fn reset_table_cell_text_ligatures_in_package(
 }
 
 pub(crate) fn table_cell_text_outline_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -767,7 +767,7 @@ pub(crate) fn table_cell_text_outline_in_package(
 }
 
 pub(crate) fn set_table_cell_text_outline_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -777,7 +777,7 @@ pub(crate) fn set_table_cell_text_outline_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_outline_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -786,7 +786,7 @@ pub(crate) fn reset_table_cell_text_outline_in_package(
 }
 
 pub(crate) fn table_cell_text_script_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -795,7 +795,7 @@ pub(crate) fn table_cell_text_script_in_package(
 }
 
 pub(crate) fn set_table_cell_text_script_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -805,7 +805,7 @@ pub(crate) fn set_table_cell_text_script_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_script_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -814,7 +814,7 @@ pub(crate) fn reset_table_cell_text_script_in_package(
 }
 
 pub(crate) fn table_cell_text_shadow_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -823,7 +823,7 @@ pub(crate) fn table_cell_text_shadow_in_package(
 }
 
 pub(crate) fn set_table_cell_text_shadow_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -833,7 +833,7 @@ pub(crate) fn set_table_cell_text_shadow_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_shadow_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -842,7 +842,7 @@ pub(crate) fn reset_table_cell_text_shadow_in_package(
 }
 
 pub(crate) fn table_cell_text_style_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -851,7 +851,7 @@ pub(crate) fn table_cell_text_style_in_package(
 }
 
 pub(crate) fn set_table_cell_text_style_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -861,7 +861,7 @@ pub(crate) fn set_table_cell_text_style_in_package(
 }
 
 pub(crate) fn reset_table_cell_text_style_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -870,7 +870,7 @@ pub(crate) fn reset_table_cell_text_style_in_package(
 }
 
 pub(crate) fn common_table_cell_number_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -879,7 +879,7 @@ pub(crate) fn common_table_cell_number_format_in_package(
 }
 
 pub(crate) fn set_common_table_cell_number_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -889,7 +889,7 @@ pub(crate) fn set_common_table_cell_number_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_number_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -898,7 +898,7 @@ pub(crate) fn reset_table_cell_number_format_in_package(
 }
 
 pub(crate) fn table_cell_custom_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -907,7 +907,7 @@ pub(crate) fn table_cell_custom_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_custom_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -916,7 +916,7 @@ pub(crate) fn reset_table_cell_custom_format_in_package(
 }
 
 pub(crate) fn table_cell_currency_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -925,7 +925,7 @@ pub(crate) fn table_cell_currency_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_currency_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -934,7 +934,7 @@ pub(crate) fn reset_table_cell_currency_format_in_package(
 }
 
 pub(crate) fn table_cell_data_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -943,7 +943,7 @@ pub(crate) fn table_cell_data_format_in_package(
 }
 
 pub(crate) fn set_table_cell_data_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -953,7 +953,7 @@ pub(crate) fn set_table_cell_data_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_data_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -962,7 +962,7 @@ pub(crate) fn reset_table_cell_data_format_in_package(
 }
 
 pub(crate) fn table_cell_percentage_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -971,7 +971,7 @@ pub(crate) fn table_cell_percentage_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_percentage_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -980,7 +980,7 @@ pub(crate) fn reset_table_cell_percentage_format_in_package(
 }
 
 pub(crate) fn table_cell_scientific_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -989,7 +989,7 @@ pub(crate) fn table_cell_scientific_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_scientific_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -998,7 +998,7 @@ pub(crate) fn reset_table_cell_scientific_format_in_package(
 }
 
 pub(crate) fn table_cell_fraction_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1007,7 +1007,7 @@ pub(crate) fn table_cell_fraction_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_fraction_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1016,7 +1016,7 @@ pub(crate) fn reset_table_cell_fraction_format_in_package(
 }
 
 pub(crate) fn table_cell_numeral_system_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1025,7 +1025,7 @@ pub(crate) fn table_cell_numeral_system_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_numeral_system_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1034,7 +1034,7 @@ pub(crate) fn reset_table_cell_numeral_system_format_in_package(
 }
 
 pub(crate) fn table_cell_date_time_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1043,7 +1043,7 @@ pub(crate) fn table_cell_date_time_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_date_time_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1052,7 +1052,7 @@ pub(crate) fn reset_table_cell_date_time_format_in_package(
 }
 
 pub(crate) fn table_cell_duration_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1061,7 +1061,7 @@ pub(crate) fn table_cell_duration_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_duration_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1073,7 +1073,7 @@ pub(crate) fn reset_table_cell_duration_format_in_package(
 // compatibility hosts. Numbers' public control methods route through the
 // focused selector-first owner and do not call these raw-ID helpers.
 pub(crate) fn table_cell_checkbox_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1082,7 +1082,7 @@ pub(crate) fn table_cell_checkbox_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_checkbox_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1091,7 +1091,7 @@ pub(crate) fn reset_table_cell_checkbox_format_in_package(
 }
 
 pub(crate) fn table_cell_star_rating_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1100,7 +1100,7 @@ pub(crate) fn table_cell_star_rating_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_star_rating_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1109,7 +1109,7 @@ pub(crate) fn reset_table_cell_star_rating_format_in_package(
 }
 
 pub(crate) fn table_cell_slider_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1118,7 +1118,7 @@ pub(crate) fn table_cell_slider_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_slider_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1127,7 +1127,7 @@ pub(crate) fn reset_table_cell_slider_format_in_package(
 }
 
 pub(crate) fn table_cell_stepper_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1136,7 +1136,7 @@ pub(crate) fn table_cell_stepper_format_in_package(
 }
 
 pub(crate) fn reset_table_cell_stepper_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1148,7 +1148,7 @@ pub(crate) fn reset_table_cell_stepper_format_in_package(
 /// control hosts. Numbers' public popup methods route through the focused
 /// selector-first owner in `semantic::table`.
 pub(crate) fn table_cell_pop_up_menu_format_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1167,7 +1167,7 @@ pub(crate) fn table_cell_pop_up_menu_format_in_package(
 /// Shared private adapter retained for the Pages and Keynote table-cell
 /// control hosts. Numbers' public reset method is retired.
 pub(crate) fn reset_table_cell_pop_up_menu_format_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1184,7 +1184,7 @@ pub(crate) fn reset_table_cell_pop_up_menu_format_in_package(
 }
 
 pub(crate) fn set_table_cell_layout_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1194,7 +1194,7 @@ pub(crate) fn set_table_cell_layout_in_package(
 }
 
 pub(crate) fn reset_table_cell_layout_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1203,7 +1203,7 @@ pub(crate) fn reset_table_cell_layout_in_package(
 }
 
 pub(crate) fn set_table_cell_fill_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1213,7 +1213,7 @@ pub(crate) fn set_table_cell_fill_in_package(
 }
 
 pub(crate) fn reset_table_cell_fill_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1222,7 +1222,7 @@ pub(crate) fn reset_table_cell_fill_in_package(
 }
 
 pub(crate) fn set_table_cell_border_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1233,14 +1233,14 @@ pub(crate) fn set_table_cell_border_in_package(
 }
 
 pub(crate) fn table_cell_merges_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<Vec<Region>> {
     cell_merge::regions_in_package(package, table_id)
 }
 
 pub(crate) fn merge_table_cells_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     region: Region,
 ) -> Result<()> {
@@ -1248,7 +1248,7 @@ pub(crate) fn merge_table_cells_in_package(
 }
 
 pub(crate) fn unmerge_table_cells_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     region: Region,
 ) -> Result<bool> {
@@ -1256,7 +1256,7 @@ pub(crate) fn unmerge_table_cells_in_package(
 }
 
 pub(crate) fn table_cell_comment_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1265,7 +1265,7 @@ pub(crate) fn table_cell_comment_in_package(
 }
 
 pub(crate) fn table_cell_conditional_highlighting_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1274,7 +1274,7 @@ pub(crate) fn table_cell_conditional_highlighting_in_package(
 }
 
 pub(crate) fn table_cell_conditional_highlight_rules_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1283,7 +1283,7 @@ pub(crate) fn table_cell_conditional_highlight_rules_in_package(
 }
 
 pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1292,7 +1292,7 @@ pub(crate) fn clear_table_cell_conditional_highlighting_in_package(
 }
 
 pub(crate) fn set_table_cell_conditional_highlighting_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1302,7 +1302,7 @@ pub(crate) fn set_table_cell_conditional_highlighting_in_package(
 }
 
 pub(crate) fn set_table_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1312,7 +1312,7 @@ pub(crate) fn set_table_cell_comment_in_package(
 }
 
 pub(crate) fn clear_table_cell_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1321,7 +1321,7 @@ pub(crate) fn clear_table_cell_comment_in_package(
 }
 
 pub(crate) fn table_cell_comment_replies_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1330,7 +1330,7 @@ pub(crate) fn table_cell_comment_replies_in_package(
 }
 
 pub(crate) fn add_table_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1340,7 +1340,7 @@ pub(crate) fn add_table_cell_comment_reply_in_package(
 }
 
 pub(crate) fn set_table_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1358,7 +1358,7 @@ pub(crate) fn set_table_cell_comment_reply_in_package(
 }
 
 pub(crate) fn remove_table_cell_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1374,7 +1374,7 @@ pub(crate) fn remove_table_cell_comment_reply_in_package(
 }
 
 pub(crate) fn set_table_formula_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1392,7 +1392,7 @@ pub(crate) fn set_table_formula_in_package(
 }
 
 pub(crate) fn resize_table_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     rows: usize,
     columns: usize,
@@ -1401,7 +1401,7 @@ pub(crate) fn resize_table_in_package(
 }
 
 pub(crate) fn table_dimensions_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<(usize, usize)> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
@@ -1420,7 +1420,7 @@ pub(crate) enum TableTopologyMutation {
 }
 
 impl TableTopologyMutation {
-    pub(crate) fn apply(self, package: &mut IWorkPackage, table_id: u64) -> Result<(usize, usize)> {
+    pub(crate) fn apply(self, package: &mut HostPackage, table_id: u64) -> Result<(usize, usize)> {
         let dimensions = table_dimensions_in_package(package, table_id)?;
         match self {
             Self::InsertRow(row) => Ok((
@@ -1438,7 +1438,7 @@ impl TableTopologyMutation {
 }
 
 pub(crate) fn insert_table_row_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     insertion: RowInsertion,
 ) -> Result<usize> {
@@ -1446,7 +1446,7 @@ pub(crate) fn insert_table_row_in_package(
 }
 
 pub(crate) fn insert_table_column_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     insertion: ColumnInsertion,
 ) -> Result<usize> {
@@ -1454,7 +1454,7 @@ pub(crate) fn insert_table_column_in_package(
 }
 
 pub(crate) fn remove_table_row_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     deletion: RowDeletion,
 ) -> Result<(usize, usize)> {
@@ -1462,7 +1462,7 @@ pub(crate) fn remove_table_row_in_package(
 }
 
 pub(crate) fn remove_table_column_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     deletion: ColumnDeletion,
 ) -> Result<(usize, usize)> {
@@ -1470,7 +1470,7 @@ pub(crate) fn remove_table_column_in_package(
 }
 
 pub(crate) fn set_table_dimension_size_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     dimension: Dimension,
     size: Size,
@@ -1479,14 +1479,14 @@ pub(crate) fn set_table_dimension_size_in_package(
 }
 
 pub(crate) fn table_size_points_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<(f32, f32)> {
     table_dimension::attached_table_size_points(package, table_id)
 }
 
 pub(crate) fn table_owned_object_ids_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> Result<Vec<u64>> {
     let descriptor = model::attached_table_descriptor(package, table_id)?;
@@ -1497,14 +1497,14 @@ pub(crate) fn table_owned_object_ids_in_package(
 }
 
 pub(crate) fn remove_table_formula_graph_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_context_ids: &[u64],
 ) -> Result<Vec<u64>> {
     formula_clone::remove_table_formula_graph_for_contexts(package, table_context_ids)
 }
 
 pub(crate) fn create_empty_table_graph_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     template_info_id: u64,
     template_model_id: u64,
     parent_id: u64,

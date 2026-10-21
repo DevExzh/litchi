@@ -351,14 +351,17 @@ fn unmapped_opaque_map_keys_reject_creation_atomically() -> TestResult {
     // corresponding DataInfo records absent. With map reservation, creation
     // chooses later IDs and the closure validator rejects the dangling keys;
     // without reservation it would capture both keys and incorrectly pass.
-    let probe = source.add_slide_movie(
-        SlideSelector::index(0),
-        "map-probe.mov",
-        &movie,
-        "map-probe.png",
-        &poster,
-        options()?,
-    )?;
+    let probe = source
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "map-probe.mov",
+            &movie,
+            "map-probe.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(probe.patch().created_data(), 2);
     let probe_content_identifier = data_identifier(probe.package(), &movie)?;
     let probe_poster_identifier = data_identifier(probe.package(), &poster)?;
@@ -397,14 +400,17 @@ fn unmapped_opaque_map_keys_reject_creation_atomically() -> TestResult {
         opaque_map_payload
     );
     let mapped = Package::from_bytes(&mapped_source)?;
-    let result = mapped.add_slide_movie(
-        SlideSelector::index(0),
-        "map-rejected.mov",
-        &movie,
-        "map-rejected.png",
-        &poster,
-        options()?,
-    );
+    let result = mapped
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "map-rejected.mov",
+            &movie,
+            "map-rejected.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit());
     assert!(
         matches!(
             result,
@@ -466,14 +472,17 @@ fn mapped_existing_assets_allow_fresh_movie_creation_and_inverse() -> TestResult
     let movie = fresh_movie(&source_movie);
     let poster = fresh_poster(&source_poster)?;
     let mapped = Package::from_bytes(&mapped_source)?;
-    let second = mapped.add_slide_movie(
-        SlideSelector::index(0),
-        "map-second.mov",
-        &movie,
-        "map-second.png",
-        &poster,
-        options()?,
-    )?;
+    let second = mapped
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "map-second.mov",
+            &movie,
+            "map-second.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(second.patch().created_data(), 2);
     let second_content_identifier = data_identifier(second.package(), &movie)?;
     let second_poster_identifier = data_identifier(second.package(), &poster)?;

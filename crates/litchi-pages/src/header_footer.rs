@@ -456,6 +456,6 @@ mod tests {
 /// Exact-source transactions for header and footer text.
 pub mod text {
     pub use crate::package::header_footer_text::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }

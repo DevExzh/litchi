@@ -28,7 +28,7 @@ fn stored_value(
         .ok_or_else(|| io::Error::other(format!("missing {table_name:?} cell {address}")).into())
 }
 
-fn table_ids(editor: &numbers::Editor) -> TestResult<HashSet<u64>> {
+fn table_ids(editor: &numbers::Draft) -> TestResult<HashSet<u64>> {
     Ok(editor
         .tables()?
         .into_iter()
@@ -73,7 +73,7 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
         source_value
     );
 
-    let reopened = numbers::Editor::from_bytes(&changed_bytes)?;
+    let reopened = numbers::Draft::from_bytes(&changed_bytes)?;
     let reopened_bytes = reopened.to_bytes()?;
     assert_eq!(
         stored_value(&reopened_bytes, 0, "Original", "B1")?,
@@ -150,7 +150,7 @@ fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_indepen
         "duplicating Alpha must not alias the duplicated Beta storage"
     );
 
-    let reopened = numbers::Editor::from_bytes(&changed_bytes)?;
+    let reopened = numbers::Draft::from_bytes(&changed_bytes)?;
     let reopened_bytes = reopened.to_bytes()?;
     assert_eq!(
         stored_value(&reopened_bytes, 0, "Alpha", "B1")?,

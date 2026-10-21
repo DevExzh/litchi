@@ -260,9 +260,11 @@ fn exercise_fixture(fixture: Fixture, command: &[u8]) {
             edit.replace(selector, source_for_operation.clone())
         },
         2 => {
-            observe_error(ItemError::SourcePositionNotFound {
-                position: selected_position,
-            });
+            observe_error(ItemError::Refused(
+                litchi::keynote::soundtrack::items::Refusal::SourcePositionNotFound {
+                    position: selected_position,
+                },
+            ));
             return;
         },
         _ if count > 0 => {
@@ -274,9 +276,11 @@ fn exercise_fixture(fixture: Fixture, command: &[u8]) {
             edit.remove(selector)
         },
         _ => {
-            observe_error(ItemError::SourcePositionNotFound {
-                position: selected_position,
-            });
+            observe_error(ItemError::Refused(
+                litchi::keynote::soundtrack::items::Refusal::SourcePositionNotFound {
+                    position: selected_position,
+                },
+            ));
             return;
         },
     };

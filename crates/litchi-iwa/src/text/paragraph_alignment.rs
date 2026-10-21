@@ -9,7 +9,7 @@ use crate::package_metadata::{
     next_object_identifier, release_package_identifier_suffix, set_package_last_object_identifier,
 };
 use crate::shapes::{RgbaColor, insert_style_variation, remove_style_variation};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use self::native::ParagraphStyleOverrides;
 pub(crate) use super::character::{
@@ -110,7 +110,7 @@ enum InheritedCharacterProperty {
     CharacterBackground(Background),
 }
 
-pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<TextStyle> {
+pub(super) fn text_style(package: &HostPackage, storage_id: u64) -> Result<TextStyle> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_style(package, storage.style_id)
 }
@@ -118,7 +118,7 @@ pub(super) fn text_style(package: &IWorkPackage, storage_id: u64) -> Result<Text
 pub(super) use paragraph_style_redefine::redefine_applied_named_paragraph_style;
 
 pub(super) fn set_text_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     style: TextStyle,
 ) -> Result<()> {
@@ -128,17 +128,17 @@ pub(super) fn set_text_style(
     set_property(package, storage_id, ParagraphProperty::TextStyle(style))
 }
 
-pub(super) fn reset_text_style(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_style(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextStyle)
 }
 
-pub(super) fn text_font(package: &IWorkPackage, storage_id: u64) -> Result<TextFont> {
+pub(super) fn text_font(package: &HostPackage, storage_id: u64) -> Result<TextFont> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_font(package, storage.style_id)
 }
 
 pub(super) fn set_text_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     font: TextFont,
 ) -> Result<()> {
@@ -148,17 +148,17 @@ pub(super) fn set_text_font(
     set_property(package, storage_id, ParagraphProperty::TextFont(font))
 }
 
-pub(super) fn reset_text_font(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_font(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextFont)
 }
 
-pub(super) fn text_decorations(package: &IWorkPackage, storage_id: u64) -> Result<TextDecorations> {
+pub(super) fn text_decorations(package: &HostPackage, storage_id: u64) -> Result<TextDecorations> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_decorations(package, storage.style_id)
 }
 
 pub(super) fn set_text_decorations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     decorations: TextDecorations,
 ) -> Result<()> {
@@ -172,17 +172,17 @@ pub(super) fn set_text_decorations(
     )
 }
 
-pub(super) fn reset_text_decorations(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_decorations(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextDecorations)
 }
 
-pub(super) fn text_color(package: &IWorkPackage, storage_id: u64) -> Result<RgbaColor> {
+pub(super) fn text_color(package: &HostPackage, storage_id: u64) -> Result<RgbaColor> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_color(package, storage.style_id)
 }
 
 pub(super) fn set_text_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     color: RgbaColor,
 ) -> Result<()> {
@@ -192,12 +192,12 @@ pub(super) fn set_text_color(
     set_property(package, storage_id, ParagraphProperty::TextColor(color))
 }
 
-pub(super) fn reset_text_color(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_color(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextColor)
 }
 
 pub(super) fn text_capitalization(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<TextCapitalization> {
     let storage = storage::locate(package, storage_id)?;
@@ -205,7 +205,7 @@ pub(super) fn text_capitalization(
 }
 
 pub(super) fn set_text_capitalization(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     capitalization: TextCapitalization,
 ) -> Result<()> {
@@ -220,7 +220,7 @@ pub(super) fn set_text_capitalization(
 }
 
 pub(super) fn reset_text_capitalization(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -230,13 +230,13 @@ pub(super) fn reset_text_capitalization(
     )
 }
 
-pub(super) fn text_script(package: &IWorkPackage, storage_id: u64) -> Result<TextScript> {
+pub(super) fn text_script(package: &HostPackage, storage_id: u64) -> Result<TextScript> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_script(package, storage.style_id)
 }
 
 pub(super) fn set_text_script(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     script: TextScript,
 ) -> Result<()> {
@@ -246,12 +246,12 @@ pub(super) fn set_text_script(
     set_property(package, storage_id, ParagraphProperty::TextScript(script))
 }
 
-pub(super) fn reset_text_script(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_script(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextScript)
 }
 
 pub(super) fn text_baseline_shift(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<TextBaselineShift> {
     let storage = storage::locate(package, storage_id)?;
@@ -259,7 +259,7 @@ pub(super) fn text_baseline_shift(
 }
 
 pub(super) fn set_text_baseline_shift(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     shift: TextBaselineShift,
 ) -> Result<()> {
@@ -274,7 +274,7 @@ pub(super) fn set_text_baseline_shift(
 }
 
 pub(super) fn reset_text_baseline_shift(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -285,7 +285,7 @@ pub(super) fn reset_text_baseline_shift(
 }
 
 pub(super) fn text_character_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<TextCharacterSpacing> {
     let storage = storage::locate(package, storage_id)?;
@@ -293,7 +293,7 @@ pub(super) fn text_character_spacing(
 }
 
 pub(super) fn set_text_character_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     spacing: TextCharacterSpacing,
 ) -> Result<()> {
@@ -308,7 +308,7 @@ pub(super) fn set_text_character_spacing(
 }
 
 pub(super) fn reset_text_character_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -318,13 +318,13 @@ pub(super) fn reset_text_character_spacing(
     )
 }
 
-pub(super) fn text_ligatures(package: &IWorkPackage, storage_id: u64) -> Result<TextLigatures> {
+pub(super) fn text_ligatures(package: &HostPackage, storage_id: u64) -> Result<TextLigatures> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_ligatures(package, storage.style_id)
 }
 
 pub(super) fn set_text_ligatures(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     ligatures: TextLigatures,
 ) -> Result<()> {
@@ -338,17 +338,17 @@ pub(super) fn set_text_ligatures(
     )
 }
 
-pub(super) fn reset_text_ligatures(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_ligatures(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TextLigatures)
 }
 
-pub(super) fn text_outline(package: &IWorkPackage, storage_id: u64) -> Result<Outline> {
+pub(super) fn text_outline(package: &HostPackage, storage_id: u64) -> Result<Outline> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_outline(package, storage.style_id)
 }
 
 pub(super) fn set_text_outline(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     outline: Outline,
 ) -> Result<()> {
@@ -362,17 +362,17 @@ pub(super) fn set_text_outline(
     )
 }
 
-pub(super) fn reset_text_outline(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_outline(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::CharacterOutline)
 }
 
-pub(super) fn text_shadow(package: &IWorkPackage, storage_id: u64) -> Result<Shadow> {
+pub(super) fn text_shadow(package: &HostPackage, storage_id: u64) -> Result<Shadow> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_shadow(package, storage.style_id)
 }
 
 pub(super) fn set_text_shadow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     shadow: Shadow,
 ) -> Result<()> {
@@ -386,17 +386,17 @@ pub(super) fn set_text_shadow(
     )
 }
 
-pub(super) fn reset_text_shadow(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_shadow(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::CharacterShadow)
 }
 
-pub(super) fn text_background(package: &IWorkPackage, storage_id: u64) -> Result<Background> {
+pub(super) fn text_background(package: &HostPackage, storage_id: u64) -> Result<Background> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_text_background(package, storage.style_id)
 }
 
 pub(super) fn set_text_background(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     background: Background,
 ) -> Result<()> {
@@ -410,7 +410,7 @@ pub(super) fn set_text_background(
     )
 }
 
-pub(super) fn reset_text_background(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_text_background(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(
         package,
         storage_id,
@@ -419,7 +419,7 @@ pub(super) fn reset_text_background(package: &mut IWorkPackage, storage_id: u64)
 }
 
 pub(super) fn paragraph_background(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphBackground> {
     let storage = storage::locate(package, storage_id)?;
@@ -427,7 +427,7 @@ pub(super) fn paragraph_background(
 }
 
 pub(super) fn set_paragraph_background(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     background: ParagraphBackground,
 ) -> Result<()> {
@@ -442,7 +442,7 @@ pub(super) fn set_paragraph_background(
 }
 
 pub(super) fn reset_paragraph_background(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -452,13 +452,13 @@ pub(super) fn reset_paragraph_background(
     )
 }
 
-pub(super) fn paragraph_borders(package: &IWorkPackage, storage_id: u64) -> Result<Borders> {
+pub(super) fn paragraph_borders(package: &HostPackage, storage_id: u64) -> Result<Borders> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_paragraph_borders(package, storage.style_id)
 }
 
 pub(super) fn set_paragraph_borders(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     borders: Borders,
 ) -> Result<()> {
@@ -468,17 +468,17 @@ pub(super) fn set_paragraph_borders(
     set_property(package, storage_id, ParagraphProperty::Borders(borders))
 }
 
-pub(super) fn reset_paragraph_borders(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_paragraph_borders(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Borders)
 }
 
-pub(super) fn paragraph_flow(package: &IWorkPackage, storage_id: u64) -> Result<ParagraphFlow> {
+pub(super) fn paragraph_flow(package: &HostPackage, storage_id: u64) -> Result<ParagraphFlow> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_paragraph_flow(package, storage.style_id)
 }
 
 pub(super) fn set_paragraph_flow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     flow: ParagraphFlow,
 ) -> Result<()> {
@@ -488,12 +488,12 @@ pub(super) fn set_paragraph_flow(
     set_property(package, storage_id, ParagraphProperty::Flow(flow))
 }
 
-pub(super) fn reset_paragraph_flow(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_paragraph_flow(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Flow)
 }
 
 pub(super) fn paragraph_writing_direction(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphWritingDirection> {
     let storage = storage::locate(package, storage_id)?;
@@ -501,7 +501,7 @@ pub(super) fn paragraph_writing_direction(
 }
 
 pub(super) fn set_paragraph_writing_direction(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     direction: ParagraphWritingDirection,
 ) -> Result<()> {
@@ -516,19 +516,19 @@ pub(super) fn set_paragraph_writing_direction(
 }
 
 pub(super) fn reset_paragraph_writing_direction(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::WritingDirection)
 }
 
-pub(super) fn paragraph_alignment(package: &IWorkPackage, storage_id: u64) -> Result<Alignment> {
+pub(super) fn paragraph_alignment(package: &HostPackage, storage_id: u64) -> Result<Alignment> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_alignment(package, storage.style_id)
 }
 
 pub(super) fn set_paragraph_alignment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     alignment: Alignment,
 ) -> Result<()> {
@@ -539,14 +539,14 @@ pub(super) fn set_paragraph_alignment(
 }
 
 pub(super) fn reset_paragraph_alignment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Alignment)
 }
 
 pub(super) fn paragraph_line_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LineSpacing> {
     let storage = storage::locate(package, storage_id)?;
@@ -554,7 +554,7 @@ pub(super) fn paragraph_line_spacing(
 }
 
 pub(super) fn set_paragraph_line_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     spacing: LineSpacing,
 ) -> Result<()> {
@@ -565,19 +565,19 @@ pub(super) fn set_paragraph_line_spacing(
 }
 
 pub(super) fn reset_paragraph_line_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::LineSpacing)
 }
 
-pub(super) fn paragraph_spacing(package: &IWorkPackage, storage_id: u64) -> Result<Spacing> {
+pub(super) fn paragraph_spacing(package: &HostPackage, storage_id: u64) -> Result<Spacing> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_spacing(package, storage.style_id)
 }
 
 pub(super) fn set_paragraph_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     spacing: Spacing,
 ) -> Result<()> {
@@ -587,17 +587,17 @@ pub(super) fn set_paragraph_spacing(
     set_property(package, storage_id, ParagraphProperty::Spacing(spacing))
 }
 
-pub(super) fn reset_paragraph_spacing(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_paragraph_spacing(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Spacing)
 }
 
-pub(super) fn paragraph_indents(package: &IWorkPackage, storage_id: u64) -> Result<Indents> {
+pub(super) fn paragraph_indents(package: &HostPackage, storage_id: u64) -> Result<Indents> {
     let storage = storage::locate(package, storage_id)?;
     native::inherited_indents(package, storage.style_id)
 }
 
 pub(super) fn set_paragraph_indents(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     indents: Indents,
 ) -> Result<()> {
@@ -607,12 +607,12 @@ pub(super) fn set_paragraph_indents(
     set_property(package, storage_id, ParagraphProperty::Indents(indents))
 }
 
-pub(super) fn reset_paragraph_indents(package: &mut IWorkPackage, storage_id: u64) -> Result<bool> {
+pub(super) fn reset_paragraph_indents(package: &mut HostPackage, storage_id: u64) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::Indents)
 }
 
 pub(super) fn paragraph_tab_stops(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphTabStops> {
     let storage = storage::locate(package, storage_id)?;
@@ -620,7 +620,7 @@ pub(super) fn paragraph_tab_stops(
 }
 
 pub(super) fn paragraph_decimal_tab_character(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphDecimalTabCharacter> {
     let storage = storage::locate(package, storage_id)?;
@@ -628,7 +628,7 @@ pub(super) fn paragraph_decimal_tab_character(
 }
 
 pub(crate) fn named_paragraph_styles(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<NamedParagraphStyle>> {
     let storage = storage::locate(package, storage_id)?;
@@ -636,14 +636,14 @@ pub(crate) fn named_paragraph_styles(
 }
 
 pub(crate) fn applied_named_paragraph_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<AppliedParagraphStyle> {
     paragraph_style_apply::applied_named_paragraph_style(package, storage_id)
 }
 
 pub(super) fn apply_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
@@ -651,7 +651,7 @@ pub(super) fn apply_named_paragraph_style(
 }
 
 pub(super) fn create_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     source: litchi_iwa_text::paragraph::style::ParagraphStyleId,
     name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
@@ -661,7 +661,7 @@ pub(super) fn create_named_paragraph_style(
 }
 
 pub(super) fn rename_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
     name: litchi_iwa_text::paragraph::style::ParagraphStyleName,
@@ -671,7 +671,7 @@ pub(super) fn rename_named_paragraph_style(
 }
 
 pub(super) fn delete_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     target: litchi_iwa_text::paragraph::style::ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
@@ -680,7 +680,7 @@ pub(super) fn delete_named_paragraph_style(
 }
 
 pub(super) fn paragraph_following_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphFollowingStyle> {
     let storage = storage::locate(package, storage_id)?;
@@ -688,7 +688,7 @@ pub(super) fn paragraph_following_style(
 }
 
 pub(super) fn set_paragraph_following_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     following_style: ParagraphFollowingStyle,
 ) -> Result<()> {
@@ -707,14 +707,14 @@ pub(super) fn set_paragraph_following_style(
 }
 
 pub(super) fn reset_paragraph_following_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::FollowingStyle)
 }
 
 pub(super) fn set_paragraph_decimal_tab_character(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     character: ParagraphDecimalTabCharacter,
 ) -> Result<()> {
@@ -729,7 +729,7 @@ pub(super) fn set_paragraph_decimal_tab_character(
 }
 
 pub(super) fn reset_paragraph_decimal_tab_character(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -740,7 +740,7 @@ pub(super) fn reset_paragraph_decimal_tab_character(
 }
 
 pub(super) fn paragraph_default_tab_interval(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ParagraphDefaultTabInterval> {
     let storage = storage::locate(package, storage_id)?;
@@ -748,7 +748,7 @@ pub(super) fn paragraph_default_tab_interval(
 }
 
 pub(super) fn set_paragraph_default_tab_interval(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     interval: ParagraphDefaultTabInterval,
 ) -> Result<()> {
@@ -763,7 +763,7 @@ pub(super) fn set_paragraph_default_tab_interval(
 }
 
 pub(super) fn reset_paragraph_default_tab_interval(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(
@@ -774,7 +774,7 @@ pub(super) fn reset_paragraph_default_tab_interval(
 }
 
 pub(super) fn set_paragraph_tab_stops(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     stops: &ParagraphTabStops,
 ) -> Result<()> {
@@ -789,14 +789,14 @@ pub(super) fn set_paragraph_tab_stops(
 }
 
 pub(super) fn reset_paragraph_tab_stops(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<bool> {
     reset_property(package, storage_id, ParagraphPropertyKind::TabStops)
 }
 
 fn set_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     property: ParagraphProperty<'_>,
 ) -> Result<()> {
@@ -891,7 +891,7 @@ fn set_property(
 }
 
 fn reset_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     kind: ParagraphPropertyKind,
 ) -> Result<bool> {
@@ -937,7 +937,7 @@ fn reset_property(
 }
 
 fn inherited_character_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     parent_style_id: u64,
     property: &ParagraphProperty<'_>,
 ) -> Result<InheritedCharacterProperty> {
@@ -1231,7 +1231,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: ParagraphProper
 }
 
 fn inherited_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
     kind: ParagraphPropertyKind,
 ) -> Result<ParagraphProperty<'static>> {
@@ -1312,7 +1312,7 @@ fn inherited_property(
 }
 
 fn validate_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     expected: ParagraphProperty<'_>,
 ) -> Result<()> {
@@ -1322,7 +1322,7 @@ fn validate_property(
 }
 
 fn validate_expected_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     expected: ParagraphProperty<'_>,
 ) -> Result<()> {

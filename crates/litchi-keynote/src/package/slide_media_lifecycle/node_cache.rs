@@ -49,9 +49,11 @@ pub(super) fn prepare_slide_node_build_cache(
     let slide_record = source
         .slide_record_at(selection.slide_position.get())
         .map_err(|_| Error::Read)?
-        .ok_or(Error::SlidePositionNotFound {
-            position: selection.slide_position,
-        })?;
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: selection.slide_position,
+            },
+        ))?;
     if slide_record.slide_identifier != selection.slide_identifier {
         return Err(Error::PatchConflict);
     }
@@ -155,9 +157,11 @@ pub(super) fn validate_candidate_package_node_cache(
     let slide_record = candidate
         .slide_record_at(selection.slide_position.get())
         .map_err(|_| Error::Read)?
-        .ok_or(Error::SlidePositionNotFound {
-            position: selection.slide_position,
-        })?;
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: selection.slide_position,
+            },
+        ))?;
     if slide_record.slide_identifier != selection.slide_identifier
         || slide_record.node_identifier == 0
     {
@@ -393,7 +397,7 @@ fn map_lifecycle_decode_error(error: lifecycle_codec::DecodeError) -> Error {
             (super::LimitKind::References, observed, maximum)
         },
         DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: super::LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -409,7 +413,7 @@ fn map_lifecycle_decode_error(error: lifecycle_codec::DecodeError) -> Error {
         Ok(value) => value,
         Err(_) => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -420,7 +424,7 @@ fn map_archive_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: super::LimitKind::Entries,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

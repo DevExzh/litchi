@@ -526,7 +526,7 @@ pub(super) struct ResolvedTableDataList {
 }
 
 pub(super) fn resolve_table_data_list(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     list_type: tst::table_data_list::ListType,
@@ -633,7 +633,7 @@ pub(super) fn resolve_table_data_list(
 /// Resolve only the requested plain-string entries without cloning an entire
 /// potentially large table string list.
 pub(super) fn resolve_table_string_values(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     requested_keys: &HashSet<u32>,
@@ -789,7 +789,7 @@ pub(super) fn resolve_table_string_values(
 /// This avoids cloning payloads when a caller only needs to distinguish an
 /// empty native allocation from storage that carries semantic content.
 pub(super) fn table_data_list_has_entries(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     list_type: tst::table_data_list::ListType,
@@ -1623,7 +1623,7 @@ pub(super) fn entry_object_references(entry: &tst::table_data_list::ListEntry) -
 }
 
 pub(super) fn rewind_table_data_list_next_id(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     resolved: &ResolvedTableDataList,
     list_type: tst::table_data_list::ListType,
     removed_key: u32,
@@ -1662,7 +1662,7 @@ pub(super) fn rewind_table_data_list_next_id(
 }
 
 pub(super) fn mutate_table_data_list_entry<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     resolved: &ResolvedTableDataList,
     owner: &TableDataListEntryOwner,
@@ -1834,7 +1834,7 @@ where
 }
 
 pub(super) fn increment_table_data_list_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     resolved: &ResolvedTableDataList,
     located: &LocatedTableDataListEntry,
@@ -1857,7 +1857,7 @@ pub(super) fn increment_table_data_list_entry(
 }
 
 pub(super) fn decrement_table_data_list_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     resolved: &ResolvedTableDataList,
     located: &LocatedTableDataListEntry,
@@ -1890,7 +1890,7 @@ pub(super) fn decrement_table_data_list_entry(
 }
 
 pub(super) fn rich_text_entry_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     identifier: u32,
@@ -1976,7 +1976,7 @@ pub(super) fn rich_text_entry_location(
 }
 
 pub(super) fn set_rich_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     identifier: u32,
@@ -2017,7 +2017,7 @@ pub(super) fn set_rich_text(
         if text_is_unchanged {
             return Ok(identifier);
         }
-        let mut text = IWorkTextEditor::from_package(package.clone());
+        let mut text = crate::text::Draft::from_package(package.clone());
         text.set_text(
             crate::text::native_storage_id(entry.storage_id)?,
             replacement,
@@ -2162,7 +2162,7 @@ pub(super) fn set_rich_text(
     })?;
 
     if !text_is_unchanged {
-        let mut text = IWorkTextEditor::from_package(package.clone());
+        let mut text = crate::text::Draft::from_package(package.clone());
         text.set_text(crate::text::native_storage_id(new_storage_id)?, replacement)?;
         *package = text.into_package();
     }
@@ -2170,7 +2170,7 @@ pub(super) fn set_rich_text(
 }
 
 pub(super) fn rich_text_payload_entry_count(
-    package: &IWorkPackage,
+    package: &HostPackage,
     payload_id: u64,
 ) -> Result<usize> {
     let mut count: usize = 0;
@@ -2316,7 +2316,7 @@ pub(super) fn remove_message_object_reference(
 }
 
 pub(super) fn release_rich_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     identifier: u32,
@@ -2353,7 +2353,7 @@ pub(super) fn release_rich_text(
 }
 
 pub(super) fn package_references_object(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<bool> {
@@ -2379,7 +2379,7 @@ pub(super) fn package_references_object(
 }
 
 pub(super) fn decrement_formula_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     identifier: u32,
@@ -2410,7 +2410,7 @@ pub(super) fn decrement_formula_table(
 }
 
 pub(super) fn rewrite_formula_table_entry<F>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     resolved: &ResolvedTableDataList,
     located: &LocatedTableDataListEntry,
     current_formula: &tsce::FormulaArchive,
@@ -2593,7 +2593,7 @@ where
 }
 
 pub(super) fn decrement_formula_error_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     identifier: u32,
@@ -2649,7 +2649,7 @@ pub(super) fn table_data_list_message_index(
 }
 
 pub(super) fn insert_formula_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     formula: tsce::FormulaArchive,
@@ -2715,7 +2715,7 @@ pub(super) fn insert_formula_table(
 }
 
 pub(super) fn set_encoded_cell_value(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -2742,7 +2742,7 @@ pub(super) fn set_encoded_cell_value(
 }
 
 pub(super) fn verify_formula_link(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -2962,7 +2962,7 @@ pub(super) fn rewrite_calculation_engine_formula_count_wire(
 }
 
 pub(super) fn update_formula_dependencies(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
     row: usize,
     column: usize,
@@ -3322,7 +3322,7 @@ pub(super) fn expanded_formula_edges(
 }
 
 pub(super) fn verify_formula_dependency(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_info_id: u64,
     row: usize,
     column: usize,
@@ -3402,7 +3402,7 @@ pub(super) fn verify_formula_dependency(
 }
 
 pub(super) fn decrement_old_string(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     old_string: Option<u32>,
@@ -3419,7 +3419,7 @@ pub(super) fn decrement_old_string(
     Ok(())
 }
 
-pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor>> {
+pub(super) fn table_models(package: &HostPackage) -> Result<Vec<TableDescriptor>> {
     let document = numbers_document(package)?;
     let locations = object_locations(package)?;
     let mut result = Vec::new();
@@ -3525,7 +3525,7 @@ pub(super) fn table_models(package: &IWorkPackage) -> Result<Vec<TableDescriptor
     Ok(result)
 }
 
-pub(super) fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, String>> {
+pub(super) fn object_locations(package: &HostPackage) -> Result<HashMap<u64, String>> {
     let mut locations = HashMap::new();
     for name in package.iwa_entry_names() {
         package.with_parsed_archive(name, |archive| {
@@ -3547,7 +3547,7 @@ pub(super) fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, St
 }
 
 pub(super) fn read_tile_cell(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     tile_id: u64,
     row: u32,
@@ -3576,7 +3576,7 @@ pub(super) fn read_tile_cell(
 }
 
 pub(super) fn update_string_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     old_identifier: Option<u32>,
@@ -3678,7 +3678,7 @@ pub(super) fn update_string_table(
 }
 
 pub(super) fn update_tile(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     tile_id: u64,
     row: u32,
@@ -3899,7 +3899,7 @@ pub(super) fn update_tile(
 }
 
 pub(super) fn update_row_header(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     row: usize,
@@ -4388,7 +4388,7 @@ mod tests {
         assert_eq!(object.messages, before);
     }
 
-    fn formula_dependency_package(last_object_identifier: u64) -> IWorkPackage {
+    fn formula_dependency_package(last_object_identifier: u64) -> HostPackage {
         let owner = tsce::FormulaOwnerDependenciesArchive {
             formula_owner_uid: tsp::Uuid {
                 lower: 0x0200_0000_0000_0000,
@@ -4472,7 +4472,7 @@ mod tests {
             ],
         };
 
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/CalculationEngine.iwa", &calculation_engine)
             .unwrap();

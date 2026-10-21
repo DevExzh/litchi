@@ -947,6 +947,8 @@ fn selector_first_deletion_is_exact_applicable_and_reversible() -> TestResult<()
     let commit = edit.commit()?;
     assert_eq!(names(commit.package())?, ["Plan", "Evidence"]);
     assert_eq!(commit.patch().position(), Position::new(0));
+    assert!(!commit.patch().is_noop());
+    assert!(!commit.patch().inverse().is_noop());
     assert_ne!(
         commit.patch().source_fingerprint(),
         commit.patch().target_fingerprint()
@@ -1019,18 +1021,18 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut missing_position = package.edit_slide_deletion();
     assert!(matches!(
         missing_position.remove_slide(Position::new(99)),
-        Err(delete::Error::SlidePositionNotFound { position })
+        Err(delete::Error::Refused(delete::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(99)
     ));
     let mut missing_name = package.edit_slide_deletion();
     assert!(matches!(
         missing_name.remove_slide("Missing"),
-        Err(delete::Error::SlideNameNotFound)
+        Err(delete::Error::Refused(delete::Refusal::SlideNameNotFound))
     ));
     let mut empty_name = package.edit_slide_deletion();
     assert!(matches!(
         empty_name.remove_slide(""),
-        Err(delete::Error::EmptySlideName)
+        Err(delete::Error::Refused(delete::Refusal::EmptySlideName))
     ));
 
     let ambiguous_bytes = package_bytes(&["Same", "Same", "Other"], MetadataMode::Exact)?;
@@ -1038,7 +1040,7 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut ambiguous_edit = ambiguous.edit_slide_deletion();
     assert!(matches!(
         ambiguous_edit.remove_slide("Same"),
-        Err(delete::Error::AmbiguousSelector)
+        Err(delete::Error::Refused(delete::Refusal::AmbiguousSelector))
     ));
 
     let one_bytes = package_bytes(&["Only"], MetadataMode::Exact)?;
@@ -1046,18 +1048,22 @@ fn selectors_final_slide_and_transaction_state_fail_closed() -> TestResult<()> {
     let mut final_edit = one.edit_slide_deletion();
     assert!(matches!(
         final_edit.remove_slide(0usize),
-        Err(delete::Error::CannotDeleteFinalSlide)
+        Err(delete::Error::Refused(
+            delete::Refusal::CannotDeleteFinalSlide
+        ))
     ));
 
     let mut staged = package.edit_slide_deletion();
     staged.remove_slide(0usize)?;
     assert!(matches!(
         staged.remove_slide(1usize),
-        Err(delete::Error::OperationAlreadyStaged)
+        Err(delete::Error::Refused(
+            delete::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert!(matches!(
         package.edit_slide_deletion().commit(),
-        Err(delete::Error::NoStagedOperation)
+        Err(delete::Error::Refused(delete::Refusal::NoStagedOperation))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1075,7 +1081,7 @@ fn surviving_inbound_reference_refuses_before_publication() -> TestResult<()> {
         let mut edit = package.edit_slide_deletion();
         edit.remove_slide("Intro")?;
         match edit.commit() {
-            Err(delete::Error::AmbiguousOwnership) => {},
+            Err(delete::Error::Refused(delete::Refusal::AmbiguousOwnership)) => {},
             Err(error) => panic!("{mode:?} returned {error:?}"),
             Ok(_) => panic!("{mode:?} unexpectedly committed"),
         }

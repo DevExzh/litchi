@@ -1290,8 +1290,10 @@ fn native_comment_removal_oracles_retain_authors_and_cull_only_final_edge() -> T
 fn duplicate_selected_native_commented_movie_preserves_comment_graph() -> TestResult {
     let source_package = Package::from_bytes(NATIVE_COMMENT_BASELINE)?;
     let source = exact_bytes(&source_package)?;
-    let commit =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(exact_bytes(&source_package)?, source);
     let candidates = native_commented_media_ids(&candidate)?;
@@ -1356,8 +1358,10 @@ fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph(
     let source_author_ids = native_annotation_author_ids(&source)?;
     let source_author_storage_ids = native_annotation_author_storage_ids(&source)?;
 
-    let duplicate =
-        source_package.duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))?;
+    let duplicate = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_audio(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     assert!(!duplicate.patch().is_noop());
     assert_eq!(exact_bytes(&source_package)?, source);
     let duplicate_bytes = exact_bytes(duplicate.package())?;
@@ -1408,7 +1412,9 @@ fn duplicate_and_remove_selected_native_commented_audio_preserves_comment_graph(
     // duplication appends the clone after the two existing movies.
     let removed = duplicate
         .package()
-        .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(4))?;
+        .edit_slide_media_lifecycle()
+        .remove_audio(SlideSelector::index(0), MovieSelector::index(4))
+        .and_then(|edit| edit.commit())?;
     assert!(!removed.patch().is_noop());
     assert_eq!(exact_bytes(duplicate.package())?, duplicate_bytes);
     let removed_bytes = exact_bytes(removed.package())?;
@@ -1459,8 +1465,10 @@ fn duplicate_selected_commented_movie_clones_synthetic_replies() -> TestResult {
     let source = with_native_reply_graph(NATIVE_COMMENT_BASELINE, false)?;
     let source_package = Package::from_bytes(&source)?;
     let before = exact_bytes(&source_package)?;
-    let commit =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_eq!(exact_bytes(&source_package)?, before);
     let clone_movie = native_commented_media_ids(&candidate)?
@@ -1515,8 +1523,10 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
     assert!(source_author_ids.contains(&NATIVE_COMMENT_AUTHOR));
     assert!(source_author_storage_ids.contains(&NATIVE_COMMENT_AUTHOR_STORAGE));
 
-    let duplicate =
-        source_package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let duplicate = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let duplicate_bytes = exact_bytes(duplicate.package())?;
     let clone_movie = native_commented_media_ids(&duplicate_bytes)?
         .into_iter()
@@ -1527,7 +1537,9 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
 
     let shared = duplicate
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let shared_bytes = exact_bytes(shared.package())?;
     assert_eq!(
         native_media_ids(&shared_bytes)?,
@@ -1561,7 +1573,9 @@ fn selected_native_commented_movie_removal_culls_storage_and_reuses_author_until
 
     let final_removal = shared
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(3))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(final_removal.package())?;
     assert_eq!(
         native_media_ids(&final_bytes)?,
@@ -1622,8 +1636,10 @@ fn remove_selected_commented_movie_with_synthetic_reply_graph_is_atomic_and_reve
         .find(|node| node.identifier == SYNTHETIC_REPLY_ID)
         .ok_or_else(|| io::Error::other("reply fixture has no synthetic reply"))?;
 
-    let removal =
-        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let removal = source_package
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(removal.package())?;
     assert_eq!(native_commented_media_ids(&candidate)?, Vec::<u64>::new());
     assert_eq!(
@@ -1669,8 +1685,10 @@ fn remove_shared_comment_root_preserves_replies_until_final_media_owner() -> Tes
         root_identifier
     );
 
-    let first_removal =
-        source_package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let first_removal = source_package
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let first_bytes = exact_bytes(first_removal.package())?;
     assert_eq!(
         native_media_ids(&first_bytes)?,
@@ -1707,7 +1725,9 @@ fn remove_shared_comment_root_preserves_replies_until_final_media_owner() -> Tes
 
     let final_removal = first_removal
         .package()
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(final_removal.package())?;
     assert_eq!(
         native_media_ids(&final_bytes)?,
@@ -1761,7 +1781,10 @@ fn remove_selected_comment_rejects_surviving_movie_payload_header_mismatch_atomi
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1806,7 +1829,10 @@ fn remove_selected_comment_rejects_surviving_movie_payload_missing_target_atomic
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1823,7 +1849,10 @@ fn remove_selected_comment_rejects_unselected_reply_payload_header_mismatch_atom
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1855,7 +1884,10 @@ fn remove_selected_comment_rejects_unselected_reply_payload_missing_target_atomi
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1868,7 +1900,10 @@ fn duplicate_selected_native_commented_movie_rejects_reply_cycles_atomically() -
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1881,7 +1916,10 @@ fn duplicate_selected_native_commented_movie_rejects_malformed_reply_atomically(
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1895,7 +1933,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_root_reply_referenc
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1919,7 +1960,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_archive_info_atomic
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1942,7 +1986,10 @@ fn remove_native_movie_rejects_unknown_surviving_archive_info_atomically() -> Te
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(3)),
+        package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(3))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1959,7 +2006,10 @@ fn duplicate_selected_native_commented_movie_rejects_unknown_comment_reference_a
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -1976,7 +2026,10 @@ fn duplicate_selected_native_commented_movie_rejects_deprecated_comment_referenc
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
-        package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2)),
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit()),
         Err(SlideMediaLifecycleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);

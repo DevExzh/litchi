@@ -461,16 +461,18 @@ fn selector_validation_and_malformed_wire_fail_before_publication() -> TestResul
     let selector_package = Package::from_bytes(&selector_bytes)?;
     assert!(matches!(
         selector_package.edit_section_pagination(SectionSelector::name("Missing")),
-        Err(SectionPaginationError::NameNotFound)
+        Err(SectionPaginationError::Refused(
+            litchi_pages::section::pagination::transaction::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         selector_package.edit_section_pagination(SectionSelector::index(2)),
-        Err(SectionPaginationError::PositionNotFound { position })
+        Err(SectionPaginationError::Refused(litchi_pages::section::pagination::transaction::Refusal::PositionNotFound { position }))
             if position == Position::new(2)
     ));
     assert!(matches!(
         selector_package.edit_section_pagination(SectionSelector::name("Same")),
-        Err(SectionPaginationError::AmbiguousSelector { first, duplicate })
+        Err(SectionPaginationError::Refused(litchi_pages::section::pagination::transaction::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     let mut edit = selector_package.edit_section_pagination(SectionSelector::index(0))?;
@@ -556,7 +558,9 @@ fn no_op_supports_legacy_but_changed_legacy_source_is_refused() -> TestResult<()
     changed.set_start(Some(Start::LeftPage))?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionPaginationError::UnsupportedSource)
+        Err(SectionPaginationError::Refused(
+            litchi_pages::section::pagination::transaction::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -701,7 +705,7 @@ fn changed_pagination_respects_retained_output_limit() -> TestResult<()> {
     limited_edit.set_pagination(target)?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(SectionPaginationError::LimitExceeded {
+        Err(SectionPaginationError::Limit {
             kind: SectionPaginationLimitKind::OutputBytes,
             ..
         })

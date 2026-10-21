@@ -201,7 +201,9 @@ fn verify_placeholder_contract(package: &Package) {
         package.edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(4));
     assert!(matches!(
         error,
-        Err(SlideMediaPropertiesError::WrongMediaKind)
+        Err(SlideMediaPropertiesError::Refused(
+            litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+        ))
     ));
     assert_eq!(package_bytes(package), source_bytes);
 }
@@ -235,7 +237,12 @@ fn read_movie_inventory(package: &Package, source_bytes: &[u8]) -> Option<Vec<Mo
             let error = package
                 .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(index));
             assert!(
-                matches!(error, Err(SlideMediaPropertiesError::WrongMediaKind)),
+                matches!(
+                    error,
+                    Err(SlideMediaPropertiesError::Refused(
+                        litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+                    ))
+                ),
                 "non-file/audio movie properties must remain read-only"
             );
             assert_eq!(package_bytes(package), source_bytes);

@@ -28,7 +28,7 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{tsch, tsp, tss};
 use crate::wire::{append_varint_field, parse_wire_fields, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding generated chart-series non-style properties.
 pub(crate) const GENERATED_CHART_SERIES_NON_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -63,7 +63,7 @@ struct ChartSeriesNonStyleGraph {
 
 /// Read one typed value for each series in chart series order.
 pub(crate) fn chart_series_non_style_values<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -86,7 +86,7 @@ where
 
 /// Set one typed value for each series in chart series order.
 pub(crate) fn set_chart_series_non_style_values<T>(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -366,7 +366,7 @@ where
 }
 
 fn allocate_series_non_style_identifier(
-    package: &IWorkPackage,
+    package: &HostPackage,
     next_identifier: &mut u64,
     base: NewChartSeriesNonStyleBase,
     object_container: &mut Option<ObjectContainerAllocation>,
@@ -382,7 +382,7 @@ fn allocate_series_non_style_identifier(
 }
 
 fn chart_stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -448,7 +448,7 @@ fn chart_stylesheet_id(
 }
 
 fn read_values_from_graph<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     graph: &ChartSeriesNonStyleGraph,
     default: &T,
     read: &impl Fn(&[u8]) -> Result<T>,
@@ -467,7 +467,7 @@ where
 }
 
 fn chart_series_non_style_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -562,7 +562,7 @@ fn chart_series_non_style_graph(
 }
 
 impl ChartSeriesNonStyleSlot {
-    fn read<T>(&self, package: &IWorkPackage, read: impl FnOnce(&[u8]) -> Result<T>) -> Result<T> {
+    fn read<T>(&self, package: &HostPackage, read: impl FnOnce(&[u8]) -> Result<T>) -> Result<T> {
         let archive = package.archive(&self.archive_name)?;
         let object = archive.object(self.object_id).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -585,7 +585,7 @@ impl ChartSeriesNonStyleSlot {
         read(message.data.as_slice())
     }
 
-    fn replace(&self, package: &mut IWorkPackage, data: Vec<u8>) -> Result<()> {
+    fn replace(&self, package: &mut HostPackage, data: Vec<u8>) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {
             let object = archive.object_mut(self.object_id).ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -616,7 +616,7 @@ impl ChartSeriesNonStyleSlot {
         })
     }
 
-    fn owner_count(&self, package: &IWorkPackage) -> Result<usize> {
+    fn owner_count(&self, package: &HostPackage) -> Result<usize> {
         let mut owner_count = 0usize;
         for archive_name in package.iwa_entry_names() {
             let archive = package.archive(archive_name)?;
@@ -649,7 +649,7 @@ impl ChartSeriesNonStyleSlot {
 }
 
 fn patch_chart_series_non_style_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -730,7 +730,7 @@ fn patch_chart_series_non_style_references(
 }
 
 fn update_component_registrations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     removals: &[ChartSeriesNonStyleSlot],
     chart_created_ids: &[u64],

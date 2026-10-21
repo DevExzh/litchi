@@ -7,7 +7,7 @@ use crate::charts::radar_grid_shape::{
     set_chart_radar_grid_shape as set_native_chart_radar_grid_shape,
 };
 
-impl Editor {
+impl Draft {
     /// Read one radar chart's `Radar Chart Grid Shape`.
     pub fn slide_chart_radar_grid_shape(
         &self,
@@ -51,7 +51,7 @@ impl Editor {
             graph.info.kind,
             shape,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_radar_grid_shape(slide_index, drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Keynote radar chart grid-shape update failed validation".to_owned(),
@@ -90,7 +90,7 @@ mod tests {
                 ChartRadarGridShape::Curved,
             )
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_radar_grid_shape(0, chart.drawable_object_id)

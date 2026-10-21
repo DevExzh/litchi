@@ -922,7 +922,7 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
 
     let changed_edit = package.edit_body_table_appearance(0usize)?;
     let changed = changed_edit.set(changed_appearance()).commit();
-    assert!(matches!(changed, Err(Error::LimitExceeded { .. })));
+    assert!(matches!(changed, Err(Error::Limit { .. })));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -1070,7 +1070,10 @@ fn locked_table_allows_exact_noop_but_refuses_change_atomically() -> TestResult 
         .expect_err("locked appearance must reject changes");
     assert!(matches!(
         error,
-        Error::TableLocked { .. } | Error::UnsupportedDependency { .. }
+        Error::Refused(litchi_pages::table::appearance::transaction::Refusal::TableLocked { .. })
+            | Error::Refused(
+                litchi_pages::table::appearance::transaction::Refusal::UnsupportedDependency { .. }
+            )
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -1200,7 +1203,7 @@ fn finite_ingress_and_semantic_limits_refuse_before_publication() -> TestResult 
         let result = package
             .edit_body_table_appearance(0usize)
             .and_then(|edit| edit.set(changed_appearance()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before);
             refused = true;
             break;

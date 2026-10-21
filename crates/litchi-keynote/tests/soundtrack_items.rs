@@ -797,7 +797,9 @@ fn lifecycle_patch_apply_inverse_and_foreign_source_conflict_are_exact() -> Test
     foreign_edit.remove(original_item.handle())?;
     assert!(matches!(
         foreign_edit.commit(),
-        Err(litchi_keynote::soundtrack::items::Error::ItemHandleConflict)
+        Err(litchi_keynote::soundtrack::items::Error::Refused(
+            litchi_keynote::soundtrack::items::Refusal::ItemHandleConflict
+        ))
     ));
     Ok(())
 }
@@ -834,14 +836,18 @@ fn empty_edit_and_invalid_positions_are_atomic() -> TestResult {
     let source = bytes(&package)?;
     assert!(matches!(
         package.edit_soundtrack_items()?.commit(),
-        Err(litchi_keynote::soundtrack::items::Error::NoStagedOperation)
+        Err(litchi_keynote::soundtrack::items::Error::Refused(
+            litchi_keynote::soundtrack::items::Refusal::NoStagedOperation
+        ))
     ));
 
     let mut already_staged = package.edit_soundtrack_items()?;
     already_staged.add(audio("first-new.wav", THIRD_AUDIO)?)?;
     assert!(matches!(
         already_staged.remove(Position::new(0)),
-        Err(litchi_keynote::soundtrack::items::Error::OperationAlreadyStaged)
+        Err(litchi_keynote::soundtrack::items::Error::Refused(
+            litchi_keynote::soundtrack::items::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     for stage in [0_u8, 1, 2] {

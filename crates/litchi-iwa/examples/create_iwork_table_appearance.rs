@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pages_table = BodyTableSelector::index(0);
     pages = set_focused_pages_table_appearance(pages, pages_table, APPEARANCE)?;
     pages.save(&pages_path)?;
-    let pages_package = PagesPackage::from_bytes(&pages::Editor::open(&pages_path)?.to_bytes()?)?;
+    let pages_package = PagesPackage::from_bytes(&pages::Draft::open(&pages_path)?.to_bytes()?)?;
     assert_eq!(
         pages_package.body_table_appearance(pages_table)?,
         APPEARANCE
@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     keynote = set_focused_keynote_table_appearance(keynote, APPEARANCE)?;
     keynote.save(&keynote_path)?;
     let keynote_package =
-        litchi_keynote::Package::from_bytes(&keynote::Editor::open(&keynote_path)?.to_bytes()?)?;
+        litchi_keynote::Package::from_bytes(&keynote::Draft::open(&keynote_path)?.to_bytes()?)?;
     assert_eq!(
         keynote_package.slide_table_appearance(
             litchi_keynote::SlideSelector::index(0),
@@ -123,9 +123,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_table_headers(
-    editor: numbers::Editor,
+    editor: numbers::Draft,
     settings: HeaderSettings,
-) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Draft, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -133,13 +133,13 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(numbers::Editor::from_bytes(&bytes)?)
+    Ok(numbers::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_numbers_table_appearance(
-    editor: numbers::Editor,
+    editor: numbers::Draft,
     appearance: Appearance,
-) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Draft, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_appearance(SheetSelector::index(0), TableSelector::index(0))?
@@ -147,11 +147,11 @@ fn set_focused_numbers_table_appearance(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(numbers::Editor::from_bytes(&bytes)?)
+    Ok(numbers::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_pages_table_headers(
-    editor: &mut pages::Editor,
+    editor: &mut pages::Draft,
     settings: PagesHeaderSettings,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
@@ -161,15 +161,15 @@ fn set_focused_pages_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = pages::Editor::from_bytes(&bytes)?;
+    *editor = pages::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn set_focused_pages_table_appearance(
-    editor: pages::Editor,
+    editor: pages::Draft,
     selector: BodyTableSelector<'static>,
     appearance: Appearance,
-) -> Result<pages::Editor, Box<dyn std::error::Error>> {
+) -> Result<pages::Draft, Box<dyn std::error::Error>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_body_table_appearance(selector)?
@@ -177,13 +177,13 @@ fn set_focused_pages_table_appearance(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(pages::Editor::from_bytes(&bytes)?)
+    Ok(pages::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_keynote_table_headers(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     settings: KeynoteHeaderSettings,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -194,13 +194,13 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(keynote::Editor::from_bytes(&bytes)?)
+    Ok(keynote::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_keynote_table_appearance(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     appearance: Appearance,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_appearance(
@@ -211,5 +211,5 @@ fn set_focused_keynote_table_appearance(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(keynote::Editor::from_bytes(&bytes)?)
+    Ok(keynote::Draft::from_bytes(&bytes)?)
 }

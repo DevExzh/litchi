@@ -8,7 +8,7 @@ use crate::charts::series_trendline::{
 };
 use crate::charts::{ChartSeriesTrendline, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' trendline in native series order.
     pub fn slide_chart_series_trendlines(
         &self,
@@ -63,7 +63,7 @@ impl Editor {
 }
 
 fn slide_chart_series_trendlines(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesTrendline>> {
@@ -85,7 +85,7 @@ fn slide_chart_series_trendlines(
 }
 
 fn set_slide_chart_series_trendlines(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     trendlines: &[ChartSeriesTrendline],
@@ -123,7 +123,7 @@ fn set_slide_chart_series_trendlines(
         "Keynote",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_trendlines(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote chart series trendline update failed validation".to_owned(),

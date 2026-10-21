@@ -52,7 +52,7 @@ struct CatalogTableModelFacts {
 }
 
 pub(super) fn require_table_model(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     model_object_id: u64,
 ) -> Result<SlideTableInfo> {
@@ -82,7 +82,7 @@ pub(super) fn require_table_model(
 /// mixed current/legacy candidates are rejected by the catalog's strict role
 /// census rather than being retried through an eager graph.
 pub(super) fn slide_table_graph(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideTableGraph> {
@@ -139,7 +139,7 @@ fn catalog_table_position(
 /// and builds a focused object index once per listing. Retaining it avoids
 /// repeating that index construction for every table in the same listing.
 fn focused_table_appearance_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<Option<litchi_keynote::Package>> {
     if !package.source_is_exact() {
         return Ok(None);
@@ -173,7 +173,7 @@ fn focused_table_appearance_package(
 /// admitted exact physical source. The source provenance check above keeps
 /// synthetic and compatibility snapshots on their existing catalog path.
 fn focused_table_appearances(
-    package: &IWorkPackage,
+    package: &HostPackage,
     slide_index: usize,
     has_table: bool,
 ) -> Result<Option<Vec<CommonTableAppearance>>> {
@@ -203,7 +203,7 @@ fn focused_table_appearances(
 /// decompressed payload only for the duration of its strict decoder and keeps
 /// only the scalar facts needed by table discovery.
 pub(super) fn catalog_slide_context(
-    package: &IWorkPackage,
+    package: &HostPackage,
     catalog: &mut KeynoteObjectCatalog,
     slide_index: usize,
 ) -> Result<CatalogSlideContext> {
@@ -263,7 +263,7 @@ pub(super) fn catalog_slide_context(
 fn decode_catalog_slide_drawables(
     source: &[u8],
     slide_index: usize,
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> std::result::Result<(Vec<u64>, Vec<u64>), KeynoteObjectCatalogError> {
     let wire_limits = keynote_slide_wire_limits(package.limits(), source)?;
     litchi_keynote::__decode_slide_drawable_projection(source, wire_limits, slide_index).map_err(
@@ -278,7 +278,7 @@ fn decode_catalog_slide_drawables(
 fn decode_catalog_slide_node_identifier(
     source: &[u8],
     slide_index: usize,
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> std::result::Result<u64, KeynoteObjectCatalogError> {
     let wire_limits = keynote_slide_wire_limits(package.limits(), source)?;
     litchi_keynote::__decode_slide_node_projection(source, wire_limits, slide_index)
@@ -339,7 +339,7 @@ fn decode_catalog_slide_identifier(
 /// node/slide semantic decodes remain constant when a slide contains many
 /// tables.
 pub(super) fn slide_table_graph_from_catalog_context(
-    editor: &Editor,
+    editor: &Draft,
     catalog: &mut KeynoteObjectCatalog,
     slide_index: usize,
     drawable_object_id: u64,
@@ -483,7 +483,7 @@ fn validate_catalog_table_info_role(catalog: &KeynoteObjectCatalog, info_id: u64
 }
 
 fn catalog_table_model_facts(
-    package: &IWorkPackage,
+    package: &HostPackage,
     catalog: &mut KeynoteObjectCatalog,
     model_id: u64,
 ) -> Result<CatalogTableModelFacts> {
@@ -571,7 +571,7 @@ const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
 
 struct CatalogAppearanceSource<'a> {
-    package: &'a IWorkPackage,
+    package: &'a HostPackage,
     catalog: &'a mut KeynoteObjectCatalog,
 }
 
@@ -605,7 +605,7 @@ impl litchi_keynote::__CatalogTableAppearanceSource for CatalogAppearanceSource<
     }
 }
 
-fn catalog_appearance_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+fn catalog_appearance_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -635,7 +635,7 @@ fn catalog_appearance_wire_limits(package: &IWorkPackage) -> Result<WireLimits> 
 /// host retains ownership of the physical catalog only.
 #[cfg(test)]
 fn catalog_table_appearance(
-    package: &IWorkPackage,
+    package: &HostPackage,
     catalog: &mut KeynoteObjectCatalog,
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
@@ -650,7 +650,7 @@ fn catalog_table_appearance(
 }
 
 fn catalog_table_appearance_with_limits(
-    package: &IWorkPackage,
+    package: &HostPackage,
     catalog: &mut KeynoteObjectCatalog,
     style_identifier: u64,
     style_preset_identifier: Option<u64>,
@@ -741,7 +741,7 @@ fn table_model_options(source: &[u8]) -> table_model_discovery_codec::DecodeOpti
 
 /// Find a table template through the bounded catalog.
 pub(super) fn table_template_from_catalog(
-    package: &IWorkPackage,
+    package: &HostPackage,
     catalog: &mut KeynoteObjectCatalog,
 ) -> Result<(u64, u64)> {
     let mut candidate = None;
@@ -848,8 +848,8 @@ mod tests {
         output
     }
 
-    fn model_package(messages: Vec<(u32, Vec<u8>)>) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn model_package(messages: Vec<(u32, Vec<u8>)>) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/CalculationEngine.iwa",
@@ -861,7 +861,7 @@ mod tests {
         package
     }
 
-    fn table_template_package(model_messages: Vec<(u32, Vec<u8>)>) -> IWorkPackage {
+    fn table_template_package(model_messages: Vec<(u32, Vec<u8>)>) -> HostPackage {
         table_template_package_with_info_messages(
             vec![(TABLE_INFO_MESSAGE_TYPE, table_info_payload(42))],
             model_messages,
@@ -871,8 +871,8 @@ mod tests {
     fn table_template_package_with_info_messages(
         info_messages: Vec<(u32, Vec<u8>)>,
         model_messages: Vec<(u32, Vec<u8>)>,
-    ) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    ) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/CalculationEngine.iwa",
@@ -925,7 +925,7 @@ mod tests {
 
     #[test]
     fn catalog_slide_node_projection_matches_generated_identifier_without_retaining_source() {
-        let package = IWorkPackage::new();
+        let package = HostPackage::new();
         let mut source = slide_node_payload(88, true);
         let generated = kn::SlideNodeArchive::decode(source.as_slice()).expect("generated node");
         let projected = decode_catalog_slide_node_identifier(&source, 3, &package)
@@ -950,7 +950,7 @@ mod tests {
 
     #[test]
     fn catalog_slide_node_projection_rejects_missing_duplicate_and_malformed_references() {
-        let package = IWorkPackage::new();
+        let package = HostPackage::new();
         let reference = reference_payload(88);
         let mut missing_required = Vec::new();
         bytes_field(2, &reference, &mut missing_required);
@@ -1188,8 +1188,8 @@ mod tests {
         .encode_to_vec()
     }
 
-    fn appearance_package(objects: Vec<ArchiveObject>) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    fn appearance_package(objects: Vec<ArchiveObject>) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/CalculationEngine.iwa", &Archive { objects })
             .expect("synthetic appearance archive");
@@ -1199,8 +1199,8 @@ mod tests {
     fn appearance_package_in_members(
         calculation_objects: Vec<ArchiveObject>,
         stylesheet_objects: Vec<ArchiveObject>,
-    ) -> IWorkPackage {
-        let mut package = IWorkPackage::new();
+    ) -> HostPackage {
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/CalculationEngine.iwa",
@@ -1221,7 +1221,7 @@ mod tests {
     }
 
     fn assert_catalog_appearance_matches_expected(
-        package: &IWorkPackage,
+        package: &HostPackage,
         model_identifier: u64,
         expected: CommonTableAppearance,
     ) -> CommonTableAppearance {
@@ -1284,7 +1284,7 @@ mod tests {
     }
 
     fn assert_catalog_appearance_rejected(
-        package: &IWorkPackage,
+        package: &HostPackage,
         style_identifier: u64,
         style_preset_identifier: Option<u64>,
     ) {
@@ -1302,7 +1302,7 @@ mod tests {
         assert_eq!(package.to_bytes().expect("source bytes"), before);
     }
 
-    fn unmark_source_built_document(editor: Editor) -> Editor {
+    fn unmark_source_built_document(editor: Draft) -> Draft {
         let mut package = editor.into_package();
         package
             .update_archive("Index/Document.iwa", |archive| {
@@ -1329,7 +1329,7 @@ mod tests {
                 Ok(())
             })
             .expect("unmark source-built document");
-        Editor::from_bytes(&package.to_bytes().expect("unmarked package bytes"))
+        Draft::from_bytes(&package.to_bytes().expect("unmarked package bytes"))
             .expect("reopen unmarked package")
     }
 
@@ -1343,7 +1343,7 @@ mod tests {
         );
 
         let reopened =
-            Editor::from_bytes(&editor.to_bytes().expect("builder bytes")).expect("reopen builder");
+            Draft::from_bytes(&editor.to_bytes().expect("builder bytes")).expect("reopen builder");
         assert!(
             focused_table_appearance_package(reopened.package())
                 .expect("reopened source-built route")
@@ -1408,7 +1408,7 @@ mod tests {
         let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/keynote/table-discovery.key");
         let source = std::fs::read(fixture).expect("native Keynote fixture");
-        let editor = Editor::from_bytes(&source).expect("native Keynote editor");
+        let editor = Draft::from_bytes(&source).expect("native Keynote editor");
         let focused = litchi_keynote::Package::from_bytes(&source).expect("focused native package");
         let expected = focused
             .__slide_table_appearances(0)
@@ -1461,7 +1461,7 @@ mod tests {
         let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/iwork/keynote/table-discovery.key");
         let source = std::fs::read(fixture).expect("native Keynote fixture");
-        let editor = Editor::from_bytes(&source).expect("native Keynote editor");
+        let editor = Draft::from_bytes(&source).expect("native Keynote editor");
         let before = editor.to_bytes().expect("native package bytes");
         assert_eq!(before, source);
         let listed = editor.slide_tables(0).expect("native table listing");
@@ -1630,7 +1630,7 @@ mod tests {
     #[test]
     fn multiple_valid_catalog_templates_are_rejected() {
         let payload = model_payload();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/CalculationEngine.iwa",

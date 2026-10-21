@@ -22,13 +22,13 @@ struct SourceBuiltAppearanceObjectLocation {
 /// only archive names and object slots, so appearance reads can borrow one
 /// selected message at a time without cloning every archive in the package.
 struct SourceBuiltAppearanceCatalog<'package> {
-    package: &'package IWorkPackage,
+    package: &'package HostPackage,
     archive_names: Vec<String>,
     objects: HashMap<u64, SourceBuiltAppearanceObjectLocation>,
 }
 
 impl<'package> SourceBuiltAppearanceCatalog<'package> {
-    fn build(package: &'package IWorkPackage) -> Result<Self> {
+    fn build(package: &'package HostPackage) -> Result<Self> {
         let archive_count = package.iwa_entry_names().count();
         let mut archive_names = Vec::new();
         archive_names
@@ -140,16 +140,16 @@ impl<'package> SourceBuiltAppearanceCatalog<'package> {
     }
 }
 
-impl Editor {
+impl Draft {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(IWorkPackage::open(path)?)
+        Self::from_package(HostPackage::open(path)?)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_package(HostPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub fn from_package(package: HostPackage) -> Result<Self> {
         numbers_document(&package)?;
         Ok(Self { package })
     }
@@ -158,7 +158,7 @@ impl Editor {
     /// provenance across the internal byte-validation boundary.
     ///
     /// A public `from_bytes` call always denotes an exact source. This helper
-    /// is reserved for transactions that started from an `IWorkPackage`
+    /// is reserved for transactions that started from an `HostPackage`
     /// without an exact source and must not turn that compatibility graph into
     /// an exact focused-owner candidate merely because validation serialized
     /// it once.
@@ -349,7 +349,7 @@ impl Editor {
         let mut staged = self.package.clone();
         resize_attached_table_in_package(&mut staged, table_id, rows, columns)?;
 
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let resized = verified
             .tables()?
             .into_iter()
@@ -498,7 +498,7 @@ impl Editor {
         release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
 
         let source_built = !self.package.source_is_exact();
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         if table_models(verified.package())?
             .iter()
             .any(|candidate| candidate.object_id == table_id)
@@ -545,7 +545,7 @@ impl Editor {
             Ok(())
         })?;
         let source_built = !self.package.source_is_exact();
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .sheets()?
             .into_iter()
@@ -564,7 +564,6 @@ impl Editor {
     /// preset instead. Cell stores, data lists, row/column UIDs, headers, stroke
     /// state, and the CalculationEngine owner are allocated independently;
     /// workbook styles are shared intentionally.
-    #[allow(deprecated)]
     pub fn add_empty_table(
         &mut self,
         selector: SheetSelector<'_>,
@@ -648,7 +647,7 @@ impl Editor {
         })?;
 
         let source_built = !self.package.source_is_exact();
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()
@@ -671,7 +670,6 @@ impl Editor {
     /// CalculationEngine dependency owners are cloned independently. Workbook
     /// styles and referenced rich-text/comment payloads retain their native
     /// copy-on-write sharing.
-    #[allow(deprecated)]
     pub fn duplicate_table(&mut self, selector: TableSelector<'_>) -> Result<TableInfo> {
         let source_built = !self.package.source_is_exact();
         let table_id = selectors::table_id(self, selector)?;
@@ -732,7 +730,7 @@ impl Editor {
             Ok(())
         })?;
 
-        let verified = Editor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        let verified = Draft::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()
@@ -755,7 +753,7 @@ impl Editor {
         Ok(created)
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub fn package(&self) -> &HostPackage {
         &self.package
     }
 

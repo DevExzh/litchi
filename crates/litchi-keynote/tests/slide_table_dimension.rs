@@ -855,10 +855,10 @@ fn assert_rejected_atomically(source: &[u8], dimension: Dimension) -> TestResult
         matches!(
             read,
             Err(SlideTableDimensionError::InvalidSource)
-                | Err(SlideTableDimensionError::UnsupportedSource)
-                | Err(SlideTableDimensionError::UnsupportedDependency)
-                | Err(SlideTableDimensionError::UnsupportedTopology)
-                | Err(SlideTableDimensionError::LimitExceeded { .. })
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedSource))
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedDependency))
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedTopology))
+                | Err(SlideTableDimensionError::Limit { .. })
         ),
         "malformed dimension read was unexpectedly accepted: {read:?}"
     );
@@ -866,10 +866,10 @@ fn assert_rejected_atomically(source: &[u8], dimension: Dimension) -> TestResult
         matches!(
             edit,
             Err(SlideTableDimensionError::InvalidSource)
-                | Err(SlideTableDimensionError::UnsupportedSource)
-                | Err(SlideTableDimensionError::UnsupportedDependency)
-                | Err(SlideTableDimensionError::UnsupportedTopology)
-                | Err(SlideTableDimensionError::LimitExceeded { .. })
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedSource))
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedDependency))
+                | Err(SlideTableDimensionError::Refused(litchi_keynote::slide::table::dimension::transaction::Refusal::UnsupportedTopology))
+                | Err(SlideTableDimensionError::Limit { .. })
         ),
         "malformed dimension edit was unexpectedly accepted: {edit:?}"
     );
@@ -921,11 +921,15 @@ fn typed_selectors_read_rows_columns_and_redacted_transactions() -> TestResult {
     );
     assert!(matches!(
         package.slide_table_dimension_size("Missing", 0usize, Dimension::Row(0)),
-        Err(SlideTableDimensionError::SlideNameNotFound)
+        Err(SlideTableDimensionError::Refused(
+            litchi_keynote::slide::table::dimension::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_table_dimension_size("Tables", 2usize, Dimension::Row(0)),
-        Err(SlideTableDimensionError::TablePositionNotFound { .. })
+        Err(SlideTableDimensionError::Refused(
+            litchi_keynote::slide::table::dimension::transaction::Refusal::TablePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_table_dimension_size("Tables", 0usize, Dimension::Row(8)),
@@ -1144,7 +1148,12 @@ fn locked_table_allows_noop_but_rejects_changed_dimension_atomically() -> TestRe
         .set(points(32.0)?)
         .commit()
         .expect_err("locked table must reject changed dimension");
-    assert!(matches!(error, SlideTableDimensionError::Locked));
+    assert!(matches!(
+        error,
+        SlideTableDimensionError::Refused(
+            litchi_keynote::slide::table::dimension::transaction::Refusal::Locked
+        )
+    ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
@@ -1377,7 +1386,7 @@ fn finite_physical_and_semantic_limits_refuse_before_publication() -> TestResult
         let result = package.slide_table_dimension_size("Tables", 0usize, Dimension::Row(1));
         assert!(matches!(
             result,
-            Err(SlideTableDimensionError::LimitExceeded { .. })
+            Err(SlideTableDimensionError::Limit { .. })
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }

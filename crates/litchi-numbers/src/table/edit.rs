@@ -56,8 +56,9 @@ impl Batch {
         let updates_iter = updates.into_iter();
         let lower_bound = updates_iter.size_hint().0;
         if lower_bound > budget.max_updates {
-            return Err(Error::LimitExceeded {
-                requested: lower_bound,
+            return Err(Error::Limit {
+                kind: LimitKind::Updates,
+                observed: lower_bound,
                 maximum: budget.max_updates,
             });
         }
@@ -75,8 +76,9 @@ impl Batch {
 
         for update in updates_iter {
             if values.len() >= budget.max_updates {
-                return Err(Error::LimitExceeded {
-                    requested: budget.max_updates.saturating_add(1),
+                return Err(Error::Limit {
+                    kind: LimitKind::Updates,
+                    observed: budget.max_updates.saturating_add(1),
                     maximum: budget.max_updates,
                 });
             }
@@ -128,6 +130,14 @@ impl Batch {
     }
 }
 
+/// A budget of a cell-edit batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Updates in one batch.
+    Updates,
+}
+
 /// Failure while constructing a bounded cell-edit batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -137,7 +147,14 @@ pub enum Error {
     /// A coordinate occurs more than once in the batch.
     DuplicatePosition { position: At },
     /// The batch exceeds its caller-supplied bound.
-    LimitExceeded { requested: usize, maximum: usize },
+    Limit {
+        /// The exceeded budget.
+        kind: LimitKind,
+        /// The observed amount.
+        observed: usize,
+        /// The configured maximum.
+        maximum: usize,
+    },
     /// A collection reservation failed before the batch was completed.
     Allocation {
         resource: &'static str,
@@ -162,9 +179,13 @@ impl fmt::Display for Error {
                 position.row(),
                 position.column()
             ),
-            Self::LimitExceeded { requested, maximum } => write!(
+            Self::Limit {
+                kind: LimitKind::Updates,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "table edit batch requests {requested} updates, budget is {maximum}"
+                "table edit batch requests {observed} updates, budget is {maximum}"
             ),
             Self::Allocation { resource, amount } => {
                 write!(
@@ -242,7 +263,7 @@ mod tests {
         assert!(matches!(duplicate, Err(Error::DuplicatePosition { .. })));
 
         let oversized = Batch::collect([Update::clear(0, 0), Update::clear(0, 1)], Budget::new(1));
-        assert!(matches!(oversized, Err(Error::LimitExceeded { .. })));
+        assert!(matches!(oversized, Err(Error::Limit { .. })));
     }
 
     #[test]

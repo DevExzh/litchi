@@ -6,7 +6,7 @@ use crate::charts::border::{
     set_chart_border_visible as set_native_chart_border_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Numbers shows the chart-area border for one native sheet chart.
     pub fn sheet_chart_border_visible(
         &self,
@@ -28,7 +28,7 @@ impl Editor {
 }
 
 fn sheet_chart_border_visible(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -42,7 +42,7 @@ fn sheet_chart_border_visible(
 }
 
 fn set_sheet_chart_border_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     visible: bool,
@@ -59,7 +59,7 @@ fn set_sheet_chart_border_visible(
         "Numbers",
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_border_visible(sheet_id, drawable_object_id)? != visible {
         return Err(Error::InvalidFormat(
             "Numbers chart border update failed validation".to_owned(),

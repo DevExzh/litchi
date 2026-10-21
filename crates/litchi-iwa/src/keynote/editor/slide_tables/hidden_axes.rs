@@ -3,7 +3,7 @@
 use super::*;
 use litchi_iwa_common::table::axis::HiddenAxes;
 
-impl Editor {
+impl Draft {
     /// Read the canonical user-hidden rows and columns of a slide table.
     pub fn slide_table_hidden_axes(
         &self,
@@ -73,7 +73,7 @@ mod tests {
                 .unwrap(),
             hidden
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_table_hidden_axes(0, table.model_object_id)

@@ -100,7 +100,7 @@ impl NativeOwnerKind {
 }
 
 pub(super) fn ensure_volatile_owner(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_uuid: &tsp::Uuid,
     conditional_owner_uid: tsp::Uuid,
     row: usize,
@@ -324,7 +324,7 @@ pub(super) fn ensure_volatile_owner(
 }
 
 fn append_host(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     entry_name: &str,
     conditional_owner_uid: tsp::Uuid,
     host: &HostDependency,

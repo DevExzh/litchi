@@ -8,7 +8,7 @@ use crate::charts::series_trendline::{
 };
 use crate::charts::{ChartSeriesTrendline, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' trendline in native series order.
     pub fn sheet_chart_series_trendlines(
         &self,
@@ -63,7 +63,7 @@ impl Editor {
 }
 
 fn sheet_chart_series_trendlines(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesTrendline>> {
@@ -85,7 +85,7 @@ fn sheet_chart_series_trendlines(
 }
 
 fn set_sheet_chart_series_trendlines(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     trendlines: &[ChartSeriesTrendline],
@@ -123,7 +123,7 @@ fn set_sheet_chart_series_trendlines(
         "Numbers",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_trendlines(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers chart series trendline update failed validation".to_owned(),

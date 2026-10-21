@@ -67,7 +67,7 @@ enum AudioClonePlacement {
     Preserve,
 }
 
-impl Editor {
+impl Draft {
     /// List independently positioned audio clips owned directly by one reachable sheet.
     pub fn sheet_audio(&self, sheet_id: u64) -> Result<Vec<SheetAudioInfo>> {
         audio_infos(self, sheet_id)
@@ -89,7 +89,7 @@ impl Editor {
         let context = movie_creation_context(self, sheet_id)?;
         let ids = MovieObjectIds::allocate(next_object_identifier(&self.package)?)?;
 
-        let mut media = IWorkMediaEditor::from_package(self.package.clone())?;
+        let mut media = crate::media::Draft::from_package(self.package.clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
         if asset.media_type != MediaType::Audio {
             return Err(Error::ParseError(format!(
@@ -460,14 +460,13 @@ impl Editor {
     }
 
     /// Remove one audio clip, its private graph, and its unshared asset.
-    #[allow(deprecated)]
     pub fn remove_sheet_audio(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetAudio> {
         let source = audio_graph(self, sheet_id, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -513,7 +512,7 @@ impl Editor {
         remove_component_object_uuids(&mut staged, source.component_id, &source.uuid_object_ids)?;
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
-        let mut media = IWorkMediaEditor::from_package(staged)?;
+        let mut media = crate::media::Draft::from_package(staged)?;
         let mut removed_data_identifiers = Vec::new();
         let data_identifiers = source
             .data_references
@@ -581,7 +580,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn scratch_spreadsheet_supports_audio_crud_without_a_source_package() {
         let mut editor = numbers::Builder::new().sheet_name("Audio").build().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
@@ -600,7 +598,7 @@ mod tests {
         );
         assert!(editor.sheet_movies(sheet_id).unwrap().is_empty());
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.sheet_audio(sheet_id).unwrap(),
             std::slice::from_ref(&created)
@@ -690,7 +688,7 @@ mod tests {
         );
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -773,7 +771,7 @@ mod tests {
             REPLACEMENT_AUDIO
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheet_audio(sheet_id).unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -800,7 +798,7 @@ mod tests {
         );
         assert!(editor.sheet_audio(sheet_id).unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
@@ -898,6 +896,6 @@ mod tests {
             editor.extract_media(second.audio_data_identifier).unwrap(),
             REPLACEMENT_AUDIO
         );
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 }

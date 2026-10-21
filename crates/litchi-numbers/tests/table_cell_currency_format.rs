@@ -307,11 +307,15 @@ fn currency_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_currency_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -363,11 +367,15 @@ fn currency_coordinate_boundaries_return_cell_not_found_without_mutation() -> Te
     for position in out_of_bounds {
         assert!(matches!(
             package.table_cell_currency_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::currency::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_currency_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::currency::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -397,13 +405,13 @@ fn currency_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Currency edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::currency::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -615,11 +623,15 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let number_before = number_package.exact_bytes();
     assert!(matches!(
         number_package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         number_package.edit_table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(number_package.exact_bytes(), number_before);
 
@@ -631,11 +643,15 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let percentage_before = percentage_package.exact_bytes();
     assert!(matches!(
         percentage_package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         percentage_package.edit_table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(percentage_package.exact_bytes(), percentage_before);
 
@@ -644,19 +660,23 @@ fn currency_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let currency_before = currency_package.exact_bytes();
     assert!(matches!(
         currency_package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number::transaction::Error::WrongFormatFamily { .. })
+        Err(number::transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         currency_package.edit_table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number::transaction::Error::WrongFormatFamily { .. })
+        Err(number::transaction::Error::Refused(
+            number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         currency_package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         currency_package.edit_table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert_eq!(currency_package.exact_bytes(), currency_before);
     Ok(())
@@ -1367,9 +1387,7 @@ fn currency_input_and_operation_budgets_reject_before_publication() -> TestResul
     assert!(
         matches!(
             result,
-            Err(Error::LimitExceeded { .. })
-                | Err(Error::Allocation { .. })
-                | Err(Error::Verification)
+            Err(Error::Limit { .. }) | Err(Error::Allocation { .. }) | Err(Error::Verification)
         ),
         "unexpected operation-budget result: {result:?}"
     );
@@ -1499,7 +1517,12 @@ fn currency_checked_native_fixture_selects_by_name_and_refuses_number_family() -
         position,
     );
     assert_eq!(by_name, by_index);
-    assert!(matches!(by_index, Err(Error::WrongFormatFamily { .. })));
+    assert!(matches!(
+        by_index,
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
+    ));
     Ok(())
 }
 
