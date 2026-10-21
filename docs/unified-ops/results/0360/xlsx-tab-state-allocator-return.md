@@ -105,6 +105,50 @@ the result is retained as a returned performance result pending the required
 equivalent-workload decision; no elapsed-time, RSS, or native source-family
 acceptance is claimed.
 
+## Deferred-policy storage repair (ac929d4957)
+
+The next returned candidate removes a duplicated `SourceLimits` value from
+each `Deferred` owner and each deferred `RestoreEndpoint`. `SourceLimits` has
+24 scalar ceilings (eight `u64` and sixteen `usize`, 192 bytes on the
+64-bit build). The retained endpoint's `Arc<SourceBackedPackage>` already
+owns the exact policy under which its catalog was parsed, so `catalog_for`
+compares the recipient package's `read_limits()` with that retained package's
+policy. Equal policies reuse the catalog; unequal policies reparse through the
+publisher under the recipient policy. Snapshot limits remain by value for the
+tab-state XML audit and `EditOptions` path, so the edit and stricter-recipient
+policy semantics are unchanged.
+
+The candidate binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/limits-compact-alloc/release/xlsx_tab_state_history_alloc`,
+SHA-256
+`3e21996eedbbe71ee98daee5ed6184b0e67bc55e6f348cd595cfbdf0db7aaec4`.
+The sequential count-only receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-limits-compact-v1`.
+The e63 JSON SHA-256 is
+`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the
+candidate JSON SHA-256 is
+`05ecfdfa74142e036b3fe4be09327dd9e7648e9648c87ab709f17f24e7504837`.
+Both used the same two-defined-name fixture, 64 retained steps, two warmups,
+and exact 64/64 forward and inverse checks. This was an allocator-count run;
+it makes no latency or RSS claim.
+
+| interval | e63 | ac929d4957 | change vs e63 |
+| --- | ---: | ---: | ---: |
+| retained history allocated bytes | 4,834,958 | 4,911,667 | +76,709 (+1.59%) |
+| retained history allocation calls | 46,730 | 46,859 | +129 (+0.28%) |
+| retained history live bytes after | 167,697 | 253,473 | +85,776 |
+| retained history peak live after | 427,929 | 427,929 | unchanged |
+| independent replay allocated bytes | 103,381,056 | 102,882,860 | -498,196 (-0.48%) |
+| independent replay live bytes after | 167,953 | 257,641 | +89,688 |
+| independent replay peak live after | 606,577 | 711,571 | +104,994 (+17.31%) |
+| source-owner admission allocated bytes | 23,346,752 | 24,392,288 | +1,045,536 (+4.48%) |
+
+Compared with 14370c12c9, the duplicated policy removal reduces retained live
+bytes by 30,208, replay live bytes by 30,208, and replay peak by 30,208. The
+candidate still has positive retained/replay live and peak deltas versus the
+reproducible pre-W4 baseline, so this remains returned evidence and does not
+close the W4 performance gate.
+
 The native source-family attempt was not a measurement: a wrapper path typo
 failed before any child launch. Its host/error files are retained under
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/final-source-family-20261021-v1/page_margin`.
