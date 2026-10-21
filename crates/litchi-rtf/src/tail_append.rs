@@ -132,7 +132,7 @@ impl TailAppendPublicationLimits {
         }
     }
 
-    fn validate(self) -> Result<(), TailAppendPublicationError> {
+    pub(crate) fn validate(self) -> Result<(), TailAppendPublicationError> {
         if self.max_window_bytes == 0 {
             return Err(TailAppendPublicationError::InvalidLimits(
                 "publication window must be positive",
@@ -749,26 +749,15 @@ impl Edit {
         self.append_paragraphs(std::slice::from_ref(&paragraph))
     }
 
-    /// Converts this staged transaction into a publication-only plan using
-    /// the default bounded source/write window.
-    ///
-    /// Unlike [`Self::commit`], this path does not construct, reopen, or retain
-    /// a complete candidate artifact.  It proves the exact source tail and
-    /// stores only the bounded inserted span; callers can later publish it to
-    /// a sequential non-seek sink with an explicit [`ExecutionContext`].
-    pub fn publication_plan(self) -> Result<TailAppendPublicationPlan, Error> {
-        self.publication_plan_with_limits(TailAppendPublicationLimits::default())
-    }
-
     /// Converts this staged transaction into a publication-only plan with an
     /// explicit hard source/write window.
     ///
     /// This constructor uses the transaction's finite [`SemanticLimits`]
     /// as its allocation boundary.  Call
-    /// [`Self::publication_plan_with_limits_and_context`] when planning must
+    /// [`Self::publication_plan_with_context`] when planning must
     /// also reserve execution-budget memory before the encoded insertion is
     /// allocated.
-    pub fn publication_plan_with_limits(
+    pub fn publication_plan(
         self,
         publication_limits: TailAppendPublicationLimits,
     ) -> Result<TailAppendPublicationPlan, Error> {
@@ -790,26 +779,8 @@ impl Edit {
             })
     }
 
-    /// Converts this staged transaction into a publication-only plan while
-    /// reserving its bounded retained insertion before encoding it.
-    ///
-    /// This context-aware constructor is the ownership boundary for callers
-    /// that need an execution budget to cover planning allocations.  The
-    /// returned plan retains that reservation until all clones of the plan are
-    /// dropped; publication itself borrows source and insertion windows
-    /// directly and therefore does not allocate a complete candidate.
-    pub fn publication_plan_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(
-            TailAppendPublicationLimits::default(),
-            context,
-        )
-    }
-
     /// Context-aware variant with explicit bounded source/write windows.
-    pub fn publication_plan_with_limits_and_context(
+    pub fn publication_plan_with_context(
         self,
         publication_limits: TailAppendPublicationLimits,
         context: &ExecutionContext,
@@ -1454,7 +1425,7 @@ impl TailAppendPublicationPlan {
 /// only by the constructors on this type, all of which call the same
 /// conservative proof used by [`Edit`].
 #[derive(Debug, Clone)]
-pub struct TailAppendSourceProof {
+pub(crate) struct TailAppendSourceProof {
     selector: TailSelector,
     source_version: SourceVersion,
     source_bytes: usize,
@@ -1470,39 +1441,6 @@ pub struct TailAppendSourceProof {
 struct TailAppendSourceCapability;
 
 impl TailAppendSourceProof {
-    /// Issues a proof for the exact source retained by an already parsed
-    /// document.
-    pub fn from_document(source: &Package, selector: TailSelector) -> Result<Self, Error> {
-        Self::from_document_with_source_version(source, selector, source.source_version())
-    }
-
-    /// Issues a proof with the caller-supplied positional source version.
-    ///
-    /// The source-backed edit rechecks this token and the exact digest before
-    /// planning and publication, so supplying a token never authorizes bytes
-    /// from a different source.
-    pub fn from_document_with_source_version(
-        source: &Package,
-        selector: TailSelector,
-        source_version: SourceVersion,
-    ) -> Result<Self, Error> {
-        let splice = prove_splice_source(source, selector)?;
-        let bytes = source
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
-        Ok(Self {
-            selector,
-            source_version,
-            source_bytes: bytes.len(),
-            source_digest: BlobId::of(bytes).as_hex(),
-            root_close: splice.root_close,
-            ends_with_par: splice.ends_with_par,
-            body_nonempty: !source.body().is_empty(),
-            source_limit: source.limits().max_input_bytes(),
-            capability: TailAppendSourceCapability,
-        })
-    }
-
     /// Issues a proof for `source`, binding the proof to that positional
     /// source's declared revision and exact bytes.
     ///
@@ -1514,7 +1452,14 @@ impl TailAppendSourceProof {
     /// after a mutate-and-restore ABA sequence). A version and digest bind
     /// content/revision, not object identity; equal-byte providers with the
     /// same declared version are intentionally equivalent.
-    pub fn from_document_for_source(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the source-backed engine's full surface is exercised by its internal tests"
+        )
+    )]
+    pub(crate) fn from_document_for_source(
         document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
@@ -1524,7 +1469,7 @@ impl TailAppendSourceProof {
 
     /// Issues a source proof while charging the bounded digest scan to
     /// `context` and checking cancellation between positional reads.
-    pub fn from_document_for_source_with_context(
+    pub(crate) fn from_document_for_source_with_context(
         document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
@@ -1644,65 +1589,35 @@ impl TailAppendSourceProof {
         })
     }
 
-    /// Alias emphasizing that the proof binds an external positional source.
-    pub fn from_document_and_source(
-        document: &Package,
-        selector: TailSelector,
-        source: &dyn ReadAt,
-    ) -> Result<Self, TailAppendPublicationError> {
-        Self::from_document_for_source(document, selector, source)
-    }
-
-    /// Context-aware alias for [`Self::from_document_for_source_with_context`].
-    pub fn from_document_and_source_with_context(
-        document: &Package,
-        selector: TailSelector,
-        source: &dyn ReadAt,
-        context: &ExecutionContext,
-    ) -> Result<Self, TailAppendPublicationError> {
-        Self::from_document_for_source_with_context(document, selector, source, context)
-    }
-
-    /// Selector authorized by this proof.
-    #[must_use]
-    pub const fn selector(&self) -> TailSelector {
-        self.selector
-    }
-
     /// Source revision token authorized by this proof.
     #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
+    pub(crate) const fn source_version(&self) -> SourceVersion {
         self.source_version
     }
 
     /// Exact source length authorized by this proof.
     #[must_use]
-    pub const fn source_bytes(&self) -> usize {
+    pub(crate) const fn source_bytes(&self) -> usize {
         self.source_bytes
     }
 
-    /// Canonical lowercase SHA-256 source digest authorized by this proof.
-    #[must_use]
-    pub fn source_digest(&self) -> &str {
-        &self.source_digest
-    }
-
-    /// Exact root-close insertion offset authorized by this proof.
-    #[must_use]
-    pub const fn root_close(&self) -> usize {
-        self.root_close
-    }
-
     /// Whether the existing body ends in a parameterless `\\par` control.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the source-backed engine's full surface is exercised by its internal tests"
+        )
+    )]
     #[must_use]
-    pub const fn ends_with_par(&self) -> bool {
+    pub(crate) const fn ends_with_par(&self) -> bool {
         self.ends_with_par
     }
 }
 
 /// A source-backed append transaction that never retains the parsed
 /// [`Package`] or a complete source/target candidate.
-pub struct TailAppendSourceEdit {
+pub(crate) struct TailAppendSourceEdit {
     source: Arc<dyn ReadAt>,
     proof: TailAppendSourceProof,
     selector: TailSelector,
@@ -1729,7 +1644,7 @@ impl fmt::Debug for TailAppendSourceEdit {
 impl TailAppendSourceEdit {
     /// Starts a source-backed append from a previously issued proof.
     #[must_use]
-    pub fn new(
+    pub(crate) fn new(
         source: Arc<dyn ReadAt>,
         proof: TailAppendSourceProof,
         selector: TailSelector,
@@ -1747,7 +1662,7 @@ impl TailAppendSourceEdit {
 
     /// Starts a source-backed append with explicit finite append bounds.
     #[must_use]
-    pub fn new_with_options(
+    pub(crate) fn new_with_options(
         source: Arc<dyn ReadAt>,
         proof: TailAppendSourceProof,
         selector: TailSelector,
@@ -1760,48 +1675,24 @@ impl TailAppendSourceEdit {
 
     /// The policy admitted for this edit.
     #[must_use]
-    pub fn options(&self) -> EditOptions {
+    pub(crate) fn options(&self) -> EditOptions {
         EditOptions::new().semantic_limits(self.limits)
-    }
-
-    /// Returns the retained positional source handle.
-    #[must_use]
-    pub fn source(&self) -> &Arc<dyn ReadAt> {
-        &self.source
-    }
-
-    /// Returns the private-capability proof used by this edit.
-    #[must_use]
-    pub const fn proof(&self) -> &TailAppendSourceProof {
-        &self.proof
-    }
-
-    /// Selector resolved by this transaction.
-    #[must_use]
-    pub const fn selector(&self) -> TailSelector {
-        self.selector
     }
 
     /// Number of staged paragraphs.
     #[must_use]
-    pub fn paragraph_count(&self) -> usize {
+    pub(crate) fn paragraph_count(&self) -> usize {
         self.paragraphs.len()
     }
 
     /// Number of staged runs.
     #[must_use]
-    pub const fn run_count(&self) -> usize {
+    pub(crate) const fn run_count(&self) -> usize {
         self.run_count
     }
 
-    /// UTF-8 bytes copied from submitted runs.
-    #[must_use]
-    pub const fn input_bytes(&self) -> usize {
-        self.input_bytes
-    }
-
     /// Stages one bounded batch of borrowed plain paragraphs.
-    pub fn append_paragraphs(
+    pub(crate) fn append_paragraphs(
         &mut self,
         paragraphs: &[PlainParagraph<'_>],
     ) -> Result<&mut Self, Error> {
@@ -1819,7 +1710,10 @@ impl TailAppendSourceEdit {
     }
 
     /// Convenience staging method for one plain run per paragraph.
-    pub fn append_text_paragraphs(&mut self, paragraphs: &[&str]) -> Result<&mut Self, Error> {
+    pub(crate) fn append_text_paragraphs(
+        &mut self,
+        paragraphs: &[&str],
+    ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
             return Err(Error::AlreadyStaged);
         }
@@ -1852,7 +1746,7 @@ impl TailAppendSourceEdit {
     }
 
     /// Convenience staging method for one paragraph made from plain runs.
-    pub fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, Error> {
+    pub(crate) fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, Error> {
         if runs.is_empty() {
             return Ok(self);
         }
@@ -1860,36 +1754,23 @@ impl TailAppendSourceEdit {
         self.append_paragraphs(std::slice::from_ref(&paragraph))
     }
 
-    /// Builds a source-backed publication plan with the default window.
-    pub fn publication_plan(
-        self,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits(TailAppendPublicationLimits::default())
-    }
-
     /// Builds a source-backed publication plan with explicit source windows.
-    pub fn publication_plan_with_limits(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the source-backed engine's full surface is exercised by its internal tests"
+        )
+    )]
+    pub(crate) fn publication_plan(
         self,
         publication_limits: TailAppendPublicationLimits,
     ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
         self.publication_plan_inner(publication_limits, None)
     }
 
-    /// Builds a source-backed plan while reserving its bounded insertion and
-    /// one source window from `context` during planning. Each later
-    /// publication reserves its own window independently.
-    pub fn publication_plan_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(
-            TailAppendPublicationLimits::default(),
-            context,
-        )
-    }
-
     /// Context-aware source-backed planning with explicit source windows.
-    pub fn publication_plan_with_limits_and_context(
+    pub(crate) fn publication_plan_with_context(
         self,
         publication_limits: TailAppendPublicationLimits,
         context: &ExecutionContext,
@@ -2142,7 +2023,7 @@ impl TailAppendSourceEdit {
 /// Plans are intentionally not [`Clone`]. Each publication reserves its own
 /// source window, so concurrent or repeated calls are independently bounded
 /// by the caller's execution budget.
-pub struct TailAppendSourcePublicationPlan {
+pub(crate) struct TailAppendSourcePublicationPlan {
     source: Arc<dyn ReadAt>,
     proof: TailAppendSourceProof,
     selector: TailSelector,
@@ -2178,157 +2059,71 @@ impl fmt::Debug for TailAppendSourcePublicationPlan {
     }
 }
 
-/// Evidence returned after source-backed publication succeeds.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TailAppendSourcePublicationReport {
-    bytes: usize,
-    source_bytes: usize,
-    inserted_bytes: usize,
-    source_version: SourceVersion,
-    source_digest: String,
-    target_digest: String,
-    writes: usize,
-    largest_write: usize,
-}
-
-impl TailAppendSourcePublicationReport {
-    /// Complete target bytes accepted by the sink.
-    #[must_use]
-    pub const fn bytes(&self) -> usize {
-        self.bytes
-    }
-
-    /// Exact source bytes emitted.
-    #[must_use]
-    pub const fn source_bytes(&self) -> usize {
-        self.source_bytes
-    }
-
-    /// Exact inserted bytes emitted.
-    #[must_use]
-    pub const fn inserted_bytes(&self) -> usize {
-        self.inserted_bytes
-    }
-
-    /// Source version checked before and after publication.
-    #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
-        self.source_version
-    }
-
-    /// Canonical source digest checked before and after publication.
-    #[must_use]
-    pub fn source_digest(&self) -> &str {
-        &self.source_digest
-    }
-
-    /// Canonical target digest computed during planning.
-    #[must_use]
-    pub fn target_digest(&self) -> &str {
-        &self.target_digest
-    }
-
-    /// Number of sink writes.
-    #[must_use]
-    pub const fn writes(&self) -> usize {
-        self.writes
-    }
-
-    /// Largest slice offered to one sink write.
-    #[must_use]
-    pub const fn largest_write(&self) -> usize {
-        self.largest_write
-    }
-}
-
 impl TailAppendSourcePublicationPlan {
-    /// Returns the retained positional source handle.
-    #[must_use]
-    pub fn source(&self) -> &Arc<dyn ReadAt> {
-        &self.source
-    }
-
-    /// Returns the private-capability proof retained by this plan.
-    #[must_use]
-    pub const fn proof(&self) -> &TailAppendSourceProof {
-        &self.proof
-    }
-
-    /// Selector retained by this plan.
-    #[must_use]
-    pub const fn selector(&self) -> TailSelector {
-        self.selector
-    }
-
     /// Whether this plan is an exact source identity publication.
     #[must_use]
-    pub const fn is_noop(&self) -> bool {
+    pub(crate) const fn is_noop(&self) -> bool {
         self.inserted.is_empty() && self.root_close == self.source_bytes
     }
 
     /// Exact source byte length captured during planning.
     #[must_use]
-    pub const fn source_bytes(&self) -> usize {
+    pub(crate) const fn source_bytes(&self) -> usize {
         self.source_bytes
     }
 
     /// Exact inserted byte length.
     #[must_use]
-    pub const fn inserted_bytes(&self) -> usize {
+    pub(crate) const fn inserted_bytes(&self) -> usize {
         self.inserted.len()
     }
 
     /// Exact output byte length.
     #[must_use]
-    pub const fn output_bytes(&self) -> usize {
+    pub(crate) const fn output_bytes(&self) -> usize {
         self.source_bytes.saturating_add(self.inserted.len())
     }
 
     /// UTF-8 bytes copied while staging.
     #[must_use]
-    pub const fn input_bytes(&self) -> usize {
+    pub(crate) const fn input_bytes(&self) -> usize {
         self.input_bytes
     }
 
     /// Number of staged paragraphs.
     #[must_use]
-    pub const fn paragraphs(&self) -> usize {
+    pub(crate) const fn paragraphs(&self) -> usize {
         self.paragraphs
     }
 
     /// Number of staged runs.
     #[must_use]
-    pub const fn runs(&self) -> usize {
+    pub(crate) const fn runs(&self) -> usize {
         self.runs
-    }
-
-    /// Exact splice offset, or source length for a no-op.
-    #[must_use]
-    pub const fn root_close(&self) -> usize {
-        self.root_close
-    }
-
-    /// Source version captured during planning.
-    #[must_use]
-    pub const fn source_version(&self) -> SourceVersion {
-        self.proof.source_version
     }
 
     /// Canonical source digest captured during planning.
     #[must_use]
-    pub fn source_digest(&self) -> &str {
+    pub(crate) fn source_digest(&self) -> &str {
         &self.source_digest
     }
 
     /// Canonical target digest computed during planning.
     #[must_use]
-    pub fn target_digest(&self) -> &str {
+    pub(crate) fn target_digest(&self) -> &str {
         &self.target_digest
     }
 
     /// Publication window bounds retained by this plan.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the source-backed engine's full surface is exercised by its internal tests"
+        )
+    )]
     #[must_use]
-    pub const fn publication_limits(&self) -> TailAppendPublicationLimits {
+    pub(crate) const fn publication_limits(&self) -> TailAppendPublicationLimits {
         self.publication_limits
     }
 
@@ -2336,31 +2131,12 @@ impl TailAppendSourcePublicationPlan {
     ///
     /// This method proves bytes and source lineage only; callers that need
     /// semantic readback should explicitly reopen the accepted output.
-    pub fn write_to<W: Write>(
+    pub(crate) fn write_to<W: Write>(
         &self,
         sink: &mut W,
         context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationReport, TailAppendPublicationError> {
+    ) -> Result<crate::source_backed::Report, TailAppendPublicationError> {
         self.write_to_source(self.source.as_ref(), sink, context)
-    }
-
-    /// Alias for [`Self::write_to`].
-    pub fn publish_to<W: Write>(
-        &self,
-        sink: &mut W,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationReport, TailAppendPublicationError> {
-        self.write_to(sink, context)
-    }
-
-    /// Alias for [`Self::write_to_source`].
-    pub fn publish_to_source<W: Write>(
-        &self,
-        source: &dyn ReadAt,
-        sink: &mut W,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationReport, TailAppendPublicationError> {
-        self.write_to_source(source, sink, context)
     }
 
     /// Emits against an explicit positional source. A source with a different
@@ -2380,12 +2156,12 @@ impl TailAppendSourcePublicationPlan {
     /// The execution context charges `InputBytes` and `Work` for the exact
     /// cumulative bounded passes: source/target preflight, emission, and the
     /// final source/target verification.
-    pub fn write_to_source<W: Write>(
+    pub(crate) fn write_to_source<W: Write>(
         &self,
         source: &dyn ReadAt,
         sink: &mut W,
         context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationReport, TailAppendPublicationError> {
+    ) -> Result<crate::source_backed::Report, TailAppendPublicationError> {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
             return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
@@ -2918,7 +2694,7 @@ impl TailAppendSourcePublicationPlan {
             source_scan_units(source_scanned, inserted_scanned),
             u64::try_from(accepted).unwrap_or(u64::MAX),
         );
-        Ok(TailAppendSourcePublicationReport {
+        Ok(crate::source_backed::Report {
             bytes: output_length,
             source_bytes: self.source_bytes,
             inserted_bytes: self.inserted.len(),
@@ -2933,7 +2709,14 @@ impl TailAppendSourcePublicationPlan {
     /// Converts this source-backed plan to the existing safe durable codec.
     /// The codec remains document-authorized on application; parsing JSON
     /// alone never creates a source proof.
-    pub fn to_durable(&self) -> Result<DurableTailAppendPatch, Error> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the source-backed engine's full surface is exercised by its internal tests"
+        )
+    )]
+    pub(crate) fn to_durable(&self) -> Result<DurableTailAppendPatch, Error> {
         let wire = DurableTailAppendPatch {
             selector: self.selector,
             direction: Direction::Append,

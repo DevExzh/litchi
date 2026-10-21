@@ -56,9 +56,11 @@ pub(super) fn select_media(
     let slide_record = package
         .slide_record_at(slide_position.get())
         .map_err(|_| Error::Read)?
-        .ok_or(Error::SlidePositionNotFound {
-            position: slide_position,
-        })?;
+        .ok_or(Error::Refused(
+            crate::slide::media::lifecycle::Refusal::SlidePositionNotFound {
+                position: slide_position,
+            },
+        ))?;
     let (component_name, slide) = package
         .object_with_component(slide_record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -97,12 +99,11 @@ pub(super) fn select_media(
         }
     }
     let movie_position = movie_selector.as_position();
-    let movie_identifier =
-        *movies
-            .get(movie_position.get())
-            .ok_or(Error::MoviePositionNotFound {
-                position: movie_position,
-            })?;
+    let movie_identifier = *movies.get(movie_position.get()).ok_or(Error::Refused(
+        crate::slide::media::lifecycle::Refusal::MoviePositionNotFound {
+            position: movie_position,
+        },
+    ))?;
     let movie = package
         .object(movie_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -280,19 +281,27 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(|_| Error::Read)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(
+                crate::slide::media::lifecycle::Refusal::SlidePositionNotFound { position },
+            )),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(
+                    crate::slide::media::lifecycle::Refusal::EmptySlideName,
+                ));
             }
             let selected = package
                 .show()
                 .map_err(|_| Error::Read)?
                 .select_slide(SlideSelector::name(name))
-                .map_err(|_| Error::AmbiguousSelector)?;
+                .map_err(|_| {
+                    Error::Refused(crate::slide::media::lifecycle::Refusal::AmbiguousSelector)
+                })?;
             selected
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(
+                    crate::slide::media::lifecycle::Refusal::SlideNameNotFound,
+                ))
         },
     }
 }
@@ -481,7 +490,9 @@ fn private_graph(
             .any(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
             && comment_graph.is_none_or(|plan| plan.storage_ids.binary_search(&identifier).is_err())
         {
-            return Err(Error::UnsupportedComment);
+            return Err(Error::Refused(
+                crate::slide::media::lifecycle::Refusal::UnsupportedComment,
+            ));
         }
         insert_sorted_unique(&mut selected, identifier, budget)?;
         budget.charge_entries(1)?;
@@ -1117,13 +1128,8 @@ fn append_length_delimited(
     if output.capacity().saturating_sub(output.len()) < required {
         budget.charge_allocations(required)?;
     }
-    litchi_iwa_common::wire::append_length_delimited_field_with_limits(
-        output,
-        field_number,
-        payload,
-        limits,
-    )
-    .map_err(map_wire_error)
+    litchi_iwa_common::wire::append_length_delimited_field(output, field_number, payload, limits)
+        .map_err(map_wire_error)
 }
 
 fn copy_boxed(value: &str, budget: &mut LifecycleBudget) -> Result<Box<str>, Error> {
@@ -1158,7 +1164,7 @@ fn parse_view<'source>(
     // accounting internally.  Precharge the conservative source-width upper
     // bound before entering it so hostile nesting cannot allocate first.
     budget.charge_allocations(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }
@@ -1419,32 +1425,32 @@ fn map_lifecycle_decode_error(
     use litchi_iwa_protos::keynote_media_lifecycle_codec::DecodeLimit;
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::InputBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::Fields { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::WireFields,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::Work { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::OutputBytes { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::References { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::References { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::References,
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            DecodeLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: super::LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -1495,7 +1501,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
                 litchi_iwa_common::LimitKind::RewriteWork => super::LimitKind::WireWork,
                 _ => return Error::InvalidSource,
             };
-            Error::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: limit as u64,
@@ -1510,7 +1516,7 @@ fn map_archive_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: super::LimitKind::Entries,
             observed: observed as u64,
             maximum: maximum as u64,

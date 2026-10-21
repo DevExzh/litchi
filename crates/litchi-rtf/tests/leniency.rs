@@ -13,7 +13,8 @@ use litchi_rtf::leniency::{
     Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
     UnicodeDefect,
 };
-use litchi_rtf::{EmphasisMark, OpenOptions, Package, RtfDocument, SourceLimits, compress};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{EmphasisMark, OpenOptions, Package, SourceLimits, compress};
 
 /// A conformant document touching the main destinations.
 const CONFORMANT: &str = concat!(
@@ -52,7 +53,7 @@ fn conformant_input_reports_clean_through_every_entry_point() {
         Package::from_owned_bytes_with_options(CONFORMANT.as_bytes().to_vec(), strict).unwrap();
     assert_clean(document.tolerance_report());
 
-    let raw = RtfDocument::parse_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
+    let raw = Tree::parse_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
     assert_clean(raw.tolerance_report());
 
     let compressed = compress(CONFORMANT.as_bytes(), true).unwrap();
@@ -227,7 +228,7 @@ fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
 fn malformed_parameter_shapes_take_words_interpretation_and_are_recorded() {
     let source =
         r"{\rtf1\ansi\hyphauto2\deff0{\fonttbl{\f0 Arial;}}\pard\fs A\page2 B\accdot0 C\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
 
     // A nonzero toggle parameter is on.
     assert_eq!(document.hyphenation().automatic, Some(true));
@@ -273,7 +274,7 @@ fn malformed_parameter_shapes_take_words_interpretation_and_are_recorded() {
 #[test]
 fn well_formed_parameter_shapes_are_not_defects() {
     let source = r"{\rtf1\ansi\hyphauto1\deff0{\fonttbl{\f0 Arial;}}\pard\fs24 A\page B\accdot C\accnone\par}";
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     assert_eq!(document.page_breaks().count(), 1);
     assert_clean(document.tolerance_report());
 }
@@ -286,7 +287,7 @@ fn parameter_shapes_in_destinations_are_repaired() {
         r"\trowd\trgaph\trql2\cellx1000\pard\intbl X\cell\row",
         r"\sectd\vertsect1\pard Y\par}",
     );
-    let document = RtfDocument::parse(source).unwrap();
+    let document = Tree::parse(source).unwrap();
     let report = document.tolerance_report();
     assert_eq!(report.total(), 5, "{report:?}");
     assert!(

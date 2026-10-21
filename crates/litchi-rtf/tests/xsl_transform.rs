@@ -11,9 +11,10 @@ mod repair_support;
 
 use std::borrow::Cow;
 
-use litchi_rtf::{DocumentXslTransform, DocumentXslTransformUsage, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentXslTransform, DocumentXslTransformUsage, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -24,8 +25,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 #[test]
 fn parses_passive_transform_location_and_decodes_destination_text() {
     let document =
-        RtfDocument::parse(r"{\rtf1{\*\xform file:///C:\\transform\u20320?\{v1\}.xsl}Body}")
-            .unwrap();
+        Tree::parse(r"{\rtf1{\*\xform file:///C:\\transform\u20320?\{v1\}.xsl}Body}").unwrap();
     assert_eq!(
         document.xsl_transform().unwrap().location,
         "file:///C:\\transform你{v1}.xsl"
@@ -35,7 +35,7 @@ fn parses_passive_transform_location_and_decodes_destination_text() {
 
 #[test]
 fn writer_emits_required_starred_destination_and_round_trips() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\xform  relative path.xsl }Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\xform  relative path.xsl }Body}").unwrap();
     assert_eq!(
         document.xsl_transform().unwrap().location,
         " relative path.xsl "
@@ -44,14 +44,14 @@ fn writer_emits_required_starred_destination_and_round_trips() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.contains(r"{\*\xform  relative path.xsl }"));
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.xsl_transform(), document.xsl_transform());
     assert_eq!(reparsed.text(), "Body");
 }
 
 #[test]
 fn typed_api_stores_but_never_resolves_or_executes_location() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_xsl_transform(
             DocumentXslTransform::new(Cow::Borrowed("https://invalid.example/transform.xsl"))
@@ -60,7 +60,7 @@ fn typed_api_stores_but_never_resolves_or_executes_location() {
         .unwrap();
     assert_eq!(document.text(), "Body");
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.xsl_transform(), document.xsl_transform());
     assert_eq!(reparsed.text(), "Body");
 
@@ -81,10 +81,7 @@ fn rejects_unstarred_misplaced_duplicate_empty_active_nested_and_binary_forms() 
         r"{\rtf1{\*\xform \b active}Body}",
         r"{\rtf1{\*\xform \bin1 x}Body}",
     ] {
-        assert!(
-            RtfDocument::parse(source).is_err(),
-            "accepted malformed {source}"
-        );
+        assert!(Tree::parse(source).is_err(), "accepted malformed {source}");
     }
 }
 
@@ -95,12 +92,12 @@ fn enforces_model_and_parser_resource_bounds() {
 
     let oversized = "x".repeat(litchi_rtf::MAX_DOCUMENT_XSL_TRANSFORM_LOCATION_BYTES + 1);
     let source = format!(r"{{\rtf1{{\*\xform {oversized}}}Body}}");
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(Tree::parse(&source).is_err());
 }
 
 #[test]
 fn usexform_preserves_requested_intent_and_writes_after_location() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\xform transform.xsl}\usexform Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\xform transform.xsl}\usexform Body}").unwrap();
     assert_eq!(
         document.xsl_transform_usage(),
         DocumentXslTransformUsage::Requested
@@ -110,7 +107,7 @@ fn usexform_preserves_requested_intent_and_writes_after_location() {
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
     assert!(serialized.find("\\xform").unwrap() < serialized.find("\\usexform").unwrap());
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(reparsed.xsl_transform(), document.xsl_transform());
     assert_eq!(
         reparsed.xsl_transform_usage(),
@@ -120,7 +117,7 @@ fn usexform_preserves_requested_intent_and_writes_after_location() {
 
 #[test]
 fn requested_intent_is_inert_and_independent_of_location() {
-    let mut document = RtfDocument::parse(r"{\rtf1\usexform Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1\usexform Body}").unwrap();
     assert!(document.xsl_transform().is_none());
     assert!(document.xsl_transform_usage().is_requested());
     assert_eq!(document.text(), "Body");
@@ -146,7 +143,7 @@ fn rejects_usexform_parameters_duplicates_starred_grouped_and_late_forms() {
         r"{\rtf1 Body\usexform}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }

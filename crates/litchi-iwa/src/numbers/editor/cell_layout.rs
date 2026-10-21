@@ -17,7 +17,7 @@ const NATIVE_ALIGN_BOTTOM: i32 =
     tswp::shape_style_properties_archive::VerticalAlignmentType::KFrameAlignBottom as i32;
 
 pub(super) fn cell_layout(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -69,7 +69,7 @@ pub(super) fn cell_layout(
 }
 
 pub(super) fn set_cell_layout(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -86,7 +86,7 @@ pub(super) fn set_cell_layout(
 }
 
 pub(super) fn reset_cell_layout(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,

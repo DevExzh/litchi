@@ -13,7 +13,7 @@ use crate::charts::style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultradarradiusgridlinecurve` in
 /// `TSCH.Generated.ChartStyleArchive`.
@@ -52,7 +52,7 @@ impl ChartRadarGridShape {
 
 /// Read one radar chart's effective native grid shape.
 pub(crate) fn chart_radar_grid_shape(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -70,7 +70,7 @@ pub(crate) fn chart_radar_grid_shape(
 
 /// Set one radar chart's native grid shape.
 pub(crate) fn set_chart_radar_grid_shape(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

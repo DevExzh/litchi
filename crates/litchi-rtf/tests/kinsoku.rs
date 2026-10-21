@@ -9,9 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{RtfDocument, RtfWriter};
+use litchi_rtf::RtfWriter;
+use litchi_rtf::raw::Tree;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,30 +22,29 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_kinsoku_sets_and_language_and_round_trips() {
-    let document = RtfDocument::parse(
-        r"{\rtf1\ansi{\*\fchars .,;:\u12305?}{\*\lchars \u12304?ab}\ksulang1041 Body}",
-    )
-    .unwrap();
+    let document =
+        Tree::parse(r"{\rtf1\ansi{\*\fchars .,;:\u12305?}{\*\lchars \u12304?ab}\ksulang1041 Body}")
+            .unwrap();
     assert_eq!(document.text(), "Body");
     let kinsoku = document.kinsoku();
     assert_eq!(kinsoku.following.as_deref(), Some(".,;:】"));
     assert_eq!(kinsoku.leading.as_deref(), Some("【ab"));
     assert_eq!(kinsoku.language, Some(1041));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.kinsoku(), kinsoku);
 }
 
 #[test]
 fn parses_partial_kinsoku_metadata() {
-    let document = RtfDocument::parse(r"{\rtf1{\*\lchars abc}Body}").unwrap();
+    let document = Tree::parse(r"{\rtf1{\*\lchars abc}Body}").unwrap();
     let kinsoku = document.kinsoku();
     assert_eq!(kinsoku.leading.as_deref(), Some("abc"));
     assert!(kinsoku.following.is_none());
     assert!(kinsoku.language.is_none());
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.kinsoku(), kinsoku);
 }
 
@@ -53,7 +53,7 @@ fn parses_upr_wrapped_cjk_kinsoku_from_word() {
     // The shape Word writes in codepage CJK document headers: the ANSI
     // branch of \upr is skipped and the Unicode branch carries the set,
     // including {\ucN\uN } encoding-switch groups.
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r"{\rtf1\ansi{\upr{\*\fchars x}{\*\ud\uc0{\*\fchars ),.{\uc2\u162 }}}}",
         r"{\upr{\*\lchars x}{\*\ud\uc1{\*\lchars \u12304?(}}}Body}",
     ))
@@ -63,7 +63,7 @@ fn parses_upr_wrapped_cjk_kinsoku_from_word() {
     assert_eq!(kinsoku.following.as_deref(), Some("),.¢"));
     assert_eq!(kinsoku.leading.as_deref(), Some("【("));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.kinsoku(), kinsoku);
 }
 
@@ -91,7 +91,7 @@ fn rejects_malformed_kinsoku_metadata() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(rtf)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf)),
             "accepted malformed {rtf}"
         );
     }

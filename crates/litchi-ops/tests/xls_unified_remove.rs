@@ -16,7 +16,7 @@ use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::error::Source;
 use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use litchi_ops::{BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, SourceMode};
-use litchi_xls::cell_values::{Reference, Selector, Snapshot, Value as XlsValue};
+use litchi_xls::cell_values::{Reference, Selector, Value as XlsValue};
 
 const A1: &str = "/sheet[1]/A1";
 const B1: &str = "/sheet[1]/B1";
@@ -173,7 +173,9 @@ fn cell_property(file: &File, path: &str, key: &str) -> Option<String> {
 }
 
 fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<XlsValue> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
+    let snapshot = litchi_xls::Package::from_bytes(bytes)
+        .and_then(|package| package.cell_values())
+        .expect("open native XLS snapshot");
     snapshot
         .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")
@@ -186,7 +188,9 @@ fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Optio
 }
 
 fn native_cell_style(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<u16> {
-    let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
+    let snapshot = litchi_xls::Package::from_bytes(bytes)
+        .and_then(|package| package.cell_values())
+        .expect("open native XLS snapshot");
     snapshot
         .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")

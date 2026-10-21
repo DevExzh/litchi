@@ -33,15 +33,11 @@ impl std::fmt::Debug for SourceBackedOverlayPublisher {
 }
 
 impl SourceBackedOverlayPublisher {
-    /// Opens and fully validates a bounded positional CFB source, then applies
-    /// the common signed/encrypted/DRM mutation guard.
-    pub fn open(source: Arc<dyn ReadAt>) -> Result<Self, OverlayError> {
-        Self::open_with_limits(source, SharedOleFileLimits::default())
-    }
-
     /// Opens exact immutable bytes without erasing their owned provenance.
     ///
-    /// The common protected-container guard is identical to [`Self::open`].
+    /// The common protected-container guard is identical to [`Self::open`];
+    /// `limits` bound the physical CFB parse ([`SharedOleFileLimits::default`]
+    /// is the default profile).
     /// Only the low-level CFB owner may use the provenance to specialize a
     /// later planning and publication: a plan computes its source and target
     /// fingerprints once, at planning, and never recomputes them to re-prove
@@ -50,17 +46,7 @@ impl SourceBackedOverlayPublisher {
     /// views omit their preflight, and direct and atomic publication omit
     /// their outer fences and the emission hash. Atomic saves keep every
     /// flush, fsync, rename, and parent-sync durability step.
-    pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_owned(source, version)?;
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
-        Ok(Self { cfb: Arc::new(cfb) })
-    }
-
-    /// Opens sealed bytes under caller-selected physical CFB bounds.
-    ///
-    /// Preserves the owned-source optimizations and protection policy of
-    /// [`Self::open_owned`]. Returns a typed physical or protection error.
-    pub fn open_owned_with_limits(
+    pub fn open_owned(
         source: Arc<[u8]>,
         version: SourceVersion,
         limits: SharedOleFileLimits,
@@ -70,9 +56,10 @@ impl SourceBackedOverlayPublisher {
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
-    /// Opens under a caller-selected positional CFB ingress ceiling, then
-    /// applies the common signed/encrypted/DRM mutation guard.
-    pub fn open_with_limits(
+    /// Opens and fully validates a bounded positional CFB source under
+    /// `limits` ([`SharedOleFileLimits::default`] is the default profile),
+    /// then applies the common signed/encrypted/DRM mutation guard.
+    pub fn open(
         source: Arc<dyn ReadAt>,
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
@@ -185,8 +172,11 @@ mod tests {
             writer.create_stream(&["Target"], b"before").unwrap();
             writer.create_stream(&["Opaque"], b"unchanged").unwrap();
         });
-        let publisher =
-            SourceBackedOverlayPublisher::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let publisher = SourceBackedOverlayPublisher::open(
+            Arc::new(OwnedSource::new(bytes)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = publisher
             .plan(
                 vec![SameLengthStreamOverlay::new(
@@ -209,8 +199,11 @@ mod tests {
             writer.create_stream(&["Target"], b"before").unwrap();
             writer.create_stream(&["Opaque"], b"unchanged").unwrap();
         });
-        let publisher =
-            SourceBackedOverlayPublisher::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let publisher = SourceBackedOverlayPublisher::open(
+            Arc::new(OwnedSource::new(bytes)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = publisher
             .plan_splices(
                 vec![SameLengthStreamSplice::new(
@@ -251,7 +244,7 @@ mod tests {
                 writer.create_stream(&["Ordinary"], b"bytes").unwrap();
             });
             assert!(matches!(
-                SourceBackedOverlayPublisher::open_with_limits(
+                SourceBackedOverlayPublisher::open(
                     Arc::new(OwnedSource::new(bytes.clone())),
                     SharedOleFileLimits::default(),
                 ),
@@ -261,6 +254,7 @@ mod tests {
                 SourceBackedOverlayPublisher::open_owned(
                     Arc::from(bytes),
                     SourceVersion::new(0x0181, 0),
+                    SharedOleFileLimits::default(),
                 ),
                 Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
             ));

@@ -94,6 +94,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source graph or selected storage cannot be decoded or rewritten safely.
+    #[error("the Keynote slide-text source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Keynote slide-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote slide-text transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full semantic readback did not reproduce the requested change.
+    #[error("the edited Keynote slide text failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-text patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source cannot support a changed exact-source slide-text transaction.
     #[error("this Keynote source does not support physical slide-text edits")]
     UnsupportedSource,
@@ -152,31 +188,34 @@ pub enum Error {
     /// A second operation was staged on an edit that already has one.
     #[error("a Keynote slide-text edit accepts exactly one staged operation")]
     OperationAlreadyStaged,
-    /// The source graph or selected storage cannot be decoded or rewritten safely.
-    #[error("the Keynote slide-text source cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error("Keynote slide-text {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote slide-text transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full semantic readback did not reproduce the requested change.
-    #[error("the edited Keynote slide text failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-text patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedKind { .. }
+            | Self::ObjectMarkerReplacement { .. }
+            | Self::DependentContent { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::SpanOutOfBounds { .. }
+            | Self::SurrogateBoundary { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TextStorageNotFound { .. } => RefusalKind::NotFound,
+            Self::OperationAlreadyStaged { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug)]
@@ -217,17 +256,17 @@ impl WireScanBudget {
     fn parse<'source>(&mut self, payload: &'source [u8]) -> Result<WireView<'source>, Error> {
         let observed_work = self.work.saturating_add(payload.len());
         if observed_work > self.limits.max_rewrite_work() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed_work),
                 maximum: usize_to_u64(self.limits.max_rewrite_work()),
             });
         }
         self.work = observed_work;
-        let view = WireView::parse_with_limits(payload, self.limits).map_err(map_wire_error)?;
+        let view = WireView::parse(payload, self.limits).map_err(map_wire_error)?;
         let observed_fields = self.fields.saturating_add(view.len());
         if observed_fields > self.limits.max_fields() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed_fields),
                 maximum: usize_to_u64(self.limits.max_fields()),
@@ -279,8 +318,8 @@ impl<'a> Edit<'a> {
         role: Kind,
     ) -> Result<Self, Error> {
         let position = resolve_position(source, selector.into())?;
-        let snapshot =
-            text_snapshot_at(source, position, role)?.ok_or(Error::TextStorageNotFound { role })?;
+        let snapshot = text_snapshot_at(source, position, role)?
+            .ok_or(Error::Refused(Refusal::TextStorageNotFound { role }))?;
         Ok(Self {
             source,
             position,
@@ -348,7 +387,7 @@ impl<'a> Edit<'a> {
     /// without modifying the source snapshot.
     pub fn replace(&mut self, span: TextSpan, replacement: &str) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         validate_replacement(replacement)?;
         let range = validate_span(&self.before, span)?;
@@ -500,7 +539,7 @@ impl<'a> Edit<'a> {
             return Err(Error::InvalidSource);
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let changed_replacement = operation
@@ -719,6 +758,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -737,7 +782,7 @@ impl Package {
     ///
     /// `Ok(None)` means that the slide has no title/body role. `Some("")`
     /// denotes an existing empty storage. [`Kind::SlideNumber`] is not text
-    /// bearing for this API and returns [`Error::UnsupportedKind`];
+    /// bearing for this API and returns [`Refusal::UnsupportedKind`];
     /// use the per-slide placeholder-visibility transaction instead.
     ///
     /// # Costs
@@ -746,7 +791,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsupportedKind`] for
+    /// Returns [`Refusal::UnsupportedKind`] for
     /// [`Kind::SlideNumber`], or a typed selector, source, limit, allocation,
     /// or dependency error when title/body text cannot be read safely.
     pub fn slide_text<'selector>(
@@ -793,7 +838,7 @@ impl Package {
     /// Start one selector-first title/body text edit.
     ///
     /// [`Kind::SlideNumber`] is visibility-only and returns
-    /// [`Error::UnsupportedKind`]. Use
+    /// [`Refusal::UnsupportedKind`]. Use
     /// [`Package::edit_slide_placeholder_visibility`] to show or hide that
     /// role on one selected slide; it does not modify the show-wide
     /// slide-number preference.
@@ -804,7 +849,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnsupportedKind`] for
+    /// Returns [`Refusal::UnsupportedKind`] for
     /// [`Kind::SlideNumber`], or a typed selector, missing-placeholder, source,
     /// limit, allocation, or dependency error.
     pub fn edit_slide_text<'selector>(
@@ -924,21 +969,21 @@ fn resolve_position(package: &Package, selector: SlideSelector<'_>) -> Result<Po
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(_) => package
             .show()
             .map_err(map_read_error)?
             .select_slide(selector)
             .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
-            .ok_or(Error::SlideNameNotFound),
+            .ok_or(Error::Refused(Refusal::SlideNameNotFound)),
     }
 }
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -948,12 +993,12 @@ fn text_snapshot_at(
     role: Kind,
 ) -> Result<Option<TextSnapshot>, Error> {
     if role == Kind::SlideNumber {
-        return Err(Error::UnsupportedKind { kind: role });
+        return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
     }
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let slide = package
         .required_object(record.slide_identifier, "Keynote slide")
         .map_err(map_read_error)?;
@@ -967,7 +1012,7 @@ fn text_snapshot_at(
     let placeholder = match role {
         Kind::Title => owner.title_placeholder(),
         Kind::Body => owner.body_placeholder(),
-        Kind::SlideNumber => return Err(Error::UnsupportedKind { kind: role }),
+        Kind::SlideNumber => return Err(Error::Refused(Refusal::UnsupportedKind { kind: role })),
     };
     let Some(placeholder_identifier) = placeholder.map(|reference| reference.identifier().get())
     else {
@@ -981,7 +1026,7 @@ fn text_snapshot_at(
         .iter()
         .any(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let placeholder_payload = unique_payload(
         &placeholder_object.messages,
@@ -1004,12 +1049,12 @@ fn text_snapshot_at(
     if nested_reference_snapshot(package, placeholder_payload, &[1, 2], &mut scan_budget)?
         .is_some_and(|deprecated| deprecated != owned_storage)
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     if nested_reference_identifier(package, placeholder_payload, &[1, 3], &mut scan_budget)?
         == Some(storage_identifier)
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let storage = package
         .required_object(storage_identifier, "Keynote placeholder text storage")
@@ -1037,8 +1082,8 @@ fn validate_placeholder_kind(role: Kind, kind: Option<i32>) -> Result<(), Error>
     // through this focused capability.
     match (role, kind) {
         (_, None | Some(0)) | (Kind::Title, Some(2)) | (Kind::Body, Some(3)) => Ok(()),
-        (Kind::SlideNumber, _) => Err(Error::UnsupportedKind { kind: role }),
-        _ => Err(Error::DependentContent),
+        (Kind::SlideNumber, _) => Err(Error::Refused(Refusal::UnsupportedKind { kind: role })),
+        _ => Err(Error::Refused(Refusal::DependentContent)),
     }
 }
 
@@ -1085,14 +1130,14 @@ fn map_speaker_notes_codec_error(error: keynote_speaker_notes_codec::DecodeError
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_speaker_notes_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: observed.map_or(u64::MAX, usize_to_u64),
                     maximum: maximum.map_or(u64::MAX, usize_to_u64),
                 }
             },
             keynote_speaker_notes_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: observed.map_or(u64::MAX, u64::from),
                     maximum: maximum.map_or(u64::MAX, u64::from),
@@ -1101,14 +1146,14 @@ fn map_speaker_notes_codec_error(error: keynote_speaker_notes_codec::DecodeError
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1119,28 +1164,28 @@ fn map_speaker_notes_codec_error(error: keynote_speaker_notes_codec::DecodeError
 
 fn map_placeholder_codec_error(error: keynote_placeholder_text_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.recursion_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1162,9 +1207,9 @@ fn rewrite_text(
     let record = source
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     if record.node_identifier == expected_storage_identifier {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     let snapshot = text_snapshot_at(source, position, role)?.ok_or(Error::InvalidSource)?;
     if snapshot.placeholder_identifier != expected_placeholder_identifier
@@ -1332,7 +1377,7 @@ pub(super) fn rewrite_owned_storage_text(
                 || rewrite.object_reference_occurrences_before()
                     != rewrite.object_reference_occurrences_after()
             {
-                return Err(Error::DependentContent);
+                return Err(Error::Refused(Refusal::DependentContent));
             }
             if !rewrite.changed() || std::mem::replace(&mut storage_changed, true) {
                 return Err(Error::Verification);
@@ -1414,9 +1459,9 @@ fn prove_slide_text_caches_absent(package: &Package, slide_identifier: u64) -> R
     let payload = unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
         .map_err(map_read_error)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     if view.fields().any(|field| matches!(field.number(), 37 | 38)) {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -1508,7 +1553,9 @@ fn verify_candidate(
                     return Err(Error::Verification);
                 }
             },
-            Kind::SlideNumber => return Err(Error::UnsupportedKind { kind: role }),
+            Kind::SlideNumber => {
+                return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
+            },
         }
     }
     Ok(())
@@ -1686,7 +1733,7 @@ fn validate_selected_storage_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -1706,7 +1753,7 @@ fn prove_exclusive_text_ownership(
     let slide_identifier = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?
         .slide_identifier;
     prove_metadata_ownership(
         package,
@@ -1745,7 +1792,7 @@ fn prove_exclusive_text_ownership(
                             || body == Some(placeholder_identifier)
                         {
                             if owner_identifier != slide_identifier {
-                                return Err(Error::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                             let owner = keynote_speaker_notes_codec::decode_slide_notes_owner(
                                 &message.data,
@@ -1768,12 +1815,14 @@ fn prove_exclusive_text_ownership(
                                         && projected_title != Some(placeholder_identifier)
                                 },
                                 Kind::SlideNumber => {
-                                    return Err(Error::UnsupportedKind { kind: role });
+                                    return Err(Error::Refused(Refusal::UnsupportedKind {
+                                        kind: role,
+                                    }));
                                 },
                             };
                             role_edges = role_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                             if role_edges > 1 || !matches_role {
-                                return Err(Error::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                         }
                     },
@@ -1799,7 +1848,7 @@ fn prove_exclusive_text_ownership(
                         if scanned_text_flow
                             .is_some_and(|reference| reference.identifier == storage_identifier)
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if scanned_owned_storage
                             .is_none_or(|reference| reference.identifier != storage_identifier)
@@ -1814,7 +1863,7 @@ fn prove_exclusive_text_ownership(
                             continue;
                         }
                         if owner_identifier != placeholder_identifier {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         let owner = keynote_placeholder_text_codec::decode_placeholder_text_owner(
                             &message.data,
@@ -1836,7 +1885,7 @@ fn prove_exclusive_text_ownership(
                                 || owned_storage.map(|reference| reference.identifier)
                                     != Some(storage_identifier))
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if nested_reference_identifier(
                             package,
@@ -1845,7 +1894,7 @@ fn prove_exclusive_text_ownership(
                             &mut scan_budget,
                         )? == Some(storage_identifier)
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         if owned_storage.map(|reference| reference.identifier)
                             != Some(storage_identifier)
@@ -1855,11 +1904,11 @@ fn prove_exclusive_text_ownership(
                         if deprecated_storage
                             .is_some_and(|deprecated| Some(deprecated) != owned_storage)
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         storage_edges = storage_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                         if storage_edges > 1 || owner_identifier != placeholder_identifier {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                         validate_placeholder_kind(role, owner.kind())?;
                     },
@@ -1871,7 +1920,7 @@ fn prove_exclusive_text_ownership(
                             &mut scan_budget,
                         )? == Some(storage_identifier)
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     },
                     SHAPE_INFO_MESSAGE_TYPE => {
@@ -1883,7 +1932,7 @@ fn prove_exclusive_text_ownership(
                                 &mut scan_budget,
                             )? == Some(storage_identifier)
                             {
-                                return Err(Error::DependentContent);
+                                return Err(Error::Refused(Refusal::DependentContent));
                             }
                         }
                     },
@@ -2048,12 +2097,12 @@ fn prove_metadata_ownership(
                     if *reference == placeholder_identifier
                         && std::mem::replace(&mut aggregate_placeholder, true)
                     {
-                        return Err(Error::DependentContent);
+                        return Err(Error::Refused(Refusal::DependentContent));
                     }
                     if *reference == storage_identifier
                         && std::mem::replace(&mut aggregate_storage, true)
                     {
-                        return Err(Error::DependentContent);
+                        return Err(Error::Refused(Refusal::DependentContent));
                     }
                 }
                 let mut role_path_seen = false;
@@ -2071,27 +2120,27 @@ fn prove_metadata_ownership(
                             match field.path.as_slice() {
                                 path if path == role_path => {
                                     if std::mem::replace(&mut role_path_seen, true) {
-                                        return Err(Error::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
                                 [7] => {
                                     if std::mem::replace(&mut owned_path_seen, true) {
-                                        return Err(Error::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
                                 [42] => {
                                     if std::mem::replace(&mut z_order_path_seen, true) {
-                                        return Err(Error::DependentContent);
+                                        return Err(Error::Refused(Refusal::DependentContent));
                                     }
                                 },
-                                _ => return Err(Error::DependentContent),
+                                _ => return Err(Error::Refused(Refusal::DependentContent)),
                             }
                         }
                         if *reference == storage_identifier
                             && (field.path.as_slice() != [1, 4]
                                 || std::mem::replace(&mut storage_path_seen, true))
                         {
-                            return Err(Error::DependentContent);
+                            return Err(Error::Refused(Refusal::DependentContent));
                         }
                     }
                 }
@@ -2102,7 +2151,7 @@ fn prove_metadata_ownership(
                         || owner_identifier != expected_slide_identifier
                         || message.type_ != SLIDE_MESSAGE_TYPE)
                 {
-                    return Err(Error::DependentContent);
+                    return Err(Error::Refused(Refusal::DependentContent));
                 }
                 let has_storage = aggregate_storage || storage_path_seen;
                 if has_storage
@@ -2110,7 +2159,7 @@ fn prove_metadata_ownership(
                         || owner_identifier != placeholder_identifier
                         || message.type_ != PLACEHOLDER_MESSAGE_TYPE)
                 {
-                    return Err(Error::DependentContent);
+                    return Err(Error::Refused(Refusal::DependentContent));
                 }
             }
         }
@@ -2189,14 +2238,14 @@ fn storage_rewrite_limits(
 
 fn validate_replacement(replacement: &str) -> Result<(), Error> {
     if contains_dependent_marker(replacement) {
-        return Err(Error::ObjectMarkerReplacement);
+        return Err(Error::Refused(Refusal::ObjectMarkerReplacement));
     }
     Ok(())
 }
 
 fn validate_consumed_text(text: &str) -> Result<(), Error> {
     if contains_dependent_marker(text) {
-        return Err(Error::DependentContent);
+        return Err(Error::Refused(Refusal::DependentContent));
     }
     Ok(())
 }
@@ -2210,10 +2259,10 @@ fn validate_span(text: &str, span: TextSpan) -> Result<Range<usize>, Error> {
     let length_position =
         TextPosition::from_utf16_index(length).map_err(|_error| Error::InvalidSource)?;
     if span.end() > length_position {
-        return Err(Error::SpanOutOfBounds {
+        return Err(Error::Refused(Refusal::SpanOutOfBounds {
             span,
             length: length_position,
-        });
+        }));
     }
     Ok(utf16_to_byte_index(text, span.start())?..utf16_to_byte_index(text, span.end())?)
 }
@@ -2232,7 +2281,7 @@ fn utf16_to_byte_index(text: &str, position: TextPosition) -> Result<usize, Erro
             .checked_add(character.len_utf16())
             .ok_or(Error::InvalidSource)?;
         if units > target {
-            return Err(Error::SurrogateBoundary { position });
+            return Err(Error::Refused(Refusal::SurrogateBoundary { position }));
         }
     }
     if units == target {
@@ -2291,7 +2340,7 @@ fn try_owned_text(text: &str) -> Result<String, Error> {
 }
 
 fn utf16_len(text: &str) -> Result<u32, Error> {
-    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::LimitExceeded {
+    u32::try_from(text.encode_utf16().count()).map_err(|_error| Error::Limit {
         kind: LimitKind::TextUnits,
         observed: u64::MAX,
         maximum: u64::from(u32::MAX),
@@ -2305,7 +2354,7 @@ fn utf16_len(text: &str) -> Result<u32, Error> {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -2316,7 +2365,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -2333,7 +2382,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -2355,7 +2404,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2380,7 +2429,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
@@ -2416,7 +2465,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2439,7 +2488,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(resource),
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -2448,7 +2497,7 @@ fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             field,
             value,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: text_rewrite_limit_kind(field),
             observed: usize_to_u64(value),
             maximum: usize_to_u64(maximum),
@@ -2479,7 +2528,7 @@ fn text_rewrite_limit_kind(resource: &str) -> LimitKind {
 }
 
 fn text_limit_error(observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::TextBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),

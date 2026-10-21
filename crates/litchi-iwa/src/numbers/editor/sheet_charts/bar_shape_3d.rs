@@ -7,7 +7,7 @@ use crate::charts::bar_shape_3d::{
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
 };
 
-impl Editor {
+impl Draft {
     /// Read the rectangular/cylindrical geometry of one 3D bar or column chart.
     pub fn sheet_chart_3d_bar_shape(
         &self,
@@ -50,7 +50,7 @@ impl Editor {
             "Numbers",
             shape,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_bar_shape(sheet_id, drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D bar-shape update failed validation".to_owned(),

@@ -26,4 +26,4 @@ mod tests;
 pub use model::{Blob, Error, Info, Kind, Limits};
 pub use patch::{Change, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::{Commit, Revision, Transaction, update};
+pub use transaction::{Commit, Diagnostics, Edit, Revision, update};

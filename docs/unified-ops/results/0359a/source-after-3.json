@@ -1,0 +1,63 @@
+[
+  {
+    "median_us": 3532.7735999999995,
+    "min_us": 3520.7434000000003,
+    "output_sha256": "d318ad95cfb1463e09a5ee39b5bfbe6adb8b4d0cd9060a34c9d627e6c89e3663",
+    "samples": 31,
+    "scenario": "doc/source_set"
+  },
+  {
+    "median_us": 1327399.217,
+    "min_us": 1205957.057,
+    "samples": 7,
+    "scenario": "doc/batch1k_ops"
+  },
+  {
+    "median_us": 1476174.672,
+    "min_us": 1161051.4549999998,
+    "samples": 7,
+    "scenario": "doc/batch1k_leaf"
+  },
+  {
+    "median_us": 208.48540000000003,
+    "min_us": 207.5634,
+    "output_sha256": "595ab31fa6ced92034e6eff1663f2d880b886832a3be9095fde07f1e6f22f992",
+    "samples": 31,
+    "scenario": "xls/source_cells1"
+  },
+  {
+    "median_us": 264.2836,
+    "min_us": 262.53959999999995,
+    "output_sha256": "7b810037f305d037644a0aeee4dd196e883d8426a1b48c9b20a4ee420be08080",
+    "samples": 31,
+    "scenario": "xls/source_cells100"
+  },
+  {
+    "median_us": 1215.2574,
+    "min_us": 1208.2712000000001,
+    "output_sha256": "dd1faf8e5fb072ecd59e50fd9c7f549d39fdff4ddc2b874f1d1e8ac7bfe3a5bd",
+    "samples": 31,
+    "scenario": "xls/source_comments1"
+  },
+  {
+    "median_us": 1735.4346,
+    "min_us": 1722.0025999999998,
+    "output_sha256": "6dc30ba00e98c80924488cba6e0af4a2add43770886636190d0e61bbcfeb2f16",
+    "samples": 31,
+    "scenario": "xls/source_comments256"
+  },
+  {
+    "median_us": 66.5664,
+    "min_us": 65.9684,
+    "output_sha256": "460f614162e09972b08518490580f235ac7ca6305f497e8571edc5d673b7bcdb",
+    "samples": 31,
+    "scenario": "xls/source_hide7"
+  },
+  {
+    "median_us": 299.3378,
+    "min_us": 297.8798,
+    "output_sha256": "9c1cc5368f99a988f1280446fcf43ec9485a1a88ff6e7245b26038676718731a",
+    "samples": 31,
+    "scenario": "rtf/source_append"
+  }
+]

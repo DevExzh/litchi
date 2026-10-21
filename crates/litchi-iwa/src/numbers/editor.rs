@@ -33,10 +33,9 @@ use super::formula::{
     FormulaPivotCategoryReference, FormulaUuid, PivotFormulaKey, compile_formula,
 };
 use crate::archive::{Archive, ArchiveObject, RawMessage};
-#[allow(deprecated)]
 use crate::comments::{
-    IWorkDrawableCommentEditor, advance_save_tokens_for_entries, clone_comment_storage_exact,
-    current_apple_reference_date, fresh_comment_storage_uuid, insert_comment_storage,
+    advance_save_tokens_for_entries, clone_comment_storage_exact, current_apple_reference_date,
+    fresh_comment_storage_uuid, insert_comment_storage,
     preferred_or_ensure_table_annotation_author, remove_generated_annotation_author_if_unused,
     update_comment_reply_reference,
 };
@@ -58,9 +57,9 @@ use crate::shapes::{
 };
 use crate::text::layout::Layout;
 use crate::text::{
-    Alignment, Background, Borders, IWorkTextEditor, Indents, LineSpacing, Outline,
-    ParagraphBackground, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow,
-    ParagraphList, ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
+    Alignment, Background, Borders, Indents, LineSpacing, Outline, ParagraphBackground,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFlow, ParagraphList,
+    ParagraphListBullet, ParagraphListBulletGeometry, ParagraphListIndentation,
     ParagraphListLabelColor, ParagraphListLevel, ParagraphListLevelPlacement,
     ParagraphListNumberFormat, ParagraphListNumberScale, ParagraphListNumberTiering,
     ParagraphListNumbering, ParagraphListPlacement, ParagraphTabStops, ParagraphWritingDirection,
@@ -77,7 +76,7 @@ use crate::wire::{
     rewrite_repeated_varint_fields, transform_length_delimited_field,
     transform_length_delimited_fields_at_path,
 };
-use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{EmbeddedMediaAsset, Error, HostPackage, Result};
 use formula_clone::{
     clone_table_formula_graph, create_empty_table_formula_graph, formula_graph_owner_uuids,
     remap_cloned_formula_owner_storage, remap_cloned_formula_storage, remove_table_formula_graph,
@@ -103,23 +102,6 @@ const TABLE_DUPLICATE_OFFSET: f32 = DRAWABLE_DUPLICATE_OFFSET;
 const EMPTY_TABLE_POSITION_OFFSET: f32 = 40.0;
 const CONDITIONAL_STYLE_NO_APPLIED_RULE: u32 = 15;
 
-/// Numbers-owned table editing vocabulary.
-pub mod table {
-    /// Cell-level table editing vocabulary.
-    pub mod cell {
-        /// Compatibility re-export for the former Numbers-owned border value.
-        ///
-        /// New code should import [`litchi_iwa_common::table::cell::Borders`]
-        /// directly. This path remains only so migration-host callers using
-        /// the historical `numbers::editor::table::cell` namespace continue
-        /// to compile while the common owner is adopted.
-        #[deprecated(
-            note = "use litchi_iwa_common::table::cell::Borders; this Numbers path is retained for migration-host compatibility"
-        )]
-        pub use litchi_iwa_common::table::cell::Borders;
-    }
-}
-
 #[derive(Debug, Clone)]
 struct NumbersTextBoxGraph {
     sheet_id: u64,
@@ -134,7 +116,7 @@ struct NumbersTextBoxGraph {
 pub(crate) fn compatibility_document_from_bytes(
     bytes: &[u8],
 ) -> crate::Result<litchi_numbers::Workbook> {
-    let editor = Editor::from_bytes(bytes)?;
+    let editor = Draft::from_bytes(bytes)?;
     let descriptors = table_models(editor.package())?;
     let tables = litchi_numbers::compatibility_tables_from_bytes(bytes)
         .map_err(|error| crate::Error::InvalidFormat(error.to_string()))?;
@@ -222,13 +204,13 @@ mod text_box_duplicate;
 mod topology_oracle;
 
 #[doc(hidden)]
-pub use topology_oracle::UnverifiedTopologyEdit;
+pub use topology_oracle::UnverifiedAxisChange;
 
 pub use crate::charts::Direction;
 use model::*;
 
 #[cfg(test)]
-pub(crate) fn test_sheet_selector(editor: &Editor, native_id: u64) -> SheetSelector<'static> {
+pub(crate) fn test_sheet_selector(editor: &Draft, native_id: u64) -> SheetSelector<'static> {
     let index = editor
         .sheets()
         .ok()
@@ -242,7 +224,7 @@ pub(crate) fn test_sheet_selector(editor: &Editor, native_id: u64) -> SheetSelec
 }
 
 #[cfg(test)]
-pub(crate) fn test_table_selector(editor: &Editor, native_id: u64) -> TableSelector<'static> {
+pub(crate) fn test_table_selector(editor: &Draft, native_id: u64) -> TableSelector<'static> {
     let index = editor
         .tables()
         .ok()
@@ -257,7 +239,7 @@ pub(crate) fn test_table_selector(editor: &Editor, native_id: u64) -> TableSelec
 
 #[cfg(test)]
 fn test_cell_selectors(
-    editor: &Editor,
+    editor: &Draft,
     native_id: u64,
 ) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
     selectors::focused_table_location(editor, native_id)
@@ -282,7 +264,7 @@ fn test_cell_input(value: CellValue) -> Result<Option<litchi_numbers::table::cel
 
 #[cfg(test)]
 pub(crate) fn test_set_cells(
-    editor: &mut Editor,
+    editor: &mut Draft,
     native_id: u64,
     updates: impl IntoIterator<Item = TableCellUpdate>,
 ) -> Result<usize> {
@@ -312,13 +294,13 @@ pub(crate) fn test_set_cells(
     target
         .write_to(&mut bytes)
         .map_err(|error| Error::ParseError(error.to_string()))?;
-    *editor = Editor::from_bytes(&bytes)?;
+    *editor = Draft::from_bytes(&bytes)?;
     Ok(count)
 }
 
 #[cfg(test)]
 pub(crate) fn test_set_cell(
-    editor: &mut Editor,
+    editor: &mut Draft,
     native_id: u64,
     row: usize,
     column: usize,
@@ -334,7 +316,7 @@ pub(crate) fn test_set_cell(
 
 #[cfg(test)]
 pub(crate) fn set_cell_fixture(
-    editor: &mut Editor,
+    editor: &mut Draft,
     native_id: u64,
     row: usize,
     column: usize,
@@ -342,14 +324,14 @@ pub(crate) fn set_cell_fixture(
 ) -> Result<()> {
     let mut staged = editor.package.clone();
     set_table_cell_in_package(&mut staged, native_id, row, column, value)?;
-    IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+    HostPackage::from_bytes(&staged.to_bytes()?)?;
     editor.package = staged;
     Ok(())
 }
 
 #[cfg(test)]
 pub(crate) fn apply_numbers_fixture(
-    editor: &mut Editor,
+    editor: &mut Draft,
     native_id: u64,
     updates: impl IntoIterator<Item = TableCellUpdate>,
 ) -> Result<usize> {
@@ -366,7 +348,7 @@ pub(crate) fn apply_numbers_fixture(
             "fixture table cell batch applied {applied} updates, expected {expected}"
         )));
     }
-    IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+    HostPackage::from_bytes(&staged.to_bytes()?)?;
     editor.package = staged;
     Ok(applied)
 }
@@ -395,7 +377,6 @@ pub(crate) use table_sort::{
 pub(crate) use package::*;
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests;
 
 #[cfg(test)]

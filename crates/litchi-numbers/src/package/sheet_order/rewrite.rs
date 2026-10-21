@@ -1,5 +1,5 @@
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
-use litchi_iwa_common::{WireLimits, wire::parse_wire_fields_with_limits};
+use litchi_iwa_common::{WireLimits, wire::parse_wire_fields};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::numbers_sheet_order_codec::ReferenceSnapshot;
 
@@ -41,7 +41,9 @@ pub(super) fn rewrite(
     previews: &[&str],
 ) -> Result<Rewritten, Error> {
     if target.document.component_index != target.sidebar_root.component_index {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let source_catalog = physical_source(source)?;
     let component = source
@@ -57,7 +59,9 @@ pub(super) fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let decoded_extent = archive_extent(component.archive())?;
     let decoded_allocation = archive_allocation_cost(component.archive())?;
@@ -305,7 +309,7 @@ fn reorder_raw_records(
     destination_position: usize,
 ) -> Result<RawReorder, Error> {
     let limits = wire_limits(source.len())?;
-    let fields = parse_wire_fields_with_limits(source, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(source, limits).map_err(map_wire_error)?;
     let selected_count = fields
         .iter()
         .filter(|field| field.number() == field_number)
@@ -685,11 +689,9 @@ pub(super) fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<&'sta
 }
 
 pub(super) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
-    package
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource)
+    package.state.components.physical().ok_or(Error::Refused(
+        crate::package::sheet_order::Refusal::UnsupportedSource,
+    ))
 }
 
 pub(super) fn preflight_transaction_work(
@@ -914,10 +916,10 @@ fn raw_records_reordered_exact(
     {
         return Ok(false);
     }
-    let source_fields = parse_wire_fields_with_limits(source, wire_limits(source.len())?)
-        .map_err(map_wire_error)?;
-    let candidate_fields = parse_wire_fields_with_limits(candidate, wire_limits(candidate.len())?)
-        .map_err(map_wire_error)?;
+    let source_fields =
+        parse_wire_fields(source, wire_limits(source.len())?).map_err(map_wire_error)?;
+    let candidate_fields =
+        parse_wire_fields(candidate, wire_limits(candidate.len())?).map_err(map_wire_error)?;
     if source_fields.len() != candidate_fields.len() {
         return Ok(false);
     }
@@ -1303,7 +1305,9 @@ mod tests {
         let attributed = Package::from_bytes(&package_bytes(true, false, 3)?)?;
         assert!(matches!(
             attributed.edit_sheet_order().move_sheet(0usize, 2),
-            Err(Error::UnsupportedSource)
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
         ));
         let malformed = Package::from_bytes(&package_bytes(false, true, 3)?)?;
         assert!(matches!(
@@ -1318,7 +1322,12 @@ mod tests {
         let source = package_bytes(false, false, 2)?;
         let package = Package::from_bytes(&source)?;
         let result = package.edit_sheet_order().move_sheet(0usize, 2)?.commit();
-        assert!(matches!(result, Err(Error::UnsupportedSource)));
+        assert!(matches!(
+            result,
+            Err(Error::Refused(
+                crate::package::sheet_order::Refusal::UnsupportedSource
+            ))
+        ));
         assert_eq!(exact_bytes(&package)?, source);
         Ok(())
     }
@@ -1333,9 +1342,15 @@ mod tests {
                 &mut payload,
                 1,
                 &reference(*identifier).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
-        append_length_delimited_field(&mut payload, 5, &reference(SIDEBAR).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            5,
+            &reference(SIDEBAR).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let options = numbers_sheet_order_codec::DecodeOptions::new(
             payload.len(),
             payload.len().saturating_mul(2),

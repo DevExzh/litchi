@@ -2262,8 +2262,12 @@ fn rename_table_qnames(source: &str, element_prefix: &str, attribute_prefix: &st
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
 }
-fn unsupported(message: impl Into<String>) -> Error {
-    Error::Unsupported(message.into())
+fn unsupported(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "ods.sheet_metadata.index",
+        reason,
+    ))
 }
 fn limit(resource: Resource, scope: &'static str, observed: usize, maximum: usize) -> Error {
     Error::ResourceLimit(litchi_core::ResourceLimit {
@@ -2304,10 +2308,10 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 fn map_execution(error: litchi_core::ExecutionError) -> Error {
     match error {
         litchi_core::ExecutionError::ResourceLimit(value) => Error::ResourceLimit(value),
-        litchi_core::ExecutionError::Cancelled => unsupported("ODS metadata operation cancelled"),
-        other => unsupported(format!(
-            "ODS metadata execution policy rejected operation: {other}"
-        )),
+        litchi_core::ExecutionError::Cancelled => {
+            Error::Other("ODS metadata operation cancelled".to_string())
+        },
+        _other => Error::Other("ODS metadata execution policy rejected operation".to_string()),
     }
 }
 

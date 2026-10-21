@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, ParagraphListLevel};
+use litchi_iwa::text::ParagraphListLevel;
 use litchi_iwa_text::position::TextPosition;
 
 enum LevelEdit {
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = IWorkTextEditor::open(input)?;
+    let mut editor = litchi_iwa::text::Draft::open(input)?;
     match edit {
         LevelEdit::Reset => {
             editor.reset_paragraph_list_level(storage_id, paragraph)?;

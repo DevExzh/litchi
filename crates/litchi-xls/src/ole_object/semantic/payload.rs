@@ -6,6 +6,7 @@ use litchi_cfb::{
     OleFile,
     consts::{STGTY_STORAGE, STGTY_STREAM},
 };
+use litchi_core::edit::RefusalKind;
 use litchi_ole_common::property_set::PropertySetReader;
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use std::io::Cursor;
@@ -184,10 +185,7 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
             (entry.entry_type, entry.name.clone(), entry.size)
         };
         if is_nested_protected_component(&name) {
-            return Err(Error::UnsafeEdit(
-                "embedded payload contains signed, encrypted, or DRM content; refusing publication"
-                    .into(),
-            ));
+            return Err(Error::refused(RefusalKind::UnsupportedOperation, "edit OLE objects", "embedded payload contains signed, encrypted, or DRM content; refusing publication"));
         }
         if budget.entries >= budget.max_entries {
             return Err(Error::InvalidData(
@@ -260,9 +258,7 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
                         .iter()
                         .any(|section| section.property(DIGITAL_SIGNATURE).is_some())
                     {
-                        return Err(Error::UnsafeEdit(
-                            "embedded payload contains PIDDSI DigitalSignature; refusing a rewritten payload".into(),
-                        ));
+                        return Err(Error::refused(RefusalKind::UnsupportedOperation, "edit OLE objects", "embedded payload contains PIDDSI DigitalSignature; refusing a rewritten payload"));
                     }
                 }
             },

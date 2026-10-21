@@ -1862,8 +1862,10 @@ fn stage_axis_attribute(
         }),
         (Some(new_value), None, None) => {
             let prefix = axis.prefix.as_deref().ok_or_else(|| {
-                CoreError::Unsupported(format!(
-                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add a chart element without a lossless chart namespace prefix",
                 ))
             })?;
             let raw = &source.as_bytes()[axis.tag.clone()];
@@ -1902,13 +1904,17 @@ fn stage_exact_attribute(
         (Some(new_value), None) => {
             let (namespace, local) = attribute_name(attribute);
             if namespace != CHART {
-                return Err(CoreError::Unsupported(format!(
-                    "cannot add {local} without a lossless namespace-prefix proof"
+                return Err(CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add an element without a lossless namespace-prefix proof",
                 )));
             }
             let prefix = tag.prefix.as_deref().ok_or_else(|| {
-                CoreError::Unsupported(format!(
-                    "cannot add chart:{local} without a lossless chart namespace prefix"
+                CoreError::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odc.flat",
+                    "cannot add a chart element without a lossless chart namespace prefix",
                 ))
             })?;
             let relative = insertion_offset(&source.as_bytes()[tag.tag.clone()])?;

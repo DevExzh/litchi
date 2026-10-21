@@ -23,7 +23,7 @@ fn reader(snapshot: &Snapshot) -> Reader<Cursor<Vec<u8>>> {
 #[test]
 fn alignment_border_and_fill_changes_author_one_shared_xf() {
     let bytes = fixture();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let xf_count = source.inner.xf_records.len();
     let change = FormatChange {
         horizontal: Some(HorizontalAlignment::Center),
@@ -104,7 +104,7 @@ fn alignment_border_and_fill_changes_author_one_shared_xf() {
 
 #[test]
 fn ineffective_and_invalid_format_changes() {
-    let source = Snapshot::from_bytes(fixture()).unwrap();
+    let source = Snapshot::from_bytes(fixture(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_cell_format(
         Selector::Position(Position::new(0)),

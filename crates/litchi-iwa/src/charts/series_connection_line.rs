@@ -11,7 +11,7 @@ use crate::charts::series_non_style::{
     set_chart_series_non_style_values,
 };
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const LINE_LINE_TYPE_FIELD: u32 = 18;
 const SCATTER_SHOW_LINE_FIELD: u32 = 29;
@@ -102,7 +102,7 @@ impl ChartSeriesConnectionLineKind {
 
 /// Read connection geometry in native series order.
 pub(crate) fn chart_series_connection_lines(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -124,7 +124,7 @@ pub(crate) fn chart_series_connection_lines(
 /// Replace every series' connection geometry in native series order.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_chart_series_connection_lines(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

@@ -6,7 +6,7 @@ use crate::charts::options::{
     set_chart_title as set_native_chart_title,
 };
 
-impl Editor {
+impl Draft {
     /// Read the chart title shown by Pages for one body chart.
     pub fn body_chart_title(&self, drawable_object_id: u64) -> Result<Option<String>> {
         body_chart_title(self, drawable_object_id)
@@ -25,7 +25,7 @@ impl Editor {
     }
 }
 
-fn body_chart_title(editor: &Editor, drawable_object_id: u64) -> Result<Option<String>> {
+fn body_chart_title(editor: &Draft, drawable_object_id: u64) -> Result<Option<String>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_title(
         editor.package(),
@@ -35,7 +35,7 @@ fn body_chart_title(editor: &Editor, drawable_object_id: u64) -> Result<Option<S
     )
 }
 
-fn set_body_chart_title(editor: &mut Editor, drawable_object_id: u64, title: &str) -> Result<()> {
+fn set_body_chart_title(editor: &mut Draft, drawable_object_id: u64, title: &str) -> Result<()> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
     set_native_chart_title(
@@ -45,7 +45,7 @@ fn set_body_chart_title(editor: &mut Editor, drawable_object_id: u64, title: &st
         "Pages",
         title,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_title(drawable_object_id)?.as_deref() != Some(title) {
         return Err(Error::InvalidFormat(
             "Pages chart title update failed validation".to_owned(),
@@ -55,7 +55,7 @@ fn set_body_chart_title(editor: &mut Editor, drawable_object_id: u64, title: &st
     Ok(())
 }
 
-fn remove_body_chart_title(editor: &mut Editor, drawable_object_id: u64) -> Result<bool> {
+fn remove_body_chart_title(editor: &mut Draft, drawable_object_id: u64) -> Result<bool> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     let mut staged = editor.package().clone();
     let removed = remove_native_chart_title(
@@ -67,7 +67,7 @@ fn remove_body_chart_title(editor: &mut Editor, drawable_object_id: u64) -> Resu
     if !removed {
         return Ok(false);
     }
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_title(drawable_object_id)?.is_some() {
         return Err(Error::InvalidFormat(
             "Pages chart title removal failed validation".to_owned(),

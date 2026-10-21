@@ -4,4 +4,4 @@
 //! [`Commit`] carrying the new immutable package, an exact-source [`Patch`]
 //! and [`Diagnostics`]. [`crate::Package::apply`] replays a patch.
 
-pub use crate::package::edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal};

@@ -142,7 +142,7 @@ fn component_population_work_scales_and_required_minus_one_refuses_before_public
     let (rejected, rejected_usage) = attempt(8_192, Some(maximum))?;
     assert!(matches!(
         rejected,
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::TransactionWork,
             maximum: reported_maximum,
             ..

@@ -7,11 +7,12 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{LatentStyleException, LatentStyles, RtfDocument, RtfError, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{LatentStyleException, LatentStyles, RtfError, RtfWriter};
 use std::borrow::Cow;
 use std::fs;
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -21,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_full_unicode_latent_styles_and_round_trips_order() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1{\*\latentstyles\lsdstimax156\lsdlockeddef0"#,
         r#"\lsdsemihiddendef1\lsdunhideuseddef1\lsdqformatdef0\lsdprioritydef99"#,
         r#"{\lsdlockedexcept \lsdqformat1\lsdpriority0 Normal;"#,
@@ -40,14 +41,14 @@ fn parses_full_unicode_latent_styles_and_round_trips_order() {
     assert_eq!(styles.exceptions[1].name, "Heading 你");
     assert_eq!(styles.exceptions[1].semi_hidden, Some(true));
 
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.latent_styles(), Some(styles));
 }
 
 #[test]
 fn parses_multiple_exception_names_from_one_text_token() {
-    let document = RtfDocument::parse(
+    let document = Tree::parse(
         r"{\rtf1{\*\latentstyles\lsdstimax3{\lsdlockedexcept\lsdlocked1 Alpha;Beta;Gamma;}}}",
     )
     .unwrap();
@@ -80,9 +81,9 @@ fn mutation_validates_and_clear_preserves_body() {
             priority: Some(10),
         }],
     };
-    let mut document = RtfDocument::parse(r"{\rtf1 Text}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Text}").unwrap();
     document.set_latent_styles(styles.clone()).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
     assert_eq!(reparsed.latent_styles(), Some(&styles));
     assert_eq!(reparsed.text(), "Text");
 
@@ -108,7 +109,7 @@ fn rejects_malformed_or_active_latent_style_grammar() {
         r"{\rtf1\lsdstimax1}",
     ];
     for rtf in cases {
-        assert!(RtfDocument::parse(rtf).is_err(), "accepted malformed {rtf}");
+        assert!(Tree::parse(rtf).is_err(), "accepted malformed {rtf}");
     }
 
     let mut oversized_unicode =
@@ -116,7 +117,7 @@ fn rejects_malformed_or_active_latent_style_grammar() {
     oversized_unicode.push_str(&r"\u20320?".repeat(21_846));
     oversized_unicode.push_str(";}}}");
     assert!(matches!(
-        RtfDocument::parse(&oversized_unicode),
+        Tree::parse(&oversized_unicode),
         Err(RtfError::MalformedDocument(message))
             if message == "RTF latent-style exception name exceeds the safety limit"
     ));
@@ -139,7 +140,7 @@ fn parses_bundled_libreoffice_latent_style_fixtures() {
     );
     for (fixture, has_exceptions) in FIXTURES {
         let bytes = fs::read(format!("{root}/{fixture}")).unwrap();
-        let document = RtfDocument::parse_bytes(&bytes)
+        let document = Tree::parse_bytes(&bytes)
             .unwrap_or_else(|error| panic!("failed to parse {fixture}: {error}"));
         let styles = document
             .latent_styles()

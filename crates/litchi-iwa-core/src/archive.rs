@@ -32,8 +32,7 @@ use std::io::Read;
 use std::mem::size_of;
 
 use litchi_iwa_common::wire::{
-    WireDescent, WireField, WirePreflight, WireVisit, parse_wire_fields_with_limits,
-    preflight_wire_tree_with_limits,
+    WireDescent, WireField, WirePreflight, WireVisit, parse_wire_fields, preflight_wire_tree,
 };
 use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_protos::archive_codec;
@@ -3505,7 +3504,7 @@ fn rewrite_message_metadata_in_header(
     }
 
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let message_field = fields
         .iter()
@@ -3589,7 +3588,7 @@ fn rewrite_effective_message_scalars(
     wire_limits: WireLimits,
     message_index: usize,
 ) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let type_field = (current_type != replacement_type)
         .then(|| {
@@ -3693,7 +3692,7 @@ fn rewrite_message_metadata_and_prune_references_in_header(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let mut message_count = 0usize;
     let mut target = None;
@@ -3846,7 +3845,7 @@ fn rewrite_message_metadata_and_reorder_references_in_header(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let mut message_count = 0usize;
     let mut target = None;
@@ -3931,7 +3930,7 @@ fn rewrite_message_metadata_and_transition_references_in_header(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let mut message_count = 0usize;
     let mut target = None;
@@ -4178,7 +4177,7 @@ fn rewrite_message_metadata_and_transition_data_references_in_header(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
     let mut message_count = 0usize;
     let mut target = None;
@@ -4262,7 +4261,7 @@ fn rewrite_effective_message_scalars_and_data_reference_transition(
     limits: Limits,
     message_index: usize,
 ) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let type_field = effective_required_varint_field(
         source,
@@ -4611,7 +4610,7 @@ fn rewrite_field_info_data_reference_transition(
     limits: Limits,
     message_index: usize,
 ) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut rewrites = retained_field_rewrites(fields.len())?;
     let mut first = None;
@@ -4721,7 +4720,7 @@ fn rewrite_repeated_data_reference_fields(
     allocation_context: &'static str,
 ) -> Result<HeaderFieldRewrite> {
     let _ = first_payload;
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut observed = Vec::new();
     observed
@@ -4924,7 +4923,7 @@ fn rewrite_effective_message_scalars_and_reference_transition(
     limits: Limits,
     message_index: usize,
 ) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let type_field = effective_required_varint_field(
         source,
@@ -5140,7 +5139,7 @@ fn rewrite_field_info_reference_transition(
     limits: Limits,
     message_index: usize,
 ) -> Result<Vec<u8>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut rewrites = retained_field_rewrites(fields.len())?;
     let mut source_index = 0usize;
@@ -5201,7 +5200,7 @@ fn rewrite_effective_message_scalars_and_reference_order(
             "reordered reference count changed",
         ));
     }
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let type_field = effective_required_varint_field(
         source,
@@ -5305,7 +5304,7 @@ fn rewrite_field_info_data_reference_order(
     limits: Limits,
     message_index: usize,
 ) -> Result<HeaderFieldRewrite> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut actual_count = 0usize;
     let mut matches_expected = true;
@@ -5957,7 +5956,7 @@ fn rewrite_effective_message_scalars_and_references(
     limits: Limits,
     message_index: usize,
 ) -> Result<Option<Vec<u8>>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let type_field = effective_required_varint_field(
         source,
@@ -6063,7 +6062,7 @@ fn rewrite_field_info_references(
     limits: Limits,
     message_index: usize,
 ) -> Result<Option<Vec<u8>>> {
-    let fields = parse_wire_fields_with_limits(source, wire_limits)
+    let fields = parse_wire_fields(source, wire_limits)
         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
     let mut rewrites = retained_field_rewrites(fields.len())?;
     for (field_index, field) in fields.iter().copied().enumerate() {
@@ -7897,7 +7896,7 @@ fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<W
     let metadata_items = Cell::new(0usize);
     let message_infos = Cell::new(0usize);
 
-    let preflight = preflight_wire_tree_with_limits(data, wire_limits, |visit| {
+    let preflight = preflight_wire_tree(data, wire_limits, |visit| {
         let node = node_at_path(root, visit.path());
         if node == Some(HeaderNode::ArchiveInfo)
             && visit.field().number() == 2
@@ -7946,7 +7945,7 @@ fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<W
 fn header_has_unknown_reference_metadata(data: &[u8], limits: Limits) -> Result<bool> {
     let wire_limits = header_wire_limits(limits)?;
     let mut unknown = false;
-    preflight_wire_tree_with_limits(data, wire_limits, |visit| {
+    preflight_wire_tree(data, wire_limits, |visit| {
         let node = node_at_path(HeaderNode::ArchiveInfo, visit.path());
         let field = visit.field();
         unknown |= !known_header_field(node, field.number());

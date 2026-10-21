@@ -213,7 +213,7 @@ impl Reply {
 /// Exact-source transactions for one drawable's comment thread.
 pub mod transaction {
     pub use crate::package::slide_drawable_comments::{
-        Commit, Diagnostics, DrawableSummary, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, DrawableSummary, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

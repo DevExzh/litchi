@@ -710,7 +710,7 @@ mod tests {
             Ok(output.into_inner())
         };
         let bytes = write(21).unwrap();
-        let mut package = crate::raw::Package::from_reader(std::io::Cursor::new(bytes)).unwrap();
+        let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).unwrap();
         package.document().unwrap().text().unwrap();
         for columns in [22, 23, 40, 63] {
             match write(columns) {

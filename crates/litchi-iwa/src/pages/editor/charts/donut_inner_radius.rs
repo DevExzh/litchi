@@ -7,7 +7,7 @@ use crate::charts::donut_inner_radius::{
     set_chart_donut_inner_radius as set_native_chart_donut_inner_radius,
 };
 
-impl Editor {
+impl Draft {
     /// Read the Segments inner radius of one donut body chart.
     pub fn body_chart_donut_inner_radius(
         &self,
@@ -27,7 +27,7 @@ impl Editor {
 }
 
 fn body_chart_donut_inner_radius(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<ChartDonutInnerRadius> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -41,7 +41,7 @@ fn body_chart_donut_inner_radius(
 }
 
 fn set_body_chart_donut_inner_radius(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     radius: ChartDonutInnerRadius,
 ) -> Result<()> {
@@ -64,7 +64,7 @@ fn set_body_chart_donut_inner_radius(
         "Pages",
         radius,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_donut_inner_radius(drawable_object_id)? != radius {
         return Err(Error::InvalidFormat(
             "Pages chart donut inner-radius update failed validation".to_owned(),

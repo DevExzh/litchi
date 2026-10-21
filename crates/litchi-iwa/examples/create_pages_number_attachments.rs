@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)
         .ok_or("usage: create_pages_number_attachments <output.pages>")?;
-    let mut editor = pages::Editor::create_with_text(BODY)?;
+    let mut editor = pages::Draft::create_with_text(BODY)?;
     editor.insert_body_number_attachment(
         TextPosition::from_utf16_index(PAGE_NUMBER_POSITION)?,
         TextNumberAttachmentSettings::new(TextNumberAttachmentKind::PageNumber),

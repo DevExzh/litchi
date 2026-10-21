@@ -37,7 +37,7 @@ use crate::wire::{
     patch_nested_length_delimited_field, patch_nested_varint_field, patch_varint_field,
     remove_repeated_length_delimited_field_where, transform_length_delimited_fields_at_path,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3056;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
@@ -187,28 +187,30 @@ impl From<litchi_iwa_common::comment::Error> for Error {
 /// It edits the `TSD.DrawableArchive.comment` reference nested in each known
 /// drawable payload and stores comment bodies in `TSD.CommentStorageArchive`
 /// objects. Table-cell comments use a separate table-list indirection and are
-/// available through each application's semantic editor.
-#[deprecated(
-    since = "0.0.1",
-    note = "legacy migration-host drawable-comment editor; use focused format-semantic comment owners where available; direct-drawable comment migration remains pending"
-)]
+/// available through each application's semantic draft.
+///
+/// This is a host draft (record 0361): a mutable working copy of one host
+/// [`crate::Package`] that drawables are addressed in by native identifier.
+/// Keynote slide drawables have the selector-first
+/// `litchi_keynote::Package::edit_slide_drawable_comment` family; Pages and
+/// Numbers drawable comments have no focused owner yet, so the draft keeps
+/// them.
 #[derive(Debug, Clone)]
-pub struct IWorkDrawableCommentEditor {
-    package: IWorkPackage,
+pub struct Draft {
+    package: HostPackage,
     application: Application,
 }
 
-#[allow(deprecated)]
-impl IWorkDrawableCommentEditor {
+impl Draft {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(IWorkPackage::open(path)?)
+        Self::from_package(HostPackage::open(path)?)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_package(IWorkPackage::from_bytes(bytes)?)
+        Self::from_package(HostPackage::from_bytes(bytes)?)
     }
 
-    pub fn from_package(package: IWorkPackage) -> Result<Self> {
+    pub fn from_package(package: HostPackage) -> Result<Self> {
         let application = package_application(&package)?;
         // Decode the full drawable surface now so malformed known payloads fail
         // before a caller receives an editor.
@@ -343,11 +345,11 @@ impl IWorkDrawableCommentEditor {
         Ok(())
     }
 
-    pub fn package(&self) -> &IWorkPackage {
+    pub fn package(&self) -> &HostPackage {
         &self.package
     }
 
-    pub fn into_package(self) -> IWorkPackage {
+    pub fn into_package(self) -> HostPackage {
         self.package
     }
 
@@ -369,13 +371,13 @@ struct DrawableLocation {
     comment_storage_object_id: Option<u64>,
 }
 
-fn validate_package_round_trip(package: &IWorkPackage) -> Result<()> {
+fn validate_package_round_trip(package: &HostPackage) -> Result<()> {
     let bytes = package.to_bytes()?;
-    IWorkPackage::from_bytes(&bytes)?;
+    HostPackage::from_bytes(&bytes)?;
     Ok(())
 }
 
-fn package_application(package: &IWorkPackage) -> Result<Application> {
+fn package_application(package: &HostPackage) -> Result<Application> {
     let mut detected = None;
     for name in package.iwa_entry_names() {
         package.with_parsed_archive(name, |archive| {
@@ -403,7 +405,7 @@ fn package_application(package: &IWorkPackage) -> Result<Application> {
     })
 }
 
-fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, String>> {
+fn object_locations(package: &HostPackage) -> Result<HashMap<u64, String>> {
     let mut locations = HashMap::new();
     for name in package.iwa_entry_names() {
         package.with_parsed_archive(name, |archive| {
@@ -424,7 +426,7 @@ fn object_locations(package: &IWorkPackage) -> Result<HashMap<u64, String>> {
 }
 
 fn drawable_locations(
-    package: &IWorkPackage,
+    package: &HostPackage,
     application: Application,
 ) -> Result<HashMap<u64, DrawableLocation>> {
     let mut result = HashMap::new();
@@ -468,7 +470,7 @@ fn drawable_locations(
 }
 
 fn drawable_comment_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     application: Application,
     drawable_object_id: u64,
 ) -> Result<Option<DrawableComment>> {
@@ -494,7 +496,7 @@ fn drawable_comment_in_package(
 }
 
 fn drawable_comment_replies_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     application: Application,
     drawable_object_id: u64,
 ) -> Result<Vec<DrawableReply>> {
@@ -541,7 +543,7 @@ fn drawable_comment_replies_in_package(
 }
 
 fn set_drawable_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     drawable_object_id: u64,
     text: String,
@@ -653,7 +655,7 @@ fn set_drawable_comment_in_package(
 }
 
 fn clear_drawable_comment_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     drawable_object_id: u64,
 ) -> Result<()> {
@@ -697,7 +699,7 @@ fn clear_drawable_comment_in_package(
 }
 
 fn add_drawable_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     drawable_object_id: u64,
     text: String,
@@ -769,7 +771,7 @@ fn add_drawable_comment_reply_in_package(
 }
 
 fn set_drawable_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     drawable_object_id: u64,
     reply_storage_object_id: u64,
@@ -827,7 +829,7 @@ fn set_drawable_comment_reply_in_package(
 }
 
 fn remove_drawable_comment_reply_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     drawable_object_id: u64,
     reply_storage_object_id: u64,
@@ -896,7 +898,7 @@ fn validate_direct_reply_reference(
 }
 
 fn validate_direct_reply_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     root_storage_id: u64,
     root: &Comment,
@@ -921,7 +923,7 @@ fn validate_direct_reply_graph(
 }
 
 fn cleanup_removed_comment_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     original_locations: &HashMap<u64, String>,
     removed: &mut RemovedCommentGraph,
     modified_entries: &mut Vec<String>,
@@ -947,7 +949,7 @@ fn cleanup_removed_comment_graph(
 }
 
 pub(crate) fn advance_save_tokens_for_entries(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     entry_names: &[String],
 ) -> Result<()> {
     let mut component_identifiers = Vec::new();
@@ -962,7 +964,7 @@ pub(crate) fn advance_save_tokens_for_entries(
 }
 
 fn replace_drawable_comment_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     location: &DrawableLocation,
     old: Option<u64>,
@@ -1119,7 +1121,7 @@ fn comment_storage_message_index(object: &ArchiveObject, storage_id: u64) -> Res
 }
 
 fn read_comment_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     storage_id: u64,
 ) -> Result<Comment> {
@@ -1189,7 +1191,7 @@ fn materialize_comment_text(storage_id: u64, text: &str) -> Result<String> {
 }
 
 fn update_comment_storage_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     storage_id: u64,
     text: String,
@@ -1228,7 +1230,7 @@ fn update_comment_storage_text(
 }
 
 fn clone_comment_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     old_storage_id: u64,
     new_storage_id: u64,
@@ -1296,7 +1298,7 @@ fn clone_comment_storage(
 }
 
 pub(crate) fn clone_comment_storage_exact(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     old_storage_id: u64,
     new_storage_id: u64,
@@ -1329,7 +1331,7 @@ pub(crate) fn clone_comment_storage_exact(
 }
 
 pub(crate) fn insert_comment_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     storage_id: u64,
     text: String,
@@ -1365,7 +1367,7 @@ pub(crate) fn insert_comment_storage(
 }
 
 pub(crate) fn update_comment_reply_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     root_storage_id: u64,
     old_reply_id: Option<u64>,
     new_reply_id: Option<u64>,
@@ -1560,7 +1562,7 @@ fn strict_annotation_author_error(object_id: u64, error: impl std::fmt::Display)
 /// common parser's typed allocation error instead of turning an exhausted
 /// candidate-local vector into a generic malformed-message error.
 fn annotation_wire_fields(object_id: u64, source: &[u8]) -> Result<Vec<crate::wire::WireField>> {
-    match litchi_iwa_common::wire::parse_wire_fields_with_limits(
+    match litchi_iwa_common::wire::parse_wire_fields(
         source,
         litchi_iwa_common::WireLimits::default(),
     ) {
@@ -2036,7 +2038,7 @@ fn annotation_author_storage_ids(storage_id: u64, source: &[u8]) -> Result<Vec<u
 }
 
 fn annotation_author_is_generated(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     author_id: u64,
     public_id: bool,
@@ -2078,7 +2080,7 @@ fn annotation_author_is_generated(
 }
 
 fn validate_annotation_author(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     author_id: u64,
 ) -> Result<()> {
@@ -2130,7 +2132,7 @@ fn object_reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-pub(crate) fn fresh_comment_storage_uuid(package: &IWorkPackage) -> Result<tsp::Uuid> {
+pub(crate) fn fresh_comment_storage_uuid(package: &HostPackage) -> Result<tsp::Uuid> {
     let mut existing = HashSet::new();
     for name in package.iwa_entry_names() {
         for object in package.archive(name)?.objects {
@@ -2167,7 +2169,7 @@ pub(crate) fn fresh_comment_storage_uuid(package: &IWorkPackage) -> Result<tsp::
 }
 
 fn annotation_author_storage_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<Option<AnnotationAuthorStorageLocation>> {
     let mut result = None;
     for name in package.iwa_entry_names() {
@@ -2257,19 +2259,19 @@ fn generated_annotation_author_object(
 }
 
 pub(crate) fn ensure_annotation_author(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     ensure_generated_annotation_author(package, generated_annotation_author())
 }
 
 pub(crate) fn ensure_table_annotation_author(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     ensure_generated_annotation_author(package, generated_local_annotation_author())
 }
 
 pub(crate) fn preferred_or_ensure_table_annotation_author(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
@@ -2295,7 +2297,7 @@ pub(crate) fn preferred_or_ensure_table_annotation_author(
 }
 
 fn ensure_generated_annotation_author(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     generated: tsk::AnnotationAuthorArchive,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     let Some(location) = annotation_author_storage_location(package)? else {
@@ -2382,7 +2384,7 @@ fn ensure_generated_annotation_author(
 
 /// Return the first author already registered by iWork.
 fn preferred_annotation_author(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
 ) -> Result<(Option<u64>, Option<String>, bool)> {
     let Some(location) = annotation_author_storage_location(package)? else {
         return Ok((None, None, false));
@@ -2420,7 +2422,7 @@ fn preferred_annotation_author(
 }
 
 pub(crate) fn remove_generated_annotation_author_if_unused(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     author_id: u64,
 ) -> Result<bool> {
     let locations = object_locations(package)?;
@@ -2531,7 +2533,7 @@ struct RemovedCommentGraph {
 }
 
 fn remove_unreferenced_comment_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     root: u64,
 ) -> Result<RemovedCommentGraph> {
@@ -2542,7 +2544,7 @@ fn remove_unreferenced_comment_graph(
 }
 
 fn remove_unreferenced_comment_graph_in_place(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     application: Application,
     root: u64,
 ) -> Result<RemovedCommentGraph> {
@@ -2595,7 +2597,7 @@ fn remove_unreferenced_comment_graph_in_place(
 }
 
 fn comment_object_is_referenced(
-    package: &IWorkPackage,
+    package: &HostPackage,
     application: Application,
     identifier: u64,
 ) -> Result<bool> {
@@ -2763,7 +2765,7 @@ impl PackageMetadataVisitor for CommentMetadataReferenceVisitor {
 /// path, preserving the legacy raw APIs while preventing a hidden owner from
 /// observing the in-place text mutation.
 fn prove_global_comment_ownership(
-    package: &IWorkPackage,
+    package: &HostPackage,
     application: Application,
     location: &DrawableLocation,
     storage_id: u64,
@@ -3073,5 +3075,4 @@ impl DrawablePayload {
 }
 
 #[cfg(test)]
-#[allow(deprecated)]
 mod tests;

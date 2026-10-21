@@ -4,8 +4,8 @@ use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits,
     wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireDescent,
-        patch_nested_fields_batched_with_limits, preflight_wire_tree_with_limits,
+        NestedFieldEdit, NestedFieldReplacement, WireDescent, patch_nested_fields_batched,
+        preflight_wire_tree,
     },
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
@@ -115,10 +115,8 @@ fn rewritten_payload(source: &[u8], before: Settings, after: Settings) -> Result
         .map_err(map_wire_error)?
         .with_rewrite_work(source.len().saturating_mul(4).max(1))
         .map_err(map_wire_error)?;
-    preflight_wire_tree_with_limits(source, limits, |_visit| Ok(WireDescent::Skip))
-        .map_err(map_wire_error)?;
-    let output =
-        patch_nested_fields_batched_with_limits(source, &edits, limits).map_err(map_wire_error)?;
+    preflight_wire_tree(source, limits, |_visit| Ok(WireDescent::Skip)).map_err(map_wire_error)?;
+    let output = patch_nested_fields_batched(source, &edits, limits).map_err(map_wire_error)?;
     if settings_from_snapshot(&decode_settings(&output)?)? != after {
         return Err(Error::Verification);
     }
@@ -149,7 +147,9 @@ pub(super) fn rewrite(
             path: Path::Package,
         })?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::table_headers::Refusal::UnsupportedSource,
+        ));
     }
     let physical_limits = source_catalog.limits();
     let archive_limits = physical_limits
@@ -540,11 +540,9 @@ fn message_info_preserved_except_length(
 }
 
 pub(in crate::package) fn physical_source(package: &Package) -> Result<&SourceCatalog, Error> {
-    package
-        .state
-        .components
-        .physical()
-        .ok_or(Error::UnsupportedSource)
+    package.state.components.physical().ok_or(Error::Refused(
+        crate::package::table_headers::Refusal::UnsupportedSource,
+    ))
 }
 
 pub(in crate::package) fn preflight_transaction_work(

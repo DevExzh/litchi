@@ -7,7 +7,7 @@ use crate::charts::pie_wedge_explosion::{
 };
 use crate::charts::{ChartPieWedgeExplosion, ChartPieWedgeIndex};
 
-impl Editor {
+impl Draft {
     /// Read every pie or donut wedge position in chart series order.
     pub fn sheet_chart_pie_wedge_explosions(
         &self,
@@ -62,7 +62,7 @@ impl Editor {
 }
 
 fn sheet_chart_pie_wedge_explosions(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartPieWedgeExplosion>> {
@@ -84,7 +84,7 @@ fn sheet_chart_pie_wedge_explosions(
 }
 
 fn set_sheet_chart_pie_wedge_explosions(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     explosions: &[ChartPieWedgeExplosion],
@@ -122,7 +122,7 @@ fn set_sheet_chart_pie_wedge_explosions(
         "Numbers",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_pie_wedge_explosions(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers chart pie wedge-explosion update failed validation".to_owned(),

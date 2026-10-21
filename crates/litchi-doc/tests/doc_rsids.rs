@@ -68,7 +68,7 @@ fn reads_plrsid_from_a_word_produced_document() {
 
 #[test]
 fn exposes_rsids_through_the_document_api() {
-    let mut package = litchi_doc::raw::Package::from_reader(
+    let mut package = litchi_doc::raw::Reader::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();

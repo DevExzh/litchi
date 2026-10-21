@@ -2164,7 +2164,7 @@ struct LatentStyleExceptionBuilder {
 /// Parsed RTF document.
 ///
 /// This is an intermediate representation produced by the parser
-/// before being converted into the final `RtfDocument` structure.
+/// before being converted into the final `Tree` structure.
 /// All fields are public to allow direct access during document construction.
 pub(crate) struct ParsedDocument<'a> {
     /// Repairs applied while tokenizing and parsing, in discovery order.

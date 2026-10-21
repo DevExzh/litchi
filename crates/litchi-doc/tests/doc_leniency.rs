@@ -39,9 +39,9 @@ use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, Builder, CommentDefect, Defect, Leniency, OpenOptions,
     PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
-    StylesheetDefect, TableDefinitionDefect, raw::Package,
+    StylesheetDefect, TableDefinitionDefect, raw::Reader,
 };
-use litchi_ole_common::object::{Editor as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Targets};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -55,7 +55,7 @@ fn fixture(name: &str) -> PathBuf {
 /// enforces that. The fixture is a real Word document that violates it.
 #[test]
 fn duplicate_style_names_are_rejected_by_default() {
-    let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     match package.document() {
         Err(error) => assert!(
@@ -70,7 +70,7 @@ fn duplicate_style_names_are_rejected_by_default() {
 /// reference resolves a style by index — so the text and structure are intact.
 #[test]
 fn opting_in_recovers_the_document_and_records_the_repair() {
-    let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     let document = package
         .document_with_options(OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects))
@@ -121,7 +121,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
 fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
     // Word 6.0 predates the table stream entirely; no stylesheet tolerance can
     // make it readable.
-    let mut package = Package::open(fixture("word6-no-table-stream.doc")).expect("container opens");
+    let mut package = Reader::open(fixture("word6-no-table-stream.doc")).expect("container opens");
 
     assert!(
         package
@@ -137,7 +137,7 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
 #[test]
 fn a_conforming_document_records_no_repairs() {
     for leniency in [Leniency::Strict, Leniency::TolerateStylesheetDefects] {
-        let mut package = Package::open(fixture("Lists.doc")).expect("container opens");
+        let mut package = Reader::open(fixture("Lists.doc")).expect("container opens");
         let document = package
             .document_with_options(OpenOptions::default().leniency(leniency))
             .expect("a conforming document parses under either contract");
@@ -205,7 +205,7 @@ fn break_table_pointer(word: &mut [u8], index: usize) {
 }
 
 fn open_degraded(bytes: Vec<u8>) -> litchi_doc::Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package opens");
     package
         .document()
         .expect("degraded optional tables must not fail the open")
@@ -405,7 +405,7 @@ fn stylesheet_framing_stays_fatal() {
         word[pair + 4..pair + 8].copy_from_slice(&4u32.to_le_bytes());
     });
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("package opens");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package opens");
     assert!(
         package.document().is_err(),
         "stylesheet framing must stay fatal under the default contract"
@@ -778,7 +778,7 @@ fn an_unreachable_papx_page_is_skipped_and_recorded() {
 fn papx_alignment_padding_is_trimmed_by_default_and_recorded() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/document/test.doc");
-    let mut package = Package::open(path).expect("container opens");
+    let mut package = Reader::open(path).expect("container opens");
     let document = package
         .document()
         .expect("the producer pad no longer needs an opt-in");
@@ -1104,7 +1104,7 @@ fn property_set_repairs_join_the_document_report() {
     );
     // The metadata accessor still hands the lossy title back with its own
     // report.
-    let summary = Package::from_reader(Cursor::new(bytes))
+    let summary = Reader::from_reader(Cursor::new(bytes))
         .unwrap()
         .summary_information()
         .unwrap()

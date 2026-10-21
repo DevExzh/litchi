@@ -252,7 +252,7 @@ fn reference_ids(references: &[tsp::Reference]) -> Vec<u64> {
 
 fn strip_fields(payload: &[u8], excluded: &[u32]) -> TestResult<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len());
-    for field in WireView::parse(payload)?.fields() {
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !excluded.contains(&field.number()) {
             output.extend_from_slice(field.raw());
         }
@@ -382,12 +382,10 @@ fn fresh_audio_matches_native_graph_and_preserves_unrelated_source_payloads() ->
     let source_package = Package::from_bytes(NATIVE_SOURCE)?;
     let data = valid_wav();
     let requested = options()?;
-    let commit = source_package.add_slide_audio(
-        SlideSelector::index(0),
-        "fresh-pcm.wav",
-        &data,
-        requested,
-    )?;
+    let commit = source_package
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), "fresh-pcm.wav", &data, requested)
+        .and_then(|edit| edit.commit())?;
     let candidate_package = commit.package();
     let candidate = {
         let mut bytes = Vec::new();
@@ -888,12 +886,15 @@ fn fresh_audio_allocates_above_metadata_watermark() -> TestResult {
     assert_eq!(source_metadata.last_object_identifier, watermark);
 
     let package = Package::from_bytes(&source)?;
-    let commit = package.add_slide_audio(
-        SlideSelector::index(0),
-        "watermark-pcm.wav",
-        &valid_wav(),
-        options()?,
-    )?;
+    let commit = package
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "watermark-pcm.wav",
+            &valid_wav(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate = package_bytes(commit.package())?;
     let slide_component = component_containing_object(&source, SLIDE_COMPONENT)?;
     let new_ids = fresh_ids(&source, &candidate, &slide_component)?;
@@ -947,12 +948,15 @@ fn fresh_audio_uses_metadata_component_identity_and_rejects_duplicate_locator_at
     assert_eq!(source_component.identifier, metadata_component_identifier);
 
     let package = Package::from_bytes(&mismatched_source)?;
-    let commit = package.add_slide_audio(
-        SlideSelector::index(0),
-        "component-id-pcm.wav",
-        &valid_wav(),
-        options()?,
-    )?;
+    let commit = package
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "component-id-pcm.wav",
+            &valid_wav(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate = package_bytes(commit.package())?;
     let candidate_metadata = native_metadata(&candidate)?;
     let candidate_component = metadata_component_for_locator(&candidate_metadata, &slide_locator)?;
@@ -1054,12 +1058,15 @@ fn fresh_audio_uses_metadata_component_identity_and_rejects_duplicate_locator_at
     })?;
     let invalid_package = Package::from_bytes(&invalid_source)?;
     assert_eq!(package_bytes(&invalid_package)?, invalid_source);
-    let rejected = invalid_package.add_slide_audio(
-        SlideSelector::index(0),
-        "duplicate-locator.wav",
-        &valid_wav(),
-        options()?,
-    );
+    let rejected = invalid_package
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "duplicate-locator.wav",
+            &valid_wav(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit());
     assert!(rejected.is_err());
     assert_eq!(
         package_bytes(&invalid_package)?,
@@ -1073,12 +1080,15 @@ fn fresh_audio_uses_metadata_component_identity_and_rejects_duplicate_locator_at
 #[test]
 fn audio_position_validates_build_payload_before_admitting_its_header_edge() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let creation = source.add_slide_audio(
-        SlideSelector::index(0),
-        "build-edge.wav",
-        &valid_wav(),
-        options()?,
-    )?;
+    let creation = source
+        .edit_slide_audio_creation()
+        .add(
+            SlideSelector::index(0),
+            "build-edge.wav",
+            &valid_wav(),
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate = package_bytes(creation.package())?;
     let original_ids = all_object_ids(NATIVE_SOURCE)?;
     let (component, archive) = native_archives(&candidate)?
@@ -1151,7 +1161,9 @@ fn audio_position_validates_build_payload_before_admitting_its_header_edge() -> 
     let forged_package = Package::from_bytes(&forged)?;
     assert!(matches!(
         forged_package.edit_slide_audio_position(SlideSelector::index(0), selector),
-        Err(litchi_keynote::slide::audio::position::Error::UnsupportedDependency),
+        Err(litchi_keynote::slide::audio::position::Error::Refused(
+            litchi_keynote::slide::audio::position::Refusal::UnsupportedDependency
+        )),
     ));
     assert_eq!(package_bytes(&forged_package)?, forged);
     Ok(())

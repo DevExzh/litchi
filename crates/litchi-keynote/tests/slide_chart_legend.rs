@@ -76,11 +76,17 @@ fn chart_payload_with_graph(
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         CHART_EXTENSION_FIELD,
         &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -95,7 +101,12 @@ fn non_style_payload(
 ) -> TestResult<Vec<u8>> {
     let extension = non_style_extension(visible, title, with_unknown_fields)?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        CHART_EXTENSION_FIELD,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -117,10 +128,20 @@ fn non_style_extension(
         append_varint_field(&mut extension, 21, 1)?;
     }
     if with_unknown_fields {
-        append_length_delimited_field(&mut extension, 4_001, b"opaque legend metadata")?;
+        append_length_delimited_field(
+            &mut extension,
+            4_001,
+            b"opaque legend metadata",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknown_fields {
         append_varint_field(&mut extension, 4_002, 9)?;
@@ -586,7 +607,12 @@ fn malformed_payload(kind: &str) -> TestResult<Vec<u8>> {
             append_varint_field(&mut extension, LEGEND_VISIBLE_FIELD, 0)?;
         },
         "wrong-wire" => {
-            append_length_delimited_field(&mut extension, LEGEND_VISIBLE_FIELD, b"wrong wire")?;
+            append_length_delimited_field(
+                &mut extension,
+                LEGEND_VISIBLE_FIELD,
+                b"wrong wire",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         },
         "noncanonical" => {
             // field 20, wire type 0, followed by a non-canonical zero varint.
@@ -594,9 +620,19 @@ fn malformed_payload(kind: &str) -> TestResult<Vec<u8>> {
         },
         other => return Err(io::Error::other(format!("unknown malformed case: {other}")).into()),
     }
-    append_length_delimited_field(&mut extension, 23, b"Revenue")?;
+    append_length_delimited_field(
+        &mut extension,
+        23,
+        b"Revenue",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        CHART_EXTENSION_FIELD,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -605,8 +641,18 @@ fn malformed_outer_non_style_payload(kind: &str) -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
     match kind {
         "duplicate" => {
-            append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
-            append_length_delimited_field(&mut payload, CHART_EXTENSION_FIELD, &extension)?;
+            append_length_delimited_field(
+                &mut payload,
+                CHART_EXTENSION_FIELD,
+                &extension,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
+            append_length_delimited_field(
+                &mut payload,
+                CHART_EXTENSION_FIELD,
+                &extension,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         },
         "wrong-wire" => append_varint_field(&mut payload, CHART_EXTENSION_FIELD, 1)?,
         other => {

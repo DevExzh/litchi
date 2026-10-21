@@ -385,7 +385,12 @@ fn table_model(
     .encode_to_vec();
     if with_unknowns {
         append_varint_field(&mut payload, 99, 0xfeed_beef)?;
-        append_length_delimited_field(&mut payload, 100, b"physical-sort-unknown")?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            b"physical-sort-unknown",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -885,7 +890,12 @@ fn rewrite_model_wire(package: &[u8], field: u32, payload: &[u8]) -> TestResult<
             .ok_or("missing table model")?;
         let message = model.messages.first().ok_or("missing model message")?;
         let mut bytes = message.data.clone();
-        append_length_delimited_field(&mut bytes, field, payload)?;
+        append_length_delimited_field(
+            &mut bytes,
+            field,
+            payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             0,
             RawMessage {
@@ -956,14 +966,24 @@ fn rewrite_repeated_child_wire(
 
 fn valid_cfuuid_owner_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &[1u8; 16])?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &[1u8; 16],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn valid_sort_tracker_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
     let reference = reference(FORMULAS).encode_to_vec();
-    append_length_delimited_field(&mut payload, 1, &reference)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -974,7 +994,12 @@ fn valid_uuid_owner_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &uuid)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &uuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -1791,7 +1816,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 100, b"opaque optional format state")?;
+            append_length_delimited_field(
+                bytes,
+                100,
+                b"opaque optional format state",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -1809,7 +1839,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_CUSTOM_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 4, &reference(TILE).encode_to_vec())?;
+            append_length_delimited_field(
+                bytes,
+                4,
+                &reference(TILE).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -1919,11 +1954,13 @@ fn duplicate_sort_keys_are_stable_and_selected_ranges_are_body_relative() -> Tes
     let package = Package::from_bytes(&selected)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::ScopeMismatch {
-            configured: Scope::SelectedRows,
-            requested: Scope::EntireTable,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::ScopeMismatch {
+                configured: Scope::SelectedRows,
+                requested: Scope::EntireTable,
+                ..
+            }
+        ))
     ));
     let commit = package.execute_slide_table_sort_order_to_rows(
         SlideSelector::name("Tables"),
@@ -1993,7 +2030,7 @@ fn cross_tile_row_moves_are_rejected_before_publication() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())
@@ -2077,25 +2114,29 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
     let package = Package::from_bytes(&entire_source)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(usize::MAX, 0usize),
-        Err(Error::SlidePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlidePositionNotFound { .. }))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name(""), 0usize),
-        Err(Error::EmptySlideName)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name("missing"), 0usize),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, usize::MAX),
-        Err(Error::TablePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::TablePositionNotFound { .. }))
     ));
     let selected_source = source(Scope::SelectedRows)?;
     let selected = Package::from_bytes(&selected_source)?;
     assert!(matches!(
         selected.execute_slide_table_sort_order_to_rows(0usize, 0usize, RowRange::new(4, 6)?),
-        Err(Error::RowRangeOutOfBounds { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::RowRangeOutOfBounds { .. }))
     ));
     let absent = Package::from_bytes(&source_package(Scope::EntireTable, false, false)?)?;
     let absent = rewrite_document(&package_bytes(&absent)?, |archive| {
@@ -2117,13 +2158,17 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
     let absent = Package::from_bytes(&absent)?;
     assert!(matches!(
         absent.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::SortOrderMissing { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SortOrderMissing { .. }
+        ))
     ));
     let locked = Package::from_bytes(&rewrite_table_info(&entire_source, true)?)?;
     let before = package_bytes(&locked)?;
     assert!(matches!(
         locked.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::TableLocked { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::TableLocked { .. }
+        ))
     ));
     assert_source_unchanged(&locked, &before)?;
     Ok(())
@@ -2226,10 +2271,12 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let formula_before = package_bytes(&formula_package)?;
     assert!(matches!(
         formula_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedFeature {
-            feature: UnsupportedFeature::Formula,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                feature: UnsupportedFeature::Formula,
+                ..
+            }
+        ))
     ));
     assert_source_unchanged(&formula_package, &formula_before)?;
 
@@ -2238,10 +2285,10 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let imported_before = package_bytes(&imported_package)?;
     assert!(matches!(
         imported_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedDependency {
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedDependency {
             feature: UnsupportedFeature::RowAffineDependency,
             ..
-        })
+        }))
     ));
     assert_source_unchanged(&imported_package, &imported_before)?;
     Ok(())
@@ -2327,7 +2374,7 @@ fn string_entry_sidecars_are_rejected_atomically() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())
@@ -2401,21 +2448,36 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "tile root",
             rewrite_object_wire(&source, TILE, TILE_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque tile state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque tile state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "tile row",
             rewrite_repeated_child_wire(&source, TILE, TILE_MESSAGE_TYPE, 5, 0, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque row state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque row state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "row-header bucket root",
             rewrite_object_wire(&source, ROW_HEADERS, HEADER_BUCKET_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque bucket state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque bucket state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2428,7 +2490,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 2,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque header state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque header state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,
@@ -2436,7 +2503,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "UID-map root",
             rewrite_object_wire(&source, UID_MAP, COLUMN_ROW_UID_MAP_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque UID state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque UID state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2449,7 +2521,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 4,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque UUID state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque UUID state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,

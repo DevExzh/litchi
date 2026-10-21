@@ -311,9 +311,9 @@ fn snapshot_noop_and_edits_preserve_opaque_wire_bytes() {
     assert_eq!(snapshot.finish(), bytes);
 
     let noop = snapshot.edit().commit().expect("no-op commit");
-    assert!(!noop.changed());
+    assert!(!noop.diagnostics().changed());
     assert!(noop.patch().is_noop());
-    assert_eq!(noop.into_bytes(), bytes);
+    assert_eq!(noop.package().bytes().to_vec(), bytes);
 
     let mut transaction = snapshot.edit();
     transaction
@@ -326,20 +326,20 @@ fn snapshot_noop_and_edits_preserve_opaque_wire_bytes() {
         .set_style_id(0x1122_3344)
         .expect("style edit");
     let commit = transaction.commit().expect("commit");
-    let after = commit.snapshot().bytes();
+    let after = commit.package().bytes();
     assert_eq!(&after[16..20], &[0x11, 0x22, 0x33, 0x44]);
     assert_eq!(&after[after.len() - 2..], &[0xD1, 0xD2]);
     assert!(after.windows(3).any(|window| window == [0xAA, 0xBB, 0xCC]));
     assert_eq!(
-        commit.snapshot().publication().title,
+        commit.package().publication().title,
         "A changed publication title"
     );
     assert_eq!(
-        commit.snapshot().publication().file_destination,
+        commit.package().publication().file_destination,
         "https://example.invalid/café.mht"
     );
-    assert_eq!(commit.snapshot().publication().style_id, 0x1122_3344);
-    assert!(commit.snapshot().publication().auto_republish);
+    assert_eq!(commit.package().publication().style_id, 0x1122_3344);
+    assert!(commit.package().publication().auto_republish);
     assert_eq!(u16::from_le_bytes([after[14], after[15]]) & 0x4000, 0x4000);
 
     let applied = commit.patch().apply(&snapshot).expect("apply");
@@ -347,7 +347,7 @@ fn snapshot_noop_and_edits_preserve_opaque_wire_bytes() {
     assert_eq!(reverted.finish(), bytes);
     let reverted_directly = commit
         .patch()
-        .revert(commit.snapshot())
+        .revert(commit.package())
         .expect("direct revert");
     assert_eq!(reverted_directly.finish(), bytes);
 }
@@ -359,7 +359,12 @@ fn bounded_conditional_edits_and_invalid_edits_are_atomic() {
     workbook.title = "Book".to_string();
     let snapshot = Snapshot::parse(workbook.build()).expect("snapshot");
     let mut transaction = snapshot.edit();
-    let before = transaction.snapshot().expect("candidate").finish();
+    let before = transaction
+        .clone()
+        .commit()
+        .map(litchi_core::edit::Commit::into_package)
+        .expect("candidate")
+        .finish();
 
     assert!(transaction.set_title("x".repeat(256)).is_err());
     assert!(transaction.set_source_name("unexpected").is_err());
@@ -371,7 +376,9 @@ fn bounded_conditional_edits_and_invalid_edits_are_atomic() {
     assert!(transaction.set_chart_shape_id(7).is_err());
     assert_eq!(
         transaction
-            .snapshot()
+            .clone()
+            .commit()
+            .map(litchi_core::edit::Commit::into_package)
             .expect("unchanged candidate")
             .finish(),
         before
@@ -389,7 +396,7 @@ fn bounded_conditional_edits_and_invalid_edits_are_atomic() {
         range_edit
             .commit()
             .expect("range commit")
-            .snapshot()
+            .package()
             .publication()
             .range,
         Some(WebPubRange::new(10, 20, 3, 8).unwrap())
@@ -409,13 +416,10 @@ fn bounded_conditional_edits_and_invalid_edits_are_atomic() {
         .expect("shape edit");
     let chart_commit = chart_edit.commit().expect("chart commit");
     assert_eq!(
-        chart_commit.snapshot().publication().source_name.as_deref(),
+        chart_commit.package().publication().source_name.as_deref(),
         Some("Chart 2")
     );
-    assert_eq!(
-        chart_commit.snapshot().publication().chart_shape_id,
-        Some(8)
-    );
+    assert_eq!(chart_commit.package().publication().chart_shape_id, Some(8));
 }
 
 #[test]

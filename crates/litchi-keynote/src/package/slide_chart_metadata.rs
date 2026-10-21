@@ -136,7 +136,7 @@ pub enum Error {
     InvalidSource,
     /// A finite resource ceiling was exceeded.
     #[error("Keynote chart metadata {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its limit.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -191,18 +191,17 @@ fn read_selected_metadata(
 
     let (limits, residual_work) = budget.chart_metadata_residual_limits();
     if residual_work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
-    let maximum_depth =
-        u32::try_from(limits.max_nesting()).map_err(|_error| Error::LimitExceeded {
-            kind: LimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        })?;
+    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
+    })?;
     let options = DecodeOptions::new(
         message.data.len().max(1).min(limits.max_input_bytes()),
         limits.max_fields().min(residual_work).max(1),
@@ -300,26 +299,38 @@ fn map_axis_support_error(error: AxisSupportError) -> Error {
 
 fn map_chart_title_error(error: ChartTitleError) -> Error {
     match error {
-        ChartTitleError::UnsupportedSource => Error::UnsupportedSource,
-        ChartTitleError::AmbiguousSelector => Error::AmbiguousSelector,
-        ChartTitleError::EmptySlideName => Error::EmptySlideName,
-        ChartTitleError::SlideNameNotFound => Error::SlideNameNotFound,
-        ChartTitleError::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
+            Error::UnsupportedSource
         },
-        ChartTitleError::ChartNameNotFound => Error::ChartNameNotFound,
-        ChartTitleError::ChartPositionNotFound { position } => {
-            Error::ChartPositionNotFound { position }
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
+            Error::AmbiguousSelector
         },
-        ChartTitleError::EmptyChartName => Error::EmptyChartName,
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::EmptySlideName
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
+            Error::SlideNameNotFound
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => Error::SlidePositionNotFound { position },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
+            Error::ChartNameNotFound
+        },
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => Error::ChartPositionNotFound { position },
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::EmptyChartName
+        },
         ChartTitleError::InvalidSource
         | ChartTitleError::Verification
         | ChartTitleError::PatchConflict => Error::InvalidSource,
-        ChartTitleError::LimitExceeded {
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_title_limit_kind(kind),
             observed,
             maximum,
@@ -352,42 +363,42 @@ fn map_chart_metadata_decode_error(error: chart_metadata_codec::DecodeError) -> 
         return Error::Allocation { amount };
     }
     if let Some((observed, maximum)) = error.input_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.label_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::LabelCount,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.text_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::TextBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.depth_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),

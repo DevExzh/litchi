@@ -18,7 +18,7 @@ pub(super) struct SheetChartGraph {
 }
 
 pub(super) fn chart_graph(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetChartGraph> {

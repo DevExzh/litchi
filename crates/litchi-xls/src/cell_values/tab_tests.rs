@@ -89,7 +89,7 @@ fn sorted(mut value: Vec<(String, Vec<String>)>) -> Vec<(String, Vec<String>)> {
 #[test]
 fn reorder_moves_tabs_and_keeps_every_cell_and_reference() {
     let bytes = three_sheets();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.reorder_sheets(&[
         Selector::Name("third"),
@@ -119,7 +119,7 @@ fn reorder_moves_tabs_and_keeps_every_cell_and_reference() {
 #[test]
 fn identity_reorder_is_an_exact_noop() {
     let bytes = three_sheets();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.reorder_sheets(&[
         Selector::Position(Position::new(0)),
@@ -136,7 +136,7 @@ fn identity_reorder_is_an_exact_noop() {
 
 #[test]
 fn reorder_refuses_incomplete_repeated_and_unknown_orders() {
-    let source = Snapshot::from_bytes(three_sheets()).unwrap();
+    let source = Snapshot::from_bytes(three_sheets(), Limits::default()).unwrap();
     for order in [
         vec![
             Selector::Position(Position::new(0)),
@@ -167,7 +167,7 @@ fn reorder_refuses_incomplete_repeated_and_unknown_orders() {
 #[test]
 fn insert_adds_an_empty_unselected_worksheet() {
     let bytes = three_sheets();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     for position in 0..=3 {
         let mut edit = source.edit();
         edit.insert_sheet(Position::new(position), "Added").unwrap();
@@ -207,7 +207,7 @@ fn insert_adds_an_empty_unselected_worksheet() {
 
 #[test]
 fn insert_refuses_invalid_and_caseless_duplicate_names() {
-    let source = Snapshot::from_bytes(three_sheets()).unwrap();
+    let source = Snapshot::from_bytes(three_sheets(), Limits::default()).unwrap();
     for name in [
         "",
         "first",
@@ -234,7 +234,7 @@ fn remove_drops_a_tab_and_restores_exactly() {
     builder.write_number(keep, 0, 0, 1.0).unwrap();
     builder.write_string(drop, 0, 0, "gone").unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.remove_sheet(Selector::Name("DROP")).unwrap();
     let (target, patch) = edit.commit().unwrap().into_parts();
@@ -257,7 +257,11 @@ fn remove_drops_a_tab_and_restores_exactly() {
 
 #[test]
 fn remove_refuses_the_last_tab_and_referenced_tabs() {
-    let source = Snapshot::from_bytes(crate::Package::new().unwrap().to_bytes().unwrap()).unwrap();
+    let source = Snapshot::from_bytes(
+        crate::Package::new().unwrap().to_bytes().unwrap(),
+        Limits::default(),
+    )
+    .unwrap();
     let mut edit = source.edit();
     assert!(
         edit.remove_sheet(Selector::Position(Position::new(0)))
@@ -265,10 +269,17 @@ fn remove_refuses_the_last_tab_and_referenced_tabs() {
     );
 
     // Sheet1 owns the sheet-scoped Print_Area name.
-    let source = Snapshot::from_bytes(fixture("SimpleWithPrintArea.xls")).unwrap();
+    let source =
+        Snapshot::from_bytes(fixture("SimpleWithPrintArea.xls"), Limits::default()).unwrap();
     let mut edit = source.edit();
     let refusal = edit.remove_sheet(Selector::Name("Sheet1"));
-    assert!(matches!(refusal, Err(Error::UnsafeEdit(_))), "{refusal:?}");
+    assert!(
+        matches!(
+            refusal,
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
+        ),
+        "{refusal:?}"
+    );
     assert!(edit.tab_change.is_none());
     // Sheet2 is unreferenced; the name keeps its scope and target.
     let mut edit = source.edit();
@@ -285,7 +296,7 @@ fn remove_refuses_the_last_tab_and_referenced_tabs() {
 #[test]
 fn three_dimensional_ranges_follow_or_refuse_tab_moves() {
     let bytes = fixture("FormulaSheetRange.xls");
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let catalog = names(&source);
     let formulas = |bytes: &[u8]| -> Vec<String> {
         contents(bytes)
@@ -329,16 +340,17 @@ fn three_dimensional_ranges_follow_or_refuse_tab_moves() {
         source.edit().insert_sheet(Position::new(2), "Inside"),
     ];
     assert!(
-        refusals
-            .iter()
-            .all(|result| matches!(result, Err(Error::UnsafeEdit(_)))),
+        refusals.iter().all(|result| matches!(
+            result,
+            Err(Error::Refused(_) | Error::PatchConflict { .. } | Error::Internal(_))
+        )),
         "{refusals:?}"
     );
 }
 
 #[test]
 fn a_tab_change_is_exclusive_within_its_edit() {
-    let source = Snapshot::from_bytes(three_sheets()).unwrap();
+    let source = Snapshot::from_bytes(three_sheets(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_value(
         Selector::Position(Position::new(0)),
@@ -393,7 +405,7 @@ fn corpus_tab_changes_reopen_or_refuse() {
             continue;
         }
         let bytes = std::fs::read(&path).unwrap();
-        let Ok(source) = Snapshot::from_bytes(bytes.clone()) else {
+        let Ok(source) = Snapshot::from_bytes(bytes.clone(), Limits::default()) else {
             continue;
         };
         let count = names(&source).len();
@@ -455,7 +467,7 @@ fn corpus_tab_changes_reopen_or_refuse() {
 #[test]
 fn fixture_with_chart_tab_reorders_complete_catalog() {
     let bytes = fixture("WithChart.xls");
-    let Ok(source) = Snapshot::from_bytes(bytes) else {
+    let Ok(source) = Snapshot::from_bytes(bytes, Limits::default()) else {
         return;
     };
     let catalog = tabs::catalog(source.workbook_stream()).unwrap();

@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let row = arguments[3].parse::<usize>()?;
     let column = arguments[4].parse::<usize>()?;
     let function = &arguments[5];
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     let tables = editor.tables()?;
     let table_ids = tables.iter().map(|table| table.id()).collect::<Vec<_>>();
     let table = tables

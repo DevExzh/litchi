@@ -7,7 +7,7 @@ use crate::charts::reference_line::{
     set_chart_reference_lines as set_native_reference_lines,
 };
 
-impl Editor {
+impl Draft {
     /// Read ordered reference lines on one sheet chart's primary value axis.
     pub fn sheet_chart_reference_lines(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn sheet_chart_reference_lines(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<Line>> {
@@ -43,7 +43,7 @@ fn sheet_chart_reference_lines(
 }
 
 fn set_sheet_chart_reference_lines(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     reference_line: &[Line],
@@ -57,7 +57,7 @@ fn set_sheet_chart_reference_lines(
         "Numbers",
         reference_line,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_reference_lines(sheet_id, drawable_object_id)? != reference_line {
         return Err(Error::InvalidFormat(
             "Numbers chart reference-line update failed validation".to_owned(),
@@ -144,7 +144,7 @@ mod tests {
         editor
             .remove_sheet_chart(sheet_id, duplicate.drawable_object_id)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_reference_lines(sheet_id, chart.drawable_object_id)

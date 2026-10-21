@@ -3,13 +3,13 @@
 use super::super::super::axis;
 use super::super::super::format::Format;
 use super::super::super::model::{
-    Cache, Chart, Family, Owner, Role, Value, XlValue, cache_dimensions, dimensions_cover,
+    Cache, Family, Model, Owner, Role, Value, XlValue, cache_dimensions, dimensions_cover,
 };
 use super::links;
 use super::wire::{DATA_LAB_EXT, DATA_LAB_EXT_CONTENTS, TEXT, invalid_model, limit};
 use crate::{Error, Limits, Result};
 
-pub(super) fn validate(chart: &Chart, limits: Limits, require_topology: bool) -> Result<()> {
+pub(super) fn validate(chart: &Model, limits: Limits, require_topology: bool) -> Result<()> {
     if chart.series.len() > limits.max_series {
         return limit("series count", chart.series.len(), limits.max_series);
     }

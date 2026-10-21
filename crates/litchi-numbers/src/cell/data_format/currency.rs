@@ -13,7 +13,7 @@ pub use super::number::{
 /// explicit Currency format.
 pub mod transaction {
     pub use crate::package::table_cell_currency_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

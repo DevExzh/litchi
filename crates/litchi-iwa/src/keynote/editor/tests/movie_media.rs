@@ -85,7 +85,7 @@ mod cases {
             .unwrap()
     }
 
-    fn focused_package(editor: &Editor) -> TestResult<FocusedKeynotePackage> {
+    fn focused_package(editor: &Draft) -> TestResult<FocusedKeynotePackage> {
         Ok(FocusedKeynotePackage::from_bytes(&editor.to_bytes()?)?)
     }
 
@@ -96,10 +96,10 @@ mod cases {
     }
 
     fn reopen_focused_package(
-        editor: &mut Editor,
+        editor: &mut Draft,
         package: &FocusedKeynotePackage,
     ) -> TestResult<()> {
-        *editor = Editor::from_bytes(&focused_bytes(package)?)?;
+        *editor = Draft::from_bytes(&focused_bytes(package)?)?;
         Ok(())
     }
 
@@ -116,7 +116,7 @@ mod cases {
         Ok(MovieSnapshot { info, properties })
     }
 
-    fn movie_graph(editor: &Editor, slide_index: usize) -> TestResult<MovieGraphOracle> {
+    fn movie_graph(editor: &Draft, slide_index: usize) -> TestResult<MovieGraphOracle> {
         let slides = editor.slides()?;
         let slide = slides
             .get(slide_index)
@@ -188,7 +188,7 @@ mod cases {
         }
     }
 
-    fn native_movie_properties(editor: &Editor, object_id: u64) -> TestResult<MediaProperties> {
+    fn native_movie_properties(editor: &Draft, object_id: u64) -> TestResult<MediaProperties> {
         let graph = ObjectGraph::read(editor.package())?;
         let raw = graph.message_data_type(object_id, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
         let movie = tsd::MovieArchive::decode(raw)?;
@@ -201,19 +201,21 @@ mod cases {
     }
 
     fn add_audio(
-        editor: &mut Editor,
+        editor: &mut Draft,
         preferred_filename: &str,
         data: &[u8],
         options: SlideAudioOptions,
     ) -> TestResult<()> {
         let package = focused_package(editor)?;
-        let commit =
-            package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+        let commit = package
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), preferred_filename, data, options)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())
     }
 
     fn add_movie(
-        editor: &mut Editor,
+        editor: &mut Draft,
         preferred_movie_filename: &str,
         movie_data: &[u8],
         preferred_poster_filename: &str,
@@ -232,7 +234,7 @@ mod cases {
     }
 
     fn add_movie_at(
-        editor: &mut Editor,
+        editor: &mut Draft,
         slide_index: usize,
         preferred_movie_filename: &str,
         movie_data: &[u8],
@@ -242,7 +244,8 @@ mod cases {
     ) -> TestResult<MovieSnapshot> {
         let package = focused_package(editor)?;
         let commit = package
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(slide_index),
                 preferred_movie_filename,
                 movie_data,
@@ -250,6 +253,7 @@ mod cases {
                 poster_data,
                 options,
             )
+            .and_then(|edit| edit.commit())
             .map_err(|error| format!("focused movie creation failed: {error}"))?;
         reopen_focused_package(editor, commit.package())?;
         let package = focused_package(editor)?;
@@ -257,7 +261,7 @@ mod cases {
     }
 
     fn remove_movie_poster(
-        editor: &mut Editor,
+        editor: &mut Draft,
         drawable_object_id: u64,
         poster_data_identifier: u64,
     ) -> TestResult<()> {
@@ -291,12 +295,12 @@ mod cases {
                 .retain(|identifier| *identifier != poster_data_identifier);
             Ok(())
         })?;
-        *editor = Editor::from_bytes(&package.to_bytes()?)?;
+        *editor = Draft::from_bytes(&package.to_bytes()?)?;
         Ok(())
     }
 
     fn remove_movie_data(
-        editor: &mut Editor,
+        editor: &mut Draft,
         drawable_object_id: u64,
         movie_data_identifier: u64,
     ) -> TestResult<()> {
@@ -330,13 +334,16 @@ mod cases {
                 .retain(|identifier| *identifier != movie_data_identifier);
             Ok(())
         })?;
-        *editor = Editor::from_bytes(&package.to_bytes()?)?;
+        *editor = Draft::from_bytes(&package.to_bytes()?)?;
         Ok(())
     }
 
-    fn duplicate_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<MovieSnapshot> {
+    fn duplicate_movie(editor: &mut Draft, movie: MovieSelector) -> TestResult<MovieSnapshot> {
         let package = focused_package(editor)?;
-        let commit = package.duplicate_slide_movie(SlideSelector::index(0), movie)?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), movie)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())?;
         let package = focused_package(editor)?;
         let index = package
@@ -346,17 +353,20 @@ mod cases {
         movie_snapshot(&package, index)
     }
 
-    fn remove_movie(editor: &mut Editor, movie: MovieSelector) -> TestResult<()> {
+    fn remove_movie(editor: &mut Draft, movie: MovieSelector) -> TestResult<()> {
         let package = focused_package(editor)?;
-        let commit = package.remove_slide_movie(SlideSelector::index(0), movie)?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), movie)
+            .and_then(|edit| edit.commit())?;
         reopen_focused_package(editor, commit.package())
     }
 
-    fn movie_title(editor: &Editor, movie: MovieSelector) -> TestResult<Option<String>> {
+    fn movie_title(editor: &Draft, movie: MovieSelector) -> TestResult<Option<String>> {
         Ok(focused_package(editor)?.slide_movie_title(SlideSelector::index(0), movie)?)
     }
 
-    fn set_movie_title(editor: &mut Editor, movie: MovieSelector, title: &str) -> TestResult<()> {
+    fn set_movie_title(editor: &mut Draft, movie: MovieSelector, title: &str) -> TestResult<()> {
         let package = focused_package(editor)?;
         let commit = package
             .edit_slide_movie_title(SlideSelector::index(0), movie)?
@@ -365,7 +375,7 @@ mod cases {
         reopen_focused_package(editor, commit.package())
     }
 
-    fn remove_movie_title(editor: &mut Editor, movie: MovieSelector) -> TestResult<bool> {
+    fn remove_movie_title(editor: &mut Draft, movie: MovieSelector) -> TestResult<bool> {
         let package = focused_package(editor)?;
         let edit = package.edit_slide_movie_title(SlideSelector::index(0), movie)?;
         let had_title = edit.before().is_some();
@@ -376,12 +386,12 @@ mod cases {
         Ok(had_title)
     }
 
-    fn movie_caption(editor: &Editor, movie: MovieSelector) -> TestResult<Option<String>> {
+    fn movie_caption(editor: &Draft, movie: MovieSelector) -> TestResult<Option<String>> {
         Ok(focused_package(editor)?.slide_movie_caption(SlideSelector::index(0), movie)?)
     }
 
     fn set_movie_caption(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie: MovieSelector,
         caption: &str,
     ) -> TestResult<()> {
@@ -393,7 +403,7 @@ mod cases {
         reopen_focused_package(editor, commit.package())
     }
 
-    fn remove_movie_caption(editor: &mut Editor, movie: MovieSelector) -> TestResult<bool> {
+    fn remove_movie_caption(editor: &mut Draft, movie: MovieSelector) -> TestResult<bool> {
         let package = focused_package(editor)?;
         let edit = package.edit_slide_movie_caption(SlideSelector::index(0), movie)?;
         let had_caption = edit.before().is_some();
@@ -413,7 +423,7 @@ mod cases {
     }
 
     fn set_movie_properties(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie: MovieSelector,
         properties: MediaProperties,
     ) -> TestResult<()> {
@@ -426,7 +436,7 @@ mod cases {
     }
 
     fn replace_movie_media(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie: MovieSelector,
         part: MediaPart,
         replacement: &[u8],
@@ -462,7 +472,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let mut editor = Editor::from_bytes(&seed.to_bytes()?)?;
+        let mut editor = Draft::from_bytes(&seed.to_bytes()?)?;
         let package = focused_package(&editor)?;
         let baseline = movie_snapshot(&package, 0)?;
         assert_eq!(
@@ -511,7 +521,7 @@ mod cases {
 
     #[test]
     fn native_file_movie_properties_match_focused_source_projection() -> TestResult {
-        let editor = Editor::from_bytes(NATIVE_MEDIA_BASELINE)?;
+        let editor = Draft::from_bytes(NATIVE_MEDIA_BASELINE)?;
         let package = focused_package(&editor)?;
         let graph = movie_graph(&editor, 0)?;
         assert_movie_graph_is_local(&graph);
@@ -559,7 +569,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let seed_editor = Editor::from_bytes(&seed.to_bytes()?)?;
+        let seed_editor = Draft::from_bytes(&seed.to_bytes()?)?;
         let graph = movie_graph(&seed_editor, 0)?;
         let movie = graph.movies.first().ok_or("movie graph is empty")?;
         let mut editor = seed_editor;
@@ -612,7 +622,7 @@ mod cases {
             POSTER,
             options(),
         )?;
-        let seed_editor = Editor::from_bytes(&seed.to_bytes()?)?;
+        let seed_editor = Draft::from_bytes(&seed.to_bytes()?)?;
         let graph = movie_graph(&seed_editor, 0)?;
         let movie = graph.movies.first().ok_or("movie graph is empty")?;
         let mut editor = seed_editor;
@@ -718,7 +728,7 @@ mod cases {
         assert_eq!(builds[0].settings, BuildSettings::movie_start());
         assert_eq!(builds[0].chunks.len(), 1);
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes()?)?;
+        let roundtripped = Draft::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(
             movie_snapshot(&focused_package(&roundtripped)?, 0)?,
             created
@@ -846,7 +856,7 @@ mod cases {
                 )
                 .is_err()
         );
-        Editor::from_bytes(&editor.to_bytes()?)?;
+        Draft::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
@@ -899,7 +909,7 @@ mod cases {
         assert_eq!(movie_title(&editor, MovieSelector::index(0))?, None);
         assert_eq!(movie_caption(&editor, MovieSelector::index(0))?, None);
 
-        let reopened = Editor::from_bytes(&editor.to_bytes()?)?;
+        let reopened = Draft::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(
             movie_caption(&reopened, MovieSelector::index(1))?,
             Some("Updated revenue overview".to_owned())

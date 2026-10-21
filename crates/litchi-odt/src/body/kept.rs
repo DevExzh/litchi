@@ -287,10 +287,138 @@ fn is_marker(ns: Ns, local: &[u8]) -> bool {
     }
 }
 
-fn refusal(root: Kind, element: &str, what: &str) -> Error {
-    Error::Unsupported(format!(
-        "an ODT {root:?} text set would replace {element} ({what}): set the text of the \
-         runs around it, or remove it first (record 0304)"
+/// A text-set refusal naming the replaced element when it is an ODF
+/// element the set can meet (a schema name, never authored content).
+fn refusal(_root: Kind, element: &str, _what: &str) -> Error {
+    macro_rules! reason {
+        ($name:literal) => {
+            concat!(
+                "an ODT text set would replace ",
+                $name,
+                ": set the text of the runs around it, or remove it first (record 0304)"
+            )
+        };
+    }
+    let reason = match element {
+        "text:date" => reason!("text:date"),
+        "text:time" => reason!("text:time"),
+        "text:page-number" => reason!("text:page-number"),
+        "text:page-continuation" => reason!("text:page-continuation"),
+        "text:sender-firstname" => reason!("text:sender-firstname"),
+        "text:sender-lastname" => reason!("text:sender-lastname"),
+        "text:sender-initials" => reason!("text:sender-initials"),
+        "text:sender-title" => reason!("text:sender-title"),
+        "text:sender-position" => reason!("text:sender-position"),
+        "text:sender-email" => reason!("text:sender-email"),
+        "text:sender-phone-private" => reason!("text:sender-phone-private"),
+        "text:sender-fax" => reason!("text:sender-fax"),
+        "text:sender-company" => reason!("text:sender-company"),
+        "text:sender-phone-work" => reason!("text:sender-phone-work"),
+        "text:sender-street" => reason!("text:sender-street"),
+        "text:sender-city" => reason!("text:sender-city"),
+        "text:sender-postal-code" => reason!("text:sender-postal-code"),
+        "text:sender-country" => reason!("text:sender-country"),
+        "text:sender-state-or-province" => reason!("text:sender-state-or-province"),
+        "text:author-name" => reason!("text:author-name"),
+        "text:author-initials" => reason!("text:author-initials"),
+        "text:chapter" => reason!("text:chapter"),
+        "text:file-name" => reason!("text:file-name"),
+        "text:template-name" => reason!("text:template-name"),
+        "text:sheet-name" => reason!("text:sheet-name"),
+        "text:variable-set" => reason!("text:variable-set"),
+        "text:variable-get" => reason!("text:variable-get"),
+        "text:variable-input" => reason!("text:variable-input"),
+        "text:user-field-get" => reason!("text:user-field-get"),
+        "text:user-field-input" => reason!("text:user-field-input"),
+        "text:sequence" => reason!("text:sequence"),
+        "text:expression" => reason!("text:expression"),
+        "text:text-input" => reason!("text:text-input"),
+        "text:initial-creator" => reason!("text:initial-creator"),
+        "text:creation-date" => reason!("text:creation-date"),
+        "text:creation-time" => reason!("text:creation-time"),
+        "text:description" => reason!("text:description"),
+        "text:user-defined" => reason!("text:user-defined"),
+        "text:print-time" => reason!("text:print-time"),
+        "text:print-date" => reason!("text:print-date"),
+        "text:printed-by" => reason!("text:printed-by"),
+        "text:title" => reason!("text:title"),
+        "text:subject" => reason!("text:subject"),
+        "text:keywords" => reason!("text:keywords"),
+        "text:editing-cycles" => reason!("text:editing-cycles"),
+        "text:editing-duration" => reason!("text:editing-duration"),
+        "text:modification-time" => reason!("text:modification-time"),
+        "text:modification-date" => reason!("text:modification-date"),
+        "text:creator" => reason!("text:creator"),
+        "text:page-count" => reason!("text:page-count"),
+        "text:paragraph-count" => reason!("text:paragraph-count"),
+        "text:word-count" => reason!("text:word-count"),
+        "text:character-count" => reason!("text:character-count"),
+        "text:table-count" => reason!("text:table-count"),
+        "text:image-count" => reason!("text:image-count"),
+        "text:object-count" => reason!("text:object-count"),
+        "text:database-display" => reason!("text:database-display"),
+        "text:database-next" => reason!("text:database-next"),
+        "text:database-row-select" => reason!("text:database-row-select"),
+        "text:database-row-number" => reason!("text:database-row-number"),
+        "text:database-name" => reason!("text:database-name"),
+        "text:page-variable-set" => reason!("text:page-variable-set"),
+        "text:page-variable-get" => reason!("text:page-variable-get"),
+        "text:placeholder" => reason!("text:placeholder"),
+        "text:conditional-text" => reason!("text:conditional-text"),
+        "text:hidden-text" => reason!("text:hidden-text"),
+        "text:hidden-paragraph" => reason!("text:hidden-paragraph"),
+        "text:reference-ref" => reason!("text:reference-ref"),
+        "text:bookmark-ref" => reason!("text:bookmark-ref"),
+        "text:note-ref" => reason!("text:note-ref"),
+        "text:sequence-ref" => reason!("text:sequence-ref"),
+        "text:script" => reason!("text:script"),
+        "text:execute-macro" => reason!("text:execute-macro"),
+        "text:dde-connection" => reason!("text:dde-connection"),
+        "text:measure" => reason!("text:measure"),
+        "text:table-formula" => reason!("text:table-formula"),
+        "text:meta-field" => reason!("text:meta-field"),
+        "text:meta" => reason!("text:meta"),
+        "text:ruby" => reason!("text:ruby"),
+        "text:note" => reason!("text:note"),
+        "text:note-body" => reason!("text:note-body"),
+        "text:note-citation" => reason!("text:note-citation"),
+        "text:a" => reason!("text:a"),
+        "text:span" => reason!("text:span"),
+        "text:h" => reason!("text:h"),
+        "text:p" => reason!("text:p"),
+        "text:list" => reason!("text:list"),
+        "text:list-item" => reason!("text:list-item"),
+        "text:section" => reason!("text:section"),
+        "text:soft-page-break" => reason!("text:soft-page-break"),
+        "text:bibliography-mark" => reason!("text:bibliography-mark"),
+        "text:toc-mark" => reason!("text:toc-mark"),
+        "text:alphabetical-index-mark" => reason!("text:alphabetical-index-mark"),
+        "text:user-index-mark" => reason!("text:user-index-mark"),
+        "text:drop-down" => reason!("text:drop-down"),
+        "text:annotation" => reason!("text:annotation"),
+        "office:annotation" => reason!("office:annotation"),
+        "office:annotation-end" => reason!("office:annotation-end"),
+        "draw:frame" => reason!("draw:frame"),
+        "draw:a" => reason!("draw:a"),
+        "draw:custom-shape" => reason!("draw:custom-shape"),
+        "draw:rect" => reason!("draw:rect"),
+        "draw:line" => reason!("draw:line"),
+        "draw:ellipse" => reason!("draw:ellipse"),
+        "draw:control" => reason!("draw:control"),
+        "draw:g" => reason!("draw:g"),
+        "table:table" => reason!("table:table"),
+        "table:table-row" => reason!("table:table-row"),
+        "table:table-cell" => reason!("table:table-cell"),
+        "table:covered-table-cell" => reason!("table:covered-table-cell"),
+        _ => {
+            "an ODT text set would replace a non-text element: set the text of the runs around it, \
+              or remove it first (record 0304)"
+        },
+    };
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "odt.body.set_text",
+        reason,
     ))
 }
 
@@ -454,7 +582,7 @@ mod tests {
         let body = "<text:p>Page <text:page-number>3</text:page-number></text:p>";
         let error = set(body, Kind::Paragraph, "x").unwrap_err();
         assert!(
-            matches!(&error, Error::Unsupported(message) if message.contains("text:page-number"))
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
         );
         // A field that shows nothing is kept.
         let body = "<text:p>Page <text:page-number></text:page-number></text:p>";
@@ -480,7 +608,9 @@ mod tests {
         let nested = "<table:table><table:table-row><table:table-cell>\
              <table:table/><text:p>x</text:p></table:table-cell></table:table-row></table:table>";
         let error = set(nested, Kind::Cell, "y").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("table:table")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
     }
 
     #[test]
@@ -488,7 +618,9 @@ mod tests {
         let body =
             r#"<text:p>See <text:a xlink:href="https://example.com/">this</text:a></text:p>"#;
         let error = set(body, Kind::Paragraph, "x").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("text:a")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
         // The hyperlink's own text is set.
         let (text, _) = set(body, Kind::Hyperlink, "that").unwrap();
         assert_eq!(text, "that");
@@ -500,6 +632,8 @@ mod tests {
              <text:list><text:list-item><text:p>b</text:p></text:list-item></text:list>\
              </text:list-item></text:list>";
         let error = set(body, Kind::ListItem, "y").unwrap_err();
-        assert!(matches!(&error, Error::Unsupported(message) if message.contains("text:list")));
+        assert!(
+            matches!(&error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
     }
 }

@@ -9,11 +9,10 @@
 
 mod repair_support;
 
-use litchi_rtf::{
-    DocumentPrintLayoutSettings, DocumentThemeLanguages, LanguageId, RtfDocument, RtfWriter,
-};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{DocumentPrintLayoutSettings, DocumentThemeLanguages, LanguageId, RtfWriter};
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -23,7 +22,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn parses_flags_and_producer_style_theme_languages() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\gutterprl\twoonone\themelang1033"#,
         r#"\themelangfe2052\themelangcs1025 Body}"#,
     ))
@@ -51,14 +50,13 @@ fn parses_flags_and_producer_style_theme_languages() {
 
 #[test]
 fn omission_is_distinct_from_explicit_zero_languages() {
-    let omitted = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let omitted = Tree::parse(r"{\rtf1 Body}").unwrap();
     assert!(omitted.print_layout_settings().is_empty());
     assert!(omitted.theme_languages().is_empty());
     let serialized = String::from_utf8(write(&omitted)).unwrap();
     assert!(!serialized.contains("\\themelang"));
 
-    let explicit =
-        RtfDocument::parse(r"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}").unwrap();
+    let explicit = Tree::parse(r"{\rtf1\themelang0\themelangfe0\themelangcs0 Body}").unwrap();
     assert_eq!(explicit.theme_languages().primary.unwrap().value(), 0);
     assert_eq!(explicit.theme_languages().east_asian.unwrap().value(), 0);
     assert_eq!(
@@ -73,7 +71,7 @@ fn omission_is_distinct_from_explicit_zero_languages() {
 
 #[test]
 fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
-    let mut document = RtfDocument::parse(r"{\rtf1 Body}").unwrap();
+    let mut document = Tree::parse(r"{\rtf1 Body}").unwrap();
     document
         .set_print_layout_settings(DocumentPrintLayoutSettings {
             facing_pages: false,
@@ -100,7 +98,7 @@ fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
     for pair in controls.windows(2) {
         assert!(serialized.find(pair[0]).unwrap() < serialized.find(pair[1]).unwrap());
     }
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(
         reparsed.print_layout_settings(),
         document.print_layout_settings()
@@ -117,14 +115,14 @@ fn typed_apis_round_trip_in_stable_order_and_clear_without_side_effects() {
 
 #[test]
 fn coexists_with_theme_data_grid_and_rendering_metadata() {
-    let document = RtfDocument::parse(concat!(
+    let document = Tree::parse(concat!(
         r#"{\rtf1\themelangfe0\horzdoc\dgmargin\gutterprl"#,
         r#"{\*\themedata 0102}\themelang1031\jexpand\twoonone"#,
         r#"\themelangcs0 Body}"#,
     ))
     .unwrap();
     let output = write(&document);
-    let reparsed = RtfDocument::parse_bytes(&output).unwrap();
+    let reparsed = Tree::parse_bytes(&output).unwrap();
     assert_eq!(
         reparsed.print_layout_settings(),
         document.print_layout_settings()
@@ -157,7 +155,7 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
         r"{\rtf1\themelangcs0\themelangcs1025 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&RtfDocument::parse(source)),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(source)),
             "accepted malformed {source}"
         );
     }
@@ -177,10 +175,7 @@ fn rejects_every_starred_grouped_and_late_control() {
             format!(r"{{\rtf1{{{control}}}Body}}"),
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
-            assert!(
-                RtfDocument::parse(&source).is_err(),
-                "accepted malformed {source}"
-            );
+            assert!(Tree::parse(&source).is_err(), "accepted malformed {source}");
         }
     }
 }

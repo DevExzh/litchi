@@ -15,7 +15,7 @@ pub(crate) struct AttachedTableGraphClone {
 }
 
 pub(super) fn table_owned_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
 ) -> Result<BTreeMap<u64, TableOwnedKind>> {
@@ -100,8 +100,8 @@ pub(crate) fn duplicate_table_name(source: &str, existing: &HashSet<&str>) -> Re
 /// family; references to the existing parent stay intact. Callers add the
 /// returned drawable to their native container only after this succeeds.
 pub(crate) fn duplicate_attached_table_graph_in_package(
-    source: &IWorkPackage,
-    staged: &mut IWorkPackage,
+    source: &HostPackage,
+    staged: &mut HostPackage,
     source_info_id: u64,
     source_model_id: u64,
     name: &str,
@@ -284,7 +284,7 @@ pub(crate) fn duplicate_attached_table_graph_in_package(
     })
 }
 
-fn table_uuids(package: &IWorkPackage) -> Result<HashSet<String>> {
+fn table_uuids(package: &HostPackage) -> Result<HashSet<String>> {
     let mut identifiers = HashSet::new();
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
@@ -503,8 +503,8 @@ pub(super) fn clone_table_storage_object(
 }
 
 pub(super) fn register_cloned_numbers_objects(
-    staged: &mut IWorkPackage,
-    source: &IWorkPackage,
+    staged: &mut HostPackage,
+    source: &HostPackage,
     locations: &HashMap<u64, String>,
     remap: &HashMap<u64, u64>,
 ) -> Result<()> {
@@ -564,7 +564,7 @@ pub(super) fn register_cloned_numbers_objects(
 }
 
 pub(super) fn register_numbers_component_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_entry: &str,
     target_entry: &str,
     object_id: u64,

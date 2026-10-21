@@ -36,18 +36,20 @@ pub(super) struct Request<'r> {
 }
 
 fn storage_error(_error: litchi_numbers_wire::table_write::WriteError) -> Error {
-    Error::Unsupported {
+    Error::Refused(crate::slide::drawable::Refusal::Unsupported {
         reason: Unsupported::TableStorage,
-    }
+    })
 }
 
 /// The single payload of `message_type` of `object`.
 fn single(object: &ArchiveObject, message_type: u32) -> Result<&[u8], Error> {
     match object.messages.as_slice() {
         [message] if message.type_ == message_type => Ok(&message.data),
-        _ => Err(Error::Unsupported {
-            reason: Unsupported::TableStorage,
-        }),
+        _ => Err(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TableStorage,
+            },
+        )),
     }
 }
 
@@ -134,16 +136,20 @@ fn reference(workspace: &mut Workspace<'_>, from: u64, target: u64) -> Result<()
     let source = workspace
         .registry
         .component_for_member(&from_member)
-        .ok_or(Error::Unsupported {
-            reason: Unsupported::RegistryShape,
-        })?
+        .ok_or(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::RegistryShape,
+            },
+        ))?
         .identifier;
     let destination = workspace
         .registry
         .component_for_member(&target_member)
-        .ok_or(Error::Unsupported {
-            reason: Unsupported::RegistryShape,
-        })?
+        .ok_or(Error::Refused(
+            crate::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::RegistryShape,
+            },
+        ))?
         .identifier;
     let entry = workspace
         .registry
@@ -171,10 +177,12 @@ pub(super) fn add_table(
     request: &Request<'_>,
 ) -> Result<u64, Error> {
     if !table_create::admits_size(request.rows, request.columns) {
-        return Err(Error::InvalidTableSize {
-            rows: request.rows,
-            columns: request.columns,
-        });
+        return Err(Error::Refused(
+            crate::slide::drawable::Refusal::InvalidTableSize {
+                rows: request.rows,
+                columns: request.columns,
+            },
+        ));
     }
     let info_object = workspace.require(request.template).map_err(lift)?.clone();
     let info_template = single(&info_object, TABLE_INFO_MESSAGE_TYPE)?.to_vec();
@@ -204,9 +212,11 @@ pub(super) fn add_table(
     for (identifier, role) in &owned {
         let object = workspace.require(*identifier).map_err(lift)?.clone();
         let [message] = object.messages.as_slice() else {
-            return Err(Error::Unsupported {
-                reason: Unsupported::TableStorage,
-            });
+            return Err(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::TableStorage,
+                },
+            ));
         };
         let member = workspace
             .component_of(*identifier)
@@ -271,7 +281,7 @@ pub(super) fn add_table(
         height: request.geometry.height,
     };
     let info_data = table_create::info_payload(&info_template, request.slide, new_model, frame)
-        .map_err(|_error| Error::InvalidGeometry)?;
+        .map_err(|_error| Error::Refused(crate::slide::drawable::Refusal::InvalidGeometry))?;
     let info_references = declared(&info_object, &info_data, &|identifier| {
         if identifier == model {
             Some(new_model)
@@ -355,13 +365,14 @@ pub(super) fn add_table(
     // cross-member reference.
     for (clone, source) in &inserted {
         let member = workspace.component_of(*clone).ok_or(Error::InvalidSource)?;
-        let component =
-            workspace
-                .registry
-                .component_for_member(&member)
-                .ok_or(Error::Unsupported {
+        let component = workspace
+            .registry
+            .component_for_member(&member)
+            .ok_or(Error::Refused(
+                crate::slide::drawable::Refusal::Unsupported {
                     reason: Unsupported::RegistryShape,
-                })?;
+                },
+            ))?;
         let (identifier, source_uuid) = (component.identifier, component.uuid_of(*source));
         if let Some(source_uuid) = source_uuid {
             let uuid = workspace

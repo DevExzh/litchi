@@ -28,7 +28,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 mod codec {
     use super::CHART_BACKGROUND_FILL_FIELD;
@@ -443,7 +443,7 @@ pub(crate) fn native_default_chart_background_fill() -> Result<ShapeFill> {
 
 /// Read the effective background fill of one native chart.
 pub(crate) fn chart_background_fill(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -459,7 +459,7 @@ pub(crate) fn chart_background_fill(
 
 /// Set the background fill of one native chart.
 pub(crate) fn set_chart_background_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -496,7 +496,7 @@ pub(crate) fn set_chart_background_fill(
 
 /// Embed image bytes and use them as a simple or tinted chart background.
 pub(crate) fn set_chart_background_image_fill_data(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -506,7 +506,7 @@ pub(crate) fn set_chart_background_image_fill_data(
     fill_size: DrawableSize,
     tint: Option<RgbaColor>,
 ) -> Result<ShapeImageFill> {
-    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    let mut media = crate::media::Draft::from_package(package.clone())?;
     let asset = media.insert_unreferenced(preferred_filename, data)?;
     if asset.media_type != MediaType::Image {
         return Err(Error::Bundle(format!(
@@ -624,7 +624,7 @@ fn encode_fill(fill: &ShapeFill) -> Result<Vec<u8>> {
 }
 
 fn adjust_chart_style_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slot: &ChartStyleSlot,
     old_data_identifier: Option<MediaAssetId>,
     new_data_identifier: Option<MediaAssetId>,

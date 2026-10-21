@@ -15,7 +15,7 @@
 //! cargo run -p litchi-rtf --example compressed_rtf
 //! ```
 
-use litchi_rtf::transport::{compress, decompress, is_compressed_rtf};
+use litchi_rtf::transport::{DecompressionLimits, compress, decompress, is_compressed_rtf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let original: &[u8] = b"{\\rtf1\\ansi{\\fonttbl\\f0\\fswiss Helvetica;}\\f0\\pard \
@@ -38,7 +38,7 @@ This text is repeated.\\par}";
         is_compressed_rtf(&compressed)
     );
 
-    let round_trip = decompress(&compressed)?;
+    let round_trip = decompress(&compressed, DecompressionLimits::default())?;
     assert_eq!(
         round_trip, original,
         "LZFu round-trip should restore the exact bytes"
@@ -60,7 +60,7 @@ This text is repeated.\\par}";
         is_compressed_rtf(&stored)
     );
 
-    let stored_round_trip = decompress(&stored)?;
+    let stored_round_trip = decompress(&stored, DecompressionLimits::default())?;
     assert_eq!(
         stored_round_trip, original,
         "Uncompressed round-trip should restore the exact bytes"

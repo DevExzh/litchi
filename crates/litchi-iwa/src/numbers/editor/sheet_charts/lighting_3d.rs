@@ -7,7 +7,7 @@ use crate::charts::lighting_3d::{
     set_chart_3d_lighting_style as set_native_chart_3d_lighting_style,
 };
 
-impl Editor {
+impl Draft {
     /// Read one sheet chart's native Lighting Style choice.
     pub fn sheet_chart_3d_lighting_style(
         &self,
@@ -51,7 +51,7 @@ impl Editor {
             graph.info.kind,
             style,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_lighting_style(sheet_id, drawable_object_id)? != style {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D lighting-style update failed validation".to_owned(),

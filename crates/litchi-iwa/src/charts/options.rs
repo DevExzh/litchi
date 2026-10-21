@@ -13,7 +13,7 @@ use crate::charts::non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_protos::keynote_chart_title_codec::{
     ChartTitleWrite, DecodeOptions, decode_chart_title, decode_visible_chart_title,
     rewrite_chart_title,
@@ -25,7 +25,7 @@ const CHART_LEGEND_VISIBLE_FIELD: u32 = 20;
 const MAX_CHART_TITLE_BYTES: usize = 64 * 1024 * 1024;
 /// Read one chart title from its native chart non-style extension.
 pub(crate) fn chart_title(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -41,7 +41,7 @@ pub(crate) fn chart_title(
 
 /// Set one chart title, enabling the native title switch when necessary.
 pub(crate) fn set_chart_title(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -73,7 +73,7 @@ pub(crate) fn set_chart_title(
 /// Returns whether the title was visible. A chart non-style shared by more than
 /// one chart is rejected rather than silently changing another chart.
 pub(crate) fn remove_chart_title(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -99,7 +99,7 @@ pub(crate) fn remove_chart_title(
 
 /// Read whether one chart shows its native legend.
 pub(crate) fn chart_legend_visible(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -115,7 +115,7 @@ pub(crate) fn chart_legend_visible(
 
 /// Set whether one chart shows its native legend.
 pub(crate) fn set_chart_legend_visible(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

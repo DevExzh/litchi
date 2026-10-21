@@ -7501,10 +7501,8 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
 
-    let mut model = crate::document::RtfDocument::parse_bytes_with_options(
-        source_bytes,
-        edit.source.options(),
-    )?;
+    let mut model =
+        crate::document::Tree::parse_bytes_with_options(source_bytes, edit.source.options())?;
     for operation in &edit.operations {
         match operation {
             Operation::TableCellText { path, after, .. } => {
@@ -7837,7 +7835,7 @@ fn shape_group_has_active_link(group: &crate::ShapeGroup<'_>) -> bool {
 }
 
 fn model_header_footer_paragraph_mut<'a>(
-    model: &'a mut crate::document::RtfDocument<'static>,
+    model: &'a mut crate::document::Tree<'static>,
     target: HeaderFooterParagraph,
 ) -> Result<&'a mut crate::HeaderFooterParagraph<'static>, Error> {
     model

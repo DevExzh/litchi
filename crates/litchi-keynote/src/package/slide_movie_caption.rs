@@ -132,6 +132,39 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source movie, caption graph, or text storage is malformed or unsafe.
+    #[error("the Keynote movie-caption source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote movie-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote movie-caption transaction")]
+    Allocation { amount: usize },
+    /// Full candidate reopening did not reproduce the requested caption.
+    #[error("the edited Keynote movie caption failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote movie-caption patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical movie-caption edits")]
     UnsupportedSource,
@@ -153,28 +186,31 @@ pub enum Error {
     /// A checked semantic movie position does not exist.
     #[error("the selected Keynote slide has no movie at position {position:?}")]
     MoviePositionNotFound { position: Position },
-    /// The source movie, caption graph, or text storage is malformed or unsafe.
-    #[error("the Keynote movie-caption source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote movie-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its ceiling.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote movie-caption transaction")]
-    Allocation { amount: usize },
-    /// Full candidate reopening did not reproduce the requested caption.
-    #[error("the edited Keynote movie caption failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote movie-caption patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable movie-caption value staged against an immutable package.
@@ -277,7 +313,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !source_catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         if self
@@ -287,7 +323,7 @@ impl<'a> Edit<'a> {
             .is_some_and(contains_dependent_marker)
             || self.after.as_deref().is_some_and(contains_dependent_marker)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut budget = super::slide_chart_caption::CaptionBudget::for_package(self.source)
             .map_err(map_chart_caption_error)?;
@@ -582,6 +618,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -806,9 +848,9 @@ pub(super) fn select_movie_text(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -846,12 +888,11 @@ pub(super) fn select_movie_text(
         }
     }
     let movie_position = movie_selector.as_position();
-    let movie_identifier =
-        *movies
-            .get(movie_position.get())
-            .ok_or(Error::MoviePositionNotFound {
-                position: movie_position,
-            })?;
+    let movie_identifier = *movies.get(movie_position.get()).ok_or(Error::Refused(
+        Refusal::MoviePositionNotFound {
+            position: movie_position,
+        },
+    ))?;
     let movie = package
         .object(movie_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1025,7 +1066,7 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -1034,7 +1075,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1044,8 +1085,8 @@ fn repeated_references(
     field_number: u32,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
-        .map_err(map_wire_error)?;
+    let fields =
+        litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut references = Vec::new();
     references
         .try_reserve(fields.len())
@@ -1073,8 +1114,8 @@ fn unique_length_delimited_payload(
     field_number: u32,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Option<&[u8]>, Error> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
-        .map_err(map_wire_error)?;
+    let fields =
+        litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in fields
         .fields()
@@ -1140,7 +1181,7 @@ fn prove_exclusive_movie_drawable(
                             .filter(|identifier| *identifier == movie_identifier)
                             .count();
                     if local != 0 && (!canonical_slide || local != 1) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     payload_occurrences = payload_occurrences
                         .checked_add(local)
@@ -1158,11 +1199,11 @@ fn prove_exclusive_movie_drawable(
                     .filter(|identifier| **identifier == movie_identifier)
                     .count();
                 if aggregate_data_count != 0 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if aggregate_count != 0 {
                     if aggregate_count != 1 || (!canonical_slide && !selected_build) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     aggregate_occurrences = aggregate_occurrences
                         .checked_add(aggregate_count)
@@ -1181,7 +1222,7 @@ fn prove_exclusive_movie_drawable(
                         .filter(|identifier| **identifier == movie_identifier)
                         .count();
                     if field_data_count != 0 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if !canonical_slide
@@ -1191,7 +1232,7 @@ fn prove_exclusive_movie_drawable(
                                 [7, 1] | [1, 7, 1] | [1, 1, 7, 1]
                             )
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         field_occurrences = field_occurrences
                             .checked_add(field_count)
@@ -1241,7 +1282,7 @@ fn selected_movie_build_identifiers(
         })?;
     for (index, identifier) in build_identifiers.iter().copied().enumerate() {
         if build_identifiers[..index].contains(&identifier) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let (component, object) = package
             .object_with_component(identifier)
@@ -1257,7 +1298,7 @@ fn selected_movie_build_identifiers(
             .filter(|(_, message)| message.type_ == BUILD_MESSAGE_TYPE)
         {
             if build_message.replace((message_index, message)).is_some() {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
         }
         let Some((message_index, message)) = build_message else {
@@ -1281,7 +1322,7 @@ fn selected_movie_build_identifiers(
         match info.object_references.as_slice() {
             [] => {},
             [reference] if *reference == movie_identifier => selected.push(identifier),
-            _ => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::Refused(Refusal::UnsupportedDependency)),
         }
     }
     Ok(selected)
@@ -1304,14 +1345,14 @@ fn validate_movie_start_build(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<(), Error> {
-    let attributes =
-        unique_length_delimited_payload(payload, 4, limits)?.ok_or(Error::UnsupportedDependency)?;
+    let attributes = unique_length_delimited_payload(payload, 4, limits)?
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let animation = unique_length_delimited_payload(attributes, 18, limits)?
-        .ok_or(Error::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let effect = unique_length_delimited_payload(animation, 2, limits)?
-        .ok_or(Error::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     if effect != b"apple:movie-start" {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1400,7 +1441,7 @@ fn prove_exclusive_caption_storage(
                         MovieTextKind::Title => snapshot.caption_identifier(),
                     };
                     if opposite_identifier == Some(caption_info_identifier) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     let edge_identifier = match kind {
                         MovieTextKind::Caption => snapshot.caption_identifier(),
@@ -1409,7 +1450,7 @@ fn prove_exclusive_caption_storage(
                     if edge_identifier == Some(caption_info_identifier) {
                         movie_edges = movie_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                         if owner_identifier != movie_identifier {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                 }
@@ -1424,7 +1465,7 @@ fn prove_exclusive_caption_storage(
                     .filter(|identifier| **identifier == caption_info_identifier)
                     .count();
                 if data_info != 0 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let mut local_info_fields = 0usize;
                 for field in &info.field_infos {
@@ -1439,7 +1480,7 @@ fn prove_exclusive_caption_storage(
                         .filter(|identifier| **identifier == caption_info_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != movie_identifier
@@ -1447,7 +1488,7 @@ fn prove_exclusive_caption_storage(
                             || field_count != 1
                             || !kind.accepts_edge_path(field.path.path.as_slice())
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_info_fields = local_info_fields
                             .checked_add(field_count)
@@ -1459,7 +1500,7 @@ fn prove_exclusive_caption_storage(
                         || message.type_ != MOVIE_MESSAGE_TYPE
                         || aggregate_info != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 info_aggregate_edges = info_aggregate_edges
@@ -1483,7 +1524,7 @@ fn prove_exclusive_caption_storage(
                             .checked_add(1)
                             .ok_or(Error::InvalidSource)?;
                         if owner_identifier != caption_info_identifier {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                     if snapshot.style_identifier() == Some(style_identifier) {
@@ -1491,7 +1532,7 @@ fn prove_exclusive_caption_storage(
                             .checked_add(1)
                             .ok_or(Error::InvalidSource)?;
                         if owner_identifier != caption_info_identifier {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                     if snapshot.placement_identifier() == Some(placement_identifier) {
@@ -1499,7 +1540,7 @@ fn prove_exclusive_caption_storage(
                             .checked_add(1)
                             .ok_or(Error::InvalidSource)?;
                         if owner_identifier != caption_info_identifier {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                 }
@@ -1516,7 +1557,7 @@ fn prove_exclusive_caption_storage(
                 if info.data_references.iter().any(|identifier| {
                     *identifier == style_identifier || *identifier == placement_identifier
                 }) {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if aggregate_style != 0 {
                     let allowed_owner = (owner_identifier == caption_info_identifier
@@ -1524,7 +1565,7 @@ fn prove_exclusive_caption_storage(
                         || (owner_identifier == movie_identifier
                             && message.type_ == MOVIE_MESSAGE_TYPE);
                     if !allowed_owner || aggregate_style != 1 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 if aggregate_placement != 0 {
@@ -1532,7 +1573,7 @@ fn prove_exclusive_caption_storage(
                         || message.type_ != CAPTION_INFO_MESSAGE_TYPE
                         || aggregate_placement != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let mut local_style_fields = 0usize;
@@ -1551,7 +1592,7 @@ fn prove_exclusive_caption_storage(
                     if field.data_references.iter().any(|identifier| {
                         *identifier == style_identifier || *identifier == placement_identifier
                     }) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if style_count != 0 {
                         if owner_identifier != caption_info_identifier
@@ -1559,7 +1600,7 @@ fn prove_exclusive_caption_storage(
                             || style_count != 1
                             || !matches!(field.path.path.as_slice(), [1, 1, 2] | [1, 2])
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_style_fields = local_style_fields
                             .checked_add(style_count)
@@ -1571,7 +1612,7 @@ fn prove_exclusive_caption_storage(
                             || placement_count != 1
                             || !matches!(field.path.path.as_slice(), [2])
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_placement_fields = local_placement_fields
                             .checked_add(placement_count)
@@ -1601,7 +1642,7 @@ fn prove_exclusive_caption_storage(
                     .filter(|identifier| **identifier == storage_identifier)
                     .count();
                 if data_storage != 0 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let mut local_storage_fields = 0usize;
                 for field in &info.field_infos {
@@ -1616,7 +1657,7 @@ fn prove_exclusive_caption_storage(
                         .filter(|identifier| **identifier == storage_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != caption_info_identifier
@@ -1624,7 +1665,7 @@ fn prove_exclusive_caption_storage(
                             || field_count > 2
                             || !matches!(field.path.path.as_slice(), [1, 2] | [1, 4])
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_storage_fields = local_storage_fields
                             .checked_add(field_count)
@@ -1636,7 +1677,7 @@ fn prove_exclusive_caption_storage(
                         || message.type_ != CAPTION_INFO_MESSAGE_TYPE
                         || aggregate_storage != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 storage_aggregate_owner = storage_aggregate_owner
@@ -1691,7 +1732,7 @@ fn prove_exclusive_caption_standin(
                         MovieTextKind::Title => snapshot.caption_identifier(),
                     };
                     if opposite_identifier == Some(standin_identifier) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     let edge_identifier = match kind {
                         MovieTextKind::Caption => snapshot.caption_identifier(),
@@ -1700,7 +1741,7 @@ fn prove_exclusive_caption_standin(
                     if edge_identifier == Some(standin_identifier) {
                         payload_edges += 1;
                         if payload_edges > 1 || owner_identifier != movie_identifier {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                 }
@@ -1710,7 +1751,7 @@ fn prove_exclusive_caption_standin(
                     .get(message_index)
                     .ok_or(Error::InvalidSource)?;
                 if info.data_references.contains(&standin_identifier) {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let aggregate = info
                     .object_references
@@ -1722,7 +1763,7 @@ fn prove_exclusive_caption_standin(
                         || message.type_ != MOVIE_MESSAGE_TYPE
                         || aggregate != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     aggregate_edges += aggregate;
                 }
@@ -1733,7 +1774,7 @@ fn prove_exclusive_caption_standin(
                         .filter(|identifier| **identifier == standin_identifier)
                         .count();
                     if field.data_references.contains(&standin_identifier) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != movie_identifier
@@ -1741,7 +1782,7 @@ fn prove_exclusive_caption_standin(
                             || field_count != 1
                             || !kind.accepts_edge_path(field.path.path.as_slice())
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         field_edges += field_count;
                     }
@@ -1788,13 +1829,13 @@ fn caption_info_decode_options(
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn copy_caption(value: &str) -> Result<String, Error> {
     if value.len() > MAX_CAPTION_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CaptionBytes,
             observed: usize_to_u64(value.len()),
             maximum: usize_to_u64(MAX_CAPTION_BYTES),
@@ -1815,8 +1856,10 @@ pub(super) fn contains_dependent_marker(text: &str) -> bool {
 
 fn map_slide_selector_error(error: crate::SlideSelectorError) -> Error {
     match error {
-        crate::SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        crate::SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        crate::SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        crate::SlideSelectorError::DuplicateSlideName { .. } => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
     }
 }
 
@@ -1828,7 +1871,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -1845,7 +1888,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -1866,7 +1909,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1894,7 +1937,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -1929,7 +1972,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1947,7 +1990,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn map_movie_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1959,14 +2002,14 @@ fn map_movie_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Err
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_movie_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: usize_to_u64(observed),
                     maximum: usize_to_u64(maximum),
                 }
             },
             keynote_movie_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -1976,14 +2019,14 @@ fn map_movie_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Err
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -1994,21 +2037,21 @@ fn map_movie_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Err
 
 fn map_caption_info_codec_error(error: pages_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -2019,14 +2062,18 @@ fn map_caption_info_codec_error(error: pages_movie_caption_codec::DecodeError) -
 
 fn map_slide_text_error(error: super::slide_text::Error) -> Error {
     match error {
-        super::slide_text::Error::UnsupportedSource => Error::UnsupportedSource,
-        super::slide_text::Error::DependentContent
-        | super::slide_text::Error::ObjectMarkerReplacement => Error::UnsupportedDependency,
-        super::slide_text::Error::LimitExceeded {
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::DependentContent)
+        | super::slide_text::Error::Refused(crate::slide::text::Refusal::ObjectMarkerReplacement) => {
+            Error::Refused(Refusal::UnsupportedDependency)
+        },
+        super::slide_text::Error::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_slide_text_limit_kind(kind),
             observed,
             maximum,
@@ -2040,13 +2087,17 @@ fn map_slide_text_error(error: super::slide_text::Error) -> Error {
 fn map_chart_caption_error(error: super::slide_chart_caption::Error) -> Error {
     use super::slide_chart_caption::Error as ChartCaptionError;
     match error {
-        ChartCaptionError::UnsupportedSource => Error::UnsupportedSource,
-        ChartCaptionError::UnsupportedDependency => Error::UnsupportedDependency,
-        ChartCaptionError::LimitExceeded {
+        ChartCaptionError::Refused(crate::chart::caption::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        ChartCaptionError::Refused(crate::chart::caption::Refusal::UnsupportedDependency) => {
+            Error::Refused(Refusal::UnsupportedDependency)
+        },
+        ChartCaptionError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_chart_caption_limit_kind(kind),
             observed,
             maximum,

@@ -228,13 +228,13 @@ fn charge_remaining(
     let used = maximum
         .checked_sub(*remaining)
         .ok_or(Error::InvalidSource)?;
-    let observed = used.checked_add(amount).ok_or(Error::LimitExceeded {
+    let observed = used.checked_add(amount).ok_or(Error::Limit {
         kind,
         observed: u64::MAX,
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
     })?;
     if observed > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -311,7 +311,9 @@ pub(super) fn resolve_native_target(
         .map_err(map_sheet_order_codec_error)?;
     budget.consume(sidebar_report)?;
     if sidebar_snapshot.object_reference().is_some() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     let child_references = sidebar_snapshot.child_references();
     if child_references.len() != sheet_references.len() {
@@ -338,9 +340,9 @@ pub(super) fn resolve_native_target(
             )
             .map_err(map_sheet_order_codec_error)?;
         budget.consume(child_report)?;
-        let sheet_reference = child_snapshot
-            .object_reference()
-            .ok_or(Error::UnsupportedSource)?;
+        let sheet_reference = child_snapshot.object_reference().ok_or(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ))?;
         validate_reference(sheet_reference)?;
         if sheet_reference.identifier()
             != sheet_references
@@ -472,7 +474,9 @@ fn validate_plain_sheet(
         .count();
     match (ordinary, forms) {
         (1, 0) => Ok(()),
-        (0, 1) => Err(Error::UnsupportedSource),
+        (0, 1) => Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        )),
         _ => Err(Error::InvalidSource),
     }
 }
@@ -481,7 +485,9 @@ fn require_same_component(expected: usize, actual: usize) -> Result<(), Error> {
     if expected == actual {
         Ok(())
     } else {
-        Err(Error::UnsupportedSource)
+        Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ))
     }
 }
 
@@ -598,7 +604,9 @@ fn validate_order_metadata(
             .iter()
             .any(|identifier| positions.contains_key(identifier))
     }) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::sheet_order::Refusal::UnsupportedSource,
+        ));
     }
     Ok(())
 }

@@ -261,12 +261,15 @@ fn rewrite_document_root(source: &[u8], corruption: RouteCorruption) -> TestResu
 }
 
 fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestResult<Vec<u8>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == DOCUMENT_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("native TSA super envelope is missing"))?;
-    let tsa = WireView::parse(super_field.payload())?;
+    let tsa = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let registry = tsa
         .fields()
         .find(|field| field.number() == TSA_REGISTRY_FIELD)
@@ -279,6 +282,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut tsa_payload,
                 TSA_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(patch_length_delimited_field(
                 source,
@@ -293,6 +297,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_SUPER_FIELD,
                 super_field.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },
@@ -302,6 +307,7 @@ fn corrupt_document_route(source: &[u8], corruption: RouteCorruption) -> TestRes
                 &mut root_payload,
                 DOCUMENT_REGISTRY_FIELD,
                 registry.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(root_payload)
         },

@@ -9,7 +9,7 @@ use crate::charts::series_symbol_outline::{
 };
 use crate::charts::{ChartSeriesStroke, Index};
 
-impl Editor {
+impl Draft {
     pub fn body_chart_series_symbol_outlines(
         &self,
         drawable_object_id: u64,
@@ -72,7 +72,7 @@ impl Editor {
             count,
             series.zero_based(),
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_series_symbol_outline(drawable_object_id, series)? != inherited {
             return Err(Error::InvalidFormat(
                 "Pages chart data-symbol outline reset failed validation".to_owned(),
@@ -83,7 +83,7 @@ impl Editor {
     }
 }
 
-fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<Option<ChartSeriesStroke>>> {
+fn read(editor: &Draft, drawable_object_id: u64) -> Result<Vec<Option<ChartSeriesStroke>>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native(
         editor.package(),
@@ -96,7 +96,7 @@ fn read(editor: &Editor, drawable_object_id: u64) -> Result<Vec<Option<ChartSeri
 }
 
 fn set(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     outlines: &[Option<ChartSeriesStroke>],
 ) -> Result<()> {
@@ -114,7 +114,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         outlines,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_series_symbol_outlines(drawable_object_id)? != outlines {
         return Err(Error::InvalidFormat(
             "Pages chart data-symbol outline update failed validation".to_owned(),

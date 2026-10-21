@@ -393,9 +393,19 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xfeed_beef)?;
     Ok(data)
 }
@@ -745,7 +755,12 @@ fn metadata_root(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn document_metadata_component(source: &[u8], identifier: u64) -> TestResult<tsp::ComponentInfo> {
-    for field in WireView::parse(&metadata_payload(source)?)?.fields() {
+    for field in WireView::parse(
+        &metadata_payload(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    {
         if field.number() != 3 {
             continue;
         }
@@ -1783,18 +1798,21 @@ fn popup_unknown_metadata_and_payload_bytes_survive_rewrite() -> TestResult {
         .ok_or_else(|| io::Error::other("target popup payload is missing"))?
         .1;
     assert!(
-        !WireView::parse(&target_payload)?
+        !WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == 90)
             .collect::<Vec<_>>()
             .is_empty()
     );
     assert!(
-        !WireView::parse(&metadata_payload(&target)?)?
-            .fields()
-            .filter(|field| field.number() == 90)
-            .collect::<Vec<_>>()
-            .is_empty()
+        !WireView::parse(
+            &metadata_payload(&target)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .filter(|field| field.number() == 90)
+        .collect::<Vec<_>>()
+        .is_empty()
     );
     Ok(())
 }

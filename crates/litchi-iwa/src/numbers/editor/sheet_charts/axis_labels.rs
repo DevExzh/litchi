@@ -7,7 +7,7 @@ use crate::charts::axis::{
     set_chart_axis_labels_visible as set_native_chart_axis_labels_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Numbers shows labels for one native sheet-chart axis.
     pub fn sheet_chart_axis_labels_visible(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_labels_visible(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_labels_visible(
 }
 
 fn set_sheet_chart_axis_labels_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_labels_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_labels_visible(sheet_id, drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Numbers chart axis-label update failed validation".to_owned(),

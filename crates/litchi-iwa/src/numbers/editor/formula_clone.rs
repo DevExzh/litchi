@@ -53,7 +53,7 @@ struct RangeTileSource {
 /// Minimal legacy packages may omit a CalculationEngine entirely. They remain
 /// editable, but there is no component in which to register formula state.
 pub(super) fn create_empty_table_formula_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_info_id: u64,
     table_uuid: &str,
 ) -> Result<Option<(String, u64)>> {
@@ -121,7 +121,7 @@ pub(super) fn create_empty_table_formula_graph(
 /// that cannot yet be remapped without ambiguity. Packages without a
 /// CalculationEngine are valid minimal documents and need no graph clone.
 pub(super) fn clone_table_formula_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_table_info_id: u64,
     new_table_info_id: u64,
     source_table_uuid: &str,
@@ -383,7 +383,7 @@ pub(super) fn clone_table_formula_graph(
 }
 
 pub(super) fn formula_graph_owner_uuids(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_info_id: u64,
     source_table_uuid: &str,
     new_table_uuid: &str,
@@ -410,7 +410,7 @@ pub(super) fn formula_graph_owner_uuids(
 /// original targets. Sheet duplication needs a later sheet-wide remap for those edges, so it
 /// rejects them until that operation can preserve their native semantics exactly.
 pub(super) fn table_formula_graph_is_self_contained(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_info_id: u64,
 ) -> Result<bool> {
     let Some(calculation_engine_entry) = package.calculation_engine_entry_name()? else {

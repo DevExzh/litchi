@@ -210,9 +210,13 @@ impl Catalog {
                     .iter()
                     .enumerate()
                     .filter(|(_, record)| record.name.as_deref() == Some(name));
-                let (index, _) = matches.next().ok_or(Error::LayoutNameNotFound)?;
+                let (index, _) = matches.next().ok_or(Error::Refused(
+                    crate::slide::creation::Refusal::LayoutNameNotFound,
+                ))?;
                 if matches.next().is_some() {
-                    return Err(Error::AmbiguousLayout);
+                    return Err(Error::Refused(
+                        crate::slide::creation::Refusal::AmbiguousLayout,
+                    ));
                 }
                 Ok(index)
             },
@@ -220,7 +224,9 @@ impl Catalog {
                 if position.get() < self.records.len() {
                     Ok(position.get())
                 } else {
-                    Err(Error::LayoutPositionNotFound { position })
+                    Err(Error::Refused(
+                        crate::slide::creation::Refusal::LayoutPositionNotFound { position },
+                    ))
                 }
             },
         }
@@ -369,9 +375,11 @@ impl NoteSource {
                 });
             }
         }
-        best.ok_or(Error::UnsupportedContent {
-            reason: Unsupported::NotesTemplate,
-        })
+        best.ok_or(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::NotesTemplate,
+            },
+        ))
     }
 }
 
@@ -416,9 +424,11 @@ fn classify(workspace: &Workspace<'_>, drawable: u64) -> Result<Media, Error> {
                 Media::TemplateOnly
             })
         },
-        (true, Some(_)) => Err(Error::UnsupportedContent {
-            reason: Unsupported::LayoutMedia,
-        }),
+        (true, Some(_)) => Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::LayoutMedia,
+            },
+        )),
     }
 }
 
@@ -449,9 +459,11 @@ pub(super) fn stage(
         || template.all(SLIDE_BUILD_CHUNKS).next().is_some()
         || template.unique(SLIDE_NOTE).lift()?.is_some()
     {
-        return Err(Error::UnsupportedContent {
-            reason: Unsupported::LayoutState,
-        });
+        return Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::LayoutState,
+            },
+        ));
     }
     let owned = graph::repeated_references(&template, SLIDE_OWNED_DRAWABLES)?;
     let mut images = Vec::new();
@@ -482,9 +494,11 @@ pub(super) fn stage(
     }
     let objects = private_closure(workspace, &record.member, roots, &[record.slide])?;
     if objects.iter().any(|object| template_only.contains(object)) {
-        return Err(Error::UnsupportedContent {
-            reason: Unsupported::LayoutMedia,
-        });
+        return Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::LayoutMedia,
+            },
+        ));
     }
 
     let new_node = workspace.allocate().lift()?;
@@ -506,9 +520,11 @@ pub(super) fn stage(
     for movie in &movies {
         let payload = graph::payload(workspace, remap[movie], MOVIE_MESSAGE_TYPE)?;
         if media_parent(payload, workspace)? != Some(new_slide) {
-            return Err(Error::UnsupportedContent {
-                reason: Unsupported::LayoutMedia,
-            });
+            return Err(Error::Refused(
+                crate::slide::creation::Refusal::UnsupportedContent {
+                    reason: Unsupported::LayoutMedia,
+                },
+            ));
         }
     }
     if let Some(guides) = reference(&template, SLIDE_USER_GUIDES)? {
@@ -592,9 +608,11 @@ fn materialize_slide(
 fn materialize_image(workspace: &mut Workspace<'_>, image: u64, slide: u64) -> Result<(), Error> {
     let payload = graph::payload(workspace, image, IMAGE_MESSAGE_TYPE)?;
     if media_parent(payload, workspace)? != Some(slide) {
-        return Err(Error::UnsupportedContent {
-            reason: Unsupported::LayoutMedia,
-        });
+        return Err(Error::Refused(
+            crate::slide::creation::Refusal::UnsupportedContent {
+                reason: Unsupported::LayoutMedia,
+            },
+        ));
     }
     let mut fields = Fields::parse(payload, workspace.wire).lift()?;
     let Some(flags) = fields.unique(IMAGE_FLAGS).lift()? else {
@@ -779,9 +797,11 @@ fn register(
                 graph::member_kind(&target),
                 MemberKind::Document | MemberKind::Stylesheet
             ) {
-                return Err(Error::UnsupportedContent {
-                    reason: Unsupported::ExternalContent,
-                });
+                return Err(Error::Refused(
+                    crate::slide::creation::Refusal::UnsupportedContent {
+                        reason: Unsupported::ExternalContent,
+                    },
+                ));
             }
             let edge = ExternalReference {
                 component: graph::registered(workspace, &target)?.identifier,

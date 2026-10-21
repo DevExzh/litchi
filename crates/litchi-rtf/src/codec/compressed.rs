@@ -182,29 +182,11 @@ pub fn is_compressed_rtf(data: &[u8]) -> bool {
     })
 }
 
-/// Decompress RTF data
-///
-/// # Arguments
-///
-/// * `data` - Compressed RTF data with header
-///
-/// # Returns
-///
-/// Decompressed RTF data as bytes
-///
-/// # Errors
-///
-/// Returns an error when the frame, token stream, declared size, compression
-/// type, checksum, or default output budget is invalid.
-pub fn decompress(data: &[u8]) -> RtfResult<Vec<u8>> {
-    decompress_with_limits(data, DecompressionLimits::default())
-}
-
 /// Decompress compressed RTF with an explicit finite output budget.
 ///
 /// # Errors
 /// Returns an error when the input is malformed or a configured limit is exceeded.
-pub fn decompress_with_limits(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>> {
+pub fn decompress(data: &[u8], limits: DecompressionLimits) -> RtfResult<Vec<u8>> {
     let (header, contents) = parse_frame(data)?;
     let raw_size = usize::try_from(header.get_raw_size()).map_err(|_err| {
         RtfError::InvalidStructure("RTF RAWSIZE is not representable on this target".to_string())
@@ -894,18 +876,19 @@ mod tests {
     fn test_round_trip_uncompressed() {
         let original = b"{\\rtf1\\ansi Hello World!\\par}";
         let compressed = compress(original, false).unwrap();
-        let decompressed = decompress(&compressed).unwrap();
+        let decompressed = decompress(&compressed, DecompressionLimits::default()).unwrap();
         assert_eq!(original, decompressed.as_slice());
     }
 
     #[test]
     fn specification_example_is_byte_exact() {
-        assert_eq!(decompress(SPEC_COMPRESSED).unwrap(), SPEC_RAW);
+        assert_eq!(
+            decompress(SPEC_COMPRESSED, DecompressionLimits::default()).unwrap(),
+            SPEC_RAW
+        );
         assert_eq!(compress(SPEC_RAW, true).unwrap(), SPEC_COMPRESSED);
         assert_eq!(
-            crate::RtfDocument::from_bytes(SPEC_COMPRESSED)
-                .unwrap()
-                .text(),
+            crate::Tree::from_bytes(SPEC_COMPRESSED).unwrap().text(),
             "hello world"
         );
     }
@@ -919,7 +902,10 @@ mod tests {
 
         let encoded = compress(&original, true).unwrap();
         assert!(encoded.len() < original.len());
-        assert_eq!(decompress(&encoded).unwrap(), original);
+        assert_eq!(
+            decompress(&encoded, DecompressionLimits::default()).unwrap(),
+            original
+        );
     }
 
     #[test]
@@ -948,7 +934,7 @@ mod tests {
 
                 let encoded = compress(&original, true).unwrap();
                 assert_eq!(
-                    decompress(&encoded).unwrap(),
+                    decompress(&encoded, DecompressionLimits::default()).unwrap(),
                     original,
                     "round trip failed for corpus case {case} at length {len}"
                 );
@@ -960,7 +946,11 @@ mod tests {
     fn canonical_empty_compressed_stream_round_trips() {
         let encoded = compress(&[], true).unwrap();
         assert_eq!(&encoded[HEADER_SIZE..], &[0x02, 0x00, 0x0d, 0x00]);
-        assert!(decompress(&encoded).unwrap().is_empty());
+        assert!(
+            decompress(&encoded, DecompressionLimits::default())
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
@@ -968,19 +958,19 @@ mod tests {
         let mut stored = compress(b"abc", false).unwrap();
         stored[0..4].copy_from_slice(&14u32.to_le_bytes());
         assert!(matches!(
-            decompress(&stored),
+            decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("COMPSIZE")
         ));
 
         let stored = build_frame(4, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
         assert!(matches!(
-            decompress(&stored),
+            decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
 
         let stored = build_frame(2, b"abc", *UNCOMPRESSED_SIGNATURE, 0).unwrap();
         assert!(matches!(
-            decompress(&stored),
+            decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
     }
@@ -992,7 +982,7 @@ mod tests {
         let limits = DecompressionLimits::new(1024);
         assert_eq!(limits.max_output_bytes(), 1024);
         assert!(matches!(
-            decompress_with_limits(&stored, limits),
+            decompress(&stored, limits),
             Err(RtfError::Limit {
                 kind: crate::SourceLimitKind::DecompressedBytes,
                 observed,
@@ -1040,7 +1030,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decompress(&missing_end),
+            decompress(&missing_end, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("ends")
         ));
 
@@ -1052,7 +1042,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decompress(&truncated_reference),
+            decompress(&truncated_reference, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("dictionary reference")
         ));
 
@@ -1064,7 +1054,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decompress(&unavailable_reference),
+            decompress(&unavailable_reference, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("unavailable")
         ));
 
@@ -1076,7 +1066,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decompress(&oversized_literal),
+            decompress(&oversized_literal, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
 
@@ -1089,7 +1079,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            decompress(&duplicate_artificial_literal),
+            decompress(&duplicate_artificial_literal, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("RAWSIZE")
         ));
     }
@@ -1104,7 +1094,10 @@ mod tests {
             crc32(&contents).unwrap(),
         )
         .unwrap();
-        assert_eq!(decompress(&padded).unwrap(), SPEC_RAW);
+        assert_eq!(
+            decompress(&padded, DecompressionLimits::default()).unwrap(),
+            SPEC_RAW
+        );
     }
 
     #[test]
@@ -1112,13 +1105,13 @@ mod tests {
         let mut compressed = SPEC_COMPRESSED.to_vec();
         compressed[12] ^= 0x80;
         assert!(matches!(
-            decompress(&compressed),
+            decompress(&compressed, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
         ));
 
         let stored = build_frame(3, b"abc", *UNCOMPRESSED_SIGNATURE, 1).unwrap();
         assert!(matches!(
-            decompress(&stored),
+            decompress(&stored, DecompressionLimits::default()),
             Err(RtfError::InvalidStructure(message)) if message.contains("CRC32")
         ));
     }
@@ -1126,13 +1119,13 @@ mod tests {
     #[test]
     fn truncation_and_single_byte_mutation_never_panic() {
         for end in 0..SPEC_COMPRESSED.len() {
-            assert!(decompress(&SPEC_COMPRESSED[..end]).is_err());
+            assert!(decompress(&SPEC_COMPRESSED[..end], DecompressionLimits::default()).is_err());
         }
         for index in 0..SPEC_COMPRESSED.len() {
             for replacement in [0x00, 0x01, 0x7f, 0xff] {
                 let mut mutated = SPEC_COMPRESSED.to_vec();
                 mutated[index] = replacement;
-                drop(decompress(&mutated));
+                drop(decompress(&mutated, DecompressionLimits::default()));
             }
         }
     }

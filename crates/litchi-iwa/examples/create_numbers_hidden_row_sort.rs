@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    editor = numbers::Editor::from_bytes(&bytes)?;
+    editor = numbers::Draft::from_bytes(&bytes)?;
     if !editor.apply_table_sort_order(table)? {
         return Err("expected the hidden-row table to be reordered".into());
     }
@@ -68,9 +68,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn set_focused_table_headers(
-    editor: numbers::Editor,
+    editor: numbers::Draft,
     settings: HeaderSettings,
-) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Draft, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -78,13 +78,13 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(numbers::Editor::from_bytes(&bytes)?)
+    Ok(numbers::Draft::from_bytes(&bytes)?)
 }
 
 fn set_focused_table_cells(
-    editor: numbers::Editor,
+    editor: numbers::Draft,
     changes: impl IntoIterator<Item = Change>,
-) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Draft, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_cells(SheetSelector::index(0), TableSelector::index(0))?
@@ -92,5 +92,5 @@ fn set_focused_table_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(numbers::Editor::from_bytes(&bytes)?)
+    Ok(numbers::Draft::from_bytes(&bytes)?)
 }

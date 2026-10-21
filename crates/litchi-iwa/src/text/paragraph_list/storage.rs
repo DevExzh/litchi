@@ -6,7 +6,7 @@ use crate::wire::{
     repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::storage_wire::update_parsed_archive;
 use litchi_iwa_text::storage::Storage;
@@ -53,7 +53,7 @@ pub(super) struct LocatedListBoundaryStorage {
     pub(super) archive: Archive,
 }
 
-pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<ListStorageLocation> {
+pub(super) fn locate(package: &HostPackage, storage_id: u64) -> Result<ListStorageLocation> {
     let located = locate_storage_with_archive(package, storage_id)?;
     if !located.table_present {
         return Err(Error::InvalidFormat(format!(
@@ -89,14 +89,14 @@ pub(super) fn locate(package: &IWorkPackage, storage_id: u64) -> Result<ListStor
 }
 
 pub(super) fn locate_boundaries(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<ListBoundaryStorage> {
     locate_boundaries_with_archive(package, storage_id).map(|located| located.location)
 }
 
 pub(super) fn locate_boundaries_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedListBoundaryStorage> {
     let LocatedListStorage {
@@ -166,7 +166,7 @@ pub(super) fn locate_boundaries_with_archive(
 }
 
 pub(super) fn replace_boundaries(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListBoundaryStorage,
     storage_id: u64,
     old_style_ids: &[u64],
@@ -179,7 +179,7 @@ pub(super) fn replace_boundaries(
 }
 
 pub(super) fn replace_boundaries_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedListBoundaryStorage,
     storage_id: u64,
     old_style_ids: &[u64],
@@ -339,7 +339,7 @@ fn replace_reference_sequence(
 }
 
 pub(super) fn patch_style_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ListStorageLocation,
     storage_id: u64,
     old_style_id: u64,
@@ -449,7 +449,7 @@ pub(super) fn patch_style_reference(
 }
 
 fn locate_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedListStorage> {
     let mut found = None;
@@ -578,7 +578,7 @@ fn is_paragraph_style_wire(data: &[u8]) -> Result<bool> {
                 "paragraph-style wire classifier limits are invalid: {error}"
             ))
         })?;
-    let fields = litchi_iwa_common::wire::parse_wire_fields_with_limits(data, limits)
+    let fields = litchi_iwa_common::wire::parse_wire_fields(data, limits)
         .map_err(|error| Error::InvalidFormat(format!("invalid paragraph-style wire: {error}")))?;
     let mut super_present = false;
     for field in fields {
@@ -782,7 +782,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",
@@ -856,7 +856,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",
@@ -895,7 +895,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",
@@ -952,7 +952,7 @@ mod tests {
 
         let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2_001, data }]).unwrap();
         object.archive_info.message_infos[0].object_references = vec![7];
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",

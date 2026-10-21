@@ -32,7 +32,7 @@ fn transaction_applies_atomically_and_checks_the_base() {
     let mut edit = snapshot.edit();
     edit.set_settings(Settings::new(true)).unwrap();
     edit.insert_unknown(0, 0x4321, [1, 2, 3]).unwrap();
-    let patch = edit.commit().unwrap();
+    let patch = edit.commit().unwrap().into_parts().1;
 
     let mut target = snapshot.clone();
     patch.apply(&mut target).unwrap();
@@ -45,7 +45,12 @@ fn transaction_applies_atomically_and_checks_the_base() {
     let mut changed = snapshot.clone();
     let mut diverged = changed.edit();
     diverged.set_settings(Settings::new(true)).unwrap();
-    diverged.commit().unwrap().apply(&mut changed).unwrap();
+    diverged
+        .commit()
+        .unwrap()
+        .patch()
+        .apply(&mut changed)
+        .unwrap();
     let before_failed_apply = changed.clone();
     assert!(patch.apply(&mut changed).is_err());
     assert_eq!(changed, before_failed_apply);

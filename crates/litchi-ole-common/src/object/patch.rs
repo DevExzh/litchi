@@ -71,48 +71,12 @@ impl Patch {
     }
 }
 
-/// The validated result of an OLE object edit.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// The validated result of an OLE object edit: the post-edit snapshot, its
+/// reversible artifact patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// The immutable post-edit snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// The reversible artifact patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit and returns its post-edit snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the commit and returns its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the commit into its snapshot and reversible patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one OLE object commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[cfg(test)]
 #[allow(

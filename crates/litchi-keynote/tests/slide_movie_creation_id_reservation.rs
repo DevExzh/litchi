@@ -119,14 +119,17 @@ fn fresh_movie_ids_follow_dangling_aggregate_and_field_header_references() -> Te
         height: 180.0,
     })?;
 
-    let commit = package.add_slide_movie(
-        SlideSelector::index(0),
-        "reserved-id-movie.mov",
-        &movie,
-        "reserved-id-poster.png",
-        &poster,
-        options,
-    )?;
+    let commit = package
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "reserved-id-movie.mov",
+            &movie,
+            "reserved-id-poster.png",
+            &poster,
+            options,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(commit.patch().created_objects(), 5);
 
     let candidate = exact_bytes(commit.package())?;

@@ -8,7 +8,7 @@ use crate::charts::font::{
 };
 use crate::charts::{ChartFont, ChartFontSize};
 
-impl Editor {
+impl Draft {
     /// Read the uniform effective font used by one slide chart.
     pub fn slide_chart_font(
         &self,
@@ -40,7 +40,7 @@ impl Editor {
             "Keynote",
             &font,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_font(slide_index, drawable_object_id)? != font {
             return Err(Error::InvalidFormat(
                 "Keynote chart font update failed validation".to_owned(),
@@ -66,7 +66,7 @@ impl Editor {
         )? {
             return Ok(false);
         }
-        *self = Editor::from_bytes(&staged.to_bytes()?)?;
+        *self = Draft::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 
@@ -101,7 +101,7 @@ impl Editor {
             "Keynote",
             size,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_font_size(slide_index, drawable_object_id)? != size {
             return Err(Error::InvalidFormat(
                 "Keynote chart font-size update failed validation".to_owned(),
@@ -127,7 +127,7 @@ impl Editor {
         )? {
             return Ok(false);
         }
-        *self = Editor::from_bytes(&staged.to_bytes()?)?;
+        *self = Draft::from_bytes(&staged.to_bytes()?)?;
         Ok(true)
     }
 }

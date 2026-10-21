@@ -77,7 +77,7 @@ fn bounded_path_ingress_retains_an_independent_immutable_source() {
         .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT);
     assert!(matches!(
         MergeReader::open_with_options(file.path(), options),
-        Err(TableMergesError::LimitExceeded {
+        Err(TableMergesError::Limit {
             kind: TableMergesLimitKind::InputBytes,
             observed,
             maximum: actual_maximum,
@@ -135,7 +135,7 @@ fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() 
             Arc::clone(&catalog),
             litchi_numbers::OpenOptions::new().semantic_limits(limited),
         ),
-        Err(TableMergesError::LimitExceeded {
+        Err(TableMergesError::Limit {
             kind: TableMergesLimitKind::PayloadObjects,
             observed,
             maximum,

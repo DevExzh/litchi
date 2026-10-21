@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .ok_or("usage: create_pages_flipped_shape <output.pages>")?;
     let body = "This left-facing arrow was created entirely by litchi-iwa.";
-    let mut editor = pages::Editor::create_with_text(body)?;
+    let mut editor = pages::Draft::create_with_text(body)?;
     let arrow = editor.add_body_shape(
         body.encode_utf16().count(),
         "Horizontally Flipped",

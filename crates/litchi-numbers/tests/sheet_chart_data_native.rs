@@ -42,14 +42,19 @@ fn native_numbers_chart_data_rejects_unmatched_selectors_without_mutation() -> T
     let error = package
         .sheet_chart_data(SheetSelector::name("missing"), ChartSelector::index(0))
         .expect_err("unknown sheet must be rejected");
-    assert!(matches!(error, ChartDataError::SheetNameNotFound));
+    assert!(matches!(
+        error,
+        ChartDataError::Refused(litchi_numbers::sheet::chart::data::Refusal::SheetNameNotFound)
+    ));
 
     let error = package
         .sheet_chart_data(SheetSelector::index(0), ChartSelector::index(99))
         .expect_err("unknown chart position must be rejected");
     assert!(matches!(
         error,
-        ChartDataError::ChartPositionNotFound { .. }
+        ChartDataError::Refused(
+            litchi_numbers::sheet::chart::data::Refusal::ChartPositionNotFound { .. }
+        )
     ));
 
     let mut round_trip = Vec::new();
@@ -102,7 +107,7 @@ fn native_numbers_chart_data_refuses_a_tight_reference_budget() -> TestResult {
     let error = package
         .sheet_chart_data(SheetSelector::index(0), ChartSelector::index(0))
         .expect_err("the selected graph must honor the finite reference budget");
-    assert!(matches!(error, ChartDataError::LimitExceeded { .. }));
+    assert!(matches!(error, ChartDataError::Limit { .. }));
 
     let mut round_trip = Vec::new();
     package.write_to(&mut round_trip)?;

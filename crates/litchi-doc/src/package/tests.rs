@@ -1,5 +1,5 @@
 use super::{Error, OpenOptions};
-use crate::raw::{OpenOutcome, Package, open_package};
+use crate::raw::{OpenOutcome, Reader, open_package};
 use litchi_cfb::OleFile;
 use std::io::Cursor;
 use std::path::Path;
@@ -7,7 +7,7 @@ use std::path::Path;
 #[test]
 #[ignore = "requires an external DOC fixture"]
 fn test_open_package() {
-    let result = Package::open("test.doc");
+    let result = Reader::open("test.doc");
     assert!(result.is_ok());
 }
 
@@ -16,7 +16,7 @@ fn test_open_package() {
 fn test_invalid_file() {
     // Create a non-DOC file
     std::fs::write("test_invalid.tmp", b"Not a DOC file").unwrap();
-    let result = Package::open("test_invalid.tmp");
+    let result = Reader::open("test_invalid.tmp");
     assert!(result.is_err());
     std::fs::remove_file("test_invalid.tmp").ok();
 }
@@ -31,16 +31,16 @@ fn poi_fixture(name: &str) -> std::path::PathBuf {
 fn opens_apache_poi_binary_rc4_document() {
     let path = poi_fixture("password_tika_binaryrc4.doc");
 
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
 
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     assert!(matches!(
         package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let document = package
         .document_with_options(OpenOptions::default().password("tika".to_owned().into()))
         .unwrap();
@@ -51,16 +51,16 @@ fn opens_apache_poi_binary_rc4_document() {
 fn opens_apache_poi_cryptoapi_document() {
     let path = poi_fixture("password_password_cryptoapi.doc");
 
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     assert!(matches!(package.document(), Err(Error::PasswordRequired)));
 
-    let mut package = Package::open(&path).unwrap();
+    let mut package = Reader::open(&path).unwrap();
     assert!(matches!(
         package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
-    let mut package = Package::open(path).unwrap();
+    let mut package = Reader::open(path).unwrap();
     let document = package
         .document_with_options(OpenOptions::default().password("password".to_owned().into()))
         .unwrap();
@@ -89,7 +89,7 @@ fn raw_open_outcome_retains_encrypted_cfb_for_later_password_ingress() {
 
 #[test]
 fn ordinary_doc_exposes_an_empty_dataspaces_profile() {
-    let mut package = Package::open(poi_fixture("test.doc")).unwrap();
+    let mut package = Reader::open(poi_fixture("test.doc")).unwrap();
     assert!(package.data_spaces().unwrap().is_none());
     assert!(package.data_spaces_snapshot().unwrap().is_none());
 }

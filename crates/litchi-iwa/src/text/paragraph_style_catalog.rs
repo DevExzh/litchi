@@ -13,7 +13,7 @@ use crate::wire::{
     append_repeated_length_delimited_field, patch_nested_length_delimited_field,
     patch_nested_varint_field,
 };
-use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
+use crate::{Error, HostPackage, IWorkThemeArchive, Result};
 
 use super::paragraph_alignment::native;
 use super::style_registry::object_archive_name;
@@ -41,7 +41,7 @@ pub(super) struct ThemeLocation {
 }
 
 pub(super) fn create_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     first_style_id: u64,
     source: ParagraphStyleId,
     name: ParagraphStyleName,
@@ -132,7 +132,7 @@ pub(super) fn create_named_paragraph_style(
 }
 
 pub(super) fn locate_themes(
-    package: &IWorkPackage,
+    package: &HostPackage,
     stylesheet_id: u64,
     source_style_id: u64,
 ) -> Result<Vec<ThemeLocation>> {
@@ -239,7 +239,7 @@ fn clone_named_style(
 }
 
 fn insert_named_style_with_archive(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     style_id: u64,
@@ -327,7 +327,7 @@ fn insert_named_style_in_archive(
 }
 
 fn append_theme_preset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ThemeLocation,
     stylesheet_id: u64,
     style_id: u64,

@@ -284,7 +284,7 @@ fn reads_poi_comment_fixtures() {
 #[test]
 fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
     use crate::cell_values::{Reference, Selector};
-    use litchi_ole_common::object::{Editor, Limits, Targets};
+    use litchi_ole_common::object::{Edit, Limits, Targets};
     use std::io::Cursor;
     use std::sync::Arc;
 
@@ -315,8 +315,8 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             super::Value::new("Probe", "a replacement of another length").unwrap(),
         )
         .unwrap();
-        let commit = edit.commit().unwrap();
-        let mut rerendered = Editor::open(
+        let commit = edit.commit_record().unwrap();
+        let mut rerendered = Edit::open(
             source.bytes().to_vec(),
             Targets::default(),
             Limits::default(),

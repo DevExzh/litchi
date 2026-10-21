@@ -244,7 +244,12 @@ fn volatile_sheet_table_name_cells_are_readable_but_block_changed_names() -> Tes
         Ok(())
     })?;
     assert_read_and_noop(&source)?;
-    assert_changed_error(&source, BodyTableNameError::UnsupportedSource)
+    assert_changed_error(
+        &source,
+        BodyTableNameError::Refused(
+            litchi_pages::table::name::transaction::Refusal::UnsupportedSource,
+        ),
+    )
 }
 
 #[test]
@@ -329,8 +334,18 @@ fn duplicate_reachable_dependency_is_rejected_atomically() -> TestResult {
 fn selected_pivot_reference_to_physical_owner_blocks_changed_names() -> TestResult {
     let source = rewrite_table_model(SOURCE, |payload| {
         let reference = local_reference(FORMULA_OWNER_IDENTIFIER).encode_to_vec();
-        append_length_delimited_field(payload, TABLE_MODEL_PIVOT_OWNER_FIELD, &reference)?;
+        append_length_delimited_field(
+            payload,
+            TABLE_MODEL_PIVOT_OWNER_FIELD,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
-    assert_changed_error(&source, BodyTableNameError::UnsupportedSource)
+    assert_changed_error(
+        &source,
+        BodyTableNameError::Refused(
+            litchi_pages::table::name::transaction::Refusal::UnsupportedSource,
+        ),
+    )
 }

@@ -38,7 +38,7 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource,
 };
 use litchi_doc::{
-    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Reader as DocReader,
 };
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
@@ -46,7 +46,7 @@ use litchi_opc::{
     OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
 };
 use litchi_sign::{Policy, Status};
-use litchi_xls::{cell_values::Snapshot as XlsSnapshot, raw::Reader as XlsReader};
+use litchi_xls::raw::Reader as XlsReader;
 use sha2::{Digest, Sha256};
 
 const SIGNED_DOCX_SHA256: &str = "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f";
@@ -288,22 +288,26 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
             .iter()
             .any(|module| { module.source().text().contains("Sub ") })
     );
-    let source = XlsSnapshot::from_bytes_with_limits_and_cfb(
-        bytes.clone(),
-        security_object_limits(),
-        security_ole_limits()?,
-    )?;
-    let no_op = source.edit().commit()?;
-    assert_eq!(no_op.snapshot().bytes(), bytes.as_slice());
+    let options = litchi_xls::EditOptions::new()
+        .object_limits(security_object_limits())
+        .cfb_limits(security_ole_limits()?);
+    let source = litchi_xls::Package::from_bytes(&bytes)?;
+    let no_op = source.edit_with_options(options)?.commit()?;
+    assert_eq!(no_op.patch().after(), bytes.as_slice());
     assert_eq!(
         before_macro_digest,
-        macro_stream_digest(no_op.snapshot().bytes())?
+        macro_stream_digest(no_op.patch().after())?
     );
-    let mut edit = source.edit();
-    edit.insert_rows("Sheet1".into(), 1, 1)?;
-    let error = edit.commit_source_backed().unwrap_err();
-    assert!(matches!(error, litchi_xls::Error::UnsupportedFeature(_)));
-    assert_eq!(source.bytes(), bytes.as_slice());
+    // Structural edits have no source-backed verb; the source-backed cell
+    // family's no-op republishes the macro-bearing source byte-for-byte.
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(bytes.clone()),
+    ))?;
+    let source_backed = workbook.edit_cells()?.commit()?;
+    assert!(source_backed.patch().is_noop());
+    let mut republished = Vec::new();
+    source_backed.package().write_to(&mut republished)?;
+    assert_eq!(republished, bytes);
     assert_eq!(before_macro_digest, macro_stream_digest(&bytes)?);
     Ok(())
 }
@@ -473,11 +477,11 @@ fn security_object_limits() -> ObjectLimits {
     }
 }
 
-fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<Vec<u8>>>, Box<dyn Error>> {
+fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<Vec<u8>>>, Box<dyn Error>> {
     let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
-    Ok(DocPackage::from_ole_file_with_limits(
+    Ok(DocReader::from_ole_file_with_options(
         ole,
-        security_doc_limits()?,
+        OpenOptions::default().source_limits(security_doc_limits()?),
     )?)
 }
 

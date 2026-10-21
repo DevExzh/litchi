@@ -250,7 +250,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -266,7 +266,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -290,7 +290,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_name(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| field.number() != 26)
         .map(|field| field.raw().to_vec())
@@ -450,7 +450,9 @@ fn selector_first_name_convenience_methods_share_transaction_boundaries() -> Tes
 
     assert!(matches!(
         package.set_section_name(SectionSelector::name("Missing"), Some("x")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.set_section_name(SectionSelector::name("Alpha"), Some("bad\0name")),
@@ -467,29 +469,37 @@ fn selector_and_name_validation_fail_before_publication() -> TestResult<()> {
 
     assert!(matches!(
         package.section_name(SectionSelector::name("Missing")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.section_name(SectionSelector::index(2)),
-        Err(SectionNameError::PositionNotFound { .. })
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::PositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.section_name(SectionSelector::name("Same")),
-        Err(SectionNameError::AmbiguousSelector { .. })
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::AmbiguousSelector { .. }
+        ))
     ));
 
     assert!(matches!(
         package.edit_section_name(SectionSelector::name("Missing")),
-        Err(SectionNameError::NameNotFound)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_name(SectionSelector::index(2)),
-        Err(SectionNameError::PositionNotFound { position })
+        Err(SectionNameError::Refused(litchi_pages::section::name::Refusal::PositionNotFound { position }))
             if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_section_name(SectionSelector::name("Same")),
-        Err(SectionNameError::AmbiguousSelector { first, duplicate })
+        Err(SectionNameError::Refused(litchi_pages::section::name::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
 
@@ -546,7 +556,9 @@ fn no_op_reuses_exact_source_and_applies_to_legacy_source() -> TestResult<()> {
     legacy_changed.set_name(Some("Changed"))?;
     assert!(matches!(
         legacy_changed.commit(),
-        Err(SectionNameError::UnsupportedSource)
+        Err(SectionNameError::Refused(
+            litchi_pages::section::name::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -604,7 +616,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         fields_except_name(&source_first_payload)?
     );
     assert!(
-        WireView::parse(&target_first_payload)?
+        WireView::parse(&target_first_payload, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -614,7 +626,7 @@ fn changed_name_preserves_unrelated_content_and_reversible_patch() -> TestResult
         "only the renamed message length may change in the opaque archive header"
     );
     assert!(
-        WireView::parse(&target_first_header)?
+        WireView::parse(&target_first_header, WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -680,7 +692,7 @@ fn changed_name_respects_retained_tight_output_limit() -> TestResult<()> {
     edit.set_name(Some(&replacement))?;
     assert!(matches!(
         edit.commit(),
-        Err(SectionNameError::LimitExceeded {
+        Err(SectionNameError::Limit {
             kind: SectionNameLimitKind::OutputBytes,
             ..
         })

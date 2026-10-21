@@ -2,7 +2,7 @@
 
 use super::catalog::{Catalog, Entry};
 use super::model::{Limits, Links, Metadata};
-use super::transaction::{Revision, Transaction};
+use super::transaction::{Edit, Revision};
 use litchi_cfb::{DirectoryEntry, OleError};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -127,14 +127,8 @@ impl Snapshot {
 
     /// Starts an isolated typed directory edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
-    }
-
-    /// Alias for [`Self::edit`] for transactional call sites.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     pub(crate) fn catalog_clone(&self) -> Catalog {

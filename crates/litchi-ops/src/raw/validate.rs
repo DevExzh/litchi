@@ -14,7 +14,7 @@
         feature = "odt",
         feature = "ods",
         feature = "odp",
-        feature = "odf-objects"
+        odf_objects
     )),
     allow(
         unreachable_code,
@@ -71,12 +71,7 @@ pub enum Error {
     #[cfg(feature = "doc")]
     Cfb(litchi_cfb::CfbValidationError),
     /// The ODF package validator.
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     Odf(litchi_odf_common::OdfValidationError),
     /// The merged report exceeded the report bounds.
     Report(ValidationReportError),
@@ -107,12 +102,7 @@ impl std::error::Error for Error {
             Self::Ppt(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::Cfb(error) => Some(error),
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf(error) => Some(error),
             Self::Report(error) => Some(error),
         }
@@ -175,8 +165,11 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "xls")]
         FileFormat::Xls => {
             let bytes = file.to_bytes()?;
-            litchi_xls::validation::validate_source(Arc::new(litchi_core::OwnedSource::new(bytes)))
-                .map_err(Error::Xls)?
+            litchi_xls::validation::validate_source(
+                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                litchi_xls::validation::XlsValidationLimits::default(),
+            )
+            .map_err(Error::Xls)?
         },
         #[cfg(feature = "ppt")]
         FileFormat::Ppt => {
@@ -195,12 +188,7 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         },
         #[cfg(feature = "rtf")]
         FileFormat::Rtf => rtf(&file.to_bytes()?)?,
-        #[cfg(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ))]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         FileFormat::Odt
         | FileFormat::Oth
         | FileFormat::Odm
@@ -335,12 +323,7 @@ fn rtf(bytes: &[u8]) -> Result<ValidateReport> {
 }
 
 /// A flat ODF document: one XML file, already parsed on open.
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 fn flat_odf() -> Result<ValidateReport> {
     use litchi_core::{CheckCapabilityId, CheckStatus, ValidationCheck};
     let limits = ValidationLimits::default();

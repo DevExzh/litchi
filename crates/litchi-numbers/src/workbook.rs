@@ -415,8 +415,8 @@ impl Workbook {
         Self::from_sheets_with_limits(sheets, SemanticLimits::DEFAULT)
     }
 
-    /// Build a workbook under explicit finite semantic budgets: its sheet,
-    /// table, materialized-cell and output-text dimensions apply.
+    /// Build a workbook under the semantic limits of `options`: their
+    /// sheet, table, materialized-cell and output-text dimensions apply.
     ///
     /// The source vector is consumed without cloning its sheet or table
     /// values. Validation runs before the vector is moved into one shared
@@ -427,7 +427,16 @@ impl Workbook {
     ///
     /// Returns a typed error when any count, index, name, or textual-data
     /// budget is exceeded.
-    pub fn from_sheets_with_limits(sheets: Vec<Sheet>, limits: SemanticLimits) -> Result<Self> {
+    pub fn from_sheets_with_options(sheets: Vec<Sheet>, options: OpenOptions) -> Result<Self> {
+        Self::from_sheets_with_limits(sheets, options.semantic_limits_value())
+    }
+
+    /// Build a workbook under explicit finite semantic budgets (the
+    /// crate-internal form of [`Self::from_sheets_with_options`]).
+    pub(crate) fn from_sheets_with_limits(
+        sheets: Vec<Sheet>,
+        limits: SemanticLimits,
+    ) -> Result<Self> {
         let max_sheets = limits.max_sheets();
         let max_tables = limits.max_tables();
         let max_materialized_cells = limits.max_materialized_cells();
@@ -1154,9 +1163,9 @@ mod tests {
             .max_sheets(1)
             .and_then(crate::limits::SemanticLimitsBuilder::build)
             .unwrap_or_else(|error| panic!("valid sheet limit rejected: {error}"));
-        let too_many = Workbook::from_sheets_with_limits(
+        let too_many = Workbook::from_sheets_with_options(
             vec![Sheet::new("Sheet 1", 0), Sheet::new("Sheet 2", 1)],
-            one,
+            OpenOptions::new().semantic_limits(one),
         );
         assert!(matches!(
             too_many,

@@ -2,7 +2,7 @@
 //!
 //! Text-box selectors use [`DrawableId`] as their canonical type.
 
-use super::Editor;
+use super::Draft;
 use crate::Result;
 use crate::text::{
     TextNumberAttachment, TextNumberAttachmentId, TextNumberAttachmentSettings, TextPosition,
@@ -10,7 +10,7 @@ use crate::text::{
 use litchi_iwa_common::comment::DrawableId;
 use litchi_pages::header_footer::HeaderFooterSelector;
 
-impl Editor {
+impl Draft {
     /// Read every number attachment in the main Pages body.
     pub fn body_number_attachments(&self) -> Result<Vec<TextNumberAttachment>> {
         self.text.text_number_attachments(self.body_storage_id)
@@ -152,8 +152,8 @@ mod tests {
         height: 72.0,
     };
 
-    fn pages_with_text_box() -> (Editor, DrawableId) {
-        let mut pages = Editor::create_with_text("Body").unwrap();
+    fn pages_with_text_box() -> (Draft, DrawableId) {
+        let mut pages = Draft::create_with_text("Body").unwrap();
         let text_box = pages.add_text_box(4, "Box", POSITION, SIZE).unwrap();
         let selector = DrawableId::try_from(text_box.drawable_object_id).unwrap();
         (pages, selector)

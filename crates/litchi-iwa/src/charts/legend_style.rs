@@ -24,7 +24,7 @@ use crate::wire::{
     parse_wire_fields, patch_length_delimited_field, patch_varint_field,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding the generated legend-style properties.
 pub(crate) const GENERATED_LEGEND_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -45,7 +45,7 @@ pub(crate) struct LegendStyleSlot {
 
 /// Resolve the native legend-style payload referenced by one chart.
 pub(crate) fn legend_style_slot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -126,7 +126,7 @@ impl LegendStyleSlot {
     /// Read the resolved legend-style bytes without allocating a rewrite.
     pub(crate) fn read<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
         package.with_parsed_archive(&self.archive_name, |archive| {
@@ -152,7 +152,7 @@ impl LegendStyleSlot {
     /// Disconnect a shared or preset legend style before mutating it.
     pub(crate) fn ensure_exclusive(
         &mut self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         chart_archive_name: &str,
         drawable_object_id: u64,
         drawable_label: &str,
@@ -262,7 +262,7 @@ impl LegendStyleSlot {
     /// Transactionally rewrite the resolved legend-style message.
     pub(crate) fn update(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {
@@ -296,7 +296,7 @@ impl LegendStyleSlot {
     /// Reconnect an exact child to its parent and reclaim the disposable style.
     pub(crate) fn collapse_if_equivalent(
         &mut self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         chart_archive_name: &str,
         drawable_object_id: u64,
     ) -> Result<bool> {
@@ -397,7 +397,7 @@ impl LegendStyleSlot {
 }
 
 fn move_style_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_archive_name: &str,
     destination_archive_name: &str,
     style_id: u64,
@@ -424,7 +424,7 @@ fn without_style_archive(data: &[u8]) -> Result<Vec<u8>> {
     patch_length_delimited_field(data, LEGEND_STYLE_SUPER_FIELD, true, None)
 }
 
-fn chart_owner_count(package: &IWorkPackage, style_id: u64) -> Result<usize> {
+fn chart_owner_count(package: &HostPackage, style_id: u64) -> Result<usize> {
     let mut count = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in &package.archive(archive_name)?.objects {
@@ -489,7 +489,7 @@ fn make_style_variation(
 }
 
 fn patch_chart_legend_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     old_style_id: u64,

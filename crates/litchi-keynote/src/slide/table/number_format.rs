@@ -315,6 +315,6 @@ impl Number {
 /// Exact-source transactions for one existing slide-table cell.
 pub mod transaction {
     pub use crate::package::slide_table_cell_number_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

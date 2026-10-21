@@ -163,14 +163,17 @@ fn create_movie(
     poster: &[u8],
     requested: Options,
 ) -> TestResult<litchi_keynote::slide::movie::creation::Commit> {
-    Ok(source.add_slide_movie(
-        SlideSelector::index(0),
-        movie_filename,
-        movie,
-        poster_filename,
-        poster,
-        requested,
-    )?)
+    Ok(source
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            movie_filename,
+            movie,
+            poster_filename,
+            poster,
+            requested,
+        )
+        .and_then(|edit| edit.commit())?)
 }
 
 #[test]
@@ -465,7 +468,8 @@ fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult 
     let poster_name = format!("{}.png", "p".repeat(4_093));
     assert_eq!(
         source
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(0),
                 &movie_name,
                 &movie,
@@ -473,12 +477,16 @@ fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult 
                 &poster,
                 options()?
             )
+            .and_then(|edit| edit.commit())
             .err(),
-        Some(SlideMovieCreationError::InvalidMovieFilename),
+        Some(SlideMovieCreationError::Refused(
+            litchi_keynote::slide::movie::creation::Refusal::InvalidMovieFilename
+        )),
     );
     assert_eq!(
         source
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(0),
                 "movie.mov",
                 &movie,
@@ -486,8 +494,11 @@ fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult 
                 &poster,
                 options()?
             )
+            .and_then(|edit| edit.commit())
             .err(),
-        Some(SlideMovieCreationError::InvalidPosterFilename),
+        Some(SlideMovieCreationError::Refused(
+            litchi_keynote::slide::movie::creation::Refusal::InvalidPosterFilename
+        )),
     );
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())
@@ -528,7 +539,8 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
 
     assert!(
         source
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(usize::MAX),
                 "movie.mov",
                 &movie,
@@ -536,11 +548,13 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
                 &poster,
                 requested,
             )
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         source
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::name(""),
                 "movie.mov",
                 &movie,
@@ -548,6 +562,7 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
                 &poster,
                 requested,
             )
+            .and_then(|edit| edit.commit())
             .is_err()
     );
 
@@ -561,7 +576,8 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
     ] {
         assert!(
             source
-                .add_slide_movie(
+                .edit_slide_movie_creation()
+                .add(
                     SlideSelector::index(0),
                     name,
                     &movie,
@@ -569,6 +585,7 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
                     &poster,
                     requested,
                 )
+                .and_then(|edit| edit.commit())
                 .is_err()
         );
     }
@@ -582,7 +599,8 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
     ] {
         assert!(
             source
-                .add_slide_movie(
+                .edit_slide_movie_creation()
+                .add(
                     SlideSelector::index(0),
                     "movie.mov",
                     &movie,
@@ -590,6 +608,7 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
                     &poster,
                     requested,
                 )
+                .and_then(|edit| edit.commit())
                 .is_err()
         );
     }
@@ -600,7 +619,8 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
     ] {
         assert!(
             source
-                .add_slide_movie(
+                .edit_slide_movie_creation()
+                .add(
                     SlideSelector::index(0),
                     "movie.mov",
                     invalid_movie,
@@ -608,6 +628,7 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
                     invalid_poster,
                     requested,
                 )
+                .and_then(|edit| edit.commit())
                 .is_err()
         );
     }
@@ -639,7 +660,8 @@ fn entry_limit_refusal_does_not_mutate_the_source() -> TestResult {
     let before = exact_bytes(&limited)?;
     assert!(
         limited
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(0),
                 "oversized.mov",
                 &oversized_movie,
@@ -647,6 +669,7 @@ fn entry_limit_refusal_does_not_mutate_the_source() -> TestResult {
                 &poster,
                 options()?,
             )
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&limited)?, before);

@@ -7,14 +7,15 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{Field, FieldOwner, FieldStatus, ReferenceFieldKind, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Field, FieldOwner, FieldStatus, ReferenceFieldKind, RtfWriter};
 
 const FIXTURE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../test-data/rtf/typed_hyperlinks_and_references.rtf"
 ));
 
-fn write(document: &RtfDocument<'_>) -> Vec<u8> {
+fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(document)
@@ -24,7 +25,7 @@ fn write(document: &RtfDocument<'_>) -> Vec<u8> {
 
 #[test]
 fn inspects_hyperlink_and_cross_reference_metadata_without_resolving_targets() {
-    let document = RtfDocument::parse(FIXTURE).unwrap();
+    let document = Tree::parse(FIXTURE).unwrap();
 
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(document.hyperlink_count(), 1);
@@ -98,8 +99,8 @@ fn inspects_hyperlink_and_cross_reference_metadata_without_resolving_targets() {
 
 #[test]
 fn typed_hyperlink_and_cross_reference_metadata_round_trips() {
-    let document = RtfDocument::parse(FIXTURE).unwrap();
-    let reparsed = RtfDocument::parse_bytes(&write(&document)).unwrap();
+    let document = Tree::parse(FIXTURE).unwrap();
+    let reparsed = Tree::parse_bytes(&write(&document)).unwrap();
 
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.hyperlink_count(), document.hyperlink_count());

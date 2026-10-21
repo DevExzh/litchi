@@ -7,7 +7,7 @@ use crate::charts::scene_3d::{
     set_chart_3d_rotation as set_native_chart_3d_rotation,
 };
 
-impl Editor {
+impl Draft {
     /// Read the X/Y orientation of one sheet chart's native 3D scene.
     pub fn sheet_chart_3d_rotation(
         &self,
@@ -50,7 +50,7 @@ impl Editor {
             "Numbers",
             rotation,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_rotation(sheet_id, drawable_object_id)? != rotation {
             return Err(Error::InvalidFormat(
                 "Numbers chart 3D rotation update failed validation".to_owned(),

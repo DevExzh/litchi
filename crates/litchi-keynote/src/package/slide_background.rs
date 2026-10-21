@@ -136,6 +136,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph or payload is not safe to edit.
+    #[error("the Keynote slide-background source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the requested semantic state.
+    #[error("the edited Keynote slide background failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-background patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical slide-background edits")]
     UnsupportedSource,
@@ -151,27 +183,29 @@ pub enum Error {
     /// A name selector matched multiple slides.
     #[error("the Keynote slide-background selector is ambiguous")]
     AmbiguousSelector,
-    /// The selected graph or payload is not safe to edit.
-    #[error("the Keynote slide-background source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the requested semantic state.
-    #[error("the edited Keynote slide background failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-background patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic slide-background edit staged against an immutable
@@ -248,7 +282,7 @@ impl<'a> Edit<'a> {
     /// Stage a semantic background value, including explicit [`Background::None`].
     pub fn set(mut self, background: Background) -> Result<Self, Error> {
         if matches!(&background, Background::Unsupported) {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.desired = Desired::Set(background);
         Ok(self)
@@ -475,6 +509,12 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     /// Borrow the exact reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -554,7 +594,7 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -563,7 +603,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -572,7 +612,7 @@ fn select_slide(package: &Package, position: Position) -> Result<Selection, Erro
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let (slide_component, slide_object) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -638,9 +678,9 @@ fn read_style(package: &Package, identifier: u64) -> Result<StyleState, Error> {
         .ok_or(Error::InvalidSource)?;
     let raw = exactly_one_payload(object, SLIDE_STYLE_MESSAGE_TYPE)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &raw, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let parent = optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?;
     let variation = optional_bool(&super_view, STYLE_VARIATION_FIELD)?;
     let stylesheet =
@@ -703,8 +743,7 @@ fn gradient_wire_has_only_semantic_fields(
     gradient: codec::GradientSnapshot<'_>,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let gradient_view =
-        WireView::parse_with_limits(gradient.raw, limits).map_err(map_wire_error)?;
+    let gradient_view = WireView::parse(gradient.raw, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &gradient_view,
         &[
@@ -719,7 +758,7 @@ fn gradient_wire_has_only_semantic_fields(
     }
 
     let angle = required_bytes(&gradient_view, gradient.raw, GRADIENT_ANGLE_FIELD)?;
-    let angle_view = WireView::parse_with_limits(angle, limits).map_err(map_wire_error)?;
+    let angle_view = WireView::parse(angle, limits).map_err(map_wire_error)?;
     if !has_exact_field_numbers(&angle_view, &[ANGLE_RADIANS_FIELD]) {
         return Ok(false);
     }
@@ -732,7 +771,7 @@ fn gradient_wire_has_only_semantic_fields(
             return Err(Error::InvalidSource);
         }
         let stop = field.payload();
-        let stop_view = WireView::parse_with_limits(stop, limits).map_err(map_wire_error)?;
+        let stop_view = WireView::parse(stop, limits).map_err(map_wire_error)?;
         if !has_exact_field_numbers(
             &stop_view,
             &[STOP_COLOR_FIELD, STOP_POSITION_FIELD, STOP_MIDPOINT_FIELD],
@@ -740,7 +779,7 @@ fn gradient_wire_has_only_semantic_fields(
             return Ok(false);
         }
         let color = required_bytes(&stop_view, stop, STOP_COLOR_FIELD)?;
-        let color_view = WireView::parse_with_limits(color, limits).map_err(map_wire_error)?;
+        let color_view = WireView::parse(color, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(
             &color_view,
             &[
@@ -862,10 +901,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if edit.before == Background::Unsupported {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     edit.source.validate().map_err(map_read_error)?;
     let reset_effective = if reset {
@@ -961,7 +1000,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1128,8 +1167,7 @@ fn next_object_identifier(package: &Package) -> Result<u64, Error> {
                 if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
                     continue;
                 }
-                let view =
-                    WireView::parse_with_limits(&message.data, limits).map_err(map_wire_error)?;
+                let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
                 if let Some(last) = optional_varint(&view, 1)? {
                     maximum = maximum.max(last);
                 }
@@ -1145,7 +1183,7 @@ fn next_object_identifier(package: &Package) -> Result<u64, Error> {
 /// partially-saved native packages, so allocation must also account for
 /// registry records and cross-component references.
 fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1175,7 +1213,7 @@ fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Err
 }
 
 fn metadata_component_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1206,7 +1244,7 @@ fn metadata_component_identifier_max(source: &[u8], limits: WireLimits) -> Resul
 }
 
 fn metadata_external_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1218,13 +1256,13 @@ fn metadata_external_identifier(source: &[u8], limits: WireLimits) -> Result<u64
 }
 
 fn metadata_data_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
             1 => maximum = maximum.max(metadata_field_varint(&field)?),
             2 => {
-                let nested = WireView::parse_with_limits(metadata_field_bytes(&field)?, limits)
+                let nested = WireView::parse(metadata_field_bytes(&field)?, limits)
                     .map_err(map_wire_error)?;
                 for nested_field in nested.fields().filter(|field| field.number() == 1) {
                     maximum = maximum.max(metadata_field_varint(&nested_field)?);
@@ -1237,7 +1275,7 @@ fn metadata_data_reference_identifier(source: &[u8], limits: WireLimits) -> Resu
 }
 
 fn metadata_uuid_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1247,7 +1285,7 @@ fn metadata_uuid_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Er
 }
 
 fn metadata_data_info_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1257,7 +1295,7 @@ fn metadata_data_info_identifier(source: &[u8], limits: WireLimits) -> Result<u6
 }
 
 fn metadata_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1972,7 +2010,7 @@ fn patch_slide_style(
     validate_rewrite_metadata(object, index)?;
     validate_slide_style_metadata_for_rewrite(object, index, old_style)?;
     let data = object.messages[index].data.clone();
-    let slide_view = WireView::parse_with_limits(&data, wire_limits).map_err(map_wire_error)?;
+    let slide_view = WireView::parse(&data, wire_limits).map_err(map_wire_error)?;
     if slide_view
         .fields()
         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2191,14 +2229,14 @@ fn encode_background(
                 options,
             )
         },
-        Background::Unsupported => return Err(Error::UnsupportedSource),
+        Background::Unsupported => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     rewritten
         .map(|(bytes, _report)| bytes)
         .map_err(map_codec_error)
         .and_then(|bytes| {
             if bytes.len() > limits.max_output_bytes() {
-                Err(Error::LimitExceeded {
+                Err(Error::Limit {
                     kind: LimitKind::OutputBytes,
                     observed: usize_to_u64(bytes.len()),
                     maximum: usize_to_u64(limits.max_output_bytes()),
@@ -2226,12 +2264,11 @@ fn style_is_collapsible(package: &Package, selection: &Selection) -> Result<bool
         return Ok(false);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&style.raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&style.raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &style.raw, STYLE_SUPER_FIELD)?;
     let properties = style.properties.as_deref().ok_or(Error::InvalidSource)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    let properties_view =
-        WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
+    let properties_view = WireView::parse(properties, limits).map_err(map_wire_error)?;
     // Unknown fields and any additional native property mean that culling the
     // variation would silently discard producer-authored state.
     Ok(has_exact_field_numbers(
@@ -2259,7 +2296,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
     validate_rewrite_metadata(stylesheet, index)?;
     let payload = stylesheet.messages[index].data.clone();
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
     if optional_bool(&view, STYLESHEET_CAN_CULL_FIELD)? != Some(true) {
         return Ok(false);
     }
@@ -2281,8 +2318,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(false);
                 }
@@ -2306,8 +2342,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(false);
                 }
@@ -2383,7 +2418,7 @@ fn versioned_styles_reference(
     target: u64,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             VERSIONED_STYLES_FIELD => {
@@ -2397,8 +2432,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD])
                     || required_reference_field_from_slice(
                         entry,
@@ -2411,8 +2445,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2575,7 +2608,7 @@ fn stylesheet_payload_references_target(
     target: u64,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             STYLESHEET_STYLES_FIELD => {
@@ -2589,8 +2622,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(true);
                 }
@@ -2614,8 +2646,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2680,8 +2711,8 @@ fn style_is_exclusive(package: &Package, selection: &Selection) -> Result<bool, 
                     return Ok(false);
                 }
                 if message.type_ == SLIDE_MESSAGE_TYPE {
-                    let slide_view = WireView::parse_with_limits(&message.data, wire_limits)
-                        .map_err(map_wire_error)?;
+                    let slide_view =
+                        WireView::parse(&message.data, wire_limits).map_err(map_wire_error)?;
                     if slide_view
                         .fields()
                         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2773,7 +2804,7 @@ fn style_is_exclusive(package: &Package, selection: &Selection) -> Result<bool, 
 }
 
 fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &outer,
         &[
@@ -2785,7 +2816,7 @@ fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Resu
         return Ok(false);
     }
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(&super_view, &[1, 2, 3, 4, 5]) {
         return Ok(false);
     }
@@ -2797,7 +2828,7 @@ fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Resu
         }
     }
     if let Some(properties) = optional_bytes(&outer, source, STYLE_PROPERTIES_FIELD)? {
-        let properties = WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+        let properties = WireView::parse(properties, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(&properties, &[1, 2, 3, 4, 5, 6, 7]) {
             return Ok(false);
         }
@@ -3006,7 +3037,7 @@ fn validate_rewrite_metadata(object: &ArchiveObject, message_index: usize) -> Re
 
 fn required_reference_field(package: &Package, source: &[u8], number: u32) -> Result<u64, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
@@ -3016,13 +3047,13 @@ fn required_reference_field_from_slice(
     number: u32,
     limits: WireLimits,
 ) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
 
 fn required_reference_payload(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field = unique_field(&view, 1)?;
     let field = field.ok_or(Error::InvalidSource)?;
     if field.wire_type() != 0 {
@@ -3037,7 +3068,7 @@ fn required_reference_payload(source: &[u8], limits: WireLimits) -> Result<u64, 
 }
 
 fn reference_payload_allows_removal(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     required_reference_payload(source, limits)?;
     if !has_only_field_numbers(&view, &[1, 2, 3]) {
         return Ok(false);
@@ -3065,7 +3096,7 @@ fn optional_reference_from_payload(
     number: u32,
 ) -> Result<Option<u64>, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let Some(payload) = optional_bytes(&view, source, number)? else {
         return Ok(None);
     };
@@ -3074,9 +3105,9 @@ fn optional_reference_from_payload(
 
 fn parse_style_metadata(package: &Package, source: &[u8]) -> Result<StyleState, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     Ok(StyleState {
         raw: source.to_vec(),
         parent: optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?,
@@ -3101,7 +3132,7 @@ fn required_bytes_from_slice(
     number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
         .map(|payload| payload.map(ToOwned::to_owned))?
         .ok_or(Error::InvalidSource)
@@ -3127,7 +3158,7 @@ fn optional_bytes_in_payload(
     number: u32,
     limits: WireLimits,
 ) -> Result<Option<&[u8]>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
 }
 
@@ -3212,7 +3243,7 @@ fn rewrite_reference_field(
     identifier: u64,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let replacement = match optional_bytes(&view, source, number)? {
         Some(reference) => rewrite_reference_identifier(reference, identifier, limits)?,
         None => encode_reference(identifier),
@@ -3221,8 +3252,13 @@ fn rewrite_reference_field(
 }
 
 fn append_length(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Result<(), Error> {
-    litchi_iwa_common::wire::append_length_delimited_field(output, number, payload)
-        .map_err(map_wire_error)
+    litchi_iwa_common::wire::append_length_delimited_field(
+        output,
+        number,
+        payload,
+        WireLimits::DEFAULT,
+    )
+    .map_err(map_wire_error)
 }
 
 fn append_varint(output: &mut Vec<u8>, number: u32, value: u64) -> Result<(), Error> {
@@ -3235,7 +3271,7 @@ fn rewrite_length_field(
     replacement: Option<&[u8]>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3267,7 +3303,7 @@ fn rewrite_varint_field(
     replacement: Option<u64>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3299,7 +3335,7 @@ fn repeated_payloads(
     number: u32,
     limits: WireLimits,
 ) -> Result<Vec<Vec<u8>>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut payloads = Vec::new();
     for field in view.fields().filter(|field| field.number() == number) {
         if field.wire_type() != 2 {
@@ -3317,7 +3353,7 @@ fn rewrite_repeated_length_field(
     replacements: &[Vec<u8>],
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut selected = 0usize;
     for field in view.fields() {
@@ -3343,7 +3379,7 @@ fn rewrite_repeated_length_field(
 
 fn check_wire_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     if output.len() > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3413,14 +3449,14 @@ fn codec_options(package: &Package, _source: &[u8]) -> Result<codec::DecodeOptio
 
 fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -3428,12 +3464,12 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            codec::WireResourceLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            codec::WireResourceLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -3481,7 +3517,7 @@ fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
             ),
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
@@ -3495,8 +3531,8 @@ fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -3507,7 +3543,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -3524,7 +3560,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -3545,7 +3581,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3571,7 +3607,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3594,7 +3630,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects

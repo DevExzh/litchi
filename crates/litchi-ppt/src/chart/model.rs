@@ -20,7 +20,7 @@ use crate::package::{Error, Result as PackageResult};
 /// retain an exact bounded source stream and can replay it unchanged; parsed
 /// mutation and fresh emission remain subject to the neutral model's explicit
 /// safety errors.
-pub type SemanticChart = litchi_ograph::chart::Chart;
+pub type SemanticChart = litchi_ograph::chart::Model;
 
 /// Fallible semantic views over every chart substream in one PPT chart object.
 ///

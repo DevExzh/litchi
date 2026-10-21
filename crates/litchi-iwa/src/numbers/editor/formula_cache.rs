@@ -68,7 +68,7 @@ struct DependencyGraph {
 }
 
 impl DependencyGraph {
-    fn from_package(package: &IWorkPackage) -> Result<Option<Self>> {
+    fn from_package(package: &HostPackage) -> Result<Option<Self>> {
         let Some(component) = package.calculation_engine_entry_name()? else {
             return Ok(None);
         };
@@ -475,7 +475,7 @@ enum EvalValue {
 }
 
 pub(super) fn refresh_formula_caches_after_cell_write(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -484,7 +484,7 @@ pub(super) fn refresh_formula_caches_after_cell_write(
 }
 
 pub(super) fn refresh_formula_caches_after_cell_writes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     coordinates: &[(usize, usize)],
 ) -> Result<usize> {
@@ -505,7 +505,7 @@ pub(super) fn refresh_formula_caches_after_cell_writes(
 /// ordinary cell value was written. Starting with the hosts themselves keeps
 /// their native cached values coherent before iWork opens the document.
 pub(super) fn refresh_formula_caches_at_hosts(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     coordinates: &[(usize, usize)],
 ) -> Result<usize> {
@@ -565,7 +565,7 @@ fn downstream_formula_hosts(
 }
 
 fn refresh_formula_hosts(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &DependencyGraph,
     impacted: HashSet<CellKey>,
 ) -> Result<usize> {
@@ -641,7 +641,7 @@ fn refresh_formula_hosts(
 }
 
 fn evaluate_formula(
-    package: &IWorkPackage,
+    package: &HostPackage,
     graph: &DependencyGraph,
     refreshed: &HashMap<CellKey, CachedFormulaValue>,
     host: CellKey,
@@ -685,7 +685,7 @@ fn evaluate_formula(
 }
 
 struct FormulaEvaluator<'a> {
-    package: &'a IWorkPackage,
+    package: &'a HostPackage,
     graph: &'a DependencyGraph,
     refreshed: &'a HashMap<CellKey, CachedFormulaValue>,
     host: CellKey,
@@ -1134,7 +1134,7 @@ impl FormulaEvaluator<'_> {
 }
 
 fn read_cell(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     descriptor: &TableDescriptor,
     row: u32,

@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("usage: create_pages_duplicated_shape <output.pages>")?;
 
     let body = "Created entirely by litchi-iwa";
-    let mut editor = pages::Editor::create_with_text(body)?;
+    let mut editor = pages::Draft::create_with_text(body)?;
     let source = editor.add_body_shape(
         body.encode_utf16().count(),
         "Source shape",

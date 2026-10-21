@@ -98,23 +98,33 @@ fn refusals_are_typed() -> TestResult {
     let mut edit = package.edit_section_text_style(0)?;
     assert!(matches!(
         edit.set(span(0, 0)?, bold.clone()),
-        Err(Error::InvalidSpan)
+        Err(Error::Refused(
+            litchi_pages::section::text_style::Refusal::InvalidSpan
+        ))
     ));
     assert!(matches!(
         edit.set(span(0, 1_000_000)?, bold.clone()),
-        Err(Error::InvalidSpan)
+        Err(Error::Refused(
+            litchi_pages::section::text_style::Refusal::InvalidSpan
+        ))
     ));
     assert!(matches!(
         edit.set(span(0, 1)?, CharacterProperties::new()),
-        Err(Error::EmptyStyle)
+        Err(Error::Refused(
+            litchi_pages::section::text_style::Refusal::EmptyStyle
+        ))
     ));
     assert!(matches!(
         package.edit_section_text_style(40),
-        Err(Error::SectionNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::text_style::Refusal::SectionNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_text_style(0)?.commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_pages::section::text_style::Refusal::NoStagedOperation
+        ))
     ));
     Ok(())
 }
@@ -162,7 +172,14 @@ fn corpus_bodies_take_bold_or_refuse_typed() -> TestResult {
                 assert_eq!(bytes(restored.package())?, source, "{}", path.display());
                 styled += 1;
             },
-            Err(error @ (Error::UnsupportedDependency | Error::UnsupportedSource)) => {
+            Err(
+                error @ (Error::Refused(
+                    litchi_pages::section::text_style::Refusal::UnsupportedDependency,
+                )
+                | Error::Refused(
+                    litchi_pages::section::text_style::Refusal::UnsupportedSource,
+                )),
+            ) => {
                 refused.push((path, error));
             },
             Err(error) => panic!("{}: {error:?}", path.display()),

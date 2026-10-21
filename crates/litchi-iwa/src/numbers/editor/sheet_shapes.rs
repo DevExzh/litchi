@@ -70,7 +70,7 @@ struct SheetShapeGraph {
     uuid_object_ids: Vec<u64>,
 }
 
-impl Editor {
+impl Draft {
     /// List ordinary non-text-box shapes owned by one reachable sheet.
     pub fn sheet_shapes(&self, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
         shape_infos(self, sheet_id)
@@ -808,7 +808,7 @@ impl Editor {
         replacement: &str,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.replace_text(source.info.storage.id, range, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         shape_graph(&verified, sheet_id, drawable_object_id)?;
@@ -824,7 +824,7 @@ impl Editor {
         replacement: &str,
     ) -> Result<()> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
-        let mut text = IWorkTextEditor::from_package(self.package.clone());
+        let mut text = crate::text::Draft::from_package(self.package.clone());
         text.set_text(source.info.storage.id, replacement)?;
         let verified = Self::from_package(text.into_package())?;
         let updated = shape_graph(&verified, sheet_id, drawable_object_id)?;
@@ -980,14 +980,13 @@ impl Editor {
     }
 
     /// Remove an ordinary shape and its private text-bearing graph.
-    #[allow(deprecated)]
     pub fn remove_sheet_shape(
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
     ) -> Result<RemovedNumbersSheetShape> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package.clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -1061,7 +1060,7 @@ fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
     .validate()
 }
 
-fn shape_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
+fn shape_infos(editor: &Draft, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut shapes = Vec::new();
@@ -1108,7 +1107,7 @@ fn shape_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetShapeInfo>> {
 }
 
 #[allow(deprecated)]
-fn shape_graph(editor: &Editor, sheet_id: u64, drawable_object_id: u64) -> Result<SheetShapeGraph> {
+fn shape_graph(editor: &Draft, sheet_id: u64, drawable_object_id: u64) -> Result<SheetShapeGraph> {
     let (archive_name, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     if sheet
         .drawable_infos
@@ -1250,7 +1249,7 @@ fn required_reference(
 }
 
 fn validate_shape_ownership(
-    package: &IWorkPackage,
+    package: &HostPackage,
     drawable_object_id: u64,
     storage_id: u64,
 ) -> Result<()> {
@@ -1313,7 +1312,7 @@ fn validate_shape_ownership(
 }
 
 fn shape_info(
-    editor: &Editor,
+    editor: &Draft,
     locations: &HashMap<u64, String>,
     sheet_id: u64,
     drawable_object_id: u64,
@@ -1336,7 +1335,7 @@ fn shape_info(
             "Numbers shape {drawable_object_id} has storage outside its component"
         )));
     }
-    let text = IWorkTextEditor::from_package(editor.package.clone());
+    let text = crate::text::Draft::from_package(editor.package.clone());
     let line_segment = shape_line_segment(shape)?;
     let line_endpoints = line_segment
         .map(|_| shape_line_endpoints(editor.package(), archive_name, drawable_object_id))
@@ -1456,7 +1455,7 @@ mod tests {
             .set_sheet_shape_properties(sheet_id, created.drawable_object_id, properties.clone())
             .unwrap();
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.sheet_shapes(sheet_id).unwrap()[0];
         assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
@@ -1546,7 +1545,7 @@ mod tests {
                 .text(),
             "Source shape"
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shapes(sheet_id)
@@ -1588,7 +1587,7 @@ mod tests {
             LineSegment::new(LINE_START, LINE_END).unwrap()
         ));
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(line_segments_match(
             reopened
                 .sheet_line_segment(sheet_id, created.drawable_object_id)
@@ -1675,7 +1674,7 @@ mod tests {
                 LineStyle::new(stroke).with_endpoints(endpoints),
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_stroke(sheet_id, created.drawable_object_id)
@@ -1729,7 +1728,7 @@ mod tests {
         editor
             .set_sheet_shape_fill(sheet_id, created.drawable_object_id, &fill)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1783,7 +1782,7 @@ mod tests {
             bytes
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_fill(sheet_id, created.drawable_object_id)
@@ -1826,7 +1825,7 @@ mod tests {
             .set_sheet_shape_effects(sheet_id, created.drawable_object_id, effects)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_effects(sheet_id, created.drawable_object_id)
@@ -1873,7 +1872,7 @@ mod tests {
             .set_sheet_shape_shadow(sheet_id, created.drawable_object_id, shadow)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_shadow(sheet_id, created.drawable_object_id)
@@ -1916,7 +1915,7 @@ mod tests {
             .set_sheet_shape_text_layout(sheet_id, created.drawable_object_id, layout)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_text_layout(sheet_id, created.drawable_object_id)
@@ -1964,7 +1963,7 @@ mod tests {
             Some(Endpoints::new(Endpoint::FilledSquare, Endpoint::OpenArrow))
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let replacement = Endpoints::new(Endpoint::InvertedArrow, Endpoint::FilledCircle);
         reopened
             .set_sheet_line_endpoints(sheet_id, created.drawable_object_id, replacement)
@@ -2009,7 +2008,7 @@ mod tests {
         assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_shape_preset(sheet_id, created.drawable_object_id)

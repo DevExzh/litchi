@@ -2748,6 +2748,208 @@ def p0358():
     return out
 
 
+W6_SOURCE_BACKED = {
+    "ods/cells1": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (1 cell) + commit + write_to", "12k×8 cells"),
+    "ods/cells100": ("ods", "set", "SourceBackedSpreadsheet open + edit_cells (100 cells) + commit + write_to", "12k×8 cells"),
+    "ods/dde": ("ods", "set", "SourceBackedSpreadsheet open + edit_dde + commit + write_to", "12k×8 cells"),
+    "ods/sheet_metadata": ("ods", "set", "SourceBackedSpreadsheet open + edit_sheet_metadata + commit + write_to", "12k×8 cells"),
+    "odp/tail_append": ("odp", "add", "SourceBackedPresentation open + edit_tail_append + commit + write_to", "2,000 slides"),
+}
+W6_CODEGEN = ("explained residual: the same work (callgrind instructions within 0.3%); the "
+              "fat-LTO codegen-unit partition and its inlining moved with the source-backed "
+              "code added to the binary; with codegen-units=1 the ratio is {cgu1} "
+              "(results/0358a/codegen.json)")
+
+
+@needs("0361")
+def p0361():
+    """Record 0361 §8 (W7 iWork): the after legs of keynote_bench,
+    pages_bench and numbers_unified_bench (processes 2 and 3 of B A A B) and
+    the batch-closure 1k/10k iWork batches (`abba/batch-A-after-*.json`)."""
+    base = RES / "0361"
+    return (iwork_after("0361", base, "{fmt}-*-after.{ext}")
+            + batch_closure("0361", sorted((base / "abba").glob("batch-A-after-*.json")),
+                            stages={"after": ("", 1)}))
+
+
+@needs("0361a")
+def p0361a():
+    """Record 0361a §4: the after legs of keynote_bench, pages_bench and
+    numbers_unified_bench (processes 2, 3, 6 and 7 of B A A B B A A B) after
+    the wire-codec limits change."""
+    return iwork_after("0361a", RES / "0361a", "{fmt}-*-after.{ext}")
+
+
+@needs("0358a")
+def p0358a():
+    """Record 0358a §6: the source-backed ODF families (after) against the
+    former stream routes (before), byte-identical output, and the record
+    0358 routes (0358a head vs 0358 head), both A-B-B-A pinned in release."""
+    base = RES / "0358a"
+    out = []
+    for probe, label in (("sb", "after/before"), ("w6", "after/before")):
+        legs: dict = {"before": {}, "after": {}}
+        paths = sorted(base.glob(f"{probe}-*-*.json"))
+        for path in paths:
+            leg = path.name.split("-")[1]
+            for r in load_json(path):
+                legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+        for scen, after in legs["after"].items():
+            before = legs["before"].get(scen)
+            if not before:
+                continue
+            b, a = med(before), med(after)
+            if probe == "sb":
+                fmt, op, scenario, size = W6_SOURCE_BACKED[scen]
+                scenario += ", family route vs former stream route"
+                explanation = ""
+            else:
+                fmt, op = scen.split("/")
+                scenario = f"File {op.replace('_', ' ')} ({fmt}, 0358a head vs 0358 head)"
+                size = "1k ops" if op == "batch1k" else ""
+                op = W6_ODF_OPS.get(op, op)
+                cgu1 = {"odt/set": "1.014", "fodt/open_get": "1.032"}.get(scen)
+                explanation = W6_CODEGEN.format(cgu1=cgu1) if cgu1 and a / b > 1.05 else ""
+            out.append(row("0358a", fmt, op, scenario, size, b, a, [a / b], regression("0358a"),
+                           f"{probe}:{scen}:after-before", src(paths), comparison=label,
+                           explanation=explanation))
+    return out
+
+
+W5_LEGACY_OPS = {"open_get": "open", "get": "get", "set": "set", "add": "add", "batch1k": "batch",
+                 "batch256": "batch"}
+
+
+@needs("0359")
+def p0359():
+    """Record 0359 §7 (W5 DOC/XLS/RTF contract): legacy_w5_probe, one source
+    built on the wave's base (trunk) and head, run A-B-B-A pinned in
+    release; one after/before row per unified route (median of the after
+    runs over the median of the before runs)."""
+    base = RES / "0359"
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(base.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    out = []
+    for scen, after in legs["after"].items():
+        before = legs["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        size = {"batch1k": "1k ops", "batch256": "256 ops"}.get(op, "")
+        out.append(row("0359", fmt, W5_LEGACY_OPS.get(op, op),
+                       f"File {op.replace('_', ' ')} ({fmt}, W5 head vs base)",
+                       size, b, a, [a / b], regression("0359"), f"legacy_w5_probe:{scen}:after-before",
+                       src(paths), comparison="after/before"))
+    return out
+
+
+W5_SOURCE_BACKED = {
+    "doc/source_set": ("doc", "set", "source_backed::Package open + edit_paragraph + set_text + commit + write_to", "1k paragraphs"),
+    "xls/source_cells1": ("xls", "set", "SourceBackedWorkbook open + edit_cells (1 cell) + commit + write_to", "100×10 cells"),
+    "xls/source_cells100": ("xls", "set", "SourceBackedWorkbook open + edit_cells (100 cells) + commit + write_to", "100×10 cells"),
+    "xls/source_comments1": ("xls", "set", "SourceBackedWorkbook open + edit_comments (1 comment) + commit + write_to", "256 comments"),
+    "xls/source_comments256": ("xls", "set", "SourceBackedWorkbook open + edit_comments (256 comments) + commit + write_to", "256 comments"),
+    "xls/source_hide7": ("xls", "set", "SourceBackedWorkbook open + edit_sheet_visibility (7 sheets) + commit + write_to", "8 sheets"),
+    "rtf/source_append": ("rtf", "add", "source_backed::Package open + edit_tail_append + commit + write_to", "1k paragraphs"),
+}
+W5A_SAME_WORK = ("explained residual: the same work (callgrind instructions within 0.03% on both builds, "
+                 "results/0359a/callgrind-totals.txt); the other A-B-B-A run is {other}")
+W5A_LEAF = ("explained residual: process state, not the leaf edit. The leaf batch runs after the ops "
+            "batch in one process; on the base that batch faults in about 15 GB first, and the leaf "
+            "reuses the warmed heap. Alone in its process the leaf edit takes the same time on both "
+            "builds (1.684-1.688 s vs 1.669-1.690 s, results/0359a/doc-batch-isolated.txt)")
+
+
+def w5a_legs(paths):
+    legs: dict = {"before": {}, "after": {}}
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    return legs
+
+
+@needs("0359a")
+def p0359a():
+    """Record 0359a §7: legacy_w5_source_probe (the source-backed routes and
+    the DOC 1k batch; only its `routes` module differs between the base,
+    record 0359's tip, and the head) and legacy_w5_probe (the 0359 routes),
+    A-B-B-A twice pinned in release. Ratios span both runs (run 2 is
+    `results/0359a/*.json`, run 1 `results/0359a/run1/`); the DOC batch row
+    is the head's unified/leaf ratio per run."""
+    base = RES / "0359a"
+    runs = [base, base / "run1"]
+    out = []
+    for probe in ("source", "ops"):
+        per_run = [w5a_legs(sorted(r.glob(f"{probe}-*-*.json"))) for r in runs]
+        paths = sorted(base.glob(f"{probe}-*-*.json"))
+        for scen, after in per_run[0]["after"].items():
+            before = per_run[0]["before"].get(scen)
+            if not before:
+                continue
+            b, a = med(before), med(after)
+            ratios = [med(legs["after"][scen]) / med(legs["before"][scen]) for legs in per_run
+                      if scen in legs["after"] and scen in legs["before"]]
+            if probe == "source" and scen in W5_SOURCE_BACKED:
+                fmt, op, scenario, size = W5_SOURCE_BACKED[scen]
+                scenario += ", family route vs former publisher"
+                explanation = ""
+                series = f"legacy_w5_source_probe:{scen}:after-before"
+            elif probe == "source":
+                fmt, op = scen.split("/")
+                label = {"doc/batch1k_ops": "File::edit_with_limits, 1,000 paragraph bold sets",
+                         "doc/batch1k_leaf": "Package::edit_with_options, 1,000 set_paragraph_bold"}[scen]
+                scenario, size, op = f"{label}, 0359a head vs 0359 head", "1k ops", "batch"
+                explanation = W5A_LEAF if scen == "doc/batch1k_leaf" else ""
+                series = f"legacy_w5_source_probe:{scen}:after-before"
+            else:
+                fmt, op = scen.split("/")
+                scenario = f"File {op.replace('_', ' ')} ({fmt}, 0359a head vs 0359 head)"
+                size = {"batch1k": "1k ops", "batch256": "256 ops"}.get(op, "")
+                op = W5_LEGACY_OPS.get(op, op)
+                explanation = ""
+                if max(ratios) > 1.05:
+                    other = ", ".join(f"{r:.3f}" for r in ratios)
+                    explanation = W5A_SAME_WORK.format(other=other)
+                series = f"legacy_w5_probe:{scen}:after-before"
+            out.append(row("0359a", fmt, op, scenario, size, b, a, ratios, regression("0359a"),
+                           series, src(paths), comparison="after/before", explanation=explanation))
+        if probe == "source":
+            for scen in ("xls/source_cells1", "xls/source_cells100"):
+                plan = per_run[0]["before"].get(scen + "_plan")
+                if not plan:
+                    continue
+                b, a = med(plan), med(per_run[0]["after"][scen])
+                ratios = [med(legs["after"][scen]) / med(legs["before"][scen + "_plan"])
+                          for legs in per_run if scen + "_plan" in legs["before"]]
+                fmt, op, scenario, size = W5_SOURCE_BACKED[scen]
+                out.append(row("0359a", fmt, op, scenario + ", family route vs former plan-only publisher",
+                               size, b, a, ratios, regression("0359a"),
+                               f"legacy_w5_source_probe:{scen}:after-before_plan", src(paths),
+                               comparison="after/before",
+                               explanation=("explained residual: the family commit reopens the "
+                                            "committed workbook over the plan's composed source, "
+                                            "which the forward-only plan publisher did not; the "
+                                            "former materializing publisher it replaces is the "
+                                            "after/before row") if max(ratios) > 1.05 else ""))
+    per_run = [w5a_legs(sorted(r.glob("source-after-*.json")) + sorted(r.glob("source-before-*.json")))
+               for r in runs]
+    ratios = [med(legs["after"]["doc/batch1k_ops"]) / med(legs["after"]["doc/batch1k_leaf"])
+              for legs in per_run]
+    legs = per_run[0]
+    out.append(row("0359a", "doc", "batch",
+                   "File::edit_with_limits, 1,000 paragraph bold sets vs the leaf edit with its operation bound raised through EditOptions",
+                   "1k ops", med(legs["after"]["doc/batch1k_leaf"]), med(legs["after"]["doc/batch1k_ops"]),
+                   ratios, BATCH, "legacy_w5_source_probe:doc/batch1k:unified-leaf",
+                   src(sorted(base.glob("source-after-*.json")))))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2845,7 +3047,8 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358]
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0358a,
+           p0359, p0359a, p0361, p0361a]
 
 
 

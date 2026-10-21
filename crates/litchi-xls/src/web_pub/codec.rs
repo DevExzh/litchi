@@ -1,5 +1,6 @@
 //! BIFF8 `WebPub` payload codec (MS-XLS 2.4.344).
 
+use litchi_core::edit::RefusalKind;
 use std::ops::Range;
 
 use crate::{Error, Result};
@@ -258,8 +259,8 @@ pub(super) fn rewrite_preserving_source(
 ) -> Result<Vec<u8>> {
     let (parsed, layout) = WebPub::parse_with_layout(source)?;
     if &parsed != current {
-        return Err(Error::UnsafeEdit(
-            "WebPub transaction candidate is out of sync with its source bytes".into(),
+        return Err(Error::Internal(
+            "WebPub transaction candidate is out of sync with its source bytes",
         ));
     }
     replacement.validate_for_write()?;
@@ -268,20 +269,29 @@ pub(super) fn rewrite_preserving_source(
         || replacement.source_name.is_some() != current.source_name.is_some()
         || replacement.chart_shape_id.is_some() != current.chart_shape_id.is_some()
     {
-        return Err(Error::UnsafeEdit(
-            "WebPub edits cannot change conditional record topology".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit web publishing",
+            "WebPub edits cannot change conditional record topology",
         ));
     }
 
     let mut tail = Vec::new();
     if let Some(span) = &layout.source_name {
         let before = current.source_name.as_deref().ok_or_else(|| {
-            Error::UnsafeEdit("WebPub source-name span has no semantic owner".into())
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "WebPub source-name span has no semantic owner",
+            )
         })?;
-        let after = replacement
-            .source_name
-            .as_deref()
-            .ok_or_else(|| Error::UnsafeEdit("WebPub source-name replacement is missing".into()))?;
+        let after = replacement.source_name.as_deref().ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit web publishing",
+                "WebPub source-name replacement is missing",
+            )
+        })?;
         append_string(&mut tail, source, span, before, after)?;
     }
     append_string(
@@ -308,11 +318,19 @@ pub(super) fn rewrite_preserving_source(
 
     if let Some(span) = &layout.chart_shape_id {
         let before = current.chart_shape_id.ok_or_else(|| {
-            Error::UnsafeEdit("WebPub chart-shape span has no semantic owner".into())
+            Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit web publishing",
+                "WebPub chart-shape span has no semantic owner",
+            )
         })?;
-        let after = replacement
-            .chart_shape_id
-            .ok_or_else(|| Error::UnsafeEdit("WebPub chart-shape replacement is missing".into()))?;
+        let after = replacement.chart_shape_id.ok_or_else(|| {
+            Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit web publishing",
+                "WebPub chart-shape replacement is missing",
+            )
+        })?;
         if before == after {
             tail.extend_from_slice(&source[span.clone()]);
         } else {

@@ -7,7 +7,7 @@ use std::str::FromStr;
 /// decimal Number format.
 pub mod transaction {
     pub use crate::package::table_cell_number_format::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }
 

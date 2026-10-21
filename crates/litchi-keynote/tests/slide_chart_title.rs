@@ -57,8 +57,18 @@ fn chart_payload_with_graph(
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
-    append_length_delimited_field(&mut payload, 10_000, &chart_data.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -71,10 +81,20 @@ fn non_style_payload_state(
         append_varint_field(&mut extension, 21, u64::from(title_visible))?;
     }
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -87,14 +107,29 @@ fn non_style_payload_state_with_unknown_title_fields(
     if let Some(title_visible) = title_visible {
         append_varint_field(&mut extension, 21, u64::from(title_visible))?;
     }
-    append_length_delimited_field(&mut extension, 4_001, b"opaque title metadata")?;
+    append_length_delimited_field(
+        &mut extension,
+        4_001,
+        b"opaque title metadata",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     if let Some(title) = title {
-        append_length_delimited_field(&mut extension, 23, title.as_bytes())?;
+        append_length_delimited_field(
+            &mut extension,
+            23,
+            title.as_bytes(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     append_varint_field(&mut extension, 4_002, 9)?;
 
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 10_000, &extension)?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &extension,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -506,27 +541,37 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
     );
     assert!(matches!(
         package.slide_chart_title(0usize, ChartSelector::name("revenue")),
-        Err(ChartTitleError::ChartNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_title(0usize, ChartSelector::name("Missing")),
-        Err(ChartTitleError::ChartNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::ChartNameNotFound
+        ))
     ));
     assert!(matches!(
         package.slide_chart_title("charts", 0usize),
-        Err(ChartTitleError::SlideNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_title("Missing", 0usize),
-        Err(ChartTitleError::SlideNameNotFound)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_chart_title(0usize, 4usize),
-        Err(ChartTitleError::ChartPositionNotFound { position }) if position == Position::new(4)
+        Err(ChartTitleError::Refused(litchi_keynote::chart::title::Refusal::ChartPositionNotFound { position })) if position == Position::new(4)
     ));
     assert!(matches!(
         package.edit_slide_chart_title(0usize, ChartSelector::name("")),
-        Err(ChartTitleError::EmptyChartName)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::EmptyChartName
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
 
@@ -544,12 +589,16 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
     );
     assert!(matches!(
         duplicate.slide_chart_title(0usize, ChartSelector::name("Revenue")),
-        Err(ChartTitleError::AmbiguousSelector)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::AmbiguousSelector
+        ))
     ));
     let duplicate_source = exact_bytes(&duplicate)?;
     assert!(matches!(
         duplicate.edit_slide_chart_title(0usize, ChartSelector::name("Revenue")),
-        Err(ChartTitleError::AmbiguousSelector)
+        Err(ChartTitleError::Refused(
+            litchi_keynote::chart::title::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(exact_bytes(&duplicate)?, duplicate_source);
 
@@ -571,7 +620,12 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
         }
         .encode_to_vec();
         let mut malformed_chart = Vec::new();
-        append_length_delimited_field(&mut malformed_chart, 1, &drawable)?;
+        append_length_delimited_field(
+            &mut malformed_chart,
+            1,
+            &drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         message.data = malformed_chart;
         stream = archive.to_bytes()?;
         let compressed = SnappyStream::compress(&stream)?;

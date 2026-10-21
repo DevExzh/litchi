@@ -64,6 +64,7 @@ fn builds_are_detached_from_later_authoring() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         second.to_bytes().unwrap()

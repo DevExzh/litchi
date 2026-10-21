@@ -33,6 +33,42 @@ structure::structural_family!("table-order");
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted table-order source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} table-order items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested order.
+    #[error("table-order candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("table-order patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The sheet selector did not resolve one sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -59,31 +95,30 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support table reordering")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted table-order source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} table-order items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested order.
-    #[error("table-order candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("table-order patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::DestinationOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,27 +151,27 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::TableNotFound`], [`Error::DestinationOutOfRange`],
-    /// [`Error::OperationAlreadyStaged`].
+    /// [`Refusal::TableNotFound`], [`Refusal::DestinationOutOfRange`],
+    /// [`Refusal::OperationAlreadyStaged`].
     pub fn move_table<'selector>(
         mut self,
         selector: impl Into<TableSelector<'selector>>,
         destination: usize,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let sheet = self
             .source
             .workbook_ref()
             .sheets()
             .get(self.sheet)
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         let source = match selector.into() {
             TableSelector::Position(position) => {
                 let position = position.get();
                 if position >= sheet.table_count() {
-                    return Err(Error::TableNotFound);
+                    return Err(Error::Refused(Refusal::TableNotFound));
                 }
                 position
             },
@@ -145,7 +180,9 @@ impl Edit<'_> {
                     .tables()
                     .enumerate()
                     .filter(|(_, table)| table.name() == name);
-                let (position, _) = matches.next().ok_or(Error::TableNotFound)?;
+                let (position, _) = matches
+                    .next()
+                    .ok_or(Error::Refused(Refusal::TableNotFound))?;
                 if matches.next().is_some() {
                     return Err(Error::InvalidSource);
                 }
@@ -153,10 +190,10 @@ impl Edit<'_> {
             },
         };
         if destination >= sheet.table_count() {
-            return Err(Error::DestinationOutOfRange {
+            return Err(Error::Refused(Refusal::DestinationOutOfRange {
                 position: destination,
                 table_count: sheet.table_count(),
-            });
+            }));
         }
         self.operation = Some(Operation {
             source,
@@ -169,10 +206,12 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit; source, resource and
+    /// [`Refusal::NoStagedOperation`] for an empty edit; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self
+            .operation
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         if operation.source == operation.destination {
             return Commit::unchanged(self.source);
         }
@@ -231,7 +270,9 @@ fn reorder(
         &document.messages[document_index].data,
         &[DOCUMENT_SIDEBAR_FIELD],
     )?;
-    let sheet = *sheets.get(sheet_position).ok_or(Error::SheetNotFound)?;
+    let sheet = *sheets
+        .get(sheet_position)
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let sheet_object = working.object(sheet)?;
     let (index, path) = structure::sheet_message(sheet_object)?;
     let drawables = references::identifiers(&sheet_object.messages[index].data, path)?;
@@ -370,7 +411,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::SheetNotFound`] when the selector resolves no sheet.
+    /// [`Refusal::SheetNotFound`] when the selector resolves no sheet.
     pub fn edit_table_order<'selector>(
         &self,
         sheet: impl Into<SheetSelector<'selector>>,
@@ -379,7 +420,7 @@ impl Package {
             .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?
             .index();
         Ok(Edit {
             source: self,

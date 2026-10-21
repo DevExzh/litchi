@@ -15,11 +15,11 @@ use prost::Message;
 
 const BOOKMARK_TABLE_FIELD: u32 = 15;
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = pages::Editor::create_with_text("Alpha Beta").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId) {
+    let pages = pages::Draft::create_with_text("Alpha Beta").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         storage_id,
     )
 }
@@ -32,7 +32,7 @@ fn named(value: &str) -> TextBookmarkSettings {
     TextBookmarkSettings::new().with_name(TextBookmarkName::new(value).unwrap())
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: TextStorageId) -> usize {
+fn storage_message_index(package: &crate::HostPackage, storage_id: TextStorageId) -> usize {
     locate_storage(package, storage_id.get(), BOOKMARK_TABLE)
         .unwrap()
         .message_index
@@ -84,7 +84,7 @@ fn unknown_table_entry_and_bookmark_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_bookmark(storage_id, bookmark.id, range(6, 10), named("Beta"))
         .unwrap();
@@ -148,7 +148,7 @@ fn duplicate_bookmark_tables_fail_without_mutation() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(editor.text_bookmarks(storage_id).is_err());
     assert!(
@@ -182,7 +182,7 @@ fn bookmark_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let bookmark = editor
         .add_text_bookmark(storage_id, range(0, 5), named("Alpha"))
         .unwrap();
@@ -235,7 +235,7 @@ fn bookmark_with_an_additional_owner_cannot_be_updated_or_deleted() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

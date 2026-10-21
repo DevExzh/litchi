@@ -313,7 +313,9 @@ fn native_image_adjustments_reject_out_of_range_and_stale_transactions() -> Test
         .expect_err("a second image must not be synthesized");
     assert!(matches!(
         error,
-        SlideImageAdjustmentsError::ImagePositionNotFound { .. }
+        SlideImageAdjustmentsError::Refused(
+            litchi_keynote::slide::image::adjustments::Refusal::ImagePositionNotFound { .. }
+        )
     ));
 
     let replacement = replacement_adjustments()?;

@@ -126,33 +126,29 @@ fn source_bound_patch_respects_a_new_profile_on_the_same_owner() {
     let source = owner
         .sheet_metadata_with(sheet_metadata::Limits::default(), &source_context)
         .expect("originating profile");
-    let mut edit = source.edit().expect("source edit");
+    let mut edit = owner
+        .edit_sheet_metadata_with(sheet_metadata::Limits::default(), &source_context)
+        .expect("source edit");
     let mut value = options();
     value.function = "f".repeat(2048);
     edit.set_consolidation(Some(value))
         .expect("stage larger owner");
-    let commit = edit.commit(&source_context).expect("originating commit");
+    let commit = edit.commit().expect("originating commit");
 
     let (_destination_cancel, destination_context) = context(budget());
-    let destination = owner
-        .sheet_metadata_with(
-            sheet_metadata::Limits::new(4096, 1024, 32, 1024, 1_000_000)
-                .expect("smaller destination policy"),
-            &destination_context,
-        )
-        .expect("same owner under smaller profile");
+    let destination_limits = sheet_metadata::Limits::new(4096, 1024, 32, 1024, 1_000_000)
+        .expect("smaller destination policy");
     assert!(commit.patch().target_xml().len() > 1024);
-    let error = commit
-        .patch()
-        .apply(&destination)
+    let error = owner
+        .apply_sheet_metadata_with(commit.patch(), destination_limits, &destination_context)
         .expect_err("destination output ceiling");
-    let Error::ResourceLimit(limit) = error else {
+    let Some(Error::ResourceLimit(limit)) = error.core() else {
         panic!("typed resource limit expected: {error:?}")
     };
     assert_eq!(limit.resource, Resource::OutputBytes);
     assert_eq!(limit.limit, 1024);
     assert!(limit.observed > limit.limit);
-    assert_eq!(destination.source_xml(), source.source_xml());
+    assert_eq!(owner.content_xml().expect("source"), source.source_xml());
 }
 
 #[test]

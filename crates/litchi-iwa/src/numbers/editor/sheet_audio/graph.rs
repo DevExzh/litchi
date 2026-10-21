@@ -65,7 +65,7 @@ pub(super) fn audio_creation_values(options: SheetAudioOptions) -> Result<(Drawa
     Ok((geometry, duration_seconds as f32))
 }
 
-pub(super) fn audio_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetAudioInfo>> {
+pub(super) fn audio_infos(editor: &Draft, sheet_id: u64) -> Result<Vec<SheetAudioInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut audio = Vec::new();
@@ -121,7 +121,7 @@ pub(super) fn audio_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetAud
 }
 
 pub(super) fn audio_graph(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetAudioGraph> {
@@ -282,7 +282,7 @@ pub(super) fn audio_graph(
     })
 }
 
-fn audio_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetAudioInfo> {
+fn audio_info(package: &HostPackage, sheet_id: u64, identifier: u64) -> Result<SheetAudioInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -351,7 +351,6 @@ fn audio_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<
     })
 }
 
-#[allow(deprecated)]
 pub(super) fn audio_objects(
     ids: MovieObjectIds,
     sheet_id: u64,

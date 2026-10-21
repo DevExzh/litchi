@@ -30,7 +30,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireView, append_length_delimited_field_with_limits, append_varint_field},
+    wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -140,7 +140,7 @@ impl CaptionBudget {
     }
 
     fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-        Error::LimitExceeded {
+        Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -466,7 +466,7 @@ impl CaptionBudget {
         let compressed_bound =
             SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
         if compressed_bound > snappy_limits.max_compressed_stream() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed_bound),
                 maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
@@ -645,6 +645,42 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source chart, caption graph, or text storage is malformed or unsafe.
+    #[error("the Keynote chart-caption source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error("Keynote chart-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Keynote chart-caption transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full candidate reopening did not reproduce the requested caption.
+    #[error("the edited Keynote chart caption failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote chart-caption patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart-caption edits")]
     UnsupportedSource,
@@ -679,31 +715,32 @@ pub enum Error {
     /// An empty exact chart name was supplied.
     #[error("the Keynote chart selector name cannot be empty")]
     EmptyChartName,
-    /// The source chart, caption graph, or text storage is malformed or unsafe.
-    #[error("the Keynote chart-caption source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error("Keynote chart-caption {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category that exceeded its limit.
-        kind: LimitKind,
-        /// Observed or requested amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded destination allocation failed before publication.
-    #[error("could not allocate {amount} units for the Keynote chart-caption transaction")]
-    Allocation {
-        /// Elements or bytes requested.
-        amount: usize,
-    },
-    /// Full candidate reopening did not reproduce the requested caption.
-    #[error("the edited Keynote chart caption failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote chart-caption patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. }
+            | Self::EmptySlideName { .. }
+            | Self::EmptyChartName { .. } => RefusalKind::InvalidValue,
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::ChartNameNotFound { .. }
+            | Self::ChartPositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable chart-caption value staged against an immutable package.
@@ -812,7 +849,7 @@ impl<'a> Edit<'a> {
             });
         }
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.source.validate().map_err(map_read_error)?;
         let guarded = select_caption(
@@ -1027,6 +1064,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.
@@ -1389,7 +1432,7 @@ pub(super) fn prove_exclusive_caption_storage(
                     if std::mem::replace(&mut chart_edge_seen, true)
                         || owner_identifier != chart_identifier
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 if message.type_ == CAPTION_INFO_MESSAGE_TYPE {
@@ -1404,7 +1447,7 @@ pub(super) fn prove_exclusive_caption_storage(
                         && (std::mem::replace(&mut payload_owner_seen, true)
                             || owner_identifier != caption_info_identifier)
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
@@ -1431,7 +1474,7 @@ pub(super) fn prove_exclusive_caption_storage(
                         .filter(|identifier| **identifier == storage_identifier)
                         .count();
                     if occurrences != 0 && !matches!(field.path.as_slice(), [1, 2] | [1, 4]) {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     field_count = field_count
                         .checked_add(occurrences)
@@ -1459,7 +1502,7 @@ pub(super) fn prove_exclusive_caption_storage(
                         || aggregate_data != 0
                         || field_data != 0
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
             }
@@ -1490,7 +1533,7 @@ pub(super) fn prove_exclusive_caption_standin(
                 {
                     payload_edges = payload_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                     if payload_edges > 1 || owner_identifier != chart_identifier {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
@@ -1509,14 +1552,14 @@ pub(super) fn prove_exclusive_caption_standin(
                     .filter(|identifier| **identifier == standin_identifier)
                     .count();
                 if aggregate_data != 0 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if aggregate_count != 0 {
                     if owner_identifier != chart_identifier
                         || message.type_ != CHART_MESSAGE_TYPE
                         || aggregate_count != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     aggregate_edges = aggregate_edges
                         .checked_add(aggregate_count)
@@ -1534,7 +1577,7 @@ pub(super) fn prove_exclusive_caption_standin(
                         .filter(|identifier| **identifier == standin_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != chart_identifier
@@ -1545,7 +1588,7 @@ pub(super) fn prove_exclusive_caption_standin(
                                 [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
                             )
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         field_edges = field_edges
                             .checked_add(field_count)
@@ -1584,7 +1627,7 @@ fn prove_exclusive_caption_info_owner(
                 {
                     payload_edges = payload_edges.checked_add(1).ok_or(Error::InvalidSource)?;
                     if owner_identifier != chart_identifier || payload_edges > 1 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 let info = object
@@ -1603,7 +1646,7 @@ fn prove_exclusive_caption_info_owner(
                     .filter(|identifier| **identifier == caption_info_identifier)
                     .count();
                 if aggregate_data != 0 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 let mut local_field_edges = 0usize;
                 for field in &info.field_infos {
@@ -1618,7 +1661,7 @@ fn prove_exclusive_caption_info_owner(
                         .filter(|identifier| **identifier == caption_info_identifier)
                         .count();
                     if field_data != 0 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     if field_count != 0 {
                         if owner_identifier != chart_identifier
@@ -1629,7 +1672,7 @@ fn prove_exclusive_caption_info_owner(
                                 [11, 1] | [1, 11, 1] | [1, 1, 11, 1]
                             )
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                         local_field_edges = local_field_edges
                             .checked_add(field_count)
@@ -1641,7 +1684,7 @@ fn prove_exclusive_caption_info_owner(
                         || message.type_ != CHART_MESSAGE_TYPE
                         || aggregate_count != 1
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 if aggregate_count != 0 || local_field_edges != 0 {
@@ -1673,9 +1716,9 @@ fn chart_caption_reference(package: &Package, payload: &[u8]) -> Result<Option<u
         return Err(Error::InvalidSource);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let reference = unique_payload_field(&drawable, 11)?.ok_or(Error::InvalidSource)?;
     let projected = super::validate_reference_payload(reference, limits, "Keynote chart caption")
         .map_err(map_wire_error)?;
@@ -1741,8 +1784,8 @@ fn rewrite_chart_caption_operation(
     if !creating && !removing {
         let storage = selection
             .storage_identifier
-            .ok_or(Error::UnsupportedDependency)?;
-        let desired = after.ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let desired = after.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         let end = selection
             .text
             .as_deref()
@@ -1755,7 +1798,7 @@ fn rewrite_chart_caption_operation(
             .is_some_and(contains_dependent_marker)
             || contains_dependent_marker(desired)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         if metadata_member_name(physical_catalog(source)?, source).is_ok() {
             return rewrite_existing_caption_text_with_metadata_budget(
@@ -1802,10 +1845,10 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     let creating = storage_identifier.is_none() && after.is_some();
     let removing = storage_identifier.is_some() && after.is_none();
     if !creating && !removing {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     if after.is_some_and(contains_dependent_marker) {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
 
     // The graph transition performs package-wide metadata, identifier, theme,
@@ -2533,7 +2576,7 @@ fn prove_caption_dependencies(
             }
         }
         if owner_names.len() != 1 {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let owner_name = owner_names[0];
         if owner_name == slide_component_name {
@@ -2552,7 +2595,7 @@ fn prove_caption_dependencies(
         // package object index.  There must be one current component at the
         // exact effective locator; versioned records never authorize a write.
         if target_components.len() != 1 {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let target_identifier = target_components[0].identifier;
         if facts
@@ -2562,7 +2605,7 @@ fn prove_caption_dependencies(
             .count()
             != 1
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut matching = 0usize;
         let mut prohibited = false;
@@ -2581,7 +2624,7 @@ fn prove_caption_dependencies(
             }
         }
         if prohibited || matching != 1 {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
     }
     Ok(())
@@ -2779,8 +2822,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let document_view =
-        WireView::parse_with_limits(document_payload, limits).map_err(map_wire_error)?;
+    let document_view = WireView::parse(document_payload, limits).map_err(map_wire_error)?;
     let show_payload = unique_payload_field(&document_view, 2)?.ok_or(Error::InvalidSource)?;
     let show_identifier = reference_identifier(show_payload, limits)?;
     let show = package
@@ -2795,7 +2837,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let show_view = WireView::parse_with_limits(show_payload, limits).map_err(map_wire_error)?;
+    let show_view = WireView::parse(show_payload, limits).map_err(map_wire_error)?;
     let theme_identifier = reference_identifier(
         unique_payload_field(&show_view, 2)?.ok_or(Error::InvalidSource)?,
         limits,
@@ -2816,16 +2858,14 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .as_slice();
-    let theme_view = WireView::parse_with_limits(theme_payload, limits).map_err(map_wire_error)?;
+    let theme_view = WireView::parse(theme_payload, limits).map_err(map_wire_error)?;
     let theme_super = unique_payload_field(&theme_view, 1)?.ok_or(Error::InvalidSource)?;
-    let theme_super_view =
-        WireView::parse_with_limits(theme_super, limits).map_err(map_wire_error)?;
+    let theme_super_view = WireView::parse(theme_super, limits).map_err(map_wire_error)?;
     let presets = unique_payload_field(&theme_super_view, 210)?.ok_or(Error::InvalidSource)?;
-    let presets_view = WireView::parse_with_limits(presets, limits).map_err(map_wire_error)?;
+    let presets_view = WireView::parse(presets, limits).map_err(map_wire_error)?;
     let paragraph_style = first_reference_identifier(&presets_view, 1, limits)?;
     let document_super = unique_payload_field(&document_view, 3)?.ok_or(Error::InvalidSource)?;
-    let document_super_view =
-        WireView::parse_with_limits(document_super, limits).map_err(map_wire_error)?;
+    let document_super_view = WireView::parse(document_super, limits).map_err(map_wire_error)?;
     let language = match unique_payload_field(&document_super_view, 3)? {
         Some(bytes) => Some(
             std::str::from_utf8(bytes)
@@ -2842,7 +2882,7 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
 }
 
 fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 1) {
         if selected.is_some() || field.wire_type() != 0 {
@@ -2887,13 +2927,13 @@ fn caption_drawable_width(package: &Package, drawable_identifier: u64) -> Result
         .object(drawable_identifier)
         .ok_or(Error::InvalidSource)?;
     let payload = &object.messages.first().ok_or(Error::InvalidSource)?.data;
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let drawable = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable_view = WireView::parse_with_limits(drawable, limits).map_err(map_wire_error)?;
+    let drawable_view = WireView::parse(drawable, limits).map_err(map_wire_error)?;
     let geometry = unique_payload_field(&drawable_view, 1)?.ok_or(Error::InvalidSource)?;
-    let geometry_view = WireView::parse_with_limits(geometry, limits).map_err(map_wire_error)?;
+    let geometry_view = WireView::parse(geometry, limits).map_err(map_wire_error)?;
     let size = unique_payload_field(&geometry_view, 2)?.ok_or(Error::InvalidSource)?;
-    let size_view = WireView::parse_with_limits(size, limits).map_err(map_wire_error)?;
+    let size_view = WireView::parse(size, limits).map_err(map_wire_error)?;
     let mut width = None;
     for field in size_view.fields().filter(|field| field.number() == 1) {
         if width.is_some() || field.wire_type() != 5 {
@@ -2980,7 +3020,7 @@ fn patch_caption_edge(
         || aggregate_frequencies.get(&expected_identifier).copied() != Some(1)
         || info.object_references.contains(&replacement_identifier)
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     struct OwnedFieldTransition {
         path: Vec<u32>,
@@ -3004,7 +3044,7 @@ fn patch_caption_edge(
             || field.data_references.contains(&replacement_identifier)
             || field.object_references.contains(&replacement_identifier)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let edge_field = match edge_kind {
             CaptionEdgeKind::Chart => 11,
@@ -3022,7 +3062,7 @@ fn patch_caption_edge(
                 && !matches!(field.path.path.as_slice(), [1, 1, number, 1] if *number == edge_field)
                 || count != 1)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let mut after = field.object_references.clone();
         after.retain(|identifier| *identifier != expected_identifier);
@@ -3079,12 +3119,10 @@ fn patch_caption_edge(
             )?;
             let input_bytes = payload.len();
             let output_bytes = rewritten.len();
-            let source_view =
-                WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
-            let output_view =
-                WireView::parse_with_limits(&rewritten, limits).map_err(map_wire_error)?;
+            let source_view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
+            let output_view = WireView::parse(&rewritten, limits).map_err(map_wire_error)?;
             let source_fields = source_view.fields().count()
-                + WireView::parse_with_limits(
+                + WireView::parse(
                     unique_payload_field(&source_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
@@ -3092,7 +3130,7 @@ fn patch_caption_edge(
                 .fields()
                 .count();
             let output_fields = output_view.fields().count()
-                + WireView::parse_with_limits(
+                + WireView::parse(
                     unique_payload_field(&output_view, 1)?.ok_or(Error::InvalidSource)?,
                     limits,
                 )
@@ -3155,7 +3193,7 @@ fn patch_caption_edge(
     aggregate_after.push(replacement_identifier);
     if let Some(style_identifier) = graph_style_identifier {
         if style_identifier == 0 || aggregate_before.contains(&style_identifier) {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         aggregate_after.push(style_identifier);
     }
@@ -3209,9 +3247,9 @@ fn insert_movie_caption_edge(
     if replacement_identifier == 0 {
         return Err(Error::InvalidSource);
     }
-    let outer = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_payload = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
-    let drawable = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let edge_field = match edge_kind {
         CaptionEdgeKind::Movie => 11,
         CaptionEdgeKind::MovieTitle => 10,
@@ -3243,13 +3281,8 @@ fn insert_movie_caption_edge(
         field.validate_canonical_framing().map_err(map_wire_error)?;
         drawable_output.extend_from_slice(field.raw());
     }
-    append_length_delimited_field_with_limits(
-        &mut drawable_output,
-        edge_field,
-        &reference_payload,
-        limits,
-    )
-    .map_err(map_wire_error)?;
+    append_length_delimited_field(&mut drawable_output, edge_field, &reference_payload, limits)
+        .map_err(map_wire_error)?;
 
     budget.charge_allocation(1, 0)?;
     let mut output = Vec::new();
@@ -3262,7 +3295,7 @@ fn insert_movie_caption_edge(
         field.validate_canonical_key().map_err(map_wire_error)?;
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if field.number() == 1 {
-            append_length_delimited_field_with_limits(&mut output, 1, &drawable_output, limits)
+            append_length_delimited_field(&mut output, 1, &drawable_output, limits)
                 .map_err(map_wire_error)?;
         } else {
             output.extend_from_slice(field.raw());
@@ -3976,7 +4009,7 @@ pub(super) fn caption_info_decode_options(
 
 fn copy_caption(value: &str) -> Result<String, Error> {
     if value.len() > MAX_CAPTION_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CaptionBytes,
             observed: usize_to_u64(value.len()),
             maximum: usize_to_u64(MAX_CAPTION_BYTES),
@@ -4005,27 +4038,39 @@ fn preview_count(catalog: &SourceCatalog) -> usize {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
 fn map_chart_title_error(error: super::slide_chart_title::Error) -> Error {
     match error {
-        super::slide_chart_title::Error::UnsupportedSource => Error::UnsupportedSource,
-        super::slide_chart_title::Error::AmbiguousSelector => Error::AmbiguousSelector,
-        super::slide_chart_title::Error::EmptySlideName => Error::EmptySlideName,
-        super::slide_chart_title::Error::SlideNameNotFound => Error::SlideNameNotFound,
-        super::slide_chart_title::Error::SlidePositionNotFound { position } => {
-            Error::SlidePositionNotFound { position }
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::AmbiguousSelector,
+        ) => Error::Refused(Refusal::AmbiguousSelector),
+        super::slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptySlideName) => {
+            Error::Refused(Refusal::EmptySlideName)
         },
-        super::slide_chart_title::Error::ChartNameNotFound => Error::ChartNameNotFound,
-        super::slide_chart_title::Error::ChartPositionNotFound { position } => {
-            Error::ChartPositionNotFound { position }
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::SlideNameNotFound,
+        ) => Error::Refused(Refusal::SlideNameNotFound),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::SlidePositionNotFound { position },
+        ) => Error::Refused(Refusal::SlidePositionNotFound { position }),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::ChartNameNotFound,
+        ) => Error::Refused(Refusal::ChartNameNotFound),
+        super::slide_chart_title::Error::Refused(
+            crate::chart::title::Refusal::ChartPositionNotFound { position },
+        ) => Error::Refused(Refusal::ChartPositionNotFound { position }),
+        super::slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptyChartName) => {
+            Error::Refused(Refusal::EmptyChartName)
         },
-        super::slide_chart_title::Error::EmptyChartName => Error::EmptyChartName,
-        super::slide_chart_title::Error::LimitExceeded {
+        super::slide_chart_title::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed,
             maximum,
@@ -4043,7 +4088,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -4071,7 +4116,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -4129,7 +4174,7 @@ fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4165,7 +4210,7 @@ fn map_graph_error(error: graph_codec::EncodeError) -> Error {
                 },
                 _ => return Error::InvalidSource,
             };
-            Error::LimitExceeded {
+            Error::Limit {
                 kind,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
@@ -4201,7 +4246,7 @@ fn map_slide_preview_budget_error(
         },
         super::slide_preview::BudgetedInvalidationError::BudgetExceeded {
             kind, observed, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::slide_preview::InvalidationBudgetKind::References => LimitKind::References,
                 super::slide_preview::InvalidationBudgetKind::Work => LimitKind::WireWork,
@@ -4230,7 +4275,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -4247,7 +4292,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -4268,7 +4313,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -4286,7 +4331,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn map_chart_caption_codec_error(error: keynote_chart_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4298,14 +4343,14 @@ fn map_chart_caption_codec_error(error: keynote_chart_caption_codec::DecodeError
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_chart_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: usize_to_u64(observed),
                     maximum: usize_to_u64(maximum),
                 }
             },
             keynote_chart_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -4315,14 +4360,14 @@ fn map_chart_caption_codec_error(error: keynote_chart_caption_codec::DecodeError
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4333,7 +4378,7 @@ fn map_chart_caption_codec_error(error: keynote_chart_caption_codec::DecodeError
 
 fn map_movie_caption_codec_error(error: keynote_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.output_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4345,14 +4390,14 @@ fn map_movie_caption_codec_error(error: keynote_movie_caption_codec::DecodeError
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
             keynote_movie_caption_codec::WireResourceLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: usize_to_u64(observed),
                     maximum: usize_to_u64(maximum),
                 }
             },
             keynote_movie_caption_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -4362,14 +4407,14 @@ fn map_movie_caption_codec_error(error: keynote_movie_caption_codec::DecodeError
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4380,21 +4425,21 @@ fn map_movie_caption_codec_error(error: keynote_movie_caption_codec::DecodeError
 
 pub(super) fn map_caption_info_codec_error(error: pages_movie_caption_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.message_byte_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -4405,12 +4450,16 @@ pub(super) fn map_caption_info_codec_error(error: pages_movie_caption_codec::Dec
 
 pub(super) fn map_slide_text_error(error: super::slide_text::Error) -> Error {
     match error {
-        super::slide_text::Error::UnsupportedSource => Error::UnsupportedSource,
-        super::slide_text::Error::DependentContent
-        | super::slide_text::Error::ObjectMarkerReplacement => Error::UnsupportedDependency,
-        super::slide_text::Error::LimitExceeded {
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        super::slide_text::Error::Refused(crate::slide::text::Refusal::DependentContent)
+        | super::slide_text::Error::Refused(crate::slide::text::Refusal::ObjectMarkerReplacement) => {
+            Error::Refused(Refusal::UnsupportedDependency)
+        },
+        super::slide_text::Error::Limit {
             observed, maximum, ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: LimitKind::WireWork,
             observed,
             maximum,

@@ -604,7 +604,7 @@ fn custom_registry_payload(family: CustomFamily, include_second: bool) -> Fixtur
         registry.custom_formats.push(custom_archive(family, true));
     }
     let encoded = registry.encode_to_vec();
-    let view = WireView::parse(&encoded)?;
+    let view = WireView::parse(&encoded, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(encoded.len().saturating_add(64));
     for field in view.fields() {
         if field.number() != 2 {
@@ -615,8 +615,18 @@ fn custom_registry_payload(family: CustomFamily, include_second: bool) -> Fixtur
         // A nested unknown record is intentionally attached to every
         // registry archive.  Focused rewrites must preserve it even when the
         // selected custom format is copied to a new UUID.
-        append_length_delimited_field(&mut archive, 94, b"custom-archive-extension")?;
-        append_length_delimited_field(&mut output, 2, &archive)?;
+        append_length_delimited_field(
+            &mut archive,
+            94,
+            b"custom-archive-extension",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut output,
+            2,
+            &archive,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
@@ -631,7 +641,12 @@ fn attach_custom_registry(
         // Keep unknown records both before and after the repeated custom
         // payloads.  They make registry rewrites prove order/span retention
         // instead of merely proving that one scalar survived.
-        append_length_delimited_field(&mut registry_data, 90, b"custom-registry-before")?;
+        append_length_delimited_field(
+            &mut registry_data,
+            90,
+            b"custom-registry-before",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         append_varint_field(&mut registry_data, 91, 0xc0de_0001)?;
     }
     let registry = object(CUSTOM_REGISTRY_ID, CUSTOM_FORMAT_LIST_TYPE, registry_data)?;
@@ -1546,21 +1561,26 @@ fn text_format_entry(key: u32, refcount: u32) -> tst::table_data_list::ListEntry
 }
 
 fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::new();
     for field in view.fields() {
         if field.number() != 3 {
             output.extend_from_slice(field.raw());
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut entry = Vec::new();
         let mut format_found = false;
         for entry_field in entry_view.fields() {
             if entry_field.number() == 6 && !format_found {
                 let mut format = entry_field.payload().to_vec();
                 append_varint_field(&mut format, UNKNOWN_EXTENSION_FIELD, 0x80_03)?;
-                append_length_delimited_field(&mut entry, 6, &format)?;
+                append_length_delimited_field(
+                    &mut entry,
+                    6,
+                    &format,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 format_found = true;
             } else {
                 entry.extend_from_slice(entry_field.raw());
@@ -1569,14 +1589,24 @@ fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u
         if !format_found {
             return Err(io::Error::other("format payload field is missing").into());
         }
-        append_length_delimited_field(&mut output, 3, &entry)?;
+        append_length_delimited_field(
+            &mut output,
+            3,
+            &entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(output)
 }
 
 fn unrelated_object() -> FixtureResult<ArchiveObject> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 89, b"untouched unrelated archive payload")?;
+    append_length_delimited_field(
+        &mut payload,
+        89,
+        b"untouched unrelated archive payload",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 90, 0x90_ee_7a)?;
     append_varint_field(&mut payload, 91, 0x91_ee_7a)?;
     object(UNRELATED_OBJECT_ID, 99_991, payload)
@@ -1584,7 +1614,12 @@ fn unrelated_object() -> FixtureResult<ArchiveObject> {
 
 fn view_state_object() -> FixtureResult<ArchiveObject> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 89, b"deterministic view state payload")?;
+    append_length_delimited_field(
+        &mut payload,
+        89,
+        b"deterministic view state payload",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 90, 0x80_ee_7a)?;
     object(VIEW_STATE_OBJECT_ID, 777, payload)
 }
@@ -1605,10 +1640,25 @@ fn metadata_object() -> FixtureResult<ArchiveObject> {
     )?;
     let view = metadata_component(300, "ViewState", 7, &[])?;
     let versioned = metadata_component(100, "Document", 3, &[0xfeed])?;
-    append_length_delimited_field(&mut data, 3, &document)?;
-    append_length_delimited_field(&mut data, 3, &tables)?;
-    append_length_delimited_field(&mut data, 3, &view)?;
-    append_length_delimited_field(&mut data, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut data,
+        3,
+        &tables,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(&mut data, 3, &view, litchi_iwa_common::WireLimits::DEFAULT)?;
+    append_length_delimited_field(
+        &mut data,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut data, 90, 0xa5_a5_a5)?;
     object(METADATA_OBJECT_ID, METADATA_TYPE, data)
 }
@@ -2352,13 +2402,13 @@ pub(crate) fn format_next_list_id(source: &[u8]) -> FixtureResult<u32> {
 /// assertions.
 pub(crate) fn format_payload_by_key(source: &[u8], key: u32) -> FixtureResult<Vec<u8>> {
     let payload = format_list_payload(source)?;
-    let list = WireView::parse(&payload)?;
+    let list = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     for field in list.fields().filter(|field| field.number() == 3) {
         let entry = tst::table_data_list::ListEntry::decode(field.payload())?;
         if entry.key != key {
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         return entry_view
             .fields()
             .find(|entry_field| entry_field.number() == 6)
@@ -2395,7 +2445,7 @@ pub(crate) fn custom_registry_facts(source: &[u8]) -> FixtureResult<Vec<((u64, u
 /// source spans remain available to preservation assertions.
 pub(crate) fn custom_archive_payload_by_name(source: &[u8], name: &str) -> FixtureResult<Vec<u8>> {
     let payload = custom_registry_payload_bytes(source)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     for field in view.fields().filter(|field| field.number() == 2) {
         let archive = tsk::CustomFormatArchive::decode(field.payload())?;
         if archive.name == name {
@@ -2434,7 +2484,7 @@ pub(crate) fn custom_format_descriptor(
 
 /// Return one exact raw extension record from a decoded format payload.
 pub(crate) fn unknown_field_record(payload: &[u8], field_number: u32) -> FixtureResult<Vec<u8>> {
-    WireView::parse(payload)?
+    WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .map(|field| field.raw().to_vec())
@@ -2515,7 +2565,7 @@ pub(crate) fn rewrite_format_payload_by_key(
     replacement: &[u8],
 ) -> FixtureResult<Vec<u8>> {
     rewrite_format_list_raw(source, |payload| {
-        let view = WireView::parse(payload)?;
+        let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut output = Vec::with_capacity(payload.len());
         let mut replaced = false;
         for field in view.fields() {
@@ -2528,12 +2578,18 @@ pub(crate) fn rewrite_format_payload_by_key(
                 output.extend_from_slice(field.raw());
                 continue;
             }
-            let entry_view = WireView::parse(field.payload())?;
+            let entry_view =
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut entry_output = Vec::with_capacity(field.payload().len());
             let mut format_found = false;
             for entry_field in entry_view.fields() {
                 if entry_field.number() == 6 && !format_found {
-                    append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                    append_length_delimited_field(
+                        &mut entry_output,
+                        6,
+                        replacement,
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     format_found = true;
                 } else {
                     entry_output.extend_from_slice(entry_field.raw());
@@ -2542,7 +2598,12 @@ pub(crate) fn rewrite_format_payload_by_key(
             if !format_found {
                 return Err(io::Error::other("format payload field is missing").into());
             }
-            append_length_delimited_field(&mut output, 3, &entry_output)?;
+            append_length_delimited_field(
+                &mut output,
+                3,
+                &entry_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         }
         if !replaced {
@@ -2617,12 +2678,12 @@ fn append_varint_unchecked(output: &mut Vec<u8>, field_number: u32, value: u64) 
 const UNKNOWN_EXTENSION_FIELD: u32 = 94;
 
 fn first_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let entry = view
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("format entry field is missing"))?;
-    WireView::parse(entry.payload())?
+    WireView::parse(entry.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 6)
         .map(|field| field.payload().to_vec())
@@ -2638,7 +2699,7 @@ fn rewrite_format_payload_by_key_from_payload(
     key: u32,
     replacement: &[u8],
 ) -> FixtureResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -2651,12 +2712,17 @@ fn rewrite_format_payload_by_key_from_payload(
             output.extend_from_slice(field.raw());
             continue;
         }
-        let entry_view = WireView::parse(field.payload())?;
+        let entry_view = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut entry_output = Vec::with_capacity(field.payload().len());
         let mut format_found = false;
         for entry_field in entry_view.fields() {
             if entry_field.number() == 6 && !format_found {
-                append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                append_length_delimited_field(
+                    &mut entry_output,
+                    6,
+                    replacement,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 format_found = true;
             } else {
                 entry_output.extend_from_slice(entry_field.raw());
@@ -2665,7 +2731,12 @@ fn rewrite_format_payload_by_key_from_payload(
         if !format_found {
             return Err(io::Error::other("format payload field is missing").into());
         }
-        append_length_delimited_field(&mut output, 3, &entry_output)?;
+        append_length_delimited_field(
+            &mut output,
+            3,
+            &entry_output,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         replaced = true;
     }
     if !replaced {

@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let movie = fs::read(&movie_path)?;
     let poster = fs::read(&poster_path)?;
 
-    let mut editor = pages::Editor::create_with_text(BODY_TEXT)?;
+    let mut editor = pages::Draft::create_with_text(BODY_TEXT)?;
     let created = editor.add_body_movie(
         BODY_TEXT.encode_utf16().count(),
         movie_filename,

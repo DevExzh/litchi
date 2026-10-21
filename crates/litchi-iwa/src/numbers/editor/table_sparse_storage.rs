@@ -41,7 +41,7 @@ struct HeaderBucketAllocation {
 /// buckets already exist, so an in-tile write preserves the existing object
 /// graph byte-for-byte except for the cell itself.
 pub(super) fn ensure_cell_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -50,7 +50,7 @@ pub(super) fn ensure_cell_storage(
 }
 
 pub(super) fn ensure_attached_cell_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -59,7 +59,7 @@ pub(super) fn ensure_attached_cell_storage(
 }
 
 pub(super) fn ensure_cells_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     coordinates: &[(usize, usize)],
 ) -> Result<()> {
@@ -71,7 +71,7 @@ pub(super) fn ensure_cells_storage(
 }
 
 pub(super) fn ensure_attached_cells_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     coordinates: &[(usize, usize)],
 ) -> Result<()> {
@@ -80,7 +80,7 @@ pub(super) fn ensure_attached_cells_storage(
 }
 
 fn ensure_descriptor_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     descriptor: &model::TableDescriptor,
     coordinates: &[(usize, usize)],
 ) -> Result<()> {
@@ -271,7 +271,7 @@ fn tile_references_by_key(model: &TableModelArchive) -> Result<HashMap<u32, u64>
 }
 
 fn update_model_storage_references(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     descriptor: &model::TableDescriptor,
     locations: &HashMap<u64, String>,
     tiles: &[TileAllocation],
@@ -628,7 +628,7 @@ fn rewrite_tree_nodes_wire(
 }
 
 fn register_storage_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     model_id: u64,
     locations: &HashMap<u64, String>,
     tiles: &[TileAllocation],

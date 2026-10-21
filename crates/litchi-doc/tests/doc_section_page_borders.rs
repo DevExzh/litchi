@@ -33,7 +33,7 @@
 )]
 
 use litchi_doc::{
-    ApplyTo, Art, Border, BorderError, Borders, Builder, Color, Depth, Offset, Style, raw::Package,
+    ApplyTo, Art, Border, BorderError, Borders, Builder, Color, Depth, Offset, Style, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -41,7 +41,7 @@ fn round_trip(writer: &mut Builder) -> litchi_doc::Section {
     writer.add_paragraph("Borders").unwrap();
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     package.document().unwrap().sections()[0].clone()
 }
 

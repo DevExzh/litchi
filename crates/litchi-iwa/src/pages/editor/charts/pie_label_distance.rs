@@ -7,7 +7,7 @@ use crate::charts::pie_label_distance::{
 };
 use crate::charts::{ChartPieLabelDistance, ChartPieWedgeIndex};
 
-impl Editor {
+impl Draft {
     /// Read every pie or donut wedge's label distance in chart-series order.
     pub fn body_chart_pie_label_distances(
         &self,
@@ -58,7 +58,7 @@ impl Editor {
 }
 
 fn body_chart_pie_label_distances(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartPieLabelDistance>> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
@@ -79,7 +79,7 @@ fn body_chart_pie_label_distances(
 }
 
 fn set_body_chart_pie_label_distances(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     distances: &[ChartPieLabelDistance],
 ) -> Result<()> {
@@ -116,7 +116,7 @@ fn set_body_chart_pie_label_distances(
         "Pages",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_pie_label_distances(drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Pages chart pie label-distance update failed validation".to_owned(),

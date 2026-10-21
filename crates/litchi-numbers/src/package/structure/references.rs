@@ -39,7 +39,8 @@ pub(in crate::package) fn reference_payload(identifier: u64) -> FaultResult<Vec<
 /// The identifier of a `TSP.Reference` payload. Records carrying anything but
 /// their identifier are refused: a structural edit never reinterprets them.
 pub(in crate::package) fn reference_identifier(payload: &[u8]) -> FaultResult<u64> {
-    let view = parse_wire_view(payload).map_err(|error| map_wire(&error))?;
+    let view = parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|error| map_wire(&error))?;
     if view
         .fields()
         .any(|field| field.number() != REFERENCE_IDENTIFIER_FIELD || field.wire_type() != 0)

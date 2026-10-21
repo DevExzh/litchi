@@ -7,7 +7,7 @@ use crate::charts::axis_label_position_3d::{
     set_chart_3d_value_axis_label_position as set_native_3d_value_axis_label_position,
 };
 
-impl Editor {
+impl Draft {
     /// Read one sheet chart's 3D primary value-axis label position.
     pub fn sheet_chart_3d_value_axis_label_position(
         &self,
@@ -51,7 +51,7 @@ impl Editor {
             graph.info.kind,
             position,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_3d_value_axis_label_position(sheet_id, drawable_object_id)?
             != position
         {

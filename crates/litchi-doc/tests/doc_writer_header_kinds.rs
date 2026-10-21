@@ -43,7 +43,7 @@ use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     HeaderFooterParagraph, HeaderFooterType, HeaderKind, ShapeHorizontalOrigin, ShapeTextWrap,
-    ShapeVerticalOrigin, raw::Package,
+    ShapeVerticalOrigin, raw::Reader,
 };
 use litchi_odraw::shape::Kind;
 use std::io::{Cursor, Write};
@@ -129,7 +129,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
 #[test]
 fn even_and_first_page_header_text_boxes_round_trip() {
     let doc_bytes = write_doc_with_even_and_first_boxes();
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     assert!(document.text().unwrap().contains("Body text"));
@@ -248,7 +248,7 @@ fn header_picture_round_trips_with_byte_identical_payload() {
     writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
-    let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(&doc_bytes)).unwrap();
     let document = package.document().unwrap();
 
     // Two picture runs (the main-story floating JPEG anchor and the header

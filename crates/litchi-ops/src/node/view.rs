@@ -397,7 +397,7 @@ pub(crate) enum Source<'a> {
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::Props<'a>),
     /// An object-tree node's values, aligned with its property table.
-    #[cfg(any(feature = "odf-objects", feature = "iwork-adapter"))]
+    #[cfg(any(odf_objects, feature = "iwork-adapter"))]
     Tree(&'a [Option<Value<'static>>]),
 }
 
@@ -436,7 +436,7 @@ impl<'a> Source<'a> {
             Self::Odt(ref props) => props.get(index),
             #[cfg(feature = "odp")]
             Self::Odp(ref props) => props.get(index),
-            #[cfg(any(feature = "odf-objects", feature = "iwork-adapter"))]
+            #[cfg(any(odf_objects, feature = "iwork-adapter"))]
             Self::Tree(values) => values.get(index)?.as_ref().map(Value::borrowed),
         }
     }
@@ -644,7 +644,7 @@ enum Inner<'n, 'f> {
     #[cfg(feature = "odp")]
     Odp(Box<crate::format::odp::children::Children<'f>>),
     /// The object-tree iterator walks one item's children.
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     Object(crate::format::odf_tree::children::Children<'f>),
     #[cfg(feature = "iwork-adapter")]
     Iwork(crate::format::iwork::children::Children<'f>),
@@ -742,7 +742,7 @@ impl<'n, 'f> Children<'n, 'f> {
     }
 
     /// An object-tree node's children.
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     pub(crate) const fn odf_tree(
         children: crate::format::odf_tree::children::Children<'f>,
     ) -> Self {
@@ -807,7 +807,7 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Odt(children) => children.next().map(|child| child.map(Node::Odt)),
             #[cfg(feature = "odp")]
             Inner::Odp(children) => children.next().map(|child| child.map(Node::Odp)),
-            #[cfg(feature = "odf-objects")]
+            #[cfg(odf_objects)]
             Inner::Object(children) => children.next().map(|child| child.map(Node::Object)),
             #[cfg(feature = "iwork-adapter")]
             Inner::Iwork(children) => children.next().map(|child| child.map(Node::Iwork)),

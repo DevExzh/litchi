@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("too many arguments".into());
     }
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     let layouts = editor.slide_layouts()?;
     let matches = layouts
         .iter()

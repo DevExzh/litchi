@@ -2,13 +2,13 @@
 //! compound file.
 //!
 //! A metadata transaction on an opened document reads the three sections
-//! through the shared [`Editor`], edits them as [`SummaryProperties`], and
+//! through the shared [`Edit`], edits them as [`SummaryProperties`], and
 //! stages back only the sections that changed. An unchanged section is never
 //! re-serialized, so an exact no-op leaves the editor without a staged stream
-//! and [`Editor::finish`] returns the source bytes.
+//! and [`Edit::finish`] returns the source bytes.
 
 use super::super::binding::Binding;
-use super::super::codec::Editor;
+use super::super::codec::Edit;
 use super::model::SummaryProperties;
 use litchi_cfb::OleError;
 
@@ -21,7 +21,7 @@ impl SummaryProperties {
     ///
     /// Returns an error if a stream cannot be parsed or a present standard
     /// section breaks its typed owner's invariants.
-    pub fn from_editor(editor: &Editor) -> Result<Self, OleError> {
+    pub fn from_editor(editor: &Edit) -> Result<Self, OleError> {
         let summary = editor.property_set(Binding::SummaryInformation)?;
         let document_summary = editor.property_set(Binding::DocumentSummaryInformation)?;
         let user_defined = editor.property_set(Binding::UserDefinedProperties)?;
@@ -43,7 +43,7 @@ impl SummaryProperties {
     ///
     /// Returns an error if the editor refuses a replacement (for example a
     /// source stream whose read repair would not preserve its content).
-    pub fn stage_changes(&self, base: &Self, editor: &mut Editor) -> Result<bool, OleError> {
+    pub fn stage_changes(&self, base: &Self, editor: &mut Edit) -> Result<bool, OleError> {
         let (summary, document_summary, user_defined) = self.sections();
         let (base_summary, base_document_summary, base_user_defined) = base.sections();
         let mut changed = false;

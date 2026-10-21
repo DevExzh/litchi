@@ -11,7 +11,7 @@ use crate::charts::series_symbol_fill::{
 use crate::charts::{ChartSeriesSymbolFill, Index};
 use crate::shapes::{RgbaColor, ShapeImageFill, ShapeImageFillTechnique};
 
-impl Editor {
+impl Draft {
     pub fn slide_chart_series_symbol_fills(
         &self,
         slide_index: usize,
@@ -79,7 +79,7 @@ impl Editor {
             count,
             series.zero_based(),
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_series_symbol_fill(slide_index, drawable_object_id, series)?
             != inherited
         {
@@ -124,7 +124,7 @@ impl Editor {
             fill_size,
             tint,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_series_symbol_fill(slide_index, drawable_object_id, series)?
             != ChartSeriesSymbolFill::Custom(crate::shapes::ShapeFill::Image(image.clone()))
         {
@@ -138,7 +138,7 @@ impl Editor {
 }
 
 fn read(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesSymbolFill>> {
@@ -154,7 +154,7 @@ fn read(
 }
 
 fn set(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     fills: &[ChartSeriesSymbolFill],
@@ -173,7 +173,7 @@ fn set(
         series_count(&graph, drawable_object_id)?,
         fills,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_symbol_fills(slide_index, drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Keynote chart data-symbol fill update failed validation".to_owned(),

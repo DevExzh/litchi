@@ -8,10 +8,10 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
-use litchi_cfb::{OleFile, OleFileLimits};
+use litchi_cfb::OleFile;
 use litchi_core::sheet::WorkbookTrait;
 use litchi_core::{FileFormat, Metadata};
-use litchi_xls::{Package, SourceBackedWorkbook, cell_values};
+use litchi_xls::{Package, SourceBackedWorkbook};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
@@ -379,24 +379,20 @@ impl Xls {
         Ok(self.owner().workbook().tolerance_report()?)
     }
 
-    /// Open the retained native cell-value engine after signature admission.
+    /// The retained editable package after signature admission (unsigned
+    /// first when removal is authorized): its `cell_values()` read view and
+    /// `edit()` stage the native cell-value engine.
     #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
-    pub(crate) fn cell_values_editor(&self) -> Result<cell_values::Snapshot> {
+    pub(crate) fn cell_values_editor(&self) -> Result<Package> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xls));
         }
-        let limits = litchi_ole_common::object::Limits::default();
         if self.0.signature() == Signature::RemovalAuthorized {
             let bytes = self.owner().source_bytes()?;
             let bytes = signature::unsign_compound_file(bytes, litchi_sign::cfb::Format::Xls)?;
-            return Ok(litchi_xls::raw::cell_values_snapshot_from_bytes(
-                self.owner(),
-                bytes,
-            )?);
+            return Ok(Package::from_bytes(&bytes)?);
         }
-        Ok(self
-            .owner()
-            .edit_snapshot_with_limits(limits, OleFileLimits::default())?)
+        Ok(self.owner().clone())
     }
 
     fn trait_workbook(&self) -> Result<&EagerWorkbook> {
@@ -738,7 +734,7 @@ mod tests {
             if !xls.is_source_backed() {
                 continue;
             }
-            let owner = SourceBackedWorkbook::from_path(&path).unwrap();
+            let owner = SourceBackedWorkbook::open(&path).unwrap();
             assert_same(xls.text(), owner.text(), &name);
             assert_same(xls.worksheet_names(), owner.worksheet_names(), &name);
             assert_same(xls.worksheet_count(), owner.worksheet_count(), &name);
@@ -1122,17 +1118,17 @@ mod tests {
     #[test]
     fn editors_are_built_from_the_retained_source() {
         let bytes = fixture("Simple.xls");
-        let oracle = cell_values::Snapshot::from_bytes(bytes.clone()).unwrap();
+        let oracle = Package::from_bytes(&bytes).unwrap().cell_values().unwrap();
 
         let eager = open_bytes(bytes).unwrap();
-        let editor = eager.cell_values_editor().unwrap();
+        let editor = eager.cell_values_editor().unwrap().cell_values().unwrap();
         assert_eq!(editor.bytes(), oracle.bytes());
         assert_eq!(editor.worksheet_count(), oracle.worksheet_count());
 
         #[cfg(any(unix, windows))]
         {
             let source = open_path(&fixture_path("Simple.xls"));
-            let editor = source.cell_values_editor().unwrap();
+            let editor = source.cell_values_editor().unwrap().cell_values().unwrap();
             assert_eq!(editor.bytes(), oracle.bytes());
             assert_eq!(editor.worksheet_count(), oracle.worksheet_count());
         }

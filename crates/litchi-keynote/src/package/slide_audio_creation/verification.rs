@@ -193,7 +193,7 @@ enum BuildEffect {
 /// Verify the complete graph produced by one fresh slide-audio publication.
 ///
 /// This witness is intentionally used for the initial candidate assembled by
-/// [`Package::add_slide_audio`].  A replay of an already-authorized exact
+/// [`crate::slide::audio::creation::Edit`].  A replay of an already-authorized exact
 /// artifact does not need to retain these private native identifiers: the
 /// artifact fingerprint and the package-level semantic checks are its source
 /// of truth.
@@ -874,7 +874,7 @@ fn verify_metadata(
 
 fn preserve_resource_error(error: SlideAudioCreationError) -> SlideAudioCreationError {
     match error {
-        error @ (SlideAudioCreationError::LimitExceeded { .. }
+        error @ (SlideAudioCreationError::Limit { .. }
         | SlideAudioCreationError::Allocation { .. }) => error,
         _ => SlideAudioCreationError::Verification,
     }
@@ -1451,8 +1451,8 @@ fn wire_view<'a>(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<WireView<'a>, SlideAudioCreationError> {
-    let view = WireView::parse_with_limits(payload, limits)
-        .map_err(|_| SlideAudioCreationError::Verification)?;
+    let view =
+        WireView::parse(payload, limits).map_err(|_| SlideAudioCreationError::Verification)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
     for field in view.fields() {

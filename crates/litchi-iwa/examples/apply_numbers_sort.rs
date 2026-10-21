@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     editor
         .tables()?
         .first()
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .commit()?;
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes)?;
-        editor = numbers::Editor::from_bytes(&bytes)?;
+        editor = numbers::Draft::from_bytes(&bytes)?;
     }
     editor.apply_table_sort_order(table)?;
     editor.save(output)?;

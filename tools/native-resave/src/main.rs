@@ -134,9 +134,9 @@ fn missing(message: &str) -> std::io::Error {
 #[cfg(feature = "doc")]
 fn generate_doc(output: &Path) -> Result<()> {
     let source = fixture("test-data/ole/doc/NoHeadFoot.doc");
-    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(source)?)?;
+    let snapshot = litchi_doc::Package::from_bytes(&fs::read(source)?)?;
     let paragraph = snapshot
-        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .body_paragraphs(litchi_doc::body_text::Projection::All)?
         .into_iter()
         .find(|paragraph| !paragraph.text().is_empty())
         .ok_or_else(|| missing("DOC has no nonempty ordinary paragraph"))?;
@@ -144,15 +144,15 @@ fn generate_doc(output: &Path) -> Result<()> {
     let mut edit = snapshot.edit()?;
     edit.replace_paragraph(paragraph.position(), SENTINEL)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().finish())?;
+    fs::write(output, commit.package().to_bytes()?)?;
     readback_doc(output)
 }
 
 #[cfg(feature = "doc")]
 fn readback_doc(input: &Path) -> Result<()> {
-    let snapshot = litchi_doc::body_text::Snapshot::from_bytes(fs::read(input)?)?;
+    let snapshot = litchi_doc::Package::from_bytes(&fs::read(input)?)?;
     let found = snapshot
-        .paragraphs(litchi_doc::body_text::Projection::All)?
+        .body_paragraphs(litchi_doc::body_text::Projection::All)?
         .into_iter()
         .any(|paragraph| paragraph.text() == SENTINEL);
     if !found {
@@ -360,7 +360,8 @@ fn readback_rtf(input: &Path) -> Result<()> {
 #[cfg(feature = "xls")]
 fn generate_xls(output: &Path) -> Result<()> {
     let source = fixture("test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(fs::read(source)?)?;
+    let package = litchi_xls::Package::from_bytes(&fs::read(source)?)?;
+    let snapshot = package.cell_values()?;
     let mut candidates = Vec::new();
     for sheet in snapshot.worksheets() {
         for cell in sheet.cells() {
@@ -371,7 +372,9 @@ fn generate_xls(output: &Path) -> Result<()> {
     }
     let mut changed = None;
     for (sheet, reference) in candidates {
-        let mut edit = snapshot.edit();
+        let Ok(mut edit) = package.edit() else {
+            continue;
+        };
         if edit
             .set_value(
                 litchi_xls::cell_values::Selector::Name(&sheet),
@@ -391,7 +394,7 @@ fn generate_xls(output: &Path) -> Result<()> {
             reference.row(),
             reference.column()
         );
-        changed = Some(commit.snapshot().bytes().to_vec());
+        changed = Some(commit.patch().after().to_vec());
         break;
     }
     fs::write(
@@ -403,7 +406,7 @@ fn generate_xls(output: &Path) -> Result<()> {
 
 #[cfg(feature = "xls")]
 fn readback_xls(input: &Path) -> Result<()> {
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(fs::read(input)?)?;
+    let snapshot = litchi_xls::Package::from_bytes(&fs::read(input)?)?.cell_values()?;
     let found = snapshot.worksheets().any(|sheet| {
         sheet.cells().any(|cell| {
             matches!(

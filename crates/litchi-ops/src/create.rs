@@ -244,7 +244,7 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
         .map(File::Odm);
     }
 
-    #[cfg(feature = "odf-objects")]
+    #[cfg(odf_objects)]
     if matches!(
         format,
         FileFormat::Odg | FileFormat::Odc | FileFormat::Odi | FileFormat::Odb | FileFormat::Odf

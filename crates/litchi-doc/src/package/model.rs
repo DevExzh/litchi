@@ -244,7 +244,7 @@ impl OpenOptions {
     ///     .max_aggregate_bytes(96 * 1024 * 1024)?
     ///     .build()?;
     /// let options = OpenOptions::default().source_limits(source_limits);
-    /// assert_eq!(options.get_source_limits(), source_limits);
+    /// assert_eq!(options.source_limits_value(), source_limits);
     /// # Ok::<(), litchi_doc::Error>(())
     /// ```
     #[must_use]
@@ -255,7 +255,7 @@ impl OpenOptions {
 
     /// Return the physical source limits selected for this open operation.
     #[must_use]
-    pub const fn get_source_limits(&self) -> SourceLimits {
+    pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
     }
 
@@ -275,7 +275,7 @@ impl OpenOptions {
 
     /// Return the stylesheet-defect policy selected for this open operation.
     #[must_use]
-    pub const fn get_leniency(&self) -> crate::leniency::Leniency {
+    pub const fn leniency_value(&self) -> crate::leniency::Leniency {
         self.leniency
     }
 
@@ -499,18 +499,20 @@ pub(crate) fn preflight_declared_streams<R: Read + Seek>(
     Ok(aggregate)
 }
 
-/// A Word (.doc) package.
+/// A cursor-backed reader of one Word (.doc) compound file.
 ///
-/// This is the main entry point for working with legacy Word documents.
-/// It wraps an OLE file and provides Word-specific functionality.
+/// This is the low-level, mutable codec reader (record 0351 §2.1 rule 6: a
+/// non-owner noun): its lazy stream and property-set readers take `&mut
+/// self` because they seek the underlying OLE file. The immutable owner is
+/// [`crate::Package`].
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_doc::raw::Package;
+/// use litchi_doc::raw::Reader;
 ///
 /// // Open an existing document
-/// let mut pkg = Package::open("document.doc")?;
+/// let mut pkg = Reader::open("document.doc")?;
 ///
 /// // Get the main document
 /// let doc = pkg.document()?;
@@ -520,17 +522,17 @@ pub(crate) fn preflight_declared_streams<R: Read + Seek>(
 /// println!("{}", text);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct RawPackage<R: Read + Seek = File> {
+pub struct Reader<R: Read + Seek = File> {
     /// The underlying OLE file
     pub(super) ole: OleFile<R>,
     /// Source limits inherited by [`Package::document`](super::Package::document).
     pub(super) source_limits: SourceLimits,
 }
 
-impl<R: Read + Seek> std::fmt::Debug for RawPackage<R> {
+impl<R: Read + Seek> std::fmt::Debug for Reader<R> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("RawPackage")
+            .debug_struct("Reader")
             .field("source_limits", &self.source_limits)
             .finish_non_exhaustive()
     }
@@ -550,7 +552,7 @@ pub(crate) struct EditProfile {
 
 /// An immutable, owned DOC package snapshot.
 ///
-/// The raw seek-cursor owner remains available under [`crate::package::raw`]
+/// The seek-cursor codec reader remains available as [`crate::raw::Reader`]
 /// for format-specific stream and property-set work. This owner is the
 /// canonical semantic package: its CFB index and parsed document projection
 /// are shared by clones and are never mutated in place.

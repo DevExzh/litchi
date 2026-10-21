@@ -12,7 +12,7 @@ fn checked_shift(value: u32, insertion: u32, what: &str) -> Result<u32> {
 }
 
 pub(super) fn shift_table_tile_columns(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     insertion: usize,
@@ -88,7 +88,7 @@ pub(super) fn shift_table_tile_columns(
 }
 
 pub(super) fn shift_column_headers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     insertion: usize,
@@ -182,7 +182,7 @@ pub(super) fn shift_column_headers(
 }
 
 pub(super) fn insert_column_uid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     old_columns: usize,
@@ -261,7 +261,7 @@ pub(super) fn insert_column_uid(
 }
 
 pub(super) fn set_table_column_count(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     columns: u32,

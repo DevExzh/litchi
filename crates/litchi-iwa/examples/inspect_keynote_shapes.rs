@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_shapes <input.key>")?;
-    let editor = keynote::Editor::open(input)?;
+    let editor = keynote::Draft::open(input)?;
     for slide in editor.slides()? {
         for (shape_index, shape) in editor.slide_shapes(slide.index)?.into_iter().enumerate() {
             let fill = editor.slide_shape_fill(slide.index, shape.drawable_object_id)?;

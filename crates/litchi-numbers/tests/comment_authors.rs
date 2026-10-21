@@ -48,7 +48,9 @@ fn field(number: u32, payload: &[u8]) -> Vec<u8> {
 
 /// Replace length-delimited field `number` (every occurrence) of `data`.
 fn replace_field(data: &[u8], number: u32, payload: &[u8]) -> Vec<u8> {
-    let view = litchi_iwa_common::wire::parse_wire_view(data).expect("wire");
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)
+            .expect("wire");
     let mut output = Vec::new();
     let mut done = false;
     for candidate in view.fields() {
@@ -69,7 +71,9 @@ fn replace_field(data: &[u8], number: u32, payload: &[u8]) -> Vec<u8> {
 
 /// The varint field `number` of `data` set to `value`.
 fn set_varint(data: &[u8], number: u32, value: u64) -> Vec<u8> {
-    let view = litchi_iwa_common::wire::parse_wire_view(data).expect("wire");
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)
+            .expect("wire");
     let mut output = Vec::new();
     for candidate in view.fields() {
         if candidate.number() == number {
@@ -193,7 +197,10 @@ fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
             if message.type_ != 11_006 {
                 continue;
             }
-            let view = litchi_iwa_common::wire::parse_wire_view(&message.data)?;
+            let view = litchi_iwa_common::wire::parse_wire_view(
+                &message.data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut output = Vec::new();
             for candidate in view.fields() {
                 if candidate.number() != 3 {

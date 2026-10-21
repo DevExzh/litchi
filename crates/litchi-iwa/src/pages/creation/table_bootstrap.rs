@@ -16,7 +16,7 @@ pub(in crate::pages) struct BootstrappedTableGraph {
 }
 
 pub(in crate::pages) fn bootstrap_first_table_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     body_storage_id: u64,
     name: &str,
     rows: usize,
@@ -66,7 +66,7 @@ pub(in crate::pages) fn bootstrap_first_table_graph(
     })
 }
 
-fn require_scratch_table_slots(package: &IWorkPackage, body_storage_id: u64) -> Result<()> {
+fn require_scratch_table_slots(package: &HostPackage, body_storage_id: u64) -> Result<()> {
     if body_storage_id != PagesObjectId::Body.value()
         || component_identifier_for_entry(package, DOCUMENT_ARCHIVE_ENTRY)?
             != Some(PagesObjectId::Document.value())
@@ -109,7 +109,7 @@ fn require_scratch_table_slots(package: &IWorkPackage, body_storage_id: u64) -> 
     Ok(())
 }
 
-fn patch_document_scaffolding(package: &mut IWorkPackage) -> Result<()> {
+fn patch_document_scaffolding(package: &mut HostPackage) -> Result<()> {
     package.update_archive(DOCUMENT_ARCHIVE_ENTRY, |archive| {
         let document = archive
             .object_mut(PagesObjectId::Document.value())
@@ -190,7 +190,7 @@ fn patch_document_scaffolding(package: &mut IWorkPackage) -> Result<()> {
     })
 }
 
-fn register_table_components(package: &mut IWorkPackage) -> Result<()> {
+fn register_table_components(package: &mut HostPackage) -> Result<()> {
     let document_component = PagesObjectId::Document.value();
     let stylesheet_component = PagesObjectId::Stylesheet.value();
     add_component_object_uuids(

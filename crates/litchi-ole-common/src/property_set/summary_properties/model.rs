@@ -130,16 +130,13 @@ impl SummaryProperties {
         F: for<'a> FnOnce(&mut summary_information::Edit<'a>) -> Result<(), OleError>,
     {
         let section = {
-            let mut transaction = self.summary.transaction()?;
-            {
-                let mut draft = transaction.edit();
-                edit(&mut draft)?;
-            }
-            let commit = transaction.commit()?;
-            if !commit.changed() {
+            let mut draft = self.summary.edit()?;
+            edit(&mut draft)?;
+            let commit = draft.commit()?;
+            if !commit.diagnostics().changed() {
                 return Ok(false);
             }
-            commit.into_section()
+            commit.into_package()
         };
         self.summary = summary_information::Snapshot { section };
         Ok(true)
@@ -162,16 +159,13 @@ impl SummaryProperties {
         F: for<'a> FnOnce(&mut document_summary::Edit<'a>) -> Result<(), OleError>,
     {
         let section = {
-            let mut transaction = self.document_summary.transaction()?;
-            {
-                let mut draft = transaction.edit();
-                edit(&mut draft)?;
-            }
-            let commit = transaction.commit()?;
-            if !commit.changed() {
+            let mut draft = self.document_summary.edit()?;
+            edit(&mut draft)?;
+            let commit = draft.commit()?;
+            if !commit.diagnostics().changed() {
                 return Ok(false);
             }
-            commit.into_section()
+            commit.into_package()
         };
         // The typed owner checks string lengths but leaves representability
         // to serialization; check it here so an unwritable value is refused

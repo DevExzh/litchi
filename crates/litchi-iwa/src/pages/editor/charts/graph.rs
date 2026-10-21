@@ -40,7 +40,7 @@ pub(super) struct BodyChartArchiveGroup {
     pub(super) uuid_object_ids: Vec<u64>,
 }
 
-pub(super) fn body_chart_infos(editor: &Editor) -> Result<Vec<BodyChartInfo>> {
+pub(super) fn body_chart_infos(editor: &Draft) -> Result<Vec<BodyChartInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -91,7 +91,7 @@ pub(super) fn body_chart_infos(editor: &Editor) -> Result<Vec<BodyChartInfo>> {
     Ok(charts)
 }
 
-pub(super) fn body_chart_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyChartGraph> {
+pub(super) fn body_chart_graph(editor: &Draft, drawable_object_id: u64) -> Result<BodyChartGraph> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -584,7 +584,7 @@ pub(super) fn body_chart_graph(editor: &Editor, drawable_object_id: u64) -> Resu
     })
 }
 
-fn chart_reference_owner_counts(package: &IWorkPackage) -> Result<HashMap<u64, usize>> {
+fn chart_reference_owner_counts(package: &HostPackage) -> Result<HashMap<u64, usize>> {
     let mut counts = HashMap::new();
     for archive_name in package.iwa_entry_names() {
         for object in &package.archive(archive_name)?.objects {
@@ -636,7 +636,7 @@ pub(super) fn chart_attachment_object(
 }
 
 pub(super) fn set_chart_attachment_position(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     attachment_id: u64,
     position: DrawablePoint,
@@ -701,7 +701,7 @@ fn required_chart_reference(
 }
 
 fn object_has_message_type(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
 ) -> Result<bool> {

@@ -26,7 +26,7 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     let directory = tempdir()?;
 
     let pages_path = directory.path().join("generated.pages");
-    pages::Editor::create_with_text("Generated Pages verification document")?.save(&pages_path)?;
+    pages::Draft::create_with_text("Generated Pages verification document")?.save(&pages_path)?;
     verify_package(&pages_path, Application::Pages)?;
 
     let numbers_path = directory.path().join("generated.numbers");
@@ -76,7 +76,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
 
     match expected {
         Application::Pages => {
-            pages::Editor::open(path)?;
+            pages::Draft::open(path)?;
             let specialized = litchi_pages::Package::open(path)?.document();
             let snapshot = specialized.clone();
             let specialized_stats = specialized
@@ -114,7 +114,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
             );
         },
         Application::Numbers => {
-            numbers::Editor::open(path)?;
+            numbers::Draft::open(path)?;
             let specialized = NumbersSemanticDocument::open(path)?;
             let snapshot = specialized.snapshot();
             let specialized_stats = specialized
@@ -158,7 +158,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
             );
         },
         Application::Keynote => {
-            keynote::Editor::open(path)?;
+            keynote::Draft::open(path)?;
             let specialized = KeynotePackage::open(path)?;
             let snapshot = specialized.snapshot();
             let specialized_stats = specialized.stats()?;

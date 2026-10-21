@@ -70,7 +70,7 @@ pub(crate) fn staging_error(error: litchi_core::Error) -> Error {
 /// neither keep nor replace (record 0304) stays `unsupported_capability`.
 fn text_error(error: litchi_core::Error) -> Error {
     match error {
-        litchi_core::Error::Unsupported(_) => core_error(error),
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_) => core_error(error),
         other => staging_error(other),
     }
 }

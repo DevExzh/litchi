@@ -1,12 +1,13 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
-use super::{Error, Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot};
+use super::transaction::{Error, Snapshot};
+use super::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
 use crate::builder::Builder;
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
-use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
@@ -110,7 +111,7 @@ fn transaction_supports_revision_metadata_crud_and_replacement() {
 
     let mut transaction = source.edit().unwrap();
     let replacement = transaction
-        .replace_metadata(
+        .replace(
             index,
             RevisionMetadata::new("Replacement")
                 .with_reason(0x2b)

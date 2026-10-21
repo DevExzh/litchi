@@ -7,7 +7,7 @@ use super::*;
 const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
 
 pub(super) fn clear_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: CellLocation,
     row: usize,
     column: usize,
@@ -76,7 +76,7 @@ pub(super) fn clear_at_location(
 }
 
 fn conditional_style_owned_object_ids(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     style_set_id: u64,
 ) -> Result<Vec<u64>> {

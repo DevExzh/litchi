@@ -1092,10 +1092,12 @@ fn lower<'text>(
             for argument in arguments {
                 lower(argument.root(), owner, output, path)?;
             }
-            let identifier = function_identifier(name).ok_or(Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            })?;
+            let identifier = function_identifier(name).ok_or(Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            ))?;
             output.push(FormulaWriteNode::Function {
                 identifier,
                 argument_count: u32::try_from(arguments.len())
@@ -1359,13 +1361,15 @@ fn map_codec(error: codec::DecodeError, path: Path) -> Error {
             };
         },
         None => {
-            return Error::UnsupportedDependency {
-                path,
-                kind: crate::package::table_cells::DependencyKind::Formula,
-            };
+            return Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: crate::package::table_cells::DependencyKind::Formula,
+                },
+            );
         },
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: as_u64(observed),
         maximum: as_u64(maximum),

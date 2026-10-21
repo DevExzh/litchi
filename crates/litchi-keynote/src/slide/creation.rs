@@ -26,11 +26,12 @@
 //! component and reference only that component, the document, the document
 //! stylesheet and their layout; layouts with placeholders, text boxes,
 //! images, live-video and media-placeholder movies. Refused with
-//! [`Error::UnsupportedContent`]: slides with tables, charts or other
+//! [`Refusal::UnsupportedContent`]: slides with tables, charts or other
 //! content stored in other components or held by native messages without a
 //! reference schema, layouts with build or notes state, and decks with no
 //! speaker-notes graph to reuse for a fresh slide.
 
 pub use crate::package::slide_creation::{
-    Commit, Diagnostics, Edit, Error, Layout, LayoutSelector, LimitKind, Patch, Unsupported,
+    Commit, Diagnostics, Edit, Error, Layout, LayoutSelector, LimitKind, Patch, Refusal,
+    Unsupported,
 };

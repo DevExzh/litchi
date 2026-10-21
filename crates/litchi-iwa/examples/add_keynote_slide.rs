@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = arguments.next().ok_or("missing output path")?;
     let requested: Option<usize> = arguments.next().map(|value| value.parse()).transpose()?;
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     let layouts = editor.slide_layouts()?;
     let layout = match requested {
         Some(index) => layouts.get(index).ok_or("layout index is out of range")?,

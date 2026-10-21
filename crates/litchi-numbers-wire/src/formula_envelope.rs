@@ -6,7 +6,7 @@
 //! this crate only reports successful work and the cost attempted by a failed
 //! scan.
 
-use litchi_iwa_common::wire::{WireDescent, WirePreflight, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, WirePreflight, preflight_wire_tree};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_protos::numbers_formula_codec;
 
@@ -307,7 +307,7 @@ pub fn preflight_formula_envelope(
     let mut lazy_traversal_entry_count = 0usize;
     let mut root_known_fields = [0u32; 9];
     let mut root_known_field_count = 0usize;
-    let preflight = preflight_wire_tree_with_limits(source, scan_limits, |visit| {
+    let preflight = preflight_wire_tree(source, scan_limits, |visit| {
         let field = visit.field();
         attempted.charge_field(envelope_limits.max_fields)?;
         field.validate_canonical_framing()?;
@@ -558,7 +558,7 @@ fn required_formula_ast_node_type(source: &[u8]) -> litchi_iwa_common::Result<()
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(1))?;
     let mut found = false;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         field.validate_canonical_framing()?;
         if field.number() == 1 {
@@ -602,7 +602,7 @@ fn require_formula_fields(
     let mut seen = [false; 8];
     let mut known_fields = [0u32; 64];
     let mut known_field_count = 0usize;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         field.validate_canonical_framing()?;
         let schema = formula_envelope_field(message_path, field.number());

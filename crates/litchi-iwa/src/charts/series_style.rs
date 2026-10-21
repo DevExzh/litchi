@@ -10,7 +10,7 @@ use crate::charts::source::{CHART_MESSAGE_TYPE, SERIES_STYLE_MESSAGE_TYPE};
 use crate::charts::unique_chart_object_archive_name;
 use crate::protobuf::tsch;
 use crate::wire::parse_wire_fields;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// Proto2 extension holding generated chart-series style properties.
 pub(crate) const GENERATED_CHART_SERIES_STYLE_EXTENSION_FIELD: u32 = 10_000;
@@ -30,7 +30,7 @@ pub(crate) struct ChartSeriesStyleSlot {
 /// charts generally own their theme-style objects directly and have no
 /// private overlays.
 pub(crate) fn chart_series_style_slots(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -140,7 +140,7 @@ pub(crate) fn chart_series_style_slots(
 
 /// Resolve the effective style slot for every data series.
 pub(crate) fn effective_chart_series_style_slots(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -173,7 +173,7 @@ impl ChartSeriesStyleSlot {
 
     pub(crate) fn read<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl FnOnce(&[u8]) -> Result<T>,
     ) -> Result<T> {
         package.with_parsed_archive(&self.archive_name, |archive| {
@@ -203,7 +203,7 @@ impl ChartSeriesStyleSlot {
     /// current style does not define the requested property.
     pub(crate) fn read_inherited<T>(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         read: impl Fn(&[u8]) -> Result<Option<T>> + Copy,
     ) -> Result<Option<T>> {
         let mut identifier = self.object_id;
@@ -260,7 +260,7 @@ impl ChartSeriesStyleSlot {
     /// Reject a mutation that would silently affect another chart.
     pub(crate) fn ensure_exclusive(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         drawable_object_id: u64,
         drawable_label: &str,
     ) -> Result<()> {
@@ -309,7 +309,7 @@ impl ChartSeriesStyleSlot {
 
     pub(crate) fn update(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         patch: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<()> {
         package.update_archive(&self.archive_name, |archive| {

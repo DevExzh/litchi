@@ -84,13 +84,13 @@ impl EditOptions {
 
     /// Return the requested object-capture bounds.
     #[must_use]
-    pub const fn get_object_limits(&self) -> ObjectLimits {
+    pub const fn object_limits_value(&self) -> ObjectLimits {
         self.object_limits
     }
 
     /// Return the requested CFB admission bounds.
     #[must_use]
-    pub const fn get_cfb_limits(&self) -> OleFileLimits {
+    pub const fn cfb_limits_value(&self) -> OleFileLimits {
         self.cfb_limits
     }
 }
@@ -205,6 +205,16 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    const fn applied(changed: bool, operation_count: usize) -> Self {
+        Self {
+            changed,
+            operation_count,
+            changed_cells: 0,
+            changed_number_fields: 0,
+            touched_streams: 0,
+        }
+    }
+
     fn from_leaf(value: cell_values::Diagnostics, operation_count: usize) -> Self {
         Self {
             changed: value.changed(),
@@ -310,6 +320,15 @@ impl Patch {
         Self::from_leaf(self.inner.inverse())
     }
 
+    /// The durable, reversible semantic patch: deterministic JSON
+    /// ([`cell_values::SemanticPatch::to_deterministic_json`]), replayed with
+    /// [`Package::apply_semantic`], merged with [`Package::plan_three_way`]
+    /// and transferred with [`Package::plan_transfer`].
+    #[must_use]
+    pub fn semantic(&self) -> &cell_values::SemanticPatch {
+        self.inner.semantic()
+    }
+
     pub(crate) fn leaf(&self) -> &cell_values::Patch {
         &self.inner
     }
@@ -364,6 +383,39 @@ impl Commit {
     pub fn into_parts(self) -> (Package, Patch) {
         (self.package, self.patch)
     }
+    /// Record this commit's package in `history` as its next state, weighted
+    /// by the patch's before and after artifact lengths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the history's current package
+    /// is not this commit's source, and a refusal when the history cannot
+    /// hold it.
+    pub fn record_in(self, history: &mut crate::package::History) -> Result<Vec<Package>> {
+        if history
+            .current()
+            .to_bytes()
+            .map_err(Error::Package)?
+            .as_slice()
+            != self.patch.before()
+        {
+            return Err(Error::PatchConflict);
+        }
+        let weight = u64::try_from(self.patch.before().len())
+            .ok()
+            .zip(u64::try_from(self.patch.after().len()).ok())
+            .and_then(|(before, after)| before.checked_add(after))
+            .ok_or(Error::CellValues(crate::Error::Internal(
+                "XLS history weight overflow",
+            )))?;
+        history.record(self.package, weight).map_err(|_error| {
+            Error::CellValues(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "the cell edit history cannot record this commit",
+            ))
+        })
+    }
 }
 
 /// Detached primary XLS edit backed by the checked cell-values snapshot.
@@ -399,7 +451,7 @@ impl Edit {
         super::ensure_publication_allowed(&package.inner).map_err(Error::Package)?;
         let source_guard = capture_source_guard(&package)?;
         let snapshot = package
-            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .edit_snapshot_with_options(options)
             .map_err(Error::Package)?;
         check_source_guard(source_guard.as_ref())?;
         let inner = snapshot.edit();
@@ -409,6 +461,37 @@ impl Edit {
             options,
             source_guard,
         })
+    }
+
+    /// A primary edit of `package` over a leaf edit already staged from its
+    /// cell-value snapshot (a semantic replay or transfer).
+    pub(crate) fn from_leaf(
+        package: Package,
+        inner: cell_values::Edit,
+        options: EditOptions,
+    ) -> Result<Self> {
+        let source_guard = capture_source_guard(&package)?;
+        Ok(Self {
+            package,
+            inner,
+            options,
+            source_guard,
+        })
+    }
+
+    /// Join another edit of the same source package when the two are provably
+    /// disjoint; the joined edit commits both atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the structured join refusal with the rejected edit's
+    /// conflicts.
+    pub fn join(
+        &mut self,
+        incoming: Self,
+    ) -> std::result::Result<&mut Self, cell_values::JoinError> {
+        self.inner.join(incoming.inner)?;
+        Ok(self)
     }
 
     /// Immutable package that authorized this edit.
@@ -495,7 +578,7 @@ impl Edit {
     ) -> Result<Option<&mut Self>> {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
-        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let donor = donor.edit_snapshot_with_options(options)?;
         let mut candidate = self.inner.clone();
         let copied = candidate
             .copy_scalar_cells_from(
@@ -525,7 +608,7 @@ impl Edit {
     ) -> Result<Option<&mut Self>> {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
-        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let donor = donor.edit_snapshot_with_options(options)?;
         let mut candidate = self.inner.clone();
         let copied = candidate
             .copy_scalar_cell_from(
@@ -630,8 +713,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Write one formula cell, replacing an existing scalar cell in place;
-    /// see [`cell_values::Edit::set_formula`].
+    /// Write one formula cell, replacing an existing scalar cell in place.
     ///
     /// # Errors
     ///
@@ -648,8 +730,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Set one row's height in twips and mark it custom; see
-    /// [`cell_values::Edit::set_row_height`].
+    /// Set one row's height in twips and mark it custom.
     ///
     /// # Errors
     ///
@@ -665,7 +746,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Hide or show one row; see [`cell_values::Edit::set_row_hidden`].
+    /// Hide or show one row.
     ///
     /// # Errors
     ///
@@ -681,8 +762,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Set one column's width in 1/256 character; see
-    /// [`cell_values::Edit::set_column_width`].
+    /// Set one column's width in 1/256 character.
     ///
     /// # Errors
     ///
@@ -699,7 +779,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Hide or show one column; see [`cell_values::Edit::set_column_hidden`].
+    /// Hide or show one column.
     ///
     /// # Errors
     ///
@@ -716,8 +796,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Change one cell's alignment, border styles or fill; see
-    /// [`cell_values::Edit::set_cell_format`].
+    /// Change one cell's alignment, border styles or fill.
     ///
     /// # Errors
     ///
@@ -829,8 +908,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Reorder the complete tab catalog; see
-    /// [`cell_values::Edit::reorder_sheets`]. The identity order is an exact
+    /// Reorder the complete tab catalog. The identity order is an exact
     /// no-op, and a tab-structure change must be the only operation of its
     /// edit.
     ///
@@ -860,8 +938,7 @@ impl Edit {
         self.inner.reorder_sheets(order).map_err(Error::from)
     }
 
-    /// Insert one empty worksheet at a complete-catalog position; see
-    /// [`cell_values::Edit::insert_sheet`].
+    /// Insert one empty worksheet at a complete-catalog position.
     ///
     /// # Errors
     ///
@@ -871,8 +948,7 @@ impl Edit {
         self.inner.insert_sheet(position, name).map_err(Error::from)
     }
 
-    /// Remove one ordinary worksheet tab; see
-    /// [`cell_values::Edit::remove_sheet`].
+    /// Remove one ordinary worksheet tab.
     ///
     /// # Errors
     ///
@@ -913,6 +989,17 @@ impl Edit {
 }
 
 impl Package {
+    /// The cell-value snapshot an edit of this package starts from, with
+    /// the retained edit options.
+    pub(crate) fn cell_source(&self) -> Result<(cell_values::Snapshot, EditOptions)> {
+        super::ensure_publication_allowed(&self.inner).map_err(Error::Package)?;
+        let options = self.retained_edit_options()?;
+        let snapshot = self
+            .edit_snapshot_with_options(options)
+            .map_err(Error::Package)?;
+        Ok((snapshot, options))
+    }
+
     fn retained_edit_options(&self) -> Result<EditOptions> {
         if let Some(snapshot) = &self.inner.edit_snapshot {
             return Ok(EditOptions::new()
@@ -943,7 +1030,7 @@ impl Package {
     }
 
     /// Apply a primary exact-source patch without mutating this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         super::ensure_publication_allowed(&self.inner).map_err(Error::Package)?;
         let guard = capture_source_guard(self)?;
         let matches = if let Some(snapshot) = &self.inner.edit_snapshot {
@@ -957,17 +1044,25 @@ impl Package {
         }
         if patch.is_noop() {
             check_source_guard(guard.as_ref())?;
-            return Ok(self.clone());
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::applied(false, patch.operation_count()),
+            });
         }
         let options = self.retained_edit_options()?;
         let snapshot = self
-            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .edit_snapshot_with_options(options)
             .map_err(Error::Package)?;
         let target = patch.leaf().apply(&snapshot).map_err(Error::from)?;
         check_source_guard(guard.as_ref())?;
         let package = package_from_snapshot(self, target)?;
         check_source_guard(guard.as_ref())?;
-        Ok(package)
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::applied(true, patch.operation_count()),
+        })
     }
 }
 
@@ -1040,8 +1135,8 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
             cfb,
             crate::SourceBackedOptions::default()
-                .with_limits(limits)
-                .with_leniency(leniency),
+                .limits(limits)
+                .leniency(leniency),
         )
         .map_err(PackageError::Source)?;
         let mut package = Package::from_source(workbook)?;

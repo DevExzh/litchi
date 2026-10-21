@@ -215,26 +215,27 @@ fn annotation_author_registry(source: &[u8]) -> TestResult<RegistrySnapshot> {
                         author_objects.insert(identifier);
                     },
                     ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE => {
-                        let references = WireView::parse(&message.data)?
-                            .fields()
-                            .filter(|field| field.number() == 1)
-                            .map(|field| {
-                                if field.wire_type() != 2 {
-                                    return Err(io::Error::other(
-                                        "author registry reference has the wrong wire type",
-                                    )
-                                    .into());
-                                }
-                                let reference = tsp::Reference::decode(field.payload())?;
-                                if reference.identifier == 0 {
-                                    return Err(io::Error::other(
-                                        "author registry contains a zero identifier",
-                                    )
-                                    .into());
-                                }
-                                Ok(reference.identifier)
-                            })
-                            .collect::<TestResult<Vec<_>>>()?;
+                        let references =
+                            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
+                                .fields()
+                                .filter(|field| field.number() == 1)
+                                .map(|field| {
+                                    if field.wire_type() != 2 {
+                                        return Err(io::Error::other(
+                                            "author registry reference has the wrong wire type",
+                                        )
+                                        .into());
+                                    }
+                                    let reference = tsp::Reference::decode(field.payload())?;
+                                    if reference.identifier == 0 {
+                                        return Err(io::Error::other(
+                                            "author registry contains a zero identifier",
+                                        )
+                                        .into());
+                                    }
+                                    Ok(reference.identifier)
+                                })
+                                .collect::<TestResult<Vec<_>>>()?;
                         storage_references.insert(identifier, references);
                     },
                     _ => {},
@@ -267,7 +268,7 @@ fn document_root_payload(source: &[u8]) -> TestResult<Vec<u8>> {
 fn reference_at_path(payload: &[u8], path: &[u32]) -> TestResult<u64> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -386,6 +387,7 @@ fn mutate_root_storage_reference(source: &[u8], mutation: RootMutation) -> TestR
                                         &mut output,
                                         TSK_ANNOTATION_AUTHOR_STORAGE_FIELD,
                                         &replacement,
+                                        litchi_iwa_common::WireLimits::DEFAULT,
                                     )?;
                                     Ok(output)
                                 },

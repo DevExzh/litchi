@@ -7,7 +7,7 @@
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
-use litchi_iwa_common::wire::{WireField, parse_wire_fields_with_limits};
+use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 
 use super::schema::{Field, MESSAGES, Slot, root};
 
@@ -103,7 +103,7 @@ fn visit_message(
     if depth > MAX_DEPTH {
         return Err(RefError::Depth);
     }
-    for field in parse_wire_fields_with_limits(payload, limits)? {
+    for field in parse_wire_fields(payload, limits)? {
         let Some(schema) = schema_field(index, field.number()) else {
             continue;
         };
@@ -127,7 +127,7 @@ fn rewrite_message(
     if depth > MAX_DEPTH {
         return Err(RefError::Depth);
     }
-    let fields = parse_wire_fields_with_limits(payload, limits)?;
+    let fields = parse_wire_fields(payload, limits)?;
     let mut output: Option<Vec<u8>> = None;
     for (position, field) in fields.iter().enumerate() {
         let replacement = match schema_field(index, field.number()) {
@@ -172,7 +172,7 @@ fn length_delimited(field: WireField, payload: &[u8]) -> Result<&[u8], RefError>
 /// The identifier (field 1) of a `TSP.Reference` / `TSP.DataReference`.
 fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, RefError> {
     let mut identifier = None;
-    for field in parse_wire_fields_with_limits(payload, limits)? {
+    for field in parse_wire_fields(payload, limits)? {
         if field.number() == 1 {
             if field.wire_type() != WIRE_VARINT || identifier.is_some() {
                 return Err(RefError::Malformed);
@@ -202,7 +202,7 @@ fn rewrite_reference(
         return Ok(None);
     }
     let mut output = Vec::with_capacity(payload.len() + 4);
-    for field in parse_wire_fields_with_limits(payload, limits)? {
+    for field in parse_wire_fields(payload, limits)? {
         if field.number() == 1 {
             output.push(0x08);
             encode_varint_into(&mut output, replacement);

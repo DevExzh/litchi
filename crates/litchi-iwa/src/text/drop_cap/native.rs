@@ -5,7 +5,7 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::{tsp, tss, tswp};
 use crate::wire::{parse_wire_fields, repeated_length_delimited_payloads};
-use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
+use crate::{Error, HostPackage, IWorkThemeArchive, Result};
 
 use crate::text::style_registry::{object_archive, object_archive_name};
 use litchi_iwa_text::paragraph::drop_cap::{
@@ -53,7 +53,7 @@ pub(super) struct DropCapBaseStyle {
     pub(super) identifier: u64,
 }
 
-pub(super) fn locate_style(package: &IWorkPackage, style_id: u64) -> Result<DropCapStyleLocation> {
+pub(super) fn locate_style(package: &HostPackage, style_id: u64) -> Result<DropCapStyleLocation> {
     let (archive_name, archive) = object_archive(package, style_id)?;
     let object = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork Drop Cap style {style_id} is missing"))
@@ -112,7 +112,7 @@ pub(super) fn plain_text_model(style_id: u64, location: &DropCapStyleLocation) -
     Ok(drop_cap)
 }
 
-pub(super) fn base_style(package: &IWorkPackage, stylesheet_id: u64) -> Result<DropCapBaseStyle> {
+pub(super) fn base_style(package: &HostPackage, stylesheet_id: u64) -> Result<DropCapBaseStyle> {
     let archive_name = object_archive_name(package, stylesheet_id)?;
     let mut identifiers = Vec::new();
     for candidate_archive_name in package.iwa_entry_names() {
@@ -207,7 +207,7 @@ pub(super) fn variation_object(
 }
 
 pub(super) fn replace_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &DropCapStyleLocation,
     mut replacement: ArchiveObject,
 ) -> Result<()> {
@@ -279,7 +279,7 @@ pub(super) fn replace_variation(
     })
 }
 
-pub(super) fn is_exclusive(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+pub(super) fn is_exclusive(package: &HostPackage, style_id: u64) -> Result<bool> {
     let mut storage_references = 0usize;
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
@@ -532,7 +532,7 @@ mod tests {
         let archive = crate::archive::Archive {
             objects: vec![object],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package.replace_archive("Index/One.iwa", &archive).unwrap();
 
         let location = locate_style(&package, 9).unwrap();

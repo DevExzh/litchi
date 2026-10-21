@@ -33,12 +33,12 @@ impl Revision {
 
 /// An isolated, failure-atomic edit over one directory snapshot.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Catalog,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.catalog_clone(),
@@ -65,7 +65,7 @@ impl Transaction {
 
     /// Whether the current raw directory catalog differs from the source.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         !self.candidate.raw_equal(self.source.catalog())
     }
 
@@ -253,22 +253,6 @@ impl Transaction {
         self.update_raw(edit)
     }
 
-    /// Captures the current candidate as a validated snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a changed candidate no longer validates under the
-    /// transaction's retained CFB resource limits.
-    pub fn snapshot(&self) -> Result<Snapshot, OleError> {
-        self.materialize()
-    }
-
-    /// Discards the candidate and returns its source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Validates and publishes the candidate without mutating its source.
     ///
     /// # Errors
@@ -278,7 +262,8 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit, OleError> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(&self.source, &snapshot);
-        Ok(Commit { snapshot, patch })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn update_raw<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
@@ -306,7 +291,7 @@ impl Transaction {
     }
 
     fn materialize(&self) -> Result<Snapshot, OleError> {
-        if !self.is_changed() {
+        if !self.has_changes() {
             return Ok(self.source.clone());
         }
         let catalog = Catalog::from_entries_shared(
@@ -317,50 +302,12 @@ impl Transaction {
     }
 }
 
-/// A successful directory publication containing its reversible patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    /// Whether the raw directory source changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.is_noop()
-    }
-
-    /// Borrows the committed snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrows the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Consumes the commit into its patch.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-
-    /// Splits the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// Runs one source-checked directory edit atomically.
 ///
@@ -370,7 +317,7 @@ impl Commit {
 /// the snapshot's retained resource limits.
 pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, OleError>
 where
-    F: FnOnce(&mut Transaction) -> Result<(), OleError>,
+    F: FnOnce(&mut Edit) -> Result<(), OleError>,
 {
     let mut transaction = snapshot.edit();
     edit(&mut transaction)?;

@@ -11,7 +11,7 @@ pub(super) struct ChartThemeContext {
 }
 
 pub(super) fn chart_theme_context(
-    package: &IWorkPackage,
+    package: &HostPackage,
     graph: &ObjectGraph,
     theme_id: u64,
 ) -> Result<ChartThemeContext> {
@@ -70,7 +70,7 @@ pub(super) fn chart_theme_context(
 }
 
 pub(super) fn patch_theme_chart_preset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     context: &ChartThemeContext,
     previous: Option<u64>,
     replacement: Option<u64>,

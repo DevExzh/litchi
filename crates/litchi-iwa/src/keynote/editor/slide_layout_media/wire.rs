@@ -8,7 +8,7 @@ const SLIDE_DRAWABLES_Z_ORDER_FIELD: u32 = 42;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn rewrite_slide_media_roots(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     slide_id: u64,
     remove: &[u64],

@@ -9,10 +9,10 @@
 //! (notes and comments by index, one malformed comment failing only itself).
 
 use litchi_core::Position;
-use litchi_doc::raw::Package;
+use litchi_doc::raw::Reader;
 use litchi_doc::writer::{Builder, CommentEntry};
 use litchi_doc::{Document, Error, HeaderFooterType, Paragraph};
-use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -21,12 +21,12 @@ fn fixture_directory() -> PathBuf {
 }
 
 fn open(name: &str) -> Document {
-    let mut package = Package::open(fixture_directory().join(name)).expect("DOC fixture opens");
+    let mut package = Reader::open(fixture_directory().join(name)).expect("DOC fixture opens");
     package.document().expect("DOC fixture document")
 }
 
 fn open_bytes(bytes: Vec<u8>) -> Document {
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("DOC bytes open");
     package.document().expect("DOC document")
 }
 
@@ -40,7 +40,7 @@ fn corpus() -> Vec<(String, Document)> {
     let documents = names
         .into_iter()
         .filter_map(|name| {
-            let mut package = Package::open(fixture_directory().join(&name)).ok()?;
+            let mut package = Reader::open(fixture_directory().join(&name)).ok()?;
             let document = package.document().ok()?;
             Some((name, document))
         })
@@ -253,7 +253,7 @@ fn notes_by_index_match_the_lists() {
 fn comments_by_index_match_the_list() {
     let redlines = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc");
-    let mut package = Package::open(redlines).expect("LibreOffice fixture opens");
+    let mut package = Reader::open(redlines).expect("LibreOffice fixture opens");
     let mut documents = corpus();
     documents.push((
         "bookmark-delete-redline.doc".to_string(),

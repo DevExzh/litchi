@@ -7,7 +7,8 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::{FileLocation, RtfDocument, RtfWriter};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{FileLocation, RtfWriter};
 
 const SYNTHETIC: &str = r"{\rtf1\ansi\ansicpg1250\uc1
 {\*\filetbl
@@ -18,7 +19,7 @@ Body}";
 
 #[test]
 fn parses_decodes_and_round_trips_file_table() {
-    let doc = RtfDocument::parse(SYNTHETIC).unwrap();
+    let doc = Tree::parse(SYNTHETIC).unwrap();
     let table = doc.file_table().unwrap();
     assert_eq!(table.entries().len(), 3);
 
@@ -41,7 +42,7 @@ fn parses_decodes_and_round_trips_file_table() {
     RtfWriter::new(&mut first_bytes)
         .write_document(&doc)
         .unwrap();
-    let reparsed = RtfDocument::parse_bytes(&first_bytes).unwrap();
+    let reparsed = Tree::parse_bytes(&first_bytes).unwrap();
     assert_eq!(table, reparsed.file_table().unwrap());
     let mut second_bytes = Vec::new();
     RtfWriter::new(&mut second_bytes)
@@ -75,7 +76,7 @@ fn rejects_malformed_file_tables_and_active_content() {
     ];
     for source in malformed {
         assert!(
-            RtfDocument::parse(source).is_err(),
+            Tree::parse(source).is_err(),
             "accepted malformed RTF: {source}"
         );
     }
@@ -85,5 +86,5 @@ fn rejects_malformed_file_tables_and_active_content() {
 fn rejects_overlong_file_name() {
     let name = "x".repeat(4097);
     let source = format!(r"{{\rtf1{{\*\filetbl{{\file\fid1 {name};}}}}}}");
-    assert!(RtfDocument::parse(&source).is_err());
+    assert!(Tree::parse(&source).is_err());
 }

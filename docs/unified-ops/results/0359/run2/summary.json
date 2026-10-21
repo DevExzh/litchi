@@ -1,0 +1,156 @@
+[
+ {
+  "scenario": "doc/open_get",
+  "before_us": 850.8,
+  "after_us": 779.2,
+  "ratio": 0.916,
+  "before_runs": [
+   853.4123999999999,
+   848.1483999999998
+  ],
+  "after_runs": [
+   774.384,
+   784.0382
+  ]
+ },
+ {
+  "scenario": "doc/get",
+  "before_us": 0.2,
+  "after_us": 0.2,
+  "ratio": 0.992,
+  "before_runs": [
+   0.22099999999999997,
+   0.22799999999999998
+  ],
+  "after_runs": [
+   0.22560000000000002,
+   0.22
+  ]
+ },
+ {
+  "scenario": "doc/set",
+  "before_us": 1728.0,
+  "after_us": 1699.3,
+  "ratio": 0.983,
+  "before_runs": [
+   1716.7189999999998,
+   1739.1989999999998
+  ],
+  "after_runs": [
+   1749.229,
+   1649.3826000000001
+  ]
+ },
+ {
+  "scenario": "doc/batch256",
+  "before_us": 669521.1,
+  "after_us": 649954.7,
+  "ratio": 0.971,
+  "before_runs": [
+   666999.162,
+   672043.1340000001
+  ],
+  "after_runs": [
+   663365.46,
+   636543.91
+  ]
+ },
+ {
+  "scenario": "xls/open_get",
+  "before_us": 153.8,
+  "after_us": 151.2,
+  "ratio": 0.983,
+  "before_runs": [
+   158.2448,
+   149.37259999999998
+  ],
+  "after_runs": [
+   151.2608,
+   151.1268
+  ]
+ },
+ {
+  "scenario": "xls/set",
+  "before_us": 98.2,
+  "after_us": 100.5,
+  "ratio": 1.024,
+  "before_runs": [
+   97.67240000000001,
+   98.67660000000001
+  ],
+  "after_runs": [
+   100.6826,
+   100.37259999999999
+  ]
+ },
+ {
+  "scenario": "xls/batch1k",
+  "before_us": 4444.2,
+  "after_us": 4445.0,
+  "ratio": 1.0,
+  "before_runs": [
+   4399.9130000000005,
+   4488.4929999999995
+  ],
+  "after_runs": [
+   4451.003000000001,
+   4438.943
+  ]
+ },
+ {
+  "scenario": "rtf/open_get",
+  "before_us": 208.4,
+  "after_us": 210.9,
+  "ratio": 1.012,
+  "before_runs": [
+   205.99720000000002,
+   210.815
+  ],
+  "after_runs": [
+   213.51500000000001,
+   208.24319999999997
+  ]
+ },
+ {
+  "scenario": "rtf/set",
+  "before_us": 328.8,
+  "after_us": 331.5,
+  "ratio": 1.008,
+  "before_runs": [
+   328.53159999999997,
+   329.0016
+  ],
+  "after_runs": [
+   331.9598,
+   331.0176
+  ]
+ },
+ {
+  "scenario": "rtf/add",
+  "before_us": 559.9,
+  "after_us": 557.1,
+  "ratio": 0.995,
+  "before_runs": [
+   554.393,
+   565.439
+  ],
+  "after_runs": [
+   546.0008,
+   568.273
+  ]
+ },
+ {
+  "scenario": "rtf/batch1k",
+  "before_us": 5814.6,
+  "after_us": 5512.8,
+  "ratio": 0.948,
+  "before_runs": [
+   5488.388,
+   6140.881
+  ],
+  "after_runs": [
+   5498.478,
+   5527.188
+  ]
+ }
+]

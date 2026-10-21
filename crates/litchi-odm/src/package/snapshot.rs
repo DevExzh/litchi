@@ -515,9 +515,11 @@ fn push_active_details(
 fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {
     let package = archive.package()?;
     if package.manifest().has_encrypted_entries() {
-        return Err(Error::Unsupported(
-            "ODM package edits refuse encrypted packages".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedOperation,
+            "odm.package.snapshot",
+            "ODM package edits refuse encrypted packages",
+        )));
     }
     if files.iter().any(|path| {
         matches!(
@@ -525,9 +527,11 @@ fn ensure_editable(archive: &OwnedPackage, files: &[String]) -> Result<()> {
             "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
         )
     }) {
-        return Err(Error::Unsupported(
-            "ODM package edits refuse signed packages".to_string(),
-        ));
+        return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::Protected,
+            "odm.package.snapshot",
+            "ODM package edits refuse signed packages",
+        )));
     }
     Ok(())
 }

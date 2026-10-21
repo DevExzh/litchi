@@ -14,7 +14,7 @@ use crate::charts::series_style::{
 use crate::protobuf::{tsch, tsd};
 use crate::shapes::empty_stroke_archive;
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AREA_OUTLINE_FIELD: u32 = 75;
 const BUBBLE_OUTLINE_FIELD: u32 = 76;
@@ -58,7 +58,7 @@ impl ChartSeriesSymbolOutlineKind {
 }
 
 pub(crate) fn chart_series_symbol_outlines(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -80,7 +80,7 @@ pub(crate) fn chart_series_symbol_outlines(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_chart_series_symbol_outlines(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -133,7 +133,7 @@ pub(crate) fn set_chart_series_symbol_outlines(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn reset_chart_series_symbol_outline(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -165,7 +165,7 @@ pub(crate) fn reset_chart_series_symbol_outline(
 
 fn read_effective_outline(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage: ChartSeriesSymbolOutlineKind,
 ) -> Result<Option<ChartSeriesStroke>> {
     Ok(slot
@@ -177,7 +177,7 @@ fn read_effective_outline(
 
 fn read_local_outline(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage: ChartSeriesSymbolOutlineKind,
 ) -> Result<Option<Option<ChartSeriesStroke>>> {
     slot.read(package, |data| {

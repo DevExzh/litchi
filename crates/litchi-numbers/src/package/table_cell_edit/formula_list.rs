@@ -5,7 +5,7 @@ use core::{fmt, mem::size_of};
 use litchi_iwa_common::{
     WireLimits,
     varint::{encode_varint_into, encoded_len},
-    wire::{WireView, parse_wire_fields_with_limits},
+    wire::{WireView, parse_wire_fields},
 };
 use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
 
@@ -1283,7 +1283,7 @@ fn decode_entries<'a>(
     output: &mut Vec<Entry<'a>>,
     limits: Limits,
 ) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(source, wire_limits(source.len(), limits)?)
+    let view = WireView::parse(source, wire_limits(source.len(), limits)?)
         .map_err(|_error| Error::Wire)?;
     let mut source_index = 0usize;
     for field in view.fields().filter(|field| field.number() == ENTRY_FIELD) {
@@ -1328,7 +1328,7 @@ fn decode_entries<'a>(
 }
 
 fn contains_field(source: &[u8], number: u32, limits: Limits) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, wire_limits(source.len(), limits)?)
+    let view = WireView::parse(source, wire_limits(source.len(), limits)?)
         .map_err(|_error| Error::Wire)?;
     Ok(view.fields().any(|field| field.number() == number))
 }
@@ -1436,7 +1436,7 @@ fn rewrite_message(
     next: Option<(u32, u32)>,
     limits: Limits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, wire_limits(source.len(), limits)?)
+    let view = WireView::parse(source, wire_limits(source.len(), limits)?)
         .map_err(|_error| Error::Wire)?;
     let owner_indexes = owner_slice(entries, owner_order, owner);
     let mut exact = source.len();
@@ -1545,8 +1545,7 @@ fn formula_index(entries: &[Entry<'_>], order: &[usize], bytes: &[u8]) -> Option
 }
 
 fn rewritten_entry_len(entry: Entry<'_>) -> Result<usize, Error> {
-    let fields =
-        parse_wire_fields_with_limits(entry.raw, WireLimits::default()).map_err(|_| Error::Wire)?;
+    let fields = parse_wire_fields(entry.raw, WireLimits::default()).map_err(|_| Error::Wire)?;
     let mut exact = entry.raw.len();
     let mut seen = false;
     for field in fields {
@@ -1573,7 +1572,7 @@ fn rewritten_entry_len(entry: Entry<'_>) -> Result<usize, Error> {
 fn rewrite_entry(entry: Entry<'_>, limits: Limits) -> Result<Vec<u8>, Error> {
     let exact = rewritten_entry_len(entry)?;
     ensure(Resource::OutputBytes, exact, limits.max_output_bytes)?;
-    let fields = parse_wire_fields_with_limits(entry.raw, wire_limits(entry.raw.len(), limits)?)
+    let fields = parse_wire_fields(entry.raw, wire_limits(entry.raw.len(), limits)?)
         .map_err(|_| Error::Wire)?;
     let mut output = exact_vec(exact)?;
     for field in fields {

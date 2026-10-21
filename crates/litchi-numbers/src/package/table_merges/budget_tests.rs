@@ -186,7 +186,7 @@ fn counters(
 
 fn assert_limit(result: Result<Vec<Region>, Error>, expected: LimitKind, label: &str) {
     match result {
-        Err(Error::LimitExceeded { kind, .. }) => {
+        Err(Error::Limit { kind, .. }) => {
             assert_eq!(kind, expected, "{label} reported the wrong resource");
         },
         other => panic!("{label} unexpectedly returned {other:?}"),
@@ -195,7 +195,7 @@ fn assert_limit(result: Result<Vec<Region>, Error>, expected: LimitKind, label: 
 
 fn assert_preflight_limit(result: Result<(), Error>, expected: LimitKind, label: &str) {
     match result {
-        Err(Error::LimitExceeded { kind, .. }) => {
+        Err(Error::Limit { kind, .. }) => {
             assert_eq!(kind, expected, "{label} reported the wrong resource");
         },
         other => panic!("{label} unexpectedly returned {other:?}"),

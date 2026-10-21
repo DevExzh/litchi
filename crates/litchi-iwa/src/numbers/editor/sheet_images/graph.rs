@@ -29,7 +29,7 @@ const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
 /// Derive one bounded image-adjustment profile from the host package's
 /// physical archive ceilings. The focused Numbers owner applies the profile
 /// to its borrowed whole-ImageArchive codec projection.
-pub(super) fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+pub(super) fn image_adjustments_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -62,7 +62,7 @@ pub(super) fn image_adjustments_wire_limits(package: &IWorkPackage) -> Result<Wi
 /// ImageArchive payload. Generated ImageArchive decoding remains responsible
 /// for graph identity and geometry validation elsewhere in this module.
 pub(super) fn image_adjustments_from_payload(
-    package: &IWorkPackage,
+    package: &HostPackage,
     payload: &[u8],
 ) -> Result<ImageAdjustments> {
     let limits = image_adjustments_wire_limits(package)?;
@@ -167,7 +167,7 @@ pub(super) fn image_creation_values(options: SheetImageOptions) -> Result<Drawab
 }
 
 pub(super) fn image_creation_context(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
 ) -> Result<ImageCreationContext> {
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
@@ -206,7 +206,7 @@ pub(super) fn image_creation_context(
     })
 }
 
-fn image_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
+fn image_style_id(package: &HostPackage, theme_id: u64) -> Result<u64> {
     let locations = object_locations(package)?;
     let archive_name = locations.get(&theme_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
@@ -234,7 +234,7 @@ fn image_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
 }
 
 fn image_caption_theme(
-    package: &IWorkPackage,
+    package: &HostPackage,
     theme_id: u64,
     stylesheet_id: u64,
 ) -> Result<CaptionThemeStyle> {
@@ -283,7 +283,7 @@ fn image_caption_theme(
     })
 }
 
-pub(super) fn image_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetImageInfo>> {
+pub(super) fn image_infos(editor: &Draft, sheet_id: u64) -> Result<Vec<SheetImageInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut images = Vec::new();
@@ -325,7 +325,7 @@ pub(super) fn image_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetIma
 }
 
 pub(super) fn image_graph(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetImageGraph> {
@@ -479,7 +479,7 @@ pub(super) fn image_graph(
 }
 
 pub(super) fn image_title_caption(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<DrawableTitleCaption> {
@@ -495,7 +495,7 @@ pub(super) fn image_title_caption(
         image.super_.caption,
         DrawableCaptionKind::Caption,
     )?;
-    let text_editor = IWorkTextEditor::from_package(editor.package().clone());
+    let text_editor = crate::text::Draft::from_package(editor.package().clone());
     Ok(DrawableTitleCaption {
         title: title
             .storage_id
@@ -517,7 +517,7 @@ pub(super) fn image_title_caption(
 }
 
 pub(super) fn image_caption_slot(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     kind: DrawableCaptionKind,
@@ -531,7 +531,7 @@ pub(super) fn image_caption_slot(
     image_caption_slot_from_reference(editor.package(), reference, kind)
 }
 
-fn image_archive(package: &IWorkPackage, identifier: u64) -> Result<tsd::ImageArchive> {
+fn image_archive(package: &HostPackage, identifier: u64) -> Result<tsd::ImageArchive> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -554,7 +554,7 @@ fn image_archive(package: &IWorkPackage, identifier: u64) -> Result<tsd::ImageAr
 }
 
 fn image_caption_slot_from_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     reference: Option<tsp::Reference>,
     kind: DrawableCaptionKind,
 ) -> Result<ImageCaptionSlot> {
@@ -680,7 +680,7 @@ fn image_caption_slot_from_reference(
 }
 
 pub(super) fn insert_image_caption(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -701,7 +701,7 @@ pub(super) fn insert_image_caption(
 }
 
 pub(super) fn insert_image_caption_standin(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     old_reference_id: u64,
@@ -767,7 +767,7 @@ fn replace_image_caption_reference(
     Ok(())
 }
 
-fn image_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetImageInfo> {
+fn image_info(package: &HostPackage, sheet_id: u64, identifier: u64) -> Result<SheetImageInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -907,7 +907,7 @@ pub(super) fn image_objects(
 }
 
 pub(super) fn set_image_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     geometry: DrawableGeometry,
@@ -946,7 +946,7 @@ pub(super) fn set_image_geometry(
 }
 
 pub(super) fn set_image_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     image_id: u64,
     properties: &DrawableProperties,

@@ -24,7 +24,7 @@ use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{
-    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree,
 };
 use litchi_iwa_core::{
     Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
@@ -246,7 +246,7 @@ impl Comment {
         author: Option<CommentAuthor>,
     ) -> Result<Self, Error> {
         if text.len() > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: text.len(),
                 maximum,
@@ -406,35 +406,18 @@ pub enum LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// A relative or absolute A1 address is malformed.
-    #[error("invalid Numbers comment cell address")]
-    InvalidAddress,
-    /// The sheet selector did not resolve.
-    #[error("the Numbers workbook has no sheet matching the comment selector")]
-    SheetNotFound,
-    /// The table selector did not resolve.
-    #[error("the selected Numbers sheet has no table matching the comment selector")]
-    TableNotFound,
-    /// The requested cell is outside the selected table.
-    #[error("the Numbers comment cell is outside the selected table")]
-    OutOfBounds { path: Path },
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The source has an ambiguous or malformed native ownership graph.
     #[error("the Numbers comment source is invalid at {path:?}")]
     InvalidSource { path: Path },
-    /// The source does not retain an exact physical package suitable for edit.
-    #[error("this Numbers source does not support exact comment editing")]
-    UnsupportedSource,
-    /// The selected cell has no existing comment for an operation that needs one.
-    #[error("the selected Numbers cell has no comment")]
-    CommentNotFound { path: Path },
-    /// Creating a new native comment would require an unsupported ownership graph.
-    #[error("creating a new Numbers cell comment is not supported for this source")]
-    UnsupportedDependency { path: Path },
     /// A bounded resource ceiling was exceeded.
     #[error(
         "Numbers comment {kind:?} limit exceeded: observed {observed}, maximum {maximum} at {path:?}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -458,6 +441,57 @@ pub enum Error {
     /// A patch was applied to another source package.
     #[error("the Numbers comment patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// A relative or absolute A1 address is malformed.
+    #[error("invalid Numbers comment cell address")]
+    InvalidAddress,
+    /// The sheet selector did not resolve.
+    #[error("the Numbers workbook has no sheet matching the comment selector")]
+    SheetNotFound,
+    /// The table selector did not resolve.
+    #[error("the selected Numbers sheet has no table matching the comment selector")]
+    TableNotFound,
+    /// The requested cell is outside the selected table.
+    #[error("the Numbers comment cell is outside the selected table")]
+    OutOfBounds { path: Path },
+    /// The source does not retain an exact physical package suitable for edit.
+    #[error("this Numbers source does not support exact comment editing")]
+    UnsupportedSource,
+    /// The selected cell has no existing comment for an operation that needs one.
+    #[error("the selected Numbers cell has no comment")]
+    CommentNotFound { path: Path },
+    /// Creating a new native comment would require an unsupported ownership graph.
+    #[error("creating a new Numbers cell comment is not supported for this source")]
+    UnsupportedDependency { path: Path },
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::InvalidAddress { .. } | Self::OutOfBounds { .. } => RefusalKind::InvalidValue,
+            Self::SheetNotFound { .. }
+            | Self::TableNotFound { .. }
+            | Self::CommentNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Content-free publication diagnostics.
@@ -696,6 +730,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -798,17 +838,14 @@ impl CensusBudget {
     }
 
     fn charge(&mut self, amount: usize, path: Path) -> Result<(), Error> {
-        let observed = self
-            .observed
-            .checked_add(amount)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::References,
-                observed: usize::MAX,
-                maximum: self.maximum,
-                path,
-            })?;
+        let observed = self.observed.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::References,
+            observed: usize::MAX,
+            maximum: self.maximum,
+            path,
+        })?;
         if observed > self.maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::References,
                 observed,
                 maximum: self.maximum,
@@ -973,7 +1010,7 @@ impl Package {
             .map_err(|_| Error::InvalidSource { path })?
             .ok_or(Error::InvalidSource { path })?;
         let populated = resolved.messages.iter().any(|message| {
-            WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+            WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
                 view.fields()
                     .any(|field| field.number() == 3 || field.number() == 4)
             })
@@ -990,7 +1027,7 @@ impl Package {
             .sheets()
             .get(sheet)
             .and_then(|candidate| candidate.tables().nth(table))
-            .ok_or(Error::TableNotFound)?;
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
         let mut output = Vec::new();
         for cell in semantic.iter_cells() {
             let position = cell.position();
@@ -1027,7 +1064,7 @@ impl Package {
     /// The recognized native comment graph is validated package-wide before
     /// any direct-reply text is published. Reply identities, authors, UUIDs,
     /// and archive objects never cross this boundary. A cell without a root
-    /// comment returns [`Error::CommentNotFound`]; a comment without replies
+    /// comment returns [`Refusal::CommentNotFound`]; a comment without replies
     /// returns an empty slice. Nested replies are outside this focused read
     /// contract and fail closed.
     pub fn table_cell_comment_replies<'sheet, 'table>(
@@ -1066,7 +1103,7 @@ impl Package {
     ) -> Result<Box<[CommentReply]>, Error> {
         let path = located.target.path;
         if located.comment.is_none() {
-            return Err(Error::CommentNotFound { path });
+            return Err(Error::Refused(Refusal::CommentNotFound { path }));
         }
 
         // The semantic reader uses a deliberately separate census policy.
@@ -1219,7 +1256,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Box<[CommentReply]>, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.table_cell_comment_replies(sheet, table, position)
     }
 
@@ -1230,7 +1267,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Option<Comment>, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.table_cell_comment(sheet, table, position)
     }
 
@@ -1274,7 +1311,7 @@ impl Package {
     /// comment graph with strict PackageMetadata ownership and save-token
     /// attribution. Shared, segmented, reply-bearing, metadata-owned, or
     /// otherwise ambiguous graphs fail closed with
-    /// [`Error::UnsupportedDependency`]. Clearing an already-empty cell is an
+    /// [`Refusal::UnsupportedDependency`]. Clearing an already-empty cell is an
     /// exact no-op.
     pub fn clear_table_cell_comment<'sheet, 'table>(
         &self,
@@ -1295,7 +1332,7 @@ impl Package {
         address: &str,
         text: impl AsRef<str>,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.set_table_cell_comment(sheet, table, position, text)
     }
 
@@ -1306,7 +1343,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
     ) -> Result<Commit, Error> {
-        let position = At::from_a1(address).map_err(|_| Error::InvalidAddress)?;
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
         self.clear_table_cell_comment(sheet, table, position)
     }
 
@@ -1351,7 +1388,9 @@ impl Package {
                 || entry.storage_occurrences != 1
                 || located.replies != 0
             {
-                return Err(Error::UnsupportedDependency { path: patch.path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency {
+                    path: patch.path,
+                }));
             }
             if patch.after.is_none() {
                 let _ = prove_root_clear_ownership(self, &located)?;
@@ -1416,7 +1455,7 @@ fn validate_reply_package_metadata_with_mode(
             .max_archive_bytes(),
     );
     if payload_len > maximum_wire {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: payload_len,
             maximum: maximum_wire,
@@ -1496,7 +1535,8 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .and_then(|object| object.messages.get(target.message_index))
         .ok_or(Error::InvalidSource { path })?;
     let field = |data: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
-        let view = WireView::parse(data).map_err(|_| Error::InvalidSource { path })?;
+        let view = WireView::parse(data, WireLimits::DEFAULT)
+            .map_err(|_| Error::InvalidSource { path })?;
         Ok(view
             .fields()
             .find(|field| field.number() == number && field.wire_type() == 2)
@@ -1508,7 +1548,8 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
     let Some(reference) = field(&store, 19)? else {
         return Ok(false);
     };
-    let view = WireView::parse(&reference).map_err(|_| Error::InvalidSource { path })?;
+    let view = WireView::parse(&reference, WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource { path })?;
     let identifier = view
         .fields()
         .find(|field| field.number() == 1 && field.wire_type() == 0)
@@ -1522,7 +1563,7 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
     Ok(resolved.messages.iter().any(|message| {
-        WireView::parse(message.data.as_slice()).is_ok_and(|view| {
+        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
             view.fields()
                 .any(|field| field.number() == 3 || field.number() == 4)
         })
@@ -1542,7 +1583,7 @@ fn resolve_comment<'sheet, 'table>(
         .map_err(|_| Error::InvalidSource {
             path: Path::Package,
         })?
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     if selected_sheet
         .tables()
         .enumerate()
@@ -1576,11 +1617,11 @@ fn resolve_comment<'sheet, 'table>(
             selected.map(|(index, _)| index)
         },
     }
-    .ok_or(Error::TableNotFound)?;
+    .ok_or(Error::Refused(Refusal::TableNotFound))?;
     let table = selected_sheet
         .tables()
         .nth(table_position)
-        .ok_or(Error::TableNotFound)?;
+        .ok_or(Error::Refused(Refusal::TableNotFound))?;
     let dimensions = table.dimensions();
     let row = usize::try_from(position.row()).map_err(|_| Error::InvalidSource {
         path: Path::Package,
@@ -1589,14 +1630,14 @@ fn resolve_comment<'sheet, 'table>(
         path: Path::Package,
     })?;
     if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
-        return Err(Error::OutOfBounds {
+        return Err(Error::Refused(Refusal::OutOfBounds {
             path: Path::Cell {
                 sheet: selected_sheet.index(),
                 table: table_position,
                 row,
                 column,
             },
-        });
+        }));
     }
     let path = Path::Cell {
         sheet: selected_sheet.index(),
@@ -1738,7 +1779,7 @@ fn has_comment_legacy_table_model_shape(source: &[u8], path: Path) -> Result<boo
     let mut present = 0_u8;
     let mut ambiguous = false;
     let limits = wire_limits_for(source.len(), 0, path)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         if !visit.path().is_empty() {
             return Ok(WireDescent::Skip);
         }
@@ -1907,7 +1948,7 @@ fn table_info_error_is_resource(error: &table_info_codec::DecodeError) -> bool {
 
 fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed,
             maximum,
@@ -1915,7 +1956,7 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed,
             maximum,
@@ -1926,25 +1967,21 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
         return Error::Allocation { amount, path };
     }
     match error.wire_resource_limit() {
-        Some(table_info_codec::WireResourceLimit::Bytes { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireBytes,
-                observed: observed.unwrap_or(usize::MAX),
-                maximum: maximum.unwrap_or(usize::MAX),
-                path,
-            }
+        Some(table_info_codec::WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed.unwrap_or(usize::MAX),
+            maximum: maximum.unwrap_or(usize::MAX),
+            path,
         },
-        Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: observed
-                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
-                    .unwrap_or(usize::MAX),
-                maximum: maximum
-                    .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
-                    .unwrap_or(usize::MAX),
-                path,
-            }
+        Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed
+                .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                .unwrap_or(usize::MAX),
+            maximum: maximum
+                .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                .unwrap_or(usize::MAX),
+            path,
         },
         _ => Error::InvalidSource { path },
     }
@@ -2094,7 +2131,7 @@ fn resolve_comment_native_with_mode(
             reply_ids: Vec::new(),
         });
     };
-    let tile_view = WireView::parse_with_limits(
+    let tile_view = WireView::parse(
         tile_message.data.as_slice(),
         wire_limits_for(tile_message.data.len(), 0, target.path)?,
     )
@@ -2197,7 +2234,9 @@ fn resolve_comment_native_with_mode(
         target.path,
     )?;
     if storage_resolved.messages.len() != 1 {
-        return Err(Error::UnsupportedDependency { path: target.path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
+            path: target.path,
+        }));
     }
     let storage_route = MessageRoute {
         component_index: storage_resolved.component_index,
@@ -2311,7 +2350,7 @@ fn map_table_codec_error(
     if let Some(limit) = error.resource_limit() {
         return match limit {
             numbers_table_cell_storage_codec::DecodeLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed,
                     maximum,
@@ -2319,7 +2358,7 @@ fn map_table_codec_error(
                 }
             },
             numbers_table_cell_storage_codec::DecodeLimit::References { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::References,
                     observed,
                     maximum,
@@ -2327,7 +2366,7 @@ fn map_table_codec_error(
                 }
             },
             numbers_table_cell_storage_codec::DecodeLimit::Text { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::TextBytes,
                     observed,
                     maximum,
@@ -2335,7 +2374,7 @@ fn map_table_codec_error(
                 }
             },
             numbers_table_cell_storage_codec::DecodeLimit::Fields { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireFields,
                     observed,
                     maximum,
@@ -2343,7 +2382,7 @@ fn map_table_codec_error(
                 }
             },
             numbers_table_cell_storage_codec::DecodeLimit::Work { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireWork,
                     observed,
                     maximum,
@@ -2351,7 +2390,7 @@ fn map_table_codec_error(
                 }
             },
             numbers_table_cell_storage_codec::DecodeLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireWork,
                     observed: usize::try_from(observed).unwrap_or(usize::MAX),
                     maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
@@ -2401,17 +2440,14 @@ impl CommentTextBudget {
     }
 
     fn retain(&mut self, amount: usize, path: Path) -> Result<(), Error> {
-        let observed = self
-            .retained
-            .checked_add(amount)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::TextBytes,
-                observed: usize::MAX,
-                maximum: self.maximum,
-                path,
-            })?;
+        let observed = self.retained.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize::MAX,
+            maximum: self.maximum,
+            path,
+        })?;
         if observed > self.maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed,
                 maximum: self.maximum,
@@ -2611,53 +2647,41 @@ fn decode_comment_author(
 fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            comment_storage_codec::DecodeLimit::Bytes { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireBytes,
-                    observed,
-                    maximum,
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed,
+                maximum,
+                path,
             },
-            comment_storage_codec::DecodeLimit::References { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::References,
-                    observed,
-                    maximum,
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
+                kind: LimitKind::References,
+                observed,
+                maximum,
+                path,
             },
-            comment_storage_codec::DecodeLimit::Text { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::TextBytes,
-                    observed,
-                    maximum,
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed,
+                maximum,
+                path,
             },
-            comment_storage_codec::DecodeLimit::Fields { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireFields,
-                    observed,
-                    maximum,
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireFields,
+                observed,
+                maximum,
+                path,
             },
-            comment_storage_codec::DecodeLimit::Work { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireWork,
-                    observed,
-                    maximum,
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
+                observed,
+                maximum,
+                path,
             },
-            comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => {
-                Error::LimitExceeded {
-                    kind: LimitKind::WireWork,
-                    observed: usize::try_from(observed).unwrap_or(usize::MAX),
-                    maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
-                    path,
-                }
+            comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                path,
             },
             _ => Error::InvalidSource { path },
         };
@@ -2687,7 +2711,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     }
     if edit.before.is_some() && edit.after.is_none() {
         if !source_catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let located = resolve_comment_native(edit.source, edit.target.clone())?;
         if located.comment != edit.before {
@@ -2766,7 +2790,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let located = resolve_comment_native(edit.source, edit.target.clone())?;
     if located.comment != edit.before {
@@ -2793,14 +2817,14 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             || entry.storage_occurrences != 1
             || edit.after.is_none()
         {
-            return Err(Error::UnsupportedDependency {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
                 path: edit.target.path,
-            });
+            }));
         }
         if !matches!(entry.owner, EntryOwner::Root) || located.replies != 0 {
-            return Err(Error::UnsupportedDependency {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
                 path: edit.target.path,
-            });
+            }));
         }
         prove_global_comment_ownership(edit.source, &located)?;
     }
@@ -2845,15 +2869,15 @@ fn rewrite_existing(
 ) -> Result<(Package, Arc<[u8]>, usize, usize), Error> {
     let source_catalog = physical_source(source)?;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let Some(comment) = after else {
         // This guard is intentionally duplicated at the transaction boundary
         // so this private helper can never grow a cell-only clear path by
         // accident in a later refactor.
-        return Err(Error::UnsupportedDependency {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
             path: located.target.path,
-        });
+        }));
     };
     let storage = located.storage.ok_or(Error::InvalidSource {
         path: located.target.path,
@@ -2921,7 +2945,7 @@ fn prepare_root_clear(
         .entry
         .as_ref()
         .filter(|entry| matches!(entry.owner, EntryOwner::Root))
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let storage = located.storage.ok_or(Error::InvalidSource { path })?;
     let tile = located.tile.ok_or(Error::InvalidSource { path })?;
     let key = located.comment_key.ok_or(Error::InvalidSource { path })?;
@@ -3038,10 +3062,10 @@ fn prepare_metadata_uuid_removal_entry(
 ) -> Result<(String, Vec<u8>), Error> {
     let options = metadata_inspection_options(source);
     let registry = super::comments_metadata::inspect(source, options)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let removal = registry
         .uuid_removal(storage.component_index, storage_id)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let mut components = Vec::new();
     for mutation in mutations {
         let index = mutation.component_index();
@@ -3055,7 +3079,7 @@ fn prepare_metadata_uuid_removal_entry(
     components.sort_unstable();
     let selectors = registry
         .touched_selectors(&components)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let removals = [removal];
     let batch = litchi_iwa_protos::package_metadata_codec::RemovalSaveTokenBatch::new(
         litchi_iwa_protos::package_metadata_codec::RemovalBatch::new(
@@ -3067,7 +3091,7 @@ fn prepare_metadata_uuid_removal_entry(
         SaveTokenBatch::new(&selectors),
     );
     let prepared = super::comments_metadata::prepare_removals(&registry, batch, options)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let requirements = prepared.execution_requirements();
     let payload = prepared
         .execute(requirements.exact_limits())
@@ -3083,7 +3107,7 @@ fn prepare_metadata_token_entry(
     path: Path,
 ) -> Result<(String, Vec<u8>), Error> {
     let route = super::metadata::unique_message_route(source)
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let metadata_component = source
         .state
         .components
@@ -3175,10 +3199,10 @@ fn prepare_metadata_token_entry(
     let mut visitor = super::metadata::ComponentSelectorVisitor::new(&target_locators)
         .map_err(|amount| Error::Allocation { amount, path })?;
     inspect_package_metadata_with_visitor(metadata_message.data.as_slice(), options, &mut visitor)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let selectors = visitor.into_selectors().map_err(|amount| {
         if amount == 0 {
-            Error::UnsupportedDependency { path }
+            Error::Refused(Refusal::UnsupportedDependency { path })
         } else {
             Error::Allocation { amount, path }
         }
@@ -3188,7 +3212,7 @@ fn prepare_metadata_token_entry(
         SaveTokenBatch::new(&selectors),
         options,
     )
-    .map_err(|_| Error::UnsupportedDependency { path })?
+    .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?
     .into_bytes();
     let physical = physical_source(source)?;
     let entry = physical
@@ -3196,7 +3220,7 @@ fn prepare_metadata_token_entry(
         .iter()
         .find(|entry| entry.name() == super::metadata::ENTRY_NAME)
         .filter(|entry| !entry.is_opaque())
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
@@ -3253,15 +3277,16 @@ fn rewrite_archives(
             .ok_or(Error::InvalidSource { path })?;
         let name = component.name().to_owned();
         let entry = physical_source(source)
-            .map_err(|_| Error::UnsupportedSource)?
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?
             .package()
             .iter()
             .find(|entry| entry.name() == name)
             .ok_or(Error::InvalidSource { path })?;
         if entry.is_opaque() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
-        let physical = physical_source(source).map_err(|_| Error::UnsupportedSource)?;
+        let physical =
+            physical_source(source).map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
         let archive_limits = physical
             .limits()
             .effective_archive_limits()
@@ -3351,7 +3376,7 @@ fn patch_length_delimited_field_checked(
     let output = patch_length_delimited_field(source, field_number, expected_present, replacement)
         .map_err(|error| map_wire_error(error, path))?;
     if output.len() > WireLimits::MAX_OUTPUT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: output.len(),
             maximum: WireLimits::MAX_OUTPUT_BYTES,
@@ -3368,7 +3393,7 @@ fn wire_limits_for(
 ) -> Result<WireLimits, Error> {
     let output = source_bytes
         .checked_add(replacement_bytes)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize::MAX,
             maximum: WireLimits::MAX_OUTPUT_BYTES,
@@ -3396,7 +3421,7 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
@@ -3422,14 +3447,14 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
 // the same hard ceiling so malformed sparse rows cannot hide an unbounded
 // amount of adapter-side work.
 fn charge_scan_work(work: &mut usize, amount: usize, path: Path) -> Result<(), Error> {
-    let observed = work.checked_add(amount).ok_or(Error::LimitExceeded {
+    let observed = work.checked_add(amount).ok_or(Error::Limit {
         kind: LimitKind::WireWork,
         observed: usize::MAX,
         maximum: WireLimits::MAX_REWRITE_WORK,
         path,
     })?;
     if observed > WireLimits::MAX_REWRITE_WORK {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireWork,
             observed,
             maximum: WireLimits::MAX_REWRITE_WORK,
@@ -4028,7 +4053,7 @@ fn scan_global_comment_cells(
                 amount: rows.rows.len(),
                 path,
             })?;
-        let tile_view = WireView::parse_with_limits(
+        let tile_view = WireView::parse(
             tile_message.data.as_slice(),
             wire_limits_for(tile_message.data.len(), 0, path)?,
         )
@@ -4109,9 +4134,9 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
         || entry.storage_occurrences != 1
         || selected.replies != 0
     {
-        return Err(Error::UnsupportedDependency {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
             path: selected.target.path,
-        });
+        }));
     }
     let root_list = message_at_route(source, entry.route, selected.target.path)?;
     if !TABLE_DATA_LIST_MESSAGE_TYPES.contains(&root_list.type_) {
@@ -4207,9 +4232,9 @@ fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Resul
             .count()
             != 1
     {
-        return Err(Error::UnsupportedDependency {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
             path: selected.target.path,
-        });
+        }));
     }
     Ok(())
 }
@@ -4230,10 +4255,10 @@ fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<bo
     let path = selected.target.path;
     let storage = selected.storage.ok_or(Error::InvalidSource { path })?;
     let registry = super::comments_metadata::inspect(source, metadata_inspection_options(source))
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     match registry.current_uuid_if_registered(storage.component_index, deleted_object) {
         Ok(Some(_)) => Ok(true),
-        _ => Err(Error::UnsupportedDependency { path }),
+        _ => Err(Error::Refused(Refusal::UnsupportedDependency { path })),
     }
 }
 
@@ -4261,7 +4286,7 @@ fn prove_metadata_ownership(
     path: Path,
 ) -> Result<(), Error> {
     let route = super::metadata::unique_message_route(source)
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     let message = source
         .state
         .components
@@ -4280,7 +4305,7 @@ fn prove_metadata_ownership(
             .max_archive_bytes(),
     );
     if message.data.is_empty() || message.data.len() > maximum_wire {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireBytes,
             observed: message.data.len(),
             maximum: maximum_wire,
@@ -4317,9 +4342,9 @@ fn prove_metadata_ownership(
     );
     let mut census = super::metadata::ObjectOwnershipVisitor::new(deleted_object);
     inspect_package_metadata_with_visitor(message.data.as_slice(), options, &mut census)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
     if census.is_owned() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     Ok(())
 }
@@ -4354,7 +4379,8 @@ fn prove_archive_reference_ownership(
     allowed_route: MessageRoute,
     path: Path,
 ) -> Result<(), Error> {
-    let physical = physical_source(source).map_err(|_| Error::UnsupportedSource)?;
+    let physical =
+        physical_source(source).map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     let limits = physical
         .limits()
         .effective_archive_limits()
@@ -4391,18 +4417,18 @@ fn prove_archive_reference_ownership(
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
                 )
-                .map_err(|_| Error::UnsupportedDependency { path })?;
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
             inspected_references =
                 inspected_references
                     .checked_add(occurrences)
-                    .ok_or(Error::LimitExceeded {
+                    .ok_or(Error::Limit {
                         kind: LimitKind::References,
                         observed: usize::MAX,
                         maximum: maximum_references,
                         path,
                     })?;
             if inspected_references > maximum_references {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::References,
                     observed: inspected_references,
                     maximum: maximum_references,
@@ -4416,7 +4442,7 @@ fn prove_archive_reference_ownership(
     // views agree; this package-wide census only needs at least one occurrence
     // and no occurrence owned by another object/message route.
     if census.occurrences == 0 || census.unexpected {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     Ok(())
 }
@@ -4845,14 +4871,14 @@ fn census_alias_checks(
     ]
     .into_iter()
     .try_fold(0usize, usize::checked_add)
-    .ok_or(Error::LimitExceeded {
+    .ok_or(Error::Limit {
         kind: LimitKind::References,
         observed: usize::MAX,
         maximum: maximum_references,
         path,
     })?;
     if observed > maximum_references {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::References,
             observed,
             maximum: maximum_references,
@@ -5232,14 +5258,14 @@ fn census_models_and_cells(
                 else {
                     continue;
                 };
-                model_count = model_count.checked_add(1).ok_or(Error::LimitExceeded {
+                model_count = model_count.checked_add(1).ok_or(Error::Limit {
                     kind: LimitKind::References,
                     observed: usize::MAX,
                     maximum: maximum_models,
                     path,
                 })?;
                 if model_count > maximum_models {
-                    return Err(Error::LimitExceeded {
+                    return Err(Error::Limit {
                         kind: LimitKind::References,
                         observed: model_count,
                         maximum: maximum_models,
@@ -5336,9 +5362,8 @@ fn census_models_and_cells(
 }
 
 fn comment_field_present(source: &[u8], field_number: u32) -> Result<bool, Error> {
-    let view =
-        WireView::parse_with_limits(source, wire_limits_for(source.len(), 0, Path::Package)?)
-            .map_err(|error| map_wire_error(error, Path::Package))?;
+    let view = WireView::parse(source, wire_limits_for(source.len(), 0, Path::Package)?)
+        .map_err(|error| map_wire_error(error, Path::Package))?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)
@@ -5356,7 +5381,7 @@ fn physical_source(source: &Package) -> Result<&SourceCatalog, Error> {
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
 }
 
 fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> {
@@ -5452,7 +5477,7 @@ mod tests {
 
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: WireLimits::MAX_REWRITE_WORK + 1,
                 maximum: WireLimits::MAX_REWRITE_WORK,
@@ -5529,7 +5554,7 @@ mod tests {
 
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::References,
                 observed: 2,
                 maximum: 1,
@@ -5562,7 +5587,7 @@ mod tests {
 
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::References,
                 observed: usize::MAX,
                 maximum: usize::MAX,
@@ -5627,7 +5652,7 @@ mod tests {
 
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::TextBytes,
                 observed: 8,
                 maximum: 3,

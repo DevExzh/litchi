@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_pages_audio <input.pages>")?;
-    let editor = pages::Editor::open(input)?;
+    let editor = pages::Draft::open(input)?;
     for (audio_index, audio) in editor.body_audio()?.iter().enumerate() {
         println!(
             "audio_index={audio_index} anchor={} drawable={} audio_data={} position={:?} duration={:?}",

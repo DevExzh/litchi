@@ -683,9 +683,24 @@ fn selectors_report_typed_not_found_errors_without_native_identifiers() -> TestR
         .table_merges(usize::MAX, 0usize)
         .expect_err("out-of-range sheet must be rejected");
 
-    assert_eq!(missing_sheet, TableMergesError::SheetNotFound);
-    assert_eq!(missing_table, TableMergesError::TableNotFound);
-    assert_eq!(out_of_range, TableMergesError::SheetNotFound);
+    assert_eq!(
+        missing_sheet,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        )
+    );
+    assert_eq!(
+        missing_table,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        )
+    );
+    assert_eq!(
+        out_of_range,
+        TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        )
+    );
 
     for error in [&missing_sheet, &missing_table, &out_of_range] {
         let rendered = format!("{error:?}\n{error}");
@@ -715,7 +730,9 @@ fn merge_selection_follows_rooted_order_and_excludes_detached_models() -> TestRe
     assert_eq!(package.extract_structured_tables()?.len(), 3);
     assert_eq!(
         package.table_merges("Rooted sheet", "Detached legacy"),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert!(package.table_merges(0usize, 0usize)?.is_empty());
     assert!(package.table_merges(0usize, 1usize)?.is_empty());
@@ -904,19 +921,27 @@ fn metadata_reader_reports_typed_selector_errors_and_ambiguity() -> TestResult {
 
     assert_eq!(
         reader.table_merges("missing sheet", TABLE_NAME),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(SHEET_NAME, "missing table"),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(usize::MAX, 0usize),
-        Err(TableMergesError::SheetNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::SheetNotFound
+        ))
     );
     assert_eq!(
         reader.table_merges(0usize, usize::MAX),
-        Err(TableMergesError::TableNotFound)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
 
     let rooted = decorate_rooted_oracle_metadata(&decode_hex(ROOTED_ORACLE_HEX)?)?;
@@ -924,7 +949,9 @@ fn metadata_reader_reports_typed_selector_errors_and_ambiguity() -> TestResult {
     let duplicate_reader = MergeReader::from_bytes(&duplicate)?;
     assert_eq!(
         duplicate_reader.table_merges("Rooted sheet", "First canonical"),
-        Err(TableMergesError::AmbiguousSelector)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::AmbiguousSelector
+        ))
     );
     assert_eq!(
         duplicate_reader.table_merges(0usize, 0usize)?,
@@ -1016,7 +1043,7 @@ fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResu
     let reader = MergeReader::from_bytes_with_options(&rooted, options)?;
     assert!(matches!(
         reader.table_merges(0usize, 1usize),
-        Err(TableMergesError::LimitExceeded {
+        Err(TableMergesError::Limit {
             kind: litchi_numbers::table::merge::transaction::LimitKind::Tables,
             ..
         })
@@ -1130,7 +1157,9 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
         )?;
         assert_eq!(
             MergeReader::from_bytes(&source)?.table_merges(SHEET_NAME, "missing table"),
-            Err(TableMergesError::TableNotFound),
+            Err(TableMergesError::Refused(
+                litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+            )),
             "the padded metadata remains valid with default budgets"
         );
         let reader = MergeReader::from_bytes_with_options(&source, options)?;
@@ -1138,13 +1167,18 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
         if many_fields {
             assert!(matches!(
                 result,
-                Err(TableMergesError::LimitExceeded {
+                Err(TableMergesError::Limit {
                     kind: litchi_numbers::table::merge::transaction::LimitKind::WireFields,
                     ..
                 })
             ));
         } else {
-            assert_eq!(result, Err(TableMergesError::TableNotFound));
+            assert_eq!(
+                result,
+                Err(TableMergesError::Refused(
+                    litchi_numbers::table::merge::transaction::Refusal::TableNotFound
+                ))
+            );
         }
     }
     Ok(())

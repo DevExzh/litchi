@@ -8,7 +8,7 @@ use litchi_pages::{BodyTableSelector, Package as PagesPackage};
 pub type TableSortRowRange = RowRange;
 
 fn focused_table_sort_source(
-    editor: &Editor,
+    editor: &Draft,
     model_object_id: u64,
 ) -> Result<(PagesPackage, BodyTableSelector<'static>)> {
     let table_index = editor
@@ -25,14 +25,14 @@ fn focused_table_sort_source(
     Ok((package, BodyTableSelector::index(table_index)))
 }
 
-fn focused_table_sort_order(editor: &Editor, model_object_id: u64) -> Result<Option<Order>> {
+fn focused_table_sort_order(editor: &Draft, model_object_id: u64) -> Result<Option<Order>> {
     let (package, selector) = focused_table_sort_source(editor, model_object_id)?;
     package
         .body_table_sort_order(selector)
         .map_err(|error| Error::InvalidFormat(format!("Pages table sort: {error}")))
 }
 
-impl Editor {
+impl Draft {
     /// Execute a body table's configured full-table sort order.
     ///
     /// Persisted sort configuration is read through the selector-first

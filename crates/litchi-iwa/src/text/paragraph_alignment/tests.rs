@@ -12,13 +12,13 @@ use crate::shapes::{
     ShapeShadowOpacity, ShapeShadowPerspective, StrokePattern, StrokeWidth,
 };
 use crate::text::{
-    Background, Border, IWorkTextEditor, IndentPoints, Indents, LineSpacingMultiple,
-    LineSpacingPoints, Outline, ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval,
-    ParagraphFollowingStyle, ParagraphHyphenation, ParagraphStyleName, ParagraphTabAlignment,
-    ParagraphTabLeader, ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops,
-    ParagraphWritingDirection, Shadow, Spacing, SpacingPoints, TextBaselineShift,
-    TextCapitalization, TextCharacterSpacing, TextDecorations, TextFont, TextLigatures,
-    TextPointSize, TextScript, TextStrikethrough, TextStyle, TextUnderline,
+    Background, Border, IndentPoints, Indents, LineSpacingMultiple, LineSpacingPoints, Outline,
+    ParagraphDecimalTabCharacter, ParagraphDefaultTabInterval, ParagraphFollowingStyle,
+    ParagraphHyphenation, ParagraphStyleName, ParagraphTabAlignment, ParagraphTabLeader,
+    ParagraphTabPosition, ParagraphTabStop, ParagraphTabStops, ParagraphWritingDirection, Shadow,
+    Spacing, SpacingPoints, TextBaselineShift, TextCapitalization, TextCharacterSpacing,
+    TextDecorations, TextFont, TextLigatures, TextPointSize, TextScript, TextStrikethrough,
+    TextStyle, TextUnderline,
 };
 use litchi_iwa_text::columns::{Columns, Count};
 use litchi_iwa_text::paragraph::border::{Offset as BorderOffset, Sides as BorderSides};
@@ -28,7 +28,7 @@ const SOURCE_PAGES_OBJECT_TITLE_STYLE_ID: u64 = 121;
 
 #[test]
 fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
-    let mut pages = pages::Editor::create_with_text("Following style").unwrap();
+    let mut pages = pages::Draft::create_with_text("Following style").unwrap();
     let text_box = pages
         .add_text_box(
             15,
@@ -78,7 +78,7 @@ fn pages_following_paragraph_style_catalog_round_trips_and_resets() {
     pages
         .set_text_box_paragraph_following_style(text_box.drawable_object_id, expected)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_following_style(text_box.drawable_object_id)
@@ -108,7 +108,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
             },
         )
         .unwrap();
-    let numbers_text = IWorkTextEditor::from_package(numbers.into_package());
+    let numbers_text = crate::text::Draft::from_package(numbers.into_package());
     assert_eq!(
         numbers_text
             .named_paragraph_styles(numbers_box.storage.id)
@@ -138,7 +138,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
             },
         )
         .unwrap();
-    let keynote_text = IWorkTextEditor::from_package(keynote.into_package());
+    let keynote_text = crate::text::Draft::from_package(keynote.into_package());
     assert_eq!(
         keynote_text
             .named_paragraph_styles(keynote_box.storage.id)
@@ -166,7 +166,7 @@ fn source_theme_paragraph_presets_are_deduplicated_across_suite_wrappers() {
 
 #[test]
 fn named_paragraph_style_crud_is_transactional_across_all_suites() {
-    let mut pages = pages::Editor::create_with_text("Pages style catalog").unwrap();
+    let mut pages = pages::Draft::create_with_text("Pages style catalog").unwrap();
     let pages_box = pages
         .add_text_box(
             19,
@@ -225,7 +225,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
             .is_err()
     );
     assert_eq!(pages.to_bytes().unwrap(), before_duplicate_rename);
-    let pages = pages::Editor::from_bytes(&before_duplicate_rename).unwrap();
+    let pages = pages::Draft::from_bytes(&before_duplicate_rename).unwrap();
     assert_eq!(
         pages
             .text_box_named_paragraph_styles(pages_box.drawable_object_id)
@@ -294,7 +294,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
             },
         )
         .unwrap();
-    let mut numbers_text = IWorkTextEditor::from_package(numbers.into_package());
+    let mut numbers_text = crate::text::Draft::from_package(numbers.into_package());
     let initial_numbers = numbers_text.package().to_bytes().unwrap();
     let body = numbers_text
         .named_paragraph_styles(numbers_box.storage.id)
@@ -316,7 +316,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         .unwrap();
     let numbers_bytes = numbers_text.package().to_bytes().unwrap();
     let numbers_text =
-        IWorkTextEditor::from_package(IWorkPackage::from_bytes(&numbers_bytes).unwrap());
+        crate::text::Draft::from_package(HostPackage::from_bytes(&numbers_bytes).unwrap());
     assert_eq!(
         numbers_text
             .named_paragraph_styles(numbers_box.storage.id)
@@ -347,7 +347,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
             },
         )
         .unwrap();
-    let mut keynote_text = IWorkTextEditor::from_package(keynote.into_package());
+    let mut keynote_text = crate::text::Draft::from_package(keynote.into_package());
     let initial_keynote = keynote_text.package().to_bytes().unwrap();
     let body = keynote_text
         .named_paragraph_styles(keynote_box.storage.id)
@@ -369,7 +369,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
         .unwrap();
     let keynote_bytes = keynote_text.package().to_bytes().unwrap();
     let keynote_text =
-        IWorkTextEditor::from_package(IWorkPackage::from_bytes(&keynote_bytes).unwrap());
+        crate::text::Draft::from_package(HostPackage::from_bytes(&keynote_bytes).unwrap());
     assert_eq!(
         keynote_text
             .named_paragraph_styles(keynote_box.storage.id)
@@ -391,7 +391,7 @@ fn named_paragraph_style_crud_is_transactional_across_all_suites() {
 
 #[test]
 fn named_paragraph_style_application_and_replacement_deletion_are_transactional() {
-    let mut pages = pages::Editor::create_with_text("Pages style application").unwrap();
+    let mut pages = pages::Draft::create_with_text("Pages style application").unwrap();
     let first = pages
         .add_text_box(
             23,
@@ -532,7 +532,7 @@ fn named_paragraph_style_application_and_replacement_deletion_are_transactional(
 }
 
 fn assert_numbers_style_lifecycle(
-    editor: &mut numbers::Editor,
+    editor: &mut numbers::Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) {
@@ -603,7 +603,7 @@ fn assert_numbers_style_lifecycle(
     assert_eq!(editor.package().to_bytes().unwrap(), initial);
 }
 
-fn assert_keynote_style_lifecycle(editor: &mut keynote::Editor, drawable_object_id: u64) {
+fn assert_keynote_style_lifecycle(editor: &mut keynote::Draft, drawable_object_id: u64) {
     let body = editor
         .slide_text_box_applied_named_paragraph_style(0, drawable_object_id)
         .unwrap()
@@ -673,7 +673,7 @@ fn assert_keynote_style_lifecycle(editor: &mut keynote::Editor, drawable_object_
 
 #[test]
 fn named_paragraph_style_redefinition_propagates_across_suites() {
-    let mut pages = pages::Editor::create_with_text("Pages redefine").unwrap();
+    let mut pages = pages::Draft::create_with_text("Pages redefine").unwrap();
     let first = pages
         .add_text_box(
             0,
@@ -729,7 +729,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
             .unwrap(),
         display
     );
-    let pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     for object_id in [first.drawable_object_id, second.drawable_object_id] {
         assert_eq!(
             pages.text_box_paragraph_alignment(object_id).unwrap(),
@@ -795,7 +795,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
     numbers
         .redefine_applied_sheet_text_box_named_paragraph_style(sheet_id, first.drawable_object_id)
         .unwrap();
-    let numbers = numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     for object_id in [first.drawable_object_id, second.drawable_object_id] {
         assert_eq!(
             numbers
@@ -852,7 +852,7 @@ fn named_paragraph_style_redefinition_propagates_across_suites() {
     keynote
         .redefine_applied_slide_text_box_named_paragraph_style(0, first.drawable_object_id)
         .unwrap();
-    let keynote = keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     for object_id in [first.drawable_object_id, second.drawable_object_id] {
         assert_eq!(
             keynote
@@ -1538,7 +1538,7 @@ fn native_paragraph_flow_rejects_noncanonical_boolean_wire() {
 
 #[test]
 fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
-    let mut pages = pages::Editor::create_with_text("Scripts").unwrap();
+    let mut pages = pages::Draft::create_with_text("Scripts").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -1573,7 +1573,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         TextScript::Normal
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_script(pages_box.drawable_object_id)
@@ -1625,7 +1625,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
             TextScript::Subscript,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_script(sheet_id, numbers_box.drawable_object_id)
@@ -1666,7 +1666,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_script(0, keynote_box.drawable_object_id, TextScript::Superscript)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_script(0, keynote_box.drawable_object_id)
@@ -1689,7 +1689,7 @@ fn uniform_text_script_round_trips_isolates_and_resets_in_every_suite() {
 #[test]
 fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
     let pages_shift = TextBaselineShift::from_points(4.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Baseline shifts").unwrap();
+    let mut pages = pages::Draft::create_with_text("Baseline shifts").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -1724,7 +1724,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         TextBaselineShift::ZERO
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_baseline_shift(pages_box.drawable_object_id)
@@ -1777,7 +1777,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
             numbers_shift,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_baseline_shift(sheet_id, numbers_box.drawable_object_id)
@@ -1815,7 +1815,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_baseline_shift(0, keynote_box.drawable_object_id, keynote_shift)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_baseline_shift(0, keynote_box.drawable_object_id)
@@ -1839,7 +1839,7 @@ fn uniform_baseline_shift_round_trips_isolates_and_resets_in_every_suite() {
 fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
     let pages_shift = TextBaselineShift::from_points(4.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Character spacing").unwrap();
+    let mut pages = pages::Draft::create_with_text("Character spacing").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -1874,7 +1874,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         TextCharacterSpacing::NORMAL
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_character_spacing(pages_box.drawable_object_id)
@@ -1927,7 +1927,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
             numbers_spacing,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_character_spacing(sheet_id, numbers_box.drawable_object_id)
@@ -1973,7 +1973,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
             keynote_spacing,
         )
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_character_spacing(0, keynote_box.drawable_object_id)
@@ -1996,7 +1996,7 @@ fn uniform_character_spacing_round_trips_isolates_and_resets_in_every_suite() {
 #[test]
 fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Ligatures").unwrap();
+    let mut pages = pages::Draft::create_with_text("Ligatures").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2031,7 +2031,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
             .unwrap(),
         TextLigatures::Standard
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_ligatures(pages_box.drawable_object_id)
@@ -2084,7 +2084,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
             TextLigatures::All,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_ligatures(sheet_id, numbers_box.drawable_object_id)
@@ -2129,7 +2129,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
             TextLigatures::RequiredOnly,
         )
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_ligatures(0, keynote_box.drawable_object_id)
@@ -2152,7 +2152,7 @@ fn uniform_ligatures_round_trip_isolate_and_reset_in_every_suite() {
 #[test]
 fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Outlines").unwrap();
+    let mut pages = pages::Draft::create_with_text("Outlines").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2187,7 +2187,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         Outline::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_outline(pages_box.drawable_object_id)
@@ -2234,7 +2234,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
             Outline::standard(),
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_outline(sheet_id, numbers_box.drawable_object_id)
@@ -2275,7 +2275,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_outline(0, keynote_box.drawable_object_id, Outline::standard())
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_outline(0, keynote_box.drawable_object_id)
@@ -2298,7 +2298,7 @@ fn uniform_text_outline_round_trips_isolates_and_resets_in_every_suite() {
 #[test]
 fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Shadows").unwrap();
+    let mut pages = pages::Draft::create_with_text("Shadows").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2333,7 +2333,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         Shadow::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_shadow(pages_box.drawable_object_id)
@@ -2380,7 +2380,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
             Shadow::standard(),
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_shadow(sheet_id, numbers_box.drawable_object_id)
@@ -2421,7 +2421,7 @@ fn uniform_text_shadow_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_shadow(0, keynote_box.drawable_object_id, Shadow::standard())
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_shadow(0, keynote_box.drawable_object_id)
@@ -2447,7 +2447,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
         RgbaColor::new(0.95, 0.42, 0.17, 0.72, RgbColorSpace::DisplayP3).unwrap(),
     );
     let pages_spacing = TextCharacterSpacing::from_percent(12.0).unwrap();
-    let mut pages = pages::Editor::create_with_text("Backgrounds").unwrap();
+    let mut pages = pages::Draft::create_with_text("Backgrounds").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2482,7 +2482,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         Background::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_background(pages_box.drawable_object_id)
@@ -2531,7 +2531,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
             numbers_background,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_background(sheet_id, numbers_box.drawable_object_id)
@@ -2575,7 +2575,7 @@ fn uniform_text_background_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_background(0, keynote_box.drawable_object_id, keynote_background)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_background(0, keynote_box.drawable_object_id)
@@ -2601,7 +2601,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
         RgbaColor::new(1.0, 0.588_738_74, 0.552_926_2, 1.0, RgbColorSpace::Srgb).unwrap(),
     );
 
-    let mut pages = pages::Editor::create_with_text("Paragraph backgrounds").unwrap();
+    let mut pages = pages::Draft::create_with_text("Paragraph backgrounds").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2634,7 +2634,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         ParagraphBackground::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_background(pages_box.drawable_object_id)
@@ -2668,7 +2668,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
             background,
         )
         .unwrap();
-    let numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_background(sheet_id, numbers_box.drawable_object_id)
@@ -2691,7 +2691,7 @@ fn paragraph_background_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_paragraph_background(0, keynote_box.drawable_object_id, background)
         .unwrap();
-    let keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_background(0, keynote_box.drawable_object_id)
@@ -2714,7 +2714,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
         .unwrap(),
     );
 
-    let mut pages = pages::Editor::create_with_text("Paragraph borders").unwrap();
+    let mut pages = pages::Draft::create_with_text("Paragraph borders").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2747,7 +2747,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
             .unwrap(),
         Borders::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_borders(pages_box.drawable_object_id)
@@ -2778,7 +2778,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     numbers
         .set_sheet_text_box_paragraph_borders(sheet_id, numbers_box.drawable_object_id, borders)
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_borders(sheet_id, numbers_box.drawable_object_id)
@@ -2808,7 +2808,7 @@ fn paragraph_borders_round_trip_isolate_and_reset_in_every_suite() {
     keynote
         .set_slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id, borders)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_borders(0, keynote_box.drawable_object_id)
@@ -2832,7 +2832,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
         .with_prevent_widow_orphan_lines(false)
         .with_hyphenation(ParagraphHyphenation::Prevented);
 
-    let mut pages = pages::Editor::create_with_text("Paragraph flow").unwrap();
+    let mut pages = pages::Draft::create_with_text("Paragraph flow").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2865,7 +2865,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         ParagraphFlow::default()
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_flow(pages_box.drawable_object_id)
@@ -2896,7 +2896,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     numbers
         .set_sheet_text_box_paragraph_flow(sheet_id, numbers_box.drawable_object_id, flow)
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_flow(sheet_id, numbers_box.drawable_object_id)
@@ -2926,7 +2926,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id, flow)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_flow(0, keynote_box.drawable_object_id)
@@ -2943,7 +2943,7 @@ fn paragraph_flow_round_trips_isolates_and_resets_in_every_suite() {
 
 #[test]
 fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
-    let mut pages = pages::Editor::create_with_text("Directions").unwrap();
+    let mut pages = pages::Draft::create_with_text("Directions").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -2962,7 +2962,7 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
             ParagraphWritingDirection::RightToLeft,
         )
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_writing_direction(pages_box.drawable_object_id)
@@ -2997,7 +2997,7 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
             ParagraphWritingDirection::RightToLeft,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_writing_direction(sheet_id, numbers_box.drawable_object_id,)
@@ -3034,7 +3034,7 @@ fn paragraph_writing_direction_round_trips_and_resets_in_every_suite() {
             ParagraphWritingDirection::LeftToRight,
         )
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_writing_direction(0, keynote_box.drawable_object_id)
@@ -3054,7 +3054,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
     let interval = ParagraphDefaultTabInterval::from_points(54.0).unwrap();
     let character = ParagraphDecimalTabCharacter::COMMA;
 
-    let mut pages = pages::Editor::create_with_text("Tab defaults").unwrap();
+    let mut pages = pages::Draft::create_with_text("Tab defaults").unwrap();
     let pages_box = pages
         .add_text_box(
             7,
@@ -3073,7 +3073,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
     pages
         .set_text_box_paragraph_default_tab_interval(pages_box.drawable_object_id, interval)
         .unwrap();
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_paragraph_decimal_tab_character(pages_box.drawable_object_id)
@@ -3132,7 +3132,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
             interval,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_paragraph_decimal_tab_character(
@@ -3205,7 +3205,7 @@ fn paragraph_tab_defaults_round_trip_compose_and_reset_in_every_suite() {
             interval,
         )
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_paragraph_decimal_tab_character(0, keynote_box.drawable_object_id)
@@ -3245,7 +3245,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     let pages_font = TextFont::named("Georgia-Bold").unwrap();
     let pages_background =
         Background::Color(RgbaColor::new(0.95, 0.72, 0.52, 1.0, RgbColorSpace::Srgb).unwrap());
-    let mut pages = pages::Editor::create_with_text("Fonts").unwrap();
+    let mut pages = pages::Draft::create_with_text("Fonts").unwrap();
     let pages_box = pages
         .add_text_box(
             5,
@@ -3283,7 +3283,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         inherited_pages
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_font(pages_box.drawable_object_id)
@@ -3332,7 +3332,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
             numbers_font.clone(),
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_font(sheet_id, numbers_box.drawable_object_id)
@@ -3370,7 +3370,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_font(0, keynote_box.drawable_object_id, keynote_font.clone())
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_font(0, keynote_box.drawable_object_id)
@@ -3392,7 +3392,7 @@ fn uniform_text_font_round_trips_isolates_and_resets_in_every_suite() {
 
 #[test]
 fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
-    let mut pages = pages::Editor::create_with_text("Caps").unwrap();
+    let mut pages = pages::Draft::create_with_text("Caps").unwrap();
     let pages_box = pages
         .add_text_box(
             4,
@@ -3428,7 +3428,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         TextCapitalization::None
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_capitalization(pages_box.drawable_object_id)
@@ -3473,7 +3473,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
             TextCapitalization::SmallCaps,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_capitalization(sheet_id, numbers_box.drawable_object_id)
@@ -3505,7 +3505,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
             TextCapitalization::TitleCase,
         )
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_capitalization(0, keynote_box.drawable_object_id)
@@ -3522,7 +3522,7 @@ fn uniform_capitalization_round_trips_isolates_and_resets_in_every_suite() {
 #[test]
 fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     let pages_color = RgbaColor::new(0.9, 0.2, 0.1, 1.0, RgbColorSpace::DisplayP3).unwrap();
-    let mut pages = pages::Editor::create_with_text("Colors").unwrap();
+    let mut pages = pages::Draft::create_with_text("Colors").unwrap();
     let pages_box = pages
         .add_text_box(
             6,
@@ -3558,7 +3558,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
             .unwrap(),
         RgbaColor::black()
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_color(pages_box.drawable_object_id)
@@ -3600,7 +3600,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     numbers
         .set_sheet_text_box_text_color(sheet_id, numbers_box.drawable_object_id, numbers_color)
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_color(sheet_id, numbers_box.drawable_object_id)
@@ -3629,7 +3629,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
     keynote
         .set_slide_text_box_text_color(0, keynote_box.drawable_object_id, keynote_color)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_color(0, keynote_box.drawable_object_id)
@@ -3646,7 +3646,7 @@ fn uniform_text_color_round_trips_isolates_and_resets_in_every_suite() {
 #[test]
 fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() {
     let pages_decorations = TextDecorations::new(TextUnderline::Single, TextStrikethrough::Double);
-    let mut pages = pages::Editor::create_with_text("Decorations").unwrap();
+    let mut pages = pages::Draft::create_with_text("Decorations").unwrap();
     let pages_box = pages
         .add_text_box(
             11,
@@ -3682,7 +3682,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
             .unwrap(),
         TextDecorations::NONE
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_decorations(pages_box.drawable_object_id)
@@ -3736,7 +3736,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
             numbers_decorations,
         )
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_decorations(sheet_id, numbers_box.drawable_object_id)
@@ -3771,7 +3771,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
     keynote
         .set_slide_text_box_text_decorations(0, keynote_box.drawable_object_id, keynote_decorations)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_decorations(0, keynote_box.drawable_object_id)
@@ -3794,7 +3794,7 @@ fn uniform_text_decorations_round_trip_and_reset_independently_in_every_suite() 
 #[test]
 fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     let pages_style = TextStyle::new(TextPointSize::from_points(19.5).unwrap()).with_bold(true);
-    let mut pages = pages::Editor::create_with_text("Character formatting").unwrap();
+    let mut pages = pages::Draft::create_with_text("Character formatting").unwrap();
     let pages_box = pages
         .add_text_box(
             20,
@@ -3832,7 +3832,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
             .unwrap(),
         pages_inherited
     );
-    let mut pages = pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+    let mut pages = pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
     assert_eq!(
         pages
             .text_box_text_style(pages_box.drawable_object_id)
@@ -3884,7 +3884,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     numbers
         .set_sheet_text_box_text_style(sheet_id, numbers_box.drawable_object_id, numbers_style)
         .unwrap();
-    let mut numbers = crate::numbers::Editor::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
+    let mut numbers = crate::numbers::Draft::from_bytes(&numbers.to_bytes().unwrap()).unwrap();
     assert_eq!(
         numbers
             .sheet_text_box_text_style(sheet_id, numbers_box.drawable_object_id)
@@ -3937,7 +3937,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
     keynote
         .set_slide_text_box_text_style(0, keynote_box.drawable_object_id, keynote_style)
         .unwrap();
-    let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+    let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
     assert_eq!(
         keynote
             .slide_text_box_text_style(0, keynote_box.drawable_object_id)
@@ -3965,7 +3965,7 @@ fn uniform_text_style_round_trips_and_resets_independently_in_every_suite() {
 
 #[test]
 fn pages_paragraph_overrides_compose_and_reset_independently() {
-    let mut editor = pages::Editor::create_with_text("Paragraph style").unwrap();
+    let mut editor = pages::Draft::create_with_text("Paragraph style").unwrap();
     let first = editor
         .add_text_box(
             15,
@@ -4061,7 +4061,7 @@ fn pages_paragraph_overrides_compose_and_reset_independently() {
             .is_empty()
     );
 
-    let mut reopened = pages::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = pages::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .text_box_paragraph_alignment(first.drawable_object_id)
@@ -4246,7 +4246,7 @@ fn every_native_line_spacing_mode_round_trips_in_numbers() {
                 spacing,
             )
             .unwrap();
-        let reopened = crate::numbers::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = crate::numbers::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_text_box_paragraph_line_spacing(sheet_id, created.drawable_object_id)
@@ -4341,7 +4341,7 @@ fn keynote_spacing_reset_preserves_alignment() {
     editor
         .set_slide_text_box_paragraph_tab_stops(0, created.drawable_object_id, tab_stops.clone())
         .unwrap();
-    let mut reopened = crate::keynote::Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = crate::keynote::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_text_box_paragraph_line_spacing(0, created.drawable_object_id)
@@ -4414,7 +4414,7 @@ fn keynote_spacing_reset_preserves_alignment() {
 
 #[test]
 fn multiple_paragraph_boundaries_are_rejected_transactionally() {
-    let mut pages = pages::Editor::create_with_text("Alignment").unwrap();
+    let mut pages = pages::Draft::create_with_text("Alignment").unwrap();
     let created = pages
         .add_text_box(
             9,
@@ -4457,7 +4457,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -4589,7 +4589,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
 
 #[test]
 fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
-    let mut pages = pages::Editor::create_with_text("Alignment").unwrap();
+    let mut pages = pages::Draft::create_with_text("Alignment").unwrap();
     let created = pages
         .add_text_box(
             9,
@@ -4622,7 +4622,7 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
         })
         .unwrap();
 
-    let mut editor = IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .set_paragraph_alignment(storage_id, Alignment::Center)
         .unwrap();
@@ -4649,7 +4649,7 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
 
 #[test]
 fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
-    let mut pages = pages::Editor::create_with_text("Alignment").unwrap();
+    let mut pages = pages::Draft::create_with_text("Alignment").unwrap();
     let created = pages
         .add_text_box(
             9,
@@ -4694,7 +4694,7 @@ fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
 
 #[test]
 fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload() {
-    let mut pages = pages::Editor::create_with_text("Alignment").unwrap();
+    let mut pages = pages::Draft::create_with_text("Alignment").unwrap();
     let created = pages
         .add_text_box(
             9,
@@ -4735,7 +4735,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
         })
         .unwrap();
 
-    let mut editor = IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .set_paragraph_alignment(storage_id, Alignment::Right)
         .unwrap();
@@ -4785,7 +4785,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
 
 #[test]
 fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() {
-    let mut pages = pages::Editor::create_with_text("Rename anchor").unwrap();
+    let mut pages = pages::Draft::create_with_text("Rename anchor").unwrap();
     let text_box = pages
         .add_text_box(
             11,

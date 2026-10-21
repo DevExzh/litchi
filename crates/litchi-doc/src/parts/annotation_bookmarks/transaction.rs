@@ -45,8 +45,8 @@ impl Snapshot {
 
     /// Start an independent transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             before: self.clone(),
             working: self.clone(),
         }
@@ -60,7 +60,7 @@ impl Tags {
     }
 
     /// Start a validated semantic transaction.
-    pub fn edit(&self) -> PackageResult<Transaction> {
+    pub fn edit(&self) -> PackageResult<Edit> {
         Ok(self.snapshot()?.edit())
     }
 }
@@ -116,49 +116,25 @@ impl Patch {
     }
 }
 
-/// A committed semantic transaction.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
-impl Commit {
-    pub(crate) fn new(snapshot: Snapshot, patch: Patch) -> Self {
-        Self { snapshot, patch }
-    }
-
-    /// Post-edit immutable snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Reversible semantic patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// A staged, failure-atomic tag edit.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     before: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
-    /// The current staged snapshot.
+impl Edit {
+    /// The staged candidate snapshot, not yet committed.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub fn staged(&self) -> &Snapshot {
         &self.working
-    }
-
-    /// Whether staged semantic values differ from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before != self.working
     }
 
     /// Replace the complete optional table atomically.
@@ -198,7 +174,10 @@ impl Transaction {
     /// Commit the staged state into a reversible semantic patch.
     pub fn commit(self) -> Result<Commit, Error> {
         let patch = Patch::new(self.before, self.working.clone());
-        Ok(Commit::new(self.working, patch))
+        {
+            let diagnostics = Diagnostics::new(!patch.is_noop());
+            Ok(Commit::new(self.working, patch, diagnostics))
+        }
     }
 }
 

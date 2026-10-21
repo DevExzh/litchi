@@ -15,7 +15,7 @@ use crate::charts::style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AREA_3D_LIGHTING_FIELD: u32 = 2;
 const BAR_3D_LIGHTING_FIELD: u32 = 3;
@@ -146,7 +146,7 @@ impl LightingField {
 
 /// Read one chart's effective native 3D lighting style.
 pub(crate) fn chart_3d_lighting_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -164,7 +164,7 @@ pub(crate) fn chart_3d_lighting_style(
 
 /// Set one chart's native 3D lighting style.
 pub(crate) fn set_chart_3d_lighting_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

@@ -149,7 +149,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(0),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::SheetNotFound)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         compatibility_root(
@@ -158,7 +160,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(0),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::SheetNotFound)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         compatibility_root(
@@ -167,7 +171,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(1),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::TableNotFound)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         compatibility_root(
@@ -176,7 +182,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::name("missing table"),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::TableNotFound)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         compatibility_root(
@@ -185,7 +193,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(0),
             At::new(99, 0),
         ),
-        Err(TableCellCommentError::OutOfBounds { .. })
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::OutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         compatibility_replies(
@@ -194,7 +204,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(0),
             At::new(99, 0),
         ),
-        Err(TableCellCommentError::OutOfBounds { .. })
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::OutOfBounds { .. }
+        ))
     ));
 
     // A caller-selected one-table ceiling still admits the inclusive table
@@ -224,7 +236,9 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
             TableSelector::index(1),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::TableNotFound)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }
@@ -302,7 +316,7 @@ fn duplicate_table_names_are_rejected_after_full_scan_and_limits_are_not_truncat
                 table,
                 LEGACY_CELL,
             ),
-            Err(TableCellCommentError::LimitExceeded {
+            Err(TableCellCommentError::Limit {
                 kind: TableCellCommentLimitKind::References,
                 observed: 2,
                 maximum: 1,
@@ -450,7 +464,7 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
             TableSelector::index(0),
             LEGACY_CELL,
         ),
-        Err(TableCellCommentError::LimitExceeded {
+        Err(TableCellCommentError::Limit {
             kind: TableCellCommentLimitKind::InputBytes,
             observed: source_len,
             maximum: maximum_len,
@@ -489,7 +503,7 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
     );
     assert!(matches!(
         object_result,
-        Err(TableCellCommentError::LimitExceeded {
+        Err(TableCellCommentError::Limit {
             kind: TableCellCommentLimitKind::References,
             observed: 12,
             maximum: 1,
@@ -514,7 +528,7 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
         );
     assert!(matches!(
         reference_result,
-        Err(TableCellCommentError::LimitExceeded {
+        Err(TableCellCommentError::Limit {
             kind: TableCellCommentLimitKind::References,
             observed: 2,
             maximum: 1,
@@ -542,7 +556,7 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
     );
     assert!(matches!(
         text_result,
-        Err(TableCellCommentError::LimitExceeded {
+        Err(TableCellCommentError::Limit {
             kind: TableCellCommentLimitKind::TextBytes,
             observed: 22,
             maximum: 4,

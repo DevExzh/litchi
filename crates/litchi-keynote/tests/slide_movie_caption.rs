@@ -145,8 +145,13 @@ fn storage_payload(text: &str) -> Vec<u8> {
         ..tswp::StorageArchive::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, STORAGE_UNKNOWN_FIELD, STORAGE_UNKNOWN_MARKER)
-        .expect("storage fixture unknown field must encode");
+    append_length_delimited_field(
+        &mut payload,
+        STORAGE_UNKNOWN_FIELD,
+        STORAGE_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("storage fixture unknown field must encode");
     payload
 }
 
@@ -187,6 +192,7 @@ fn metadata_component_payload(
         &mut payload,
         METADATA_COMPONENT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -208,14 +214,30 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_LAST_IDENTIFIER)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_ROOT_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -224,7 +246,7 @@ fn metadata_payload_with_last_identifier(last_identifier: u64) -> TestResult<Vec
     let payload = metadata_payload()?;
     let mut rewritten = Vec::with_capacity(payload.len() + 10);
     let mut replaced = false;
-    for field in WireView::parse(&payload)?.fields() {
+    for field in WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !replaced && field.number() == 1 {
             append_varint_field(&mut rewritten, 1, last_identifier)?;
             replaced = true;
@@ -240,11 +262,26 @@ fn metadata_payload_with_last_identifier(last_identifier: u64) -> TestResult<Vec
 
 fn caption_theme_payload() -> TestResult<Vec<u8>> {
     let mut presets = Vec::new();
-    append_length_delimited_field(&mut presets, 1, &reference(PARAGRAPH_STYLE).encode_to_vec())?;
+    append_length_delimited_field(
+        &mut presets,
+        1,
+        &reference(PARAGRAPH_STYLE).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut theme_super = Vec::new();
-    append_length_delimited_field(&mut theme_super, 210, &presets)?;
+    append_length_delimited_field(
+        &mut theme_super,
+        210,
+        &presets,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut theme = Vec::new();
-    append_length_delimited_field(&mut theme, 1, &theme_super)?;
+    append_length_delimited_field(
+        &mut theme,
+        1,
+        &theme_super,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(theme)
 }
 
@@ -433,7 +470,7 @@ fn with_metadata_reserved_uuid(source: &[u8], identifier: u64) -> TestResult<Vec
     let payload = metadata_message_payload(source)?;
     let mut rewritten = Vec::with_capacity(payload.len() + 32);
     let mut replaced = false;
-    for field in WireView::parse(&payload)?.fields() {
+    for field in WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != 3 || replaced {
             rewritten.extend_from_slice(field.raw());
             continue;
@@ -445,8 +482,18 @@ fn with_metadata_reserved_uuid(source: &[u8], identifier: u64) -> TestResult<Vec
         }
         let mut component_payload = field.payload().to_vec();
         let entry = metadata_uuid_entry(identifier).encode_to_vec();
-        append_length_delimited_field(&mut component_payload, 11, &entry)?;
-        append_length_delimited_field(&mut rewritten, 3, &component_payload)?;
+        append_length_delimited_field(
+            &mut component_payload,
+            11,
+            &entry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut rewritten,
+            3,
+            &component_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         replaced = true;
     }
     if !replaced {
@@ -457,7 +504,7 @@ fn with_metadata_reserved_uuid(source: &[u8], identifier: u64) -> TestResult<Vec
 
 fn with_duplicate_current_metadata_component(source: &[u8]) -> TestResult<Vec<u8>> {
     let payload = metadata_message_payload(source)?;
-    let duplicate = WireView::parse(&payload)?
+    let duplicate = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| {
             if field.number() != 3 {
@@ -504,13 +551,33 @@ fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8
 fn movie_start_build_payload(target: u64, include_effect: bool) -> TestResult<Vec<u8>> {
     let target = reference(target).encode_to_vec();
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &target)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &target,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     if include_effect {
         let mut animation = Vec::new();
-        append_length_delimited_field(&mut animation, 2, b"apple:movie-start")?;
+        append_length_delimited_field(
+            &mut animation,
+            2,
+            b"apple:movie-start",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let mut attributes = Vec::new();
-        append_length_delimited_field(&mut attributes, 18, &animation)?;
-        append_length_delimited_field(&mut payload, 4, &attributes)?;
+        append_length_delimited_field(
+            &mut attributes,
+            18,
+            &animation,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut payload,
+            4,
+            &attributes,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -536,6 +603,7 @@ fn with_movie_build(
             &mut slide_message.data,
             SLIDE_BUILDS_FIELD,
             &reference(*identifier).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     let slide_length = u32::try_from(slide_message.data.len())?;
@@ -557,8 +625,9 @@ fn assert_movie_caption_edit_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::InvalidSource)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        )) | Err(SlideMovieCaptionError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -618,11 +687,13 @@ fn with_document_message_payload(
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn push_varint(mut value: u64, output: &mut Vec<u8>) {
@@ -666,7 +737,7 @@ fn varint_field(number: u32, value: u64, key_width: usize, value_width: usize) -
 }
 
 fn append_duplicate_field(payload: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let duplicate = WireView::parse(payload)?
+    let duplicate = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == number)
         .map(|field| field.raw().to_vec())
@@ -680,7 +751,7 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
     let number = *path
         .first()
         .ok_or_else(|| io::Error::other("empty nested path"))?;
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len());
     let mut found = false;
     for field in view.fields() {
@@ -691,7 +762,12 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
             } else if field.wire_type() == 2 {
                 let nested = append_nested_duplicate(field.payload(), &path[1..])?;
                 let mut replacement = Vec::new();
-                append_length_delimited_field(&mut replacement, number, &nested)?;
+                append_length_delimited_field(
+                    &mut replacement,
+                    number,
+                    &nested,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 output.truncate(output.len() - field.raw().len());
                 output.extend_from_slice(&replacement);
                 found = true;
@@ -715,7 +791,7 @@ fn replace_nested_field_raw(
     let number = *path
         .first()
         .ok_or_else(|| io::Error::other("empty nested path"))?;
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -727,7 +803,12 @@ fn replace_nested_field_raw(
                     return Err(io::Error::other("nested field is not length-delimited").into());
                 }
                 let nested = replace_nested_field_raw(field.payload(), &path[1..], replacement)?;
-                append_length_delimited_field(&mut output, number, &nested)?;
+                append_length_delimited_field(
+                    &mut output,
+                    number,
+                    &nested,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
             }
             replaced = true;
         } else {
@@ -747,17 +828,19 @@ fn metadata_component_raw_payload(
     versioned: bool,
 ) -> TestResult<Vec<u8>> {
     let field_number = if versioned { 11 } else { 3 };
-    for field in WireView::parse(payload)?.fields() {
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != field_number {
             continue;
         }
-        let matches = WireView::parse(field.payload())?.fields().any(|nested| {
-            nested.number() == 1
-                && decode_varint_from_bytes(nested.payload())
-                    .ok()
-                    .map(|(value, _)| value)
-                    == Some(identifier)
-        });
+        let matches = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .any(|nested| {
+                nested.number() == 1
+                    && decode_varint_from_bytes(nested.payload())
+                        .ok()
+                        .map(|(value, _)| value)
+                        == Some(identifier)
+            });
         if matches {
             return Ok(field.payload().to_vec());
         }
@@ -786,17 +869,19 @@ fn metadata_component_raw_fields(
     identifier: u64,
     number: u32,
 ) -> TestResult<Vec<Vec<u8>>> {
-    for field in WireView::parse(payload)?.fields() {
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != 3 {
             continue;
         }
         let component = tsp::ComponentInfo::decode(field.payload())?;
         if component.identifier == identifier {
-            return Ok(WireView::parse(field.payload())?
-                .fields()
-                .filter(|nested| nested.number() == number)
-                .map(|nested| nested.raw().to_vec())
-                .collect());
+            return Ok(
+                WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+                    .fields()
+                    .filter(|nested| nested.number() == number)
+                    .map(|nested| nested.raw().to_vec())
+                    .collect(),
+            );
         }
     }
     Err(io::Error::other("missing synthetic current metadata component").into())
@@ -850,9 +935,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         changed_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_package)?, no_metadata_source);
 
@@ -873,9 +961,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         create_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_create)?, no_metadata_create_source);
 
@@ -899,9 +990,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         clear_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_clear)?, no_metadata_clear_source);
     Ok(())
@@ -1203,8 +1297,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::InvalidSource)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        )) | Err(SlideMovieCaptionError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, aliased);
 
@@ -1225,7 +1320,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, malformed_standin);
 
@@ -1238,7 +1335,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, duplicate_metadata);
 
@@ -1251,8 +1350,10 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::LimitExceeded { .. })
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
+            | Err(SlideMovieCaptionError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, overflow);
 
@@ -1374,11 +1475,15 @@ fn selector_errors_are_typed_and_source_stays_unchanged() -> TestResult<()> {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_movie_caption(SlideSelector::index(9), MovieSelector::index(0)),
-        Err(SlideMovieCaptionError::SlidePositionNotFound { .. })
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_movie_caption(SlideSelector::index(0), MovieSelector::index(9)),
-        Err(SlideMovieCaptionError::MoviePositionNotFound { .. })
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1438,7 +1543,9 @@ fn shared_caption_storage_is_rejected_without_mutation() -> TestResult<()> {
     let package = Package::from_bytes(&hostile)?;
     assert!(matches!(
         package.slide_movie_caption(0usize, 0usize),
-        Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, hostile);
     Ok(())

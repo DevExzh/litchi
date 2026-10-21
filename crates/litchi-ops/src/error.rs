@@ -380,7 +380,7 @@ pub enum Source {
     DocWrite(litchi_doc::writer::WriteError),
     /// A source-backed legacy Word main-story edit error.
     #[cfg(feature = "doc")]
-    DocBodyText(litchi_doc::body_text::source::Error),
+    DocBodyText(litchi_doc::source_backed::Error),
     /// A legacy Word document-property (metadata) transaction error.
     #[cfg(feature = "doc")]
     DocMetadata(litchi_doc::package::metadata::Error),
@@ -428,12 +428,7 @@ pub enum Source {
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
     /// An ODF package ingress, egress or transaction error (typed limits).
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     Odf(litchi_odf_common::Error),
     /// A formula conversion error: Markdown output renders OMML formulas as
     /// LaTeX.
@@ -535,12 +530,7 @@ impl Source {
             Self::RtfEdit(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
@@ -675,7 +665,7 @@ impl Error {
         feature = "pages",
         feature = "keynote",
         feature = "numbers",
-        feature = "odf-objects"
+        odf_objects
     ))]
     pub(crate) fn feature_disabled(detected: FileFormat, feature: &'static str) -> Self {
         Self::unsupported_format(Some(detected))
@@ -712,7 +702,7 @@ impl Error {
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects"
+        odf_objects
     ))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
         debug_assert!(matches!(
@@ -1075,20 +1065,27 @@ impl Classify for litchi_core::edit::Refusal {
 
 impl Classify for litchi_core::edit::RefusalKind {
     fn classify(&self) -> Class {
-        use litchi_core::edit::RefusalKind;
+        Class::of(refusal_code(*self))
+    }
+}
 
-        Class::of(match self {
-            RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
-                Code::UnsupportedCapability
-            },
-            RefusalKind::UnsupportedTarget => Code::UnsupportedType,
-            RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
-            RefusalKind::InvalidValue => Code::InvalidValue,
-            RefusalKind::NotFound => Code::NotFound,
-            RefusalKind::Protected => Code::DocumentProtected,
-            // A kind added later is unsupported until it is classified.
-            _ => Code::UnsupportedCapability,
-        })
+/// The one code of each refusal kind (record 0351 §2.4), for callers that
+/// map a leaf error to a [`Code`] directly (the iWork leaf errors, record
+/// 0361).
+pub(crate) const fn refusal_code(kind: litchi_core::edit::RefusalKind) -> Code {
+    use litchi_core::edit::RefusalKind;
+
+    match kind {
+        RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
+            Code::UnsupportedCapability
+        },
+        RefusalKind::UnsupportedTarget => Code::UnsupportedType,
+        RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
+        RefusalKind::InvalidValue => Code::InvalidValue,
+        RefusalKind::NotFound => Code::NotFound,
+        RefusalKind::Protected => Code::DocumentProtected,
+        // A kind added later is unsupported until it is classified.
+        _ => Code::UnsupportedCapability,
     }
 }
 
@@ -1141,6 +1138,7 @@ impl Classify for litchi_core::Error {
             | Self::ZipError(_) => Class::of(Code::CorruptFile),
             Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             Self::Unsupported(_) => Class::of(Code::UnsupportedCapability),
+            Self::Refused(refusal) => refusal.classify(),
             Self::Allocation { .. } | Self::Committed(_) | Self::Other(_) => {
                 Class::of(Code::InternalError)
             },
@@ -1684,9 +1682,12 @@ impl Classify for litchi_xls::Error {
             Self::InvalidPassword => {
                 Class::suggest(Code::InvalidArgument, WRONG_PASSWORD_SUGGESTION)
             },
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Internal(_) => Class::of(Code::InternalError),
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::UnsupportedEncryption(_)
             | Self::UnsupportedFeature(_)
-            | Self::UnsafeEdit(_)
             | Self::SourceBoundWorksheetMutation { .. } => Class::of(Code::UnsupportedCapability),
             Self::UnsupportedBiffVersion(_) => Class::of(Code::UnsupportedFormat),
             Self::StringTooLong { .. } | Self::TooMany { .. } | Self::RecordTooLong { .. } => {
@@ -1890,12 +1891,7 @@ impl Classify for litchi_ppt::Error {
     }
 }
 
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 impl Classify for litchi_odf_common::Error {
     fn classify(&self) -> Class {
         match self {
@@ -2041,9 +2037,9 @@ impl Classify for litchi_cfb::OverlayError {
 }
 
 #[cfg(feature = "doc")]
-impl Classify for litchi_doc::body_text::source::Error {
+impl Classify for litchi_doc::source_backed::Error {
     fn classify(&self) -> Class {
-        use litchi_doc::body_text::source::Refusal;
+        use litchi_doc::source_backed::Refusal;
 
         match self {
             Self::Ole(error) => error.classify(),
@@ -2231,7 +2227,7 @@ impl From<litchi_doc::writer::WriteError> for Error {
 }
 from_leaf!(
     #[cfg(feature = "doc")]
-    litchi_doc::body_text::source::Error => DocBodyText, Some(FileFormat::Doc)
+    litchi_doc::source_backed::Error => DocBodyText, Some(FileFormat::Doc)
 );
 from_leaf!(#[cfg(feature = "xls")] litchi_xls::Error => Xls, Some(FileFormat::Xls));
 from_leaf!(
@@ -2314,7 +2310,7 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
 from_leaf!(
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", feature = "odf-objects"))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     litchi_odf_common::Error => Odf, None
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));

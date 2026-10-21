@@ -182,7 +182,7 @@ fn first_slide(source: &[u8]) -> TestResult<(String, u64, Vec<u64>)> {
 fn nested_reference(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
     let mut current = payload;
     for field_number in path {
-        let fields = WireView::parse(current)?
+        let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .filter(|field| field.number() == *field_number)
             .collect::<Vec<_>>();
@@ -197,7 +197,7 @@ fn nested_reference(payload: &[u8], path: &[u32]) -> TestResult<Option<u64>> {
         }
         current = field.payload();
     }
-    let fields = WireView::parse(current)?
+    let fields = WireView::parse(current, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == 1)
         .collect::<Vec<_>>();
@@ -290,10 +290,15 @@ fn append_comment_reference(payload: &[u8], path: &[u32], identifier: u64) -> Te
             ..Default::default()
         }
         .encode_to_vec();
-        append_length_delimited_field(&mut output, field_number, &reference)?;
+        append_length_delimited_field(
+            &mut output,
+            field_number,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         return Ok(output);
     }
-    let fields = WireView::parse(payload)?
+    let fields = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() == field_number)
         .collect::<Vec<_>>();

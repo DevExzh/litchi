@@ -126,7 +126,9 @@ pub(super) fn prepare(
 ) -> Result<ArchivePlan, Error> {
     let source_catalog = &source.state.source;
     if !source_catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::deletion::Refusal::UnsupportedSource,
+        ));
     }
 
     // The body text edit is another source-authorized message replacement.
@@ -421,7 +423,7 @@ fn validate_plan(
             return Err(Error::InvalidSource);
         }
         if edit.data.len() > source.limits().max_iwa_stream_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: super::LimitKind::PayloadBytes,
                 observed: usize_to_u64(edit.data.len()),
                 maximum: usize_to_u64(source.limits().max_iwa_stream_bytes()),
@@ -616,7 +618,9 @@ fn preflight_component_bounds(
             .get_index(*component_index)
             .ok_or(Error::InvalidSource)?;
         if entry.is_opaque() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::deletion::Refusal::UnsupportedSource,
+            ));
         }
         let source_length = archive_source_length(component.archive())?;
         let archive_bound = component_archive_bound(
@@ -632,7 +636,11 @@ fn preflight_component_bounds(
             0 => compressed_bound,
             8 => table_lock::deflate_compressed_bound(compressed_bound)
                 .ok_or(Error::InvalidSource)?,
-            _ => return Err(Error::UnsupportedSource),
+            _ => {
+                return Err(Error::Refused(
+                    crate::table::deletion::Refusal::UnsupportedSource,
+                ));
+            },
         };
         budget
             .charge_payload_work(entry.data().len())
@@ -975,7 +983,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => super::LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

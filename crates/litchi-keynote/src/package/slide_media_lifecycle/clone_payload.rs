@@ -398,7 +398,7 @@ impl<'a, 'charge> RewriteContext<'a, 'charge> {
         }
         self.max_depth = self.max_depth.max(depth);
         self.charge_work(source.len())?;
-        let view = WireView::parse_with_limits(source, self.limits)?;
+        let view = WireView::parse(source, self.limits)?;
         self.allocations = self.allocations.checked_add(1).ok_or_else(|| {
             WireError::InvalidFormat("Keynote payload allocation count overflow".to_owned())
         })?;
@@ -495,7 +495,7 @@ impl<'a, 'charge> RewriteContext<'a, 'charge> {
         self.references_seen = self.references_seen.checked_add(1).ok_or_else(|| {
             WireError::InvalidFormat("Keynote reference count overflow".to_owned())
         })?;
-        let view = WireView::parse_with_limits(source, self.limits)?;
+        let view = WireView::parse(source, self.limits)?;
         self.allocations = self.allocations.checked_add(1).ok_or_else(|| {
             WireError::InvalidFormat("Keynote payload allocation count overflow".to_owned())
         })?;
@@ -739,7 +739,7 @@ mod tests {
     }
 
     fn reference_identifier(payload: &[u8]) -> u64 {
-        let view = WireView::parse(payload).expect("reference");
+        let view = WireView::parse(payload, WireLimits::DEFAULT).expect("reference");
         let field = view
             .fields()
             .find(|field| field.number() == 1)
@@ -829,13 +829,14 @@ mod tests {
             limits(&source),
         )
         .expect("shape-info remap");
-        let root = WireView::parse(rewrite.payload()).expect("shape-info root");
+        let root =
+            WireView::parse(rewrite.payload(), WireLimits::DEFAULT).expect("shape-info root");
         let shape = root
             .fields()
             .find(|field| field.number() == 1)
             .expect("shape archive")
             .payload();
-        let shape = WireView::parse(shape).expect("shape archive");
+        let shape = WireView::parse(shape, WireLimits::DEFAULT).expect("shape archive");
         assert!(
             shape
                 .fields()
@@ -858,7 +859,7 @@ mod tests {
             .find(|field| field.number() == 1)
             .expect("drawable")
             .payload();
-        let drawable = WireView::parse(drawable).expect("drawable");
+        let drawable = WireView::parse(drawable, WireLimits::DEFAULT).expect("drawable");
         assert_eq!(
             drawable
                 .fields()

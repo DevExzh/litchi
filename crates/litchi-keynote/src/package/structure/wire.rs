@@ -4,7 +4,7 @@
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into};
-use litchi_iwa_common::wire::parse_wire_fields_with_limits;
+use litchi_iwa_common::wire::parse_wire_fields;
 
 use super::StructureError;
 
@@ -73,7 +73,7 @@ impl Fields {
         payload: &[u8],
         limits: WireLimits,
     ) -> Result<Self, StructureError> {
-        let parsed = parse_wire_fields_with_limits(payload, limits)?;
+        let parsed = parse_wire_fields(payload, limits)?;
         let mut fields = Vec::with_capacity(parsed.len());
         for field in parsed {
             fields.push(Field {

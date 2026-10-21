@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl Editor {
+impl Draft {
     /// Read the complete category-label menu state for one slide chart.
     pub fn slide_chart_category_label_layout(
         &self,
@@ -30,7 +30,7 @@ impl Editor {
 }
 
 fn slide_chart_category_label_layout(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Layout> {
@@ -44,7 +44,7 @@ fn slide_chart_category_label_layout(
 }
 
 fn set_slide_chart_category_label_layout(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     layout: Layout,
@@ -58,7 +58,7 @@ fn set_slide_chart_category_label_layout(
         "Keynote",
         layout,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_category_label_layout(slide_index, drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Keynote chart category-label layout update failed validation".to_owned(),
@@ -116,7 +116,7 @@ mod tests {
         editor
             .set_slide_chart_category_label_layout(0, chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_category_label_layout(0, chart.drawable_object_id)

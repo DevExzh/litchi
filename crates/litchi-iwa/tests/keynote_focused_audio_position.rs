@@ -228,21 +228,23 @@ fn last_native_media_id(source: &[u8], kind: MovieKind) -> TestResult<u64> {
 }
 
 fn add_audio(
-    editor: &mut keynote::Editor,
+    editor: &mut keynote::Draft,
     preferred_filename: &str,
     data: &[u8],
     options: SlideAudioOptions,
 ) -> TestResult {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
-    let commit =
-        package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+    let commit = package
+        .edit_slide_audio_creation()
+        .add(SlideSelector::index(0), preferred_filename, data, options)
+        .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
-    *editor = keynote::Editor::from_bytes(&bytes)?;
+    *editor = keynote::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn add_movie(
-    editor: &mut keynote::Editor,
+    editor: &mut keynote::Draft,
     preferred_movie_filename: &str,
     movie_data: &[u8],
     preferred_poster_filename: &str,
@@ -250,16 +252,19 @@ fn add_movie(
     options: SlideMovieOptions,
 ) -> TestResult<u64> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
-    let commit = package.add_slide_movie(
-        SlideSelector::index(0),
-        preferred_movie_filename,
-        movie_data,
-        preferred_poster_filename,
-        poster_data,
-        options,
-    )?;
+    let commit = package
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            preferred_movie_filename,
+            movie_data,
+            preferred_poster_filename,
+            poster_data,
+            options,
+        )
+        .and_then(|edit| edit.commit())?;
     let bytes = package_bytes(commit.package())?;
-    *editor = keynote::Editor::from_bytes(&bytes)?;
+    *editor = keynote::Draft::from_bytes(&bytes)?;
     last_native_media_id(&bytes, MovieKind::File)
 }
 
@@ -335,7 +340,7 @@ fn source_fixture() -> TestResult<SourceFixture> {
         .commit()?
         .into_package();
     let bytes = package_bytes(&bytes)?;
-    let reopened = keynote::Editor::from_bytes(&bytes)?;
+    let reopened = keynote::Draft::from_bytes(&bytes)?;
     let movie_b_id = native_media_ids(&reopened.to_bytes()?)?
         .into_iter()
         .filter(|(_, kind)| *kind == MovieKind::File)
@@ -347,7 +352,7 @@ fn source_fixture() -> TestResult<SourceFixture> {
 
 fn semantic_snapshot(
     package: &Package,
-    editor: &keynote::Editor,
+    editor: &keynote::Draft,
     movie_b_id: u64,
 ) -> TestResult<MediaSnapshot> {
     let slide = package
@@ -483,7 +488,7 @@ fn source_built_audio_position_preserves_host_observations_and_opaque_state() ->
     let fixture = source_fixture()?;
     let package = Package::from_bytes(&fixture.bytes)?;
     let source_bytes = package_bytes(&package)?;
-    let baseline_editor = keynote::Editor::from_bytes(&source_bytes)?;
+    let baseline_editor = keynote::Draft::from_bytes(&source_bytes)?;
     let baseline = semantic_snapshot(&package, &baseline_editor, fixture.movie_b_id)?;
     assert_eq!(baseline.movies.len(), 2);
     assert_eq!(baseline.audio.len(), 2);
@@ -527,7 +532,7 @@ fn source_built_audio_position_preserves_host_observations_and_opaque_state() ->
         .set(audio_b_position)?
         .commit()?;
     let focused_bytes = package_bytes(focused.package())?;
-    let focused_editor = keynote::Editor::from_bytes(&focused_bytes)?;
+    let focused_editor = keynote::Draft::from_bytes(&focused_bytes)?;
     let mut expected = baseline.clone();
     expected.audio[0].position = (audio_a_position.x.to_bits(), audio_a_position.y.to_bits());
     expected.audio[1].position = (audio_b_position.x.to_bits(), audio_b_position.y.to_bits());

@@ -178,16 +178,19 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
             DOCUMENT_SAVE_TOKEN,
             FIRST_STORAGE_IDENTIFIER..=LAST_STORAGE_IDENTIFIER,
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(2, "ViewState", VIEW_STATE_SAVE_TOKEN, std::iter::empty())?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(3, "Unrelated", UNRELATED_SAVE_TOKEN, std::iter::empty())?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
@@ -198,6 +201,7 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
             VERSIONED_SAVE_TOKEN,
             std::iter::empty(),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut payload, UNKNOWN_ROOT_FIELD, 0xdead_beef)?;
     Ok(payload)
@@ -385,7 +389,7 @@ fn metadata(bytes: &[u8]) -> TestResult<tsp::PackageMetadata> {
 
 fn metadata_component_raw(bytes: &[u8], identifier: u64) -> TestResult<Vec<Vec<u8>>> {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     Ok(view
         .fields()
         .filter(|field| field.number() == 3)
@@ -527,7 +531,7 @@ fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
         .first()
         .ok_or_else(|| io::Error::other("storage message is missing"))?
         .data;
-    let view = WireView::parse(payload)?;
+    let view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_STORAGE_FIELD)
@@ -537,13 +541,13 @@ fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
 
 fn assert_metadata_unknown_fields(bytes: &[u8]) -> TestResult {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_ROOT_FIELD)
     );
     for field in view.fields().filter(|field| field.number() == 3) {
-        let nested = WireView::parse(field.payload())?;
+        let nested = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         assert!(
             nested
                 .fields()
@@ -580,7 +584,12 @@ fn wrong_storage_kind_wire(source: &[u8]) -> TestResult<Vec<u8>> {
         DOCUMENT_MEMBER,
         FIRST_STORAGE_IDENTIFIER,
         |_type_, mut data| {
-            append_length_delimited_field(&mut data, 1, &[0])?;
+            append_length_delimited_field(
+                &mut data,
+                1,
+                &[0],
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok((STORAGE_MESSAGE_TYPE, data))
         },
     )
@@ -737,6 +746,7 @@ fn duplicate_metadata_component(source: &[u8]) -> TestResult<Vec<u8>> {
             DOCUMENT_SAVE_TOKEN,
             std::iter::empty(),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     rewrite_object_payload(
         source,
@@ -759,7 +769,12 @@ fn duplicate_metadata_save_token(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn wrong_metadata_save_token_wire(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut payload = metadata_payload_from_bytes(source)?;
-    append_length_delimited_field(&mut payload, 8, &[1])?;
+    append_length_delimited_field(
+        &mut payload,
+        8,
+        &[1],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_object_payload(
         source,
         METADATA_MEMBER,
@@ -817,6 +832,7 @@ fn cross_component_storage(source: &[u8]) -> TestResult<Vec<u8>> {
             8,
             std::iter::once(CROSS_STORAGE_IDENTIFIER),
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     changed = rewrite_object_payload(
         &changed,

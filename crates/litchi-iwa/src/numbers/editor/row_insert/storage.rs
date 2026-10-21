@@ -24,7 +24,7 @@ fn checked_shift(value: u32, insertion: u32, what: &str) -> Result<u32> {
 }
 
 pub(super) fn shift_table_tile_rows(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     insertion: usize,
@@ -171,7 +171,7 @@ pub(super) fn shift_table_tile_rows(
 }
 
 pub(super) fn shift_row_headers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     insertion: usize,
@@ -305,7 +305,7 @@ pub(super) fn shift_row_headers(
 }
 
 pub(super) fn insert_row_uid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     old_rows: usize,
@@ -384,7 +384,7 @@ pub(super) fn insert_row_uid(
 }
 
 pub(super) fn set_table_row_count(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     rows: u32,

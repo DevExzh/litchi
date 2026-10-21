@@ -23,7 +23,7 @@ const PLACEHOLDER_GEOMETRY_PATH: &[u32] = &[1, 1, 1, 1];
 const PLACEHOLDER_STYLE_PATH: &[u32] = &[1, 1, 2];
 const PLACEHOLDER_PATH_SOURCE_PATH: &[u32] = &[1, 1, 3];
 
-fn slide_preview_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+fn slide_preview_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     slide_preview_wire_limits_for(
         package.limits().effective_archive_limits()?,
         package.limits().max_iwa_stream_bytes(),
@@ -60,7 +60,7 @@ fn slide_preview_wire_limits_for(
 }
 
 fn invalidate_slide_preview(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     node_id: u64,
 ) -> Result<()> {
@@ -80,7 +80,7 @@ fn invalidate_slide_preview(
     })
 }
 
-impl Editor {
+impl Draft {
     /// Reassign an existing slide to a theme layout without replacing user content.
     ///
     /// Keynote retains the slide's text, notes, builds, transition, and ordinary

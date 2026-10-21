@@ -13,7 +13,7 @@
 //! `unsupported_property`.
 
 use litchi_core::FileFormat;
-#[cfg(feature = "odf-objects")]
+#[cfg(odf_objects)]
 use litchi_core::Metadata;
 use litchi_odf_common::metadata::{Edit, Field, Owner, Patch};
 
@@ -157,7 +157,7 @@ pub(crate) fn stage<P: Owner>(
 }
 
 /// Stage create-time `metadata` on `edit`.
-#[cfg(feature = "odf-objects")]
+#[cfg(odf_objects)]
 ///
 /// # Errors
 ///
@@ -236,7 +236,10 @@ fn staging(error: litchi_odf_common::Error, format: FileFormat) -> Error {
 }
 
 fn staging_core(error: litchi_core::Error, format: FileFormat) -> Error {
-    let code = if matches!(error, litchi_core::Error::Unsupported(_)) {
+    let code = if matches!(
+        error,
+        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+    ) {
         Code::UnsupportedCapability
     } else {
         Code::InvalidValue

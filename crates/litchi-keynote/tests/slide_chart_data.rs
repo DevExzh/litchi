@@ -107,17 +107,19 @@ fn chart_data_rejects_unknown_selectors_before_reading_a_grid() -> TestResult {
 
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(1)),
-        Err(SlideChartDataError::ChartPositionNotFound { position })
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::ChartPositionNotFound { position }))
             if position == Position::new(1)
     ));
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(1), ChartSelector::index(0)),
-        Err(SlideChartDataError::SlidePositionNotFound { position })
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::SlidePositionNotFound { position }))
             if position == Position::new(1)
     ));
     assert!(matches!(
         package.slide_chart_data(SlideSelector::index(0), ChartSelector::name("")),
-        Err(SlideChartDataError::EmptyChartName)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::EmptyChartName
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -194,7 +196,9 @@ fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
             .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
             .set(changed_labels)
             .commit(),
-        Err(SlideChartDataError::LabelsChanged)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
     ));
 
     let mut changed_shape = before.values().to_owned();
@@ -213,7 +217,9 @@ fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
             .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
             .set(changed_shape)
             .commit(),
-        Err(SlideChartDataError::LabelsChanged)
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
     ));
     Ok(())
 }

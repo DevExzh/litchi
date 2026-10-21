@@ -18,7 +18,7 @@ use property::{CellParagraphProperty, CellParagraphPropertyKind};
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
 pub(super) fn style_context(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -33,7 +33,7 @@ pub(super) fn style_context(
 }
 
 pub(super) fn alignment(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -53,7 +53,7 @@ pub(super) fn alignment(
 }
 
 pub(super) fn set_alignment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -69,7 +69,7 @@ pub(super) fn set_alignment(
 }
 
 pub(super) fn reset_alignment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -84,7 +84,7 @@ pub(super) fn reset_alignment(
 }
 
 pub(super) fn line_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -104,7 +104,7 @@ pub(super) fn line_spacing(
 }
 
 pub(super) fn set_line_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -120,7 +120,7 @@ pub(super) fn set_line_spacing(
 }
 
 pub(super) fn reset_line_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -135,7 +135,7 @@ pub(super) fn reset_line_spacing(
 }
 
 pub(super) fn spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -155,7 +155,7 @@ pub(super) fn spacing(
 }
 
 pub(super) fn set_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -171,7 +171,7 @@ pub(super) fn set_spacing(
 }
 
 pub(super) fn reset_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -186,7 +186,7 @@ pub(super) fn reset_spacing(
 }
 
 pub(super) fn indents(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -206,7 +206,7 @@ pub(super) fn indents(
 }
 
 pub(super) fn set_indents(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -222,7 +222,7 @@ pub(super) fn set_indents(
 }
 
 pub(super) fn reset_indents(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -237,7 +237,7 @@ pub(super) fn reset_indents(
 }
 
 pub(super) fn tab_stops(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -258,7 +258,7 @@ pub(super) fn tab_stops(
 }
 
 pub(super) fn set_tab_stops(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -274,7 +274,7 @@ pub(super) fn set_tab_stops(
 }
 
 pub(super) fn reset_tab_stops(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -289,7 +289,7 @@ pub(super) fn reset_tab_stops(
 }
 
 pub(super) fn background(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -309,7 +309,7 @@ pub(super) fn background(
 }
 
 pub(super) fn set_background(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -325,7 +325,7 @@ pub(super) fn set_background(
 }
 
 pub(super) fn reset_background(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -340,7 +340,7 @@ pub(super) fn reset_background(
 }
 
 pub(super) fn baseline_shift(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -360,7 +360,7 @@ pub(super) fn baseline_shift(
 }
 
 pub(super) fn set_baseline_shift(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -376,7 +376,7 @@ pub(super) fn set_baseline_shift(
 }
 
 pub(super) fn reset_baseline_shift(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -391,7 +391,7 @@ pub(super) fn reset_baseline_shift(
 }
 
 pub(super) fn capitalization(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -411,7 +411,7 @@ pub(super) fn capitalization(
 }
 
 pub(super) fn set_capitalization(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -427,7 +427,7 @@ pub(super) fn set_capitalization(
 }
 
 pub(super) fn reset_capitalization(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -442,7 +442,7 @@ pub(super) fn reset_capitalization(
 }
 
 pub(super) fn character_spacing(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -462,7 +462,7 @@ pub(super) fn character_spacing(
 }
 
 pub(super) fn set_character_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -478,7 +478,7 @@ pub(super) fn set_character_spacing(
 }
 
 pub(super) fn reset_character_spacing(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -493,7 +493,7 @@ pub(super) fn reset_character_spacing(
 }
 
 pub(super) fn text_color(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -513,7 +513,7 @@ pub(super) fn text_color(
 }
 
 pub(super) fn set_text_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -529,7 +529,7 @@ pub(super) fn set_text_color(
 }
 
 pub(super) fn reset_text_color(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -544,7 +544,7 @@ pub(super) fn reset_text_color(
 }
 
 pub(super) fn decorations(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -564,7 +564,7 @@ pub(super) fn decorations(
 }
 
 pub(super) fn set_decorations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -580,7 +580,7 @@ pub(super) fn set_decorations(
 }
 
 pub(super) fn reset_decorations(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -595,7 +595,7 @@ pub(super) fn reset_decorations(
 }
 
 pub(super) fn font(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -615,7 +615,7 @@ pub(super) fn font(
 }
 
 pub(super) fn set_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -631,7 +631,7 @@ pub(super) fn set_font(
 }
 
 pub(super) fn reset_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -646,7 +646,7 @@ pub(super) fn reset_font(
 }
 
 pub(super) fn ligatures(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -666,7 +666,7 @@ pub(super) fn ligatures(
 }
 
 pub(super) fn set_ligatures(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -682,7 +682,7 @@ pub(super) fn set_ligatures(
 }
 
 pub(super) fn reset_ligatures(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -697,7 +697,7 @@ pub(super) fn reset_ligatures(
 }
 
 pub(super) fn outline(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -717,7 +717,7 @@ pub(super) fn outline(
 }
 
 pub(super) fn set_outline(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -733,7 +733,7 @@ pub(super) fn set_outline(
 }
 
 pub(super) fn reset_outline(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -748,7 +748,7 @@ pub(super) fn reset_outline(
 }
 
 pub(super) fn script(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -768,7 +768,7 @@ pub(super) fn script(
 }
 
 pub(super) fn set_script(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -784,7 +784,7 @@ pub(super) fn set_script(
 }
 
 pub(super) fn reset_script(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -799,7 +799,7 @@ pub(super) fn reset_script(
 }
 
 pub(super) fn shadow(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -819,7 +819,7 @@ pub(super) fn shadow(
 }
 
 pub(super) fn set_shadow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -835,7 +835,7 @@ pub(super) fn set_shadow(
 }
 
 pub(super) fn reset_shadow(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -850,7 +850,7 @@ pub(super) fn reset_shadow(
 }
 
 pub(super) fn text_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -871,7 +871,7 @@ pub(super) fn text_style(
 }
 
 pub(super) fn set_text_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -887,7 +887,7 @@ pub(super) fn set_text_style(
 }
 
 pub(super) fn reset_text_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -902,7 +902,7 @@ pub(super) fn reset_text_style(
 }
 
 fn property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -917,7 +917,7 @@ fn property(
 }
 
 fn set_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1047,7 +1047,7 @@ fn set_property(
 }
 
 fn reset_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1249,7 +1249,7 @@ fn base_style_id(descriptor: &model::TableDescriptor, row: usize, column: usize)
 }
 
 fn local_style_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &model::TableDescriptor,
     locations: &HashMap<u64, String>,
     row: usize,
@@ -1275,7 +1275,7 @@ fn local_style_id(
 }
 
 fn text_style_key(
-    package: &IWorkPackage,
+    package: &HostPackage,
     descriptor: &model::TableDescriptor,
     row: usize,
     column: usize,
@@ -1315,7 +1315,7 @@ fn style_entry(
 }
 
 fn insert_style_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     style_id: u64,
@@ -1370,7 +1370,7 @@ fn insert_style_entry(
 }
 
 fn attach_style_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     table_id: u64,
     style_id: u64,
@@ -1410,7 +1410,7 @@ fn attach_style_entry(
 }
 
 fn read_bnc(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &model::CellLocation,
     column: usize,
 ) -> Result<BncCell> {
@@ -1426,7 +1426,7 @@ fn read_bnc(
 }
 
 fn write_text_style_key(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &model::CellLocation,
     row: usize,
     column: usize,
@@ -1454,7 +1454,7 @@ fn entry_owner_id(
 }
 
 fn style_is_exclusive_to_list(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
     stylesheet_id: u64,
     list_owner_id: u64,
@@ -1480,7 +1480,7 @@ fn style_is_exclusive_to_list(
     Ok(true)
 }
 
-fn style_has_children(package: &IWorkPackage, style_id: u64) -> Result<bool> {
+fn style_has_children(package: &HostPackage, style_id: u64) -> Result<bool> {
     for archive_name in package.iwa_entry_names() {
         if package.archive(archive_name)?.objects.iter().any(|object| {
             object.messages.iter().any(|message| {
@@ -1503,7 +1503,7 @@ fn style_has_children(package: &IWorkPackage, style_id: u64) -> Result<bool> {
 }
 
 fn verify_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -1591,7 +1591,7 @@ mod tests {
         .unwrap()
     }
 
-    fn explicit_style_id(editor: &Editor, table_id: u64, row: usize, column: usize) -> u64 {
+    fn explicit_style_id(editor: &Draft, table_id: u64, row: usize, column: usize) -> u64 {
         let descriptor = model::attached_table_descriptor(&editor.package, table_id).unwrap();
         let locations = storage::object_locations(&editor.package).unwrap();
         local_style_id(&editor.package, &descriptor, &locations, row, column)
@@ -2433,7 +2433,7 @@ mod tests {
         pages
             .set_table_cell_paragraph_tab_stops(pages_table, 1, 1, pages_tab_stops.clone())
             .unwrap();
-        let mut pages = crate::pages::Editor::from_bytes(&pages.to_bytes().unwrap()).unwrap();
+        let mut pages = crate::pages::Draft::from_bytes(&pages.to_bytes().unwrap()).unwrap();
         assert_eq!(
             pages.table_cell_text_alignment(pages_table, 1, 1).unwrap(),
             Alignment::Justified
@@ -2735,7 +2735,7 @@ mod tests {
                 keynote_tab_stops.clone(),
             )
             .unwrap();
-        let mut keynote = crate::keynote::Editor::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
+        let mut keynote = crate::keynote::Draft::from_bytes(&keynote.to_bytes().unwrap()).unwrap();
         assert_eq!(
             keynote
                 .slide_table_cell_text_alignment(0, table.model_object_id, 1, 1)

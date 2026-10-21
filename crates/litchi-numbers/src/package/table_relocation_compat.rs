@@ -75,12 +75,16 @@ impl Package {
             return copy_bytes(source.state.source.as_ref(), path);
         }
         if table.locked == LockState::Locked {
-            return Err(Error::TableLocked { path });
+            return Err(Error::Refused(
+                crate::package::table_relocation::Refusal::TableLocked { path },
+            ));
         }
 
         let catalog = physical_source(&source)?;
         if !catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::package::table_relocation::Refusal::UnsupportedSource,
+            ));
         }
         let deleted_previews = root_preview_deletions(catalog)?;
         let source_parent = verify_physical_source_state(&source, operation)?;
@@ -109,7 +113,9 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .map_err(|_error| invalid_source(Path::Package))?;
     let source = components
         .physical()
-        .ok_or(Error::UnsupportedSource)?
+        .ok_or(Error::Refused(
+            crate::package::table_relocation::Refusal::UnsupportedSource,
+        ))?
         .__source_owner();
     let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_error| invalid_source(Path::Package))?;
@@ -133,7 +139,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
             root.sheet_references()
                 .get(index)
                 .map(|_reference| index)
-                .ok_or(Error::SheetNotFound)
+                .ok_or(Error::Refused(
+                    crate::package::table_relocation::Refusal::SheetNotFound,
+                ))
         },
         SheetSelector::Name(name) => {
             let mut found = None;
@@ -143,7 +151,9 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
                     return Err(invalid_source(Path::Package));
                 }
             }
-            found.ok_or(Error::SheetNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_relocation::Refusal::SheetNotFound,
+            ))
         },
     }
 }
@@ -200,7 +210,9 @@ fn resolve_table_position(
                     return Err(invalid_source(path));
                 }
             }
-            found.ok_or(Error::TableNotFound)
+            found.ok_or(Error::Refused(
+                crate::package::table_relocation::Refusal::TableNotFound,
+            ))
         },
     }
 }

@@ -339,9 +339,24 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &calculation)?;
-    append_length_delimited_field(&mut payload, 3, &stylesheet)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &calculation,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &stylesheet,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -971,6 +986,7 @@ fn direct_preset_and_default_resolution_preserve_precedence() -> TestResult {
             payload,
             TABLE_MODEL_PRESET_FIELD,
             &reference_payload(9_999),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -1194,6 +1210,7 @@ fn malformed_role_and_archive_info_routes_fail_closed_atomically() -> TestResult
             payload,
             TABLE_MODEL_STYLE_FIELD,
             &reference_payload(SHARED_STYLE_ID),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;
@@ -1686,7 +1703,7 @@ fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
         let result = package
             .edit_slide_table_appearance(0usize, 0usize)
             .and_then(|edit| edit.set(custom_appearance()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             saw_limit = true;
             break;

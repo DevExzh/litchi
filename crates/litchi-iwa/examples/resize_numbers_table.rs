@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rows: usize = arguments.next().ok_or("missing row count")?.parse()?;
     let columns: usize = arguments.next().ok_or("missing column count")?.parse()?;
 
-    let mut editor = numbers::Editor::open(input)?;
+    let mut editor = numbers::Draft::open(input)?;
     editor
         .tables()?
         .get(table_index)

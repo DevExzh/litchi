@@ -455,7 +455,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -470,7 +470,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -494,7 +494,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_settings(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| !SETTINGS_FIELDS.contains(&field.number()))
         .map(|field| field.raw().to_vec())
@@ -789,10 +789,12 @@ fn first_section_inheritance_changes_fail_before_template_traversal() -> TestRes
                 .set(after)?
                 .commit()
                 .unwrap_err(),
-            Error::UnsupportedDependency {
-                path: Path::section(Position::new(0)),
-                kind: DependencyKind::PreviousSectionTemplates,
-            }
+            Error::Refused(
+                litchi_pages::section::settings::Refusal::UnsupportedDependency {
+                    path: Path::section(Position::new(0)),
+                    kind: DependencyKind::PreviousSectionTemplates,
+                }
+            )
         );
         assert_eq!(exact_bytes(&package)?, bytes);
     }
@@ -863,15 +865,17 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
 
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("missing-private-selector")),
-        Err(Error::NameNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::index(2)),
-        Err(Error::PositionNotFound { position }) if position == Position::new(2)
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::PositionNotFound { position })) if position == Position::new(2)
     ));
     assert!(matches!(
         package.edit_section_settings(SectionSelector::name("Same")),
-        Err(Error::AmbiguousSelector { first, duplicate })
+        Err(Error::Refused(litchi_pages::section::settings::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
@@ -904,7 +908,9 @@ fn selectors_and_legacy_sources_are_typed_and_failure_atomic() -> TestResult {
             .edit_section_settings(SectionSelector::index(0))?
             .set(changed)?
             .commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::settings::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&legacy_package)?, legacy);
     Ok(())
@@ -951,11 +957,11 @@ fn malformed_selected_fields_fail_closed_before_publication() -> TestResult {
         assert_malformed_fails_closed(duplicate, &second)?;
 
         let mut wrong_wire = canonical_payload.clone();
-        append_length_delimited_field(&mut wrong_wire, field, &[])?;
+        append_length_delimited_field(&mut wrong_wire, field, &[], WireLimits::DEFAULT)?;
         assert_malformed_fails_closed(wrong_wire, &second)?;
     }
     let mut duplicate_name = canonical_payload.clone();
-    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate")?;
+    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate", WireLimits::DEFAULT)?;
     assert_malformed_fails_closed(duplicate_name, &second)?;
     let mut wrong_name_wire = canonical_payload.clone();
     append_varint_field(&mut wrong_name_wire, 26, 1)?;

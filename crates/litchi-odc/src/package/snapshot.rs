@@ -250,9 +250,11 @@ impl Snapshot {
             ));
         }
         if self.0.encrypted {
-            return Err(Error::Unsupported(
-                "ODC package edits refuse encrypted package members".to_string(),
-            ));
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odc.package.snapshot",
+                "ODC package edits refuse encrypted package members",
+            )));
         }
         let compact_limits =
             compact_xml::Limits::new(self.0.limits.max_content_bytes(), self.0.limits.max_depth())

@@ -11,7 +11,7 @@ use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::comments::{fresh_comment_storage_uuid, insert_comment_storage};
 use crate::protobuf::{tsp, tswp};
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 pub(super) const HIGHLIGHT_MESSAGE_TYPE: u32 = 2_013;
 pub(super) const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
@@ -204,7 +204,7 @@ fn validate_uuid(identifier: u64, uuid: &str) -> Result<()> {
 
 #[cfg(test)]
 pub(super) fn validate_annotation_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     identifier: u64,
     object: &ArchiveObject,
@@ -262,7 +262,7 @@ pub(super) fn validate_annotation_graph_in_archive(
 
 #[cfg(test)]
 pub(super) fn validate_plain_highlight_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     identifier: u64,
     object: &ArchiveObject,
@@ -369,7 +369,7 @@ pub(super) fn new_highlight_object(
 }
 
 pub(super) fn insert_annotation_comment_storage(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     comment_storage_id: u64,
     body: String,
@@ -387,7 +387,7 @@ pub(super) fn insert_annotation_comment_storage(
 }
 
 pub(super) fn update_annotation_comment_text(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     annotation_id: u64,
     storage_id: u64,
@@ -437,7 +437,7 @@ pub(super) fn update_annotation_comment_text(
 }
 
 pub(super) fn require_exclusive_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     expected_owner: u64,
     identifier: u64,
     label: &str,
@@ -466,7 +466,7 @@ pub(super) fn require_exclusive_reference(
     Ok(())
 }
 
-pub(super) fn ensure_no_metadata_reference(package: &IWorkPackage, identifier: u64) -> Result<()> {
+pub(super) fn ensure_no_metadata_reference(package: &HostPackage, identifier: u64) -> Result<()> {
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
             if object.archive_info.message_infos.iter().any(|info| {

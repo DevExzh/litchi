@@ -129,9 +129,11 @@ fn exercise_slide_text_unsupported_kind(package: &Package) {
     ] {
         assert!(matches!(
             result,
-            Err(SlideTextError::UnsupportedKind {
-                kind: Kind::SlideNumber
-            })
+            Err(SlideTextError::Refused(
+                litchi::keynote::slide::text::Refusal::UnsupportedKind {
+                    kind: Kind::SlideNumber
+                }
+            ))
         ));
     }
 }

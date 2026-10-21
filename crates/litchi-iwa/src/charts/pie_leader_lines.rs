@@ -9,7 +9,7 @@ use crate::charts::series_non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_common::chart::pie::LeaderLineVisibility;
 
 /// `tschchartseriespieenablecalloutline` in the generated series non-style.
@@ -19,7 +19,7 @@ const MIN_SIGN_EXTENDED_NATIVE_VALUE: u64 = 0xffff_ffff_8000_0000;
 
 /// Read leader-line visibility for every wedge in chart-series order.
 pub(crate) fn chart_pie_leader_line_visibilities(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -38,7 +38,7 @@ pub(crate) fn chart_pie_leader_line_visibilities(
 
 /// Set leader-line visibility for every wedge in chart-series order.
 pub(crate) fn set_chart_pie_leader_line_visibilities(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

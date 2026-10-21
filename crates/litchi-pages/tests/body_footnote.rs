@@ -222,16 +222,19 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
                 uuid_entry(SECOND_STORAGE_IDENTIFIER, 2),
             ],
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(2, "ViewState", VIEW_STATE_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(3, "Unrelated", UNRELATED_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_unknown(&mut payload, UNKNOWN_ROOT_FIELD, 0xfeed_beef)?;
     Ok(payload)
@@ -479,7 +482,12 @@ fn append_versioned_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         ..tsp::ComponentInfo::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 11, &component)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_object_payload(
         source,
         METADATA_MEMBER,
@@ -536,7 +544,12 @@ fn duplicate_body_table(source: &[u8]) -> TestResult<Vec<u8>> {
             .clone()
             .ok_or_else(|| io::Error::other("body footnote table is missing"))?;
         let mut payload = body.encode_to_vec();
-        append_length_delimited_field(&mut payload, 16, &table.encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            16,
+            &table.encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok((STORAGE_MESSAGE_TYPE, payload))
     })
 }
@@ -547,6 +560,7 @@ fn add_ambiguous_document_component(source: &[u8]) -> TestResult<Vec<u8>> {
         &mut payload,
         3,
         &metadata_component(DOCUMENT_IDENTIFIER, "Document", DOCUMENT_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     rewrite_object_payload(
         source,
@@ -771,7 +785,7 @@ fn assert_unchanged(package: &Package, source: &[u8]) -> TestResult {
 
 fn assert_metadata_unknowns(bytes: &[u8]) -> TestResult {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_ROOT_FIELD)
@@ -779,7 +793,7 @@ fn assert_metadata_unknowns(bytes: &[u8]) -> TestResult {
     for field in view.fields().filter(|field| field.number() == 3) {
         let nested = field.payload();
         assert!(
-            WireView::parse(nested)?
+            WireView::parse(nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|nested_field| nested_field.number() == UNKNOWN_COMPONENT_FIELD)
         );
@@ -813,7 +827,7 @@ fn assert_graph_unknowns(bytes: &[u8]) -> TestResult {
             .first()
             .ok_or_else(|| io::Error::other("graph message is missing"))?;
         assert!(
-            WireView::parse(&message.data)?
+            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == UNKNOWN_PAYLOAD_FIELD)
         );
@@ -1154,31 +1168,44 @@ fn insertion_rejects_boundaries_markers_occupancy_and_large_values_atomically() 
     let split_astral = package.insert_body_footnote(Position::from_utf16_index(2)?, "x", None);
     assert!(matches!(
         split_astral,
-        Err(BodyFootnoteError::PositionOutOfBounds)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::PositionOutOfBounds
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
 
     let occupied = package.insert_body_footnote(Position::from_utf16_index(3)?, "x", None);
-    assert!(matches!(occupied, Err(BodyFootnoteError::PositionOccupied)));
+    assert!(matches!(
+        occupied,
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::PositionOccupied
+        ))
+    ));
     assert_eq!(exact_bytes(&package)?, source);
 
     for value in ["bad\u{e}", "bad\u{fffc}"] {
         let text_error = package.insert_body_footnote(Position::ZERO, value, None);
         assert!(matches!(
             text_error,
-            Err(BodyFootnoteError::StructuralMarker)
+            Err(BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::StructuralMarker
+            ))
         ));
         let mark_error = package.insert_body_footnote(Position::ZERO, "ok", Some(value));
         assert!(matches!(
             mark_error,
-            Err(BodyFootnoteError::StructuralMarker)
+            Err(BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::StructuralMarker
+            ))
         ));
         assert_eq!(exact_bytes(&package)?, source);
     }
     let too_large = "x".repeat(16 * 1024 * 1024 + 1);
     assert!(matches!(
         package.insert_body_footnote(Position::ZERO, "ok", Some(&too_large)),
-        Err(BodyFootnoteError::CustomMarkTooLarge)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::CustomMarkTooLarge
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1192,11 +1219,15 @@ fn edit_rejects_structural_marker_and_preserves_source() -> TestResult {
     let mut edit = package.edit_body_footnote(Selector::index(0))?;
     assert!(matches!(
         edit.set("bad\u{e}"),
-        Err(BodyFootnoteError::StructuralMarker)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
     ));
     assert!(matches!(
         edit.set_custom_mark(Some("bad\u{fffc}")),
-        Err(BodyFootnoteError::StructuralMarker)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::StructuralMarker
+        ))
     ));
     assert_unchanged(&package, &source)?;
     Ok(())
@@ -1212,8 +1243,12 @@ fn assert_insert_graph_rejection(bytes: Vec<u8>) -> TestResult {
     assert!(matches!(
         result,
         Err(BodyFootnoteError::InvalidSource
-            | BodyFootnoteError::UnsupportedDependency
-            | BodyFootnoteError::UnsupportedSource)
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedDependency
+            )
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1257,8 +1292,12 @@ fn missing_storage_uuid_registration_rejects_insert_and_remove_atomically() -> T
     assert!(matches!(
         insertion,
         Err(BodyFootnoteError::InvalidSource
-            | BodyFootnoteError::UnsupportedDependency
-            | BodyFootnoteError::UnsupportedSource)
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedDependency
+            )
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
 
@@ -1268,8 +1307,12 @@ fn missing_storage_uuid_registration_rejects_insert_and_remove_atomically() -> T
     assert!(matches!(
         removal,
         Err(BodyFootnoteError::InvalidSource
-            | BodyFootnoteError::UnsupportedDependency
-            | BodyFootnoteError::UnsupportedSource)
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedDependency
+            )
+            | BodyFootnoteError::Refused(
+                litchi_pages::footnote::body::transaction::Refusal::UnsupportedSource
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1291,8 +1334,12 @@ fn versioned_metadata_external_owner_rejects_remove_atomically() -> TestResult {
         matches!(
             &result,
             Err(BodyFootnoteError::InvalidSource
-                | BodyFootnoteError::UnsupportedDependency
-                | BodyFootnoteError::UnsupportedSource)
+                | BodyFootnoteError::Refused(
+                    litchi_pages::footnote::body::transaction::Refusal::UnsupportedDependency
+                )
+                | BodyFootnoteError::Refused(
+                    litchi_pages::footnote::body::transaction::Refusal::UnsupportedSource
+                ))
         ),
         "versioned external owner: unexpected result {result:?}"
     );
@@ -1308,8 +1355,12 @@ fn versioned_metadata_external_owner_rejects_remove_atomically() -> TestResult {
         matches!(
             &ambiguous_result,
             Err(BodyFootnoteError::InvalidSource
-                | BodyFootnoteError::UnsupportedDependency
-                | BodyFootnoteError::UnsupportedSource)
+                | BodyFootnoteError::Refused(
+                    litchi_pages::footnote::body::transaction::Refusal::UnsupportedDependency
+                )
+                | BodyFootnoteError::Refused(
+                    litchi_pages::footnote::body::transaction::Refusal::UnsupportedSource
+                ))
         ),
         "ambiguous external owner: unexpected result {ambiguous_result:?}"
     );
@@ -1324,11 +1375,15 @@ fn selectors_and_empty_graph_edges_are_typed_and_atomic() -> TestResult {
     let source = exact_bytes(&package)?;
     assert!(matches!(
         package.edit_body_footnote(Selector::index(99)),
-        Err(BodyFootnoteError::NotFound)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::NotFound
+        ))
     ));
     assert!(matches!(
         package.edit_body_footnote(Selector::at(Position::from_utf16_index(2)?)),
-        Err(BodyFootnoteError::NotFound)
+        Err(BodyFootnoteError::Refused(
+            litchi_pages::footnote::body::transaction::Refusal::NotFound
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1388,7 +1443,7 @@ fn output_limit_rejects_lifecycle_candidate_without_mutating_source() -> TestRes
     let result = package.insert_body_footnote(Position::ZERO, "limit", None);
     assert!(matches!(
         result,
-        Err(BodyFootnoteError::LimitExceeded {
+        Err(BodyFootnoteError::Limit {
             kind: litchi_pages::footnote::body::transaction::LimitKind::InputBytes
                 | litchi_pages::footnote::body::transaction::LimitKind::OutputBytes
                 | litchi_pages::footnote::body::transaction::LimitKind::EntryBytes

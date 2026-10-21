@@ -20,8 +20,12 @@ use litchi_core::{
     Error, ReadAt, Result, SequentialTextWriter, SourceVersion, TextOutputError, TextOutputOptions,
     TextOutputReport,
 };
+use litchi_odf_common::core::source_publication::{
+    SourceContentInsertionError, SourceContentInsertionPlan,
+};
 use litchi_odf_common::core::{
-    Meta, SourceBackedPackage, private::ContentDocumentValidator, validate_content_part,
+    Meta, SourceBackedPackage, SourceContentPublicationOptions, SourceContentPublicationReport,
+    private::ContentDocumentValidator, validate_content_part,
 };
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
@@ -58,11 +62,11 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 /// This type has no edit or output methods.  Use [`super::Presentation`] for
 /// the established owned-byte/mutation API.
 pub struct SourceBackedPresentation {
-    package: SourceBackedPackage,
+    pub(super) package: Arc<SourceBackedPackage>,
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
-    content_xml: String,
-    styles_xml: Option<String>,
+    content_xml: Arc<str>,
+    styles_xml: Option<Arc<str>>,
     metadata: Option<litchi_core::Metadata>,
     slides_queries: AtomicUsize,
     slides_cache: OnceLock<Option<Arc<[Slide]>>>,
@@ -75,6 +79,16 @@ pub struct SourceBackedPresentation {
     /// repairs, computed by the first [`Self::tolerance_report`] or
     /// complete slide scan.
     tolerance: OnceLock<litchi_odf_common::leniency::ToleranceReport>,
+    /// The committed output of a source-backed edit, written when this
+    /// presentation is written; reads materialize it once (record 0358a).
+    deferred: Option<Arc<Deferred>>,
+}
+
+/// The pending output of a committed source-backed presentation.
+pub(super) struct Deferred {
+    plan: SourceContentInsertionPlan,
+    options: SourceContentPublicationOptions,
+    materialized: OnceLock<SourceBackedPresentation>,
 }
 
 impl SourceBackedPresentation {
@@ -275,11 +289,11 @@ impl SourceBackedPresentation {
         }
 
         Ok(Self {
-            package,
+            package: Arc::new(package),
             source,
             source_version,
-            content_xml,
-            styles_xml,
+            content_xml: Arc::from(content_xml),
+            styles_xml: styles_xml.map(Arc::from),
             metadata,
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
@@ -287,7 +301,148 @@ impl SourceBackedPresentation {
             tolerance: OnceLock::new(),
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
+            deferred: None,
         })
+    }
+
+    /// A share of this presentation's source, retained parts and pending
+    /// output, with fresh caches.
+    pub(crate) fn share(&self) -> Self {
+        Self {
+            package: Arc::clone(&self.package),
+            source: Arc::clone(&self.source),
+            source_version: self.source_version,
+            content_xml: Arc::clone(&self.content_xml),
+            styles_xml: self.styles_xml.clone(),
+            metadata: self.metadata.clone(),
+            slides_queries: AtomicUsize::new(0),
+            slides_cache: OnceLock::new(),
+            text_queries: AtomicUsize::new(0),
+            text_cache: OnceLock::new(),
+            open_tolerance: self.open_tolerance.clone(),
+            tolerance: OnceLock::new(),
+            deferred: self.deferred.clone(),
+        }
+    }
+
+    /// A committed presentation over this one whose output `plan` writes
+    /// under `options`. `self` must not itself be committed.
+    pub(super) fn deferred(
+        &self,
+        plan: SourceContentInsertionPlan,
+        options: SourceContentPublicationOptions,
+    ) -> Self {
+        let mut committed = self.share();
+        committed.deferred = Some(Arc::new(Deferred {
+            plan,
+            options,
+            materialized: OnceLock::new(),
+        }));
+        committed
+    }
+
+    /// The presentation that serves reads and edits: the materialized output
+    /// of a committed presentation, published into memory once, or `self`.
+    pub(crate) fn effective(&self) -> Result<&Self> {
+        let Some(deferred) = &self.deferred else {
+            return Ok(self);
+        };
+        if let Some(materialized) = deferred.materialized.get() {
+            return Ok(materialized);
+        }
+        let mut bytes = Vec::new();
+        deferred
+            .plan
+            .write_to(&mut bytes, &deferred.options)
+            .map_err(|error| Error::from(OdfError::from(error)))?;
+        let materialized = Self::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))
+            .map_err(Error::from)?;
+        Ok(deferred.materialized.get_or_init(|| materialized))
+    }
+
+    /// Whether two presentations are shares of one source and pending output.
+    pub(super) fn same_share(&self, other: &Self) -> bool {
+        match (&self.deferred, &other.deferred) {
+            (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+            (None, None) => Arc::ptr_eq(&self.package, &other.package),
+            _ => false,
+        }
+    }
+
+    /// Write this presentation as a complete ODP package: the source archive,
+    /// or the committed output of a source-backed edit, which copies every
+    /// untouched member raw from the retained source (record 0358a).
+    ///
+    /// # Errors
+    ///
+    /// Returns the typed publication failure with the sink progress it
+    /// observed; a source that changed since open is refused before any byte
+    /// is written.
+    pub fn write_to<W: std::io::Write>(
+        &self,
+        writer: W,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentInsertionError> {
+        let options = match &self.deferred {
+            Some(deferred) => deferred.options.clone(),
+            None => SourceContentPublicationOptions::default(),
+        };
+        self.write_to_with_options(writer, options)
+    }
+
+    /// [`Self::write_to`] under explicit output ceilings, cancellation,
+    /// payload verification and execution policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`].
+    pub fn write_to_with_options<W: std::io::Write>(
+        &self,
+        writer: W,
+        options: SourceContentPublicationOptions,
+    ) -> std::result::Result<SourceContentPublicationReport, SourceContentInsertionError> {
+        match &self.deferred {
+            Some(deferred) => match deferred.materialized.get() {
+                Some(materialized) => materialized.write_to_with_options(writer, options),
+                None => deferred.plan.write_to(writer, options),
+            },
+            None => Ok(self.package.write_content_xml_to_stream_with_options(
+                writer,
+                self.content_xml.as_bytes(),
+                options,
+            )?),
+        }
+    }
+
+    /// Atomically replace `path` with this presentation (full durability).
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication or I/O failure; the destination is unchanged
+    /// unless the error is a committed-I/O payload.
+    #[cfg(any(unix, windows))]
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), OdfError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this presentation under explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    #[cfg(any(unix, windows))]
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), OdfError> {
+        litchi_core::atomic::save(
+            path.as_ref(),
+            durability,
+            litchi_core::atomic::Overwrite::Replace,
+            |writer| self.write_to(writer).map(drop).map_err(OdfError::from),
+            || self.check_source().map_err(OdfError::from),
+        )
     }
 
     /// Check the source identity and revision without reading a package part.
@@ -305,6 +460,11 @@ impl SourceBackedPresentation {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        if self.deferred.is_some()
+            && let Ok(materialized) = self.effective()
+        {
+            return materialized.tolerance_report();
+        }
         self.tolerance.get_or_init(|| {
             let mut merged = self.open_tolerance.clone();
             // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
@@ -328,12 +488,18 @@ impl SourceBackedPresentation {
 
     /// Borrow the validated `content.xml` snapshot.
     pub fn content_xml(&self) -> Result<&str> {
+        if self.deferred.is_some() {
+            return self.effective()?.content_xml();
+        }
         self.check_source()?;
         Ok(&self.content_xml)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot.
     pub fn styles_xml(&self) -> Result<Option<&str>> {
+        if self.deferred.is_some() {
+            return self.effective()?.styles_xml();
+        }
         self.check_source()?;
         Ok(self.styles_xml.as_deref())
     }
@@ -341,6 +507,9 @@ impl SourceBackedPresentation {
     /// Return common document metadata projected from the optional
     /// `meta.xml` part, matching [`super::Presentation::metadata`].
     pub fn metadata(&self) -> Result<litchi_core::Metadata> {
+        if self.deferred.is_some() {
+            return self.effective()?.metadata();
+        }
         self.check_source()?;
         Ok(self.metadata.clone().unwrap_or_default())
     }
@@ -354,6 +523,9 @@ impl SourceBackedPresentation {
 
     /// Parse all slides with the same semantic parser used by [`super::Presentation`].
     pub fn slides(&self) -> Result<Vec<Slide>> {
+        if self.deferred.is_some() {
+            return self.effective()?.slides();
+        }
         if let Some(cache) = self.slides_cache.get() {
             self.check_source()?;
             return self.slides_from_cache(cache);
@@ -396,6 +568,9 @@ impl SourceBackedPresentation {
     /// Parse one slide while retaining the parser's complete-document
     /// validation semantics.
     pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
+        if self.deferred.is_some() {
+            return self.effective()?.slide(index);
+        }
         if let Some(cache) = self.slides_cache.get() {
             self.check_source()?;
             return self.slide_from_cache(cache, index);
@@ -481,6 +656,9 @@ impl SourceBackedPresentation {
     /// Extract all visible presentation text with the ordinary facade's
     /// ordering and separator semantics.
     pub fn text(&self) -> Result<String> {
+        if self.deferred.is_some() {
+            return self.effective()?.text();
+        }
         if let Some(cache) = self.text_cache.get() {
             self.check_source()?;
             return self.text_from_cache(cache);
@@ -553,6 +731,17 @@ impl SourceBackedPresentation {
         output: &mut W,
         options: TextOutputOptions<'_>,
     ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+        if self.deferred.is_some() {
+            match self.effective() {
+                Ok(materialized) => return materialized.write_text_to(output, options),
+                Err(source) => {
+                    return Err(TextOutputError::Document {
+                        source,
+                        progress: TextOutputReport::default(),
+                    });
+                },
+            }
+        }
         self.check_source()
             .map_err(|source| TextOutputError::Document {
                 source,
@@ -607,6 +796,9 @@ impl SourceBackedPresentation {
     /// The selected member is decompressed only when this method is called;
     /// opening and semantic slide queries do not materialize media payloads.
     pub fn media_data(&self, media: &Reference) -> Result<Option<Vec<u8>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.media_data(media);
+        }
         self.check_source()?;
         let Some(path) = media.package_path() else {
             self.check_source()?;
@@ -628,6 +820,9 @@ impl SourceBackedPresentation {
     /// # Errors
     /// Returns an error when the source changed or the member cannot be read.
     pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        if self.deferred.is_some() {
+            return self.effective()?.member_data(path);
+        }
         self.check_source()?;
         if !self.package.has_file(path)? {
             self.check_source()?;
@@ -647,6 +842,9 @@ impl SourceBackedPresentation {
     ///
     /// Returns a source-changed, archive or family-validation failure.
     pub fn materialize(self) -> Result<crate::Package> {
+        if self.deferred.is_some() {
+            return self.effective()?.share().materialize();
+        }
         self.package
             .materialize()
             .and_then(super::Presentation::from_owned_package)

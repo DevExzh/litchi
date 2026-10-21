@@ -118,6 +118,6 @@ fn validate(value: &str) -> Result<()> {
 /// Exact-source transaction types for a rooted Pages body table name.
 pub mod transaction {
     pub use crate::package::body_table_name::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

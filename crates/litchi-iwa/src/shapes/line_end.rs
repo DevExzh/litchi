@@ -13,7 +13,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::{tsd, tsp, tswp};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::shape_line_segment;
 pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
@@ -31,7 +31,7 @@ const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
 
 #[allow(deprecated)]
 pub(crate) fn shape_line_endpoints(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Endpoints> {
@@ -71,9 +71,8 @@ pub(crate) fn shape_line_endpoints(
     Ok(endpoints)
 }
 
-#[allow(deprecated)]
 pub(crate) fn set_shape_line_endpoints(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     endpoints: Endpoints,
@@ -250,7 +249,7 @@ pub(crate) fn set_shape_line_endpoints(
 }
 
 pub(super) fn shape_payload(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<tswp::ShapeInfoArchive> {
@@ -272,7 +271,7 @@ pub(super) fn shape_payload(
 }
 
 pub(super) fn shape_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     style_id: u64,
 ) -> Result<tswp::ShapeStyleArchive> {
@@ -284,7 +283,7 @@ pub(super) fn shape_style(
 }
 
 pub(super) fn shape_style_message(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     style_id: u64,
 ) -> Result<RawMessage> {
@@ -306,7 +305,7 @@ pub(super) fn shape_style_message(
 }
 
 fn inherited_line_ends(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<(Option<tsd::LineEndArchive>, Option<tsd::LineEndArchive>)> {
     let mut visited = HashSet::new();
@@ -342,7 +341,7 @@ fn inherited_line_ends(
     )))
 }
 
-pub(super) fn object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+pub(super) fn object_archive_name(package: &HostPackage, identifier: u64) -> Result<String> {
     let mut found = None;
     for name in package.iwa_entry_names() {
         if package.archive(name)?.object(identifier).is_some()

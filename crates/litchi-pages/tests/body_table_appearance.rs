@@ -922,7 +922,7 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
 
     let changed_edit = package.edit_body_table_appearance(0usize)?;
     let changed = changed_edit.set(changed_appearance()).commit();
-    assert!(matches!(changed, Err(Error::LimitExceeded { .. })));
+    assert!(matches!(changed, Err(Error::Limit { .. })));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -1006,12 +1006,12 @@ fn changed_appearance_cows_shared_style_preserves_unknowns_and_locality() -> Tes
     assert_ne!(source, target);
     let model = model_payload(&target, FIRST_MODEL_IDENTIFIER)?;
     assert!(
-        WireView::parse(&model)?
+        WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_MODEL_FIELD)
     );
     assert!(style_payloads(&target)?.iter().any(|payload| {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));
@@ -1070,7 +1070,10 @@ fn locked_table_allows_exact_noop_but_refuses_change_atomically() -> TestResult 
         .expect_err("locked appearance must reject changes");
     assert!(matches!(
         error,
-        Error::TableLocked { .. } | Error::UnsupportedDependency { .. }
+        Error::Refused(litchi_pages::table::appearance::transaction::Refusal::TableLocked { .. })
+            | Error::Refused(
+                litchi_pages::table::appearance::transaction::Refusal::UnsupportedDependency { .. }
+            )
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -1088,6 +1091,7 @@ fn malformed_unknown_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() 
             ..tsp::Reference::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let cases = [
         ("duplicate known", duplicate_known),
@@ -1200,7 +1204,7 @@ fn finite_ingress_and_semantic_limits_refuse_before_publication() -> TestResult 
         let result = package
             .edit_body_table_appearance(0usize)
             .and_then(|edit| edit.set(changed_appearance()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before);
             refused = true;
             break;

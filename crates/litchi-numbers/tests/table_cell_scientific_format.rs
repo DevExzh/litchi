@@ -249,11 +249,15 @@ fn scientific_selectors_and_option_semantics_are_explicit() -> TestResult {
     );
     assert!(matches!(
         package.table_cell_scientific_format("missing sheet", 0usize, selected_position()),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::scientific::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_cell_scientific_format(0usize, "missing table", selected_position()),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::scientific::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let cleared = package
@@ -295,11 +299,15 @@ fn scientific_coordinate_boundaries_return_cell_not_found_without_mutation() -> 
     for position in [At::new(1, 0), At::new(0, 2), At::new(u32::MAX, u32::MAX)] {
         assert!(matches!(
             package.table_cell_scientific_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::scientific::transaction::Refusal::CellNotFound
+            ))
         ));
         assert!(matches!(
             package.edit_table_cell_scientific_format(0usize, 0usize, position),
-            Err(Error::CellNotFound)
+            Err(Error::Refused(
+                litchi_numbers::cell::data_format::scientific::transaction::Refusal::CellNotFound
+            ))
         ));
     }
     assert_eq!(package.exact_bytes(), before);
@@ -322,13 +330,13 @@ fn scientific_changed_edit_refuses_locked_table_atomically() -> TestResult {
         .expect_err("a changed Scientific edit must refuse a locked table");
     assert!(matches!(
         error,
-        Error::TableLocked {
+        Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::TableLocked {
             path: Path::Cell {
                 sheet: 0,
                 table: 0,
                 position,
             }
-        } if position == selected_position()
+        }) if position == selected_position()
     ));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
@@ -406,11 +414,11 @@ fn scientific_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
         let before = package.exact_bytes();
         assert!(matches!(
             package.table_cell_scientific_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert!(matches!(
             package.edit_table_cell_scientific_format(0usize, 0usize, selected_position()),
-            Err(Error::WrongFormatFamily { .. })
+            Err(Error::Refused(litchi_numbers::cell::data_format::scientific::transaction::Refusal::WrongFormatFamily { .. }))
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -419,15 +427,19 @@ fn scientific_wrong_family_boundaries_are_typed_and_symmetric() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.table_cell_number_format(0usize, 0usize, selected_position()),
-        Err(number_transaction::Error::WrongFormatFamily { .. })
+        Err(number_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::number::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert!(matches!(
         package.table_cell_percentage_format(0usize, 0usize, selected_position()),
-        Err(percentage_transaction::Error::WrongFormatFamily { .. })
+        Err(percentage_transaction::Error::Refused(litchi_numbers::cell::data_format::percentage::transaction::Refusal::WrongFormatFamily { .. }))
     ));
     assert!(matches!(
         package.table_cell_currency_format(0usize, 0usize, selected_position()),
-        Err(currency_transaction::Error::WrongFormatFamily { .. })
+        Err(currency_transaction::Error::Refused(
+            litchi_numbers::cell::data_format::currency::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     Ok(())
 }
@@ -721,7 +733,12 @@ fn scientific_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"scientific extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"scientific extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -747,7 +764,7 @@ fn scientific_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> Test
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -838,7 +855,12 @@ fn scientific_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() ->
     assert_rejected_or_owner(&rewrite_payload(&source, &duplicate)?)?;
 
     let mut wrong_wire = Vec::new();
-    append_length_delimited_field(&mut wrong_wire, 1, &[0x83, 0x02])?;
+    append_length_delimited_field(
+        &mut wrong_wire,
+        1,
+        &[0x83, 0x02],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut wrong_wire, 2, 2)?;
     append_varint_field(&mut wrong_wire, 4, 0)?;
     append_varint_field(&mut wrong_wire, 5, 0)?;
@@ -988,7 +1010,7 @@ fn scientific_input_and_operation_budgets_reject_before_publication() -> TestRes
         .set(fixed_scientific(30))
         .commit();
     assert!(
-        matches!(result, Err(Error::LimitExceeded { .. })),
+        matches!(result, Err(Error::Limit { .. })),
         "unexpected operation-budget result: {result:?}"
     );
     assert_eq!(exact.exact_bytes(), before);

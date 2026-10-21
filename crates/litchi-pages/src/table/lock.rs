@@ -5,7 +5,7 @@ pub use litchi_iwa_common::table::lock::State;
 
 /// Exact-source transaction types for one rooted Pages body table's
 /// interactive lock.
-pub use crate::package::table_lock::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use crate::package::table_lock::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal};
 
 #[cfg(test)]
 mod tests {

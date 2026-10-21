@@ -25,7 +25,7 @@ use crate::shapes::{
     remove_orphaned_image_asset, validate_image_asset,
 };
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkMediaEditor, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AREA_FILL_FIELD: u32 = 54;
 const BUBBLE_FILL_FIELD: u32 = 55;
@@ -130,7 +130,7 @@ impl ChartSeriesSymbolFillKind {
 }
 
 pub(crate) fn chart_series_symbol_fills(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -152,7 +152,7 @@ pub(crate) fn chart_series_symbol_fills(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_chart_series_symbol_fills(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -225,7 +225,7 @@ pub(crate) fn set_chart_series_symbol_fills(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn reset_chart_series_symbol_fill(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -268,7 +268,7 @@ pub(crate) fn reset_chart_series_symbol_fill(
 /// Embed image bytes and assign them to one data-symbol fill.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_chart_series_symbol_image_fill_data(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -287,7 +287,7 @@ pub(crate) fn set_chart_series_symbol_image_fill_data(
             series_index + 1
         )));
     }
-    let mut media = IWorkMediaEditor::from_package(package.clone())?;
+    let mut media = crate::media::Draft::from_package(package.clone())?;
     let asset = media.insert_unreferenced(preferred_filename, data)?;
     if asset.media_type != MediaType::Image {
         return Err(Error::Bundle(format!(
@@ -336,7 +336,7 @@ pub(crate) fn set_chart_series_symbol_image_fill_data(
 
 fn read_effective_fill(
     slot: &ChartSeriesStyleSlot,
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage: ChartSeriesSymbolFillKind,
 ) -> Result<ChartSeriesSymbolFill> {
     Ok(slot
@@ -474,7 +474,7 @@ fn bool_field(generated: &tsch::generated::ChartSeriesStyleArchive, field: u32) 
 }
 
 fn adjust_data_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     slot: &ChartSeriesStyleSlot,
     old_data_identifier: Option<MediaAssetId>,
     new_data_identifier: Option<MediaAssetId>,

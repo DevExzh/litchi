@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image_filename = filename(&image_path)?;
     let image = fs::read(&image_path)?;
 
-    let mut editor = pages::Editor::create_with_text(BODY_TEXT)?;
+    let mut editor = pages::Draft::create_with_text(BODY_TEXT)?;
     let created = editor.add_body_image(
         BODY_TEXT.encode_utf16().count(),
         image_filename,

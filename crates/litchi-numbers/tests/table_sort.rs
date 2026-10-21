@@ -176,6 +176,7 @@ fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult
                 &mut rewritten,
                 SORT_RULES_FIELD,
                 if index == 0 { &first } else { raw },
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
         let mut fields = rewrite_repeated_length_delimited_fields(&payload, SORT_RULES_FIELD, &[])?;
@@ -198,13 +199,23 @@ fn with_sort(
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
         data = rewrite_repeated_length_delimited_fields(&data, SORT_TRACKER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         if tracker {
             let tracker = tst::SortRuleReferenceTrackerArchive {
                 reference_tracker: reference(91),
             }
             .encode_to_vec();
-            append_length_delimited_field(&mut data, SORT_TRACKER_FIELD, &tracker)?;
+            append_length_delimited_field(
+                &mut data,
+                SORT_TRACKER_FIELD,
+                &tracker,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *model = data;
         Ok(())
@@ -219,8 +230,18 @@ fn with_duplicate_sort_field(source: &[u8]) -> TestResult<Vec<u8>> {
     )?;
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -248,7 +269,12 @@ fn with_malformed_sort_payload(
     mutate(&mut payload);
     rewrite_native_table_model(source, |_object, _message_index, model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, &payload)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *model = data;
         Ok(())
     })
@@ -535,7 +561,10 @@ fn changed_sort_rejects_locked_table_atomically() -> TestResult {
         .set(order(1, Direction::Ascending)?)
         .commit()
         .expect_err("changed persisted sort must reject a locked table");
-    assert!(matches!(error, Error::TableLocked { .. }));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_numbers::table::sort::transaction::Refusal::TableLocked { .. })
+    ));
     assert_eq!(locked.exact_bytes(), before);
     Ok(())
 }
@@ -572,8 +601,13 @@ fn malformed_sort_wire_rejects_duplicate_known_nested_fields_and_unknown_enums()
         let mut rewritten =
             rewrite_repeated_length_delimited_fields(payload, SORT_RULES_FIELD, &[])
                 .expect("clear sort rule");
-        append_length_delimited_field(&mut rewritten, SORT_RULES_FIELD, &malformed)
-            .expect("append malformed rule");
+        append_length_delimited_field(
+            &mut rewritten,
+            SORT_RULES_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("append malformed rule");
         *payload = rewritten;
     })?;
     let duplicate_rule_direction = with_malformed_sort_payload(&fixture, |payload| {
@@ -586,8 +620,13 @@ fn malformed_sort_wire_rejects_duplicate_known_nested_fields_and_unknown_enums()
         let mut rewritten =
             rewrite_repeated_length_delimited_fields(payload, SORT_RULES_FIELD, &[])
                 .expect("clear sort rule");
-        append_length_delimited_field(&mut rewritten, SORT_RULES_FIELD, &malformed)
-            .expect("append malformed rule");
+        append_length_delimited_field(
+            &mut rewritten,
+            SORT_RULES_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("append malformed rule");
         *payload = rewritten;
     })?;
     let unknown_scope = with_malformed_sort_payload(&fixture, |payload| {
@@ -693,11 +732,15 @@ fn selector_errors_are_redacted_and_public_values_are_archive_free() -> TestResu
     let package = Package::from_bytes(&without_sort(&std::fs::read(fixture_path())?)?)?;
     assert!(matches!(
         package.table_sort_order("missing sheet", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_sort_order(0usize, "missing table"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::sort::transaction::Refusal::TableNotFound
+        ))
     ));
     let order = order(1, Direction::Ascending)?;
     let rendered = format!("{order:?}");

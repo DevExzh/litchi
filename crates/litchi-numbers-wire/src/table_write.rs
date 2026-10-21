@@ -78,7 +78,8 @@ struct Field<'a> {
 }
 
 fn fields(data: &[u8]) -> Result<Vec<Field<'_>>> {
-    let view = WireView::parse(data).map_err(|_error| WriteError::Invalid)?;
+    let view = WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_error| WriteError::Invalid)?;
     Ok(view
         .fields()
         .map(|field| Field {

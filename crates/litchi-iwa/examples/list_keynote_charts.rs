@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = keynote::Editor::open(input)?;
+    let editor = keynote::Draft::open(input)?;
     for slide in editor.slides()? {
         for chart in editor.slide_charts(slide.index)? {
             let legend_font =

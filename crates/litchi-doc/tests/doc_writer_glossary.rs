@@ -39,7 +39,7 @@ use litchi_doc::writer::{
 };
 use litchi_doc::{
     Builder, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions,
-    raw::Package,
+    raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -231,7 +231,7 @@ fn glossary_with_non_plcf_fields() -> Builder {
     writer
 }
 
-fn assert_glossary(package: &mut Package<Cursor<Vec<u8>>>) {
+fn assert_glossary(package: &mut Reader<Cursor<Vec<u8>>>) {
     let document = package.document().unwrap();
     assert!(document.fib().is_glossary_document());
     let glossary = document.glossary_metadata().unwrap().unwrap();
@@ -317,7 +317,7 @@ fn glossary_only_document_round_trips_through_write_to() {
 
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_glossary(&mut package);
 }
 
@@ -333,7 +333,7 @@ fn glossary_only_document_round_trips_through_file_save_and_can_be_cleared() {
     writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(path).unwrap();
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     assert_glossary(&mut package);
 }
 
@@ -372,7 +372,7 @@ fn glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs() {
     writer.set_glossary_metadata(metadata(3));
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         package.document().unwrap().glossary_item_text(0).unwrap(),
         Some("😀")
@@ -389,7 +389,7 @@ fn glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs() {
 #[test]
 fn template_secondary_fib_exposes_passive_attached_glossary() {
     let bytes = attached_template_bytes(|_, _| {});
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.fib().is_template());
     assert!(!document.fib().is_glossary_document());
@@ -412,7 +412,7 @@ fn distinct_attached_glossary_round_trips_through_public_writer() {
 
     let mut output = Cursor::new(Vec::new());
     template.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     assert!(document.fib().is_template());
@@ -460,7 +460,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
 
     let mut output = Cursor::new(Vec::new());
     template.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package
         .document_with_options(OpenOptions::default().password("secret".to_owned().into()))
         .unwrap();
@@ -495,7 +495,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let data = ole.open_stream(&["Data"]).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let document = package.document().unwrap();
     assert!(document.text().unwrap().starts_with("Template\r"));
     let attached = document.attached_glossary().unwrap().unwrap();
@@ -573,7 +573,7 @@ fn attached_glossary_exposes_typed_inert_fields() {
 
     let mut output = Cursor::new(Vec::new());
     template.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let attached = document.attached_glossary().unwrap().unwrap();
 
@@ -600,7 +600,7 @@ fn attached_glossary_reconstructs_all_fields_excluded_from_plcfld() {
 
     let mut output = Cursor::new(Vec::new());
     template.build().unwrap().write_to(&mut output).unwrap();
-    let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let attached = document.attached_glossary().unwrap().unwrap();
 
@@ -668,7 +668,7 @@ fn malformed_attached_fib_topologies_are_deferred_and_rejected() {
     ];
 
     for bytes in cases {
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let document = package.document().unwrap();
         assert!(document.attached_glossary().is_err());
         assert!(!document.text().unwrap().is_empty());

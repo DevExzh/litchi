@@ -111,7 +111,7 @@ pub(super) fn movie_creation_values(options: PagesMovieOptions) -> Result<(Drawa
     Ok((geometry, options.duration_seconds()))
 }
 
-pub(super) fn movie_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
+pub(super) fn movie_style_id(package: &HostPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
@@ -138,7 +138,7 @@ pub(super) fn movie_style_id(package: &IWorkPackage, root: &PagesDocumentRootFac
         .ok_or_else(|| Error::InvalidFormat("Pages theme has no movie style preset".to_owned()))
 }
 
-pub(super) fn body_movie_infos(editor: &Editor) -> Result<Vec<MovieInfo>> {
+pub(super) fn body_movie_infos(editor: &Draft) -> Result<Vec<MovieInfo>> {
     let body: StorageArchive = decode_typed_package_object(
         editor.package(),
         editor.body_storage_id.get(),
@@ -228,7 +228,7 @@ fn movie_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool>
     Ok(flags.audio_only() != Some(true) && flags.is_live_video() != Some(true))
 }
 
-pub(super) fn body_movie_graph(editor: &Editor, drawable_object_id: u64) -> Result<BodyMovieGraph> {
+pub(super) fn body_movie_graph(editor: &Draft, drawable_object_id: u64) -> Result<BodyMovieGraph> {
     let info = body_movie_infos(editor)?
         .into_iter()
         .find(|movie| movie.drawable_object_id == drawable_object_id)
@@ -466,7 +466,7 @@ pub(super) fn body_movie_graph(editor: &Editor, drawable_object_id: u64) -> Resu
 }
 
 fn movie_info(
-    package: &IWorkPackage,
+    package: &HostPackage,
     body_storage_id: u64,
     archive_name: &str,
     identifier: u64,
@@ -515,7 +515,6 @@ fn movie_info(
     })
 }
 
-#[allow(deprecated)]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn movie_objects(
     ids: MovieObjectIds,
@@ -635,7 +634,7 @@ pub(super) fn movie_objects(
 }
 
 pub(super) fn set_movie_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     geometry: DrawableGeometry,
@@ -674,7 +673,7 @@ pub(super) fn set_movie_geometry(
 }
 
 pub(super) fn set_movie_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     properties: &DrawableProperties,
@@ -716,7 +715,7 @@ pub(super) fn set_movie_properties(
 }
 
 pub(super) fn set_movie_attachment_position(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     attachment_id: u64,
     position: DrawablePoint,
@@ -800,7 +799,7 @@ fn pages_movie_object(
 }
 
 fn object_has_message_type(
-    package: &IWorkPackage,
+    package: &HostPackage,
     identifier: u64,
     message_type: u32,
 ) -> Result<bool> {

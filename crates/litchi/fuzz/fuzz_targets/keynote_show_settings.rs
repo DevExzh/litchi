@@ -198,7 +198,9 @@ fn exercise_soundtrack_settings(package: &Package, data: &[u8]) {
         Ok(None) => {
             assert!(matches!(
                 package.edit_soundtrack_settings(),
-                Err(SoundtrackError::SoundtrackNotFound)
+                Err(SoundtrackError::Refused(
+                    litchi::keynote::soundtrack::Refusal::SoundtrackNotFound
+                ))
             ));
             return;
         },

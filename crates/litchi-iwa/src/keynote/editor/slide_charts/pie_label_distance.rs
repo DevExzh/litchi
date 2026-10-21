@@ -7,7 +7,7 @@ use crate::charts::pie_label_distance::{
 };
 use crate::charts::{ChartPieLabelDistance, ChartPieWedgeIndex};
 
-impl Editor {
+impl Draft {
     /// Read every pie or donut wedge's label distance in chart-series order.
     pub fn slide_chart_pie_label_distances(
         &self,
@@ -62,7 +62,7 @@ impl Editor {
 }
 
 fn slide_chart_pie_label_distances(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartPieLabelDistance>> {
@@ -84,7 +84,7 @@ fn slide_chart_pie_label_distances(
 }
 
 fn set_slide_chart_pie_label_distances(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     distances: &[ChartPieLabelDistance],
@@ -122,7 +122,7 @@ fn set_slide_chart_pie_label_distances(
         "Keynote",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_pie_label_distances(slide_index, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Keynote chart pie label-distance update failed validation".to_owned(),

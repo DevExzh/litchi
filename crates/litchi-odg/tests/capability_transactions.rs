@@ -409,7 +409,10 @@ fn shape_text_with_several_paragraphs_is_unsupported() {
     let mut edit = source.edit();
     let error = edit.set_shape_text(0, 0, "new").unwrap_err();
     assert!(
-        matches!(error, litchi_core::Error::Unsupported(_)),
+        matches!(
+            error,
+            litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+        ),
         "{error:?}"
     );
 }

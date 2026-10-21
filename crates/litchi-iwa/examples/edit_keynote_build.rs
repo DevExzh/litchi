@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let operation = arguments.next().ok_or(usage())?;
     let object_id = arguments.next().ok_or(usage())?.parse::<u64>()?;
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     match operation.as_str() {
         "add" => {
             let mut settings = match arguments.next().as_deref() {
@@ -398,7 +398,7 @@ fn usage() -> &'static str {
 }
 
 fn add_typed_build(
-    editor: &mut keynote::Editor,
+    editor: &mut keynote::Draft,
     slide_index: usize,
     object_id: u64,
     mut settings: keynote::BuildSettings,

@@ -8,11 +8,5 @@
 
 /// Exact-source table-relocation transaction values.
 pub use crate::package::table_relocation::{
-    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
 };
-
-/// Compatibility namespace for code that groups focused transactions below
-/// `table::relocation::transaction`.
-pub mod transaction {
-    pub use super::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path};
-}

@@ -20,12 +20,7 @@ use litchi_core::detection::FileFormat;
 use litchi_core::detection::simd_utils::{check_office_signatures, signature_matches};
 use litchi_core::detection::{rtf, utils};
 
-#[cfg(any(
-    feature = "odt",
-    feature = "ods",
-    feature = "odp",
-    feature = "odf-objects"
-))]
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
 use litchi_odf_common::detect as odf;
 
 /// Detect file format from a file path.
@@ -192,12 +187,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
         return None;
     }
 
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     if let Some(result) = odf::flat(bytes, odf::Limits::default()).ok().flatten() {
         return Some(result);
     }
@@ -220,19 +210,9 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
         // malformed ZIPs (where the catalog probe deliberately returns None).
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         {
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             let normal_odf = is_normal_odf_package(bytes);
-            #[cfg(not(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            )))]
+            #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
             let normal_odf = false;
 
             // First try OOXML detection (most common), except for a
@@ -247,12 +227,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
         }
 
         // Then try ODF detection
-        #[cfg(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ))]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         if let Some(result) = odf::bytes(bytes, odf::Limits::default()).ok().flatten() {
             return Some(result);
         }
@@ -287,12 +262,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
 }
 
 #[cfg(all(
-    any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ),
+    any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
 fn is_normal_odf_package(bytes: &[u8]) -> bool {
@@ -368,12 +338,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
 
         #[cfg(any(
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-            any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ),
+            any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
             feature = "pages",
             feature = "keynote",
             feature = "numbers"
@@ -382,12 +347,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             && signature_matches(&header[..header_len], utils::ZIP_SIGNATURE)
         {
             #[cfg(all(
-                any(
-                    feature = "odt",
-                    feature = "ods",
-                    feature = "odp",
-                    feature = "odf-objects"
-                ),
+                any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             {
@@ -448,22 +408,12 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             }
 
             #[cfg(all(
-                not(any(
-                    feature = "odt",
-                    feature = "ods",
-                    feature = "odp",
-                    feature = "odf-objects"
-                )),
+                not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)),
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             let normal_odf = false;
             #[cfg(all(
-                any(
-                    feature = "odt",
-                    feature = "ods",
-                    feature = "odp",
-                    feature = "odf-objects"
-                ),
+                any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             let normal_odf = odf::packaged_has_ooxml_catalog_from_reader(
@@ -480,12 +430,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                 }
             }
 
-            #[cfg(any(
-                feature = "odt",
-                feature = "ods",
-                feature = "odp",
-                feature = "odf-objects"
-            ))]
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 if let Some(format) = odf::reader(reader, odf::Limits::default()).ok().flatten() {
@@ -512,12 +457,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             return Some(FileFormat::Rtf);
         }
 
-        #[cfg(any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ))]
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         if header[..header_len]
             .iter()
             .copied()
@@ -545,12 +485,7 @@ mod tests {
     use std::io::Write;
 
     #[test]
-    #[cfg(any(
-        feature = "odt",
-        feature = "ods",
-        feature = "odp",
-        feature = "odf-objects"
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     fn detects_flat_odf_bytes_and_reader() {
         let xml = br#"<?xml version="1.0"?><o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" o:mimetype="application/vnd.oasis.opendocument.chart"><o:body><o:chart/></o:body></o:document>"#;
         assert_eq!(detect_file_format_from_bytes(xml), Some(FileFormat::Odc));
@@ -565,12 +500,7 @@ mod tests {
 
     #[test]
     #[cfg(all(
-        any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ),
+        any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     fn packaged_odf_detection_handles_ordinary_and_malformed_catalogs() {
@@ -629,12 +559,7 @@ mod tests {
 
     #[test]
     #[cfg(all(
-        any(
-            feature = "odt",
-            feature = "ods",
-            feature = "odp",
-            feature = "odf-objects"
-        ),
+        any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     fn packaged_odf_reader_handoff_covers_each_enabled_family_without_opc_probe() {

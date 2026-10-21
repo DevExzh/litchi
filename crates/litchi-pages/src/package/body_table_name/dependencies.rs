@@ -196,7 +196,9 @@ fn rooted_calculation_engine<'a>(
         .get_index(engine_object.component_index)
         .ok_or(Error::InvalidSource)?;
     if !is_calculation_engine_component(engine_component.name()) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::name::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let engine_message = unique_message(engine_object, CALCULATION_ENGINE_MESSAGE_TYPE, budget)?
         .ok_or(Error::InvalidSource)?;
@@ -272,7 +274,9 @@ fn reject_selected_model_pivot(
         }
     }
     if pivot.is_some() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::name::transaction::Refusal::UnsupportedSource,
+        ));
     }
     Ok(())
 }
@@ -284,7 +288,7 @@ fn pivot_owner_identifier(
     let remaining_fields = budget.remaining_wire_fields();
     let remaining_work = budget.remaining_wire_work();
     if !source.is_empty() && (remaining_fields == 0 || remaining_work == 0) {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: if remaining_fields == 0 {
                 super::LimitKind::WireFields
             } else {
@@ -331,7 +335,7 @@ fn pivot_owner_identifier(
         }
         pivot = Some(parse_local_reference(field.payload(), budget)?);
     }
-    let max_depth = u32::try_from(max_depth).map_err(|_| Error::LimitExceeded {
+    let max_depth = u32::try_from(max_depth).map_err(|_| Error::Limit {
         kind: super::LimitKind::WireNesting,
         observed: u64::MAX,
         maximum: usize_to_u64(budget.wire_limits().max_nesting()),
@@ -388,7 +392,9 @@ fn validate_formula_owner_payload(
     }
     if let Some(volatile) = owner.volatile_dependencies() {
         if volatile_name_cells_present(volatile, budget)? {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::table::name::transaction::Refusal::UnsupportedSource,
+            ));
         }
     }
     Ok(())
@@ -710,7 +716,7 @@ fn dependency_options(
 ) -> Result<dependency_codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     if source_len > limits.max_input_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: super::LimitKind::WireBytes,
             observed: usize_to_u64(source_len),
             maximum: usize_to_u64(limits.max_input_bytes()),
@@ -721,21 +727,21 @@ fn dependency_options(
     let remaining_work = budget.remaining_wire_work();
     let remaining_references = budget.remaining_payload_references();
     if source_len != 0 && remaining_fields == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: super::LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     if source_len != 0 && remaining_work == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
     }
     if source_len != 0 && remaining_references == 0 {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: super::LimitKind::PayloadReferences,
             observed: 1,
             maximum: 0,
@@ -815,7 +821,7 @@ fn map_dependency_error(error: dependency_codec::DecodeError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(maximum),
@@ -828,7 +834,7 @@ fn map_raw_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => super::LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => super::LimitKind::WireOutputBytes,

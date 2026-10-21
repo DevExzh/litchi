@@ -1,13 +1,13 @@
 //! Transactional named paragraph-style redefinition from one applied override chain.
 
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::paragraph_alignment::{native, storage};
 use super::paragraph_style_apply::{applied_named_paragraph_style, apply_named_paragraph_style};
 use litchi_iwa_text::paragraph::style::{NamedParagraphStyle, raw::native_id};
 
 pub(super) fn redefine_applied_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
 ) -> Result<NamedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;

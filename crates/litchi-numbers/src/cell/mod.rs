@@ -14,7 +14,7 @@ pub mod data_format;
 /// [`crate::Package::edit_table_cell_text_style`].
 pub mod text_style {
     pub use crate::package::table_cell_text_style::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
     pub use litchi_iwa_text_wire::CharacterProperties;
 }

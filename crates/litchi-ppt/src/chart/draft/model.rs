@@ -1,7 +1,7 @@
 //! A standalone Graph chart-package draft and its borrowed read view.
 
 use litchi_ograph::Limits;
-use litchi_ograph::chart::{Chart as SemanticChart, Context};
+use litchi_ograph::chart::{Context, Model as SemanticChart};
 
 use super::codec;
 use crate::package::{Error, Result};

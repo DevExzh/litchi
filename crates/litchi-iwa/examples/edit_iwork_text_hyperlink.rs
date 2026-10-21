@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextHyperlinkTarget, TextRange, TextStorageId};
+use litchi_iwa::text::{TextHyperlinkTarget, TextRange, TextStorageId};
 use litchi_iwa_text::hyperlink::raw::{from_object_id, object_id as native_object_id};
 
 const USAGE: &str = "usage:\n  edit_iwork_text_hyperlink list <input> <storage-id>\n  edit_iwork_text_hyperlink add <input> <output> <storage-id> <start> <end> <target>\n  edit_iwork_text_hyperlink update <input> <output> <storage-id> <hyperlink-id> <start> <end> <target>\n  edit_iwork_text_hyperlink remove <input> <output> <storage-id> <hyperlink-id>";
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input = arguments.next().ok_or(USAGE)?;
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             require_end(arguments)?;
-            let editor = IWorkTextEditor::open(input)?;
+            let editor = litchi_iwa::text::Draft::open(input)?;
             for hyperlink in editor.text_hyperlinks(storage_id)? {
                 println!(
                     "id={} range={}..{} target={}",
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let range = parse_range(&mut arguments)?;
             let target = TextHyperlinkTarget::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             let hyperlink = editor.add_text_hyperlink(storage_id, range, target)?;
             editor.save(output)?;
             println!("created hyperlink {}", native_object_id(hyperlink.id));
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let range = parse_range(&mut arguments)?;
             let target = TextHyperlinkTarget::try_from(arguments.next().ok_or(USAGE)?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.update_text_hyperlink(storage_id, hyperlink_id, range, target)?;
             editor.save(output)?;
             println!("updated hyperlink {}", native_object_id(hyperlink_id));
@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let hyperlink_id = from_object_id(parse_u64(arguments.next(), "hyperlink-id")?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.remove_text_hyperlink(storage_id, hyperlink_id)?;
             editor.save(output)?;
             println!("removed hyperlink {}", native_object_id(hyperlink_id));

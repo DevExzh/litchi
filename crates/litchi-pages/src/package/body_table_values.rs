@@ -60,31 +60,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No body table matches the selector.
-    #[error("no body table matches the selector")]
-    TableNotFound,
-    /// The cell is outside the table, or a number is not finite.
-    #[error("cell outside the table or value not finite")]
-    InvalidCell,
-    /// The cell holds a formula, or a formula or chart reads it.
-    #[error("the cell takes part in a formula graph")]
-    Formulas,
-    /// The cell storage is outside the shared writer (a legacy tile, a
-    /// missing tile, a rich-text, formula or commented cell).
-    #[error("the table's cell storage is outside the shared writer")]
-    UnsupportedStorage,
-    /// Commit was requested before staging a cell.
-    #[error("no body-table cell value is staged")]
-    NoStagedOperation,
-    /// The source cannot publish an exact changed artifact.
-    #[error("source representation does not support body-table values")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
     #[error("rooted body-table source is invalid")]
     InvalidSource,
     /// A finite transaction limit was exceeded.
     #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed amount.
@@ -106,6 +91,54 @@ pub enum Error {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No body table matches the selector.
+    #[error("no body table matches the selector")]
+    TableNotFound,
+    /// The cell is outside the table, or a number is not finite.
+    #[error("cell outside the table or value not finite")]
+    InvalidCell,
+    /// The cell holds a formula, or a formula or chart reads it.
+    #[error("the cell takes part in a formula graph")]
+    Formulas,
+    /// The cell storage is outside the shared writer (a legacy tile, a
+    /// missing tile, a rich-text, formula or commented cell).
+    #[error("the table's cell storage is outside the shared writer")]
+    UnsupportedStorage,
+    /// Commit was requested before staging a cell.
+    #[error("no body-table cell value is staged")]
+    NoStagedOperation,
+    /// The source cannot publish an exact changed artifact.
+    #[error("source representation does not support body-table values")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidCell { .. } => RefusalKind::InvalidValue,
+            Self::Formulas { .. }
+            | Self::UnsupportedStorage { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::NoStagedOperation { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 impl From<litchi_iwa_core::Error> for Error {
     fn from(error: litchi_iwa_core::Error) -> Self {
         match error {
@@ -118,13 +151,15 @@ impl From<litchi_iwa_core::Error> for Error {
 }
 
 fn storage_error(_error: table_write::WriteError) -> Error {
-    Error::UnsupportedStorage
+    Error::Refused(Refusal::UnsupportedStorage)
 }
 
 fn style_error(error: super::section_text_style::Error) -> Error {
     use super::section_text_style::Error as E;
     match error {
-        E::UnsupportedSource => Error::UnsupportedSource,
+        E::Refused(crate::section::text_style::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
         E::Allocation { amount } => Error::Allocation { amount },
         _ => Error::InvalidSource,
     }
@@ -244,15 +279,15 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidCell`] outside the table or for a non-finite number.
+    /// [`Refusal::InvalidCell`] outside the table or for a non-finite number.
     pub fn set(&mut self, row: u32, column: u32, value: Value) -> Result<&mut Self, Error> {
         if row >= self.rows || column >= self.columns {
-            return Err(Error::InvalidCell);
+            return Err(Error::Refused(Refusal::InvalidCell));
         }
         if let Value::Number(number) = value
             && !number.is_finite()
         {
-            return Err(Error::InvalidCell);
+            return Err(Error::Refused(Refusal::InvalidCell));
         }
         self.cells.retain(|(r, c, _)| (*r, *c) != (row, column));
         self.cells
@@ -266,12 +301,12 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`]; [`Error::Formulas`] for a cell in a
-    /// formula graph; [`Error::UnsupportedStorage`]; source, resource and
+    /// [`Refusal::NoStagedOperation`]; [`Refusal::Formulas`] for a cell in a
+    /// formula graph; [`Refusal::UnsupportedStorage`]; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
         if self.cells.is_empty() {
-            return Err(Error::NoStagedOperation);
+            return Err(Error::Refused(Refusal::NoStagedOperation));
         }
         let candidate = publish(&self)?;
         let read = candidate
@@ -340,11 +375,15 @@ impl Staged<'_> {
 
 fn reference(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     for field in view.fields() {
         if field.number() == number {
-            let inner = litchi_iwa_common::wire::WireView::parse(field.payload())
-                .map_err(|_error| Error::InvalidSource)?;
+            let inner = litchi_iwa_common::wire::WireView::parse(
+                field.payload(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(|_error| Error::InvalidSource)?;
             for value in inner.fields() {
                 if value.number() == 1 {
                     let (identifier, _) =
@@ -360,7 +399,8 @@ fn reference(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
 
 fn varint(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     for field in view.fields() {
         if field.number() == number && field.wire_type() == 0 {
             let (value, _) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
@@ -373,7 +413,8 @@ fn varint(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
 
 fn message(payload: &[u8], number: u32) -> Result<Vec<&[u8]>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     Ok(view
         .fields()
         .filter(|field| field.number() == number && field.wire_type() == 2)
@@ -429,8 +470,11 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             message(headers, 2)?
                 .into_iter()
                 .map(|bucket| {
-                    let view = litchi_iwa_common::wire::WireView::parse(bucket)
-                        .map_err(|_error| Error::InvalidSource)?;
+                    let view = litchi_iwa_common::wire::WireView::parse(
+                        bucket,
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )
+                    .map_err(|_error| Error::InvalidSource)?;
                     let field = view.fields().next().ok_or(Error::InvalidSource)?;
                     litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
                         .map(|(value, _)| value)
@@ -446,11 +490,11 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             .map_err(storage_error)?
         {
             FormulaState::Inert => {},
-            _ => return Err(Error::Formulas),
+            _ => return Err(Error::Refused(Refusal::Formulas)),
         }
         let tile = *tile_ids
             .get(&(u64::from(*row) / size))
-            .ok_or(Error::UnsupportedStorage)?;
+            .ok_or(Error::Refused(Refusal::UnsupportedStorage))?;
         let local = u32::try_from(u64::from(*row) % size).map_err(|_error| Error::InvalidSource)?;
         let (tile_type, tile_payload) = staged.payload(tile, &[TILE])?;
         let tile_payload = tile_payload.to_vec();
@@ -490,7 +534,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         if delta != 0 {
             let bucket = *buckets
                 .get((*row / HEADER_BUCKET_ROWS) as usize)
-                .ok_or(Error::UnsupportedStorage)?;
+                .ok_or(Error::Refused(Refusal::UnsupportedStorage))?;
             let (bucket_type, payload) = staged.payload(bucket, &[HEADER_BUCKET])?;
             let adjusted =
                 table_write::header_adjust(payload, *row, delta).map_err(storage_error)?;
@@ -510,7 +554,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let limits = catalog.limits();
     let archive_limits = limits
         .effective_archive_limits()
-        .map_err(|_error| Error::UnsupportedSource)?;
+        .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     let mut members: BTreeMap<String, Archive> = BTreeMap::new();
     for (identifier, (message_type, payload)) in staged.payloads {
         let member = component_name_of(package, identifier).map_err(style_error)?;
@@ -546,7 +590,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let bytes = catalog
         .package()
         .reassemble_with_changes_to_bytes(&[], &edits, &[], limits)
-        .map_err(|_error| Error::UnsupportedSource)?;
+        .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     let candidate = Package::from_bytes_with_archive_limits(&bytes, limits)
         .map_err(|_error| Error::Verification)?;
     let after = candidate.state.source.package();
@@ -581,7 +625,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::TableNotFound`]; source errors.
+    /// [`Refusal::TableNotFound`]; source errors.
     pub fn edit_body_table_values<'table, S>(&self, selector: S) -> Result<Edit<'_>, Error>
     where
         S: Into<BodyTableSelector<'table>>,
@@ -589,10 +633,13 @@ impl Package {
         let target = self
             .resolve_body_table(selector.into())
             .map_err(|error| match error {
-                table_lock::Error::TableNotFound | table_lock::Error::AmbiguousTableName => {
-                    Error::TableNotFound
+                table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound)
+                | table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
+                    Error::Refused(Refusal::TableNotFound)
                 },
-                table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+                table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
+                    Error::Refused(Refusal::UnsupportedSource)
+                },
                 _ => Error::InvalidSource,
             })?;
         let info = target.drawable_identifier.get();

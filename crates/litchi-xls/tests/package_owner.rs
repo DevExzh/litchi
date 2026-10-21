@@ -7,7 +7,9 @@
 use litchi_cfb::{OleFile, OleFileLimits, OleWriter, SharedOleFile, consts::STGTY_STREAM};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_xls::package::{Error as PackageError, Package};
-use litchi_xls::{Builder, OpenOptions, SourceBackedError, SourceBackedLimits, SourceLimits};
+use litchi_xls::{
+    Builder, OpenOptions, SourceBackedError, SourceBackedLimits, SourceBackedOptions, SourceLimits,
+};
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -234,7 +236,7 @@ fn signed_owner_publishes_exactly_but_refuses_editing() {
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
-    assert!(package.edit_snapshot().is_err());
+    assert!(package.edit().is_err());
 }
 
 #[test]
@@ -302,21 +304,22 @@ fn retained_narrow_profile_allows_noop_but_refuses_entry_and_input_growth() {
             .unwrap();
 
     let cfb_limits = OleFileLimits::new(u64::try_from(bytes.len()).unwrap()).unwrap();
-    let object_limits = litchi_ole_common::object::Limits::default();
-    let snapshot = package
-        .edit_snapshot_with_limits(object_limits, cfb_limits)
+    let options = litchi_xls::package::edit::EditOptions::new().cfb_limits(cfb_limits);
+    let noop = package
+        .edit_with_options(options)
+        .unwrap()
+        .commit()
         .unwrap();
-    let noop = snapshot.edit().commit().unwrap();
-    assert_eq!(noop.snapshot().bytes(), bytes.as_slice());
+    assert_eq!(noop.package().to_bytes().unwrap(), bytes);
 
-    let mut growing = snapshot.edit();
-    growing.rename_sheet(0_usize.into(), "Renamed").unwrap();
+    let mut growing = package.edit_with_options(options).unwrap();
+    growing.rename_sheet(0_usize, "Renamed").unwrap();
     assert!(growing.commit().is_err());
 
     let too_small = OleFileLimits::new(u64::try_from(bytes.len() - 1).unwrap()).unwrap();
     assert!(
         package
-            .edit_snapshot_with_limits(object_limits, too_small)
+            .edit_with_options(litchi_xls::package::edit::EditOptions::new().cfb_limits(too_small))
             .is_err()
     );
 }
@@ -327,9 +330,8 @@ fn transformed_source_handoff_retains_original_entry_limits() {
     let limits = exact_source_limits(&bytes);
     let package =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits)).unwrap();
-    let snapshot = litchi_xls::raw::cell_values_snapshot_from_bytes(&package, bytes).unwrap();
-    let mut edit = snapshot.edit();
-    edit.rename_sheet(0_usize.into(), "Renamed").unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.rename_sheet(0_usize, "Renamed").unwrap();
     assert!(edit.commit().is_err());
 }
 
@@ -358,26 +360,31 @@ fn primary_commit_updates_projection_and_supports_exact_inverse_and_replay() {
         Some(CellValue::Float(8.5))
     );
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), bytes);
+    assert_eq!(restored.package().to_bytes().unwrap(), bytes);
     let reopened = Package::from_bytes(&bytes).unwrap();
     let applied = reopened.apply(commit.patch()).unwrap();
     assert_eq!(
-        applied.to_bytes().unwrap(),
+        applied.package().to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    assert!(applied.apply(commit.patch()).is_err());
+    assert!(applied.package().apply(commit.patch()).is_err());
     let destination = ScratchFile::new("primary-commit");
-    applied.save(destination.path()).unwrap();
+    applied.package().save(destination.path()).unwrap();
     assert_eq!(
         Package::open(destination.path())
             .unwrap()
             .to_bytes()
             .unwrap(),
-        applied.to_bytes().unwrap()
+        applied.package().to_bytes().unwrap()
     );
     let (package, patch) = commit.into_parts();
     assert_eq!(
-        package.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        package
+            .apply(&patch.inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
 }
@@ -444,8 +451,11 @@ fn primary_retains_narrow_object_profile_through_commit_inverse_and_explicit_wid
         .unwrap();
     let commit = edit.commit().unwrap();
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
-    assert_eq!(restored.to_bytes().unwrap(), bytes);
-    let mut grow = restored.edit_with_options(EditOptions::default()).unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), bytes);
+    let mut grow = restored
+        .package()
+        .edit_with_options(EditOptions::default())
+        .unwrap();
     grow.rename_sheet(0_usize, "LongerSheetName").unwrap();
     assert!(grow.commit().is_err());
 
@@ -491,6 +501,7 @@ fn primary_structural_edits_preserve_leaf_dependency_checks() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         bytes
@@ -614,7 +625,7 @@ fn primary_default_followup_retains_explicit_wider_profile() {
             .edit()
             .unwrap()
             .options()
-            .get_object_limits()
+            .object_limits_value()
             .max_stream_size,
         limits.max_stream_size
     );
@@ -638,7 +649,7 @@ fn primary_default_followup_retains_explicit_wider_profile() {
             .edit()
             .unwrap()
             .options()
-            .get_cfb_limits()
+            .cfb_limits_value()
             .max_input_bytes(),
         maximum
     );
@@ -657,7 +668,7 @@ fn primary_default_followup_retains_explicit_wider_profile() {
             .edit()
             .unwrap()
             .options()
-            .get_cfb_limits()
+            .cfb_limits_value()
             .max_input_bytes(),
         maximum
     );
@@ -697,6 +708,7 @@ fn primary_transfer_uses_package_donor_and_is_reversible() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -745,9 +757,9 @@ fn scalar_transfer_package() -> Vec<u8> {
 
 #[test]
 fn primary_source_commit_retains_query_limits_and_positional_projection() {
-    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at_with_limits(
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(litchi_core::OwnedSource::new(authored_package())),
-        SourceBackedLimits::default().with_max_text_cells(1),
+        SourceBackedOptions::new().limits(SourceBackedLimits::default().with_max_text_cells(1)),
     )
     .unwrap();
     let source = Package::from_source(workbook).unwrap();
@@ -798,6 +810,7 @@ fn minimal_creation_supports_native_edits_and_exact_inverse() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         original
@@ -834,6 +847,7 @@ fn first_cell_in_empty_sheet_repairs_later_sheet_offsets() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         *bytes.get_ref()

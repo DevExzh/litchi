@@ -23,9 +23,7 @@ use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_table_title_codec, table_info_codec};
@@ -98,6 +96,33 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the selected Keynote slide-table title source is invalid")]
+    InvalidSource,
+    #[error(
+        "Keynote slide-table title {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote slide-table title transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote slide-table title failed semantic verification")]
+    Verification,
+    #[error("the Keynote slide-table title patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     #[error("this Keynote source does not support physical slide-table title edits")]
     UnsupportedSource,
     #[error("the requested Keynote slide-table title graph is outside the supported scope")]
@@ -114,22 +139,32 @@ pub enum Error {
     TablePositionNotFound { position: Position },
     #[error("the selected Keynote table is locked")]
     Locked,
-    #[error("the selected Keynote slide-table title source is invalid")]
-    InvalidSource,
-    #[error(
-        "Keynote slide-table title {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    #[error("could not allocate {amount} units for the Keynote slide-table title transaction")]
-    Allocation { amount: usize },
-    #[error("the edited Keynote slide-table title failed semantic verification")]
-    Verification,
-    #[error("the Keynote slide-table title patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::TablePositionNotFound { .. } => RefusalKind::NotFound,
+            Self::Locked { .. } => RefusalKind::Protected,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -195,7 +230,7 @@ impl TitleBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -283,7 +318,7 @@ impl TitleBudget {
         self.work(report.reference_bytes())?;
         self.nesting = self.nesting.max(report.max_depth() as usize);
         if self.nesting > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: self.nesting as u64,
                 maximum: self.max_nesting as u64,
@@ -512,6 +547,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -625,7 +666,7 @@ fn commit_edit(
         });
     }
     if selection.locked {
-        return Err(Error::Locked);
+        return Err(Error::Refused(Refusal::Locked));
     }
     let mut budget = TitleBudget::new(source)?;
     let (candidate, deleted_previews) = rewrite_title(source, selection, after, &mut budget)?;
@@ -704,9 +745,9 @@ fn select_table(
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound {
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
             position: slide_position,
-        })?;
+        }))?;
     let (_slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -756,7 +797,7 @@ fn select_table(
             .iter()
             .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
         }
         let (model_message_index, model_payload) = unique_message(model, TABLE_MODEL_MESSAGE_TYPE)?;
         let before_snapshot = decode_title(model_payload, package, &mut budget)?;
@@ -793,9 +834,9 @@ fn select_table(
     ) = tables
         .get(table_position.get())
         .cloned()
-        .ok_or(Error::TablePositionNotFound {
+        .ok_or(Error::Refused(Refusal::TablePositionNotFound {
             position: table_position,
-        })?;
+        }))?;
     ensure_unique_identity(package, table_info_identifier)?;
     ensure_unique_identity(package, model_identifier)?;
     ensure_unique_table_owner(
@@ -896,8 +937,8 @@ fn rewrite_title(
         .with_output_bytes(output_bound)
         .and_then(|limits| limits.with_rewrite_work(original.len().saturating_mul(8).max(1)))
         .map_err(map_wire_error)?;
-    let rewritten = patch_nested_fields_batched_with_limits(original, &edits, limits)
-        .map_err(map_wire_error)?;
+    let rewritten =
+        patch_nested_fields_batched(original, &edits, limits).map_err(map_wire_error)?;
     let verified = decode_title(&rewritten, source, budget)?;
     if Settings::new(
         verified.table_name_enabled(),
@@ -1029,7 +1070,7 @@ fn validate_visible_prerequisites(
         || style.deprecated_is_external().is_some()
         || shape.deprecated_is_external().is_some()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_model_style_metadata(
         model,
@@ -1064,7 +1105,7 @@ fn require_style_object(
             budget.work(1)?;
             if object.archive_info.identifier == Some(identifier) {
                 if matched.replace((component.name(), object)).is_some() {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
             }
         }
@@ -1074,7 +1115,7 @@ fn require_style_object(
         || object.archive_info.message_infos.len() != 1
         || object.messages[0].type_ != message_type
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     validate_message_header(object, 0)
 }
@@ -1228,7 +1269,7 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut result = Vec::new();
     result
         .try_reserve_exact(
@@ -1254,7 +1295,7 @@ fn repeated_references(
 }
 
 fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_fields = fields
         .fields()
         .filter(|field| field.number() == TABLE_SUPER_FIELD)
@@ -1262,8 +1303,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     if super_fields.len() != 1 || super_fields[0].wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_fields[0].payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_fields[0].payload(), limits).map_err(map_wire_error)?;
     let parents = drawable
         .fields()
         .filter(|field| field.number() == DRAWABLE_PARENT_FIELD)
@@ -1275,7 +1315,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
@@ -1291,7 +1331,7 @@ fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
                 }
                 identifier = Some(value);
             },
-            2 | 3 => return Err(Error::UnsupportedDependency),
+            2 | 3 => return Err(Error::Refused(Refusal::UnsupportedDependency)),
             _ => {},
         }
     }
@@ -1353,7 +1393,7 @@ fn ensure_unique_identity(package: &Package, identifier: u64) -> Result<(), Erro
         }
     }
     if total != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1421,7 +1461,7 @@ fn ensure_unique_table_owner(
         }
     }
     if owned_count != 1 || z_order_count != 1 || !selected_slide || model_owners != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1577,15 +1617,15 @@ fn resolve_slide_position(
         SlideSelector::Position(position) => Ok(position),
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(Error::EmptySlideName);
+                return Err(Error::Refused(Refusal::EmptySlideName));
             }
             package
                 .show()
                 .map_err(map_read_error)?
                 .select_slide(selector)
-                .map_err(|_| Error::AmbiguousSelector)?
+                .map_err(|_| Error::Refused(Refusal::AmbiguousSelector))?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -1603,7 +1643,7 @@ fn same_selection(left: &TitleSelection, right: &TitleSelection) -> bool {
 fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -1619,7 +1659,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::References => LimitKind::References,
                 _ => LimitKind::WireWork,
@@ -1656,7 +1696,7 @@ fn map_title_codec_error(error: numbers_table_title_codec::DecodeError) -> Error
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -1673,7 +1713,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1698,7 +1738,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

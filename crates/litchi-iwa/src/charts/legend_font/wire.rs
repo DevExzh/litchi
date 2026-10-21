@@ -14,7 +14,7 @@ use crate::wire::{
     patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschlegendmodeldefaultlabelparagraphstyleindex`.
 const LEGEND_LABEL_PARAGRAPH_STYLE_INDEX_FIELD: u32 = 2;
@@ -93,7 +93,7 @@ pub(super) fn patch_direct_paragraph_style_index(
 }
 
 pub(super) fn patch_existing_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     size: Option<ChartFontSize>,
 ) -> Result<()> {
@@ -165,7 +165,7 @@ pub(super) fn patch_existing_size(
 }
 
 pub(super) fn patch_existing_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     expected: &crate::text::paragraph_alignment::native::ParagraphStyleOverrides,
 ) -> Result<()> {

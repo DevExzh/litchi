@@ -88,7 +88,7 @@ pub struct Reader<R: Read + Seek> {
 /// let options = OpenOptions::new()
 ///     .password("example-password")
 ///     .leniency(Leniency::Strict);
-/// assert_eq!(options.get_leniency(), Leniency::Strict);
+/// assert_eq!(options.leniency_value(), Leniency::Strict);
 /// assert!(!format!("{options:?}").contains("example-password"));
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -143,13 +143,13 @@ impl<'a> OpenOptions<'a> {
 
     /// Return the selected physical source policy.
     #[must_use]
-    pub const fn get_source_limits(&self) -> SourceLimits {
+    pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
     }
 
     /// Password used for BIFF8 password-to-open encryption.
     #[must_use]
-    pub const fn get_password(&self) -> Option<&'a str> {
+    pub const fn password_value(&self) -> Option<&'a str> {
         self.password
     }
 
@@ -161,7 +161,7 @@ impl<'a> OpenOptions<'a> {
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn get_leniency(&self) -> Leniency {
+    pub const fn leniency_value(&self) -> Leniency {
         self.leniency
     }
 
@@ -174,7 +174,7 @@ impl<'a> OpenOptions<'a> {
 
     /// Current explicit workbook compatibility profile.
     #[must_use]
-    pub const fn get_compatibility_profile(&self) -> crate::CompatibilityProfile {
+    pub const fn compatibility_profile_value(&self) -> crate::CompatibilityProfile {
         self.compatibility_profile
     }
 

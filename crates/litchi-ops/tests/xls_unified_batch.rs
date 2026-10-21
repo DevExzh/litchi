@@ -16,7 +16,7 @@ use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimi
 use litchi_ops::{
     BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, PropValue, Props, SourceMode, props,
 };
-use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Snapshot, Value};
+use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Value};
 
 const A1: &str = "/sheet[1]/A1";
 const B1: &str = "/sheet[1]/B1";
@@ -106,8 +106,8 @@ fn formula_fixture() -> Vec<u8> {
 
 fn fixture_with_blank() -> Vec<u8> {
     let source = fixture();
-    let snapshot = Snapshot::from_bytes(source).expect("open blank fixture source");
-    let mut edit = snapshot.edit();
+    let package = litchi_xls::Package::from_bytes(&source).expect("open blank fixture source");
+    let mut edit = package.edit().expect("edit blank fixture");
     edit.insert_cell(
         Selector::Position(Position::new(0)),
         Reference::new(1, 2).expect("blank reference"),
@@ -116,9 +116,9 @@ fn fixture_with_blank() -> Vec<u8> {
     .expect("insert formatting-only blank");
     edit.commit()
         .expect("commit blank fixture")
-        .snapshot()
-        .bytes()
-        .to_vec()
+        .package()
+        .to_bytes()
+        .expect("serialize blank fixture")
 }
 
 fn rich_fixture() -> Vec<u8> {
@@ -132,8 +132,8 @@ fn rich_fixture() -> Vec<u8> {
         .expect("build rich fixture")
         .to_bytes()
         .expect("serialize rich fixture");
-    let snapshot = Snapshot::from_bytes(bytes).expect("open rich fixture");
-    let mut edit = snapshot.edit();
+    let package = litchi_xls::Package::from_bytes(&bytes).expect("open rich fixture");
+    let mut edit = package.edit().expect("edit rich fixture");
     edit.insert_rich_text_cell(
         Selector::Position(Position::new(0)),
         Reference::new(0, 0).expect("rich reference"),
@@ -146,9 +146,9 @@ fn rich_fixture() -> Vec<u8> {
     .expect("insert rich cell");
     edit.commit()
         .expect("commit rich fixture")
-        .snapshot()
-        .bytes()
-        .to_vec()
+        .package()
+        .to_bytes()
+        .expect("serialize rich fixture")
 }
 
 struct Owner {

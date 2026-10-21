@@ -44,7 +44,7 @@ fn formula_at(snapshot: &Snapshot, row: u32, column: u32) -> (Option<String>, Op
 #[test]
 fn formulas_are_authored_into_absent_and_scalar_cells() {
     let bytes = fixture();
-    let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let source = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
     let original_style = source
         .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
@@ -113,7 +113,7 @@ fn formulas_are_authored_into_absent_and_scalar_cells() {
 
 #[test]
 fn existing_formula_cells_and_bad_expressions_are_refused_atomically() {
-    let source = Snapshot::from_bytes(fixture()).unwrap();
+    let source = Snapshot::from_bytes(fixture(), Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.set_formula(Selector::Position(Position::new(0)), reference(0, 0), "B1")
         .unwrap();

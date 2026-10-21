@@ -7,7 +7,7 @@ use crate::charts::radar_start_angle::{
     set_chart_radar_start_angle as set_native_chart_radar_start_angle,
 };
 
-impl Editor {
+impl Draft {
     /// Read one radar chart's `Rotation Angle`.
     pub fn sheet_chart_radar_start_angle(
         &self,
@@ -51,7 +51,7 @@ impl Editor {
             graph.info.kind,
             angle,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.sheet_chart_radar_start_angle(sheet_id, drawable_object_id)? != angle {
             return Err(Error::InvalidFormat(
                 "Numbers radar chart start-angle update failed validation".to_owned(),

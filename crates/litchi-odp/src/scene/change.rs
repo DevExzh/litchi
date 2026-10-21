@@ -465,15 +465,19 @@ fn invalid(message: impl Into<String>) -> Error {
 
 /// The refusal of a text set that would replace `element`, content that
 /// is not text (record 0304).
-fn dropped(element: &str) -> Error {
-    unsupported(format!(
-        "an ODP text set would replace {element}, which is not text: set the text of the runs \
-         around it, or remove it first"
-    ))
+fn dropped(_element: &str) -> Error {
+    unsupported(
+        "an ODP text set would replace content that is not text: set the text of the runs \
+         around it, or remove it first",
+    )
 }
 
-fn unsupported(message: impl Into<String>) -> Error {
-    Error::Unsupported(message.into())
+fn unsupported(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odp.scene",
+        reason,
+    ))
 }
 
 fn missing(what: &str) -> Error {
@@ -566,12 +570,10 @@ pub(crate) fn plan(xml: &str, scene: &Scene, changes: &[Change]) -> Result<Plan>
 }
 
 impl<'a> Planner<'a> {
-    fn prefix(&self, prefix: Option<&'a String>, namespace: &str) -> Result<&'a str> {
-        prefix.map(String::as_str).ok_or_else(|| {
-            unsupported(format!(
-                "the ODP content root does not bind the {namespace} namespace"
-            ))
-        })
+    fn prefix(&self, prefix: Option<&'a String>, _namespace: &str) -> Result<&'a str> {
+        prefix
+            .map(String::as_str)
+            .ok_or_else(|| unsupported("the ODP content root does not bind the namespace"))
     }
 
     fn text_prefix(&self) -> Result<&'a str> {
@@ -695,7 +697,7 @@ impl<'a> Planner<'a> {
     }
 
     /// The prefix the content root binds to `uri`.
-    fn root_prefix(&self, uri: &str, namespace: &str) -> Result<String> {
+    fn root_prefix(&self, uri: &str, _namespace: &str) -> Result<String> {
         let start = self
             .xml
             .find('<')
@@ -715,11 +717,9 @@ impl<'a> Planner<'a> {
             .find('>')
             .ok_or_else(|| invalid("ODP content root is malformed"))?;
         let root = StartTag::parse(&self.xml[cursor..=cursor + end])?;
-        root.prefix_of(uri).map(str::to_owned).ok_or_else(|| {
-            unsupported(format!(
-                "the ODP content root does not bind the {namespace} namespace"
-            ))
-        })
+        root.prefix_of(uri)
+            .map(str::to_owned)
+            .ok_or_else(|| unsupported("the ODP content root does not bind the namespace"))
     }
 
     fn set_run_link(

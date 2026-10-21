@@ -101,7 +101,7 @@ fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
 
 fn adversarial_reference(identifier_value: u64, sentinel: u64) -> TestResult<Vec<u8>> {
     let canonical = reference(identifier_value).encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let identifier_field = view
         .fields()
         .find(|field| field.number() == 1)
@@ -178,7 +178,7 @@ fn raw_show(topology: Topology, noncanonical_mode: bool) -> TestResult<Vec<u8>> 
         ..Default::default()
     }
     .encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut show = Vec::with_capacity(canonical.len().saturating_add(tree.len()));
     for field in view.fields() {
         match field.number() {
@@ -388,15 +388,17 @@ fn slide_tree_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    let show_view = WireView::parse(&show.data)?;
+    let show_view = WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let tree = show_view
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("missing synthetic slide tree"))?;
-    Ok(WireView::parse(tree.payload())?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(tree.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
@@ -406,10 +408,12 @@ fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    Ok(WireView::parse(&show.data)?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_message_range(stream: &[u8]) -> TestResult<std::ops::Range<usize>> {
@@ -482,28 +486,34 @@ fn selectors_validate_source_before_final_destination_and_bound_one_operation() 
     let mut missing_position = package.edit_slide_order();
     assert!(matches!(
         missing_position.move_slide(Position::new(99), Position::new(99)),
-        Err(SlideOrderError::SlidePositionNotFound { position }) if position == Position::new(99)
+        Err(SlideOrderError::Refused(litchi_keynote::slide::order::Refusal::SlidePositionNotFound { position })) if position == Position::new(99)
     ));
     let mut missing_name = package.edit_slide_order();
     assert!(matches!(
         missing_name.move_slide("Missing", Position::new(99)),
-        Err(SlideOrderError::SlideNameNotFound)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::SlideNameNotFound
+        ))
     ));
     let mut bad_destination = package.edit_slide_order();
     assert!(matches!(
         bad_destination.move_slide(0usize, Position::new(4)),
-        Err(SlideOrderError::DestinationOutOfRange { position, slide_count: 4 })
+        Err(SlideOrderError::Refused(litchi_keynote::slide::order::Refusal::DestinationOutOfRange { position, slide_count: 4 }))
             if position == Position::new(4)
     ));
     let mut one = package.edit_slide_order();
     one.move_slide(0usize, Position::new(1))?;
     assert!(matches!(
         one.move_slide(1usize, Position::new(0)),
-        Err(SlideOrderError::OperationAlreadyStaged)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert!(matches!(
         package.edit_slide_order().commit(),
-        Err(SlideOrderError::NoStagedOperation)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::NoStagedOperation
+        ))
     ));
 
     let ambiguous_bytes = package_bytes(Topology::Flat, ["Same", "Same", "C", "D"], false)?;
@@ -511,7 +521,9 @@ fn selectors_validate_source_before_final_destination_and_bound_one_operation() 
     let mut edit = ambiguous.edit_slide_order();
     assert!(matches!(
         edit.move_slide(SlideSelector::name("Same"), Position::new(0)),
-        Err(SlideOrderError::AmbiguousSelector)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::AmbiguousSelector
+        ))
     ));
     Ok(())
 }
@@ -680,7 +692,12 @@ fn mutation_rejects_nonflat_or_aliased_identity_but_reader_remains_compatible() 
         let mut changed = package.edit_slide_order();
         changed.move_slide(0usize, Position::new(1))?;
         assert!(
-            matches!(changed.commit(), Err(SlideOrderError::UnsupportedTopology)),
+            matches!(
+                changed.commit(),
+                Err(SlideOrderError::Refused(
+                    litchi_keynote::slide::order::Refusal::UnsupportedTopology
+                ))
+            ),
             "{topology:?}"
         );
 
@@ -729,7 +746,9 @@ fn legacy_physical_source_allows_exact_noop_but_refuses_changed_reassembly() -> 
     changed.move_slide(0usize, Position::new(1))?;
     assert!(matches!(
         changed.commit(),
-        Err(SlideOrderError::UnsupportedSource)
+        Err(SlideOrderError::Refused(
+            litchi_keynote::slide::order::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -782,7 +801,7 @@ fn slide_limit_is_inclusive_and_typed_for_transaction_staging() -> TestResult<()
     let mut limited_edit = one_under.edit_slide_order();
     assert!(matches!(
         limited_edit.move_slide(0usize, Position::new(1)),
-        Err(SlideOrderError::LimitExceeded {
+        Err(SlideOrderError::Limit {
             kind: SlideOrderLimitKind::Slides,
             observed,
             maximum,

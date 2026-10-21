@@ -2,7 +2,7 @@
 
 use super::*;
 
-impl Editor {
+impl Draft {
     /// Duplicate an ordinary sheet-owned text box with independent storage.
     ///
     /// The shape, stand-in title and caption, and writable storage are cloned
@@ -85,7 +85,7 @@ impl Editor {
                 offset,
             )?;
         }
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         let new_storage_id = crate::text::native_storage_id(new_storage_id)?;
         text_editor.set_text(new_storage_id, text)?;
         staged = text_editor.into_package();

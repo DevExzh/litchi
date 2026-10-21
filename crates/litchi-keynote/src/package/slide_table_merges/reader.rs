@@ -123,7 +123,7 @@ impl MergeReader {
         let options = Profile::from_options(options).map_err(map_read_error)?;
         let length = u64::try_from(bytes.len()).map_err(|_| Error::InvalidSource)?;
         if length > options.archive().max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: super::LimitKind::InputBytes,
                 observed: length,
                 maximum: options.archive().max_input_bytes(),
@@ -213,14 +213,16 @@ impl MergeReader {
 
 fn map_read_error(error: ReadError) -> Error {
     match error {
-        ReadError::UnexpectedFormat { .. } => Error::UnsupportedSource,
+        ReadError::UnexpectedFormat { .. } => {
+            Error::Refused(crate::slide::table::merge::transaction::Refusal::UnsupportedSource)
+        },
         ReadError::Archive(error) => map_archive_error(error),
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_semantic_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
@@ -230,7 +232,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_payload_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
@@ -251,7 +253,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_archive_limit(kind),
             observed,
             maximum,
@@ -365,7 +367,9 @@ mod tests {
         );
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::Error::SlideNameNotFound)
+            Err(super::super::Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::SlideNameNotFound
+            ))
         ));
         assert_eq!(
             reader
@@ -564,7 +568,7 @@ mod tests {
         )?;
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::Error::LimitExceeded {
+            Err(super::super::Error::Limit {
                 kind: super::super::LimitKind::References,
                 observed: 6,
                 maximum: 5,
@@ -588,7 +592,9 @@ mod tests {
         .expect("semantic-only Keynote package");
         assert!(matches!(
             package.slide_table_merges(SlideSelector::index(0), TableSelector::index(0)),
-            Err(super::super::Error::UnsupportedSource)
+            Err(super::super::Error::Refused(
+                crate::slide::table::merge::transaction::Refusal::UnsupportedSource
+            ))
         ));
     }
 }

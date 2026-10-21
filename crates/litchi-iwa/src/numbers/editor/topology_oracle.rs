@@ -10,10 +10,10 @@
 use super::package::TableTopologyMutation;
 use super::*;
 
-/// One row or column edit, for [`Editor::__edit_table_topology_unverified`].
+/// One row or column edit, for [`Draft::__edit_table_topology_unverified`].
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum UnverifiedTopologyEdit {
+pub enum UnverifiedAxisChange {
     /// Insert a row.
     InsertRow(RowInsertion),
     /// Insert a column.
@@ -24,7 +24,7 @@ pub enum UnverifiedTopologyEdit {
     RemoveColumn(ColumnDeletion),
 }
 
-impl Editor {
+impl Draft {
     /// Stage one row or column edit without the post-edit appearance
     /// verification of the public methods. Differential tests only.
     ///
@@ -35,21 +35,19 @@ impl Editor {
     pub fn __edit_table_topology_unverified(
         &mut self,
         selector: litchi_numbers::TableSelector<'_>,
-        edit: UnverifiedTopologyEdit,
+        edit: UnverifiedAxisChange,
     ) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let mutation = match edit {
-            UnverifiedTopologyEdit::InsertRow(insertion) => {
+            UnverifiedAxisChange::InsertRow(insertion) => {
                 TableTopologyMutation::InsertRow(insertion)
             },
-            UnverifiedTopologyEdit::InsertColumn(insertion) => {
+            UnverifiedAxisChange::InsertColumn(insertion) => {
                 TableTopologyMutation::InsertColumn(insertion)
             },
-            UnverifiedTopologyEdit::RemoveRow(deletion) => {
-                TableTopologyMutation::RemoveRow(deletion)
-            },
-            UnverifiedTopologyEdit::RemoveColumn(deletion) => {
+            UnverifiedAxisChange::RemoveRow(deletion) => TableTopologyMutation::RemoveRow(deletion),
+            UnverifiedAxisChange::RemoveColumn(deletion) => {
                 TableTopologyMutation::RemoveColumn(deletion)
             },
         };
