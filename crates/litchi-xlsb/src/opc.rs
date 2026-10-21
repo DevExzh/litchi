@@ -309,11 +309,11 @@ mod tests {
             .apply_graph(reopened_source.opc_package())
             .expect("reopened forward source replay");
         assert_eq!(
-            reopened_replayed
-                .content_types_source_bytes()
-                .expect("reopened replayed raw source allocation")
-                .as_slice(),
-            replacement.as_slice()
+            Package::from_opc(reopened_replayed)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            after.to_bytes().unwrap()
         );
         let restored = patch
             .0
@@ -338,15 +338,11 @@ mod tests {
             .apply_graph(reopened_after.opc_package())
             .expect("reopened inverse source replay");
         assert_eq!(
-            reopened_restored
-                .content_types_source_bytes()
-                .expect("reopened restored source allocation")
-                .as_slice(),
-            source
-                .opc_package()
-                .content_types_source_bytes()
-                .expect("original source allocation")
-                .as_slice()
+            Package::from_opc(reopened_restored)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            source.to_bytes().unwrap()
         );
     }
 

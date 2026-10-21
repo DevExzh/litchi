@@ -278,19 +278,24 @@ impl ContentTypesImage {
     /// publication view and the admitted source allocation: comparing only
     /// source bytes would accept an unrelated typed manifest overlay.
     fn matches_base(&self, package: &OpcPackage) -> Result<bool> {
-        let current = match package.retained_content_types_xml()? {
-            Some(bytes) => bytes,
+        let retained = package.retained_content_types_xml()?;
+        let current = match retained.as_ref() {
+            Some(bytes) => Arc::clone(bytes),
             None => package.authored_content_types_xml(package.read_limits())?,
         };
         if current.as_slice() != self.publication.as_slice() {
             return Ok(false);
         }
         if self.source {
-            let has_source = package.content_types_source_bytes().is_some();
-            let source_matches = package
-                .content_types_source_bytes()
+            let source = package.content_types_source_bytes();
+            let source_matches = source
+                .as_ref()
                 .is_some_and(|bytes| bytes.as_slice() == self.bytes.as_slice());
-            return Ok(has_source && source_matches);
+            // A source member that still binds to the typed graph is the
+            // publication already checked above. Reopening can regenerate
+            // that publication and discard an invalid, non-published source
+            // image, so provenance is optional when the publication matches.
+            return Ok(source_matches || source.is_none() || retained.is_some());
         }
         Ok(true)
     }
