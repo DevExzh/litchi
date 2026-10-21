@@ -222,8 +222,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> AxisSupportError {
         litchi_iwa_common::Error::Allocation { amount, .. } => {
             AxisSupportError::Allocation { amount }
         },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => AxisSupportError::InvalidSource,
+        _ => AxisSupportError::InvalidSource,
     }
 }
 

@@ -235,7 +235,7 @@ impl From<litchi_iwa_common::Error> for Error {
             },
             litchi_iwa_common::Error::Allocation { amount, .. } => Self::Allocation { amount },
             litchi_iwa_common::Error::InvalidLimit { .. } => Self::InvalidLimits,
-            invalid @ litchi_iwa_common::Error::InvalidFormat(_) => Self::IwaCommon(invalid),
+            other => Self::IwaCommon(other),
         }
     }
 }

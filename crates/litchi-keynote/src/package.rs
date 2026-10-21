@@ -4041,6 +4041,7 @@ fn map_wire_preflight_error(
         | litchi_iwa_common::Error::InvalidLimit { .. }) => {
             ReadError::InvalidFormat(format!("{context} wire preflight failed: {other}"))
         },
+        _ => ReadError::InvalidFormat(format!("{context} wire preflight failed")),
     }
 }
 

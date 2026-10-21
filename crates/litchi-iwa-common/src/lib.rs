@@ -67,6 +67,7 @@ impl std::fmt::Display for LimitKind {
 
 /// Errors produced while validating shared IWA wire data.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The input or requested mutation is not a valid bounded protobuf wire
     /// representation.

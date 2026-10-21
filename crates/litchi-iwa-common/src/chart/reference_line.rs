@@ -12,6 +12,7 @@ const NATIVE_CUSTOM: i32 = 5;
 
 /// Construction failures for chart reference-line values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A custom reference-line value was not finite.
     #[error("chart reference-line value must be finite")]

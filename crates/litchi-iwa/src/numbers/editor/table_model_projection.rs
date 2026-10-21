@@ -606,11 +606,6 @@ fn classify_candidate(
 
     match scan {
         Ok(()) => budget.charge_shape_scan(scanner.report)?,
-        Err(error @ litchi_iwa_common::Error::LimitExceeded { .. })
-        | Err(error @ litchi_iwa_common::Error::Allocation { .. })
-        | Err(error @ litchi_iwa_common::Error::InvalidLimit { .. }) => {
-            return Err(Error::IwaCommon(error));
-        },
         Err(litchi_iwa_common::Error::InvalidFormat(_))
             if message_type == LEGACY_MODEL_TYPE && present != REQUIRED =>
         {
@@ -621,6 +616,7 @@ fn classify_candidate(
             budget.charge_malformed(source)?;
             return Ok(CandidateClassification::Malformed);
         },
+        Err(error) => return Err(Error::IwaCommon(error)),
     }
 
     if message_type == LEGACY_MODEL_TYPE && present != REQUIRED {

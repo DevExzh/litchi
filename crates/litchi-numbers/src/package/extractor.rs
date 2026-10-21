@@ -1552,9 +1552,7 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
                 })
             },
             litchi_iwa_common::Error::InvalidFormat(_) => Ok(false),
-            common_error @ (litchi_iwa_common::Error::LimitExceeded { .. }
-            | litchi_iwa_common::Error::Allocation { .. }
-            | litchi_iwa_common::Error::InvalidLimit { .. }) => Err(Error::Common(common_error)),
+            common_error => Err(Error::Common(common_error)),
         };
     }
     if present != REQUIRED {

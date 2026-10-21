@@ -434,8 +434,7 @@ impl Error {
                 litchi_iwa_common::Error::Allocation { amount, .. } => {
                     Some(ResourceError::Allocation { amount: *amount })
                 },
-                litchi_iwa_common::Error::InvalidFormat(_)
-                | litchi_iwa_common::Error::InvalidLimit { .. } => None,
+                _ => None,
             },
             Self::Io(_)
             | Self::Archive(_)

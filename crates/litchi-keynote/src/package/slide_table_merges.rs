@@ -319,8 +319,7 @@ fn map_merge_error(error: MergeReadError) -> Error {
         litchi_iwa_common::Error::Allocation { amount, .. } => {
             Error::Allocation { amount: *amount }
         },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

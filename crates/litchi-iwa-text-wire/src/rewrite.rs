@@ -919,6 +919,7 @@ fn map_common_wire_error(error: CommonWireError) -> RewriteError {
             value,
             maximum,
         },
+        _ => RewriteError::InvalidFormat("shared wire decoder rejected source".into()),
     }
 }
 

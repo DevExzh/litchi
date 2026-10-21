@@ -8139,6 +8139,11 @@ fn map_wire_error(error: WireError, header: HeaderKind) -> Error {
         | WireError::InvalidLimit { .. }) => {
             Error::header_codec(header, HeaderOperation::Decode, other.to_string())
         },
+        _ => Error::header_codec(
+            header,
+            HeaderOperation::Decode,
+            "shared wire decoder rejected header",
+        ),
     }
 }
 

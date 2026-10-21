@@ -1018,8 +1018,7 @@ fn map_common_error(error: litchi_iwa_common::Error) -> ReadError {
             maximum: usize_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => ReadError::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => ReadError::InvalidFormat,
+        _ => ReadError::InvalidFormat,
     }
 }
 

@@ -2,6 +2,7 @@
 
 /// Validation failures for shape-path controls.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The corner radius was not finite.
     #[error("corner radius must be finite")]

@@ -17,6 +17,7 @@ const SECONDS_PER_DAY: f64 = 86_400.0;
 
 /// Validation failures for conditional-highlight values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A numeric operand was not finite.
     #[error("conditional-highlight numbers must be finite")]

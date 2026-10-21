@@ -126,6 +126,8 @@ pub mod builder {
 }
 impl strict::Package { pub fn to_bytes(&self) -> Vec<u8> { vec![] } }
 impl strict::Patch { pub fn to_bytes(&self) -> Vec<u8> { vec![] } }
+pub mod closed_error { pub enum Error { Invalid } }
+pub mod extensible_error { #[non_exhaustive] pub enum Error { Invalid } }
 pub fn with_limits() {}
 pub fn open_with_limits() {}
 pub fn open_with_options() {}
@@ -223,6 +225,12 @@ class RustdocTests(unittest.TestCase):
                 "write_to", "to_bytes", "save", "publish_to_stream",
             )
         })
+
+    def test_inventory_requires_non_exhaustive_error_enums(self):
+        errors = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
+                  if kind == "exhaustive_error"}
+        self.assertIn("fixture::closed_error::Error", errors)
+        self.assertNotIn("fixture::extensible_error::Error", errors)
 
     def test_empty_rules_pass_real_graph_with_cycles(self):
         self.assertEqual(self.check(), [])

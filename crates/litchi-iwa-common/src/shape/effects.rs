@@ -2,6 +2,7 @@
 
 /// Validation failures for normalized shape-effect values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// Shape opacity was not finite.
     #[error("shape opacity must be finite")]

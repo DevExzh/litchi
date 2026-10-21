@@ -13,6 +13,7 @@ gate sees. Each row names one public item that a migration wave must change:
 - commit_snapshot, into_workbook, is_changed, rollback, transaction_type;
 - edit_output: artifact output on an Edit instead of its committed Package;
 - unsafe_edit: an `UnsafeEdit` error variant (item 17);
+- exhaustive_error: a public Error enum missing #[non_exhaustive] (item 17);
 - with_limits: a public `with_limits` or `*_with_limits` entry point (items 18-19).
 
 Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
@@ -137,6 +138,9 @@ def rows(document, crate: str):
                     and gate.is_edit_output(name)):
                 yield "edit_output", text, receiver, "commit().package() owns artifact output"
         elif kind in ("struct", "enum", "type_alias"):
+            if (kind == "enum" and name == "Error"
+                    and not {"non_exhaustive", "#[non_exhaustive]"}.intersection(item.get("attrs", []))):
+                yield "exhaustive_error", text, kind, "add #[non_exhaustive]; migrate exhaustive consumers"
             members = methods.get(path, set())
             if surface.foreign.get(path) == CORE_COMMIT:
                 # An alias of the shared commit (record 0356 P4): rustdoc lists
