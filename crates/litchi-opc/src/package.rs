@@ -910,10 +910,11 @@ impl OpcPackage {
             .source_content_types_xml
             .as_ref()
             .is_some_and(|source| source.as_slice() != replacement.as_slice());
-        if current.bytes() == replacement.as_slice() && !source_differs {
+        let signed = self.is_signed() || self.requires_signature_edit_policy();
+        if current.bytes() == replacement.as_slice() && (!source_differs || signed) {
             return Ok(false);
         }
-        if self.is_signed() || self.requires_signature_edit_policy() {
+        if signed {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
@@ -976,10 +977,11 @@ impl OpcPackage {
             .source_content_types_xml
             .as_ref()
             .is_some_and(|source| source.as_slice() != replacement.bytes());
-        if current.bytes() == replacement.bytes() && !source_differs {
+        let signed = self.is_signed() || self.requires_signature_edit_policy();
+        if current.bytes() == replacement.bytes() && (!source_differs || signed) {
             return Ok(false);
         }
-        if self.is_signed() || self.requires_signature_edit_policy() {
+        if signed {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
 
