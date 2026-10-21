@@ -982,11 +982,10 @@ impl OpcPackage {
         owner: &PackURI,
         relationships: &Relationships,
     ) -> Result<Option<&[u8]>> {
-        let binding = RelationshipBinding::from_relationships(relationships)?;
         Ok(self
             .source_relationships_xml
             .get(owner)
-            .filter(|source| source.binding == binding)
+            .filter(|source| source.binding.matches(relationships))
             .map(|source| source.bytes.as_slice()))
     }
 
