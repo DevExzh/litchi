@@ -234,12 +234,6 @@ pub use external_links::{
 };
 pub use formula::Formula;
 pub use header_footer::{SectionKind, Settings, parse_worksheet_header_footer};
-pub use hyperlinks::{
-    Commit as HyperlinkCommit, Diagnostics as HyperlinkDiagnostics, Patch as HyperlinkPatch,
-    Snapshot as HyperlinkSnapshot, SourceBackedEditor as SourceBackedHyperlinkEditor,
-    SourceBackedHyperlinkCommit, SourceBackedHyperlinkPatch, SourceBackedHyperlinkSnapshot,
-    SourceEdit as SourceBackedHyperlinkEdit,
-};
 pub use hyperlinks::{Hyperlink, HyperlinkReference};
 pub use ignored_errors::{
     IgnoredError, IgnoredErrorRangeReference, IgnoredErrorType, IgnoredErrors,
@@ -289,12 +283,6 @@ pub use streaming::{
 // Query-table semantic types remain under the contextual `query_table` owner;
 // its package reads are also available at this convenience facade (edits go
 // through `Package::edit_query_tables`).
-pub use data_validation::{
-    Commit as DataValidationCommit, Diagnostics as DataValidationDiagnostics,
-    Patch as DataValidationPatch, Snapshot as DataValidationSnapshot,
-    SourceBackedEditor as SourceBackedDataValidationEditor,
-    SourceEdit as SourceBackedDataValidationEdit,
-};
 pub use query_table::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
     find_worksheet_query_table, is_query_table_relationship_type, load_worksheet_query_tables,
@@ -320,14 +308,10 @@ pub use scenarios::{
 };
 pub use sheet::{Name, NameError};
 pub use sheet_protection::{
-    Commit as SheetProtectionCommit, Diagnostics as SheetProtectionDiagnostics, Metadata,
-    Patch as SheetProtectionPatch, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource,
-    Protection, ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
-    ProtectionRangeSqref, Snapshot as SheetProtectionSnapshot,
-    SourceBackedEditor as SourceBackedSheetProtectionEditor,
-    SourceEdit as SourceBackedSheetProtectionEdit, StrongProtectionPasswordVerifier,
-    parse_protection, replace_protection, validate_metadata, write_core, write_extensions,
-    write_protection,
+    Metadata, ProtectedRange, ProtectedRangeCollection, ProtectedRangeSource, Protection,
+    ProtectionPasswordVerifier, ProtectionRangeReference, ProtectionRangeReferenceKind,
+    ProtectionRangeSqref, StrongProtectionPasswordVerifier, parse_protection, replace_protection,
+    validate_metadata, write_core, write_extensions, write_protection,
 };
 pub use sheet_view::parse_worksheet_views;
 pub use sort::{SortBy, SortCondition, SortMethod, SortState};

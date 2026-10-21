@@ -225,7 +225,7 @@ impl crate::workbook::source::SourceBackedWorkbook {
     /// Returns a typed parse error for a malformed persons part, and the
     /// source, cancellation and limit errors of every source-backed read.
     pub fn people(&self) -> Result<Option<crate::threaded_comments::People>> {
-        let inner = &self.inner;
+        let inner = &self.view()?.inner;
         inner.execution_check()?;
         let value = crate::threaded_comments::package::source_people(&inner.package)?;
         inner.execution_check()?;
@@ -241,7 +241,7 @@ impl crate::workbook::source::SourceBackedWorkbook {
     /// Returns a typed parse error for malformed `dxfs` markup, and the
     /// source, cancellation and limit errors of every source-backed read.
     pub fn differential_formats(&self) -> Result<Vec<crate::conditional_formatting::Differential>> {
-        let inner = &self.inner;
+        let inner = &self.view()?.inner;
         inner.execution_check()?;
         let Some(uri) = inner.styles_uri.as_ref() else {
             return Ok(Vec::new());

@@ -75,7 +75,7 @@ impl SourceBackedWorkbook {
     /// format table, belongs to another workbook, or the source changed or the
     /// read was cancelled.
     pub fn format(&self, style: Option<&StyleKey>) -> Result<Option<Format>> {
-        self.inner.format(style)
+        self.view()?.inner.format(style)
     }
 
     /// Release the parsed format table retained for [`Self::format`], unless
@@ -85,7 +85,7 @@ impl SourceBackedWorkbook {
     /// The table is a clean cached value: releasing it changes no result, and
     /// the next formatting read parses the styles part again.
     pub fn release_cached_formats(&self) -> bool {
-        self.inner.formats.trim_clean()
+        self.current().formats.trim_clean()
     }
 }
 
@@ -375,8 +375,11 @@ mod tests {
             bytes,
             revision: AtomicU64::new(0),
         });
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         (source, workbook)
     }
 

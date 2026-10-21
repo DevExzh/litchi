@@ -835,6 +835,32 @@ impl PartialEq for FormControlPartRead {
 impl Eq for FormControlPartRead {}
 
 impl FormControlPartRead {
+    /// [`Self::same_content`], except that the payload of a part named in
+    /// `excluded` (a member a patch replaces) is not compared.
+    fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
+        if self
+            .part_name
+            .as_ref()
+            .is_some_and(|name| excluded.contains(&name))
+        {
+            return self.part_name == other.part_name
+                && self.relationship_payload == other.relationship_payload
+                && self.relationship_range == other.relationship_range
+                && self.relationships == other.relationships;
+        }
+        self.same_content(other)
+    }
+
+    /// The same part read, whatever source version it was read from.
+    fn same_content(&self, other: &Self) -> bool {
+        self.part_name == other.part_name
+            && self.payload == other.payload
+            && self.relationship_payload == other.relationship_payload
+            && self.range == other.range
+            && self.relationship_range == other.relationship_range
+            && self.relationships == other.relationships
+    }
+
     pub(crate) fn part_name(&self) -> Option<&PackURI> {
         self.part_name.as_ref()
     }
@@ -961,22 +987,60 @@ impl FormControlReadSet {
             .and_then(FormControlPartRead::part_name)
     }
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
-        self.source_version == other.source_version
-            && self.workbook == other.workbook
+    /// The same read set, whatever source version it was read from, except
+    /// for the payloads of the parts named in `excluded`.
+    pub(crate) fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
+        fn optional(
+            left: Option<&FormControlPartRead>,
+            right: Option<&FormControlPartRead>,
+            excluded: &[&PackURI],
+        ) -> bool {
+            match (left, right) {
+                (Some(left), Some(right)) => left.same_content_except(right, excluded),
+                (None, None) => true,
+                _ => false,
+            }
+        }
+        fn all(
+            left: &[FormControlPartRead],
+            right: &[FormControlPartRead],
+            excluded: &[&PackURI],
+        ) -> bool {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|(left, right)| left.same_content_except(right, excluded))
+        }
+        optional(self.workbook.as_ref(), other.workbook.as_ref(), excluded)
             && self.package_relationship_payload == other.package_relationship_payload
             && self.package_relationships == other.package_relationships
             && self.content_types_payload == other.content_types_payload
             && self.signature_present == other.signature_present
             && self.incoming_relationships == other.incoming_relationships
-            && self.worksheet == other.worksheet
-            && self.drawing == other.drawing
-            && self.vml == other.vml
-            && self.properties == other.properties
-            && self.sidecar_targets == other.sidecar_targets
+            && self
+                .worksheet
+                .same_content_except(&other.worksheet, excluded)
+            && optional(self.drawing.as_ref(), other.drawing.as_ref(), excluded)
+            && optional(self.vml.as_ref(), other.vml.as_ref(), excluded)
+            && all(&self.properties, &other.properties, excluded)
+            && all(&self.sidecar_targets, &other.sidecar_targets, excluded)
             && self.worksheet_mce == other.worksheet_mce
             && self.drawing_mce == other.drawing_mce
     }
+
+    /// The bytes of the part named `name` in this read set, if it holds one.
+    pub(crate) fn part_bytes(&self, name: &PackURI) -> Option<&[u8]> {
+        std::iter::once(&self.worksheet)
+            .chain(self.workbook.as_ref())
+            .chain(self.drawing.as_ref())
+            .chain(self.vml.as_ref())
+            .chain(self.properties.iter())
+            .chain(self.sidecar_targets.iter())
+            .find(|part| part.part_name() == Some(name))
+            .map(FormControlPartRead::bytes)
+    }
+
     /// Source version shared by every retained source payload.
     #[must_use]
     pub const fn source_version(&self) -> Option<litchi_core::SourceVersion> {
@@ -1070,109 +1134,6 @@ impl FormControlReadSet {
             .is_some_and(|hold| hold.reservation_count() != 0)
             || !self.semantic_holds.is_empty()
     }
-}
-
-/// Check every retained physical member and relationship sidecar against an
-/// in-memory OPC package before applying a source-backed patch.  The source
-/// owner intentionally retains the exact relationship XML, including an
-/// explicit empty member versus absence, so a semantically equivalent graph
-/// rewrite is still a stale read-set refusal.
-pub(crate) fn read_set_matches_package_except(
-    package: &OpcPackage,
-    read_set: &FormControlReadSet,
-    excluded: &[&PackURI],
-) -> Result<bool> {
-    fn matches_part(
-        package: &OpcPackage,
-        part: &FormControlPartRead,
-        excluded: &[&PackURI],
-    ) -> Result<bool> {
-        let Some(name) = part.part_name() else {
-            return Ok(false);
-        };
-        let payload_excluded = excluded.contains(&name);
-        // A source-backed patch must turn a disappeared owner member into a
-        // normal stale-read result.  Propagating `PartNotFound` would expose
-        // an OPC lookup failure instead of the patch-conflict contract, and
-        // would make the missing-member path inconsistent with byte or
-        // relationship mismatches below.
-        let current = match package.get_part(name) {
-            Ok(current) => current,
-            Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(false),
-            Err(error) => return Err(error.into()),
-        };
-        if !payload_excluded && current.blob() != part.bytes() {
-            return Ok(false);
-        }
-        let current_relationships =
-            package.source_relationships_with_limits(name, package.read_limits())?;
-        if current_relationships.member_present() != part.relationship_bytes().is_some() {
-            return Ok(false);
-        }
-        if let Some(expected) = part.relationship_bytes()
-            && current_relationships.bytes() != expected
-        {
-            return Ok(false);
-        }
-        Ok(true)
-    }
-
-    if !read_set
-        .workbook
-        .as_ref()
-        .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-        || !matches_part(package, &read_set.worksheet, excluded)?
-        || !read_set
-            .drawing
-            .as_ref()
-            .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-        || !read_set
-            .vml
-            .as_ref()
-            .map_or(Ok(true), |part| matches_part(package, part, excluded))?
-    {
-        return Ok(false);
-    }
-    let root = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
-    let root_relationships =
-        package.source_relationships_with_limits(&root, package.read_limits())?;
-    if root_relationships.member_present() != read_set.package_relationship_payload.is_some()
-        || read_set
-            .package_relationship_payload
-            .as_ref()
-            .is_some_and(|expected| root_relationships.bytes() != expected.as_bytes())
-        || root_relationships.member_present() != read_set.package_relationships.present()
-        || root_relationships.bytes().len() != read_set.package_relationships.bytes()
-    {
-        return Ok(false);
-    }
-    if read_set.signature_present
-        != (package.is_signed() || package.requires_signature_edit_policy())
-    {
-        return Ok(false);
-    }
-    if let Some(expected) = read_set.content_types_payload.as_ref() {
-        let current = package.source_content_types_with_limits(package.read_limits())?;
-        if current.bytes() != expected.as_bytes() {
-            return Ok(false);
-        }
-    }
-    if incoming_fingerprint_from_package(package, read_set).map_err(owner_to_xlsx)?
-        != read_set.incoming_relationships
-    {
-        return Ok(false);
-    }
-    for part in read_set.properties.iter() {
-        if !matches_part(package, part, excluded)? {
-            return Ok(false);
-        }
-    }
-    for part in read_set.sidecar_targets.iter() {
-        if !matches_part(package, part, excluded)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
 }
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -1315,35 +1276,6 @@ fn incoming_fingerprint_from_source(
             if relationship.target_mode() == TargetMode::Internal {
                 let target = relationship.target_partname()?;
                 if read_set_contains_target(read_set, workbook_name, &target) {
-                    builder.push(owner, &target, relationship)?;
-                }
-            }
-        }
-    }
-    Ok(builder.finish())
-}
-
-fn incoming_fingerprint_from_package(
-    package: &OpcPackage,
-    read_set: &FormControlReadSet,
-) -> OwnerResult<RelationshipFingerprint> {
-    let maximum = package.read_limits().max_relationship_graph_nodes();
-    let mut builder = IncomingFingerprintBuilder::new(maximum)?;
-    let package_uri = PackURI::new("/").map_err(|error| owner_invalid(error.to_string()))?;
-    for relationship in package.rels().iter() {
-        if relationship.target_mode() == TargetMode::Internal {
-            let target = relationship.target_partname()?;
-            if read_set_contains_target(read_set, None, &target) {
-                builder.push(&package_uri, &target, relationship)?;
-            }
-        }
-    }
-    for part in package.iter_parts() {
-        let owner = part.partname();
-        for relationship in part.rels().iter() {
-            if relationship.target_mode() == TargetMode::Internal {
-                let target = relationship.target_partname()?;
-                if read_set_contains_target(read_set, None, &target) {
                     builder.push(owner, &target, relationship)?;
                 }
             }
@@ -1718,9 +1650,11 @@ impl FormControlCollection {
         })
     }
 
-    pub(crate) fn same_source(&self, other: &Self) -> bool {
+    /// The same owner graph, whatever source version it was read from,
+    /// except for the payloads of the parts named in `excluded`.
+    pub(crate) fn same_content_except(&self, other: &Self, excluded: &[&PackURI]) -> bool {
         match (self.read_set.as_deref(), other.read_set.as_deref()) {
-            (Some(left), Some(right)) => left.same_source(right),
+            (Some(left), Some(right)) => left.same_content_except(right, excluded),
             (None, None) => self == other,
             _ => false,
         }

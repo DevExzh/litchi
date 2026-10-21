@@ -18,9 +18,9 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
 use litchi_xlsx::Error;
+use litchi_xlsx::SourceBackedWorkbook;
 use litchi_xlsx::conditional_formatting::{
-    DifferentialRef, Formatting, Kind, Range, Rule, Snapshot, SourceBackedEditor,
-    replace_conditional_formattings,
+    DifferentialRef, Formatting, Kind, Range, Rule, Snapshot, replace_conditional_formattings,
 };
 use soapberry_zip::{PreservationIndex, ZipArchive};
 
@@ -310,8 +310,8 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
         let strict = namespace == STRICT_SML;
         let source = fixture(&worksheet_xml(namespace, ""), strict, false);
         let editor =
-            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source))).unwrap();
-        let mut edit = editor.edit("Sheet1").unwrap();
+            SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source))).unwrap();
+        let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
         let first = expression("A1:A4", 1, "A1>2", Some(0));
         let middle = expression("B1:B4", 2, "B1<8", None);
         let last = expression("C1:C4", 3, "C1=4", Some(1));
@@ -325,20 +325,20 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
                 .unwrap()
         );
         let commit = edit.commit().unwrap();
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         assert_eq!(
-            commit.snapshot().collections(),
+            commit.patch().after().collections(),
             &[first.clone(), middle.clone(), last.clone()]
         );
 
         let mut package =
             OpcPackage::from_bytes(&fixture(&worksheet_xml(namespace, ""), strict, false)).unwrap();
-        commit.patch().apply(&mut package).unwrap();
+        replay_patch(&mut package, commit.patch()).unwrap();
         assert_eq!(
             Snapshot::load(&package, 0usize).unwrap().collections(),
             &[first.clone(), middle.clone(), last.clone()]
         );
-        commit.patch().inverse().apply(&mut package).unwrap();
+        replay_patch(&mut package, &commit.patch().inverse()).unwrap();
         assert!(
             Snapshot::load(&package, "Sheet1")
                 .unwrap()
@@ -352,15 +352,15 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
             false,
         );
         let editor =
-            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(existing))).unwrap();
-        let mut edit = editor.edit("Sheet1").unwrap();
+            SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(existing))).unwrap();
+        let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
         assert!(
             edit.set_collections(vec![last.clone(), first.clone()])
                 .unwrap()
         );
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().collections(),
+            commit.patch().after().collections(),
             &[last.clone(), first.clone()]
         );
 
@@ -370,34 +370,53 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
             vec![first.clone(), middle.clone()],
             Vec::new(),
         ] {
-            let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
-                &worksheet_xml(namespace, &initial_owners(namespace)),
-                strict,
-                false,
-            ))))
-            .unwrap();
-            let mut edit = editor.edit("Sheet1").unwrap();
+            let editor =
+                SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
+                    &worksheet_xml(namespace, &initial_owners(namespace)),
+                    strict,
+                    false,
+                ))))
+                .unwrap();
+            let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
             assert!(edit.set_collections(expected.clone()).unwrap());
-            assert_eq!(edit.commit().unwrap().snapshot().collections(), expected);
+            assert_eq!(
+                edit.commit().unwrap().patch().after().collections(),
+                expected
+            );
         }
 
-        let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &worksheet_xml(namespace, &initial_owners(namespace)),
             strict,
             false,
         ))))
         .unwrap();
-        let mut edit = editor.edit("Sheet1").unwrap();
+        let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
         assert!(edit.clear());
-        assert!(edit.commit().unwrap().snapshot().collections().is_empty());
+        assert!(
+            edit.commit()
+                .unwrap()
+                .patch()
+                .after()
+                .collections()
+                .is_empty()
+        );
 
-        let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &worksheet_xml(namespace, ""),
             strict,
             false,
         ))))
         .unwrap();
-        assert!(!editor.edit("Sheet1").unwrap().commit().unwrap().changed());
+        assert!(
+            !editor
+                .edit_conditional_formats("Sheet1")
+                .unwrap()
+                .commit()
+                .unwrap()
+                .diagnostics()
+                .changed()
+        );
     }
 }
 
@@ -405,15 +424,13 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
 fn publication_reopens_and_preserves_every_unselected_part_and_relationship() {
     let source = fixture(&worksheet_xml(SML, ""), false, false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source.clone()))).unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source.clone()))).unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     let expected = vec![expression("A1:C9", 1, "$A1>5", Some(1))];
     edit.set_collections(expected.clone()).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
 
     let source_package = OpcPackage::from_bytes(&source).unwrap();
     let output_package = OpcPackage::from_bytes(&output).unwrap();
@@ -457,38 +474,39 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
         + part_len(&source_bytes, SHEET)
         + part_len(&source_bytes, STYLES);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor =
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(VersionedSource::new(source_bytes.clone())),
-            litchi_xlsx::SourceLimits::default(),
-            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
-            context,
-        )
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(source_bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
+    let snapshot = editor
+        .edit_conditional_formats("Sheet1")
+        .map(|edit| edit.before().clone())
         .unwrap();
-    let snapshot = editor.snapshot("Sheet1").unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
     drop(snapshot);
 
     let expected = vec![expression("A1:C9", 1, "$A1>5", Some(1))];
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(expected.clone()).unwrap();
     let commit = edit.commit().unwrap();
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         Snapshot::load(&replay, "Sheet1").unwrap().collections(),
         expected.as_slice()
     );
     assert!(matches!(
-        commit.patch().inverse().apply(&mut replay),
+        replay_patch(&mut replay, &commit.patch().inverse()),
         Err(Error::Package(OpcError::ManagedPartDataArcEscape))
     ));
 
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let published = OpcPackage::from_bytes(&output).unwrap();
     assert_eq!(
         Snapshot::load(&published, "Sheet1").unwrap().collections(),
@@ -506,6 +524,8 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
             .blob()
     );
     drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -513,72 +533,65 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
 fn closure_conflicts_signatures_protection_and_partial_sinks_fail_closed() {
     let unsigned = fixture(&worksheet_xml(SML, ""), false, false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(unsigned.clone()))).unwrap();
-    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    let mut exact = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut exact, &commit)
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(unsigned.clone())))
+            .unwrap();
+    let commit = editor
+        .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .unwrap();
+    let mut exact = Vec::new();
+    commit.package().write_to(&mut exact).unwrap();
     assert_eq!(exact, unsigned);
 
     let signed = fixture(&worksheet_xml(SML, ""), false, true);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
-    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    let mut exact = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut exact, &commit)
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
+    let commit = editor
+        .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .unwrap();
+    let mut exact = Vec::new();
+    commit.package().write_to(&mut exact).unwrap();
     assert_eq!(exact, signed);
 
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
         &worksheet_xml(SML, ""),
         false,
         true,
     ))))
     .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(vec![expression("A1", 1, "1", None)])
         .unwrap();
-    let commit = edit.commit().unwrap();
-    assert!(
-        editor
-            .publish_commit_to_stream(Vec::new(), &commit)
-            .is_err()
-    );
+    // A changed edit of a signed source is refused at commit.
+    assert!(edit.commit().is_err());
 
     let source = Arc::new(VersionedSource::new(fixture(
         &worksheet_xml(SML, ""),
         false,
         false,
     )));
-    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(vec![expression("A1", 1, "1", None)])
         .unwrap();
     let commit = edit.commit().unwrap();
     source.changed();
-    assert!(
-        editor
-            .publish_commit_to_stream(Vec::new(), &commit)
-            .is_err()
-    );
+    assert!(commit.package().write_to(Vec::new()).is_err());
 
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
         &worksheet_xml(SML, ""),
         false,
         false,
     ))))
     .unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(vec![expression("A1", 1, "1", None)])
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(
-        editor
-            .publish_commit_to_stream(FailingSink(32), &commit)
-            .is_err()
-    );
+    assert!(commit.package().write_to(FailingSink(32)).is_err());
 
     let mut foreign =
         OpcPackage::from_bytes(&fixture(&worksheet_xml(SML, ""), false, false)).unwrap();
@@ -590,7 +603,7 @@ fn closure_conflicts_signatures_protection_and_partial_sinks_fail_closed() {
                 .into_bytes(),
         );
     assert!(matches!(
-        commit.patch().apply(&mut foreign),
+        replay_patch(&mut foreign, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
 
@@ -600,8 +613,8 @@ fn closure_conflicts_signatures_protection_and_partial_sinks_fail_closed() {
         false,
     );
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(protected))).unwrap();
-    let mut edit = editor.edit("Sheet1").unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(protected))).unwrap();
+    let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(vec![expression("A1", 1, "1", None)])
         .unwrap();
     assert!(edit.commit().is_err());
@@ -613,11 +626,11 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         r#"<worksheet xmlns="{SML}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><sheetData/><extLst><ext uri="{{78C0D931-6437-407D-A8EE-F0AAD7539E65}}"><x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="expression"/><xm:sqref>A1</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst></worksheet>"#,
     );
     assert!(
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &x14, false, false
         ))))
         .unwrap()
-        .snapshot("Sheet1")
+        .edit_conditional_formats("Sheet1")
         .is_err()
     );
 
@@ -625,11 +638,11 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future"><sheetData/><mc:AlternateContent><mc:Choice Requires="x"><x:conditionalFormatting/></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#
     );
     assert!(
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &mce, false, false
         ))))
         .unwrap()
-        .snapshot("Sheet1")
+        .edit_conditional_formats("Sheet1")
         .is_err()
     );
 
@@ -641,9 +654,9 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
     ] {
         let bytes = fixture(&worksheet_xml(SML, owner), false, false);
         assert!(
-            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes)))
+            SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes)))
                 .unwrap()
-                .snapshot("Sheet1")
+                .edit_conditional_formats("Sheet1")
                 .is_err()
         );
     }
@@ -652,23 +665,23 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         r#"<worksheet xmlns="{SML}"><sheetData/><conditionalFormatting sqref="A1"><cfRule type="expression" priority="1"><formula>A1&gt;0</formula></cfRule></conditionalFormatting><conditionalFormatting sqref="B1"><cfRule type="expression" priority="2"><formula/></cfRule></conditionalFormatting></worksheet>"#
     );
     assert!(
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &empty_formula_second_owner,
             false,
             false,
         ))))
         .unwrap()
-        .snapshot("Sheet1")
+        .edit_conditional_formats("Sheet1")
         .is_err()
     );
 
     let malformed = format!(r#"<?bad value?><worksheet xmlns="{SML}"><sheetData/></worksheet>"#);
     assert!(
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &malformed, false, false
         ))))
         .unwrap()
-        .snapshot("Sheet1")
+        .edit_conditional_formats("Sheet1")
         .is_err()
     );
 
@@ -693,10 +706,33 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
             r#"<worksheet xmlns="{SML}" xmlns:q="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><q:Choice/></worksheet>"#
         ),
     ] {
-        let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(
+        let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture(
             &worksheet, false, false,
         ))))
         .unwrap();
-        assert!(editor.snapshot("Sheet1").is_err());
+        assert!(
+            editor
+                .edit_conditional_formats("Sheet1")
+                .map(|edit| edit.before().clone())
+                .is_err()
+        );
     }
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// source-backed workbooks).
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::conditional_formatting::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_conditional_formats(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next)?;
+    Ok(())
 }

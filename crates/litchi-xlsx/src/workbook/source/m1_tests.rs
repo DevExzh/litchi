@@ -666,8 +666,11 @@ fn block_reads_do_not_count_cell_events() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook =
-        SourceBackedWorkbook::from_read_at_with_limits(ProbeSource::new(bytes), limits).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        ProbeSource::new(bytes),
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
     let sheet = workbook.sheet("Large").unwrap().unwrap();
     let filter = sheet.auto_filter().unwrap().expect("auto-filter");
     assert!(debug(filter).contains("A1:J21000"));
@@ -804,7 +807,11 @@ fn block_reads_honor_the_open_profile_and_never_cache_limit_failures() {
         .build()
         .unwrap();
     let source = ProbeSource::new(rich_workbook());
-    let workbook = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
     let sheet = workbook.sheet("Other").unwrap().unwrap();
     for _ in 0..2 {
         assert!(matches!(

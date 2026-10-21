@@ -6,8 +6,7 @@
 
 mod patch;
 mod snapshot;
-mod source;
+pub mod source;
 
-pub use patch::{Commit, Diagnostics, Patch};
+pub(crate) use patch::Patch;
 pub use snapshot::{Snapshot, Tab};
-pub use source::{SourceBackedEditor, SourceEdit};

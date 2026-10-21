@@ -11,29 +11,16 @@
 
 pub(crate) mod budget;
 mod codec;
-#[path = "scalar_edit.rs"]
-mod edit;
 mod mirror;
 mod model;
 mod owner;
+#[path = "scalar_edit.rs"]
+pub mod source;
 
 pub use codec::{
     SourceProperties, SourceView, SourceWritable, insert_item, inspect, inspect_with_limits, parse,
     parse_with_limits, remove_item, replace_items, replace_scalar, set_scalar, write,
     write_with_limits,
-};
-pub use edit::{
-    FormControlCommit, FormControlPatch, FormControlSnapshot, FormControlSourceEdit,
-    SourceBackedFormControlEditor,
-};
-#[allow(
-    unused_imports,
-    reason = "ordinary worksheet staging consumes this preflight hook"
-)]
-pub(crate) use edit::{
-    FormControlScalarAction, OrdinaryFormControlOverlay, OwnedSelector,
-    ordinary_form_control_overlays, owned_selector, validate_ordinary_form_control_candidate,
-    validate_ordinary_form_control_selector, validate_scalar_operation_count,
 };
 pub(crate) use mirror::{ClientDataSource, MirrorLimits, replace_scalar_pair_with_limits};
 pub use model::{
@@ -49,10 +36,20 @@ pub use owner::{
 };
 pub(crate) use owner::{
     eager_form_controls_for_effective_topology, eager_form_controls_for_sheet_with_limits,
-    read_set_matches_package_except, source_form_controls_for_sheet_with_limits,
+    source_form_controls_for_sheet_with_limits,
 };
 pub(crate) use owner::{
     eager_form_controls_for_sheet, owner_to_xlsx, source_form_controls_for_sheet,
+};
+pub use source::FormControlSnapshot;
+#[allow(
+    unused_imports,
+    reason = "ordinary worksheet staging consumes this preflight hook"
+)]
+pub(crate) use source::{
+    FormControlScalarAction, OrdinaryFormControlOverlay, OwnedSelector,
+    ordinary_form_control_overlays, owned_selector, validate_ordinary_form_control_candidate,
+    validate_ordinary_form_control_selector, validate_scalar_operation_count,
 };
 
 /// The Office 2010 SpreadsheetML form-control-properties namespace.

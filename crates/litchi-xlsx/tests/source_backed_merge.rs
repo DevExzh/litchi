@@ -819,7 +819,7 @@ fn source_backed_cell_reads_a_column_formatted_worksheet_with_merges() {
     let bytes = fixture(&sheet);
     let source = Arc::new(VersionedSource::new(bytes.clone()));
     let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
-    let worksheet = workbook.sheets().next().unwrap();
+    let worksheet = workbook.sheets().unwrap().next().unwrap();
 
     let anchor = worksheet.cell("A1").unwrap();
     assert_eq!(
@@ -836,7 +836,13 @@ fn source_backed_cell_reads_a_column_formatted_worksheet_with_merges() {
     // The same read over a fresh workbook takes the same streaming route, so
     // the verdict must not depend on a warm materialized store.
     let fresh = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
-    let cells = fresh.sheets().next().unwrap().cells("A1:C1").unwrap();
+    let cells = fresh
+        .sheets()
+        .unwrap()
+        .next()
+        .unwrap()
+        .cells("A1:C1")
+        .unwrap();
     assert_eq!(cells.len(), 1);
     assert_eq!(cells[0].address, Rect::from_a1("A1:A1").unwrap().start());
 }

@@ -2551,7 +2551,13 @@ fn caller_part_limit_refuses_before_form_control_source_projection() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(SourceBackedWorkbook::from_reader_with_limits(Cursor::new(source), limits).is_err());
+    assert!(
+        SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source),
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -2706,10 +2712,11 @@ fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
 fn managed_owner_clones_and_read_set_keep_budget_charges_alive() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let sheet = workbook.sheet(0).unwrap().unwrap();
@@ -2775,10 +2782,11 @@ fn managed_owner_clones_and_read_set_keep_budget_charges_alive() {
 fn managed_owner_tiny_execution_depth_is_a_typed_resource_refusal() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, 0);
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let sheet = workbook.sheet(0).unwrap().unwrap();
@@ -2793,10 +2801,11 @@ fn mirror_node_caps_refuse_without_retaining_control_shape_charges() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     for maximum in [0, 1] {
         let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
-        let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(OwnedSource::new(source.clone())),
-            SourceLimits::default(),
-            context,
+            litchi_xlsx::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let sheet = workbook.sheet(0).unwrap().unwrap();

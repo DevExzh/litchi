@@ -14,7 +14,7 @@ mod model;
 mod package;
 mod patch;
 mod snapshot;
-mod source;
+pub mod source;
 #[cfg(test)]
 mod tests;
 
@@ -25,6 +25,5 @@ pub use model::{
     NumberFormat, Operator, Payload, Period, Range, Rule, Source, TokenError, Value, ValueKind,
 };
 pub use package::replace_conditional_formattings;
-pub use patch::{Commit, Diagnostics, Patch};
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};

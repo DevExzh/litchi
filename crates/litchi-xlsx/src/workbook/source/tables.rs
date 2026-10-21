@@ -88,10 +88,11 @@ impl SourceBackedWorkbook {
     /// As for [`SourceWorksheet::tables`] on each worksheet searched, or
     /// [`Error::Ambiguous`] when multiple names match.
     pub fn table(&self, name: &str) -> Result<Option<(SourceWorksheet, TablePart)>> {
-        self.inner.execution_check()?;
-        self.inner.package.source_version()?;
+        let this = self.view()?;
+        this.inner.execution_check()?;
+        this.inner.package.source_version()?;
         let result = find_workbook_table(
-            self.sheets(),
+            this.sheets()?,
             |sheet| {
                 if sheet.kind() == WorksheetKind::Worksheet {
                     sheet.tables().map(Some)
@@ -101,8 +102,8 @@ impl SourceBackedWorkbook {
             },
             name,
         );
-        self.inner.execution_check()?;
-        self.inner.package.source_version()?;
+        this.inner.execution_check()?;
+        this.inner.package.source_version()?;
         result
     }
 }

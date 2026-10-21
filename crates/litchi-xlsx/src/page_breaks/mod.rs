@@ -9,15 +9,14 @@ pub mod edit;
 mod model;
 mod patch;
 mod snapshot;
-mod source;
+pub mod source;
 
 pub use codec::{parse, replace, write};
 pub use model::{
     Axis, Break, Collection, LimitKind, MAX_HORIZONTAL_BREAKS, MAX_VERTICAL_BREAKS, PageBreaks,
 };
-pub use patch::{Commit, Diagnostics, Patch};
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};
 
 /// Load one source-bound worksheet page-break snapshot.
 ///
