@@ -993,6 +993,36 @@ impl OpcPackage {
     /// This is a provenance comparison; callers must separately compare the
     /// typed graph when both sides would use authored fallback metadata.
     pub fn same_retained_content_types(&self, other: &Self) -> Result<bool> {
+        // A clone with the same manifest allocation and the same coverage
+        // shape has the same retained/fallback decision. Avoid rebuilding and
+        // sorting two part-name indexes for a payload-only edit. Relationship
+        // presence matters because a producer may override a .rels member.
+        if let (Some(left), Some(right), Some(left_map), Some(right_map)) = (
+            &self.source_content_types_xml,
+            &other.source_content_types_xml,
+            &self.source_content_types,
+            &other.source_content_types,
+        ) && Arc::ptr_eq(left, right)
+            && Arc::ptr_eq(left_map, right_map)
+            && self.parts.len() == other.parts.len()
+            && self.rels.is_empty() == other.rels.is_empty()
+            && self.parts.iter().all(|(name, part)| {
+                other.parts.get(name).is_some_and(|candidate| {
+                    part.partname() == candidate.partname()
+                        && part.content_type() == candidate.content_type()
+                        && part.rels().is_empty() == candidate.rels().is_empty()
+                        && self.source_relationships_member_present(name)
+                            == other.source_relationships_member_present(name)
+                })
+            })
+        {
+            let root = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+            if self.source_relationships_member_present(&root)
+                == other.source_relationships_member_present(&root)
+            {
+                return Ok(true);
+            }
+        }
         Ok(same_optional_manifest_bytes(
             self.source_content_types_source()?.map(|(bytes, _)| bytes),
             other.source_content_types_source()?.map(|(bytes, _)| bytes),
@@ -3814,6 +3844,51 @@ mod tests {
         let owner = PackURI::new(PACKAGE_URI).unwrap();
         let token = package.source_relationships(&owner).unwrap();
         assert_eq!(token.bytes(), relationships.as_bytes());
+    }
+
+    #[test]
+    fn retained_content_type_fast_comparison_tracks_coverage_changes() {
+        for empty in [false, true] {
+            let (bytes, _) = create_source_with_explicit_relationship_overrides(empty);
+            let base = OpcPackage::from_bytes(&bytes).unwrap();
+            let owner = PackURI::new("/word/document.xml").unwrap();
+            let mut payload = base.clone();
+            payload
+                .get_part_mut(&owner)
+                .unwrap()
+                .set_blob(b"<changed/>".to_vec());
+            let mut content_type = base.clone();
+            content_type
+                .get_part_mut(&owner)
+                .unwrap()
+                .set_content_type("application/example+xml".to_owned())
+                .unwrap();
+            let mut removed = base.clone();
+            removed.remove_part(&owner);
+            let mut presence = base.clone();
+            presence
+                .get_part_mut(&owner)
+                .unwrap()
+                .rels_mut()
+                .retain(|_| false);
+            presence.source_relationships_xml.remove(&owner);
+            for changed in [&base, &payload, &content_type, &removed, &presence] {
+                let expected = same_optional_manifest_bytes(
+                    base.source_content_types_source()
+                        .unwrap()
+                        .map(|(bytes, _)| bytes),
+                    changed
+                        .source_content_types_source()
+                        .unwrap()
+                        .map(|(bytes, _)| bytes),
+                );
+                assert_eq!(base.same_retained_content_types(changed).unwrap(), expected);
+                assert_eq!(
+                    changed.same_retained_content_types(&base).unwrap(),
+                    expected
+                );
+            }
+        }
     }
 
     #[test]
