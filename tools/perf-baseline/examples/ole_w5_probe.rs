@@ -65,7 +65,7 @@ struct HistoryRun<T, P> {
 }
 
 fn main() -> Result<(), Box<dyn StdError>> {
-    let (route, warmup, samples) = arguments()?;
+    let (route, warmup, samples, batch) = arguments()?;
     let corpus = build_corpus()?;
     let route_name = route.as_str();
     let mut prepared_owner = None;
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     if matches!(route_name, "doc_tracked_revision" | "doc_history") {
         prepared_doc = Some(DocPackage::from_bytes(&corpus.doc_archive)?);
     }
-    if matches!(route_name, "xls_cells" | "xls_history") {
+    if matches!(route_name, "xls_cells" | "xls_cells_stage" | "xls_history") {
         prepared_xls = Some(XlsPackage::from_bytes(&corpus.xls_archive)?);
     }
 
@@ -92,7 +92,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 .as_ref()
                 .ok_or("DOC tracked-revision source was not prepared")?,
         )?),
-        "xls_cells" => Some(xls_cells_expected(
+        "xls_cells" | "xls_cells_stage" => Some(xls_cells_expected(
             prepared_xls
                 .as_ref()
                 .ok_or("XLS cell source was not prepared")?,
@@ -144,19 +144,33 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 let section = prepared_section
                     .as_ref()
                     .ok_or("read section was not prepared")?;
-                let properties = user_properties(section, corpus.user_limits)?;
-                black_box((properties.link_base()?, properties.hyperlinks()?));
-                section_size(section)
+                let mut output_bytes = 0;
+                for _ in 0..batch {
+                    let properties = user_properties(section, corpus.user_limits)?;
+                    black_box((properties.link_base()?, properties.hyperlinks()?));
+                    output_bytes = section_size(section);
+                }
+                output_bytes
             },
             "edit" => {
-                let mut section = corpus.user_section.clone();
-                let link_base = corpus.link_base.clone();
-                let hyperlinks = corpus.hyperlinks.clone();
-                let mut edit = user_editor(&mut section, corpus.user_limits)?;
-                edit.set_link_base(link_base)?;
-                edit.set_hyperlinks(hyperlinks)?;
-                black_box(&section);
-                black_box(section_size(&section))
+                let mut output_bytes = 0;
+                let mut final_section = None;
+                for _ in 0..batch {
+                    let mut section = corpus.user_section.clone();
+                    let link_base = corpus.link_base.clone();
+                    let hyperlinks = corpus.hyperlinks.clone();
+                    let mut edit = user_editor(&mut section, corpus.user_limits)?;
+                    edit.set_link_base(link_base)?;
+                    edit.set_hyperlinks(hyperlinks)?;
+                    black_box(&section);
+                    output_bytes = section_size(&section);
+                    final_section = Some(section);
+                }
+                let final_section = final_section.ok_or("property edit batch was empty")?;
+                if final_section != corpus.user_section {
+                    return Err("property edit output differs from preflight".into());
+                }
+                output_bytes
             },
             "doc_tracked_revision" => {
                 let source = prepared_doc
@@ -183,14 +197,44 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 let source = prepared_xls
                     .as_ref()
                     .ok_or("XLS cell source was not prepared")?;
-                let output = xls_cells_once(source)?.to_bytes()?;
-                let elapsed = started.elapsed().as_nanos();
                 let expected = expected_host_output
                     .as_ref()
                     .ok_or("XLS cell expected output was not prepared")?;
-                if output != *expected {
-                    return Err("XLS cell output differs from preflight".into());
+                let mut output_bytes = 0;
+                for _ in 0..batch {
+                    let output = xls_cells_once(source)?.to_bytes()?;
+                    if output != *expected {
+                        return Err("XLS cell output differs from preflight".into());
+                    }
+                    output_bytes = output.len();
                 }
+                let elapsed = started.elapsed().as_nanos();
+                if iteration >= warmup {
+                    println!(
+                        "{route_name},{},{elapsed},{output_bytes}",
+                        iteration - warmup,
+                    );
+                }
+                continue;
+            },
+            "xls_cells_stage" => {
+                let source = prepared_xls
+                    .as_ref()
+                    .ok_or("XLS cell source was not prepared")?;
+                let expected = expected_host_output
+                    .as_ref()
+                    .ok_or("XLS cell expected output was not prepared")?;
+                let mut last_commit = None;
+                for _ in 0..batch {
+                    last_commit = Some(xls_cells_commit_once(source)?);
+                }
+                let elapsed = started.elapsed().as_nanos();
+                let commit = last_commit.ok_or("XLS cell stage batch was empty")?;
+                let output = commit.package().to_bytes()?;
+                if output != *expected {
+                    return Err("XLS cell stage output differs from preflight".into());
+                }
+                black_box(&commit);
                 if iteration >= warmup {
                     println!(
                         "{route_name},{},{elapsed},{}",
@@ -253,19 +297,21 @@ fn main() -> Result<(), Box<dyn StdError>> {
     Ok(())
 }
 
-fn arguments() -> Result<(String, usize, usize), Box<dyn StdError>> {
+fn arguments() -> Result<(String, usize, usize, usize), Box<dyn StdError>> {
     let mut route = None;
     let mut warmup = 10usize;
     let mut samples = 100usize;
+    let mut batch = 1usize;
     let mut arguments = std::env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--route" => route = Some(arguments.next().ok_or("--route needs a value")?),
             "--warmup" => warmup = arguments.next().ok_or("--warmup needs a value")?.parse()?,
             "--samples" => samples = arguments.next().ok_or("--samples needs a value")?.parse()?,
+            "--batch" => batch = arguments.next().ok_or("--batch needs a value")?.parse()?,
             "--help" | "-h" => {
                 println!(
-                    "usage: ole_w5_probe --route <open|begin_edit|noop_commit|replace_stream|read|edit|doc_tracked_revision|xls_cells|doc_history|xls_history> [--warmup N] [--samples N]"
+                    "usage: ole_w5_probe --route <open|begin_edit|noop_commit|replace_stream|read|edit|doc_tracked_revision|xls_cells|xls_cells_stage|doc_history|xls_history> [--warmup N] [--samples N] [--batch N]"
                 );
                 std::process::exit(0);
             },
@@ -276,7 +322,10 @@ fn arguments() -> Result<(String, usize, usize), Box<dyn StdError>> {
     if samples == 0 {
         return Err("--samples must be nonzero".into());
     }
-    Ok((route, warmup, samples))
+    if batch == 0 {
+        return Err("--batch must be nonzero".into());
+    }
+    Ok((route, warmup, samples, batch))
 }
 
 fn build_corpus() -> Result<Corpus, Box<dyn StdError>> {
@@ -405,13 +454,19 @@ fn doc_tracked_revision_expected(source: &DocPackage) -> Result<Vec<u8>, Box<dyn
 }
 
 fn xls_cells_once(source: &XlsPackage) -> Result<XlsPackage, Box<dyn StdError>> {
+    Ok(xls_cells_commit_once(source)?.into_package())
+}
+
+fn xls_cells_commit_once(
+    source: &XlsPackage,
+) -> Result<litchi_xls::Commit, Box<dyn StdError>> {
     let mut edit = source.edit()?;
     edit.set_value(
         XlsSelector::Name("Cells"),
         XlsReference::new(0, 0)?,
         XlsValue::Number(XLS_EDIT_VALUE),
     )?;
-    Ok(edit.commit()?.into_package())
+    Ok(edit.commit()?)
 }
 
 fn xls_cells_expected(source: &XlsPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
