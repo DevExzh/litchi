@@ -2790,6 +2790,12 @@
    "series": "pptx_contract:save/unified/deck20",
    "explanation": "Record 0356a §4: the unified `to_bytes` of an unedited 20-box deck returns its retained source bytes, 0.27–0.30 µs a call (median 0.3 µs on both builds); the 1.08 after/before is a few tens of nanoseconds of timer resolution on the same code path, which record 0356 did not change. The 308 KB fixture's unified save is 0.89×.",
    "disposition": "residual"
+  },
+  {
+   "record": "0361a",
+   "series": "iwork:keynote:placeholder_hide",
+   "explanation": "Record 0361a §4: one of four after processes (run at host load 5–13) gave 1.075 for the Keynote placeholder hide; base processes of the same session gave 1.029–1.050, record 0361's after build 1.029–1.031, and a recheck of four more pinned processes (results/0361a/recheck/, B A A B) gives 1.028–1.032 after and 1.030–1.033 base. Callgrind of the whole keynote_bench is 6,648,186,935 Ir base and 6,648,204,410 after (+0.0003 %): the wire change only passes the previous default limits explicitly, so the outlier is host noise.",
+   "disposition": "residual"
   }
  ],
  "evidence_without_rows": [

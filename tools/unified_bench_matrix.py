@@ -2772,6 +2772,14 @@ def p0361():
                             stages={"after": ("", 1)}))
 
 
+@needs("0361a")
+def p0361a():
+    """Record 0361a §4: the after legs of keynote_bench, pages_bench and
+    numbers_unified_bench (processes 2, 3, 6 and 7 of B A A B B A A B) after
+    the wire-codec limits change."""
+    return iwork_after("0361a", RES / "0361a", "{fmt}-*-after.{ext}")
+
+
 @needs("0358a")
 def p0358a():
     """Record 0358a §6: the source-backed ODF families (after) against the
@@ -2938,7 +2946,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0358a,
-           p0359, p0361]
+           p0359, p0361, p0361a]
 
 
 
