@@ -1619,6 +1619,7 @@ impl OpcPackage {
         });
         if owner.as_str() == "/" {
             self.revoke_exact_source();
+            self.content_types_source_state.reset();
             self.signature_graph_tracked = true;
             self.rels = relationships;
         } else {
@@ -1706,6 +1707,7 @@ impl OpcPackage {
         });
         if replacement.owner.as_str() == "/" {
             self.revoke_exact_source();
+            self.content_types_source_state.reset();
             self.signature_graph_tracked = true;
             self.rels = relationships;
         } else {

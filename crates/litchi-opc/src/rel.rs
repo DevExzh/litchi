@@ -366,6 +366,17 @@ impl Relationships {
         self.source_capture.as_ref()
     }
 
+    /// Whether both collections still point at the same admitted source
+    /// capture. A clone keeps this handle until a relationship mutation
+    /// invalidates it, so pointer equality proves the semantic graph has not
+    /// changed and avoids rebinding every relationship entry.
+    pub(crate) fn same_source_capture(&self, other: &Self) -> bool {
+        self.source_capture
+            .as_ref()
+            .zip(other.source_capture.as_ref())
+            .is_some_and(|(left, right)| Arc::ptr_eq(left, right))
+    }
+
     /// Compare the semantic relationship collection while ignoring its
     /// publication provenance handle.
     pub(crate) fn semantically_eq(&self, other: &Self) -> bool {

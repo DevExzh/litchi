@@ -182,6 +182,31 @@ mod tests {
         Ok(())
     }
 
+    fn lexical_root_relationship_edit(
+        opc: &mut litchi_opc::OpcPackage,
+    ) -> crate::package::error::Result<()> {
+        let owner = PackURI::new("/")?;
+        let limits = opc.read_limits();
+        let source = opc.authored_relationships_xml(&owner, limits)?;
+        let marker = b"</Relationships>";
+        let at = source
+            .as_slice()
+            .windows(marker.len())
+            .rposition(|window| window == marker)
+            .expect("relationships root close");
+        let mut replacement = source.as_slice().to_vec();
+        replacement.splice(at..at, [b'\n']);
+        opc.try_replace_relationships_source_bytes(
+            &owner,
+            source.as_slice(),
+            true,
+            Arc::new(replacement),
+            true,
+            limits,
+        )?;
+        Ok(())
+    }
+
     #[test]
     fn starting_an_edit_copies_nothing_and_a_no_op_returns_the_source() {
         let package = Package::new().unwrap();
@@ -253,6 +278,28 @@ mod tests {
                 part: "content types"
             })
         ));
+    }
+
+    #[test]
+    fn lexical_root_relationship_edit_is_replayed_and_inverted_after_reopen() {
+        let package = Package::new().unwrap();
+        let before = package.to_bytes().unwrap();
+        let mut edit = package.edit_opc().unwrap();
+        edit.update(lexical_root_relationship_edit).unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        assert!(!patch.is_noop());
+
+        let replayed = package.apply_opc(&patch).unwrap().into_package();
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+        let reopened = Package::from_bytes(&before).unwrap();
+        let reopened_replayed = reopened.apply_opc(&patch).unwrap().into_package();
+        assert_eq!(
+            reopened_replayed.to_bytes().unwrap(),
+            after.to_bytes().unwrap()
+        );
+
+        let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
+        assert_eq!(restored.to_bytes().unwrap(), before);
     }
 
     #[test]

@@ -106,14 +106,16 @@ Focused validation on this review tree:
 | `cargo test -p litchi-xlsb --all-features comments` | 18 passed |
 | `cargo test -p litchi-xlsb --all-features conditional` | 58 passed |
 | `cargo test -p litchi-xlsb --all-features --lib opc` | 13 passed |
-| `cargo test -p litchi-xlsb --all-features` | 736 unit, all integration and doctests passed |
+| `cargo test -p litchi-xlsb --all-features --lib` | 738 unit tests passed |
+| `cargo test -p litchi-opc --all-features --lib` | 694 unit tests passed |
 | raw OPC lexical relationship and content-types regressions, including mixed and invalid-source inverse replay | passed |
 | source-backed metadata replay regression | passed |
 
-The complete `cargo test -p litchi-xlsb --all-features` run passes after the
-consumer expectation and edit-boundary corrections: 736 unit tests, every
-integration target, 40 passing doctests, 11 ignored doctests and 2 compile-fail
-doctests. The focused comments and conditional-formatting filters also pass.
+The complete library runs pass after the consumer expectation and
+edit-boundary corrections: 694 OPC unit tests and 738 XLSB unit tests. The
+focused comments, conditional-formatting, relationship and lexical replay
+filters also pass. The broader integration and doctest matrix remains the
+coordinator's final gate.
 ABBA measurements for this corrected tree remain a coordinator measurement
 step; the host was quiesced for the coordinator's isolated probes. The final
 paired route measurement is recorded in section 5.
@@ -230,8 +232,95 @@ The full sheet-dispatch matrix is present in the external `sheet-*.txt`
 captures. Its unrelated tiny `cells/xls` route measured 1.090x in this run;
 the same route measured 1.075x, 1.079x and 1.126x in the three preceding
 ABBA runs, while the XLSB routes above remain within the expected variance.
-The expanded probe has no paired baseline executable: its `tgt-expanded-before`
-target contains only dependency artifacts, so no baseline structural/history
-comparison is claimed.
+The paired reopened structural/history comparison is recorded in section 6.
+
+## 6. Reopened structural replay and attribution
+
+The earlier expanded candidate-only sample was replaced with a paired probe
+that uses independently reopened equal-content recipients for both forward and
+inverse replay. The preflight sorts the OPC inventory by part name, compares
+each retained part's exact bytes, and then compares the serialized package
+bytes. Both binaries report the same preflight:
+
+```text
+preflight exact: base_parts=7 after_parts=8 base_bytes=5155 after_bytes=5320
+```
+
+The probe sources are outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-probe/src/main.rs`
+(SHA-256
+`65d0629300694e7bab1bbc15b053223e58f77db2832bf75523ac3ddf5b7615b4`) and
+`.../expanded-probe-before-v2/src/main.rs` (SHA-256
+`74f2271ca386e08515e50f5b0d87e9b4d6e514e7284084179114d2571e794a44`). The
+baseline uses the old `into_opc`/`from_opc` operation and keeps each published
+package snapshot in its history. The candidate uses the new edit/commit and
+keeps each `Patch`; this difference is explicit in the history comparison.
+The release binaries were built in separate absolute target directories:
+
+| Binary | Size | SHA-256 |
+|---|---:|---|
+| `tgt-expanded-before-v4/release/w4b-expanded-probe-before-v2` | 7,632,296 bytes | `c38df593f0083aa3c0379d67363796adeb4f97076976393b8f6dddd61e5bce01` |
+| `tgt-expanded-after-v4/release/w4b-expanded-probe` | 7,451,432 bytes | `843034d24a33f968d1d5a6698864435d09e0516e576e4750ec75c8a0dc907fdc` |
+
+The four legs ran `before -> after -> after -> before`, pinned to CPU 29,
+with 31 samples per timed case. JSON captures are in
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-reopened-abba-1792582900`; their individual SHA-256 values are in
+`timing.sha256` (702 bytes). Medians are microseconds:
+
+| Case | Before | After | After / before |
+|---|---:|---:|---:|
+| `structural/commit` | 10.6060 | 14.4891 | 1.366123 |
+| `structural/commit_save` | 44.8822 | 50.2313 | 1.119181 |
+| `structural/forward_replay` | 73.1343 | 81.6354 | 1.116240 |
+| `structural/inverse_replay` | 75.6574 | 81.5505 | 1.077892 |
+| `history/retained128_build` | 4607.5885 | 4700.6240 | 1.020192 |
+
+The retained-history heap runs use direct `heaptrack` invocation and the same
+ABBA order. The baseline snapshot history reports 594,920 allocation calls,
+1,990 temporary allocations, 4.40 MiB peak heap and 15.25/15.12 MiB peak RSS
+on its two legs. The candidate patch history reports 417,161/417,148
+allocation calls, 3,190/3,177 temporary allocations, 781.98 KiB peak heap and
+10.19/10.17 MiB peak RSS. Both have 544 bytes leaked. These are paired
+retention measurements with the old snapshot and new patch history semantics,
+so the lower candidate live history is evidence for the compact patch model,
+not a claim that the two retained object graphs are identical. The compressed
+captures are 159,180–176,477 bytes; `heap-direct.sha256` records their hashes.
+
+The full sheet-dispatch route was profiled separately for `cells/xls` using
+the existing before and compact-after binaries, with `SHEET_DISPATCH_ONLY=cells/xls`,
+1,000 rows and 31 samples. `perf stat` could not open any event on this host:
+`/proc/sys/kernel/perf_event_paranoid` is `4`, and the kernel reports no
+`CAP_PERFMON` access. To obtain a deterministic instruction attribution, the
+same before/after ABBA was run under Valgrind Callgrind with only `Ir` enabled.
+The before instruction counts were 1,287,323,990 and 1,286,565,947; the after
+counts were 1,278,277,885 and 1,276,960,259. Their median ratio is
+`1,277,619,072 / 1,286,944,968.5 = 0.992753`, so the repeated wall-time
+increase of the tiny `cells/xls` route is not an instruction-count increase.
+The Callgrind captures are 643,027–653,510 bytes; `callgrind.sha256` records
+their hashes. Callgrind emitted `brk segment overflow` warnings while still
+producing complete `Ir` summaries; no cycle count is claimed because hardware
+cycle counters were unavailable.
+
+## 7. Memoized content-types coverage
+
+The OPC package now memoizes whether its admitted `[Content_Types].xml`
+binding still covers the current part graph. The state is clone-local, so a
+staged edit cannot invalidate or authorize a sibling package's memo. Mutable
+part access, same-name replacement, part insertion/removal/materialization,
+source-token restoration, relationship replacement and package/part
+relationship access all reset the state before exposing the changed graph;
+sign, resign and unsign follow the same rule through their signature-graph
+paths. Payload-only replacement leaves the content-types state intact because
+it cannot change the mapping.
+
+The cache repair is covered by
+`package::tests::content_types_source_state_is_clone_local_and_tracks_mutation_routes`,
+which checks clone isolation, borrowed payload access, same-URI retyping,
+part insertion/removal, root and part relationship changes, and unsigning.
+`package::tests::content_types_source_token_restores_removed_override_after_reopen`
+checks that source-token restoration resets and recomputes the memo after an
+independent reopen. Existing relationship tests cover absent versus explicit
+empty members and reopened lexical restoration; the XLSB lexical root test
+also replays and inverts a reopened raw relationship edit byte-for-byte.
 
 [0351]: 0351-api-contract.md

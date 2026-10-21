@@ -235,15 +235,6 @@ impl State {
     }
 }
 
-fn same_part(before: &dyn Part, after: &dyn Part) -> bool {
-    before.content_type() == after.content_type()
-        && {
-            let (left, right) = (before.blob(), after.blob());
-            std::ptr::eq(left, right) || left == right
-        }
-        && relationships_equal(before.rels(), after.rels())
-}
-
 fn optional_part<'a>(package: &'a OpcPackage, name: &PackURI) -> Result<Option<&'a dyn Part>> {
     match package.get_part(name) {
         Ok(part) => Ok(Some(part)),
@@ -457,26 +448,35 @@ impl Manifests {
         let limits = package.read_limits();
         if let Some(content_types) = &self.content_types {
             let current = ContentTypesImage::current_publication(package)?;
-            let replacement = content_types.bytes.bytes(package, limits)?;
-            let current_bytes = current.bytes(package, limits)?;
-            let source_differs = content_types.explicit
-                && content_types.source
-                && package
-                    .content_types_source_bytes()
-                    .is_none_or(|bytes| {
-                        !matches!(&content_types.bytes, ContentTypesXml::Retained(expected) if bytes.as_slice() == expected.as_slice())
-                    });
-            if current_bytes.as_slice() != replacement.as_slice() || source_differs {
-                let current_matches_base = match expected {
-                    Some(expected) => expected.publication_matches_current(package)?,
-                    None => false,
-                };
-                if content_types.explicit || current_matches_base {
-                    package.try_replace_content_types_bytes_with_limits(
-                        current_bytes.as_slice(),
-                        replacement,
-                        limits,
-                    )?;
+            // An authored view is already the package's lazy fallback after
+            // a structural graph change invalidates retained coverage. Avoid
+            // serializing the same canonical XML twice during replay; the
+            // writer will materialize it only when publication needs bytes.
+            if !matches!(
+                (&current, &content_types.bytes),
+                (ContentTypesXml::Authored, ContentTypesXml::Authored)
+            ) {
+                let replacement = content_types.bytes.bytes(package, limits)?;
+                let current_bytes = current.bytes(package, limits)?;
+                let source_differs = content_types.explicit
+                    && content_types.source
+                    && package
+                        .content_types_source_bytes()
+                        .is_none_or(|bytes| {
+                            !matches!(&content_types.bytes, ContentTypesXml::Retained(expected) if bytes.as_slice() == expected.as_slice())
+                        });
+                if current_bytes.as_slice() != replacement.as_slice() || source_differs {
+                    let current_matches_base = match expected {
+                        Some(expected) => expected.publication_matches_current(package)?,
+                        None => false,
+                    };
+                    if content_types.explicit || current_matches_base {
+                        package.try_replace_content_types_bytes_with_limits(
+                            current_bytes.as_slice(),
+                            replacement,
+                            limits,
+                        )?;
+                    }
                 }
             }
         }
@@ -693,6 +693,33 @@ impl PartPatch {
         })
     }
 
+    /// Content-types publication is affected by a part being added or
+    /// removed, by a part's declared type changing, or by an explicit source
+    /// manifest replacement. Payload and relationship-only deltas do not
+    /// change the content-types graph. Checking the delta shape first avoids
+    /// rebuilding a complete source-coverage index for every ordinary raw
+    /// structural commit.
+    fn content_types_changed(before: &OpcPackage, after: &OpcPackage, deltas: &[Delta]) -> bool {
+        let source_changed = match (
+            before.content_types_source_bytes(),
+            after.content_types_source_bytes(),
+        ) {
+            (None, None) => false,
+            (Some(left), Some(right)) => {
+                !(Arc::ptr_eq(&left, &right) || left.as_slice() == right.as_slice())
+            },
+            (Some(_), None) | (None, Some(_)) => true,
+        };
+        source_changed
+            || deltas
+                .iter()
+                .any(|delta| match (&delta.before, &delta.after) {
+                    (None, Some(_)) | (Some(_), None) => true,
+                    (Some(before), Some(after)) => before.content_type != after.content_type,
+                    (None, None) => false,
+                })
+    }
+
     fn root(
         before: &OpcPackage,
         after: &OpcPackage,
@@ -730,17 +757,13 @@ impl PartPatch {
                 });
             }
         }
+        let content_types_changed = Self::content_types_changed(before, after, &deltas);
         Self {
             deltas,
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(
-            before,
-            after,
-            !before.same_retained_content_types(after)?
-                || before.content_types_source_bytes() != after.content_types_source_bytes(),
-        )
+        .with_manifests(before, after, content_types_changed)
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -767,47 +790,53 @@ impl PartPatch {
             deltas.push(delta);
             Ok(())
         };
-        for part in before.try_iter_parts() {
-            let part = part?;
-            let name = part.partname();
-            match optional_part(after, name)? {
-                Some(other)
-                    if same_part(part, other)
-                        && before.same_retained_relationships(after, name)? => {},
-                Some(other) => push(Delta {
-                    name: name.clone(),
-                    before: Some(State::read(before, part)?),
-                    after: Some(State::read(after, other)?),
-                })?,
-                None => push(Delta {
-                    name: name.clone(),
-                    before: Some(State::read(before, part)?),
-                    after: None,
-                })?,
+        // `changed_parts` compares the package-owned payload handles and
+        // relationship graphs without decoding retained source members. The
+        // staged graph is a clone of `before`, so every untouched payload is
+        // one allocation and drops out here. Only names in this set need the
+        // fallible `State::read` path below.
+        let mut changed_names = after.changed_parts(before);
+
+        // A relationship member's lexical bytes are outside the typed graph.
+        // Add owners whose semantic entries stayed equal but whose retained
+        // source capture changed. Metadata iteration cannot reach payloads.
+        if !before.same_relationship_source_captures(after) {
+            for metadata in before.iter_parts() {
+                let name = metadata.partname();
+                if changed_names
+                    .binary_search_by(|current| current.as_str().cmp(name.as_str()))
+                    .is_ok()
+                {
+                    continue;
+                }
+                if let Some(other) = after.part_metadata(name)
+                    && relationships_equal(metadata.rels(), other.rels())
+                    && !before.same_retained_relationships(after, name)?
+                {
+                    changed_names.push(name.clone());
+                }
             }
         }
-        for part in after.try_iter_parts() {
-            let part = part?;
-            if optional_part(before, part.partname())?.is_none() {
-                push(Delta {
-                    name: part.partname().clone(),
-                    before: None,
-                    after: Some(State::read(after, part)?),
-                })?;
-            }
+        changed_names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        changed_names.dedup();
+
+        for name in changed_names {
+            let before_state = State::of(before, &name)?;
+            let after_state = State::of(after, &name)?;
+            push(Delta {
+                name,
+                before: before_state,
+                after: after_state,
+            })?;
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+        let content_types_changed = Self::content_types_changed(before, after, &deltas);
         Self {
             deltas,
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(
-            before,
-            after,
-            !before.same_retained_content_types(after)?
-                || before.content_types_source_bytes() != after.content_types_source_bytes(),
-        )
+        .with_manifests(before, after, content_types_changed)
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
