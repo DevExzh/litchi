@@ -70,7 +70,11 @@ impl<'a> PackageRef<'a> {
     pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
         let limits = options.limits_value();
         let limits = limits.validate()?;
-        validation::check_limit("package bytes", bytes.len(), limits.max_package_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::PackageBytes,
+            bytes.len(),
+            limits.max_package_bytes,
+        )?;
         let validated = validation::validate(bytes, limits)?;
         Ok(Self {
             bytes,
@@ -131,14 +135,22 @@ impl Package {
             workbook.push_ref(record?)?;
         }
         let workbook = workbook.finish();
-        validation::check_limit("Workbook bytes", workbook.len(), limits.max_workbook_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::WorkbookBytes,
+            workbook.len(),
+            limits.max_workbook_bytes,
+        )?;
 
         let mut writer = OleWriter::new();
         writer.create_stream(&[codec::WORKBOOK], &workbook)?;
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output)?;
         let output = output.into_inner();
-        validation::check_limit("package bytes", output.len(), limits.max_package_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::PackageBytes,
+            output.len(),
+            limits.max_package_bytes,
+        )?;
         Self::open_with_options(output, OpenOptions::new().limits(limits))
     }
 
@@ -289,7 +301,11 @@ impl<'a> WorkbookRef<'a> {
     pub fn open_with_options(bytes: &'a [u8], options: OpenOptions) -> Result<Self> {
         let limits = options.limits_value();
         let limits = limits.validate()?;
-        validation::check_limit("Workbook bytes", bytes.len(), limits.max_workbook_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::WorkbookBytes,
+            bytes.len(),
+            limits.max_workbook_bytes,
+        )?;
         let layout = validation::validate_workbook(bytes, limits)?;
         Ok(Self {
             bytes,

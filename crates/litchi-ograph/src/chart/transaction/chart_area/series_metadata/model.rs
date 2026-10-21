@@ -329,8 +329,8 @@ impl Edit {
             return Ok(self);
         }
         if self.requests.len() >= self.chart.limits.max_series {
-            return Err(Error::LimitExceeded {
-                resource: "series metadata edit count",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::SeriesMetadataEdits,
                 observed: u64::try_from(self.requests.len().saturating_add(1)).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.chart.limits.max_series).unwrap_or(u64::MAX),
             });

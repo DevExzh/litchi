@@ -41,7 +41,7 @@ macro_rules! marker {
             ///
             /// # Errors
             ///
-            /// Returns [`crate::Error::Biff`] if the encoder rejects the
+            /// Returns [`crate::Error::Limit`] if the encoder rejects the
             /// record.
             pub fn write(self, out: &mut Encoder) -> Result<()> {
                 out.push(Self::KIND, &[])?;

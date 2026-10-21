@@ -135,8 +135,8 @@ fn graph_cache_limit_refusal_is_atomic_before_chart_storage() {
 
     assert!(matches!(
         writer.add_chart(slide, 0, 0, 100, 100, chart),
-        Err(WriteError::Graph(litchi_ograph::Error::LimitExceeded {
-            resource: "cached value count",
+        Err(WriteError::Graph(litchi_ograph::Error::Limit {
+            kind: litchi_ograph::LimitKind::CachedValues,
             ..
         }))
     ));

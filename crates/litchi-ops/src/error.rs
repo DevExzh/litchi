@@ -1638,6 +1638,50 @@ impl Classify for litchi_doc::writer::WriteError {
     }
 }
 
+#[cfg(any(feature = "xls", feature = "ppt"))]
+impl Classify for litchi_biff::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidKind { .. } => Class::of(Code::InvalidValue),
+            Self::Allocation { .. } => Class::of(Code::InternalError),
+            Self::TruncatedHeader { .. }
+            | Self::TruncatedPayload { .. }
+            | Self::EmptyRecord
+            | Self::MultipleRecords { .. }
+            | Self::SizeOverflow { .. } => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(any(feature = "xls", feature = "ppt"))]
+impl Classify for litchi_ograph::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::Cfb(error) => error.classify(),
+            Self::Biff(error) => error.classify(),
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::Allocation { .. } => Class::of(Code::InternalError),
+            Self::WrongRecord { .. }
+            | Self::InvalidRecordLength { .. }
+            | Self::InvalidRecordValue { .. }
+            | Self::MissingStream { .. }
+            | Self::DuplicateStream { .. }
+            | Self::UnexpectedEntry { .. }
+            | Self::InvalidWorkbook { .. }
+            | Self::InvalidChart { .. }
+            | Self::InvalidModel { .. }
+            | Self::SizeOverflow { .. } => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
 #[cfg(feature = "xls")]
 impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
@@ -1652,6 +1696,7 @@ impl Classify for litchi_xls::Error {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::Io(error) => error.classify(),
             Self::Cfb(error) => error.classify(),
+            Self::Graph(error) => error.classify(),
             Self::PasswordProtected | Self::PasswordRequired => {
                 Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION)
             },
@@ -1676,7 +1721,6 @@ impl Classify for litchi_xls::Error {
             Self::WorksheetNotFound(_) => Class::of(Code::NotFound),
             Self::Allocation(_) => Class::of(Code::InternalError),
             Self::Vba(_)
-            | Self::Graph(_)
             | Self::InvalidRecord { .. }
             | Self::MalformedFilePass(_)
             | Self::InvalidLength { .. }
@@ -1827,9 +1871,14 @@ impl From<litchi_ppt::package::edit::Error> for Error {
 #[cfg(feature = "ppt")]
 impl Classify for litchi_ppt::writer::WriteError {
     fn classify(&self) -> Class {
+        #[allow(
+            unreachable_patterns,
+            reason = "additional writer variants depend on PPT leaf feature unification"
+        )]
         match self {
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
+            Self::Graph(error) => error.classify(),
             Self::InvalidData(_) => Class::of(Code::InvalidArgument),
             #[cfg(feature = "encryption")]
             Self::EncryptionEntropyRequired => Class::of(Code::InvalidArgument),
@@ -1849,6 +1898,7 @@ impl Classify for litchi_ppt::Error {
             Self::Authoring(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
+            Self::Graph(error) => error.classify(),
             Self::Limit { .. } | Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::AllocationFailed(_) => Class::of(Code::InternalError),
@@ -1862,7 +1912,6 @@ impl Classify for litchi_ppt::Error {
             },
             Self::UnsupportedEncryption(_) => Class::of(Code::UnsupportedCapability),
             Self::OfficeArt(_)
-            | Self::Graph(_)
             | Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
             | Self::Corrupted(_)

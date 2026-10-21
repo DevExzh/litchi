@@ -1,5 +1,75 @@
 use thiserror::Error;
 
+/// Resource dimension governed by Graph ingress, authoring or edit bounds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete compound-file bytes.
+    PackageBytes,
+    /// Direct children of the compound-file root.
+    RootEntries,
+    /// Bytes in one root stream.
+    StreamBytes,
+    /// Bytes in the Workbook stream.
+    WorkbookBytes,
+    /// Chart substreams in a workbook.
+    Charts,
+    /// Records in one chart substream.
+    ChartRecords,
+    /// Semantic series in one chart.
+    Series,
+    /// Chart groups in one chart.
+    Groups,
+    /// Axes in one chart.
+    Axes,
+    /// Bytes in one inert formula token array.
+    FormulaBytes,
+    /// Cached values in one chart.
+    CachedValues,
+    /// Aggregate retained unknown-record bytes.
+    UnknownBytes,
+    /// Nested Begin/End chart collections.
+    Nesting,
+    /// Distinct staged cache replacements.
+    CacheEdits,
+    /// Distinct staged series-metadata replacements.
+    SeriesMetadataEdits,
+    /// A physical BIFF framing bound.
+    Biff(litchi_biff::Resource),
+}
+
+impl LimitKind {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::PackageBytes => "package bytes",
+            Self::RootEntries => "root entries",
+            Self::StreamBytes => "stream bytes",
+            Self::WorkbookBytes => "Workbook bytes",
+            Self::Charts => "chart count",
+            Self::ChartRecords => "chart record count",
+            Self::Series => "series count",
+            Self::Groups => "group count",
+            Self::Axes => "axis count",
+            Self::FormulaBytes => "formula bytes",
+            Self::CachedValues => "cached value count",
+            Self::UnknownBytes => "unknown chart bytes",
+            Self::Nesting => "chart nesting",
+            Self::CacheEdits => "cache edit count",
+            Self::SeriesMetadataEdits => "series metadata edit count",
+            Self::Biff(_) => "BIFF framing",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Biff(resource) => resource.fmt(formatter),
+            kind => formatter.write_str(kind.description()),
+        }
+    }
+}
+
 /// Result type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -13,24 +83,24 @@ pub enum Error {
 
     /// The shared BIFF framing layer rejected the physical record stream.
     #[error("invalid BIFF framing: {0}")]
-    Biff(#[from] litchi_biff::Error),
+    Biff(#[source] litchi_biff::Error),
 
     /// A configured bound is internally inconsistent or unsupported.
-    #[error("invalid {resource} limit {value}: {reason}")]
+    #[error("invalid {kind} limit {value}; maximum is {maximum}")]
     InvalidLimit {
-        /// Name of the bounded resource.
-        resource: &'static str,
+        /// Dimension whose configured value is invalid.
+        kind: LimitKind,
         /// Rejected bound.
         value: u64,
-        /// Static explanation of the constraint.
-        reason: &'static str,
+        /// Largest supported bound; configured Graph bounds must also be nonzero.
+        maximum: u64,
     },
 
     /// Input or output crossed a configured resource bound.
-    #[error("{resource} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Name of the bounded resource.
-        resource: &'static str,
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Dimension whose configured bound was crossed.
+        kind: LimitKind,
         /// Observed amount.
         observed: u64,
         /// Configured maximum.
@@ -149,4 +219,34 @@ pub enum Error {
         /// Resource being allocated.
         resource: &'static str,
     },
+}
+
+impl From<litchi_biff::Error> for Error {
+    // Record loops reach this conversion only on failure. Keep the budget
+    // normalization out of their successful per-record instruction paths.
+    #[cold]
+    #[inline(never)]
+    fn from(error: litchi_biff::Error) -> Self {
+        match error {
+            litchi_biff::Error::LimitExceeded {
+                resource,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: LimitKind::Biff(resource),
+                observed,
+                maximum,
+            },
+            litchi_biff::Error::InvalidLimit {
+                resource,
+                value,
+                maximum,
+            } => Self::InvalidLimit {
+                kind: LimitKind::Biff(resource),
+                value,
+                maximum,
+            },
+            other => Self::Biff(other),
+        }
+    }
 }

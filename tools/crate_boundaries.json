@@ -244,6 +244,7 @@
       "xml-minifier"
     ],
     "litchi-ops": [
+      "litchi-biff",
       "litchi-cfb",
       "litchi-core",
       "litchi-crypto",
@@ -267,6 +268,7 @@
       "litchi-odp",
       "litchi-ods",
       "litchi-odt",
+      "litchi-ograph",
       "litchi-ole-common",
       "litchi-ooxml-common",
       "litchi-opc",

@@ -21,7 +21,11 @@ pub(super) fn read_workbook(
 ) -> Result<Vec<u8>> {
     let mut cfb = OleFile::open(Cursor::new(package_bytes))?;
     let bytes = cfb.open_stream(&[WORKBOOK])?;
-    check_limit("Workbook bytes", bytes.len(), limits.max_workbook_bytes)?;
+    check_limit(
+        crate::LimitKind::WorkbookBytes,
+        bytes.len(),
+        limits.max_workbook_bytes,
+    )?;
     layout.check(bytes.len())?;
     Ok(bytes)
 }
@@ -97,7 +101,7 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
     writer.write_to(&mut output)?;
     let output = output.into_inner();
     check_limit(
-        "package bytes",
+        crate::LimitKind::PackageBytes,
         output.len(),
         source.limits.max_package_bytes,
     )?;

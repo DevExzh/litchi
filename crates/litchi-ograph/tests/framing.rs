@@ -85,11 +85,11 @@ fn biff_record_bounds_are_enforced_without_a_second_ograph_frame_policy() {
 
     assert!(matches!(
         records.next(),
-        Some(Err(Error::Biff(BiffError::LimitExceeded {
-            resource: Resource::RecordCount,
+        Some(Err(Error::Limit {
+            kind: litchi_ograph::LimitKind::Biff(Resource::RecordCount),
             observed: 3,
             maximum: 2,
-        })))
+        }))
     ));
     assert!(records.next().is_none());
 }

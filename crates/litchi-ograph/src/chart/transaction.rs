@@ -80,8 +80,8 @@ impl Edit {
         }
 
         if self.requests.len() >= self.chart.limits.max_cached_values {
-            return Err(Error::LimitExceeded {
-                resource: "cache edit count",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::CacheEdits,
                 observed: u64::try_from(self.requests.len().saturating_add(1)).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.chart.limits.max_cached_values).unwrap_or(u64::MAX),
             });

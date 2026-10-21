@@ -573,8 +573,10 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "caseless",
+ "litchi-biff",
  "litchi-core",
  "litchi-drawingml",
+ "litchi-ograph",
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",

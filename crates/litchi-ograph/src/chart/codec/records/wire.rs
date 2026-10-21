@@ -200,20 +200,20 @@ pub(super) fn invalid_model<T>(field: &'static str, reason: &'static str) -> Res
     Err(Error::InvalidModel { field, reason })
 }
 
-pub(super) fn limit<T>(resource: &'static str, observed: usize, maximum: usize) -> Result<T> {
-    Err(Error::LimitExceeded {
-        resource,
+pub(super) fn limit<T>(kind: crate::LimitKind, observed: usize, maximum: usize) -> Result<T> {
+    Err(Error::Limit {
+        kind,
         observed: as_u64(observed),
         maximum: as_u64(maximum),
     })
 }
 
-pub(super) fn check_add(current: usize, maximum: usize, resource: &'static str) -> Result<()> {
-    let observed = current
-        .checked_add(1)
-        .ok_or(Error::SizeOverflow { resource })?;
+pub(super) fn check_add(current: usize, maximum: usize, kind: crate::LimitKind) -> Result<()> {
+    let observed = current.checked_add(1).ok_or(Error::SizeOverflow {
+        resource: kind.description(),
+    })?;
     if observed > maximum {
-        return limit(resource, observed, maximum);
+        return limit(kind, observed, maximum);
     }
     Ok(())
 }
@@ -227,9 +227,14 @@ pub(super) fn push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> 
     Ok(())
 }
 
-pub(super) fn copy(data: &[u8], resource: &'static str, maximum: usize) -> Result<Vec<u8>> {
+pub(super) fn copy(
+    data: &[u8],
+    resource: &'static str,
+    kind: crate::LimitKind,
+    maximum: usize,
+) -> Result<Vec<u8>> {
     if data.len() > maximum {
-        return limit(resource, data.len(), maximum);
+        return limit(kind, data.len(), maximum);
     }
     let mut output = Vec::new();
     output

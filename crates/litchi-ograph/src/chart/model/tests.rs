@@ -327,8 +327,8 @@ fn rejects_context_mismatch_tighter_replay_limit_and_invalid_properties() {
     limits.biff.max_output_bytes = bytes.saturating_sub(1);
     assert!(matches!(
         chart.encode_with(limits),
-        Err(Error::LimitExceeded {
-            resource: "output bytes",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
             ..
         })
     ));
@@ -384,15 +384,15 @@ fn add_methods_enforce_authoring_limits_before_growth() {
         .expect("first series");
     assert!(matches!(
         chart.add_series(Series::new(Context::excel())),
-        Err(Error::LimitExceeded {
-            resource: "series count",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Series,
             ..
         })
     ));
     assert!(matches!(
         chart.add_group(Group::line()),
-        Err(Error::LimitExceeded {
-            resource: "group count",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Groups,
             ..
         })
     ));
@@ -494,8 +494,8 @@ fn rejects_missing_collection_begin_and_nesting_over_limit() {
                 ..Limits::default()
             }
         ),
-        Err(Error::LimitExceeded {
-            resource: "chart nesting",
+        Err(Error::Limit {
+            kind: crate::LimitKind::Nesting,
             ..
         })
     ));

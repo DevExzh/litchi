@@ -201,8 +201,8 @@ impl Draft {
                 resource: "edited Workbook bytes",
             })?;
         if total > self.limits.max_workbook_bytes {
-            return Err(litchi_ograph::Error::LimitExceeded {
-                resource: "Workbook bytes",
+            return Err(litchi_ograph::Error::Limit {
+                kind: litchi_ograph::LimitKind::WorkbookBytes,
                 observed: u64::try_from(total).unwrap_or(u64::MAX),
                 maximum: u64::try_from(self.limits.max_workbook_bytes).unwrap_or(u64::MAX),
             }

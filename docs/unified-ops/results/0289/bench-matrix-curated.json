@@ -2801,7 +2801,7 @@
  "evidence_without_rows": [
   {
    "record": "0359c",
-   "reason": "Validation-only receipt for the XLS typed-budget slice; no timing or leaf-vs-unified performance claim. Shared OLE/Graph migration and integrated performance acceptance remain required."
+   "reason": "XLS typed-budget validation and a focused native Graph before/after microprobe, not a leaf-vs-unified operation pair. Record 0359c retains and tabulates the Graph samples, including rejected candidates. Shared OLE migration, Graph owner consolidation and integrated performance acceptance remain required."
   },
   {
    "record": "0272",

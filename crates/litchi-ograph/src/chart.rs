@@ -124,10 +124,14 @@ impl<'a> Ref<'a> {
     /// Copies this substream under explicit bounds.
     pub fn own(self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
-        Ref::open(self.bytes, limits)?;
+        // Every Ref has already passed framing and chart-bound admission.
+        // Only a changed policy requires another complete record walk.
+        if limits != self.limits {
+            Ref::open(self.bytes, limits)?;
+        }
         if self.bytes.len() > limits.biff.max_output_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
                 observed: as_u64(self.bytes.len()),
                 maximum: as_u64(limits.biff.max_output_bytes),
             });
@@ -213,10 +217,14 @@ impl Stream {
 
     pub(crate) fn relimit(mut self, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        Ref::open(&self.bytes, limits)?;
+        // Internal edits preserve framing and patch only validated fixed-size
+        // payloads. Unchanged bounds retain the existing framing proof.
+        if limits != self.limits {
+            Ref::open(&self.bytes, limits)?;
+        }
         if self.bytes.len() > limits.biff.max_output_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
                 observed: as_u64(self.bytes.len()),
                 maximum: as_u64(limits.biff.max_output_bytes),
             });
@@ -371,8 +379,8 @@ impl<'a> Iterator for Refs<'a> {
                     },
                 };
                 if active.records > self.limits.max_chart_records {
-                    return Some(self.fail(Error::LimitExceeded {
-                        resource: "chart record count",
+                    return Some(self.fail(Error::Limit {
+                        kind: crate::LimitKind::ChartRecords,
                         observed: as_u64(active.records),
                         maximum: as_u64(self.limits.max_chart_records),
                     }));
@@ -429,8 +437,8 @@ impl<'a> Iterator for Refs<'a> {
                 }));
             };
             if next > self.limits.max_charts {
-                return Some(self.fail(Error::LimitExceeded {
-                    resource: "chart count",
+                return Some(self.fail(Error::Limit {
+                    kind: crate::LimitKind::Charts,
                     observed: as_u64(next),
                     maximum: as_u64(self.limits.max_charts),
                 }));
@@ -480,8 +488,8 @@ fn parse_bof(record: RecordRef<'_>) -> Result<Option<Kind>> {
 
 fn check_bytes(bytes: &[u8], limits: Limits) -> Result<()> {
     if bytes.len() > limits.max_workbook_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "Workbook bytes",
+        return Err(Error::Limit {
+            kind: crate::LimitKind::WorkbookBytes,
             observed: as_u64(bytes.len()),
             maximum: as_u64(limits.max_workbook_bytes),
         });
@@ -746,8 +754,8 @@ mod tests {
         assert!(count.next().expect("first chart").is_ok());
         assert!(matches!(
             count.next(),
-            Some(Err(Error::LimitExceeded {
-                resource: "chart count",
+            Some(Err(Error::Limit {
+                kind: crate::LimitKind::Charts,
                 ..
             }))
         ));
@@ -762,8 +770,8 @@ mod tests {
                     ..Limits::default()
                 }
             ),
-            Err(Error::LimitExceeded {
-                resource: "chart record count",
+            Err(Error::Limit {
+                kind: crate::LimitKind::ChartRecords,
                 ..
             })
         ));
@@ -776,8 +784,8 @@ mod tests {
                     ..Limits::default()
                 }
             ),
-            Err(Error::LimitExceeded {
-                resource: "Workbook bytes",
+            Err(Error::Limit {
+                kind: crate::LimitKind::WorkbookBytes,
                 ..
             })
         ));
@@ -786,6 +794,82 @@ mod tests {
             Book::open(vec![0x0A, 0, 0, 0], Limits::default()),
             Err(Error::InvalidChart {
                 reason: "Workbook contains no chart substream",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn retained_admission_does_not_skip_output_or_tighter_copy_bounds() {
+        let bytes = chart(Kind::Excel, &[1, 2, 3]);
+        let limits = Limits::default();
+        let view = Ref::open(&bytes, limits).unwrap();
+        assert_eq!(view.own(limits).unwrap().as_bytes(), bytes);
+        assert!(matches!(
+            view.own(Limits {
+                max_chart_records: 2,
+                ..limits
+            }),
+            Err(Error::Limit {
+                kind: crate::LimitKind::ChartRecords,
+                observed: 3,
+                maximum: 2
+            })
+        ));
+        let restrictive = Limits {
+            biff: litchi_biff::Limits {
+                max_output_bytes: 0,
+                ..limits.biff
+            },
+            ..limits
+        };
+        let view = Ref::open(&bytes, restrictive).unwrap();
+        assert!(matches!(
+            view.own(restrictive),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
+                maximum: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn retained_stream_admission_rechecks_changed_policy_and_output_bounds() {
+        let bytes = chart(Kind::Excel, &[1, 2, 3]);
+        let limits = Limits::default();
+        let stream = Stream::open(bytes.clone(), limits).unwrap();
+        let pointer = stream.as_bytes().as_ptr();
+        let stream = stream.relimit(limits).unwrap();
+        assert_eq!(stream.as_bytes().as_ptr(), pointer);
+        assert_eq!(stream.as_bytes(), bytes);
+        assert!(matches!(
+            stream.relimit(Limits {
+                biff: litchi_biff::Limits {
+                    max_record_bytes: 8,
+                    ..limits.biff
+                },
+                ..limits
+            }),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
+                observed: 16,
+                maximum: 8
+            })
+        ));
+        let restrictive = Limits {
+            biff: litchi_biff::Limits {
+                max_output_bytes: 0,
+                ..limits.biff
+            },
+            ..limits
+        };
+        let stream = Stream::open(bytes, restrictive).unwrap();
+        assert!(matches!(
+            stream.relimit(restrictive),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Biff(litchi_biff::Resource::OutputBytes),
+                maximum: 0,
                 ..
             })
         ));

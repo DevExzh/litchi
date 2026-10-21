@@ -593,9 +593,11 @@ name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
  "caseless",
+ "litchi-biff",
  "litchi-cfb",
  "litchi-core",
  "litchi-doc",
+ "litchi-ograph",
  "litchi-ole-common",
  "litchi-sign",
  "serde",

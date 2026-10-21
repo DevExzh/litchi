@@ -145,8 +145,10 @@ close the W4/W4b/W8 program or replace its integrated workspace gate.
 
 The typed-error sweep also remains required. Record
 [0359c](0359c-typed-legacy-edit-budgets.md) migrates XLS embedded-payload,
-compound-publication and primary staging budgets to typed kinds. Shared OLE
-capture still emits configured-budget failures through generic format errors,
-and Graph's string resource labels need review against the raw-codec and
-edit-family contracts. The constructor slices do not accept these as exceptions
-or complete that audit.
+compound-publication and primary staging budgets to typed kinds, followed by
+Graph ingress, authoring and fixed-record budgets with every host consumer and
+unified classifier migrated. Shared OLE capture still emits configured-budget
+failures through generic format errors. Graph's separate `Package` and edit
+`Snapshot` owners also need consolidation onto the canonical returned-owner
+contract. The constructor slices do not accept these as exceptions or complete
+that audit.

@@ -1,0 +1,243 @@
+{
+  "baseline_commit": "b6f5225d15110118be02729bf97ca93f764e6de5",
+  "candidate": "commit containing this receipt; exact changed source hashes below",
+  "scope": "Graph typed budgets, BIFF budget normalization, XLS/PPT host constructors and unified classification, retained-admission reuse",
+  "validation": {
+    "graph_tests": 75,
+    "xls_lib_tests": 1313,
+    "ppt_chart_tests": 19,
+    "ops_xls_ppt_error_tests": 39,
+    "total_tests": 1446,
+    "failed": 0,
+    "ignored": 0,
+    "tool_tests": 36,
+    "glossary_profiles": 4,
+    "crate_boundaries": {
+      "packages": 68,
+      "internal_dependency_declarations": 288,
+      "explicit_debt_items": 11
+    }
+  },
+  "error_code_changes": {
+    "previous_graph_budget": "corrupt_file",
+    "budget": "limit_exceeded",
+    "invalid_configuration": "invalid_argument",
+    "patch_conflict": "invalid_input",
+    "refusal": "RefusalKind classification",
+    "allocation": "internal_error",
+    "previous_ppt_authoring_graph": "unsupported_capability fallback",
+    "malformed_graph_and_biff": "corrupt_file retained"
+  },
+  "performance": {
+    "final_samples": "graph-measurements.json",
+    "reproducer": [
+      "python3 docs/unified-ops/results/0359c/graph-budget-probe.py build /external/graph",
+      "python3 docs/unified-ops/results/0359c/graph-budget-probe.py run /external/graph"
+    ],
+    "quiet": "W4, W4b and W8 acknowledged holds; process check before Graph run found no other cargo, rustc, rustdoc, valgrind or probe process. W4b timing began after Graph completed.",
+    "sampling": "Three CPU-pinned process ABBA blocks per route; 20,000 iterations per chart route and 20,000,000 policy validations; exact preflight in every process.",
+    "unchanged_layout_bytes": {
+      "error": 48,
+      "result_unit": 48
+    },
+    "rejected_candidates": [
+      {
+        "samples": "graph-rejected-0.json",
+        "configuration": "Typed budgets, inline BIFF normalization, repeated framing admission retained.",
+        "reason": "Repeatable 4\u20135% parse/edit/replay slowdown."
+      },
+      {
+        "samples": "graph-rejected-1.json",
+        "configuration": "Cold non-inlined BIFF normalization, default policy-validation inlining, repeated framing admission retained.",
+        "reason": "Policy validation outlined, 2.64\u20132.87x slowdown; parse slowdown remains."
+      },
+      {
+        "samples": "graph-rejected-2.json",
+        "configuration": "Cold non-inlined BIFF normalization, forced inline policy validation, repeated framing admission retained.",
+        "reason": "Policy validation repaired; parse/edit/replay slowdown remains."
+      }
+    ],
+    "final": "Same cold conversion and inline validation, but unchanged-policy copies/relimit reuse the retained framing proof; output bound always checked. See record table for ratios."
+  },
+  "remaining_required_work": [
+    "Shared OLE typed-budget errors and all consumers",
+    "Graph Package/Snapshot consolidation and canonical returned owner",
+    "Shared OLE snapshot publication semantic audit",
+    "Integrated corpus/code-disposition, performance and full workspace gate"
+  ],
+  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "checks": {
+    "check": {
+      "command": "cargo check --locked -p litchi-ograph -p litchi-ppt --all-targets --all-features",
+      "status": "passed",
+      "log": "graph-budget-check.log",
+      "bytes": 3169,
+      "sha256": "abfc5b05e6163b7cfa7a409c67ad129ace1b841be0181c3d81fb2ac6d98bcd5a"
+    },
+    "tests": {
+      "command": "cargo test --locked -p litchi-ograph --all-features",
+      "status": "passed",
+      "log": "graph-budget-tests.log",
+      "bytes": 7603,
+      "sha256": "f4f6b36818510a264ca4b0c38b1193c1a8ebabb37bca4531a45a8e0244343cb6",
+      "passed": 75
+    },
+    "xls-tests": {
+      "command": "cargo test --locked -p litchi-xls --all-features --lib",
+      "status": "passed",
+      "log": "graph-budget-xls-tests.log",
+      "bytes": 106107,
+      "sha256": "19d363b571ae20a19c502cd702f3d277eee88382fa2fa10560ae69499b4bc467",
+      "passed": 1313
+    },
+    "ppt-tests": {
+      "command": "cargo test --locked -p litchi-ppt --all-features --lib chart",
+      "status": "passed",
+      "log": "graph-budget-ppt-tests.log",
+      "bytes": 1237,
+      "sha256": "e35e6338647a81595dc3c67c5b2d826bef6d4cdff952fb4d5f41168a8ba6407e",
+      "passed": 10
+    },
+    "ppt-integration": {
+      "command": "cargo test --locked -p litchi-ppt --all-features --test ppt_chart_writer --test ppt_charts",
+      "status": "passed",
+      "log": "graph-budget-ppt-integration.log",
+      "bytes": 1148,
+      "sha256": "e9bf713152cb1379dd5897a2e5525732a0e8d093a94d53eec8d9c7cb76ab992a",
+      "passed": 9
+    },
+    "ops-tests": {
+      "command": "cargo test --locked -p litchi-ops --no-default-features --features xls,ppt --lib error::tests",
+      "status": "passed",
+      "log": "graph-budget-ops-tests.log",
+      "bytes": 3495,
+      "sha256": "ec0546570935520a158e08a1b1d40cc3c88524116953f95e9a6fef9079af8a44",
+      "passed": 39
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p litchi-ograph -p litchi-ppt --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "log": "graph-budget-clippy.log",
+      "bytes": 269,
+      "sha256": "bf7663d9829a20e38c3851c7178bbcd1d2014ff6e573d7626df610597e95fabd"
+    },
+    "ops-clippy": {
+      "command": "cargo clippy --locked -p litchi-ops --no-default-features --features xls,ppt --all-targets -- -D warnings",
+      "status": "passed",
+      "log": "graph-budget-ops-clippy.log",
+      "bytes": 471,
+      "sha256": "ec65defce651af8ceb21f7df434b271b6d5de7710c5cd0b552dba83c90e52f40"
+    },
+    "harness": {
+      "command": "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+      "status": "passed",
+      "log": "graph-budget-harness.log",
+      "bytes": 677,
+      "sha256": "557fe12addaadcdfa2a88d98b5fd043e169d636135df6ebb2c60b6d545ca231c"
+    },
+    "ops-xls": {
+      "command": "cargo check --locked -p litchi-ops --no-default-features --features xls --all-targets",
+      "status": "passed",
+      "log": "graph-budget-ops-xls.log",
+      "bytes": 2069,
+      "sha256": "9fd86a49f08c4f37e016cec0a598c6792cd85f539573859d1d54073625f28891"
+    },
+    "ops-ppt": {
+      "command": "cargo check --locked -p litchi-ops --no-default-features --features ppt --all-targets",
+      "status": "passed",
+      "log": "graph-budget-ops-ppt.log",
+      "bytes": 2656,
+      "sha256": "9210111465f7c455acb39188ae5bef5e324e875afdad5fe2e9e04148090757f2"
+    },
+    "boundaries": {
+      "command": "python3 tools/check_crate_boundaries.py",
+      "status": "passed",
+      "log": "graph-budget-boundaries.log",
+      "bytes": 565,
+      "sha256": "b26d84df60995a6e6f079399e51488bf87aa446cda93f6a1a01f5f00ab5c38db"
+    },
+    "tools-tests": {
+      "command": "python3 -m unittest tools.test_check_api_glossary tools.test_unified_bench_matrix",
+      "status": "passed",
+      "log": "graph-budget-tools-tests.log",
+      "bytes": 541,
+      "sha256": "d79cce06e6f2caa6fd9ee45543a66a9a5e6909584c3f73522e1dd59e7f39d7f3"
+    },
+    "matrix": {
+      "command": "python3 tools/unified_bench_matrix.py --check",
+      "status": "passed",
+      "log": "graph-budget-matrix.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fmt": {
+      "command": "cargo fmt --check -p litchi-ograph -p litchi-ppt -p litchi-ops",
+      "status": "passed",
+      "log": "graph-budget-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "glossary-ograph": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ograph --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "graph-budget-glossary-ograph.log",
+      "bytes": 904,
+      "sha256": "002dcf71722b1b980b029b5ddfb88f16e7fbafd7ece0b5e0b42dfb9a4e7132a7"
+    },
+    "glossary-xls-minimal": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile xls-minimal --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "graph-budget-glossary-xls-minimal.log",
+      "bytes": 1724,
+      "sha256": "8c69136616f18bded823042dbfc1f256be1e5bc6920ffe9d56bec0e8b2a85840"
+    },
+    "glossary-ppt-minimal": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ppt-minimal --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "graph-budget-glossary-ppt-minimal.log",
+      "bytes": 1987,
+      "sha256": "972173d85c220be24a23e01664eb59db86fbc3aee29f7bf6af0f2013afd6af46"
+    },
+    "glossary-ppt-full": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ppt-full --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "graph-budget-glossary-ppt-full.log",
+      "bytes": 2078,
+      "sha256": "a25cef4393c5ed98201b23cbd31846b9db5ca1f96a977ba4bd46b429fc3c4f13"
+    }
+  },
+  "sources": {
+    "crates/litchi-ograph/src/chart.rs": "4d93573f03fa2209f2d4d6e5c64d09f51dbb41ddfb4c02efcb2ba11ccb31b670",
+    "crates/litchi-ograph/src/chart/codec/records/encode.rs": "d0e86434cdc7cbabc68b7dbd1c1ffe60532286ecccf364f463784b51e5b9eb86",
+    "crates/litchi-ograph/src/chart/codec/records/links.rs": "5a7d4f696b7b387d95abd83493a68e04f500b487908eebdde0225208aeb47e90",
+    "crates/litchi-ograph/src/chart/codec/records/parse.rs": "61641d79bfdaaf6557b29fb4bb5533dc77f38078e1cefbb466140a411ffa3730",
+    "crates/litchi-ograph/src/chart/codec/records/validate.rs": "cbe64e57033b274d6fc8e9ebf450be4f6d81b58569508591b0b6f1a7a01a3bb8",
+    "crates/litchi-ograph/src/chart/codec/records/wire.rs": "167b663c29c5a9cf4b8f978df0898daccbd52d7b53e262ab7a6cf8c57b705999",
+    "crates/litchi-ograph/src/chart/model/aggregate/semantic.rs": "e9c90053e166dc3a63c78a8b426ec9a7275f0e7f14af4b3c6870a6cedd213267",
+    "crates/litchi-ograph/src/chart/model/aggregate/validation.rs": "f2cd4a2811b499c0f3fd6a6c271254db7d762acb1c45d04c8dfef9af345f8934",
+    "crates/litchi-ograph/src/chart/model/tests.rs": "7a6b9d22307c4865fcd4949c3a54dfd483a4fd946a6904f1fec8a4ee83427a85",
+    "crates/litchi-ograph/src/chart/transaction.rs": "250f6d67d90716c0a95ad0f021991f87a6553b169027b938a1b1a1a69e7c0012",
+    "crates/litchi-ograph/src/chart/transaction/chart_area/series_metadata/model.rs": "f7dbd3007454539dcc77ca8d2d9993d40a7937ed88e388ebef3a9a90b1884224",
+    "crates/litchi-ograph/src/error.rs": "f682e8c34a8b449dd62c2f37c472d3a3f6bae4e3106386d78b56e1edf350557f",
+    "crates/litchi-ograph/src/lib.rs": "05e400f6b4e9c47f578a42be22c006088593697914bd868c4a03e16863f80f00",
+    "crates/litchi-ograph/src/limits.rs": "b64669439cc7ee1a990f05aa3a0e561ac54c1e3b1405284ccd1909bc4f01580b",
+    "crates/litchi-ograph/src/package/codec.rs": "8ff9e759c17a6353f8a86360c03626f30336135b78a6f2621203d264b37c8b15",
+    "crates/litchi-ograph/src/package/semantic.rs": "0f6a24e3fd7e011c47a8abc407c9104f33a4b69bf74279cec64ac0123617c858",
+    "crates/litchi-ograph/src/package/snapshot.rs": "8b7d9b0dec40c292c3dd39e90e05e7830fc3d549ad98c61b868f3fbda7a4de0f",
+    "crates/litchi-ograph/src/package/tests.rs": "60d94028802f7d0742a7a2b84af1af1f9caf705d7679eedb444fce33f3daebc1",
+    "crates/litchi-ograph/src/package/validation.rs": "f8aa031479eb001043f5cd4888629e987769043ebe26603cd6f016a101acb27e",
+    "crates/litchi-ograph/src/record/marker.rs": "f0b8c507a20d5e7daeee19379e46dbfda30112fd28c78b95786159103d559327",
+    "crates/litchi-ograph/tests/framing.rs": "2ef7f477991d3ecbef1e6561791c7ab94fc126277a6aaec5c760c8310bfcfbb5",
+    "crates/litchi-ops/Cargo.toml": "8f001c7fdbb95b0c7f6a0d4c82b4700b6175af98e38e9cf74443fe2ddccabbf1",
+    "crates/litchi-ops/src/error.rs": "5f49e38fee3d04cc8eaa7a368973a83455c68c2ab5071cfd7c5b884a09ddc81f",
+    "crates/litchi-ops/src/error/tests.rs": "f402c01cfb88273f27fd7cca6b95a86bdcc6580e0c5bb0475cabeac9b25dd916",
+    "crates/litchi-ppt/src/builder/graph/model.rs": "cc2f97cfc325651bf4527476735c0084fc3cd608fe2da7a6e29f6b9513adc46b",
+    "crates/litchi-ppt/src/chart/codec.rs": "3d180f63ed602e9ed2c4d3d6238a2205b59d024ba80791425f1cf5f6e6e7e2f4",
+    "crates/litchi-ppt/src/writer/chart.rs": "4de8c277b26deb19059b2dc0447fb2ed948f4a5f7fea5ac64f9dd2be9edb7e23",
+    "crates/litchi-ppt/tests/ppt_chart_writer.rs": "1cd4993a45f133e17a51b2229c4f2d449317420e19b6d800dba147b59c2107b3",
+    "tools/api_glossary.json": "eb2f72d33f16352ff6607dccb88daf4e6c1ae691df61a317e0a5303a4acf941d",
+    "tools/crate_boundaries.json": "d0e7c55a8264cd77253b7ede7ad61b789a3fbb80b8bbaae5f95bf26a8b339d02",
+    "docs/unified-ops/results/0359c/graph-budget-probe.py": "f31a8273fff9b2e66ad80c4f9cc8b0a59e704b58d2e004229455e2fcf3065fa8",
+    "docs/unified-ops/results/0359c/graph-budget-probe.rs": "08023dc720f34260ed804e3a845e08569d5f93347b87eae541e1585160d1da5b"
+  }
+}

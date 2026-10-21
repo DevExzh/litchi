@@ -8919,6 +8919,11 @@
       "features": [],
       "banned_names": [
         {
+          "name": "LimitExceeded",
+          "scope": "litchi_ograph::Error",
+          "replacement": "use Limit with typed LimitKind and numeric evidence (record 0359c)"
+        },
+        {
           "name": "Transaction",
           "scope": "litchi_ograph",
           "replacement": "use the focused module's Edit (record 0359)"

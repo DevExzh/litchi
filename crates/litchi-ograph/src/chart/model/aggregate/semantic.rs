@@ -664,7 +664,11 @@ impl Model {
                 });
             }
         }
-        check_add(self.series.len(), self.limits.max_series, "series count")?;
+        check_add(
+            self.series.len(),
+            self.limits.max_series,
+            crate::LimitKind::Series,
+        )?;
         reserve_one(&mut self.series, "chart series")?;
         self.touch();
         self.series.push(value);
@@ -759,7 +763,11 @@ impl Model {
     }
 
     pub fn add_group(&mut self, value: Group) -> Result<()> {
-        check_add(self.groups.len(), self.limits.max_groups, "group count")?;
+        check_add(
+            self.groups.len(),
+            self.limits.max_groups,
+            crate::LimitKind::Groups,
+        )?;
         if self
             .parents
             .get(value.parent.index())
@@ -858,7 +866,11 @@ impl Model {
                 reason: "axis refers to a missing axis parent",
             });
         }
-        check_add(self.axes.len(), self.limits.max_axes, "axis count")?;
+        check_add(
+            self.axes.len(),
+            self.limits.max_axes,
+            crate::LimitKind::Axes,
+        )?;
         reserve_one(&mut self.axes, "chart axes")?;
         self.touch();
         self.axes.push(value);
@@ -949,7 +961,7 @@ impl Model {
         check_add(
             self.caches.len(),
             self.limits.max_cached_values,
-            "cached value count",
+            crate::LimitKind::CachedValues,
         )?;
         reserve_one(&mut self.caches, "chart cache")?;
         self.caches.push(value);
@@ -1008,7 +1020,7 @@ impl Model {
         check_add(
             self.formats.len(),
             self.limits.max_chart_records,
-            "chart record count",
+            crate::LimitKind::ChartRecords,
         )?;
         reserve_one(&mut self.formats, "chart formats")?;
         self.touch();
@@ -1033,7 +1045,7 @@ impl Model {
         check_add(
             self.labels.len(),
             self.limits.max_chart_records,
-            "chart record count",
+            crate::LimitKind::ChartRecords,
         )?;
         reserve_one(&mut self.labels, "chart labels")?;
         self.touch();

@@ -31,7 +31,11 @@ impl Snapshot {
     /// Parses an owned package under explicit resource bounds.
     pub fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        validation::check_limit("package bytes", bytes.len(), limits.max_package_bytes)?;
+        validation::check_limit(
+            crate::LimitKind::PackageBytes,
+            bytes.len(),
+            limits.max_package_bytes,
+        )?;
         let validated = validation::validate(&bytes, limits)?;
         let bytes = Arc::from(bytes.into_boxed_slice());
         Ok(Self {

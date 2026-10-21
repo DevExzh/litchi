@@ -217,8 +217,8 @@ impl Chart {
         if data_values > limits.max_cached_values {
             let observed = u64::try_from(data_values).unwrap_or(u64::MAX);
             let maximum = u64::try_from(limits.max_cached_values).unwrap_or(u64::MAX);
-            return Err(litchi_ograph::Error::LimitExceeded {
-                resource: "cached value count",
+            return Err(litchi_ograph::Error::Limit {
+                kind: litchi_ograph::LimitKind::CachedValues,
                 observed,
                 maximum,
             }

@@ -120,7 +120,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
         let record = item?;
         if record.payload().len() > limits.biff.max_record_bytes {
             return limit(
-                "record bytes",
+                crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
                 record.payload().len(),
                 limits.biff.max_record_bytes,
             );
@@ -240,7 +240,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     resource: "chart nesting",
                 })?;
                 if depth > limits.max_nesting {
-                    return limit("chart nesting", depth, limits.max_nesting);
+                    return limit(crate::LimitKind::Nesting, depth, limits.max_nesting);
                 }
                 if parent_depth == Some(depth) {
                     parent_needs_pos = true;
@@ -669,7 +669,11 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     );
                 }
                 exact(record, 12)?;
-                check_add(chart.series.len(), limits.max_series, "series count")?;
+                check_add(
+                    chart.series.len(),
+                    limits.max_series,
+                    crate::LimitKind::Series,
+                )?;
                 let category_kind = match u16_at(data, 0, record)? {
                     1 => DataKind::Numeric,
                     3 => DataKind::Text,
@@ -874,7 +878,11 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if reserved.iter().any(|value| *value != 0) || vary & !1 != 0 {
                     return invalid(record, "ChartFormat reserved fields are nonzero");
                 }
-                check_add(chart.groups.len(), limits.max_groups, "group count")?;
+                check_add(
+                    chart.groups.len(),
+                    limits.max_groups,
+                    crate::LimitKind::Groups,
+                )?;
                 let raw = u16_at(data, 18, record)?;
                 let raw = u8::try_from(raw).ok().ok_or(Error::InvalidChart {
                     offset: record.offset(),
@@ -1036,7 +1044,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     2 => axis::Kind::Series,
                     _ => return invalid(record, "invalid axis kind"),
                 };
-                check_add(chart.axes.len(), limits.max_axes, "axis count")?;
+                check_add(chart.axes.len(), limits.max_axes, crate::LimitKind::Axes)?;
                 let parent = current_parent
                     .and_then(|index| chart.parents.get(index))
                     .map(|parent| parent.id())
@@ -1091,7 +1099,6 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 if u16_at(data, 0, record)? > 1 {
                     return invalid(record, "AxisParent index must be primary or secondary");
                 }
-                check_add(chart.parents.len(), 2, "axis-parent count")?;
                 push(
                     &mut chart.parents,
                     if secondary {
@@ -1284,7 +1291,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 }
             },
             MARKER_FORMAT => {
-                let data = copy(data, "marker payload", limits.biff.max_record_bytes)?;
+                let data = copy(
+                    data,
+                    "marker payload",
+                    crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
+                    limits.biff.max_record_bytes,
+                )?;
                 push(&mut chart.formats, Format::Marker { data }, "chart formats")?;
             },
             DATA_FORMAT => {
@@ -1332,7 +1344,12 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                     }
                     attached_label_pending = true;
                 }
-                let data = copy(data, "data-label payload", limits.biff.max_record_bytes)?;
+                let data = copy(
+                    data,
+                    "data-label payload",
+                    crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
+                    limits.biff.max_record_bytes,
+                )?;
                 push(
                     &mut chart.labels,
                     Label {
@@ -1468,7 +1485,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
-                    "cached value count",
+                    crate::LimitKind::CachedValues,
                 )?;
                 push(&mut chart.caches, value, "chart cache")?;
             },
@@ -1520,7 +1537,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
-                    "cached value count",
+                    crate::LimitKind::CachedValues,
                 )?;
                 push(&mut chart.caches, value, "chart cache")?;
             },
@@ -1560,7 +1577,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
-                    "cached value count",
+                    crate::LimitKind::CachedValues,
                 )?;
                 push(&mut chart.caches, value, "chart cache")?;
             },
@@ -1591,7 +1608,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
                 check_add(
                     chart.caches.len(),
                     limits.max_cached_values,
-                    "cached value count",
+                    crate::LimitKind::CachedValues,
                 )?;
                 let value = excel_cache(
                     data,
@@ -1813,7 +1830,7 @@ fn add_raw(
             })?;
     if *unknown_bytes > limits.max_unknown_bytes {
         return limit(
-            "unknown chart bytes",
+            crate::LimitKind::UnknownBytes,
             *unknown_bytes,
             limits.max_unknown_bytes,
         );
@@ -1821,6 +1838,7 @@ fn add_raw(
     let data = copy(
         record.payload(),
         "unknown chart payload",
+        crate::LimitKind::Biff(litchi_biff::Resource::RecordBytes),
         limits.biff.max_record_bytes,
     )?;
     push(

@@ -70,8 +70,8 @@ pub(crate) fn encode(chart: &Model, limits: Limits) -> Result<Vec<u8>> {
                     resource: "Graph title retained metadata",
                 })?;
             if retained > limits.max_unknown_bytes {
-                return Err(Error::LimitExceeded {
-                    resource: "unknown chart bytes",
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::UnknownBytes,
                     observed: crate::limits::as_u64(retained),
                     maximum: crate::limits::as_u64(limits.max_unknown_bytes),
                 });

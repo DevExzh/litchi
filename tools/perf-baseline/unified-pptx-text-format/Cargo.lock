@@ -572,8 +572,10 @@ name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
  "caseless",
+ "litchi-biff",
  "litchi-core",
  "litchi-drawingml",
+ "litchi-ograph",
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",

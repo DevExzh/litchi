@@ -1784,3 +1784,117 @@ fn xls_ole_budget_errors_preserve_typed_dimensions_and_codes() {
     ));
     assert_code(native, Code::InvalidArgument);
 }
+
+#[cfg(any(feature = "xls", feature = "ppt"))]
+#[test]
+fn graph_budget_errors_keep_dimensions_and_host_classification() {
+    use litchi_ograph::{Error as GraphError, LimitKind, Limits, OpenOptions, Package};
+    let exceeded = || {
+        let error = Package::open_with_options(
+            vec![0x55; 2],
+            OpenOptions::new().limits(Limits {
+                max_package_bytes: 1,
+                ..Limits::default()
+            }),
+        )
+        .expect_err("byte budget is checked before parsing CFB");
+        assert!(matches!(
+            error,
+            GraphError::Limit {
+                kind: LimitKind::PackageBytes,
+                observed: 2,
+                maximum: 1,
+            }
+        ));
+        error
+    };
+    let invalid = || {
+        let error = Package::open_with_options(
+            Vec::new(),
+            OpenOptions::new().limits(Limits {
+                max_groups: 11,
+                ..Limits::default()
+            }),
+        )
+        .expect_err("invalid bounds are checked before parsing CFB");
+        assert!(matches!(
+            error,
+            GraphError::InvalidLimit {
+                kind: LimitKind::Groups,
+                value: 11,
+                maximum: 10,
+            }
+        ));
+        error
+    };
+    #[cfg(feature = "xls")]
+    {
+        assert_code(litchi_xls::Error::from(exceeded()), Code::LimitExceeded);
+        assert_code(litchi_xls::Error::from(invalid()), Code::InvalidArgument);
+    }
+    #[cfg(feature = "ppt")]
+    {
+        assert_code(litchi_ppt::Error::from(exceeded()), Code::LimitExceeded);
+        assert_code(litchi_ppt::Error::from(invalid()), Code::InvalidArgument);
+        assert_code(
+            litchi_ppt::Error::Authoring(litchi_ppt::writer::WriteError::from(exceeded())),
+            Code::LimitExceeded,
+        );
+        assert_code(
+            litchi_ppt::Error::Authoring(litchi_ppt::writer::WriteError::from(invalid())),
+            Code::InvalidArgument,
+        );
+    }
+}
+
+#[cfg(any(feature = "xls", feature = "ppt"))]
+#[test]
+fn graph_typed_causes_are_classified_without_parsing_messages() {
+    use super::Classify as _;
+    use litchi_ograph::Error as GraphError;
+    let cases = [
+        (
+            GraphError::PatchConflict {
+                operation: "edit chart",
+                reason: "source differs",
+            },
+            Code::InvalidInput,
+        ),
+        (
+            GraphError::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "edit chart",
+                "target is unsupported",
+            )),
+            Code::UnsupportedType,
+        ),
+        (
+            GraphError::Allocation { resource: "chart" },
+            Code::InternalError,
+        ),
+        (
+            GraphError::Biff(litchi_biff::Error::Allocation {
+                resource: litchi_biff::Resource::RecordFrame,
+            }),
+            Code::InternalError,
+        ),
+        (
+            GraphError::Biff(litchi_biff::Error::TruncatedHeader {
+                offset: 0,
+                available: 2,
+            }),
+            Code::CorruptFile,
+        ),
+        (
+            GraphError::from(litchi_biff::Error::LimitExceeded {
+                resource: litchi_biff::Resource::RecordCount,
+                observed: 3,
+                maximum: 2,
+            }),
+            Code::LimitExceeded,
+        ),
+    ];
+    for (error, expected) in cases {
+        assert_eq!(error.classify().code, expected);
+    }
+}
