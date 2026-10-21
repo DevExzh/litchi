@@ -6,16 +6,21 @@ publish = false
 
 [features]
 default = ["current-api"]
-current-api = []
+current-api = ["current-owner-api", "current-property-api"]
+# The paired W5 driver can compare the owner and property-set migrations
+# independently.  `current-api` keeps the normal candidate invocation terse;
+# the baseline uses the two legacy flags and the intermediate pair selects
+# `current-owner-api,legacy-property-api`.
+current-owner-api = []
+current-property-api = []
 allocator-metrics = []
 ordinary-save-process-metrics = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
-# The paired OLE probe is built against the pre-owner/property-limit API when
-# these flags are enabled on the recorded baseline checkout with
-# `--no-default-features`.  They are kept here so the same source has an
-# explicit, reproducible compatibility mode while `--all-features` continues
-# to exercise the current API.
+# The paired OLE probe is built against either migration boundary when these
+# flags are enabled on the recorded baseline checkout with
+# `--no-default-features`.  `--all-features` gives current API branches
+# precedence, so the ordinary performance package profile remains buildable.
 legacy-owner-api = []
 legacy-property-api = []
 
