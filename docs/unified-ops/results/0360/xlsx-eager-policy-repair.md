@@ -86,3 +86,65 @@ The recorded v5 binaries predate this final claim-string edit and are retained
 only as diagnostic receipts. A new native ABBA is required after the repair and
 with the committed driver; no timing was run concurrently with the
 coordinator's later quiet windows.
+
+## Final 2a-to-fee repair attribution
+
+The protected repair pair is the 2a74117-to-fee2cdf pair, not the original
+pre-W4 acceptance baseline. The source-family orchestrator source is
+`tools/perf-baseline/src/bin/xlsx_source_family_abba.rs`, SHA-256
+`165de1ef06c37811f49e6ec66bb85a42a72ff33cac9b35b80646922589e1b7e0`. The
+protected orchestrator binaries are `832d592f...` (before) and
+`bc61708b...` (after); the child binaries are `80741228...` and `b2eab1f...`.
+Full hashes, per-leg samples, and complete child fidelity results are outside
+the repository under
+`/tmp/litchi-w4-source-batched-abba-20261021-v1/`.
+
+The final focused source/eager route was 20 ABBA blocks with order
+before/after/after/before. Each child used two warmups and 64 measured samples,
+with every elapsed sample and complete child result retained. The batched
+source legs therefore exceed 150 ms of measured work even though the original
+one-sample child legs were only a few milliseconds:
+
+- `page_margin` source: 80 legs, 182.900--240.639 ms per leg, pooled after vs
+  before mean +0.4179%; paired block deltas ranged from -5.594% to +8.548%.
+  Every output hash was `2b50a470...`, with 16,786,883 accepted bytes and 375
+  logical source reads totalling 16,793,599 bytes per sample.
+- `row_visibility` source: 80 legs, 1,369.205--1,461.450 ms per leg, pooled
+  after vs before mean -0.3180%; paired block deltas ranged from -2.752% to
+  +2.606%. Every output hash was `59b17e47...`, with 4,222,186 accepted bytes
+  and 163 logical source reads totalling 4,228,351 bytes per sample.
+- `row_visibility` eager: the same medium shape and 64-sample protocol, with
+  696.028--706.606 ms per leg and pooled after vs before mean +0.1278%.
+  Eager output, sink bytes, and the no-source-read contract matched the source
+  route.
+
+The first row batch omitted the required `--xlsx-row-visibility-shape medium`
+selector and returned both medium and large child results before accepting a
+leg. It is retained as the excluded attempt
+`excluded-row-visibility-unconstrained-v0.json` in the same external
+receipt directory; it is not combined with the corrected medium-shape data.
+The corrected route has the same output hash, sink bytes, and source read
+counts as the short medium-shape route.
+
+The compact route used the protected merge children for 20 ABBA samples with
+two warmups. It retained 160 merge/unmerge observations. Merge p50 was
+140,561 ns before and 139,971 ns after; unmerge p50 was 128,951 ns before and
+124,731 ns after. All observations passed exact one-part overlay, inverse
+complete-package restoration, stale-source refusal, and foreign-source
+refusal. The compact report is outside the repository at
+`/tmp/litchi-w4-source-family-repair-compact-page-margin-final-v2/report.json`.
+
+The paired allocator route used 128 retained history steps and four warmups.
+Exact forward and inverse checks were 128/128 for both binaries. Retained
+history allocated bytes fell from 4,433,237 to 4,165,697, and peak live bytes
+from 450,079 to 448,851. Independent verification allocated bytes fell from
+215,493,056 to 212,529,856, and peak live bytes from 887,051 to 636,280.
+The common replay aggregate nevertheless rose from 58,341,504 to
+110,317,056 allocated bytes; this remains an unaccepted attribution result,
+not a performance exception. The complete pair is outside the repository at
+`/tmp/litchi-w4-source-allocation-2a-fee-v1/`.
+
+These measurements are repair attribution only. The original pre-W4 frozen
+baseline has no complete source-state provenance, so the original-trunk to
+final acceptance comparison is still pending a reproducible build from the
+exact pre-W4 integration state.
