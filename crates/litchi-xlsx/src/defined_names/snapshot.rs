@@ -16,6 +16,7 @@ use crate::source_payload::SourcePayload;
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     names: Box<[DefinedName]>,
+    active_sheet: Option<usize>,
     source: SourceState,
     context: Option<ExecutionContext>,
     pub(super) limits: SourceLimits,
@@ -87,11 +88,12 @@ impl Snapshot {
         context: Option<ExecutionContext>,
         limits: SourceLimits,
     ) -> Result<Self> {
-        let names = raw::parse_catalog(bytes.as_bytes(), &limits)?
-            .defined_names
-            .into_boxed_slice();
+        let catalog = raw::parse_catalog(bytes.as_bytes(), &limits)?;
+        let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let names = catalog.defined_names.into_boxed_slice();
         Ok(Self {
             names,
+            active_sheet,
             source: SourceState {
                 part_name,
                 content_type: copy_boxed(content_type, "defined-name workbook content type")?,
@@ -104,11 +106,12 @@ impl Snapshot {
     }
 
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
-        let names = raw::parse_catalog(&bytes, &source.limits)?
-            .defined_names
-            .into_boxed_slice();
+        let catalog = raw::parse_catalog(&bytes, &source.limits)?;
+        let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let names = catalog.defined_names.into_boxed_slice();
         let mut rewritten = source.clone();
         rewritten.names = names;
+        rewritten.active_sheet = active_sheet;
         rewritten.source.bytes = SourcePayload::Owned(Arc::new(bytes));
         Ok(rewritten)
     }
@@ -117,6 +120,13 @@ impl Snapshot {
     #[must_use]
     pub fn defined_names(&self) -> &[DefinedName] {
         &self.names
+    }
+
+    pub(super) fn deferred_catalog(&self) -> crate::workbook::source::deferred::Catalog {
+        crate::workbook::source::deferred::Catalog {
+            defined_names: self.names.clone(),
+            active_sheet: self.active_sheet,
+        }
     }
 
     /// Resolved workbook Part name.

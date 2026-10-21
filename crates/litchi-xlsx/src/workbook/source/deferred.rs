@@ -28,6 +28,13 @@ use crate::error::Result;
 pub(crate) trait DeferredPublisher: Send + Sync {
     fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()>;
 
+    /// Return the target workbook catalog parsed under the recipient policy,
+    /// when this publisher owns one. Exact replays use the recorded catalog
+    /// directly only when the recipient retains its source policy.
+    fn catalog(&self, _package: &SourceBackedPackage) -> Result<Option<Catalog>> {
+        Ok(None)
+    }
+
     /// Write after the recipient's complete before artifact was authenticated.
     /// Families may omit their redundant semantic selector/dependency check
     /// while retaining the same streaming writer and source fences.
@@ -50,6 +57,10 @@ pub(crate) struct Deferred {
     /// The committed workbook catalog of a workbook-level change, which the
     /// infallible catalog accessors read without materializing the output.
     catalog: Option<Catalog>,
+    /// The source policy under which `catalog` was parsed. A replay onto a
+    /// recipient with another policy must parse the recorded target XML under
+    /// that recipient policy before exposing the catalog.
+    catalog_limits: litchi_opc::SourceLimits,
     /// Weak owner identity used to reconstruct a deferred workbook while its
     /// pending output is still alive. The endpoint keeps only the pending
     /// token, avoiding one repeated owner weak pointer per retained patch.
@@ -74,6 +85,7 @@ pub(crate) enum RestoreEndpoint {
         publisher: Arc<dyn DeferredPublisher>,
         fingerprint: OnceLock<(u64, [u8; 32])>,
         catalog: Option<Catalog>,
+        catalog_limits: litchi_opc::SourceLimits,
         pending: Weak<Deferred>,
     },
 }
@@ -90,12 +102,14 @@ impl Clone for RestoreEndpoint {
                 publisher,
                 fingerprint,
                 catalog,
+                catalog_limits,
                 pending,
             } => Self::Deferred {
                 package: Arc::clone(package),
                 publisher: Arc::clone(publisher),
                 fingerprint: clone_fingerprint(fingerprint),
                 catalog: catalog.clone(),
+                catalog_limits: *catalog_limits,
                 pending: pending.clone(),
             },
         }
@@ -138,6 +152,7 @@ impl RestoreEndpoint {
                 publisher: Arc::clone(&pending.publish),
                 fingerprint: OnceLock::new(),
                 catalog: pending.catalog.clone(),
+                catalog_limits: pending.catalog_limits,
                 pending: Arc::downgrade(pending),
             },
         }
@@ -211,11 +226,20 @@ impl RestoreEndpoint {
         }
     }
 
-    fn catalog(&self) -> Option<&Catalog> {
-        match self {
-            Self::Opened { .. } => None,
-            Self::Deferred { catalog, .. } => catalog.as_ref(),
+    fn catalog_for(&self, package: &SourceBackedPackage) -> Result<Option<Catalog>> {
+        let Self::Deferred {
+            publisher,
+            catalog,
+            catalog_limits,
+            ..
+        } = self
+        else {
+            return Ok(None);
+        };
+        if package.read_limits() == *catalog_limits {
+            return Ok(catalog.clone());
         }
+        publisher.catalog(package)
     }
 }
 
@@ -239,47 +263,22 @@ impl Deferred {
 }
 
 impl SourceBackedWorkbook {
-    /// A committed workbook over `self` whose artifact `publish` writes from
-    /// `self`'s package.
-    ///
-    /// A changed write of a signed or encrypted source is refused here,
-    /// before any output exists, as the stream writer would refuse it.
-    pub(crate) fn deferred(
-        &self,
-        catalog_xml: Option<&[u8]>,
+    fn deferred_from_base(
+        base: &Self,
+        catalog: Option<Catalog>,
         publish: Arc<dyn DeferredPublisher>,
-    ) -> Result<Self> {
-        let base = self.view()?;
-        let package = &base.inner.package;
-        if package.has_signature_infrastructure() {
-            return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
-        }
-        if package.has_encrypted_entries() {
-            return Err(litchi_opc::OpcError::SourceBackedOverlayUnavailable {
-                reason: "source XML publication refuses encrypted ZIP members".into(),
-            }
-            .into());
-        }
-        let catalog = match catalog_xml {
-            None => None,
-            Some(xml) => {
-                let parsed = crate::raw::parse_catalog(xml, &package.read_limits())?;
-                Some(Catalog {
-                    active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
-                    defined_names: parsed.defined_names.into_boxed_slice(),
-                })
-            },
-        };
-        Ok(Self {
+    ) -> Self {
+        Self {
             inner: Arc::clone(&base.inner),
             pending: Some(Arc::new(Deferred {
                 publish,
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::new(),
                 catalog,
+                catalog_limits: base.inner.package.read_limits(),
                 owner: Arc::downgrade(&base.inner),
             })),
-        })
+        }
     }
 
     /// The workbook every read and edit observes: `self` when opened, the
@@ -431,12 +430,14 @@ impl SourceBackedWorkbook {
             // when its own current output is needed as the recipient base.
             if let Some(publisher) = after.publisher() {
                 let expected_before = before.output_artifact()?;
+                check_deferred_policy(&self.inner.package)?;
+                let catalog = after.catalog_for(&self.inner.package)?;
                 return self.deferred_endpoint(
                     Arc::new(RestorePublisher::Deferred {
                         publisher: Arc::clone(publisher),
                         expected_before,
                     }),
-                    after.catalog().cloned(),
+                    catalog,
                 );
             }
         }
@@ -448,7 +449,7 @@ impl SourceBackedWorkbook {
         // established that the recipient and the patch base are equal.
         let recipient = self.view()?.clone();
         let expected_before = before.output_artifact()?;
-        let catalog = after.catalog().cloned();
+        let catalog = after.catalog_for(&recipient.inner.package)?;
 
         let publish: Arc<dyn DeferredPublisher> = if let Some(original) = after.artifact() {
             let original = original.clone();
@@ -489,6 +490,7 @@ impl SourceBackedWorkbook {
             materialized: OnceLock::new(),
             fingerprint: OnceLock::new(),
             catalog,
+            catalog_limits: next.inner.package.read_limits(),
             owner: Arc::downgrade(&next.inner),
         }));
         Ok(next)
@@ -517,10 +519,24 @@ impl SourceBackedWorkbook {
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::new(),
                 catalog,
+                catalog_limits: package.read_limits(),
                 owner: Arc::downgrade(&base.inner),
             })),
         })
     }
+}
+
+fn check_deferred_policy(package: &SourceBackedPackage) -> Result<()> {
+    if package.has_signature_infrastructure() {
+        return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+    }
+    if package.has_encrypted_entries() {
+        return Err(litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+            reason: "source XML publication refuses encrypted ZIP members".into(),
+        }
+        .into());
+    }
+    Ok(())
 }
 
 /// A deferred output endpoint used by exact replay. Keeping this as an
@@ -565,6 +581,13 @@ impl DeferredPublisher for RestorePublisher {
                 // source-backed streaming.
                 publisher.write_authenticated(package, writer)
             },
+        }
+    }
+
+    fn catalog(&self, package: &SourceBackedPackage) -> Result<Option<Catalog>> {
+        match self {
+            Self::SourceArtifact { .. } => Ok(None),
+            Self::Deferred { publisher, .. } => publisher.catalog(package),
         }
     }
 }
@@ -631,6 +654,15 @@ pub(crate) trait Change: Clone + Send + Sync + 'static {
     ) -> Result<()> {
         self.write(package, writer)
     }
+    /// Return the already-parsed workbook catalog when the change owns one and
+    /// the recipient retains the same physical read policy.
+    ///
+    /// Workbook-level families parse their target catalog while authoring the
+    /// change. Reusing that result avoids a second XML parse during commit
+    /// without changing the infallible read-only projections.
+    fn catalog(&self, _package: &SourceBackedPackage) -> Option<Catalog> {
+        None
+    }
     /// The after workbook XML of a workbook-level change, whose catalog the
     /// committed workbook's infallible accessors read.
     fn catalog_xml(&self) -> Option<&[u8]> {
@@ -649,6 +681,20 @@ impl<C: Change> DeferredPublisher for C {
         writer: &mut dyn Write,
     ) -> Result<()> {
         Change::write_authenticated(self, package, writer)
+    }
+
+    fn catalog(&self, package: &SourceBackedPackage) -> Result<Option<Catalog>> {
+        if let Some(catalog) = Change::catalog(self, package) {
+            return Ok(Some(catalog));
+        }
+        let Some(xml) = Change::catalog_xml(self) else {
+            return Ok(None);
+        };
+        let parsed = crate::raw::parse_catalog(xml, &package.read_limits())?;
+        Ok(Some(Catalog {
+            active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
+            defined_names: parsed.defined_names.into_boxed_slice(),
+        }))
     }
 }
 
@@ -669,12 +715,34 @@ pub(crate) fn publish<C: Change>(
     if change.is_noop() {
         return Ok(workbook.clone());
     }
+    let publisher: Arc<dyn DeferredPublisher> = change.clone();
+    let base = workbook.view()?;
+    let package = &base.inner.package;
+    check_deferred_policy(package)?;
+    if let Some(catalog) = change.catalog(package) {
+        return Ok(SourceBackedWorkbook::deferred_from_base(
+            base,
+            Some(catalog),
+            publisher,
+        ));
+    }
     let catalog = change.catalog_xml().map(<[u8]>::to_vec);
     // The committed workbook shares the patch's record; nothing is copied.
     // Coercing the existing Arc to the publisher trait object keeps the
     // deferred owner and patch on one allocation.
-    let publisher: Arc<dyn DeferredPublisher> = change.clone();
-    workbook.deferred(catalog.as_deref(), publisher)
+    let catalog = match catalog {
+        None => None,
+        Some(xml) => {
+            let parsed = crate::raw::parse_catalog(&xml, &package.read_limits())?;
+            Some(Catalog {
+                active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
+                defined_names: parsed.defined_names.into_boxed_slice(),
+            })
+        },
+    };
+    Ok(SourceBackedWorkbook::deferred_from_base(
+        base, catalog, publisher,
+    ))
 }
 
 /// Replay `change` onto `workbook`: refuse a workbook without the before

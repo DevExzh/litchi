@@ -5,7 +5,7 @@ use std::sync::Arc;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartView, Relationship, Relationships, SourceBackedPackage,
-    TargetMode,
+    SourceLimits, TargetMode,
 };
 
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
@@ -56,6 +56,8 @@ impl Tab {
 pub struct Snapshot {
     tabs: Arc<[Tab]>,
     active: usize,
+    defined_names: Box<[raw::DefinedName]>,
+    pub(super) limits: SourceLimits,
     pub(super) source: SourceState,
     origin: Option<Arc<()>>,
 }
@@ -78,9 +80,12 @@ impl Snapshot {
         let catalog = raw::parse_catalog(workbook_bytes.as_bytes(), &package.read_limits())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
+        let defined_names = catalog.defined_names.into_boxed_slice();
         let snapshot = Self {
             tabs,
             active,
+            defined_names,
+            limits: package.read_limits(),
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -108,9 +113,12 @@ impl Snapshot {
         let graph = capture_owned_graph(package, workbook, &catalog.sheets)?;
         let touched = capture_owned_touched(package, &graph, positions)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
+        let defined_names = catalog.defined_names.into_boxed_slice();
         Ok(Self {
             tabs,
             active,
+            defined_names,
+            limits: package.read_limits(),
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -146,7 +154,7 @@ impl Snapshot {
         workbook: Vec<u8>,
         touched: Vec<(usize, Vec<u8>)>,
     ) -> Result<Self> {
-        let catalog = raw::parse_catalog(&workbook, &litchi_opc::SourceLimits::default())?;
+        let catalog = raw::parse_catalog(&workbook, &before.limits)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
         if catalog.sheets.len() != before.source.graph.sheets.len()
             || catalog
@@ -163,6 +171,7 @@ impl Snapshot {
                 "tab-state rewrite changed workbook sheet topology or relationships",
             ));
         }
+        let defined_names = catalog.defined_names.into_boxed_slice();
 
         let mut rewritten_parts = Vec::new();
         rewritten_parts
@@ -188,6 +197,8 @@ impl Snapshot {
         Ok(Self {
             tabs,
             active,
+            defined_names,
+            limits: before.limits,
             source: SourceState {
                 workbook: PartState::new(
                     before.source.workbook.uri.clone(),
@@ -218,6 +229,13 @@ impl Snapshot {
     #[must_use]
     pub fn active_tab(&self) -> Option<&Tab> {
         self.tabs.get(self.active)
+    }
+
+    pub(super) fn deferred_catalog(&self) -> crate::workbook::source::deferred::Catalog {
+        crate::workbook::source::deferred::Catalog {
+            defined_names: self.defined_names.clone(),
+            active_sheet: (!self.tabs.is_empty()).then_some(self.active),
+        }
     }
 
     /// Resolved workbook Part name.

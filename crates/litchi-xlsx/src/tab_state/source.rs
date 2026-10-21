@@ -269,6 +269,13 @@ impl crate::workbook::source::deferred::Change for super::Patch {
         Ok(())
     }
 
+    fn catalog(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Option<crate::workbook::source::deferred::Catalog> {
+        (package.read_limits() == self.after().limits).then(|| self.after().deferred_catalog())
+    }
+
     fn catalog_xml(&self) -> Option<&[u8]> {
         Some(self.after().workbook_xml())
     }

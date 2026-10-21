@@ -148,3 +148,41 @@ These measurements are repair attribution only. The original pre-W4 frozen
 baseline has no complete source-state provenance, so the original-trunk to
 final acceptance comparison is still pending a reproducible build from the
 exact pre-W4 integration state.
+
+## Returned defined-name source reparse repair
+
+The completed defined-name route in
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-batched-v3`
+is retained as an unaccepted diagnostic receipt. Its five source blocks were
+all slower after the W4 migration: the source means were 1.009538x,
+1.010027x, 1.016369x, 1.011511x and 1.012955x (paired block order as recorded
+in `route-defined_names.json`). The source output hash, accepted bytes,
+largest write, and source read shape were unchanged; the receipt was not
+accepted as timing evidence because the enclosing run was later stopped by an
+unrelated host build.
+
+Source phase counters are unavailable for this route, so the code audit found
+the attributable extra work. The generic deferred publisher parsed the
+rewritten workbook catalog once to populate `defined_names()` and
+`active_sheet_position()`. The defined-name snapshot had already parsed that
+same catalog while authoring and reopening the target. The old stream publisher
+performed only its source-state check before streaming. Tab-state had the same
+duplicate catalog construction.
+
+The repair adds a parsed-catalog handoff to the deferred change contract.
+Defined-name and tab-state snapshots retain the catalog fields they already
+parsed, and their patches pass those fields directly to the deferred owner.
+The handoff is used only when the recipient's `SourceLimits` exactly match the
+limits retained by the target snapshot. A stricter or otherwise different
+recipient falls back to parsing the target XML under its own limits, so a
+changed target that exceeds recipient admission is refused before publication.
+The exact-artifact replay path applies the same check: it reuses the retained
+catalog only for an equal policy and reparses the recorded target XML for a
+different recipient policy before constructing the restored owner.
+Other families retain the XML fallback and all recipient source, execution,
+signature, and bounded-stream checks. Focused validation passed 7 defined-name
+tests, 12 tab-state tests, and the cross-policy target-admission regression with
+`cargo test --offline --locked -p litchi-xlsx --test source_backed_defined_names
+--test source_backed_tab_state`. A fresh protected e63-to-repaired-candidate
+native receipt is still required; no timing result from the old receipt is
+accepted by this record.

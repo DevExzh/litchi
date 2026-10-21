@@ -272,6 +272,8 @@ fn changed_edit_reopens_and_changes_only_workbook_xml() {
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
+    assert_eq!(commit.package().defined_names(), target_names());
+    assert_eq!(commit.package().active_sheet_position(), Some(0));
     let published = commit.patch().after().clone();
     assert_eq!(published.defined_names(), target_names());
 
@@ -453,6 +455,38 @@ fn protection_mce_limits_invalid_scopes_and_partial_sink_are_checked() {
         Err(Error::Package(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn replay_rechecks_target_catalog_under_recipient_source_limits() {
+    // Source-backed extraction reads in bounded chunks. Keep the admitted
+    // source above that scratch size so an exact `max_part_bytes` policy can
+    // admit the before workbook while the larger authored target exceeds it.
+    let padding = format!("<!--{}-->", "x".repeat(192 * 1024));
+    let source_bytes = fixture("", &padding, false);
+    let producer =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+            .unwrap();
+    let commit = changed_commit(&producer);
+    let before_workbook_bytes = part_len(&source_bytes, MAIN);
+    let recipient_limits = SourceLimits::builder()
+        .max_part_bytes(before_workbook_bytes)
+        .unwrap()
+        .build()
+        .unwrap();
+    let recipient = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(source_bytes)),
+        litchi_xlsx::OpenOptions::new().source_limits(recipient_limits),
+    )
+    .unwrap();
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    assert!(part_len(&output, MAIN) > before_workbook_bytes);
+
+    assert!(matches!(
+        recipient.apply_defined_names(commit.patch()),
+        Err(Error::Package(OpcError::Limit { .. }))
+    ));
 }
 
 #[test]

@@ -372,6 +372,7 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
         let commit = active_commit(&editor, "Three");
         assert_eq!(commit.diagnostics().touched_parts(), 3);
         assert_eq!(commit.diagnostics().touched_worksheets(), 2);
+        assert_eq!(commit.package().active_sheet_position(), Some(2));
         assert_eq!(editor.cache_diagnostics().successful_loads, opened + 2);
 
         let mut replay = OpcPackage::from_bytes(&source).unwrap();
