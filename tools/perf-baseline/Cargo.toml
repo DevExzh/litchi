@@ -9,6 +9,7 @@ allocator-metrics = []
 ordinary-save-process-metrics = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
+legacy-xlsx-source-history = []
 
 [[bin]]
 name = "litchi-perf-baseline-alloc"
@@ -18,6 +19,15 @@ required-features = ["allocator-metrics"]
 [[bin]]
 name = "xlsx_managed_compression_alloc"
 path = "src/bin/xlsx_managed_compression_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
+name = "xlsx_source_family_abba"
+path = "src/bin/xlsx_source_family_abba.rs"
+
+[[bin]]
+name = "xlsx_merge_history_alloc"
+path = "src/bin/xlsx_merge_history_alloc.rs"
 required-features = ["allocator-metrics"]
 
 [[bin]]

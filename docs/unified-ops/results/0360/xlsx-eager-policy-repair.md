@@ -3,11 +3,11 @@
 The focused source-family ABBA driver is
 `tools/perf-baseline/src/bin/xlsx_source_family_abba.rs`. Its canonical source
 for the diagnostic pair is SHA-256
-`7dd57fce2b97f3c044c3698916b73a8bad33db0c28973702b7cc3cb2661820c7`.
-The protected candidate and baseline driver binaries were
+`165de1ef06c37811f49e6ec66bb85a42a72ff33cac9b35b80646922589e1b7e0`.
+The earlier protected candidate and baseline driver binaries were
 `663e6904ea114a3ceccdf46a1aa4c8c266d7b65a97f19e2ccded11db17fe749a` and
 `78222adfbacf846b31112d7f1cdd6d6a4705500950e263e8e600f4a4ccf1bb28`.
-They were built in distinct target directories; the baseline was rebuilt after
+Those earlier binaries were built in distinct target directories; the baseline was rebuilt after
 an earlier stale-target attempt was discarded.
 
 The v3 six-family receipt is outside the repository at
@@ -38,6 +38,7 @@ Validation for this repair completed with:
 - `cargo test -p litchi-xlsx --test calculation_metadata --test custom_data_limits` (35/35)
 - workspace rustfmt check and `git diff --check`
 
-A new native ABBA is required after the repair and is not claimed by this
-record; no timing was run concurrently with the coordinator's later quiet
-windows.
+The recorded v5 binaries predate this final claim-string edit and are retained
+only as diagnostic receipts. A new native ABBA is required after the repair and
+with the committed driver; no timing was run concurrently with the
+coordinator's later quiet windows.
