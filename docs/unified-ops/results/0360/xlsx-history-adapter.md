@@ -230,7 +230,7 @@ No native timing is claimed from this attribution run.
 The prepared native protocol is outside the repository at
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-v1.commands`.
 Its SHA-256 is
-`0cbd1b1f6533906bdaba108f7bd3dde8b550b97f3338f3ecfcb48f03fdda1328`. It uses
+`e2b0b79e365e311e3eec966febcb9273080584f2d72cc0d9338fc688a4b6bd51`. It uses
 only the protected binaries above and the final source-family driver.
 The focused timing legs select `page_margin` and `row_visibility`, use two
 warmups and 64 measured child samples, and retain every ABBA leg and route
