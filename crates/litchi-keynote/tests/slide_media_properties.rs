@@ -446,7 +446,15 @@ fn stale_movie_field_info(source: &[u8], movie: usize) -> TestResult<Vec<u8>> {
         }) {
             field_index
         } else {
-            let mut field = FieldInfo::new(vec![if movie_data.is_some() { 14 } else { 15 }]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![if movie_data.is_some() { 14 } else { 15 }],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.data_references.push(u64::MAX);
             info.field_infos.push(field);
             info.field_infos.len().saturating_sub(1)

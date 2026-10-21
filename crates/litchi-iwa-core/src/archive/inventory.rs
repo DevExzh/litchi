@@ -634,10 +634,18 @@ mod tests {
         message.object_references = vec![10, 11];
         message.data_references = vec![20];
         message.diff_merge_version = vec![3];
-        message.diff_field_path = Some(FieldPath::new(vec![4, 5]));
-        message.fields_to_remove = vec![FieldPath::new(vec![6]), FieldPath::default()];
+        message.diff_field_path =
+            Some(FieldPath::new(vec![4, 5], crate::Limits::default()).unwrap());
+        message.fields_to_remove = vec![
+            FieldPath::new(vec![6], crate::Limits::default()).unwrap(),
+            FieldPath::default(),
+        ];
         message.diff_read_version = vec![7];
-        let mut field = FieldInfo::new(vec![8, 9]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![8, 9], crate::Limits::default()).unwrap(),
+            crate::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![12];
         field.data_references = vec![21, 22];
         field.known_field_version = vec![10];
@@ -710,7 +718,13 @@ mod tests {
             Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..32)
-            .map(|index| FieldInfo::new(vec![index; 128]))
+            .map(|index| {
+                FieldInfo::new(
+                    FieldPath::new(vec![index; 128], crate::Limits::default()).unwrap(),
+                    crate::Limits::default(),
+                )
+                .unwrap()
+            })
             .collect();
 
         let mut calls = 0;
@@ -746,7 +760,13 @@ mod tests {
             Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..8)
-            .map(|index| FieldInfo::new(vec![index; 16]))
+            .map(|index| {
+                FieldInfo::new(
+                    FieldPath::new(vec![index; 16], crate::Limits::default()).unwrap(),
+                    crate::Limits::default(),
+                )
+                .unwrap()
+            })
             .collect();
 
         let mut exact_chunks = Chunks::default();

@@ -4728,10 +4728,8 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
             );
             object.archive_info.message_infos.insert(
                 style.message_index,
-                MessageInfo::new(
-                    2_023,
-                    u32::try_from(sibling_data.len()).expect("test payload fits u32"),
-                ),
+                MessageInfo::new(2_023, sibling_data.len(), crate::archive::Limits::default())
+                    .unwrap(),
             );
             Ok(())
         })
@@ -4831,10 +4829,8 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
             );
             object.archive_info.message_infos.insert(
                 location.message_index,
-                MessageInfo::new(
-                    2_023,
-                    u32::try_from(sibling_data.len()).expect("test payload fits u32"),
-                ),
+                MessageInfo::new(2_023, sibling_data.len(), crate::archive::Limits::default())
+                    .unwrap(),
             );
             Ok(())
         })

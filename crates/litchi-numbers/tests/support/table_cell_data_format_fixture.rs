@@ -18,9 +18,7 @@ use litchi_iwa_common::{
         WireView, append_length_delimited_field, append_varint_field, patch_nested_varint_field,
     },
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsk, tsp, tst};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
@@ -924,7 +922,12 @@ pub(crate) fn corrupted_package_for(
                     .first_mut()
                     .ok_or_else(|| io::Error::other("unrelated fixture message is missing"))?;
                 info.object_references.push(TILE_ID);
-                let mut field = FieldInfo::new(FieldPath::new(vec![1]));
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::ObjectReference);
                 field.object_references.push(TILE_ID);
                 info.field_infos.push(field);
@@ -1026,7 +1029,11 @@ fn table_model_object() -> FixtureResult<ArchiveObject> {
     let payload = table_model_payload()?.encode_to_vec();
     let mut object = object(TABLE_MODEL_ID, TABLE_MODEL_TYPE, payload)?;
     object.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut unknown = FieldInfo::new(vec![99, 1]);
+    let mut unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown.data_references = vec![0xdead_beef];
     object.archive_info.message_infos[0]
         .field_infos

@@ -1188,7 +1188,12 @@ mod tests {
         document.archive_info.message_infos[0].object_references =
             [SHEETS.as_slice(), &[SIDEBAR]].concat();
         if field_attribution {
-            let mut field = FieldInfo::new(vec![1]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references = SHEETS.to_vec();
             document.archive_info.message_infos[0]
                 .field_infos

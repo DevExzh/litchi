@@ -58,6 +58,12 @@ use identity_clone::{
 };
 
 const MAX_VARINT_BYTES: usize = 10;
+const DEFAULT_MESSAGE_VERSIONS: [u32; 3] = [1, 0, 5];
+
+#[cfg(test)]
+thread_local! {
+    static MESSAGE_INFO_CONSTRUCTIONS: Cell<usize> = const { Cell::new(0) };
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HeaderNode {
@@ -79,21 +85,21 @@ pub struct FieldPath {
 
 impl FieldPath {
     /// Construct a field path from its ordered field numbers.
-    #[must_use]
-    pub const fn new(path: Vec<u32>) -> Self {
-        Self { path }
+    ///
+    /// The path is a raw metadata record, so its limits are required even
+    /// though the vector is already owned by the caller.  Empty paths and
+    /// zero-valued components are valid wire values.
+    pub fn new(path: Vec<u32>, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let value = Self { path };
+        check_field_path_constructor(&value, limits)?;
+        Ok(value)
     }
 
     /// Borrow the ordered field numbers.
     #[must_use]
     pub fn as_slice(&self) -> &[u32] {
         &self.path
-    }
-}
-
-impl From<Vec<u32>> for FieldPath {
-    fn from(path: Vec<u32>) -> Self {
-        Self::new(path)
     }
 }
 
@@ -442,12 +448,14 @@ pub struct FieldInfo {
 impl FieldInfo {
     /// Construct metadata for a field path with every optional wire field
     /// absent.
-    #[must_use]
-    pub fn new(path: impl Into<FieldPath>) -> Self {
-        Self {
-            path: path.into(),
+    pub fn new(path: FieldPath, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let value = Self {
+            path,
             ..Self::default()
-        }
+        };
+        check_field_info_constructor(&value, limits)?;
+        Ok(value)
     }
 
     /// Resolve the schema default without changing encoded presence.
@@ -520,42 +528,32 @@ impl ArchiveInfo {
     }
 
     /// Construct metadata for an object from its raw payload metadata.
-    #[must_use]
-    pub fn new(identifier: u64, message_infos: Vec<MessageInfo>) -> Self {
-        Self {
+    ///
+    /// An identifier of zero is preserved; identifier policy remains a later
+    /// archive validation concern. The supplied limits admit the complete
+    /// neutral header before this record is published.
+    pub fn new(identifier: u64, message_infos: Vec<MessageInfo>, limits: Limits) -> Result<Self> {
+        Self::new_with_header_length(identifier, message_infos, limits)
+            .map(|(value, _header_length)| value)
+    }
+
+    fn new_with_header_length(
+        identifier: u64,
+        message_infos: Vec<MessageInfo>,
+        limits: Limits,
+    ) -> Result<(Self, usize)> {
+        let limits = limits.validate()?;
+        let value = Self {
             identifier: Some(identifier),
             message_infos,
             should_merge: None,
-        }
+        };
+        let header_length = check_archive_info_constructor(&value, limits)?;
+        Ok((value, header_length))
     }
 
     fn validate(&self, limits: Limits) -> Result<()> {
-        let message_count = self.message_infos.len();
-        if message_count > limits.max_messages_per_object() {
-            return Err(limit(
-                LimitKind::MessagesPerObject,
-                message_count,
-                limits.max_messages_per_object(),
-            ));
-        }
-
-        let mut metadata_items = message_count;
-        for message_info in &self.message_infos {
-            message_info.validate(limits)?;
-            add_limited(
-                &mut metadata_items,
-                message_info.metadata_item_count()?,
-                LimitKind::MetadataItems,
-                limits.max_metadata_items(),
-            )?;
-        }
-        if self.identifier.is_none() {
-            return Err(Error::invalid_archive(
-                0,
-                "object is missing its archive identifier",
-            ));
-        }
-        Ok(())
+        check_archive_info_constructor(self, limits).map(|_| ())
     }
 }
 
@@ -577,11 +575,26 @@ pub struct MessageInfo {
 
 impl MessageInfo {
     /// Construct the conventional metadata for a newly created payload.
-    #[must_use]
-    pub fn new(type_: u32, length: u32) -> Self {
-        Self {
+    ///
+    /// `length` is checked against the message-byte budget before it is
+    /// narrowed to the wire `u32` representation. The fixed version vector
+    /// is allocated only after the header and metadata budgets are admitted.
+    pub fn new(type_: u32, length: usize, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        check_message_length(length, limits)?;
+        let length = u32::try_from(length)
+            .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+        check_minimal_message_info_constructor(type_, length, limits)?;
+        let mut versions = Vec::new();
+        versions
+            .try_reserve_exact(DEFAULT_MESSAGE_VERSIONS.len())
+            .map_err(|_| {
+                Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
+            })?;
+        versions.extend(DEFAULT_MESSAGE_VERSIONS);
+        Ok(Self {
             type_,
-            versions: vec![1, 0, 5],
+            versions,
             length,
             field_infos: Vec::new(),
             object_references: Vec::new(),
@@ -591,15 +604,21 @@ impl MessageInfo {
             diff_field_path: None,
             fields_to_remove: Vec::new(),
             diff_read_version: Vec::new(),
-        }
+        })
     }
 
     fn try_new(type_: u32, length: u32) -> Result<Self> {
+        #[cfg(test)]
+        MESSAGE_INFO_CONSTRUCTIONS.with(|count| {
+            count.set(count.get().saturating_add(1));
+        });
         let mut versions = Vec::new();
         versions
-            .try_reserve_exact(3)
-            .map_err(|_| Error::allocation("IWA message versions", 3))?;
-        versions.extend([1, 0, 5]);
+            .try_reserve_exact(DEFAULT_MESSAGE_VERSIONS.len())
+            .map_err(|_| {
+                Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
+            })?;
+        versions.extend(DEFAULT_MESSAGE_VERSIONS);
         Ok(Self {
             type_,
             versions,
@@ -697,6 +716,424 @@ impl MessageInfo {
     }
 }
 
+/// Check the bounded resources represented by a neutral record before it is
+/// published. These checks account the owned neutral model, not the private
+/// decoder's compatibility scratch; parser ingress continues to use
+/// `preflight_header` for that separate accounting.
+///
+/// Collection and string charges are logical element bytes (`len()`), as in
+/// [`ArchiveIngressRequirements`]. A caller can hand a constructor a `Vec`
+/// with allocator slack, but that pre-existing capacity is neither a wire
+/// resource nor an allocation performed by this constructor. Charging it
+/// would make the raw record contract depend on allocator growth policy and
+/// reject records that the bounded parser admits under the same profile.
+fn check_constructor_header(
+    header_length: usize,
+    header_fields: usize,
+    header_nesting: usize,
+    header_memory: usize,
+    metadata_items: usize,
+    limits: Limits,
+) -> Result<()> {
+    check_header_length(header_length, limits)?;
+    if header_fields > limits.max_header_fields() {
+        return Err(limit(
+            LimitKind::HeaderFields,
+            header_fields,
+            limits.max_header_fields(),
+        ));
+    }
+    if header_nesting > limits.max_header_nesting() {
+        return Err(limit(
+            LimitKind::HeaderNesting,
+            header_nesting,
+            limits.max_header_nesting(),
+        ));
+    }
+    if header_memory > limits.max_header_memory_bytes() {
+        return Err(limit(
+            LimitKind::HeaderMemoryBytes,
+            header_memory,
+            limits.max_header_memory_bytes(),
+        ));
+    }
+    if metadata_items > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            metadata_items,
+            limits.max_metadata_items(),
+        ));
+    }
+    Ok(())
+}
+
+fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
+    let metadata_items = path.path.len();
+    let header_length = encoded_field_path_length(path)?;
+    let header_fields = usize::from(!path.path.is_empty());
+    let header_memory = field_path_memory(path)?;
+    check_constructor_header(
+        header_length,
+        header_fields,
+        0,
+        header_memory,
+        metadata_items,
+        limits,
+    )
+}
+
+fn check_field_info_constructor(info: &FieldInfo, limits: Limits) -> Result<()> {
+    let metadata_items = field_info_metadata_item_count(info)?;
+    let header_length = encoded_field_info_length(info)?;
+    let header_fields = field_info_header_field_count(info)?;
+    let header_memory = field_info_memory(info)?;
+    check_constructor_header(
+        header_length,
+        header_fields,
+        1,
+        header_memory,
+        metadata_items,
+        limits,
+    )
+}
+
+fn check_minimal_message_info_constructor(type_: u32, length: u32, limits: Limits) -> Result<()> {
+    let header_length = minimal_message_info_encoded_length(type_, length)?;
+    let header_memory = minimal_message_info_memory()?;
+    check_constructor_header(
+        header_length,
+        3,
+        0,
+        header_memory,
+        DEFAULT_MESSAGE_VERSIONS.len(),
+        limits,
+    )
+}
+
+/// Preflight the conventional metadata that [`ArchiveObject::new`] will
+/// construct from raw payloads.
+///
+/// The caller owns the payload vector already, but the message metadata and
+/// fixed version vectors are new allocations.  Keep the complete neutral
+/// header admission before reserving either collection.  The loop also
+/// computes the canonical header length, so the successful constructor does
+/// not need to walk the freshly allocated metadata a second time.
+fn preflight_archive_object_constructor(
+    identifier: u64,
+    messages: &[RawMessage],
+    limits: Limits,
+) -> Result<usize> {
+    if messages.len() > limits.max_messages_per_object() {
+        return Err(limit(
+            LimitKind::MessagesPerObject,
+            messages.len(),
+            limits.max_messages_per_object(),
+        ));
+    }
+
+    let mut metadata_items = messages.len();
+    let mut header_fields = 1usize
+        .checked_add(messages.len())
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    let header_nesting = usize::from(!messages.is_empty());
+    let mut header_memory = size_of::<ArchiveInfo>();
+    let mut header_length = varint_field_length(1, identifier)?;
+    let message_fields = 2usize
+        .checked_add(usize::from(!DEFAULT_MESSAGE_VERSIONS.is_empty()))
+        .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    let message_memory = minimal_message_info_memory()?;
+
+    for message in messages {
+        let length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+
+        // MessageInfo::validate runs before ArchiveInfo's aggregate checks.
+        // Preserve that error precedence while avoiding the fixed-version
+        // allocation performed by MessageInfo::try_new.
+        if DEFAULT_MESSAGE_VERSIONS.len() > limits.max_metadata_items() {
+            return Err(limit(
+                LimitKind::MetadataItems,
+                DEFAULT_MESSAGE_VERSIONS.len(),
+                limits.max_metadata_items(),
+            ));
+        }
+
+        let message_length = minimal_message_info_encoded_length(message.type_, length)?;
+        header_length = checked_encoded_add(
+            header_length,
+            length_delimited_field_length(2, message_length)?,
+        )?;
+        header_fields = header_fields
+            .checked_add(message_fields)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        header_memory = checked_memory_add(header_memory, message_memory)?;
+        add_limited(
+            &mut metadata_items,
+            DEFAULT_MESSAGE_VERSIONS.len(),
+            LimitKind::MetadataItems,
+            limits.max_metadata_items(),
+        )?;
+    }
+
+    check_constructor_header(
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        limits,
+    )?;
+    Ok(header_length)
+}
+
+fn minimal_message_info_memory() -> Result<usize> {
+    size_of::<MessageInfo>()
+        .checked_add(
+            DEFAULT_MESSAGE_VERSIONS
+                .len()
+                .checked_mul(size_of::<u32>())
+                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+        )
+        .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))
+}
+
+fn check_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<usize> {
+    if info.identifier.is_none() {
+        return Err(Error::invalid_archive(
+            0,
+            "object is missing its archive identifier",
+        ));
+    }
+    let message_count = info.message_infos.len();
+    if message_count > limits.max_messages_per_object() {
+        return Err(limit(
+            LimitKind::MessagesPerObject,
+            message_count,
+            limits.max_messages_per_object(),
+        ));
+    }
+    let mut metadata_items = message_count;
+    let mut header_fields = usize::from(info.identifier.is_some());
+    header_fields = header_fields
+        .checked_add(message_count)
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    header_fields = header_fields
+        .checked_add(usize::from(info.should_merge.is_some()))
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    let mut header_nesting = usize::from(message_count != 0);
+    let mut header_memory = size_of::<ArchiveInfo>();
+    for message_info in &info.message_infos {
+        message_info.validate(limits)?;
+        add_limited(
+            &mut metadata_items,
+            message_info.metadata_item_count()?,
+            LimitKind::MetadataItems,
+            limits.max_metadata_items(),
+        )?;
+        header_fields = header_fields
+            .checked_add(message_info_header_field_count(message_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        header_nesting = header_nesting.max(
+            1usize
+                .checked_add(message_info_header_nesting(message_info)?)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo nesting overflow"))?,
+        );
+        header_memory = checked_memory_add(header_memory, message_info_memory(message_info)?)?;
+    }
+    let header_length = archive_info_encoded_len(info)?;
+    check_constructor_header(
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        limits,
+    )?;
+    Ok(header_length)
+}
+
+fn minimal_message_info_encoded_length(type_: u32, length: u32) -> Result<usize> {
+    let mut total = varint_field_length(1, u64::from(type_))?;
+    total = checked_encoded_add(
+        total,
+        packed_u32_field_length(2, &DEFAULT_MESSAGE_VERSIONS)?,
+    )?;
+    checked_encoded_add(total, varint_field_length(3, u64::from(length))?)
+}
+
+fn field_path_memory(path: &FieldPath) -> Result<usize> {
+    let bytes = field_path_bytes(path)?;
+    checked_memory_add(size_of::<FieldPath>(), bytes)
+}
+
+fn field_path_bytes(path: &FieldPath) -> Result<usize> {
+    path.path
+        .len()
+        .checked_mul(size_of::<u32>())
+        .ok_or_else(|| Error::invalid_archive(0, "field path memory overflow"))
+}
+
+fn field_info_memory(info: &FieldInfo) -> Result<usize> {
+    let mut memory = size_of::<FieldInfo>();
+    // `FieldInfo.path` is inline in the record; only its owned component
+    // buffer is additional retained memory.
+    memory = checked_memory_add(memory, field_path_bytes(&info.path)?)?;
+    memory = checked_memory_add(
+        memory,
+        info.object_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    memory = checked_memory_add(
+        memory,
+        info.data_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    memory = checked_memory_add(
+        memory,
+        info.known_field_version
+            .len()
+            .checked_mul(size_of::<u32>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    checked_memory_add(
+        memory,
+        info.known_field_feature_identifier
+            .as_deref()
+            .map_or(0, str::len),
+    )
+}
+
+fn message_info_memory(info: &MessageInfo) -> Result<usize> {
+    let mut memory = size_of::<MessageInfo>();
+    for (length, element_size) in [
+        (info.versions.len(), size_of::<u32>()),
+        (info.object_references.len(), size_of::<u64>()),
+        (info.data_references.len(), size_of::<u64>()),
+        (info.diff_merge_version.len(), size_of::<u32>()),
+        (info.diff_read_version.len(), size_of::<u32>()),
+    ] {
+        memory = checked_memory_add(
+            memory,
+            length
+                .checked_mul(element_size)
+                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+        )?;
+    }
+    for field_info in &info.field_infos {
+        memory = checked_memory_add(memory, field_info_memory(field_info)?)?;
+    }
+    if let Some(path) = &info.diff_field_path {
+        // `diff_field_path` is an inline `Option<FieldPath>`; account only
+        // for the path's separately owned component buffer here.
+        memory = checked_memory_add(memory, field_path_bytes(path)?)?;
+    }
+    memory = checked_memory_add(
+        memory,
+        info.fields_to_remove
+            .len()
+            .checked_mul(size_of::<FieldPath>())
+            .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+    )?;
+    for path in &info.fields_to_remove {
+        memory = checked_memory_add(memory, field_path_bytes(path)?)?;
+    }
+    Ok(memory)
+}
+
+fn field_path_header_field_count(path: &FieldPath) -> usize {
+    usize::from(!path.path.is_empty())
+}
+
+fn field_info_header_field_count(info: &FieldInfo) -> Result<usize> {
+    let mut fields = 1usize; // required nested FieldPath
+    for present in [
+        info.r#type.is_some(),
+        info.unknown_field_rule.is_some(),
+        !info.object_references.is_empty(),
+        !info.data_references.is_empty(),
+        info.known_field_rule.is_some(),
+        !info.known_field_version.is_empty(),
+        info.known_field_feature_identifier.is_some(),
+    ] {
+        fields = fields
+            .checked_add(usize::from(present))
+            .ok_or_else(|| Error::invalid_archive(0, "field count overflow"))?;
+    }
+    fields
+        .checked_add(field_path_header_field_count(&info.path))
+        .ok_or_else(|| Error::invalid_archive(0, "field count overflow"))
+}
+
+fn message_info_header_field_count(info: &MessageInfo) -> Result<usize> {
+    let mut fields = 2usize; // required type and length
+    for present in [
+        !info.versions.is_empty(),
+        !info.object_references.is_empty(),
+        !info.data_references.is_empty(),
+        info.base_message_index.is_some(),
+        !info.diff_merge_version.is_empty(),
+        info.diff_field_path.is_some(),
+        !info.diff_read_version.is_empty(),
+    ] {
+        fields = fields
+            .checked_add(usize::from(present))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    }
+    fields = fields
+        .checked_add(info.field_infos.len())
+        .and_then(|value| value.checked_add(info.fields_to_remove.len()))
+        .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    for field_info in &info.field_infos {
+        fields = fields
+            .checked_add(field_info_header_field_count(field_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    }
+    if let Some(path) = &info.diff_field_path {
+        fields = fields
+            .checked_add(field_path_header_field_count(path))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    }
+    for path in &info.fields_to_remove {
+        fields = fields
+            .checked_add(field_path_header_field_count(path))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    }
+    Ok(fields)
+}
+
+fn message_info_header_nesting(info: &MessageInfo) -> Result<usize> {
+    let nested = if info.field_infos.is_empty() {
+        usize::from(info.diff_field_path.is_some() || !info.fields_to_remove.is_empty())
+    } else {
+        2
+    };
+    Ok(nested)
+}
+
+fn field_info_metadata_item_count(info: &FieldInfo) -> Result<usize> {
+    let mut count = 1usize;
+    for amount in [
+        info.path.path.len(),
+        info.object_references.len(),
+        info.data_references.len(),
+        info.known_field_version.len(),
+        usize::from(info.known_field_feature_identifier.is_some()),
+    ] {
+        add_count(&mut count, amount)?;
+    }
+    Ok(count)
+}
+
+fn checked_memory_add(left: usize, right: usize) -> Result<usize> {
+    left.checked_add(right)
+        .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))
+}
+
 /// Raw payload data for one archive message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RawMessage {
@@ -744,13 +1181,7 @@ impl ArchiveObject {
     /// Construct an object under explicit resource limits.
     pub fn new(identifier: u64, messages: Vec<RawMessage>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        if messages.len() > limits.max_messages_per_object() {
-            return Err(limit(
-                LimitKind::MessagesPerObject,
-                messages.len(),
-                limits.max_messages_per_object(),
-            ));
-        }
+        let header_length = preflight_archive_object_constructor(identifier, &messages, limits)?;
         let mut message_infos = Vec::new();
         message_infos
             .try_reserve_exact(messages.len())
@@ -758,11 +1189,15 @@ impl ArchiveObject {
         for message in &messages {
             let length = u32::try_from(message.data.len())
                 .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-            check_message_length(message.data.len(), limits)?;
             message_infos.push(MessageInfo::try_new(message.type_, length)?);
         }
+        let archive_info = ArchiveInfo {
+            identifier: Some(identifier),
+            message_infos,
+            should_merge: None,
+        };
         let object = Self {
-            archive_info: ArchiveInfo::new(identifier, message_infos),
+            archive_info,
             messages,
             header_offset: 0,
             header_length: 0,
@@ -771,7 +1206,11 @@ impl ArchiveObject {
             original_header: None,
             original_canonical_header: None,
         };
-        object.validate(limits)?;
+        // `preflight_archive_object_constructor` has already admitted the
+        // complete neutral header before metadata allocation. Validate only
+        // the payload/object framing here; calling the public validator would
+        // walk that header a second time on this hot path.
+        object.validate_payloads_with_header_length(limits, header_length)?;
         Ok(object)
     }
 
@@ -930,7 +1369,19 @@ impl ArchiveObject {
             ));
         }
         self.archive_info.validate(limits)?;
+        self.validate_payloads(limits)
+    }
+
+    fn validate_payloads(&self, limits: Limits) -> Result<()> {
         let header_length = archive_info_encoded_len(&self.archive_info)?;
+        self.validate_payloads_with_header_length(limits, header_length)
+    }
+
+    fn validate_payloads_with_header_length(
+        &self,
+        limits: Limits,
+        header_length: usize,
+    ) -> Result<()> {
         check_header_length(header_length, limits)?;
         let prefix_length = varint_len(header_length)?;
         let mut payload_length = 0;
@@ -7090,17 +7541,21 @@ fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
 }
 
 fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
-    let compatibility = archive_info_to_codec(info)?;
-    usize::try_from(
-        archive_codec::archive_info_encoded_len(&compatibility).map_err(|error| {
-            Error::header_codec(
-                HeaderKind::ArchiveInfo,
-                HeaderOperation::Encode,
-                error.to_string(),
-            )
-        })?,
-    )
-    .map_err(|_| Error::invalid_archive(0, "ArchiveInfo header length exceeds usize"))
+    let mut total = 0usize;
+    if let Some(identifier) = info.identifier {
+        total = checked_encoded_add(total, varint_field_length(1, identifier)?)?;
+    }
+    for message_info in &info.message_infos {
+        let message_length = usize::try_from(message_info.length)
+            .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
+        let payload_length =
+            encoded_message_info_length(message_info, message_info.type_, message_length)?;
+        total = checked_encoded_add(total, length_delimited_field_length(2, payload_length)?)?;
+    }
+    if let Some(should_merge) = info.should_merge {
+        total = checked_encoded_add(total, varint_field_length(3, u64::from(should_merge))?)?;
+    }
+    Ok(total)
 }
 
 /// A no-allocation sink for the canonical ArchiveInfo encoding.
@@ -8114,16 +8569,22 @@ fn encode_varint(mut value: u64, output: &mut [u8; MAX_VARINT_BYTES]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::{
-        Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
+        Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
         ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
         CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
-        CanonicalObjectReferenceField, CanonicalObjectReferenceFields, DataReferencePruning,
-        DataReferenceTransition, Error, FieldDataReferenceTransition, FieldInfo,
-        FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
-        ObjectReferenceTransition, RawMessage, UnknownFieldRule, encode_archive_info,
-        encode_varint, encode_varint_with_width, varint_len,
+        CanonicalObjectReferenceField, CanonicalObjectReferenceFields, DEFAULT_MESSAGE_VERSIONS,
+        DataReferencePruning, DataReferenceTransition, Error, FieldDataReferenceTransition,
+        FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
+        MESSAGE_INFO_CONSTRUCTIONS, MessageInfo, ObjectReferenceTransition, RawMessage,
+        UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec, encode_archive_info,
+        encode_varint, encode_varint_with_width, encoded_field_info_length,
+        encoded_field_path_length, encoded_message_info_length, field_info_header_field_count,
+        field_info_memory, field_info_metadata_item_count, field_path_memory,
+        message_info_header_field_count, message_info_header_nesting, message_info_memory,
+        minimal_message_info_encoded_length, varint_len,
     };
     use crate::{LimitKind, Limits, Result};
+    use litchi_iwa_protos::archive_codec;
 
     struct ReferencePruningFixture {
         source: Vec<u8>,
@@ -8171,7 +8632,11 @@ mod tests {
         let message = &mut object.archive_info.message_infos[0];
         message.object_references = vec![10, 10];
         message.data_references = vec![20];
-        let mut field = FieldInfo::new(vec![1, 2]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![1, 2], Limits::default()).unwrap(),
+            Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![11];
         field.data_references = vec![21, 21];
         message.field_infos.push(field);
@@ -8336,11 +8801,19 @@ mod tests {
         message.data_references = vec![2, 129];
         message.base_message_index = Some(u32::MAX);
         message.diff_merge_version = vec![3, 130];
-        message.diff_field_path = Some(FieldPath::new(vec![1, 128, u32::MAX]));
-        message.fields_to_remove = vec![FieldPath::new(vec![4, 5]), FieldPath::default()];
+        message.diff_field_path =
+            Some(FieldPath::new(vec![1, 128, u32::MAX], Limits::default()).unwrap());
+        message.fields_to_remove = vec![
+            FieldPath::new(vec![4, 5], Limits::default()).unwrap(),
+            FieldPath::default(),
+        ];
         message.diff_read_version = vec![6, 7];
 
-        let mut field = FieldInfo::new(vec![9, 10]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![9, 10], Limits::default()).unwrap(),
+            Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::Unrecognized(99));
         field.unknown_field_rule = Some(UnknownFieldRule::NotSupported);
         field.object_references = vec![11, 12];
@@ -8356,6 +8829,482 @@ mod tests {
         let encoded = archive.to_bytes(Default::default())?;
         assert_eq!(archive.encoded_len(Default::default())?, encoded.len());
         assert_eq!(archive.encoded_len(Limits::default())?, encoded.len());
+        let encoded_info = archive_info_to_codec(&archive.objects[0].archive_info)?;
+        let codec_length = archive_codec::archive_info_encoded_len(&encoded_info)
+            .map_err(|_| Error::invalid_archive(0, "codec length parity failed"))
+            .and_then(|length| {
+                usize::try_from(length)
+                    .map_err(|_| Error::invalid_archive(0, "codec length exceeds usize"))
+            })?;
+        assert_eq!(
+            archive_info_encoded_len(&archive.objects[0].archive_info)?,
+            codec_length
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn raw_metadata_constructors_enforce_each_header_budget_at_the_boundary() -> Result<()> {
+        let defaults = Limits::default();
+        assert!(FieldPath::new(Vec::new(), defaults).is_ok());
+        let path = FieldPath::new(vec![0, 7], defaults)?;
+        let path_length = 1 + 1 + 2;
+        assert_eq!(encoded_field_path_length(&path)?, path_length);
+        assert!(FieldPath::new(vec![0, 7], defaults.with_header_bytes(path_length)?,).is_ok());
+        let error = FieldPath::new(
+            vec![0, 7],
+            defaults.with_header_bytes(path_length.saturating_sub(1))?,
+        )
+        .expect_err("one byte below a raw path header must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderBytes,
+                ..
+            }
+        ));
+        let path_memory = size_of::<FieldPath>() + 2 * size_of::<u32>();
+        assert_eq!(field_path_memory(&path)?, path_memory);
+        assert!(
+            FieldPath::new(vec![0, 7], defaults.with_header_memory_bytes(path_memory)?,).is_ok()
+        );
+        let error = FieldPath::new(
+            vec![0, 7],
+            defaults.with_header_memory_bytes(path_memory.saturating_sub(1))?,
+        )
+        .expect_err("one byte below neutral path memory must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderMemoryBytes,
+                ..
+            }
+        ));
+        let path_metadata = 2;
+        assert_eq!(path.path.len(), path_metadata);
+        assert!(FieldPath::new(vec![0, 7], defaults.with_metadata_items(path_metadata)?,).is_ok());
+        let error = FieldPath::new(
+            vec![0, 7],
+            defaults.with_metadata_items(path_metadata.saturating_sub(1))?,
+        )
+        .expect_err("one path item below the metadata budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MetadataItems,
+                ..
+            }
+        ));
+
+        let field = FieldInfo::new(path, defaults)?;
+        let field_fields = 2;
+        assert_eq!(field_info_header_field_count(&field)?, field_fields);
+        assert!(
+            FieldInfo::new(
+                field.path.clone(),
+                defaults.with_header_fields(field_fields)?,
+            )
+            .is_ok()
+        );
+        let error = FieldInfo::new(
+            field.path.clone(),
+            defaults.with_header_fields(field_fields.saturating_sub(1))?,
+        )
+        .expect_err("one field below a raw FieldInfo header must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                ..
+            }
+        ));
+        let field_length = 1 + 1 + path_length;
+        assert_eq!(encoded_field_info_length(&field)?, field_length);
+        assert!(
+            FieldInfo::new(
+                field.path.clone(),
+                defaults.with_header_bytes(field_length)?,
+            )
+            .is_ok()
+        );
+        let error = FieldInfo::new(
+            field.path.clone(),
+            defaults.with_header_bytes(field_length.saturating_sub(1))?,
+        )
+        .expect_err("one byte below a raw FieldInfo header must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderBytes,
+                ..
+            }
+        ));
+        let field_memory = size_of::<FieldInfo>() + 2 * size_of::<u32>();
+        assert_eq!(field_info_memory(&field)?, field_memory);
+        assert!(
+            FieldInfo::new(
+                field.path.clone(),
+                defaults.with_header_memory_bytes(field_memory)?,
+            )
+            .is_ok()
+        );
+        let error = FieldInfo::new(
+            field.path.clone(),
+            defaults.with_header_memory_bytes(field_memory.saturating_sub(1))?,
+        )
+        .expect_err("one byte below neutral FieldInfo memory must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderMemoryBytes,
+                ..
+            }
+        ));
+        let field_metadata = 1 + 2;
+        assert_eq!(field_info_metadata_item_count(&field)?, field_metadata);
+        assert!(
+            FieldInfo::new(
+                field.path.clone(),
+                defaults.with_metadata_items(field_metadata)?,
+            )
+            .is_ok()
+        );
+        let error = FieldInfo::new(
+            field.path.clone(),
+            defaults.with_metadata_items(field_metadata.saturating_sub(1))?,
+        )
+        .expect_err("one FieldInfo item below the metadata budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MetadataItems,
+                ..
+            }
+        ));
+
+        let mut message = MessageInfo::new(7, 1, defaults)?;
+        let message_length = 2 + 5 + 2;
+        assert_eq!(minimal_message_info_encoded_length(7, 1)?, message_length);
+        assert!(MessageInfo::new(7, 1, defaults.with_header_bytes(message_length)?,).is_ok());
+        let error = MessageInfo::new(
+            7,
+            1,
+            defaults.with_header_bytes(message_length.saturating_sub(1))?,
+        )
+        .expect_err("one byte below a raw MessageInfo header must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderBytes,
+                ..
+            }
+        ));
+        let message_memory = size_of::<MessageInfo>() + 3 * size_of::<u32>();
+        assert_eq!(message_info_memory(&message)?, message_memory);
+        assert!(
+            MessageInfo::new(7, 1, defaults.with_header_memory_bytes(message_memory)?,).is_ok()
+        );
+        let error = MessageInfo::new(
+            7,
+            1,
+            defaults.with_header_memory_bytes(message_memory.saturating_sub(1))?,
+        )
+        .expect_err("one byte below neutral MessageInfo memory must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderMemoryBytes,
+                ..
+            }
+        ));
+        assert!(MessageInfo::new(7, 1, defaults.with_header_fields(3)?).is_ok());
+        let error = MessageInfo::new(7, 1, defaults.with_header_fields(2)?)
+            .expect_err("one MessageInfo field below the header budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                ..
+            }
+        ));
+        assert!(
+            MessageInfo::new(
+                7,
+                1,
+                defaults.with_metadata_items(DEFAULT_MESSAGE_VERSIONS.len())?,
+            )
+            .is_ok()
+        );
+        let error = MessageInfo::new(
+            7,
+            1,
+            defaults.with_metadata_items(DEFAULT_MESSAGE_VERSIONS.len() - 1)?,
+        )
+        .expect_err("one MessageInfo item below the metadata budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MetadataItems,
+                ..
+            }
+        ));
+
+        let mut path_message = MessageInfo::new(7, 1, defaults)?;
+        path_message.diff_field_path = Some(FieldPath::new(vec![1], defaults)?);
+        path_message.fields_to_remove.push(FieldPath::default());
+        // type + versions + length, then diff path's outer and inner fields,
+        // then the empty removed path's outer field only.
+        assert_eq!(message_info_header_field_count(&path_message)?, 6);
+        let error = ArchiveInfo::new(0, vec![path_message], defaults.with_header_fields(5)?)
+            .expect_err("nested diff paths must count their own wire fields");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                ..
+            }
+        ));
+
+        message.field_infos.push(field.clone());
+        let nested = ArchiveInfo::new(0, vec![message.clone()], defaults)?;
+        let archive_nesting = message_info_header_nesting(&message)? + 1;
+        assert!(
+            ArchiveInfo::new(
+                0,
+                vec![message.clone()],
+                defaults.with_header_nesting(archive_nesting)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(
+            0,
+            vec![message.clone()],
+            defaults.with_header_nesting(archive_nesting.saturating_sub(1))?,
+        )
+        .expect_err("one nesting level below a raw ArchiveInfo must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderNesting,
+                ..
+            }
+        ));
+
+        let archive_metadata =
+            nested
+                .message_infos
+                .iter()
+                .try_fold(nested.message_infos.len(), |total, info| {
+                    total
+                        .checked_add(info.metadata_item_count()?)
+                        .ok_or_else(|| Error::invalid_archive(0, "test metadata count overflow"))
+                })?;
+        assert!(
+            ArchiveInfo::new(
+                0,
+                nested.message_infos.clone(),
+                defaults.with_metadata_items(archive_metadata)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(
+            0,
+            nested.message_infos.clone(),
+            defaults.with_metadata_items(archive_metadata.saturating_sub(1))?,
+        )
+        .expect_err("one metadata item below a raw ArchiveInfo must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MetadataItems,
+                ..
+            }
+        ));
+
+        let archive_header = 2 + 1 + 1 + 17;
+        assert_eq!(archive_info_encoded_len(&nested)?, archive_header);
+        assert!(
+            ArchiveInfo::new(
+                0,
+                nested.message_infos.clone(),
+                defaults.with_header_bytes(archive_header)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(
+            0,
+            nested.message_infos.clone(),
+            defaults.with_header_bytes(archive_header.saturating_sub(1))?,
+        )
+        .expect_err("one byte below a raw ArchiveInfo must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderBytes,
+                ..
+            }
+        ));
+        let archive_fields = 1 + 1 + 6;
+        assert_eq!(
+            message_info_header_field_count(&nested.message_infos[0])?,
+            6
+        );
+        assert!(
+            ArchiveInfo::new(
+                0,
+                nested.message_infos.clone(),
+                defaults.with_header_fields(archive_fields)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(
+            0,
+            nested.message_infos.clone(),
+            defaults.with_header_fields(archive_fields.saturating_sub(1))?,
+        )
+        .expect_err("one ArchiveInfo field below the header budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                ..
+            }
+        ));
+
+        let two_messages = vec![
+            MessageInfo::new(7, 1, defaults)?,
+            MessageInfo::new(8, 1, defaults)?,
+        ];
+        assert!(
+            ArchiveInfo::new(
+                0,
+                two_messages.clone(),
+                defaults.with_messages_per_object(2)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(0, two_messages, defaults.with_messages_per_object(1)?)
+            .expect_err("one message above the per-object raw budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessagesPerObject,
+                ..
+            }
+        ));
+
+        let expected_field_memory = size_of::<FieldInfo>() + 2 * size_of::<u32>();
+        let expected_message_memory =
+            size_of::<MessageInfo>() + 3 * size_of::<u32>() + expected_field_memory;
+        let archive_memory = size_of::<ArchiveInfo>() + expected_message_memory;
+        assert_eq!(
+            field_info_memory(&nested.message_infos[0].field_infos[0])?,
+            expected_field_memory
+        );
+        assert_eq!(
+            message_info_memory(&nested.message_infos[0])?,
+            expected_message_memory
+        );
+        assert!(
+            ArchiveInfo::new(
+                0,
+                vec![message.clone()],
+                defaults.with_header_memory_bytes(archive_memory)?,
+            )
+            .is_ok()
+        );
+        let error = ArchiveInfo::new(
+            0,
+            vec![message.clone()],
+            defaults.with_header_memory_bytes(archive_memory.saturating_sub(1))?,
+        )
+        .expect_err("one byte below neutral metadata memory must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderMemoryBytes,
+                ..
+            }
+        ));
+
+        let error = MessageInfo::new(7, 2, defaults.with_message_bytes(1)?)
+            .expect_err("payload above the raw message budget must be refused");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                ..
+            }
+        ));
+        let error = MessageInfo::new(7, usize::try_from(u32::MAX).unwrap() + 1, defaults)
+            .expect_err("payload lengths above the configured budget must be refused first");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                ..
+            }
+        ));
+        let error =
+            encoded_message_info_length(&message, 7, usize::try_from(u32::MAX).unwrap() + 1)
+                .expect_err("the wire length conversion must reject values above u32");
+        assert!(matches!(error, Error::InvalidArchive { .. }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn archive_object_preflights_header_before_metadata_allocation() -> Result<()> {
+        let message_set = || {
+            vec![
+                RawMessage {
+                    type_: 7,
+                    data: Vec::new(),
+                },
+                RawMessage {
+                    type_: 8,
+                    data: Vec::new(),
+                },
+            ]
+        };
+        let constructions = || MESSAGE_INFO_CONSTRUCTIONS.with(|count| count.get());
+
+        let assert_rejected_before_metadata = |limits: Limits, expected: LimitKind| {
+            let before = constructions();
+            let error = ArchiveObject::new(0, message_set(), limits)
+                .expect_err("aggregate header limits must reject before metadata construction");
+            assert!(matches!(
+                error,
+                Error::Limit { kind, .. } if kind == expected
+            ));
+            assert_eq!(
+                constructions(),
+                before,
+                "MessageInfo::try_new must not run for a rejected aggregate header"
+            );
+        };
+
+        assert_rejected_before_metadata(
+            Limits::default().with_header_fields(1)?,
+            LimitKind::HeaderFields,
+        );
+        assert_rejected_before_metadata(
+            Limits::default().with_header_bytes(1)?,
+            LimitKind::HeaderBytes,
+        );
+        assert_rejected_before_metadata(
+            Limits::default().with_header_memory_bytes(size_of::<ArchiveInfo>())?,
+            LimitKind::HeaderMemoryBytes,
+        );
+
+        let before = constructions();
+        ArchiveObject::new(0, message_set(), Limits::default())
+            .expect("an admitted aggregate header must construct metadata");
+        assert_eq!(
+            constructions() - before,
+            2,
+            "an admitted object must construct one MessageInfo per payload"
+        );
         Ok(())
     }
 
@@ -9128,7 +10077,11 @@ mod tests {
         let mut object = ArchiveObject::new(1, vec![original_message.clone()], Default::default())?;
         let info = &mut object.archive_info.message_infos[0];
         info.data_references.extend([7, 8]);
-        let mut field = FieldInfo::new(vec![1]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![1], Limits::default()).unwrap(),
+            Limits::default(),
+        )
+        .unwrap();
         field.data_references.extend([9, 10]);
         info.field_infos.push(field);
         let source = Archive {
@@ -10024,7 +10977,11 @@ mod tests {
         for (index, references) in field_data_references.iter().enumerate() {
             let path = u32::try_from(index)
                 .map_err(|_| Error::invalid_archive(0, "test FieldInfo path exceeds u32"))?;
-            let mut field = FieldInfo::new(vec![path]);
+            let mut field = FieldInfo::new(
+                FieldPath::new(vec![path], Limits::default()).unwrap(),
+                Limits::default(),
+            )
+            .unwrap();
             field.data_references.extend_from_slice(references);
             info.field_infos.push(field);
         }
@@ -11020,7 +11977,11 @@ mod tests {
         )?;
         let info = &mut object.archive_info.message_infos[0];
         info.data_references = vec![10, 20];
-        let mut field = FieldInfo::new(vec![3]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![3], Limits::default()).unwrap(),
+            Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::DataReference);
         field.data_references = vec![10, 20];
         info.field_infos.push(field);

@@ -2059,6 +2059,7 @@ fn insert_lifecycle(
         &mut body_object.archive_info.message_infos[body_message_index],
         reference_identifier.get(),
         true,
+        archive_limits,
     )?;
     let objects = graph_objects(graph_write, &payloads, archive_limits, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
@@ -2164,6 +2165,7 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
         &mut body_object.archive_info.message_infos[body_message_index],
         graph.reference_identifier.get(),
         false,
+        archive_limits,
     )?;
     let census = GraphCensus::new(source, &graphs, &mut budget)?;
     prove_exclusive_graph(graph_index, &graph, &census)?;
@@ -2967,6 +2969,7 @@ fn update_body_header_reference(
     info: &mut litchi_iwa_core::MessageInfo,
     reference: u64,
     adding: bool,
+    limits: litchi_iwa_core::Limits,
 ) -> Result<(), Error> {
     const BODY_REFERENCE_PATH: &[u32] = &[16, 1, 2];
     let aggregate_count = info
@@ -3015,7 +3018,9 @@ fn update_body_header_reference(
     if adding {
         info.object_references.push(reference);
         if canonical_fields == 0 {
-            let mut field = FieldInfo::new(BODY_REFERENCE_PATH.to_vec());
+            let path = litchi_iwa_core::FieldPath::new(BODY_REFERENCE_PATH.to_vec(), limits)
+                .map_err(|_| Error::InvalidSource)?;
+            let mut field = FieldInfo::new(path, limits).map_err(|_| Error::InvalidSource)?;
             field.object_references.push(reference);
             info.field_infos.push(field);
         }

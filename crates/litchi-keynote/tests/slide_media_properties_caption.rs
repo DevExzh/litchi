@@ -7,9 +7,7 @@
 use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
 use litchi_keynote::{
     MovieSelector, Package, SlideSelector,
@@ -75,13 +73,15 @@ fn movie_object(movie: usize) -> TestResult<ArchiveObject> {
     info.data_references = vec![2_002, 2_001];
     info.field_infos = vec![
         FieldInfo {
-            path: FieldPath::new(vec![14]),
+            path: litchi_iwa_core::FieldPath::new(vec![14], litchi_iwa_core::Limits::default())
+                .unwrap(),
             r#type: Some(FieldType::DataReference),
             data_references: vec![2_002],
             ..FieldInfo::default()
         },
         FieldInfo {
-            path: FieldPath::new(vec![15]),
+            path: litchi_iwa_core::FieldPath::new(vec![15], litchi_iwa_core::Limits::default())
+                .unwrap(),
             r#type: Some(FieldType::DataReference),
             data_references: vec![2_001],
             ..FieldInfo::default()

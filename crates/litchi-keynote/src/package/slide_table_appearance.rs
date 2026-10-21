@@ -2654,7 +2654,12 @@ fn append_style_object(
                     .and_then(|size| size.checked_add(2usize.saturating_mul(size_of::<u32>())))
                     .ok_or(Error::InvalidSource)?,
             )?;
-            let mut field = litchi_iwa_core::FieldInfo::new(vec![1, 3]);
+            let mut field = litchi_iwa_core::FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1, 3], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references.push(new_parent);
             cloned_info.field_infos.insert(0, field);

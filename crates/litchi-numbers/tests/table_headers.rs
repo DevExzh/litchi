@@ -3,7 +3,7 @@
 use std::{io, sync::Arc};
 
 use litchi_iwa_archive::package::Catalog;
-use litchi_iwa_core::{FieldInfo, FieldPath};
+use litchi_iwa_core::FieldInfo;
 use litchi_numbers::{
     Package, SheetSelector, TableSelector,
     table::{
@@ -51,7 +51,11 @@ fn changed_settings(base: Settings) -> Settings {
 }
 
 fn declared_field(path: &[u32], references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(FieldPath::new(path.to_vec()));
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references = references.to_vec();
     field
 }

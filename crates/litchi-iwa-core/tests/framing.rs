@@ -628,7 +628,11 @@ fn message_info_reader_and_io_errors_are_reported() -> Result<(), Error> {
 
 #[test]
 fn neutral_field_metadata_preserves_presence_and_unknown_enum_values() -> Result<(), Error> {
-    let absent = FieldInfo::new(vec![1]);
+    let absent = FieldInfo::new(
+        FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     assert_eq!(absent.effective_type(), FieldType::Value);
     assert_eq!(
         absent.effective_unknown_field_rule(),
@@ -637,21 +641,21 @@ fn neutral_field_metadata_preserves_presence_and_unknown_enum_values() -> Result
     assert_eq!(absent.effective_known_field_rule(), KnownFieldRule::None);
 
     let explicit_defaults = FieldInfo {
-        path: FieldPath::new(vec![2]),
+        path: FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Value),
         unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserveUntilModified),
         known_field_rule: Some(KnownFieldRule::None),
         ..Default::default()
     };
     let known = FieldInfo {
-        path: FieldPath::new(vec![3]),
+        path: FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Message),
         unknown_field_rule: Some(UnknownFieldRule::NotSupported),
         known_field_rule: Some(KnownFieldRule::PreserveNewerValue),
         ..Default::default()
     };
     let unrecognized = FieldInfo {
-        path: FieldPath::new(vec![4]),
+        path: FieldPath::new(vec![4], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(FieldType::Unrecognized(99)),
         unknown_field_rule: Some(UnknownFieldRule::Unrecognized(-2)),
         known_field_rule: Some(KnownFieldRule::Unrecognized(77)),

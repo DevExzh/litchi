@@ -70,7 +70,11 @@ fn reference(identifier: u64) -> tsp::Reference {
 }
 
 fn field_info(path: &[u32], references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path.to_vec());
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -651,7 +655,8 @@ fn wrong_template_reference_path(source: &[u8]) -> TestResult<Vec<u8>> {
             .iter_mut()
             .find(|field| field.path.as_slice() == [1])
             .ok_or_else(|| io::Error::other("header FieldInfo is missing"))?;
-        field.path = vec![99].into();
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }

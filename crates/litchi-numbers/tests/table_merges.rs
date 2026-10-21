@@ -430,7 +430,12 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
                 .ok_or_else(|| "selected Numbers sheet metadata is missing".to_owned())?;
             info.type_ = FORM_BASED_SHEET_MESSAGE_TYPE;
             info.field_infos.clear();
-            let mut drawables = litchi_iwa_core::FieldInfo::new(vec![1, 2]);
+            let mut drawables = litchi_iwa_core::FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             drawables.object_references = drawable_references;
             info.field_infos.push(drawables);
             changed = true;

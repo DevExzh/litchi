@@ -4,7 +4,7 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::decode_varint_from_bytes;
 use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{Package, Position, SlideSelector, slide::delete};
@@ -104,7 +104,8 @@ fn referenced_object(
     let info = &mut object.archive_info.message_infos[0];
     info.object_references.extend_from_slice(references);
     info.field_infos.push(FieldInfo {
-        path: FieldPath::new(path.to_vec()),
+        path: litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: references.to_vec(),
         ..FieldInfo::default()
@@ -568,7 +569,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
         .object_references
         .extend_from_slice(&NODE_IDS[..names.len()]);
     show_info.field_infos.push(FieldInfo {
-        path: FieldPath::new(vec![3, 2]),
+        path: litchi_iwa_core::FieldPath::new(vec![3, 2], litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: NODE_IDS[..names.len()].to_vec(),
         ..FieldInfo::default()
@@ -598,7 +600,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             let info = &mut node_object.archive_info.message_infos[0];
             info.data_references.push(500);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![16]),
+                path: litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![500],
                 ..FieldInfo::default()
@@ -608,7 +611,11 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                     info.object_references.push(SLIDE_IDS[0]);
                 },
                 MetadataMode::DuplicateFieldInfo => info.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![2]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![2],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::ObjectReference),
                     object_references: vec![SLIDE_IDS[0]],
                     ..FieldInfo::default()
@@ -620,7 +627,11 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                     info.field_infos[0].r#type = Some(FieldType::Value);
                 },
                 MetadataMode::WrongFieldInfoPath => {
-                    info.field_infos[0].path = FieldPath::new(vec![99]);
+                    info.field_infos[0].path = litchi_iwa_core::FieldPath::new(
+                        vec![99],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                 },
                 MetadataMode::NodeAggregateOnlyObject => {
                     info.field_infos
@@ -645,10 +656,19 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             }
             if matches!(mode, MetadataMode::NodeSecondMessageData) {
                 let payload = b"second node data metadata".to_vec();
-                let mut metadata = litchi_iwa_core::MessageInfo::new(991, payload.len() as u32);
+                let mut metadata = litchi_iwa_core::MessageInfo::new(
+                    991,
+                    payload.len(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 metadata.data_references.push(500);
                 metadata.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![1]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![1],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::DataReference),
                     data_references: vec![500],
                     ..FieldInfo::default()
@@ -687,7 +707,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             let info = &mut slide_object.archive_info.message_infos[0];
             info.data_references.push(501);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![99]),
+                path: litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![501],
                 ..FieldInfo::default()
@@ -709,10 +730,19 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             }
             if matches!(mode, MetadataMode::SlideSecondMessageData) {
                 let payload = b"second slide data metadata".to_vec();
-                let mut metadata = litchi_iwa_core::MessageInfo::new(992, payload.len() as u32);
+                let mut metadata = litchi_iwa_core::MessageInfo::new(
+                    992,
+                    payload.len(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 metadata.data_references.push(501);
                 metadata.field_infos.push(FieldInfo {
-                    path: FieldPath::new(vec![1]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![1],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     r#type: Some(FieldType::DataReference),
                     data_references: vec![501],
                     ..FieldInfo::default()
@@ -780,7 +810,8 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
             info.data_references.push(identifier);
         } else {
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![1]),
+                path: litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 r#type: Some(FieldType::DataReference),
                 data_references: vec![identifier],
                 ..FieldInfo::default()

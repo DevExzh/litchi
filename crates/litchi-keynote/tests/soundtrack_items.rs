@@ -110,7 +110,11 @@ fn fixture() -> TestResult<Vec<u8>> {
 
     let mut root = object(ROOT_OBJECT, 1, document.encode_to_vec())?;
     root.archive_info.message_infos[0].object_references = vec![SHOW_OBJECT];
-    let mut root_show_field = FieldInfo::new(vec![2]);
+    let mut root_show_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     root_show_field.r#type = Some(FieldType::ObjectReference);
     root_show_field.object_references = vec![SHOW_OBJECT];
     root.archive_info.message_infos[0]
@@ -120,7 +124,11 @@ fn fixture() -> TestResult<Vec<u8>> {
     let mut show_object = object(SHOW_OBJECT, 2, show.encode_to_vec())?;
     show_object.archive_info.message_infos[0].object_references =
         vec![THEME_OBJECT, STYLESHEET_OBJECT, SOUNDTRACK_OBJECT];
-    let mut show_soundtrack_field = FieldInfo::new(vec![17]);
+    let mut show_soundtrack_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     show_soundtrack_field.r#type = Some(FieldType::ObjectReference);
     show_soundtrack_field.object_references = vec![SOUNDTRACK_OBJECT];
     show_object.archive_info.message_infos[0]
@@ -129,7 +137,11 @@ fn fixture() -> TestResult<Vec<u8>> {
 
     let mut soundtrack_object = object(SOUNDTRACK_OBJECT, 21, soundtrack.encode_to_vec())?;
     soundtrack_object.archive_info.message_infos[0].data_references = AUDIO_DATA_IDS.to_vec();
-    let mut soundtrack_media_field = FieldInfo::new(vec![3]);
+    let mut soundtrack_media_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     soundtrack_media_field.r#type = Some(FieldType::DataReference);
     soundtrack_media_field.data_references = AUDIO_DATA_IDS.to_vec();
     soundtrack_object.archive_info.message_infos[0]

@@ -19,9 +19,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsa, tsce, tsch, tsd, tsk, tsp, tss};
 use prost::Message as _;
 
@@ -202,7 +200,11 @@ fn object_with_field_references(
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("source fixture object has no message info"))?;
-    let mut field_info = FieldInfo::new(FieldPath::new(vec![field]));
+    let mut field_info = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![field], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field_info.r#type = Some(FieldType::ObjectReference);
     field_info.object_references = references.to_vec();
     info.field_infos = vec![field_info];
@@ -408,7 +410,13 @@ fn chart_objects(
             .collect::<Vec<_>>()
             .as_slice(),
     )?;
-    chart_object.archive_info.message_infos[0].field_infos = vec![FieldInfo::new(vec![1])];
+    chart_object.archive_info.message_infos[0].field_infos = vec![
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    ];
     objects.push(chart_object);
     objects.push(object(
         ids.caption,
@@ -959,7 +967,12 @@ pub(crate) fn with_foreign_chart_non_style(source: &[u8]) -> TestResult<Vec<u8>>
             .first_mut()
             .ok_or_else(|| io::Error::other("first chart metadata is missing"))?;
         info.object_references.push(foreign_identifier);
-        let mut field = FieldInfo::new(FieldPath::new(vec![1, 2]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(foreign_identifier);
         info.field_infos.push(field);

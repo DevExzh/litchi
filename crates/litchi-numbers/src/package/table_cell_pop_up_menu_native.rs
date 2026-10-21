@@ -289,6 +289,14 @@ impl std::error::Error for NativePopUpError {}
 
 pub(super) type Result<T> = std::result::Result<T, NativePopUpError>;
 
+fn map_archive_constructor_error(error: litchi_iwa_core::Error) -> NativePopUpError {
+    match error {
+        litchi_iwa_core::Error::Limit { .. } => NativePopUpError::Limit,
+        litchi_iwa_core::Error::Allocation { .. } => NativePopUpError::Allocation,
+        _ => NativePopUpError::Archive,
+    }
+}
+
 /// Plan and execute one compatibility single-member Pop-Up Menu transition.
 ///
 /// The function validates the model/DataStore field-21 route, exactly one
@@ -2632,7 +2640,12 @@ pub(super) fn replace_control_message_with_transition(
                 return Err(NativePopUpError::InvalidSource);
             }
             if !aggregate_only {
-                let mut field = FieldInfo::new(vec![3, *key]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![3, *key], limits)
+                        .map_err(map_archive_constructor_error)?,
+                    limits,
+                )
+                .map_err(map_archive_constructor_error)?;
                 field.r#type = Some(FieldType::ObjectReference);
                 info.field_infos.push(field);
             }

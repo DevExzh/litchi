@@ -488,7 +488,7 @@ mod tests {
     };
     use crate::package::table_lock;
     use litchi_iwa_common::varint::encode_varint_into;
-    use litchi_iwa_core::{FieldInfo, FieldPath, MessageInfo};
+    use litchi_iwa_core::{FieldInfo, MessageInfo};
     use litchi_iwa_text_wire::{
         RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage,
         prepare_storage_text_rewrite_with_behavior,
@@ -596,17 +596,22 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_keeps_data_namespace_collision_unrelated() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         message.data_references = vec![44];
         message.field_infos = vec![
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![44],
                 ..FieldInfo::default()
             },
             FieldInfo {
-                path: FieldPath::new(vec![17]),
+                path: litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default())
+                    .unwrap(),
                 data_references: vec![44],
                 ..FieldInfo::default()
             },
@@ -620,10 +625,14 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_shared_field9_table_attachments() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44, 55];
         message.field_infos = vec![FieldInfo {
-            path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+            path: litchi_iwa_core::FieldPath::new(
+                vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: vec![44, 55],
             ..FieldInfo::default()
         }];
@@ -636,16 +645,24 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_repeated_field9_sibling_declarations() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44, 55];
         message.field_infos = vec![
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![44],
                 ..FieldInfo::default()
             },
             FieldInfo {
-                path: FieldPath::new(vec![TABLE_ATTACHMENT_STORAGE_FIELD]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_ATTACHMENT_STORAGE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![55],
                 ..FieldInfo::default()
             },
@@ -659,7 +676,7 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_allows_aggregate_only_native_inventory() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         let mut budget = table_lock::WireBudget::new(litchi_iwa_archive::Limits::default())
             .expect("default wire budget");
@@ -670,10 +687,11 @@ mod tests {
 
     #[test]
     fn attachment_header_proof_rejects_selected_object_on_wrong_path() {
-        let mut message = MessageInfo::new(2_001, 0);
+        let mut message = MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default()).unwrap();
         message.object_references = vec![44];
         message.field_infos = vec![FieldInfo {
-            path: FieldPath::new(vec![17]),
+            path: litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![44],
             ..FieldInfo::default()
         }];

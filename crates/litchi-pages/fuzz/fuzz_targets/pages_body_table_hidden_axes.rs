@@ -21,7 +21,7 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{RawWireField, RawWireFields, WireView},
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     pages_hidden_state_codec as hidden_codec, tp, tsa, tsce, tsd, tsp, tst, tswp,
 };
@@ -220,8 +220,8 @@ fn table_formula_object(index: usize, column: bool) -> u64 {
         + u64::try_from(index * 2 + usize::from(!column)).expect("fixture index fits")
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -1387,7 +1387,7 @@ fn wrong_model_map_metadata_path(package: &[u8], index: usize) -> TestResult<Vec
             .iter_mut()
             .find(|field| field.path.as_slice() == [TABLE_MODEL_UID_MAP_FIELD])
             .ok_or("missing model UID-map field metadata")?;
-        field.path = FieldPath::new(vec![TABLE_MODEL_UID_MAP_FIELD + 1]);
+        field.path = litchi_iwa_core::FieldPath::new(vec![TABLE_MODEL_UID_MAP_FIELD + 1], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }

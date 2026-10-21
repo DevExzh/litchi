@@ -2,7 +2,7 @@ use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
     MovieSelector, Package, SlideSelector, SourceLimits,
@@ -654,7 +654,8 @@ fn field_info_owner(source: &[u8], target: u64) -> TestResult<Vec<u8>> {
     theme.archive_info.message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(vec![77, 1]),
+            path: litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![target],
             ..Default::default()
         });

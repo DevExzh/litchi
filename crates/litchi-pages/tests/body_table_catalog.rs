@@ -9,9 +9,7 @@ use std::error::Error as StdError;
 
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::EntryEdit};
-use litchi_iwa_core::{
-    Archive, FieldInfo, FieldPath, Limits as CoreArchiveLimits, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, FieldInfo, Limits as CoreArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tst};
 use litchi_pages::{
     BodyTableSelector, Package, table::catalog::Error as BodyTableCatalogError,
@@ -173,7 +171,12 @@ fn remove_root_body_payload_keep_data_reference(source: &[u8]) -> TestResult<Vec
             field.data_references.clear();
             field.data_references.push(body_identifier);
         } else {
-            let mut field = FieldInfo::new(FieldPath::from(vec![4]));
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.data_references.push(body_identifier);
             message_info.field_infos.push(field);
         }
@@ -311,7 +314,12 @@ fn add_root_body_data_reference(source: &[u8]) -> TestResult<Vec<u8>> {
             if let Some(field) = field {
                 field.data_references.push(body_identifier);
             } else {
-                let mut field = FieldInfo::new(FieldPath::from(vec![4]));
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.data_references.push(body_identifier);
                 message_info.field_infos.push(field);
             }

@@ -13,7 +13,7 @@ use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_pages::{BodyTableSelector, Package};
@@ -64,8 +64,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }

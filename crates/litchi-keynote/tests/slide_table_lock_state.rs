@@ -16,9 +16,7 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{
@@ -73,8 +71,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -665,7 +667,11 @@ fn foreign_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 fn foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
         let mut foreign = object(904, 7_002, vec![0x08, 0x01], &[])?;
-        let mut field = FieldInfo::new(vec![77]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![77], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::DataReference);
         field.data_references.push(TABLE_INFOS[0]);
         foreign.archive_info.message_infos[0]
@@ -679,7 +685,11 @@ fn foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 fn foreign_field_object_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
         let mut foreign = object(905, 7_003, vec![0x08, 0x01], &[])?;
-        let mut field = FieldInfo::new(vec![78]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![78], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(TABLE_INFOS[0]);
         foreign.archive_info.message_infos[0]

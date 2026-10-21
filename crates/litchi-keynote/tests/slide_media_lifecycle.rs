@@ -218,7 +218,7 @@ fn with_slide_header_field_info(
         .first_mut()
         .ok_or_else(|| io::Error::other("missing slide message metadata"))?;
     info.field_infos.push(FieldInfo {
-        path: vec![7].into(),
+        path: litchi_iwa_core::FieldPath::new(vec![7], litchi_iwa_core::Limits::default()).unwrap(),
         r#type: Some(field_type),
         object_references: references,
         ..FieldInfo::default()

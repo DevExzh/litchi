@@ -203,7 +203,12 @@ fn metadata_requires_exact_decoded_reference_aggregate() {
         reply_identifiers: vec![7, 9],
         uuid: None,
     };
-    let mut info = MessageInfo::new(COMMENT_STORAGE_MESSAGE_TYPE, 1);
+    let mut info = MessageInfo::new(
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        1,
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     info.object_references = vec![NATIVE_AUTHOR, 7, 9];
     validate_storage_metadata(1, &info, &facts, &mut budget).expect("complete aggregate");
 
@@ -220,9 +225,18 @@ fn field_metadata_must_be_a_multiset_subset_of_the_aggregate() {
         reply_identifiers: vec![7],
         uuid: None,
     };
-    let mut info = MessageInfo::new(COMMENT_STORAGE_MESSAGE_TYPE, 1);
+    let mut info = MessageInfo::new(
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        1,
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     info.object_references = vec![NATIVE_AUTHOR, 7];
-    let mut field = FieldInfo::new(vec![1]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references = vec![7];
     info.field_infos.push(field);
     validate_storage_metadata(1, &info, &facts, &mut budget).expect("field subset");

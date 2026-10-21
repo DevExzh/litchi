@@ -149,7 +149,7 @@ fn native_fixture() -> &'static [u8] {
             );
             document.archive_info.message_infos[0].object_references =
                 vec![SOURCE_SHEET_ID, DESTINATION_SHEET_ID];
-            let mut sheet_path = FieldInfo::new(vec![1]);
+            let mut sheet_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
             sheet_path.object_references = vec![SOURCE_SHEET_ID, DESTINATION_SHEET_ID];
             document.archive_info.message_infos[0].field_infos = vec![sheet_path];
 
@@ -234,7 +234,7 @@ fn fixture_sheet(identifier: u64, name: &str, drawable_identifiers: &[u64]) -> A
         .encode_to_vec(),
     );
     sheet.archive_info.message_infos[0].object_references = drawable_identifiers.to_vec();
-    let mut drawable_path = FieldInfo::new(vec![2]);
+    let mut drawable_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     drawable_path.object_references = drawable_identifiers.to_vec();
     sheet.archive_info.message_infos[0].field_infos = vec![drawable_path];
     sheet
@@ -253,7 +253,7 @@ fn fixture_table_info() -> ArchiveObject {
     let mut table_info = fixture_object(TABLE_INFO_ID, TABLE_INFO_MESSAGE_TYPE, payload);
     table_info.archive_info.message_infos[0].object_references =
         vec![SOURCE_SHEET_ID, TABLE_MODEL_ID];
-    let mut parent_path = FieldInfo::new(vec![1, 2]);
+    let mut parent_path = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     parent_path.object_references = vec![SOURCE_SHEET_ID];
     table_info.archive_info.message_infos[0].field_infos = vec![parent_path];
     table_info

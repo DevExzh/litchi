@@ -42,7 +42,11 @@ fn referenced_object(
     let mut object = object(identifier, type_, data)?;
     let info = &mut object.archive_info.message_infos[0];
     info.object_references.extend_from_slice(references);
-    let mut field = FieldInfo::new(path.to_vec());
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     info.field_infos.push(field);

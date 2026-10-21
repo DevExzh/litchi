@@ -2703,7 +2703,12 @@ mod graph_tests {
             Default::default(),
         )
         .unwrap();
-        let mut info = MessageInfo::new(super::IMAGE_MESSAGE_TYPE, payload.len() as u32);
+        let mut info = MessageInfo::new(
+            super::IMAGE_MESSAGE_TYPE,
+            payload.len(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         info.data_references = data_references;
         info.field_infos = field_infos;
         object.archive_info.message_infos[0] = info;
@@ -2743,7 +2748,15 @@ mod graph_tests {
         let metadata = image_metadata(&valid_image_payload(), &mut budget).unwrap();
         assert!(image_data_metadata_is_owned(info, metadata.data_identifier));
 
-        let mut field = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_DATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.data_references = vec![99];
         let with_field = image_object_with_metadata(vec![99], vec![field]);
         let info = validate_selected_image_metadata(&with_field, 0, &mut budget).unwrap();
@@ -2752,14 +2765,30 @@ mod graph_tests {
 
     #[test]
     fn image_data_metadata_rejects_wrong_or_duplicate_field_attribution() {
-        let mut wrong_path = FieldInfo::new(vec![super::IMAGE_DATA_FIELD + 1]);
+        let mut wrong_path = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_DATA_FIELD + 1],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         wrong_path.data_references = vec![99];
         let wrong_path = image_object_with_metadata(vec![99], vec![wrong_path]);
         let mut budget = test_budget();
         let info = validate_selected_image_metadata(&wrong_path, 0, &mut budget).unwrap();
         assert!(!image_data_metadata_is_owned(info, 99));
 
-        let mut duplicate_field = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        let mut duplicate_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_DATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         duplicate_field.data_references = vec![99, 99];
         let duplicate_field = image_object_with_metadata(vec![99], vec![duplicate_field]);
         let info = validate_selected_image_metadata(&duplicate_field, 0, &mut budget).unwrap();
@@ -2773,9 +2802,25 @@ mod graph_tests {
         let info = validate_selected_image_metadata(&wrong_identifier, 0, &mut budget).unwrap();
         assert!(!image_data_metadata_is_owned(info, 99));
 
-        let mut first = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        let mut first = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_DATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         first.data_references = vec![99];
-        let mut second = FieldInfo::new(vec![super::IMAGE_DATA_FIELD]);
+        let mut second = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_DATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         second.data_references = vec![99];
         let duplicate_fields = image_object_with_metadata(vec![99], vec![first, second]);
         let info = validate_selected_image_metadata(&duplicate_fields, 0, &mut budget).unwrap();
@@ -2798,8 +2843,15 @@ mod graph_tests {
             metadata.parent_identifier
         ));
 
-        let mut field =
-            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![7];
         let mut with_field = image_object_with_metadata(vec![99], vec![field]);
         with_field.archive_info.message_infos[0].object_references = vec![7];
@@ -2826,22 +2878,44 @@ mod graph_tests {
         let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
         assert!(image_parent_metadata_is_owned(info, 7));
 
-        let mut field_only =
-            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        let mut field_only = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field_only.object_references = vec![7];
         absent.archive_info.message_infos[0].field_infos = vec![field_only];
         let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
         assert!(!image_parent_metadata_is_owned(info, 7));
 
-        let mut wrong_path = FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, 3]);
+        let mut wrong_path = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_SUPER_FIELD, 3],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         wrong_path.object_references = vec![7];
         absent.archive_info.message_infos[0].object_references = vec![7];
         absent.archive_info.message_infos[0].field_infos = vec![wrong_path];
         let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
         assert!(!image_parent_metadata_is_owned(info, 7));
 
-        let mut duplicate_field =
-            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        let mut duplicate_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         duplicate_field.object_references = vec![7, 7];
         absent.archive_info.message_infos[0].field_infos = vec![duplicate_field];
         let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
@@ -2853,8 +2927,15 @@ mod graph_tests {
         let info = validate_selected_image_metadata(&absent, 0, &mut budget).unwrap();
         assert!(!image_parent_metadata_is_owned(info, 7));
 
-        let mut data_collision =
-            FieldInfo::new(vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD]);
+        let mut data_collision = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![super::IMAGE_SUPER_FIELD, super::DRAWABLE_PARENT_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         data_collision.object_references = vec![7];
         data_collision.data_references = vec![7];
         absent.archive_info.message_infos[0].data_references = Vec::new();
@@ -2884,12 +2965,22 @@ mod graph_tests {
                     object.archive_info.message_infos[0].diff_merge_version = vec![1]
                 },
                 "diff_field_path" => {
-                    object.archive_info.message_infos[0].diff_field_path =
-                        Some(vec![super::IMAGE_DATA_FIELD].into())
+                    object.archive_info.message_infos[0].diff_field_path = Some(
+                        litchi_iwa_core::FieldPath::new(
+                            vec![super::IMAGE_DATA_FIELD],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    )
                 },
                 "fields_to_remove" => {
-                    object.archive_info.message_infos[0].fields_to_remove =
-                        vec![vec![super::IMAGE_DATA_FIELD].into()]
+                    object.archive_info.message_infos[0].fields_to_remove = vec![
+                        litchi_iwa_core::FieldPath::new(
+                            vec![super::IMAGE_DATA_FIELD],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    ]
                 },
                 "diff_read_version" => {
                     object.archive_info.message_infos[0].diff_read_version = vec![1]

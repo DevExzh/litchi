@@ -5069,7 +5069,7 @@ fn map_package_error(error: PackageError) -> Error {
 #[cfg(test)]
 mod reference_inventory_tests {
     use super::*;
-    use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_core::FieldInfo;
 
     fn budget(references: usize) -> table_lock::WireBudget {
         let archive = litchi_iwa_core::Limits::default()
@@ -5085,10 +5085,14 @@ mod reference_inventory_tests {
     }
 
     fn metadata() -> MessageInfo {
-        let mut info = MessageInfo::new(6001, 0);
+        let mut info = MessageInfo::new(6001, 0, litchi_iwa_core::Limits::default()).unwrap();
         info.object_references = vec![9, 3];
         info.data_references = vec![5];
-        let mut field = FieldInfo::new(FieldPath::new(vec![46]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![46], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![3];
         info.field_infos.push(field);
         info

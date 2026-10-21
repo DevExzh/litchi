@@ -483,7 +483,12 @@ fn with_form_based_first_sheet(package: &[u8]) -> TestResult<Vec<u8>> {
         message_info
             .object_references
             .retain(|identifier| *identifier != ABSENT_INFO);
-        let mut nested_drawables = FieldInfo::new(vec![1, 2]);
+        let mut nested_drawables = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         nested_drawables.object_references = vec![ABSENT_INFO];
         message_info.field_infos.push(nested_drawables);
         Ok(())

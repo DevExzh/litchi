@@ -3364,7 +3364,8 @@ mod tests {
     }
 
     fn reference_field(path: Vec<u32>, identifier: u64) -> FieldInfo {
-        let mut field = FieldInfo::new(path);
+        let path = crate::archive::FieldPath::new(path, crate::archive::Limits::default()).unwrap();
+        let mut field = FieldInfo::new(path, crate::archive::Limits::default()).unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![identifier];
         field

@@ -15,9 +15,7 @@ use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_keynote::{
@@ -81,8 +79,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field

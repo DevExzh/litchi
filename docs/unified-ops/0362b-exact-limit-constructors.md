@@ -130,7 +130,12 @@ allocates nothing. The raw samples include all three blocks, including the
 
 ## Remaining required constructors
 
-The source sweep also found exact-name constructors/setters in the legacy
+The IWA raw metadata constructor row is implemented in
+[0361f](0361f-iwa-raw-constructors.md): `FieldPath`, `FieldInfo`,
+`MessageInfo` and `ArchiveInfo` now require their validated `Limits` profile,
+and every workspace consumer migrated in that slice. Its direct raw fields and
+identifier-zero behavior remain intentionally public and are checked again at
+publication. The source sweep also found exact-name constructors/setters in the legacy
 shared/raw layers (ODraw, OLE user properties), signing and DrawingML
 helpers. These need canonical required-limit raw calls or options-based
 owner/edit routes, with every consumer migrated. Existing option setters need

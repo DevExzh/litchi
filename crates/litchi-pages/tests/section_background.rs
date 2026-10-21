@@ -177,7 +177,11 @@ fn package_with_first_message_metadata(
         Default::default(),
     )?;
     if field_object_reference {
-        let mut field = FieldInfo::new(vec![30]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![60];
         first_section.archive_info.message_infos[1]
             .field_infos

@@ -16,9 +16,7 @@ use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tss};
 use litchi_keynote::{
     Axis, ChartSelector, Package, Position, SemanticLimits, SlideSelector,
@@ -813,13 +811,15 @@ pub(crate) fn with_foreign_inbound(
         ForeignInbound::Object => info.object_references.push(target),
         ForeignInbound::Data => info.data_references.push(target),
         ForeignInbound::Field => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![99]),
+            path: litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                .unwrap(),
             r#type: Some(FieldType::ObjectReference),
             object_references: vec![target],
             ..FieldInfo::default()
         }),
         ForeignInbound::FieldData => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![100]),
+            path: litchi_iwa_core::FieldPath::new(vec![100], litchi_iwa_core::Limits::default())
+                .unwrap(),
             r#type: Some(FieldType::DataReference),
             data_references: vec![target],
             ..FieldInfo::default()

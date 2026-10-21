@@ -4,7 +4,7 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, Limits as ArchiveLimits, RawMessage, SnappyStream,
+    Archive, ArchiveObject, FieldInfo, Limits as ArchiveLimits, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::lock::State;
@@ -72,8 +72,12 @@ fn object(
     Ok(object)
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -921,7 +925,12 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
             archive,
             DRAWABLE_IDENTIFIER,
             TABLE_INFO_MESSAGE_TYPE,
-            |info| info.diff_field_path = Some(FieldPath::new(vec![1])),
+            |info| {
+                info.diff_field_path = Some(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                )
+            },
         )
     })?;
     let drawable_fields_to_remove = rewrite_document_archive(&source, |archive| {
@@ -929,7 +938,12 @@ fn archive_header_ownership_tampering_is_rejected_by_read_and_noop_resolution() 
             archive,
             DRAWABLE_IDENTIFIER,
             TABLE_INFO_MESSAGE_TYPE,
-            |info| info.fields_to_remove = vec![FieldPath::new(vec![1])],
+            |info| {
+                info.fields_to_remove = vec![
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                ]
+            },
         )
     })?;
     let drawable_diff_read = rewrite_document_archive(&source, |archive| {
@@ -990,7 +1004,15 @@ fn present_model_and_attachment_field_local_ownership_is_strict() -> TestResult<
                 vec![TABLE_INFO_SUPER_FIELD, DRAWABLE_PARENT_FIELD],
                 BODY_IDENTIFIER,
             ),
-            FieldInfo::new(FieldPath::new(vec![TABLE_INFO_MODEL_FIELD])),
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_INFO_MODEL_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
         ];
         Ok(())
     })?;
@@ -1004,7 +1026,15 @@ fn present_model_and_attachment_field_local_ownership_is_strict() -> TestResult<
             .iter()
             .position(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             .ok_or("missing table-info message")?;
-        let mut model_field = FieldInfo::new(FieldPath::new(vec![TABLE_INFO_MODEL_FIELD]));
+        let mut model_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_INFO_MODEL_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         model_field.data_references.push(MODEL_IDENTIFIER);
         drawable.archive_info.message_infos[message_index].field_infos = vec![
             field_reference(
@@ -1043,8 +1073,17 @@ fn present_model_and_attachment_field_local_ownership_is_strict() -> TestResult<
             .iter()
             .position(|message| message.type_ == ATTACHMENT_MESSAGE_TYPE)
             .ok_or("missing attachment message")?;
-        attachment.archive_info.message_infos[message_index].field_infos =
-            vec![FieldInfo::new(FieldPath::new(vec![DRAWABLE_FIELD]))];
+        attachment.archive_info.message_infos[message_index].field_infos = vec![
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![DRAWABLE_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        ];
         Ok(())
     })?;
 
@@ -1057,7 +1096,15 @@ fn present_model_and_attachment_field_local_ownership_is_strict() -> TestResult<
             .iter()
             .position(|message| message.type_ == ATTACHMENT_MESSAGE_TYPE)
             .ok_or("missing attachment message")?;
-        let mut drawable_field = FieldInfo::new(FieldPath::new(vec![DRAWABLE_FIELD]));
+        let mut drawable_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![DRAWABLE_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         drawable_field.data_references.push(DRAWABLE_IDENTIFIER);
         attachment.archive_info.message_infos[message_index].field_infos = vec![drawable_field];
         Ok(())
@@ -1104,7 +1151,15 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .ok_or("missing body message")?;
         let info = &mut body.archive_info.message_infos[message_index];
         info.object_references.clear();
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(ATTACHMENT_IDENTIFIER);
         info.field_infos.push(field);
         Ok(())
@@ -1118,7 +1173,15 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .position(|message| message.type_ == BODY_MESSAGE_TYPE)
             .ok_or("missing body message")?;
         let info = &mut body.archive_info.message_infos[message_index];
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD + 1]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD + 1],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(ATTACHMENT_IDENTIFIER);
         info.field_infos.push(field);
         Ok(())
@@ -1133,7 +1196,15 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .ok_or("missing body message")?;
         let info = &mut body.archive_info.message_infos[message_index];
         for _ in 0..2 {
-            let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_BODY_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(ATTACHMENT_IDENTIFIER);
             info.field_infos.push(field);
         }
@@ -1148,7 +1219,15 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .position(|message| message.type_ == BODY_MESSAGE_TYPE)
             .ok_or("missing body message")?;
         let info = &mut body.archive_info.message_infos[message_index];
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(MODEL_IDENTIFIER);
         info.field_infos.push(field);
         Ok(())
@@ -1161,8 +1240,17 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .iter()
             .position(|message| message.type_ == BODY_MESSAGE_TYPE)
             .ok_or("missing body message")?;
-        body.archive_info.message_infos[message_index].field_infos =
-            vec![FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]))];
+        body.archive_info.message_infos[message_index].field_infos = vec![
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_BODY_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        ];
         Ok(())
     })?;
 
@@ -1173,7 +1261,15 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .iter()
             .position(|message| message.type_ == BODY_MESSAGE_TYPE)
             .ok_or("missing body message")?;
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.data_references.push(ATTACHMENT_IDENTIFIER);
         body.archive_info.message_infos[message_index].field_infos = vec![field];
         Ok(())
@@ -1188,7 +1284,17 @@ fn contradictory_and_aliased_field_local_ownership_is_rejected() -> TestResult<(
             .ok_or("missing body message")?;
         body.archive_info.message_infos[message_index]
             .field_infos
-            .push(FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD])));
+            .push(
+                FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(
+                        vec![TABLE_BODY_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+            );
         Ok(())
     })?;
 
@@ -1267,7 +1373,11 @@ fn body_table_lock_ignores_valid_unrelated_section_paths() -> TestResult<()> {
         let info = &mut body.archive_info.message_infos[message_index];
         info.object_references
             .extend([FIRST_SECTION_IDENTIFIER, SECOND_SECTION_IDENTIFIER]);
-        let mut section_field = FieldInfo::new(FieldPath::new(vec![17]));
+        let mut section_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         section_field
             .object_references
             .extend([FIRST_SECTION_IDENTIFIER, SECOND_SECTION_IDENTIFIER]);

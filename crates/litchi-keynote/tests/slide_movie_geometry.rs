@@ -4,9 +4,7 @@ use std::io;
 
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, MessageInfo, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, MessageInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
 use litchi_keynote::slide::media::{
     Point, Size,
@@ -364,10 +362,9 @@ fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
         type_: alias_type,
         data: data.clone(),
     });
-    object
-        .archive_info
-        .message_infos
-        .push(MessageInfo::new(alias_type, u32::try_from(data.len())?));
+    object.archive_info.message_infos.push(
+        MessageInfo::new(alias_type, data.len(), litchi_iwa_core::Limits::default()).unwrap(),
+    );
     replace_document(source, archive)
 }
 
@@ -384,12 +381,14 @@ fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<V
         ForeignInbound::Object => info.object_references.push(target),
         ForeignInbound::Data => info.data_references.push(target),
         ForeignInbound::Field => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![99]),
+            path: litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![target],
             ..FieldInfo::default()
         }),
         ForeignInbound::FieldData => info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![100]),
+            path: litchi_iwa_core::FieldPath::new(vec![100], litchi_iwa_core::Limits::default())
+                .unwrap(),
             data_references: vec![target],
             ..FieldInfo::default()
         }),
@@ -483,7 +482,7 @@ fn with_duplicate_style_message(source: &[u8], id: u64, message_type: u32) -> R<
     style
         .archive_info
         .message_infos
-        .push(MessageInfo::new(message_type, 0));
+        .push(MessageInfo::new(message_type, 0, litchi_iwa_core::Limits::default()).unwrap());
     replace_document(source, archive)
 }
 
@@ -772,7 +771,11 @@ fn with_field_info_path(
         .message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(path.to_vec()),
+            path: litchi_iwa_core::FieldPath::new(
+                path.to_vec(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: object_references.to_vec(),
             data_references: data_references.to_vec(),
             ..FieldInfo::default()
@@ -838,7 +841,8 @@ fn with_field_info(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
         .message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(vec![99, 1]),
+            path: litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: refs,
             ..FieldInfo::default()
         });

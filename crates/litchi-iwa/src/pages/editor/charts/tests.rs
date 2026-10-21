@@ -425,49 +425,77 @@ fn mutate_pages_caption_metadata(
                 PagesCaptionMetadataMode::FieldOnly => {
                     info.object_references.retain(|id| *id != old_reference_id);
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![old_reference_id],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::WrongFieldPath => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![9, 9]),
+                        path: crate::archive::FieldPath::new(
+                            vec![9, 9],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![old_reference_id],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::DuplicateField => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![old_reference_id, old_reference_id],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::StaleField => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![old_reference_id, 999_999],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::NewField => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![replacement_id],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::DataReference => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         data_references: vec![old_reference_id],
                         ..Default::default()
                     });
                 },
                 PagesCaptionMetadataMode::AuthorizedField => {
                     info.field_infos.push(crate::archive::FieldInfo {
-                        path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                        path: crate::archive::FieldPath::new(
+                            vec![1, 11, 1],
+                            crate::archive::Limits::default(),
+                        )
+                        .unwrap(),
                         object_references: vec![old_reference_id],
                         ..Default::default()
                     });

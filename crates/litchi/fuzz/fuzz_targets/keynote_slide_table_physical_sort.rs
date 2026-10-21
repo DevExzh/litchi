@@ -38,7 +38,7 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tst, tswp};
 use prost::Message as _;
@@ -396,8 +396,8 @@ fn synthetic_reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn synthetic_field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn synthetic_field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field

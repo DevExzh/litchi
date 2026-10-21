@@ -104,8 +104,10 @@ fn movie_payload_reference_missing_from_header_is_rejected_atomically() {
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
     let mut info = MessageInfo::new(
         MOVIE_MESSAGE_TYPE,
-        payload.len().try_into().expect("movie payload length"),
-    );
+        payload.len(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
 
     assert!(
         validate_movie_payload_relationship(
@@ -159,8 +161,10 @@ fn movie_comment_target_must_be_a_same_component_comment_storage() {
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
     let mut info = MessageInfo::new(
         MOVIE_MESSAGE_TYPE,
-        payload.len().try_into().expect("movie payload length"),
-    );
+        payload.len(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     info.object_references.push(WRONG_TYPE_TARGET);
 
     assert!(
@@ -194,8 +198,10 @@ fn comment_reply_reference_missing_from_header_is_rejected() {
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
     let mut info = MessageInfo::new(
         COMMENT_STORAGE_MESSAGE_TYPE,
-        payload.len().try_into().expect("comment payload length"),
-    );
+        payload.len(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
 
     assert!(
         validate_comment_storage_relationship(
@@ -239,8 +245,10 @@ fn opaque_comment_root_extension_is_preserved_by_relationship_census() {
     let mut budget = LifecycleBudget::for_package(&package).expect("lifecycle budget");
     let info = MessageInfo::new(
         COMMENT_STORAGE_MESSAGE_TYPE,
-        payload.len().try_into().expect("comment payload length"),
-    );
+        payload.len(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
 
     validate_comment_storage_relationship(
         &package,

@@ -10,7 +10,7 @@ use std::error::Error as StdError;
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::headers::{Count, Settings};
 use litchi_pages::{BodyTableSelector, Package, table::headers::transaction::Error};
@@ -55,8 +55,12 @@ pub(crate) fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }

@@ -65,7 +65,11 @@ fn reference(identifier: u64) -> tsp::Reference {
 }
 
 fn field_info(path: &[u32], references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path.to_vec());
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }

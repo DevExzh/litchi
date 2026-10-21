@@ -12,7 +12,7 @@ use std::error::Error as StdError;
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsch, tsd, tsp, tswp};
 use litchi_pages::{
     BodyChartSelector, ChartArrangement, Package,
@@ -66,8 +66,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -150,8 +154,17 @@ fn chart_object(
         info.object_references.push(parent);
         // Keep unrelated source metadata in the physical object header.  The
         // Arrange projection must never derive ownership from this sentinel.
-        info.field_infos
-            .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+        info.field_infos.push(
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![UNKNOWN_METADATA_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        );
         info.field_infos.push(field_reference(vec![1, 2], parent));
     }
     Ok(object)
@@ -184,9 +197,17 @@ fn body_object(anchors: [u32; 2]) -> TestResult<ArchiveObject> {
     object.archive_info.message_infos[0]
         .field_infos
         .extend(ATTACHMENT_IDENTIFIERS.map(|identifier| field_reference(vec![9], identifier)));
-    object.archive_info.message_infos[0]
-        .field_infos
-        .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+    object.archive_info.message_infos[0].field_infos.push(
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![UNKNOWN_METADATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    );
     Ok(object)
 }
 
@@ -273,9 +294,17 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
             .field_infos
             .push(field_reference(vec![20], ZORDER_IDENTIFIER));
     }
-    root_object.archive_info.message_infos[0]
-        .field_infos
-        .push(FieldInfo::new(vec![UNKNOWN_METADATA_FIELD]));
+    root_object.archive_info.message_infos[0].field_infos.push(
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![UNKNOWN_METADATA_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    );
 
     let mut document_objects = vec![root_object, body_object(options.anchors)?];
     if let Some(order) = options.zorder {

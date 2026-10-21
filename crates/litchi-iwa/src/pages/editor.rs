@@ -5833,7 +5833,8 @@ mod pages_object_index_tests {
         second_source.archive_info.message_infos[0]
             .field_infos
             .push(crate::archive::FieldInfo {
-                path: crate::archive::FieldPath::new(vec![1, 2]),
+                path: crate::archive::FieldPath::new(vec![1, 2], crate::archive::Limits::default())
+                    .unwrap(),
                 object_references: vec![20],
                 ..Default::default()
             });

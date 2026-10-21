@@ -6,7 +6,7 @@ use litchi_iwa_common::{
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
 use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
@@ -1706,7 +1706,8 @@ fn with_unrelated_caption_owner(source: &[u8]) -> TestResult<Vec<u8>> {
         .ok_or_else(|| io::Error::other("missing unrelated chart message info"))?;
     info.object_references.push(STORAGES[0]);
     info.field_infos.push(FieldInfo {
-        path: FieldPath::new(vec![77, 1]),
+        path: litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default())
+            .unwrap(),
         r#type: Some(FieldType::ObjectReference),
         object_references: vec![STORAGES[0]],
         ..FieldInfo::default()

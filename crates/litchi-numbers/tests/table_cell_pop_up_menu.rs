@@ -298,7 +298,15 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
         && matches!(mode, FixtureMode::SharedPopup | FixtureMode::SinglePopup)
     {
         info.object_references = vec![POPUP_MODEL_ID];
-        let mut field = FieldInfo::new(vec![3, CONTROL_KEY]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![3, CONTROL_KEY],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![POPUP_MODEL_ID];
         info.field_infos.push(field);
@@ -460,7 +468,11 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
         table_model().encode_to_vec(),
     )?;
     model.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut model_unknown = FieldInfo::new(vec![99, 1]);
+    let mut model_unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     model_unknown.data_references = vec![700];
     model.archive_info.message_infos[0]
         .field_infos
@@ -1182,7 +1194,11 @@ fn with_cross_component_popup_inbound(source: &[u8]) -> TestResult<Vec<u8>> {
         .collect::<Vec<_>>();
     let mut inbound = object(700, 9_999, b"opaque inbound owner".to_vec())?;
     inbound.archive_info.message_infos[0].object_references = vec![POPUP_MODEL_ID];
-    let mut opaque_field = FieldInfo::new(vec![99, 7]);
+    let mut opaque_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 7], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     opaque_field.object_references = vec![POPUP_MODEL_ID];
     inbound.archive_info.message_infos[0]
         .field_infos

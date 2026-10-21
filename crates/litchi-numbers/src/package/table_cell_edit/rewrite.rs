@@ -2797,7 +2797,12 @@ mod tests {
         .expect("test object is valid");
         let info = &mut object.archive_info.message_infos[0];
         info.object_references.extend([10, 20]);
-        let mut field = FieldInfo::new(vec![4, 1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![4, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(10);
         info.field_infos.push(field);
         object

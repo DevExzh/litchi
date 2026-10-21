@@ -3,18 +3,19 @@ use litchi_iwa_archive::package::{PackageEntry, PackageState};
 use litchi_iwa_core as iwa_core;
 
 fn sample_archive() -> iwa::Archive {
-    let path = iwa::FieldPath::new(vec![1, 2]);
-    let mut field_info = iwa::FieldInfo::new(path);
+    let path = iwa::FieldPath::new(vec![1, 2], iwa::Limits::default()).unwrap();
+    let mut field_info = iwa::FieldInfo::new(path, iwa::Limits::default()).unwrap();
     field_info.r#type = Some(iwa::FieldType::ObjectReference);
     field_info.unknown_field_rule = Some(iwa::UnknownFieldRule::IgnoreAndPreserve);
     field_info.object_references = vec![12];
     field_info.data_references = vec![22];
 
-    let mut message_info = iwa::MessageInfo::new(99, 2);
+    let mut message_info = iwa::MessageInfo::new(99, 2, iwa::Limits::default()).unwrap();
     message_info.field_infos.push(field_info);
     message_info.object_references = vec![11];
     message_info.data_references = vec![21];
-    let archive_info = iwa::ArchiveInfo::new(7, vec![message_info]);
+    let archive_info =
+        iwa::ArchiveInfo::new(7, vec![message_info], iwa::Limits::default()).unwrap();
 
     let mut object = iwa::ArchiveObject::new(
         7,
