@@ -8,8 +8,11 @@ alternating merge/unmerge steps, replay and inverse byte checks, patch count,
 and allocator snapshot interval.
 
 The canonical source is recorded with SHA-256
-`8a188086459202a5014f25ce1e8d15bb296c3f2f902e31d1f7a398d96988647c` after the
-final source edit and before the release build. Regenerate the temporary
+`3929b1fbdaf4771d0667bc8a79cf0e274b72eebca6c064cb4a64d9c900c8f1b5` after the
+final source edit and before the release build. The final edit makes the
+legacy materialized inverse recipient mutable and removes an unnecessary
+legacy-only mutability warning; both API variants compile from the same
+adapter. Regenerate the temporary
 baseline adapter from that source as follows; the archived baseline checkout
 stays outside the repository:
 
@@ -87,3 +90,39 @@ per-step owners. The final adapter reuses the two fixture owners for commit
 history and retains only the patch records; its replay oracles remain outside
 the retained commit output. The rejected JSON remains outside the repository
 at `/tmp/litchi-w4-history-abba-20261021.json` for audit continuity.
+
+
+## Reproducible pre-W4 allocator pair
+
+The historical frozen baseline remains diagnostic because its extracted source
+archive has no complete revision provenance. A reproducible pre-W4 baseline is
+now prepared from the exact current-trunk integration commit
+`e63a1fe3534bcaaae2ce367339f7f8275877baef` in the external worktree
+`/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-alloc-v1`. The only source
+overlay is this adapter at SHA-256
+`3929b1fbdaf4771d0667bc8a79cf0e274b72eebca6c064cb4a64d9c900c8f1b5`; the
+Cargo manifest adds the `legacy-xlsx-source-history` feature and registers the
+adapter binary. The release build uses the W4 environment shim,
+`--manifest-path tools/perf-baseline/Cargo.toml`, binary
+`xlsx_merge_history_alloc`, and features
+`allocator-metrics,legacy-xlsx-source-history`. The final candidate uses the
+W4 worktree, the same adapter, and `allocator-metrics`.
+
+Protected release binaries are outside the repository:
+
+- pre-W4 base: `xlsx_merge_history_alloc-base-e63a1fe353-v1`, SHA-256
+  `12ff3a682f35f5c2292ed9232afe59aa78f3393c548584ab863d45e7802b8014`;
+- W4 candidate: `xlsx_merge_history_alloc-candidate-fee2cdf-v2`, SHA-256
+  `7201da75e2a91abb80e5fa9727c488d00349da254e4c95f61e693305dd8df539`.
+
+Both builds exited successfully. No timing or allocator comparison has been
+claimed for this pair yet; it requires a separate quiet grant.
+
+The 2a-to-fee common replay allocation difference is localized rather than
+hidden in the aggregate. Forward apply allocation fell from 1,009,920 to
+51,200 bytes, while inverse apply rose from 1,359,872 to 55,034,496 bytes.
+Publication-forward allocation fell from 55,652,224 to 54,911,872 bytes, and
+publication-inverse stayed at 319,488 bytes. Thus the candidate's lower call
+count and lower retained peak do not justify accepting the inverse allocation
+route; its exact artifact restoration path still needs the reproducible
+pre-W4 comparison or a further repair.

@@ -680,7 +680,7 @@ fn run_common_replay(
     let mut merge_forward_package = merge_recipient.clone();
     patches[0].apply(&mut merge_forward_package)?;
     let merge_forward = PackageWriter::to_bytes(&merge_forward_package)?;
-    let mut merge_forward_recipient = merge_forward_package.clone();
+    let merge_forward_recipient = merge_forward_package.clone();
     let unmerge_forward = if let Some(patch) = patches.get(1) {
         let mut package = unmerge_recipient.clone();
         patch.apply(&mut package)?;
@@ -690,7 +690,7 @@ fn run_common_replay(
         None
     };
 
-    let merge_inverse_recipient = merge_forward_package.clone();
+    let mut merge_inverse_recipient = merge_forward_package.clone();
     patches[0]
         .inverse()
         .apply_materialized(&mut merge_inverse_recipient, 64 * 1024)?;
