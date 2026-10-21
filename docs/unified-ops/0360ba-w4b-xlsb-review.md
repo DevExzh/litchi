@@ -115,7 +115,8 @@ consumer expectation and edit-boundary corrections: 736 unit tests, every
 integration target, 40 passing doctests, 11 ignored doctests and 2 compile-fail
 doctests. The focused comments and conditional-formatting filters also pass.
 ABBA measurements for this corrected tree remain a coordinator measurement
-step; the host was quiesced for the coordinator's isolated probes.
+step; the host was quiesced for the coordinator's isolated probes. The final
+paired route measurement is recorded in section 5.
 
 ## 4. Compact manifest replay measurement
 
@@ -150,7 +151,87 @@ The complete expanded case list is exactly those five cases. The retained
 `c5e9561984b5c52a9b281c0a4bb5a4c816cae6bb3b0d5200299ff2125a5f798a`). It
 reports 412,681 allocation calls, 2,541 temporary allocations, one leaked
 allocation (544 bytes), 508.23 KiB peak heap and 9.23 MiB peak RSS including
-heaptrack overhead. The full XLSB route ABBA remains a separate coordinator
-measurement.
+heaptrack overhead.
+
+## 5. Paired final route ABBA
+
+The final compact binaries were measured in a quiet `before -> after -> after
+-> before` sequence, with 31 samples per route and CPU 29 pinned. The run is
+outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/final-run-compact-abba-1792581200`.
+Its command was equivalent to:
+
+```text
+taskset -c 29 <binary> 31
+taskset -c 29 <binary> --case all --backend owned --fixture test-data/poi/test-data/spreadsheet/testVarious.xlsb --warmup 3 --samples 31 --json <output>
+```
+
+The six binaries were recorded in `binary-sha256.txt` (1,025 bytes, SHA-256
+`7480e8d203fc3dd952cf23c24afc3ffdcb5d78fbdac42f17652b8e96f41612ba`):
+
+| Route | Before SHA-256 | After SHA-256 |
+|---|---|---|
+| XLSB probe | `b8398575a088f69c48fdc3b3d10eaa40ad806ed1ac3fabdb6386697256e4fcd6` | `7dcbfd357fb320f31087355a30ae1a389bfe00e7bc277b6543fce841be8a5672` |
+| sheet dispatch | `8fa6a5ff09ab634c3ec2f69b4b30e673a1c310088770e87fd399b22e0f2c2ed6` | `b8b3559c78c44346f5dad33efb04ac0249459860dfe9a27d53a98c2d77e796a7` |
+| CRUD | `de3021bcef474cb59bb2f21353597c0d86f95546c98e1c407ed6a16cd8127d27` | `90e9e2679a546b91bb02977e777ee14d0ab4268ef6d84db26c3f57eb06ac5a38` |
+
+The probe medians are in microseconds and compare the two before legs with
+the two after legs by their median:
+
+| Case | Before | After | After / before |
+|---|---:|---:|---:|
+| `eager/batch1k` | 2025.975 | 1856.280 | 0.91624 |
+| `eager/chain` | 2929.381 | 2692.725 | 0.91921 |
+| `eager/comment` | 45.367 | 45.914 | 1.01206 |
+| `eager/format` | 1194.500 | 1050.576 | 0.87951 |
+| `eager/hyperlink` | 40.103 | 39.393 | 0.98230 |
+| `eager/merge` | 958.481 | 924.361 | 0.96440 |
+| `eager/metadata` | 35.119 | 34.546 | 0.98368 |
+| `eager/name` | 1757.332 | 1610.921 | 0.91669 |
+| `eager/open_get` | 190.040 | 176.411 | 0.92828 |
+| `eager/set` | 411.674 | 358.798 | 0.87156 |
+| `eager/set_save` | 403.623 | 353.960 | 0.87696 |
+| `leaf/batch1k` | 1315.032 | 1139.751 | 0.86671 |
+| `leaf/open` | 72.020 | 70.591 | 0.98016 |
+| `leaf/set` | 435.986 | 355.368 | 0.81509 |
+| `leaf/set_save` | 431.081 | 351.242 | 0.81479 |
+| `source/batch1k` | 2584.668 | 2416.957 | 0.93511 |
+| `source/format` | 1686.392 | 1544.974 | 0.91614 |
+| `source/metadata` | 18.701 | 18.754 | 1.00284 |
+| `source/open_get` | 157.404 | 149.823 | 0.95184 |
+| `source/set` | 758.706 | 709.872 | 0.93564 |
+| `source/set_save` | 752.449 | 709.004 | 0.94226 |
+
+The XLSB sheet-dispatch medians are likewise in microseconds:
+
+| Case | Before | After | After / before |
+|---|---:|---:|---:|
+| `cell/xlsb` | 770.858 | 799.664 | 1.03737 |
+| `cell_value/xlsb` | 791.443 | 798.554 | 1.00898 |
+| `cells/xlsb` | 290.556 | 302.817 | 1.04220 |
+| `evaluate/xlsb` | 1733.563 | 1722.008 | 0.99333 |
+| `recalculate/xlsb` | 5609.738 | 5384.676 | 0.95988 |
+| `recalculate_heavy/xlsb` | 6106.540 | 6134.770 | 1.00462 |
+
+All CRUD cases improved; their medians are shown in microseconds:
+
+| Case | Before | After | After / before |
+|---|---:|---:|---:|
+| `edit_ceil_one_percent_existing_cells_save` | 2483.992 | 2142.166 | 0.86239 |
+| `edit_one_existing_scalar_save` | 2483.033 | 2147.601 | 0.86491 |
+| `full_stored_cell_scan` | 521.953 | 513.507 | 0.98382 |
+| `full_text` | 164.810 | 162.616 | 0.98668 |
+| `noop_transaction_commit_save` | 926.415 | 568.953 | 0.61414 |
+| `open_identify` | 976.745 | 637.083 | 0.65225 |
+| `selected_worksheet_cell` | 525.112 | 513.598 | 0.97807 |
+| `worksheet_catalog` | 516.263 | 509.073 | 0.98607 |
+
+The full sheet-dispatch matrix is present in the external `sheet-*.txt`
+captures. Its unrelated tiny `cells/xls` route measured 1.090x in this run;
+the same route measured 1.075x, 1.079x and 1.126x in the three preceding
+ABBA runs, while the XLSB routes above remain within the expected variance.
+The expanded probe has no paired baseline executable: its `tgt-expanded-before`
+target contains only dependency artifacts, so no baseline structural/history
+comparison is claimed.
 
 [0351]: 0351-api-contract.md
