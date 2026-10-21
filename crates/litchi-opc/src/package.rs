@@ -836,6 +836,21 @@ impl OpcPackage {
         Ok(true)
     }
 
+    /// Record the result that is already known when a new part's declared
+    /// type is absent from the retained source binding.  The full coverage
+    /// walk remains necessary for a type that is covered: relationship
+    /// overrides and other existing graph changes can still affect source
+    /// publication.  This fast path only records a definitive invalidation.
+    fn mark_content_types_invalid_if_uncovered(&self, part: &dyn Part) {
+        if self.source_content_types.as_ref().is_some_and(|source| {
+            source
+                .lookup(part.partname())
+                .is_none_or(|content_type| content_type.as_str() != part.content_type())
+        }) {
+            self.content_types_source_state.store(false);
+        }
+    }
+
     /// Capture the current `[Content_Types].xml` publication view.
     ///
     /// Compatible admitted source bytes are retained exactly. After an edit
@@ -2144,6 +2159,7 @@ impl OpcPackage {
         self.revoke_exact_source();
         self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
+        self.mark_content_types_invalid_if_uncovered(&*part);
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
         self.source_relationships_xml.remove(&partname);
@@ -2161,6 +2177,7 @@ impl OpcPackage {
         self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
+        self.mark_content_types_invalid_if_uncovered(&*part);
         self.parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
@@ -4103,9 +4120,23 @@ mod tests {
             "application/example+xml".to_owned(),
             b"<replacement/>".to_vec(),
         )));
-        assert_eq!(replaced.content_types_source_state.load(), None);
+        assert_eq!(replaced.content_types_source_state.load(), Some(false));
         assert!(replaced.retained_content_types_xml().unwrap().is_none());
         assert_eq!(replaced.content_types_source_state.load(), Some(false));
+
+        // A rejected duplicate must not memoize an invalid result for the
+        // unchanged package.
+        let mut rejected = base.clone();
+        assert!(
+            rejected
+                .try_add_part(Box::new(BlobPart::new(
+                    document.clone(),
+                    "application/example+xml".to_owned(),
+                    b"<rejected/>".to_vec(),
+                )))
+                .is_err()
+        );
+        assert!(rejected.retained_content_types_xml().unwrap().is_some());
 
         // A part relationship invalidates the memo. The source's `rels`
         // default covers the newly present member, so recomputation still
