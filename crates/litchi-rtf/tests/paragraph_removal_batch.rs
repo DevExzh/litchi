@@ -5,7 +5,7 @@
 )]
 
 use litchi_core::Position;
-use litchi_rtf::{Package, ProtectionType, edit::Error};
+use litchi_rtf::{Package, edit::Error};
 
 fn source() -> Package {
     Package::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap()
@@ -184,9 +184,7 @@ fn protected_batch_refuses_publication_and_leaves_source_unchanged() {
         .unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::ReadOnly
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
     assert_eq!(source.to_bytes().unwrap(), exact);
 }

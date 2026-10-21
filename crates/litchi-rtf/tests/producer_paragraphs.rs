@@ -206,7 +206,9 @@ mod record_0308 {
         let source = Package::parse(bookmark).unwrap();
         let mut edit = source.edit();
         edit.remove_paragraph(Position::new(0)).unwrap();
-        assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+        assert!(
+            matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
     }
 
     #[test]

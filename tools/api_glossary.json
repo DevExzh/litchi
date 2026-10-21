@@ -8661,6 +8661,56 @@
           "name": "TailAppendSourcePublicationReport",
           "scope": "litchi_rtf",
           "replacement": "record 0359a: use source_backed::Package::edit_tail_append (litchi_rtf::source_backed::tail_append)"
+        },
+        {
+          "name": "UnsupportedSource",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "OperationAlreadyStaged",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "StructuralPropertyConflict",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "ParagraphLayoutTextConflict",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "BodyDestinationConflict",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "ProtectedDocument",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "UnsupportedSource",
+          "scope": "litchi_rtf::tail_append::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "UnsupportedSelector",
+          "scope": "litchi_rtf::tail_append::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "AlreadyStaged",
+          "scope": "litchi_rtf::tail_append::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
+        },
+        {
+          "name": "ProtectedDocument",
+          "scope": "litchi_rtf::tail_append::Error",
+          "replacement": "use Refused(Refusal) and classify by RefusalKind (record 0359b)"
         }
       ],
       "families": [

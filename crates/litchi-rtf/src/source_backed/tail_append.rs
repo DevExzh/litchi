@@ -41,7 +41,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns a bound or text refusal, or `AlreadyStaged` for a second
+    /// Returns a bound or text refusal, or an unsupported-operation refusal for a second
     /// batch; the staged state is unchanged.
     pub fn append_paragraphs(
         &mut self,

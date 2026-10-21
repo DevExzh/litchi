@@ -19,7 +19,7 @@ fn external_hyperlink_transfer_is_refused_before_publication() {
     let target = Package::parse(r"{\rtf1\ansi Target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&source, 0, &target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
@@ -87,7 +87,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
             &mismatched_color_target,
             TableCellPath::outer(0, 0, 0),
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let style_source =
@@ -172,7 +172,7 @@ fn opaque_and_active_dependencies_are_refused_before_publication() {
     let target = Package::parse(r"{\rtf1 Target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&source, 0, &target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let plain = Package::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
@@ -180,7 +180,7 @@ fn opaque_and_active_dependencies_are_refused_before_publication() {
     let exact = opaque_target.to_bytes().unwrap();
     assert!(matches!(
         TransferPlan::field(&plain, 0, &opaque_target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert_eq!(opaque_target.to_bytes().unwrap(), exact);
 
@@ -197,6 +197,6 @@ fn opaque_and_active_dependencies_are_refused_before_publication() {
             &table_target,
             TableCellPath::outer(0, 0, 0),
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }

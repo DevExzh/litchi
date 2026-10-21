@@ -32891,7 +32891,7 @@ fn verify_rtf_paragraph_split_merge_gates(
             edit.split_paragraph(Position::new(0), 1)?;
             matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
             )
         },
         Case::RtfSemanticMergeParagraphSave => {
@@ -32899,7 +32899,7 @@ fn verify_rtf_paragraph_split_merge_gates(
             edit.merge_paragraphs(Position::new(0), Position::new(1))?;
             matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
             )
         },
         _ => false,
@@ -67911,7 +67911,7 @@ mod tests {
             remove.remove_paragraph(Position::new(selected)).unwrap();
             assert!(matches!(
                 remove.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(document.to_bytes().unwrap(), exact);
 
@@ -67924,7 +67924,7 @@ mod tests {
                 .unwrap();
             assert!(matches!(
                 reorder.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(document.to_bytes().unwrap(), exact);
 
@@ -67945,7 +67945,7 @@ mod tests {
         remove.remove_paragraph(Position::new(0)).unwrap();
         assert!(matches!(
             remove.commit(),
-            Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+            Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
         assert_eq!(watermark.to_bytes().unwrap(), exact);
         let mut noop = watermark.edit();
@@ -67976,7 +67976,7 @@ mod tests {
             }
             assert!(matches!(
                 edit.commit(),
-                Err(litchi_rtf::edit::Error::UnsupportedSource(_))
+                Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
             ));
             assert_eq!(opaque.to_bytes().unwrap(), exact);
         }

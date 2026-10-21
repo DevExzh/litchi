@@ -113,7 +113,7 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
     let microsoft_target = Package::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
     assert!(matches!(
         TransferPlan::field(&microsoft, 0, &microsoft_target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     let microsoft_reopened = Package::from_bytes(&microsoft.to_bytes().unwrap()).unwrap();
     assert_eq!(microsoft_reopened.fields().len(), 1);
@@ -172,13 +172,17 @@ fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
                 let span = TextSpan::new(run_position, end).unwrap();
                 let mut edit = document.edit();
                 if let Err(error) = edit.set_text_italic(span, !run.format().italic()) {
-                    assert!(matches!(error, Error::UnsupportedSource(_)));
+                    assert!(
+                        matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                    );
                     return;
                 }
                 let Err(error) = edit.commit() else {
                     panic!("character publication discarded page-break state: {fixture}");
                 };
-                assert!(matches!(error, Error::UnsupportedSource(_)));
+                assert!(
+                    matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                );
                 return;
             }
             run_position = end;

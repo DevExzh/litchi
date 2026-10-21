@@ -38,7 +38,7 @@ impl TransferPlan {
             })?
             .to_text();
         if text.contains('\n') {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "plain paragraph transfer refuses inline line breaks",
             ));
         }
@@ -116,7 +116,7 @@ impl TransferPlan {
             .iter()
             .any(|event| matches!(event, crate::StoryEvent::Field(_)))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "field transfer refuses nested generic-field dependencies",
             ));
         }
@@ -160,7 +160,7 @@ impl TransferPlan {
         if !shape.text_destination_present
             || matches!(shape.shape_type, crate::ShapeType::PictureFrame)
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "shape transfer supports retained non-picture text frames",
             ));
         }
@@ -168,7 +168,7 @@ impl TransferPlan {
         refuse_drawing_story_fields(std::slice::from_ref(shape), &[])?;
         refuse_active_shape_links(std::slice::from_ref(shape), &[])?;
         if shape.result.is_some() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "shape transfer refuses legacy shape-result ownership",
             ));
         }
@@ -220,41 +220,38 @@ impl TransferPlan {
                 Error::Write("could not reserve nested-table field transfers".to_string())
             })?;
         for index in field_indices {
-            let field = source.fields().get(index).ok_or(Error::UnsupportedSource(
+            let field = source.fields().get(index).ok_or(Error::unsupported_source(
                 "nested-table story references a missing field",
             ))?;
             field_drawing_count =
                 field_drawing_count.saturating_add(validate_transferable_field(source, field)?);
             let mut transferred_field = owned_field(field, source.limits())?;
             let crate::FieldOwner::TableCell(source_depth) = transferred_field.owner else {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "nested-table story field has an incompatible owner",
                 ));
             };
             let relative_depth =
                 source_depth
                     .checked_sub(source_parent_depth)
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "nested-table field owner precedes its selected table",
                     ))?;
             if relative_depth == 0 {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "nested-table field owner does not belong to the selected table",
                 ));
             }
-            let target_depth =
-                target_parent_depth
-                    .checked_add(relative_depth)
-                    .ok_or(Error::UnsupportedSource(
-                        "nested-table target field depth overflows",
-                    ))?;
+            let target_depth = target_parent_depth.checked_add(relative_depth).ok_or(
+                Error::unsupported_source("nested-table target field depth overflows"),
+            )?;
             transferred_field.owner = crate::FieldOwner::TableCell(target_depth);
             transferred_fields.push((index, transferred_field));
         }
         let drawing_count = validate_table_transfer(source, &nested.table, 0)?;
         let styled_rows = count_styled_rows(&nested.table);
         if styled_rows != 0 && source.styles() != target.styles() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "nested-table transfer requires identical table-style dependencies",
             ));
         }
@@ -314,7 +311,7 @@ impl TransferPlan {
             {
                 Some(existing) if existing == style => {},
                 Some(_) => {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "style transfer found a conflicting typed style ID",
                     ));
                 },
@@ -352,7 +349,7 @@ impl TransferPlan {
         let add_list = match target.model().list_table().get(id) {
             Some(existing) if existing == list => false,
             Some(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "list transfer found a conflicting list ID",
                 ));
             },
@@ -369,7 +366,7 @@ impl TransferPlan {
             match target.model().list_override_table().get(entry.index) {
                 Some(existing) if existing == entry => {},
                 Some(_) => {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "list transfer found a conflicting override index",
                     ));
                 },
@@ -391,15 +388,15 @@ impl TransferPlan {
             let mut slot_mapping = BTreeMap::new();
             for source_slot in source_slots {
                 let source_slot_index = usize::try_from(source_slot).map_err(|_error| {
-                    Error::UnsupportedSource("picture-bullet source index overflows")
+                    Error::unsupported_source("picture-bullet source index overflows")
                 })?;
                 let offset = u32::try_from(picture_slots.len()).map_err(|_error| {
-                    Error::UnsupportedSource("picture-bullet dependency count overflows")
+                    Error::unsupported_source("picture-bullet dependency count overflows")
                 })?;
                 let target_slot =
                     first_target_slot
                         .checked_add(offset)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "picture-bullet target index overflows",
                         ))?;
                 let source_picture = source
@@ -412,7 +409,7 @@ impl TransferPlan {
                     .and_then(|picture_index| source.pictures().get(picture_index))
                     .cloned()
                     .map(crate::Picture::into_owned)
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "picture-bullet slot references a missing picture",
                     ))?;
                 slot_mapping.insert(source_slot, target_slot);
@@ -467,7 +464,7 @@ impl TransferPlan {
                 | crate::ObjectKind::Publisher
         ) || object.update_requested
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "object transfer refuses external or automatically updated dependencies",
             ));
         }
@@ -481,7 +478,7 @@ impl TransferPlan {
             let picture = source
                 .pictures()
                 .get(*index)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "object result references a missing picture",
                 ))?;
             pictures.push(picture.clone().into_owned());
@@ -549,15 +546,15 @@ fn canonical_candidate(
     mutation: impl FnOnce(&mut crate::document::Tree<'static>) -> crate::RtfResult<()>,
 ) -> Result<Vec<u8>, Error> {
     if !target.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary-root transfer refuses unknown target destinations",
         ));
     }
-    let bytes = target
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let bytes = target.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
@@ -577,7 +574,7 @@ fn canonical_candidate(
     }
     let reopened = Package::from_bytes_with_options(&output, target.options())?;
     if !reopened.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary-root transfer produced unknown destinations",
         ));
     }
@@ -641,7 +638,7 @@ fn refuse_feature_opaque(
         crate::opaque::Anchor::Body(position) => position == body_position,
         crate::opaque::Anchor::Structural { context: owner, .. } => owner == context,
     }) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "selected feature owns an unknown destination",
         ));
     }
@@ -652,7 +649,7 @@ fn require_equal_text_resources(source: &Package, target: &Package) -> Result<()
     if source.model().font_table() != target.model().font_table()
         || !equal_color_tables(source.model().color_table(), target.model().color_table())
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "transfer requires identical font and color dependencies",
         ));
     }
@@ -767,13 +764,13 @@ fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
 fn validate_transferable_field_kind(field: &crate::Field<'_>) -> Result<(), Error> {
     match field_transfer_class(field) {
         FieldTransferClass::Passive => Ok(()),
-        FieldTransferClass::External => Err(Error::UnsupportedSource(
+        FieldTransferClass::External => Err(Error::unsupported_source(
             "field transfer refuses external, referenced-document, or mail-merge instructions",
         )),
-        FieldTransferClass::Active => Err(Error::UnsupportedSource(
+        FieldTransferClass::Active => Err(Error::unsupported_source(
             "field transfer refuses active field instructions",
         )),
-        FieldTransferClass::Unknown => Err(Error::UnsupportedSource(
+        FieldTransferClass::Unknown => Err(Error::unsupported_source(
             "field transfer requires a validated passive field policy",
         )),
     }
@@ -854,12 +851,12 @@ fn owned_shape_at_depth(
     depth: usize,
 ) -> Result<crate::Shape<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
     if shape.result.is_some() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses legacy shape-result ownership",
         ));
     }
@@ -964,12 +961,12 @@ fn owned_shape_group_at_depth(
     depth: usize,
 ) -> Result<crate::ShapeGroup<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
     if group.result.is_some() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses legacy shape-result ownership",
         ));
     }
@@ -1112,7 +1109,7 @@ fn owned_transfer_table(
     depth: usize,
 ) -> Result<crate::Table<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "nested-table transfer refuses excessive table depth",
         ));
     }
@@ -1213,26 +1210,26 @@ fn validate_table_transfer_at_depth(
     node_count: &mut usize,
 ) -> Result<usize, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "nested-table transfer refuses excessive table depth",
         ));
     }
     let mut drawing_count = 0usize;
     for row in table.rows() {
-        *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+        *node_count = node_count.checked_add(1).ok_or(Error::unsupported_source(
             "nested-table transfer node count overflows",
         ))?;
         if *node_count > MAX_TRANSFER_TABLE_NODES {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "nested-table transfer exceeds bounded table ownership",
             ));
         }
         for cell in row.cells() {
-            *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+            *node_count = node_count.checked_add(1).ok_or(Error::unsupported_source(
                 "nested-table transfer node count overflows",
             ))?;
             if *node_count > MAX_TRANSFER_TABLE_NODES {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "nested-table transfer exceeds bounded table ownership",
                 ));
             }
@@ -1250,16 +1247,16 @@ fn validate_table_transfer_at_depth(
                         | crate::CellStoryEvent::RevisionDeletion(_)
                 )
             }) {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "nested-table transfer refuses unresolved navigation or revision handles",
                 ));
             }
             for nested in cell.nested_tables() {
-                *node_count = node_count.checked_add(1).ok_or(Error::UnsupportedSource(
+                *node_count = node_count.checked_add(1).ok_or(Error::unsupported_source(
                     "nested-table transfer node count overflows",
                 ))?;
                 if *node_count > MAX_TRANSFER_TABLE_NODES {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "nested-table transfer exceeds bounded table ownership",
                     ));
                 }
@@ -1294,7 +1291,7 @@ fn collect_table_story_field_indices(
                 if let crate::CellStoryEvent::Field(field) = event
                     && !indices.insert(field.field_index)
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "nested-table field metadata has multiple story owners",
                     ));
                 }
@@ -1312,9 +1309,9 @@ fn table_cell_depth(path: &TableCellPath) -> Result<u8, Error> {
         .nested
         .len()
         .checked_add(1)
-        .ok_or(Error::UnsupportedSource("table-cell path depth overflows"))?;
+        .ok_or(Error::unsupported_source("table-cell path depth overflows"))?;
     u8::try_from(depth)
-        .map_err(|_error| Error::UnsupportedSource("table-cell path depth exceeds RTF limits"))
+        .map_err(|_error| Error::unsupported_source("table-cell path depth exceeds RTF limits"))
 }
 
 fn remap_table_field_indices(
@@ -1344,7 +1341,7 @@ fn remap_table_field_indices(
 
 fn validate_transferable_field(source: &Package, field: &crate::Field<'_>) -> Result<usize, Error> {
     if !matches!(field.owner, crate::FieldOwner::TableCell(_)) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "nested-table story field has an incompatible owner",
         ));
     }
@@ -1354,7 +1351,7 @@ fn validate_transferable_field(source: &Package, field: &crate::Field<'_>) -> Re
         .iter()
         .any(|event| matches!(event, crate::StoryEvent::Field(_)))
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "nested-table field transfer refuses nested generic fields",
         ));
     }
@@ -1394,7 +1391,7 @@ fn refuse_active_shape_links(
 
 fn refuse_shape_story_fields(shape: &crate::Shape<'_>, depth: usize) -> Result<(), Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "drawing transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1403,7 +1400,7 @@ fn refuse_shape_story_fields(shape: &crate::Shape<'_>, depth: usize) -> Result<(
         .iter()
         .any(|event| matches!(event, crate::StoryEvent::Field(_)))
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "drawing transfer refuses unresolved shape-text field handles",
         ));
     }
@@ -1421,7 +1418,7 @@ fn refuse_shape_group_story_fields(
     depth: usize,
 ) -> Result<(), Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "drawing transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1436,7 +1433,7 @@ fn refuse_shape_group_story_fields(
 
 fn refuse_shape_active_link(shape: &crate::Shape<'_>, depth: usize) -> Result<(), Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1445,7 +1442,7 @@ fn refuse_shape_active_link(shape: &crate::Shape<'_>, depth: usize) -> Result<()
         .iter()
         .any(|property| property.hyperlink.is_some())
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses active hyperlink metadata",
         ));
     }
@@ -1463,7 +1460,7 @@ fn refuse_shape_group_active_link(
     depth: usize,
 ) -> Result<(), Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1472,7 +1469,7 @@ fn refuse_shape_group_active_link(
         .iter()
         .any(|property| property.hyperlink.is_some())
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses active hyperlink metadata",
         ));
     }
@@ -1491,7 +1488,7 @@ fn shape_dependency_count(shape: &crate::Shape<'_>) -> Result<usize, Error> {
 
 fn shape_dependency_count_at_depth(shape: &crate::Shape<'_>, depth: usize) -> Result<usize, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1499,20 +1496,20 @@ fn shape_dependency_count_at_depth(shape: &crate::Shape<'_>, depth: usize) -> Re
         .text_shapes
         .len()
         .checked_add(shape.text_shape_groups.len())
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "shape transfer dependency count overflows",
         ))?;
     for nested in &shape.text_shapes {
         count = count
             .checked_add(shape_dependency_count_at_depth(nested, depth + 1)?)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "shape transfer dependency count overflows",
             ))?;
     }
     for group in &shape.text_shape_groups {
         count = count
             .checked_add(shape_group_dependency_count_at_depth(group, depth + 1)?)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "shape transfer dependency count overflows",
             ))?;
     }
@@ -1524,7 +1521,7 @@ fn shape_group_dependency_count_at_depth(
     depth: usize,
 ) -> Result<usize, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "shape transfer refuses excessive nested drawing depth",
         ));
     }
@@ -1533,20 +1530,20 @@ fn shape_group_dependency_count_at_depth(
             .shapes
             .len()
             .checked_add(group.groups.len())
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "shape transfer dependency count overflows",
             ))?;
     for shape in &group.shapes {
         count = count
             .checked_add(shape_dependency_count_at_depth(shape, depth + 1)?)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "shape transfer dependency count overflows",
             ))?;
     }
     for nested in &group.groups {
         count = count
             .checked_add(shape_group_dependency_count_at_depth(nested, depth + 1)?)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "shape transfer dependency count overflows",
             ))?;
     }
@@ -1579,7 +1576,7 @@ fn style_closure(
         }
         let style = stylesheet
             .get_typed(style_kind, style_id)
-            .ok_or(Error::UnsupportedSource("style dependency is missing"))?;
+            .ok_or(Error::unsupported_source("style dependency is missing"))?;
         if let Some(parent) = style.based_on {
             pending.push((style_kind, parent));
         }

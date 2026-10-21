@@ -226,7 +226,7 @@ fn typed_lengths_and_flags_reject_invalid_input_and_native_text_conflicts_are_at
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert!(matches!(
         error.leaf(),
-        Source::RtfEdit(litchi_rtf::edit::Error::ParagraphLayoutTextConflict)
+        Source::RtfEdit(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-layout updates cannot compose with body text or character changes"
     ));
     assert!(
         source

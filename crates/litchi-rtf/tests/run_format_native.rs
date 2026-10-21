@@ -234,7 +234,7 @@ fn native_run_format_refuses_mixed_structural_work() {
 
     assert!(matches!(
         edit.replace_body_text("Changed\nwith a new paragraph"),
-        Err(Error::StructuralPropertyConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-structure and property changes cannot compose safely"
     ));
     assert_eq!(edit.operation_count(), 1);
 }

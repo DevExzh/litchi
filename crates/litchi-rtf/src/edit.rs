@@ -1077,21 +1077,21 @@ fn first_layout_conflict(
 }
 
 fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
     if !source_bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph-layout editing refuses non-ASCII transport encodings",
         ));
     }
     if source.model().unknown_syntax_markers() != 0 {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph-layout editing refuses unretained unknown RTF syntax",
         ));
     }
@@ -1102,7 +1102,7 @@ fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
                 crate::opaque::Context::Metadata | crate::opaque::Context::HeaderFooter
             )
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "paragraph-layout editing refuses opaque dependent destinations",
             ));
         }
@@ -1110,13 +1110,13 @@ fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
     source
         .model()
         .positioned_paragraph_property_editability()
-        .map_err(Error::UnsupportedSource)?;
+        .map_err(Error::unsupported_source)?;
     for paragraph in source.body().paragraphs() {
         if paragraph
             .inlines()
             .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "paragraph-layout editing refuses inline line breaks",
             ));
         }
@@ -1126,7 +1126,7 @@ fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
             || raw.list_level.is_some()
             || raw.legacy_numbering.is_some()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "paragraph-layout editing refuses dependent style or list references",
             ));
         }
@@ -1231,10 +1231,10 @@ impl HeaderFooterParagraph {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Error {
-    /// A source-specific body feature cannot be rewritten through this seam.
-    UnsupportedSource(&'static str),
-    /// Compatibility variant retained from the former one-operation editor.
-    OperationAlreadyStaged,
+    /// A well-formed request cannot be carried through this edit route.
+    Refused(Refusal),
+    /// The edit engine violated a checked internal invariant.
+    Internal(&'static str),
     /// The finite operation bound was exceeded.
     Limit {
         kind: SemanticLimitKind,
@@ -1311,12 +1311,7 @@ pub enum Error {
     },
     /// Two staged operations have overlapping effects.
     Conflict { existing: usize, incoming: usize },
-    /// Paragraph-structure and property changes cannot be proven independent.
-    StructuralPropertyConflict,
-    /// Local paragraph-layout updates cannot share a transaction with body text or character work.
-    ParagraphLayoutTextConflict,
-    /// Canonical retained-destination work cannot share a transaction with a body splice.
-    BodyDestinationConflict,
+
     /// Replacement text exceeds the source snapshot's retained resource profile.
     InputTooLarge { observed: usize, limit: usize },
     /// A span has its endpoints in reverse order.
@@ -1367,23 +1362,37 @@ pub enum Error {
     Rtf(RtfError),
     /// Candidate transport construction failed before publication.
     Write(String),
-    /// The source declares active document protection, so changed publication is refused.
-    ProtectedDocument {
-        protection_type: crate::ProtectionType,
-    },
+
     /// The patch was applied to bytes other than the snapshot that created it.
     PatchConflict,
+}
+
+/// Shared, content-free refusal details for this family's errors.
+pub use litchi_core::edit::{Refusal, RefusalKind};
+
+impl Error {
+    pub(crate) const fn unsupported_source(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit",
+            reason,
+        ))
+    }
+
+    pub(crate) const fn unsupported_operation(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedOperation,
+            "edit",
+            reason,
+        ))
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSource(reason) => {
-                write!(formatter, "unsupported RTF edit source: {reason}")
-            },
-            Self::OperationAlreadyStaged => {
-                formatter.write_str("RTF edit already has a staged operation")
-            },
+            Self::Refused(refusal) => refusal.fmt(formatter),
+            Self::Internal(reason) => write!(formatter, "internal RTF edit error: {reason}"),
             Self::Limit {
                 kind,
                 observed,
@@ -1496,14 +1505,6 @@ impl fmt::Display for Error {
                 formatter,
                 "RTF edit operation {incoming} conflicts with operation {existing}"
             ),
-            Self::StructuralPropertyConflict => formatter
-                .write_str("RTF paragraph-structure and property changes cannot compose safely"),
-            Self::ParagraphLayoutTextConflict => formatter.write_str(
-                "RTF paragraph-layout updates cannot compose with body text or character changes",
-            ),
-            Self::BodyDestinationConflict => formatter.write_str(
-                "RTF body splices and canonical retained-destination edits cannot compose safely",
-            ),
             Self::InputTooLarge { observed, limit } => write!(
                 formatter,
                 "replacement body text exceeds the source limit: observed {observed}, limit {limit}"
@@ -1581,11 +1582,6 @@ impl fmt::Display for Error {
             Self::History(reason) => write!(formatter, "RTF history refused commit: {reason}"),
             Self::Rtf(error) => error.fmt(formatter),
             Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
-            Self::ProtectedDocument { protection_type } => write!(
-                formatter,
-                "RTF document protection ({}) refuses changed publication",
-                protection_type_name(*protection_type)
-            ),
             Self::PatchConflict => {
                 formatter.write_str("RTF patch source does not match its expected snapshot")
             },
@@ -2123,10 +2119,12 @@ impl Edit {
     ) -> Result<&mut Self, Error> {
         self.ensure_operation_room()?;
         if !self.operations.is_empty() {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         if !self.source.opaque().is_empty() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "ordinary-root transfer refuses unknown target destinations",
             ));
         }
@@ -2134,7 +2132,9 @@ impl Edit {
         let before = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?
             .to_vec();
         self.charge_replacement(after.len())?;
         self.operations.push(Operation::RootTransfer {
@@ -2213,7 +2213,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         if replacements.is_empty() {
             return Err(Error::EmptyParagraphBatch);
@@ -2253,7 +2255,7 @@ impl Edit {
                 .peek()
                 .is_some_and(|replacement| replacement.position.get() == position)
             {
-                let replacement = replacements.next().ok_or(Error::UnsupportedSource(
+                let replacement = replacements.next().ok_or(Error::Internal(
                     "paragraph replacement cursor became inconsistent",
                 ))?;
                 let span = TextSpan::new(paragraph_start, paragraph_end)?;
@@ -2267,7 +2269,9 @@ impl Edit {
                     .to_string();
                 let structural = before.contains('\n') || replacement.replacement.contains('\n');
                 if structural && has_property_operation {
-                    return Err(Error::StructuralPropertyConflict);
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
                 }
                 let incoming = self.operations.len().saturating_add(staged.len());
                 for (existing, operation) in self.operations.iter().enumerate() {
@@ -2327,7 +2331,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2340,7 +2346,9 @@ impl Edit {
             .to_string();
         let structural = before.contains('\n') || after.contains('\n');
         if structural && self.operations.iter().any(Operation::is_property) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2379,7 +2387,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2388,7 +2398,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "bold edits require non-empty text within one paragraph",
             ));
         }
@@ -2405,7 +2415,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2442,7 +2454,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2451,7 +2465,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "italic edits require non-empty text within one paragraph",
             ));
         }
@@ -2468,7 +2482,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2509,7 +2525,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2518,7 +2536,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "underline edits require non-empty text within one paragraph",
             ));
         }
@@ -2535,7 +2553,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2572,7 +2592,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2581,7 +2603,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "font-size edits require non-empty text within one paragraph",
             ));
         }
@@ -2598,7 +2620,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         if self.operations.iter().any(|operation| {
             operation
@@ -2645,7 +2669,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         validate_character_baseline(baseline)?;
         let body = self.source.text();
@@ -2655,7 +2681,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "baseline edits require non-empty text within one paragraph",
             ));
         }
@@ -2672,7 +2698,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2787,7 +2815,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2796,7 +2826,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "strike edits require non-empty text within one paragraph",
             ));
         }
@@ -2813,7 +2843,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2854,7 +2886,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2863,7 +2897,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "double-strike edits require non-empty text within one paragraph",
             ));
         }
@@ -2880,7 +2914,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2917,7 +2953,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2926,7 +2964,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "hidden edits require non-empty text within one paragraph",
             ));
         }
@@ -2943,7 +2981,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -2984,7 +3024,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -2993,7 +3035,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "small-caps edits require non-empty text within one paragraph",
             ));
         }
@@ -3010,7 +3052,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -3051,7 +3095,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -3060,7 +3106,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "all-caps edits require non-empty text within one paragraph",
             ));
         }
@@ -3077,7 +3123,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -3114,7 +3162,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -3123,7 +3173,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "outline edits require non-empty text within one paragraph",
             ));
         }
@@ -3140,7 +3190,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -3178,11 +3230,13 @@ impl Edit {
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         if self.operations.iter().any(Operation::is_property) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let text = self.admit_text(input, 1)?;
         if text.contains('\n') {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "one structural insertion authors exactly one paragraph",
             ));
         }
@@ -3290,7 +3344,7 @@ impl Edit {
             let text =
                 semantic_text
                     .get(paragraph.text.clone())
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "ordinary paragraph source map has an invalid semantic range",
                     ))?;
             texts.push(clone_bounded_text(
@@ -3460,7 +3514,7 @@ impl Edit {
             self.source
                 .text()
                 .get(semantic_range.clone())
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "ordinary paragraph selector did not resolve to UTF-8 text",
                 ))?;
         if offset > semantic_text.len() {
@@ -3487,7 +3541,7 @@ impl Edit {
             self.source
                 .text()
                 .get(paragraph.text.clone())
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "ordinary paragraph source map has an invalid semantic range",
                 ))?;
         if paragraph.text != semantic_range || text != semantic_text {
@@ -3509,7 +3563,7 @@ impl Edit {
                     limit: self.source.limits().max_input_bytes(),
                 })?;
         if source_offset > paragraph.source.end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "ordinary paragraph split escaped its proven source range",
             ));
         }
@@ -3592,30 +3646,36 @@ impl Edit {
         if second != expected_second {
             return Err(Error::ParagraphMergeNonAdjacent { first, second });
         }
-        let boundary = left.boundary_after.clone().ok_or(Error::UnsupportedSource(
-            "ordinary paragraph has no exact source boundary",
-        ))?;
+        let boundary = left
+            .boundary_after
+            .clone()
+            .ok_or(Error::unsupported_source(
+                "ordinary paragraph has no exact source boundary",
+            ))?;
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
-        let boundary_bytes = source_bytes
-            .get(boundary.clone())
-            .ok_or(Error::UnsupportedSource(
-                "ordinary paragraph boundary is outside the source",
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
             ))?;
+        let boundary_bytes =
+            source_bytes
+                .get(boundary.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph boundary is outside the source",
+                ))?;
         let left_text =
             self.source
                 .text()
                 .get(left.text.clone())
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "ordinary paragraph source map has an invalid left range",
                 ))?;
         let right_text =
             self.source
                 .text()
                 .get(right.text.clone())
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "ordinary paragraph source map has an invalid right range",
                 ))?;
         // `ordinary_paragraph_source_map` has already proved uniform body
@@ -3694,7 +3754,7 @@ impl Edit {
     ) -> Result<&mut Self, Error> {
         let input = input.into();
         if input.contains('\n') {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "one restored paragraph cannot contain an ambiguous newline",
             ));
         }
@@ -3723,7 +3783,9 @@ impl Edit {
         self.ensure_body_compatible()?;
         self.ensure_operation_room_for(additional)?;
         if self.operations.iter().any(Operation::is_property) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         if !self.operations.is_empty() {
             return Err(Error::Conflict {
@@ -3844,7 +3906,9 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::RunInsert { .. }))
         {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         for (previous, incoming) in insertions.iter().zip(insertions.iter().skip(1)) {
             let previous_key = (previous.paragraph.get(), previous.run.get());
@@ -3881,7 +3945,7 @@ impl Edit {
                 });
             }
             if insertion.text.contains('\n') {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "run insertions cannot contain paragraph breaks",
                 ));
             }
@@ -4053,7 +4117,9 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
         {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
             let previous_key = (previous.paragraph.get(), previous.run.get());
@@ -4105,7 +4171,7 @@ impl Edit {
                 continue;
             }
             if first.paragraph.get() < paragraph {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::Internal(
                     "run-format selector cursor became inconsistent",
                 ));
             }
@@ -4178,7 +4244,9 @@ impl Edit {
             .iter()
             .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
         {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
             let previous_key = (previous.paragraph.get(), previous.run.get());
@@ -4209,7 +4277,7 @@ impl Edit {
         self.ensure_operation_room_for(replacements.len())?;
         let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
             if replacement.text.contains('\n') {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "run-text replacements cannot contain paragraph breaks",
                 ));
             }
@@ -4236,7 +4304,7 @@ impl Edit {
                 continue;
             }
             if first.paragraph.get() < paragraph {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::Internal(
                     "run-text selector cursor became inconsistent",
                 ));
             }
@@ -4351,7 +4419,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
 
         // Search only existing alignment facets against the ordered request.
@@ -4388,7 +4458,7 @@ impl Edit {
                 .peek()
                 .is_some_and(|update| update.position.get() == position)
             {
-                let update = updates.next().ok_or(Error::UnsupportedSource(
+                let update = updates.next().ok_or(Error::Internal(
                     "paragraph-alignment selector cursor became inconsistent",
                 ))?;
                 staged.push(Operation::Alignment {
@@ -4475,7 +4545,9 @@ impl Edit {
                     | Operation::InsertParagraph { .. }
             )
         }) {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         self.ensure_operation_room_for(updates.len())?;
         ensure_paragraph_layout_source(&self.source)?;
@@ -4511,7 +4583,7 @@ impl Edit {
                 .peek()
                 .is_some_and(|update| update.position.get() == position)
             {
-                let update = updates.next().ok_or(Error::UnsupportedSource(
+                let update = updates.next().ok_or(Error::Internal(
                     "paragraph-layout selector cursor became inconsistent",
                 ))?;
                 if let Some(Some(frame)) = update.patch.frame {
@@ -4610,7 +4682,7 @@ impl Edit {
         self.ensure_operation_room()?;
         let after = self.admit_text(input, 0)?;
         if after.contains('\n') {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "one header/footer paragraph cannot contain a paragraph break",
             ));
         }
@@ -4619,7 +4691,7 @@ impl Edit {
             || !header_footer.shape_groups.is_empty()
             || !header_footer.story_events.is_empty()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "header/footer text has dependent positioned content",
             ));
         }
@@ -4663,7 +4735,7 @@ impl Edit {
             || !annotation.shape_groups.is_empty()
             || !annotation.story_events.is_empty()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "annotation text has dependent positioned content",
             ));
         }
@@ -4703,7 +4775,7 @@ impl Edit {
         let note = note(&self.source, index)?;
         if !note.shapes.is_empty() || !note.shape_groups.is_empty() || !note.story_events.is_empty()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "note text has dependent positioned content",
             ));
         }
@@ -4743,7 +4815,7 @@ impl Edit {
         let after = self.admit_text(input, 0)?;
         let shape = shape(&self.source, index)?;
         if !shape.text_destination_present {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "shape text editing requires an existing text destination",
             ));
         }
@@ -4753,12 +4825,12 @@ impl Edit {
             || !shape.text_drawing_order.is_empty()
             || !shape.text_story_events.is_empty()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "shape text has dependent positioned or fallback content",
             ));
         }
         if shape_has_active_link(shape) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "shape text editing refuses active hyperlink metadata",
             ));
         }
@@ -4803,7 +4875,7 @@ impl Edit {
         let after = value.into_owned();
         after.validate()?;
         if before.position != after.position || before.content != after.content {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "SmartTag edits cannot change the body range",
             ));
         }
@@ -4844,7 +4916,7 @@ impl Edit {
             || before.position != after.position
             || before.content != after.content
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "move-bookmark edits cannot change identity or body range",
             ));
         }
@@ -4862,7 +4934,9 @@ impl Edit {
 
     fn ensure_body_compatible(&self) -> Result<(), Error> {
         if self.operations.iter().any(Operation::is_destination) {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         if let Some(existing) = self.operations.iter().position(Operation::is_lifecycle) {
             return Err(Error::Conflict {
@@ -4879,7 +4953,9 @@ impl Edit {
             .iter()
             .any(|operation| !operation.is_destination())
         {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         Ok(())
     }
@@ -4933,7 +5009,9 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
         {
-            return Err(Error::ParagraphLayoutTextConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -4942,7 +5020,7 @@ impl Edit {
                 .get(span.start..span.end)
                 .is_some_and(|text| text.contains('\n'))
         {
-            return Err(Error::UnsupportedSource(match property {
+            return Err(Error::unsupported_source(match property {
                 "expansion" => "expansion edits require non-empty text within one paragraph",
                 "horizontal scale" => {
                     "horizontal-scale edits require non-empty text within one paragraph"
@@ -4964,7 +5042,9 @@ impl Edit {
                     | Operation::SwapParagraph { .. }
             )
         }) {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         }
         let incoming = self.operations.len();
         for (existing, operation) in self.operations.iter().enumerate() {
@@ -5062,7 +5142,9 @@ impl Edit {
                 let operation = operation.clone();
                 let source = self.source.clone();
                 match self.commit_staged() {
-                    Err(Error::UnsupportedSource(_)) => {
+                    Err(Error::Refused(refusal))
+                        if refusal.kind() == RefusalKind::UnsupportedContent =>
+                    {
                         producer_paragraphs::commit(source, &operation)
                     },
                     result => result,
@@ -5129,7 +5211,9 @@ impl Edit {
                 Ok(map) => return commit_body_paragraph_removals(self, operation_count, map),
                 // Keep the established scalar lifecycle path for decoded or
                 // explicitly repaired sources without literal source ranges.
-                Err(Error::UnsupportedSource(_)) if operation_count == 1 => {},
+                Err(Error::Refused(refusal))
+                    if refusal.kind() == RefusalKind::UnsupportedContent
+                        && operation_count == 1 => {},
                 Err(error) => return Err(error),
             }
         }
@@ -5139,7 +5223,9 @@ impl Edit {
             .any(Operation::is_raw_paragraph_structure)
         {
             if operation_count != 1 {
-                return Err(Error::BodyDestinationConflict);
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
             }
             return commit_raw_paragraph_structure(self, operation_count);
         }
@@ -5173,19 +5259,25 @@ impl Edit {
             .count();
         if picture_removal_count != 0 {
             if picture_removal_count != operation_count {
-                return Err(Error::BodyDestinationConflict);
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
             }
             return picture_payload::commit_removals(self, operation_count);
         }
         if picture_payload_count != 0 {
             if picture_payload_count != operation_count {
-                return Err(Error::BodyDestinationConflict);
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
             }
             return picture_payload::commit(self, operation_count);
         }
         if root_transfer_count != 0 {
             if root_transfer_count != 1 || operation_count != 1 {
-                return Err(Error::BodyDestinationConflict);
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
             }
             return commit_root_transfer(self, operation_count);
         }
@@ -5193,7 +5285,9 @@ impl Edit {
             return commit_destinations(self, operation_count);
         }
         if destination_count != 0 {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
 
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
@@ -5489,9 +5583,15 @@ impl Edit {
                 | Operation::MoveBookmark { .. }
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_) => {
-                    return Err(Error::BodyDestinationConflict);
+                    return Err(Error::unsupported_operation(
+                        "body splices and retained-destination edits cannot compose safely",
+                    ));
                 },
-                Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
+                Operation::RootTransfer { .. } => {
+                    return Err(Error::unsupported_operation(
+                        "body splices and retained-destination edits cannot compose safely",
+                    ));
+                },
             }
         }
         let original_alignments = if property_operation {
@@ -5584,9 +5684,11 @@ impl Edit {
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
         if crate::compressed::is_compressed_rtf(source_bytes) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "compressed RTF needs a transport-aware rewrite",
             ));
         }
@@ -5631,67 +5733,67 @@ impl Edit {
             .iter()
             .any(|operation| matches!(operation, Operation::Baseline { .. }));
         if has_italic_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "italic edits refuse non-ASCII transport encodings",
             ));
         }
         if has_underline_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "underline edits refuse non-ASCII transport encodings",
             ));
         }
         if has_font_size_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "font-size edits refuse non-ASCII transport encodings",
             ));
         }
         if has_strike_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "strike edits refuse non-ASCII transport encodings",
             ));
         }
         if has_double_strike_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "double-strike edits refuse non-ASCII transport encodings",
             ));
         }
         if has_hidden_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "hidden edits refuse non-ASCII transport encodings",
             ));
         }
         if has_small_caps_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "small-caps edits refuse non-ASCII transport encodings",
             ));
         }
         if has_all_caps_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "all-caps edits refuse non-ASCII transport encodings",
             ));
         }
         if has_outline_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "outline edits refuse non-ASCII transport encodings",
             ));
         }
         if has_baseline_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "baseline edits refuse non-ASCII transport encodings",
             ));
         }
         if has_expansion_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "expansion edits refuse non-ASCII transport encodings",
             ));
         }
         if has_horizontal_scale_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "horizontal-scale edits refuse non-ASCII transport encodings",
             ));
         }
         if has_kerning_operation && !source_bytes.is_ascii() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "kerning edits refuse non-ASCII transport encodings",
             ));
         }
@@ -5699,7 +5801,7 @@ impl Edit {
             self.source
                 .model()
                 .positioned_paragraph_property_editability()
-                .map_err(Error::UnsupportedSource)?;
+                .map_err(Error::unsupported_source)?;
         } else if has_bold_operation
             || has_italic_operation
             || has_underline_operation
@@ -5733,7 +5835,7 @@ impl Edit {
                 self.source
                     .model()
                     .plain_body_bold_editability()
-                    .map_err(Error::UnsupportedSource)?;
+                    .map_err(Error::unsupported_source)?;
             } else {
                 plain_body_character_editability(
                     &self.source,
@@ -5754,13 +5856,13 @@ impl Edit {
                         allow_mixed_kerning: has_kerning_operation,
                     },
                 )
-                .map_err(Error::UnsupportedSource)?;
+                .map_err(Error::unsupported_source)?;
             }
         } else {
             self.source
                 .model()
                 .plain_body_text_editability()
-                .map_err(Error::UnsupportedSource)?;
+                .map_err(Error::unsupported_source)?;
         }
         let span = if layout_operation {
             retained_or_located_layout_body_source_span(&self.source, source_bytes)?
@@ -5784,7 +5886,9 @@ impl Edit {
                 || has_horizontal_scale_operation
                 || has_kerning_operation
             {
-                return Err(Error::ParagraphLayoutTextConflict);
+                return Err(Error::unsupported_operation(
+                    "paragraph-layout updates cannot compose with body text or character changes",
+                ));
             }
             ensure_paragraph_layout_source(&self.source)?;
             encoded_body_with_paragraph_properties(
@@ -5837,7 +5941,7 @@ impl Edit {
         let snapshot = Package::from_bytes_with_options(&bytes, self.source.options())?;
         validate_opaque_preservation(&self.source, &snapshot, &self.operations)?;
         if snapshot.text() != replacement {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate body text did not survive RTF validation",
             ));
         }
@@ -5847,7 +5951,7 @@ impl Edit {
             .any(|operation| matches!(operation, Operation::RestoreParagraph { .. }))
             && snapshot.paragraph_count() != self.source.paragraph_count().saturating_add(1)
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate paragraph insertion did not preserve the new paragraph boundary",
             ));
         }
@@ -5858,18 +5962,18 @@ impl Edit {
             )
         }) && snapshot.paragraph_count() != self.source.paragraph_count()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate paragraph reorder did not preserve body paragraph boundaries",
             ));
         }
         if property_operation && source_alignments(&snapshot) != alignments {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate paragraph alignment did not survive RTF validation",
             ));
         }
         if layout_operation {
             if source_paragraph_properties(&snapshot)? != paragraph_properties {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate paragraph properties did not survive RTF validation",
                 ));
             }
@@ -5877,118 +5981,120 @@ impl Edit {
         if property_operation && !layout_operation {
             let mut expected = source_paragraph_properties(&self.source)?;
             if expected.len() != alignments.len() {
-                return Err(Error::StructuralPropertyConflict);
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
             }
             for (paragraph, alignment) in expected.iter_mut().zip(&alignments) {
                 paragraph.alignment = *alignment;
             }
             if source_paragraph_properties(&snapshot)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate paragraph properties did not survive character publication",
                 ));
             }
         }
         if layout_operation {
             if !same_source_runs(&snapshot, &self.source) {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate character runs did not survive paragraph-layout publication",
                 ));
             }
         }
         for (bold_span, expected) in projected_bold_ranges {
             if bold_for_span(&snapshot, bold_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate bold property did not survive RTF validation",
                 ));
             }
         }
         for (italic_span, expected) in projected_italic_ranges {
             if italic_for_span(&snapshot, italic_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate italic property did not survive RTF validation",
                 ));
             }
         }
         for (underline_span, expected) in projected_underline_ranges {
             if underline_for_span(&snapshot, underline_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate underline property did not survive RTF validation",
                 ));
             }
         }
         for (font_size_span, expected) in projected_font_size_ranges {
             if font_size_for_span(&snapshot, font_size_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate font-size property did not survive RTF validation",
                 ));
             }
         }
         for (expansion_span, expected) in projected_expansion_ranges {
             if expansion_for_span(&snapshot, expansion_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate expansion property did not survive RTF validation",
                 ));
             }
         }
         for (scale_span, expected) in projected_horizontal_scale_ranges {
             if horizontal_scale_for_span(&snapshot, scale_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate horizontal-scale property did not survive RTF validation",
                 ));
             }
         }
         for (kerning_span, expected) in projected_kerning_ranges {
             if kerning_for_span(&snapshot, kerning_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate kerning property did not survive RTF validation",
                 ));
             }
         }
         for (strike_span, expected) in projected_strike_ranges {
             if strike_for_span(&snapshot, strike_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate strike property did not survive RTF validation",
                 ));
             }
         }
         for (hidden_span, expected) in projected_hidden_ranges {
             if hidden_for_span(&snapshot, hidden_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate hidden property did not survive RTF validation",
                 ));
             }
         }
         for (small_caps_span, expected) in projected_small_caps_ranges {
             if small_caps_for_span(&snapshot, small_caps_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate small-caps property did not survive RTF validation",
                 ));
             }
         }
         for (all_caps_span, expected) in projected_all_caps_ranges {
             if all_caps_for_span(&snapshot, all_caps_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate all-caps property did not survive RTF validation",
                 ));
             }
         }
         for (outline_span, expected) in projected_outline_ranges {
             if outline_for_span(&snapshot, outline_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate outline property did not survive RTF validation",
                 ));
             }
         }
         for (baseline_span, expected) in projected_baseline_ranges {
             if baseline_for_span(&snapshot, baseline_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate baseline property did not survive RTF validation",
                 ));
             }
         }
         for (double_strike_span, expected) in projected_double_strike_ranges {
             if double_strike_for_span(&snapshot, double_strike_span)? != expected {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate double-strike property did not survive RTF validation",
                 ));
             }
@@ -6016,7 +6122,9 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let source_runs = ordinary_run_source_map(&edit.source)?;
     let mut replacements = Vec::new();
     replacements
@@ -6033,7 +6141,9 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
             text_after: None,
         } = operation
         else {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         };
         while source_runs
             .get(source_run_index)
@@ -6093,7 +6203,9 @@ fn ordinary_run_insertion_source_offsets(
     let mut source_run_cursor = 0usize;
     for operation in operations {
         let Operation::RunInsert { paragraph, run, .. } = operation else {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         };
         let run_count =
             *paragraph_run_counts
@@ -6163,7 +6275,9 @@ fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Comm
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let source_offsets = ordinary_run_insertion_source_offsets(&edit.source, &edit.operations)?;
     let paragraph_run_counts = edit
         .source
@@ -6186,7 +6300,9 @@ fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Comm
             ..
         } = operation
         else {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         };
         let paragraph_run_count =
             *paragraph_run_counts
@@ -6230,7 +6346,9 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let source_runs = ordinary_run_source_map(&edit.source)?;
     let preserve_terminal_empty = terminal_paragraph_becomes_empty(&edit.source, &edit.operations);
     let terminal_run = edit
@@ -6254,7 +6372,9 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
             text_after,
         } = operation
         else {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         };
         while source_runs
             .get(source_run_index)
@@ -6273,7 +6393,7 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
         source_run_index = source_run_index.saturating_add(1);
         let changed = RunFormatPatch::changed_from(*before, *after);
         if let Some(text_after) = text_after {
-            let _text_before = text_before.as_deref().ok_or(Error::UnsupportedSource(
+            let _text_before = text_before.as_deref().ok_or(Error::Internal(
                 "run-text operation has no source text precondition",
             ))?;
             let encoded = if preserve_terminal_empty
@@ -6390,7 +6510,7 @@ fn validate_run_insert_candidate(
     let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
     let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
     if source_paragraphs.len() != target_paragraphs.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-insertion publication changed paragraph boundaries",
         ));
     }
@@ -6399,7 +6519,7 @@ fn validate_run_insert_candidate(
         source_paragraphs.iter().zip(&target_paragraphs).enumerate()
     {
         if source_paragraph.format().raw() != target_paragraph.format().raw() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-insertion publication changed paragraph properties",
             ));
         }
@@ -6422,19 +6542,21 @@ fn validate_run_insert_candidate(
                     ..
                 } = operations
                     .get(operation_index)
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "run-insertion operation cursor disappeared",
                     ))?
                 else {
-                    return Err(Error::StructuralPropertyConflict);
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
                 };
                 if *run != run_index {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::Internal(
                         "run-insertion operation order is inconsistent",
                     ));
                 }
                 if format.is_none() && after != inherited.as_ref() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "run-insertion inheritance precondition changed",
                     ));
                 }
@@ -6458,14 +6580,16 @@ fn validate_run_insert_candidate(
                 ..
             } = operations
                 .get(operation_index)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "run-insertion append cursor disappeared",
                 ))?
             else {
-                return Err(Error::StructuralPropertyConflict);
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
             };
             if format.is_none() && after != inherited.as_ref() {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "run-insertion inheritance precondition changed",
                 ));
             }
@@ -6480,18 +6604,18 @@ fn validate_run_insert_candidate(
                 let (expected_text, expected_format) =
                     expected
                         .get(expected_index)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "candidate run-insertion publication has excess text",
                         ))?;
                 if *expected_format != *target_run.format().raw() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "candidate run-insertion publication changed character formatting",
                     ));
                 }
                 let expected_remaining =
                     expected_text
                         .get(expected_offset..)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "candidate run-insertion expected text boundary is invalid",
                         ))?;
                 let common_limit = expected_remaining.len().min(remaining.len());
@@ -6507,12 +6631,12 @@ fn validate_run_insert_candidate(
                         .get(..common)
                         .is_none_or(|prefix| !remaining.starts_with(prefix))
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "candidate run-insertion publication changed run text",
                     ));
                 }
                 expected_offset = expected_offset.saturating_add(common);
-                remaining = remaining.get(common..).ok_or(Error::UnsupportedSource(
+                remaining = remaining.get(common..).ok_or(Error::unsupported_source(
                     "candidate run-insertion suffix is not a character boundary",
                 ))?;
                 if expected_offset == expected_text.len() {
@@ -6522,13 +6646,13 @@ fn validate_run_insert_candidate(
             }
         }
         if expected_index != expected.len() || expected_offset != 0 {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-insertion publication dropped expected text",
             ));
         }
     }
     if operation_index != operations.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-insertion publication left an unapplied operation",
         ));
     }
@@ -6572,7 +6696,7 @@ fn validate_run_text_candidate(
     let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
     let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
     if source_paragraphs.len() != target_paragraphs.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-text publication changed paragraph boundaries",
         ));
     }
@@ -6581,7 +6705,7 @@ fn validate_run_text_candidate(
         source_paragraphs.iter().zip(&target_paragraphs).enumerate()
     {
         if source_paragraph.format().raw() != target_paragraph.format().raw() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-text publication changed paragraph properties",
             ));
         }
@@ -6630,18 +6754,18 @@ fn validate_run_text_candidate(
                 let (expected_text, expected_format) =
                     expected
                         .get(expected_index)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "candidate run-text publication has excess text",
                         ))?;
                 if *expected_format != *target_run.format().raw() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "candidate run-text publication changed character formatting",
                     ));
                 }
                 let expected_remaining =
                     expected_text
                         .get(expected_offset..)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "candidate run-text expected text boundary is invalid",
                         ))?;
                 let common_limit = expected_remaining.len().min(remaining.len());
@@ -6657,12 +6781,12 @@ fn validate_run_text_candidate(
                         .get(..common)
                         .is_none_or(|prefix| !remaining.starts_with(prefix))
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "candidate run-text publication changed run text",
                     ));
                 }
                 expected_offset = expected_offset.saturating_add(common);
-                remaining = remaining.get(common..).ok_or(Error::UnsupportedSource(
+                remaining = remaining.get(common..).ok_or(Error::unsupported_source(
                     "candidate run-text suffix is not a character boundary",
                 ))?;
                 if expected_offset == expected_text.len() {
@@ -6672,13 +6796,13 @@ fn validate_run_text_candidate(
             }
         }
         if expected_index != expected.len() || expected_offset != 0 {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-text publication dropped expected text",
             ));
         }
     }
     if operation_index != operations.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-text publication left an unapplied operation",
         ));
     }
@@ -6743,7 +6867,7 @@ fn validate_run_format_candidate(
     let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
     let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
     if source_paragraphs.len() != target_paragraphs.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-format publication changed paragraph boundaries",
         ));
     }
@@ -6752,14 +6876,14 @@ fn validate_run_format_candidate(
         source_paragraphs.iter().zip(&target_paragraphs).enumerate()
     {
         if source_paragraph.format().raw() != target_paragraph.format().raw() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-format publication changed paragraph properties",
             ));
         }
         let source_runs = source_paragraph.runs().collect::<Vec<_>>();
         let target_runs = target_paragraph.runs().collect::<Vec<_>>();
         if source_runs.len() != target_runs.len() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate run-format publication changed the run axis",
             ));
         }
@@ -6775,7 +6899,7 @@ fn validate_run_format_candidate(
             source_runs.iter().zip(&target_runs).enumerate()
         {
             if source_run.text() != target_run.text() {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate run-format publication changed run text",
                 ));
             }
@@ -6805,14 +6929,14 @@ fn validate_run_format_candidate(
                 }
             }
             if expected != *target_run.format().raw() {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "candidate run-format publication changed unrelated run properties",
                 ));
             }
         }
     }
     if operation_index != operations.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate run-format publication left an unapplied operation",
         ));
     }
@@ -6824,11 +6948,14 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let map = ordinary_paragraph_source_map(&edit.source)?;
-    let operation = edit.operations.first().ok_or(Error::UnsupportedSource(
-        "missing ordinary paragraph operation",
-    ))?;
+    let operation = edit
+        .operations
+        .first()
+        .ok_or(Error::Internal("missing ordinary paragraph operation"))?;
     let (snapshot, semantic_delta) =
         match operation {
             Operation::Text {
@@ -6850,7 +6977,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                             count: map.paragraphs.len(),
                         })?;
                 let actual = edit.source.text().get(paragraph.text.clone()).ok_or(
-                    Error::UnsupportedSource(
+                    Error::unsupported_source(
                         "ordinary paragraph split selector lost its source text",
                     ),
                 )?;
@@ -6891,7 +7018,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                     || paragraph_text_at(&snapshot, *position)? != left
                     || paragraph_text_at(&snapshot, position.saturating_add(1))? != right
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "split candidate failed ordinary paragraph readback",
                     ));
                 }
@@ -6948,7 +7075,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_sub(1)
                     || paragraph_text_at(&snapshot, *position)? != merged
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "merge candidate failed ordinary paragraph readback",
                     ));
                 }
@@ -6961,9 +7088,15 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 (snapshot, semantic_delta)
             },
             Operation::Text { .. } | Operation::RunFormat { .. } | Operation::RunInsert { .. } => {
-                return Err(Error::BodyDestinationConflict);
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
             },
-            _ => return Err(Error::BodyDestinationConflict),
+            _ => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
         };
     Ok(Commit::new(
         edit.source,
@@ -6982,15 +7115,19 @@ fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<C
     // structural routes retain their stricter undelimited-source admission.
     let map = match ordinary_paragraph_source_map_inner(&edit.source, false, true) {
         Ok(map) => map,
-        Err(Error::UnsupportedSource(_)) => return Ok(None),
+        Err(Error::Refused(refusal)) if refusal.kind() == RefusalKind::UnsupportedContent => {
+            return Ok(None);
+        },
         Err(error) => return Err(error),
     };
-    let Operation::RestoreParagraph { position, text } = edit
-        .operations
-        .first()
-        .ok_or(Error::BodyDestinationConflict)?
+    let Operation::RestoreParagraph { position, text } =
+        edit.operations.first().ok_or(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ))?
     else {
-        return Err(Error::BodyDestinationConflict);
+        return Err(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ));
     };
     if *position > map.paragraphs.len() {
         return Err(Error::ParagraphOutOfRange {
@@ -7003,7 +7140,9 @@ fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<C
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let body_span = ordinary_paragraph_body_source_span(
         source_bytes,
         edit.source.text(),
@@ -7038,7 +7177,7 @@ fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<C
         .map(|paragraph| paragraph.to_text())
         .collect::<Vec<_>>();
     if actual != expected || snapshot.paragraph_count() != expected.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate paragraph insertion failed ordinary-story readback",
         ));
     }
@@ -7056,7 +7195,7 @@ fn paragraph_insertion_source_bytes(
     let mut replacement = Vec::new();
     if map.paragraphs.is_empty() {
         if position != 0 || body_span.start != body_span.end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "empty ordinary paragraph body has no contiguous source span",
             ));
         }
@@ -7116,7 +7255,7 @@ fn paragraph_insertion_source_bytes(
     let last = map
         .paragraphs
         .last()
-        .ok_or(Error::UnsupportedSource("ordinary paragraph map is empty"))?;
+        .ok_or(Error::unsupported_source("ordinary paragraph map is empty"))?;
     let terminal_boundary_end = last.boundary_after.as_ref().map(|boundary| boundary.end);
     let has_terminal_boundary = terminal_boundary_end.is_some();
     let terminal_boundary_needs_delimiter = terminal_boundary_end
@@ -7159,7 +7298,9 @@ fn commit_body_paragraph_removals(
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let mut ranges = Vec::new();
     ranges
         .try_reserve_exact(operation_count)
@@ -7167,7 +7308,9 @@ fn commit_body_paragraph_removals(
 
     for operation in &edit.operations {
         let Operation::RemoveParagraph { position, text } = operation else {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         };
         let paragraph = map
             .paragraphs
@@ -7179,36 +7322,36 @@ fn commit_body_paragraph_removals(
         if edit.source.text().get(paragraph.text.clone()) != Some(text.as_str()) {
             return Err(Error::StalePrecondition("paragraph text differs"));
         }
-        let range = if let Some(boundary) = &paragraph.boundary_after {
-            paragraph.source.start..boundary.end
-        } else if *position == 0 {
-            paragraph.source.clone()
-        } else {
-            let previous = map.paragraphs.get(position.saturating_sub(1)).ok_or(
-                Error::ParagraphOutOfRange {
-                    position: position.saturating_sub(1),
-                    count: map.paragraphs.len(),
-                },
-            )?;
-            let previous_text =
-                edit.source
-                    .text()
-                    .get(previous.text.clone())
-                    .ok_or(Error::UnsupportedSource(
-                        "ordinary paragraph source map has an invalid semantic range",
-                    ))?;
-            if previous_text.is_empty() {
+        let range =
+            if let Some(boundary) = &paragraph.boundary_after {
+                paragraph.source.start..boundary.end
+            } else if *position == 0 {
                 paragraph.source.clone()
             } else {
-                let boundary = previous
-                    .boundary_after
-                    .as_ref()
-                    .ok_or(Error::UnsupportedSource(
-                        "ordinary paragraph has no exact source boundary",
-                    ))?;
-                boundary.start..paragraph.source.end
-            }
-        };
+                let previous = map.paragraphs.get(position.saturating_sub(1)).ok_or(
+                    Error::ParagraphOutOfRange {
+                        position: position.saturating_sub(1),
+                        count: map.paragraphs.len(),
+                    },
+                )?;
+                let previous_text = edit.source.text().get(previous.text.clone()).ok_or(
+                    Error::unsupported_source(
+                        "ordinary paragraph source map has an invalid semantic range",
+                    ),
+                )?;
+                if previous_text.is_empty() {
+                    paragraph.source.clone()
+                } else {
+                    let boundary =
+                        previous
+                            .boundary_after
+                            .as_ref()
+                            .ok_or(Error::unsupported_source(
+                                "ordinary paragraph has no exact source boundary",
+                            ))?;
+                    boundary.start..paragraph.source.end
+                }
+            };
         ranges.push((range, Vec::new()));
     }
 
@@ -7266,12 +7409,12 @@ fn commit_body_paragraph_removals(
             continue;
         }
         let Some(observed) = actual.next() else {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate paragraph removal dropped an unselected paragraph",
             ));
         };
         if expected.to_text() != observed.to_text() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "candidate paragraph removal changed an unselected paragraph",
             ));
         }
@@ -7283,7 +7426,7 @@ fn commit_body_paragraph_removals(
                 .paragraph_count()
                 .saturating_sub(operation_count)
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate paragraph removal failed ordinary-story readback",
         ));
     }
@@ -7311,7 +7454,9 @@ fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Com
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let map = ordinary_paragraph_source_map_with_lines(&edit.source)?;
     let mut replacements = Vec::new();
     replacements
@@ -7328,13 +7473,15 @@ fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Com
             ..
         } = operation
         else {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         };
         let paragraph = map
             .paragraphs
             .iter()
             .find(|paragraph| paragraph.text == (span.start..span.end))
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "paragraph batch selector lost its source range",
             ))?;
         if edit.source.text().get(span.start..span.end) != Some(before.as_str()) {
@@ -7359,7 +7506,7 @@ fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Com
     let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
     validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
     if snapshot.text() != replacement {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate body text did not survive RTF paragraph publication",
         ));
     }
@@ -7448,7 +7595,7 @@ fn validate_paragraph_boundary_bytes(boundary: &[u8]) -> Result<(), Error> {
     };
     let valid_delimiter = matches!(boundary.get(4..), Some([]) | Some([b' ']));
     if !keyword_is_par || !valid_delimiter {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph boundary is not an exact \\par control",
         ));
     }
@@ -7482,21 +7629,23 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Err(_) => {},
         }
     } else if !edit.source.tables().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "canonical destination publication would relocate body tables",
         ));
     }
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
     if !edit.source.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "canonical destination edits refuse unknown RTF destinations",
         ));
     }
@@ -7555,7 +7704,11 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::SwapParagraph { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
-            | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
+            | Operation::RootTransfer { .. } => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
         }
     }
 
@@ -7572,7 +7725,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     }
     let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
     if snapshot.text() != edit.source.text() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "canonical destination edit changed the ordinary body story",
         ));
     }
@@ -7580,7 +7733,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         match operation {
             Operation::TableCellText { path, after, .. } => {
                 if table_cell(&snapshot, path)?.text() != after {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "table-cell text did not survive RTF validation",
                     ));
                 }
@@ -7593,42 +7746,42 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                     .text
                     .as_ref();
                 if actual != after {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "header/footer text did not survive RTF validation",
                     ));
                 }
             },
             Operation::AnnotationText { index, after, .. } => {
                 if annotation(&snapshot, *index)?.text != after.as_str() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "annotation text did not survive RTF validation",
                     ));
                 }
             },
             Operation::NoteText { index, after, .. } => {
                 if note(&snapshot, *index)?.content != after.as_str() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "note text did not survive RTF validation",
                     ));
                 }
             },
             Operation::ShapeText { index, after, .. } => {
                 if shape(&snapshot, *index)?.text != after.as_str() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "shape text did not survive RTF validation",
                     ));
                 }
             },
             Operation::SmartTag { index, after, .. } => {
                 if snapshot.smart_tags().get(*index) != Some(after) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "SmartTag metadata did not survive RTF validation",
                     ));
                 }
             },
             Operation::MoveBookmark { index, after, .. } => {
                 if snapshot.move_bookmarks().get(*index) != Some(after) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "move-bookmark metadata did not survive RTF validation",
                     ));
                 }
@@ -7659,7 +7812,11 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::SwapParagraph { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
-            | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
+            | Operation::RootTransfer { .. } => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
         }
     }
     Ok(Commit::new(
@@ -7674,7 +7831,7 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
     let operation = edit
         .operations
         .first()
-        .ok_or(Error::UnsupportedSource("missing ordinary-root transfer"))?;
+        .ok_or(Error::Internal("missing ordinary-root transfer"))?;
     let Operation::RootTransfer {
         before,
         after,
@@ -7682,12 +7839,16 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
         effect: _,
     } = operation
     else {
-        return Err(Error::BodyDestinationConflict);
+        return Err(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ));
     };
     let source = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     if source != before {
         return Err(Error::PatchConflict);
     }
@@ -7702,18 +7863,18 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
     }
     ensure_changed_publication_allowed(&edit.source)?;
     if crate::compressed::is_compressed_rtf(source) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
     if !edit.source.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary-root transfer refuses unknown target destinations",
         ));
     }
     let snapshot = Package::from_bytes_with_options(after, edit.source.options())?;
     if !snapshot.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary-root transfer produced unknown destinations",
         ));
     }
@@ -7728,12 +7889,14 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
 fn ensure_changed_publication_allowed(source: &Package) -> Result<(), Error> {
     let protection = source.model().protection();
     if protection.is_protected() {
-        return Err(Error::ProtectedDocument {
-            protection_type: protection.protection_type(),
-        });
+        return Err(Error::Refused(Refusal::new(
+            RefusalKind::Protected,
+            "edit",
+            "document protection refuses changed publication",
+        )));
     }
     if source.model().has_unmatched_move_bookmarks() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "changed publication refuses unmatched move-bookmark destinations",
         ));
     }
@@ -7745,22 +7908,11 @@ fn ensure_default_body_formatting(source: &Package) -> Result<(), Error> {
         block.formatting != crate::types::Formatting::default()
             || block.paragraph != crate::types::Paragraph::default()
     }) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph lifecycle editing requires default body formatting",
         ));
     }
     Ok(())
-}
-
-const fn protection_type_name(protection_type: crate::ProtectionType) -> &'static str {
-    match protection_type {
-        crate::ProtectionType::None => "none",
-        crate::ProtectionType::ReadOnly => "read-only",
-        crate::ProtectionType::RevisionTracking => "revision tracking",
-        crate::ProtectionType::Comments => "comments",
-        crate::ProtectionType::Forms => "forms",
-        crate::ProtectionType::All => "all changes",
-    }
 }
 
 fn table_cell<'a>(source: &'a Package, path: &TableCellPath) -> Result<&'a crate::Cell<'a>, Error> {
@@ -7967,21 +8119,21 @@ fn ordinary_paragraph_source_map_inner(
     allow_inline_line: bool,
     allow_undelimited_start: bool,
 ) -> Result<OrdinaryParagraphSourceMap, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph structure editing refuses compressed RTF",
         ));
     }
     if !source_bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph structure editing requires an ASCII RTF transport",
         ));
     }
     if !source.opaque().is_empty() || source.model().unknown_syntax_markers() != 0 {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph structure editing refuses unknown RTF syntax",
         ));
     }
@@ -7990,7 +8142,7 @@ fn ordinary_paragraph_source_map_inner(
         || source.model().xsl_transform().is_some()
         || source.model().xsl_transform_usage().is_requested()
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph structure editing refuses external or transformation content",
         ));
     }
@@ -8010,21 +8162,21 @@ fn ordinary_paragraph_source_map_inner(
         || !source.model().editable_regions().is_empty()
         || !source.model().body_story_events().is_empty()
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph structure editing refuses dependent destinations or review content",
         ));
     }
     source
         .model()
         .plain_body_text_editability()
-        .map_err(Error::UnsupportedSource)?;
+        .map_err(Error::unsupported_source)?;
     let body_span = if source.text().is_empty() && source.paragraph_count() == 0 {
         ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
     } else if !source.text().starts_with('\n') {
         source
             .model()
             .ordinary_body_source_span()
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "ordinary paragraph source span is not losslessly proven",
             ))?
     } else {
@@ -8037,13 +8189,13 @@ fn ordinary_paragraph_source_map_inner(
         || body_span.end > source_bytes.len()
         || (body_span.start == body_span.end && !empty_body_span)
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph source span is malformed",
         ));
     }
     let body_bytes = source_bytes
         .get(body_span.clone())
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "ordinary paragraph source span is outside the source",
         ))?;
     if !allow_undelimited_start
@@ -8056,12 +8208,12 @@ fn ordinary_paragraph_source_map_inner(
             .get(body_span.start - 1)
             .is_some_and(u8::is_ascii_whitespace)
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "leading empty paragraph has no safe control-word delimiter",
         ));
     }
     let body_input = std::str::from_utf8(body_bytes)
-        .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
+        .map_err(|_error| Error::unsupported_source("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
     let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
         .with_leniency(source.options().leniency_value());
@@ -8092,7 +8244,7 @@ fn ordinary_paragraph_source_map_inner(
                 limit: source.limits().max_input_bytes(),
             })?;
         if absolute_span.start < previous_boundary_end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "ordinary paragraph source tokens overlap",
             ));
         }
@@ -8101,19 +8253,19 @@ fn ordinary_paragraph_source_map_inner(
                 let source_fragment =
                     source_bytes
                         .get(absolute_span.clone())
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "ordinary paragraph text token is outside the source",
                         ))?;
                 if value.is_empty() {
                     if !source_fragment.is_empty() {
-                        return Err(Error::UnsupportedSource(
+                        return Err(Error::unsupported_source(
                             "ordinary paragraph source contains an unmodeled control boundary",
                         ));
                     }
                     continue;
                 }
                 if !value.is_ascii() || source_fragment != value.as_bytes() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary paragraph source text is not one-to-one ASCII text",
                     ));
                 }
@@ -8133,7 +8285,7 @@ fn ordinary_paragraph_source_map_inner(
                     source_text_start = Some(absolute_span.start);
                 }
                 if semantic_text.as_bytes().get(semantic_position) != Some(&b'\n') {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary paragraph line boundary does not match semantic text",
                     ));
                 }
@@ -8155,7 +8307,7 @@ fn ordinary_paragraph_source_map_inner(
                     && source_bytes.get(source_range.clone())
                         == semantic_text.as_bytes().get(text_range.clone());
                 if !literal_source && !paragraph_has_inline_line {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary paragraph boundary is not a literal source boundary",
                     ));
                 }
@@ -8186,7 +8338,7 @@ fn ordinary_paragraph_source_map_inner(
             | crate::lexer::Token::CloseBrace
             | crate::lexer::Token::Control(_)
             | crate::lexer::Token::Binary(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "ordinary paragraph source contains a group, binary payload, or non-paragraph control",
                 ));
             },
@@ -8200,7 +8352,7 @@ fn ordinary_paragraph_source_map_inner(
             && source_bytes.get(source_range.clone())
                 == semantic_text.as_bytes().get(text_range.clone());
         if !literal_source && !paragraph_has_inline_line {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "ordinary paragraph final source range is not literal text",
             ));
         }
@@ -8214,7 +8366,7 @@ fn ordinary_paragraph_source_map_inner(
         || paragraphs.len() != source.paragraph_count()
         || (paragraphs.is_empty() && source.paragraph_count() != 0)
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary paragraph source map does not cover the complete body story",
         ));
     }
@@ -8235,7 +8387,7 @@ fn ordinary_run_body_source_span(
     options: crate::OpenOptions,
 ) -> Result<Range<usize>, Error> {
     let lexical = std::str::from_utf8(source)
-        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
     let arena = Bump::new();
     let mut lexer =
         crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
@@ -8253,7 +8405,7 @@ fn ordinary_run_body_source_span(
         }
         match token {
             crate::lexer::Token::OpenBrace => {
-                depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
                     "ordinary run source group nesting overflowed",
                 ))?;
             },
@@ -8262,20 +8414,20 @@ fn ordinary_run_body_source_span(
                     end = Some(span.start);
                     break;
                 }
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "ordinary run source has an unmatched closing group",
                 ))?;
             },
             _ => {},
         }
     }
-    let root_end = end.ok_or(Error::UnsupportedSource(
+    let root_end = end.ok_or(Error::unsupported_source(
         "ordinary run source root group has no closing boundary",
     ))?;
     match start {
         Some(start) => Ok(start..root_end),
         None if semantic_text.is_empty() => Ok(root_end..root_end),
-        None => Err(Error::UnsupportedSource(
+        None => Err(Error::unsupported_source(
             "ordinary run source has no body text span",
         )),
     }
@@ -8287,7 +8439,7 @@ fn empty_paragraph_boundary_formats(
     empty_paragraphs: &[bool],
 ) -> Result<Vec<Option<crate::types::Formatting>>, Error> {
     if paragraph_starts.len() != empty_paragraphs.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "empty paragraph formatting map has inconsistent paragraph axes",
         ));
     }
@@ -8318,21 +8470,19 @@ fn empty_paragraph_boundary_formats(
                 break;
             }
             if paragraph_start < block_start {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "empty paragraph formatting map crossed a native block boundary",
                 ));
             }
             let offset = paragraph_start.saturating_sub(block_start);
             if block_text.as_bytes().get(offset) != Some(&b'\n') {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "empty paragraph has no retained native newline block",
                 ));
             }
-            let format = formats
-                .get_mut(paragraph_index)
-                .ok_or(Error::UnsupportedSource(
-                    "empty paragraph formatting slot is missing",
-                ))?;
+            let format = formats.get_mut(paragraph_index).ok_or(Error::Internal(
+                "empty paragraph formatting slot is missing",
+            ))?;
             *format = Some(block.formatting);
             next_empty = paragraph_index.saturating_add(1);
             while empty_paragraphs.get(next_empty) == Some(&false) {
@@ -8342,12 +8492,12 @@ fn empty_paragraph_boundary_formats(
         block_start = block_end;
     }
     if next_empty < empty_paragraphs.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "empty paragraph formatting map did not cover a native newline block",
         ));
     }
     if block_start != source.text().len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "native style blocks do not cover the complete body text",
         ));
     }
@@ -8416,11 +8566,11 @@ fn ordinary_run_group_is_destination(
 /// destinations still fail closed because they have no ordinary run byte
 /// range that this operation can safely address.
 fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run-format editing refuses compressed RTF",
         ));
     }
@@ -8434,7 +8584,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         || !source.notes().is_empty()
         || !source.model().form_fields().is_empty()
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run-format editing refuses dependent body destinations or review content",
         ));
     }
@@ -8443,7 +8593,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         .inlines()
         .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run-format editing refuses inline line breaks",
         ));
     }
@@ -8453,17 +8603,17 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
     // skips header/opaque groups while retaining every body source byte.
     let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
     if body_span.start > body_span.end || body_span.end > source_bytes.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary run source span is malformed",
         ));
     }
     let body_bytes = source_bytes
         .get(body_span.clone())
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "ordinary run source span is outside the source",
         ))?;
     let body_input = std::str::from_utf8(body_bytes)
-        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
     let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
     for paragraph in &paragraphs {
         let raw = paragraph.format().raw();
@@ -8472,7 +8622,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             || raw.list_level.is_some()
             || raw.legacy_numbering.is_some()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "run-format editing refuses dependent style or list references",
             ));
         }
@@ -8486,7 +8636,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         .with_leniency(source.options().leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     if tokens.len() != spans.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::Internal(
             "ordinary run source token map is inconsistent",
         ));
     }
@@ -8507,8 +8657,8 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
     while token_index < tokens.len() {
         let token = tokens
             .get(token_index)
-            .ok_or(Error::UnsupportedSource("ordinary run token disappeared"))?;
-        let relative_span = spans.get(token_index).ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source("ordinary run token disappeared"))?;
+        let relative_span = spans.get(token_index).ok_or(Error::unsupported_source(
             "ordinary run token span disappeared",
         ))?;
         let absolute_span = relative_span
@@ -8535,7 +8685,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 }
             },
             crate::lexer::Token::CloseBrace => {
-                unicode_skip = unicode_skip_stack.pop().ok_or(Error::UnsupportedSource(
+                unicode_skip = unicode_skip_stack.pop().ok_or(Error::unsupported_source(
                     "ordinary run source has an unmatched closing group",
                 ))?;
                 if ignored_before != 0 {
@@ -8559,7 +8709,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                     value
                         .as_ref()
                         .get(current_text_offset..)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "ordinary run text suffix is not a character boundary",
                         ))?;
                 if !value.is_empty() {
@@ -8582,7 +8732,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                         value,
                     ))) = tokens.get(end)
                     else {
-                        return Err(Error::UnsupportedSource(
+                        return Err(Error::unsupported_source(
                             "ordinary Unicode run lost its control token",
                         ));
                     };
@@ -8657,7 +8807,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                                     .nth(remaining_fallback)
                                     .map_or(value.len(), |(offset, _)| offset);
                                 let fallback_span =
-                                    spans.get(fallback_cursor).ok_or(Error::UnsupportedSource(
+                                    spans.get(fallback_cursor).ok_or(Error::unsupported_source(
                                         "ordinary Unicode fallback span disappeared",
                                     ))?;
                                 partial_fallback_end = Some(
@@ -8684,7 +8834,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                             break;
                         },
                         _ => {
-                            return Err(Error::UnsupportedSource(
+                            return Err(Error::unsupported_source(
                                 "ordinary Unicode fallback contains structure",
                             ));
                         },
@@ -8692,7 +8842,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                     fallback_cursor = fallback_cursor.saturating_add(1);
                 }
                 let end_index = fallback_cursor.saturating_sub(1).max(end.saturating_sub(1));
-                let end_span = spans.get(end_index).ok_or(Error::UnsupportedSource(
+                let end_span = spans.get(end_index).ok_or(Error::unsupported_source(
                     "ordinary Unicode span disappeared",
                 ))?;
                 let end = partial_fallback_end
@@ -8717,11 +8867,11 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 let selected_paragraph =
                     paragraph_runs
                         .get(paragraph)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "ordinary run source has excess paragraph breaks",
                         ))?;
                 if run < selected_paragraph.len() || run_offset != 0 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary run source paragraph ended inside a run",
                     ));
                 }
@@ -8730,7 +8880,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 run_offset = 0;
                 run_source_start = None;
                 if paragraph > paragraphs.len() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary run source has excess paragraph breaks",
                     ));
                 }
@@ -8741,7 +8891,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             crate::lexer::Token::Control(crate::lexer::ControlWord::Line)
             | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineBreak(_))
             | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineHeight(_)) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "ordinary run source contains a visible or structural control",
                 ));
             },
@@ -8774,13 +8924,13 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                             | crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity
                     )
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary run source control symbol has no semantic mapping",
                     ));
                 }
             },
             crate::lexer::Token::Binary(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "ordinary run source contains binary data",
                 ));
             },
@@ -8794,39 +8944,39 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             let selected_paragraph =
                 paragraph_runs
                     .get(paragraph)
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "ordinary run source has excess visible text",
                     ))?;
             let selected_run =
                 selected_paragraph
                     .get(run)
                     .copied()
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "ordinary run source has excess visible text",
                     ))?;
             let expected = selected_run.text();
-            let remaining = expected.get(run_offset..).ok_or(Error::UnsupportedSource(
+            let remaining = expected.get(run_offset..).ok_or(Error::unsupported_source(
                 "ordinary run source text offset is invalid",
             ))?;
             if !remaining.starts_with(value) {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "ordinary run source text does not match the run axis",
                 ));
             }
             if value.len() > remaining.len() {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "ordinary run source token crosses a native run boundary",
                 ));
             }
             run_source_start.get_or_insert(visible_span.start);
             run_offset = run_offset.saturating_add(value.len());
             if run_offset == expected.len() {
-                let start = run_source_start.take().ok_or(Error::UnsupportedSource(
+                let start = run_source_start.take().ok_or(Error::unsupported_source(
                     "ordinary run source has no text start",
                 ))?;
                 let end = visible_span.end;
                 if start >= end {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "ordinary run source text range is empty",
                     ));
                 }
@@ -8859,7 +9009,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             .is_some_and(|selected| run < selected.len() || run_offset != 0)
         || result.len() != source.body().runs().count()
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary run source map does not cover the complete body story",
         ));
     }
@@ -8872,22 +9022,22 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
 /// literal `\\par` control (or the end of the body for an unterminated final
 /// paragraph).
 fn ordinary_run_paragraph_source_boundaries(source: &Package) -> Result<Vec<usize>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run insertion refuses compressed RTF",
         ));
     }
     let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
     let body_bytes = source_bytes
         .get(body_span.clone())
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "ordinary run source span is outside the source",
         ))?;
     let body_input = std::str::from_utf8(body_bytes)
-        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
     let arena = Bump::new();
     let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
         .with_leniency(source.options().leniency_value());
@@ -8943,7 +9093,7 @@ fn ordinary_run_paragraph_source_boundaries(source: &Package) -> Result<Vec<usiz
         boundaries.push(body_span.end);
     }
     if ignored_group_depth != 0 || boundaries.len() != source.paragraph_count() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "ordinary run paragraph source boundaries do not cover the body story",
         ));
     }
@@ -8985,7 +9135,7 @@ fn ordinary_paragraph_body_source_span(
     options: crate::OpenOptions,
 ) -> Result<Range<usize>, Error> {
     let lexical = std::str::from_utf8(source)
-        .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
+        .map_err(|_error| Error::unsupported_source("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
     let mut lexer =
         crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
@@ -8998,11 +9148,11 @@ fn ordinary_paragraph_body_source_span(
         match token {
             crate::lexer::Token::OpenBrace => {
                 if depth == 1 && start.is_some() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the ordinary paragraph body is not one contiguous root-level span",
                     ));
                 }
-                depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
                     "RTF group nesting overflowed while locating the ordinary body",
                 ))?;
             },
@@ -9011,7 +9161,7 @@ fn ordinary_paragraph_body_source_span(
                     end = Some(span.start);
                     break;
                 }
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "RTF group nesting underflowed while locating the ordinary body",
                 ))?;
             },
@@ -9022,7 +9172,7 @@ fn ordinary_paragraph_body_source_span(
                 start = Some(span.start);
             },
             crate::lexer::Token::Binary(_) if depth == 1 && start.is_some() => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "the ordinary paragraph body contains binary data",
                 ));
             },
@@ -9031,13 +9181,13 @@ fn ordinary_paragraph_body_source_span(
             | crate::lexer::Token::Binary(_) => {},
         }
     }
-    let root_end = end.ok_or(Error::UnsupportedSource(
+    let root_end = end.ok_or(Error::unsupported_source(
         "RTF root group has no closing ordinary-body boundary",
     ))?;
     match start {
         Some(start_offset) => Ok(start_offset..root_end),
         None if semantic_text.is_empty() => Ok(root_end..root_end),
-        None => Err(Error::UnsupportedSource(
+        None => Err(Error::unsupported_source(
             "the body has no literal source span for a lossless paragraph edit",
         )),
     }
@@ -9066,7 +9216,7 @@ fn paragraph_range(source: &Package, position: usize) -> Result<Range<usize>, Er
 
 fn paragraph_text_at(source: &Package, position: usize) -> Result<&str, Error> {
     let range = paragraph_range(source, position)?;
-    source.text().get(range).ok_or(Error::UnsupportedSource(
+    source.text().get(range).ok_or(Error::unsupported_source(
         "paragraph selector did not resolve to one UTF-8 body range",
     ))
 }
@@ -9169,7 +9319,7 @@ fn project_text(
         output.push_str(
             source_text
                 .get(cursor..span.start)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "staged text spans are not ordered UTF-8 boundaries",
                 ))?,
         );
@@ -9187,7 +9337,7 @@ fn project_text(
         ));
         cursor = span.end;
     }
-    output.push_str(source_text.get(cursor..).ok_or(Error::UnsupportedSource(
+    output.push_str(source_text.get(cursor..).ok_or(Error::unsupported_source(
         "staged text span ends outside the body",
     ))?);
     Ok((output, projected))
@@ -9334,7 +9484,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
         | Operation::PicturePayload(_)
         | Operation::PictureRemoval(_)
         | Operation::RootTransfer { .. } => {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "non-lifecycle operation entered lifecycle projection",
             ));
         },
@@ -9352,28 +9502,28 @@ fn plain_lifecycle_paragraphs(
     source: &Package,
     allow_terminal_break: bool,
 ) -> Result<Vec<String>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware rewrite",
         ));
     }
     if !source_bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph lifecycle editing refuses non-ASCII transport encodings",
         ));
     }
     if !source.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph lifecycle editing refuses unknown RTF syntax",
         ));
     }
     source
         .model()
         .plain_body_text_editability()
-        .map_err(Error::UnsupportedSource)?;
+        .map_err(Error::unsupported_source)?;
     ensure_default_body_formatting(source)?;
     let paragraphs = source
         .body()
@@ -9381,7 +9531,7 @@ fn plain_lifecycle_paragraphs(
         .map(|paragraph| paragraph.to_text())
         .collect::<Vec<_>>();
     if paragraphs.iter().any(|paragraph| paragraph.contains('\n')) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph lifecycle editing requires an unambiguous ordinary body story",
         ));
     }
@@ -9393,7 +9543,7 @@ fn plain_lifecycle_paragraphs(
             && text.len() == joined.len().saturating_add(1)
             && text.strip_suffix('\n') == Some(joined.as_str()));
     if !matches_joined {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "paragraph lifecycle editing requires an unambiguous ordinary body story",
         ));
     }
@@ -9474,7 +9624,7 @@ fn uniform_body_bold(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let bold = run.format().bold();
         if value.is_some_and(|existing| existing != bold) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -9636,7 +9786,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
             if !span_fully_covered(run_span, &bold_spans) {
                 let value = run.format().bold();
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed bold state",
                     ));
                 }
@@ -9696,7 +9846,7 @@ fn uniform_body_italic(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let italic = run.format().italic();
         if value.is_some_and(|existing| existing != italic) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -9760,7 +9910,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             if !span_fully_covered(run_span, &italic_spans) {
                 let value = run.format().italic();
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed italic state",
                     ));
                 }
@@ -9820,7 +9970,7 @@ fn uniform_body_underline(source: &Package) -> Result<UnderlineStyle, Error> {
     for run in source.body().runs() {
         let underline = run.format().underline();
         if value.is_some_and(|existing| existing != underline) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -9887,7 +10037,7 @@ fn base_underline_for_edit(
             if !span_fully_covered(run_span, &underline_spans) {
                 let value = run.format().underline();
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed underline state",
                     ));
                 }
@@ -9947,7 +10097,7 @@ fn uniform_body_font_size(source: &Package) -> Result<NonZeroU16, Error> {
     for run in source.body().runs() {
         let font_size = run.format().raw().font_size;
         if value.is_some_and(|existing| existing != font_size) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10014,7 +10164,7 @@ fn base_font_size_for_edit(
             if !span_fully_covered(run_span, &font_size_spans) {
                 let value = run.format().raw().font_size;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed font-size state",
                     ));
                 }
@@ -10075,7 +10225,7 @@ fn validate_character_baseline(baseline: CharacterBaseline) -> Result<(), Error>
         | CharacterBaseline::LoweredHalfPoints(value)
             if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS =>
         {
-            Err(Error::UnsupportedSource(
+            Err(Error::unsupported_source(
                 "character baseline is out of range",
             ))
         },
@@ -10099,17 +10249,17 @@ fn map_positioning_error(error: RtfError, fallback: &'static str) -> Error {
     match error {
         RtfError::MalformedDocument(message) => match message.as_str() {
             "RTF legacy character spacing is out of range" => {
-                Error::UnsupportedSource("legacy character spacing is out of range")
+                Error::unsupported_source("legacy character spacing is out of range")
             },
             "RTF legacy character scale is out of range" => {
-                Error::UnsupportedSource("legacy character scale is out of range")
+                Error::unsupported_source("legacy character scale is out of range")
             },
             "RTF legacy character kerning is out of range" => {
-                Error::UnsupportedSource("legacy character kerning is out of range")
+                Error::unsupported_source("legacy character kerning is out of range")
             },
-            _ => Error::UnsupportedSource(fallback),
+            _ => Error::unsupported_source(fallback),
         },
-        _ => Error::UnsupportedSource(fallback),
+        _ => Error::unsupported_source(fallback),
     }
 }
 
@@ -10175,7 +10325,7 @@ fn base_character_property_for_edit<T: Copy + PartialEq>(
             if !span_fully_covered(run_span, selected_spans) {
                 let value = getter(run.format().raw())?;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(mixed_error));
+                    return Err(Error::unsupported_source(mixed_error));
                 }
                 base = Some(value);
             }
@@ -10238,7 +10388,7 @@ fn character_property_for_span<T: Copy + PartialEq>(
             if start < end {
                 let current = getter(run.format().raw())?;
                 if value.is_some_and(|existing| existing != current) {
-                    return Err(Error::UnsupportedSource(mixed_error));
+                    return Err(Error::unsupported_source(mixed_error));
                 }
                 value = Some(current);
                 covered = covered.saturating_add(end - start);
@@ -10250,11 +10400,11 @@ fn character_property_for_span<T: Copy + PartialEq>(
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(empty_error))
+    value.ok_or(Error::unsupported_source(empty_error))
 }
 
 fn base_expansion_for_edit(
@@ -10340,7 +10490,7 @@ fn uniform_body_baseline(source: &Package) -> Result<CharacterBaseline, Error> {
     for run in source.body().runs() {
         let baseline = effective_baseline(run.format().raw());
         if value.is_some_and(|existing| existing != baseline) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10407,7 +10557,7 @@ fn base_baseline_for_edit(
             if !span_fully_covered(run_span, &baseline_spans) {
                 let value = effective_baseline(run.format().raw());
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed baseline state",
                     ));
                 }
@@ -10467,7 +10617,7 @@ fn uniform_body_strike(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let strike = run.format().raw().strike;
         if value.is_some_and(|existing| existing != strike) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10481,7 +10631,7 @@ fn uniform_body_double_strike(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let double_strike = run.format().raw().double_strike;
         if value.is_some_and(|existing| existing != double_strike) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10545,7 +10695,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             if !span_fully_covered(run_span, &strike_spans) {
                 let value = run.format().raw().strike;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed strike state",
                     ));
                 }
@@ -10655,7 +10805,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
             if !span_fully_covered(run_span, &double_strike_spans) {
                 let value = run.format().raw().double_strike;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed double-strike state",
                     ));
                 }
@@ -10715,7 +10865,7 @@ fn uniform_body_hidden(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let hidden = run.format().raw().hidden;
         if value.is_some_and(|existing| existing != hidden) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10779,7 +10929,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             if !span_fully_covered(run_span, &hidden_spans) {
                 let value = run.format().raw().hidden;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed hidden state",
                     ));
                 }
@@ -10839,7 +10989,7 @@ fn uniform_body_small_caps(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let small_caps = run.format().raw().smallcaps;
         if value.is_some_and(|existing| existing != small_caps) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -10903,7 +11053,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
             if !span_fully_covered(run_span, &small_caps_spans) {
                 let value = run.format().raw().smallcaps;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed small-caps state",
                     ));
                 }
@@ -10963,7 +11113,7 @@ fn uniform_body_all_caps(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let all_caps = run.format().raw().all_caps;
         if value.is_some_and(|existing| existing != all_caps) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -11027,7 +11177,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
             if !span_fully_covered(run_span, &all_caps_spans) {
                 let value = run.format().raw().all_caps;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed all-caps state",
                     ));
                 }
@@ -11087,7 +11237,7 @@ fn uniform_body_outline(source: &Package) -> Result<bool, Error> {
     for run in source.body().runs() {
         let outline = run.format().raw().outline;
         if value.is_some_and(|existing| existing != outline) {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the body has mixed character formatting",
             ));
         }
@@ -11175,7 +11325,7 @@ fn base_outline_for_edit(source: &Package, operations: &[Operation]) -> Result<b
             if !span_fully_covered(run_span, &outline_spans) {
                 let value = run.format().raw().outline;
                 if base.is_some_and(|existing| existing != value) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "unselected body text has mixed outline state",
                     ));
                 }
@@ -11212,7 +11362,7 @@ fn bold_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let bold = run.format().bold();
                 if value.is_some_and(|existing| existing != bold) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed bold state",
                     ));
                 }
@@ -11226,11 +11376,11 @@ fn bold_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11249,7 +11399,7 @@ fn italic_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let italic = run.format().italic();
                 if value.is_some_and(|existing| existing != italic) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed italic state",
                     ));
                 }
@@ -11263,11 +11413,11 @@ fn italic_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11286,7 +11436,7 @@ fn underline_for_span(source: &Package, span: TextSpan) -> Result<UnderlineStyle
             if start < end {
                 let underline = run.format().underline();
                 if value.is_some_and(|existing| existing != underline) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed underline state",
                     ));
                 }
@@ -11300,11 +11450,11 @@ fn underline_for_span(source: &Package, span: TextSpan) -> Result<UnderlineStyle
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11323,7 +11473,7 @@ fn strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let strike = run.format().raw().strike;
                 if value.is_some_and(|existing| existing != strike) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed strike state",
                     ));
                 }
@@ -11337,11 +11487,11 @@ fn strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11360,7 +11510,7 @@ fn double_strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Erro
             if start < end {
                 let double_strike = run.format().raw().double_strike;
                 if value.is_some_and(|existing| existing != double_strike) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed double-strike state",
                     ));
                 }
@@ -11374,11 +11524,11 @@ fn double_strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Erro
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11397,7 +11547,7 @@ fn hidden_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let hidden = run.format().raw().hidden;
                 if value.is_some_and(|existing| existing != hidden) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed hidden state",
                     ));
                 }
@@ -11411,11 +11561,11 @@ fn hidden_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11434,7 +11584,7 @@ fn small_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> 
             if start < end {
                 let small_caps = run.format().raw().smallcaps;
                 if value.is_some_and(|existing| existing != small_caps) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed small-caps state",
                     ));
                 }
@@ -11448,11 +11598,11 @@ fn small_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> 
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11474,7 +11624,7 @@ fn font_size_for_span(source: &Package, span: TextSpan) -> Result<NonZeroU16, Er
             if start < end {
                 let font_size = run.format().raw().font_size;
                 if value.is_some_and(|existing| existing != font_size) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed font-size state",
                     ));
                 }
@@ -11488,11 +11638,11 @@ fn font_size_for_span(source: &Package, span: TextSpan) -> Result<NonZeroU16, Er
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected span is not entirely ordinary body text",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected span has no character formatting",
     ))
 }
@@ -11514,7 +11664,7 @@ fn baseline_for_span(source: &Package, span: TextSpan) -> Result<CharacterBaseli
             if start < end {
                 let baseline = effective_baseline(run.format().raw());
                 if value.is_some_and(|existing| existing != baseline) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed baseline state",
                     ));
                 }
@@ -11528,11 +11678,11 @@ fn baseline_for_span(source: &Package, span: TextSpan) -> Result<CharacterBaseli
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected span is not entirely ordinary body text",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected span has no character formatting",
     ))
 }
@@ -11551,7 +11701,7 @@ fn all_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let all_caps = run.format().raw().all_caps;
                 if value.is_some_and(|existing| existing != all_caps) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed all-caps state",
                     ));
                 }
@@ -11565,11 +11715,11 @@ fn all_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11588,7 +11738,7 @@ fn outline_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             if start < end {
                 let outline = run.format().raw().outline;
                 if value.is_some_and(|existing| existing != outline) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed outline state",
                     ));
                 }
@@ -11602,11 +11752,11 @@ fn outline_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11628,7 +11778,7 @@ fn formatting_for_span(
             if start < end {
                 let formatting = *run.format().raw();
                 if value.is_some_and(|existing| existing != formatting) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the selected character span has mixed formatting",
                     ));
                 }
@@ -11642,11 +11792,11 @@ fn formatting_for_span(
             .saturating_add(1);
     }
     if covered != span.end.saturating_sub(span.start) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the selected character span crosses non-text inline content",
         ));
     }
-    value.ok_or(Error::UnsupportedSource(
+    value.ok_or(Error::unsupported_source(
         "the selected character span has no text run",
     ))
 }
@@ -11683,7 +11833,7 @@ fn ordinary_run_text_spans(
         .windows(2)
         .any(|pair| matches!(pair, [left, right] if (right.0, right.1) <= (left.0, left.1)))
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run-text operations are not source ordered",
         ));
     }
@@ -11728,7 +11878,7 @@ fn ordinary_run_text_spans(
                 let (requested_paragraph, requested_run, replacement_len) = requested
                     .get(requested_index)
                     .copied()
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "run-text selector cursor disappeared",
                     ))?;
                 let replacement_len = replacement_len.saturating_add(usize::from(
@@ -11816,7 +11966,7 @@ fn base_position_changes(
                 if source.is_some() {
                     let (span, replacement_len) =
                         run_text_spans.get(run_text_index).copied().ok_or(
-                            Error::UnsupportedSource("run-text source span cursor disappeared"),
+                            Error::unsupported_source("run-text source span cursor disappeared"),
                         )?;
                     raw.push((span, replacement_len, false));
                     run_text_index = run_text_index.saturating_add(1);
@@ -11902,7 +12052,7 @@ fn project_base_position_from_changes(
         let change =
             changes
                 .get(change_count.saturating_sub(1))
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "body position change cursor disappeared",
                 ))?;
         (change.source_end, change.projected_end)
@@ -11977,11 +12127,11 @@ fn ordinary_body_source_span(
         match token {
             crate::lexer::Token::OpenBrace => {
                 if depth == 1 && start.is_some() && !allow_nested_root_groups {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the body source is not one contiguous root-level span",
                     ));
                 }
-                depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
                     "RTF group nesting overflowed while locating the body",
                 ))?;
             },
@@ -11990,7 +12140,7 @@ fn ordinary_body_source_span(
                     end = Some(span.start);
                     break;
                 }
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "RTF group nesting underflowed while locating the body",
                 ))?;
             },
@@ -11998,7 +12148,7 @@ fn ordinary_body_source_span(
                 start = Some(span.start);
             },
             crate::lexer::Token::Binary(_) if start.is_some() => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "the body source contains binary data",
                 ));
             },
@@ -12007,22 +12157,22 @@ fn ordinary_body_source_span(
             | crate::lexer::Token::Binary(_) => {},
         }
     }
-    let root_end = end.ok_or(Error::UnsupportedSource(
+    let root_end = end.ok_or(Error::unsupported_source(
         "RTF root group has no closing boundary",
     ))?;
     match start {
         Some(start_offset) => Ok(start_offset..root_end),
         None if semantic_text.is_empty() => Ok(root_end..root_end),
-        None => Err(Error::UnsupportedSource(
+        None => Err(Error::unsupported_source(
             "the body has no literal source span for a lossless replacement",
         )),
     }
 }
 
 fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
     let mut search_start = body_span.start;
     let mut offsets = Vec::new();
@@ -12033,20 +12183,20 @@ fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
     {
         let node_source = node.source();
         if node_source.is_empty() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "an empty body-anchored opaque node cannot be located",
             ));
         }
         let haystack =
             source_bytes
                 .get(search_start..body_span.end)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "body opaque search range is outside the source",
                 ))?;
         let relative = haystack
             .windows(node_source.len())
             .position(|window| window == node_source)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "body-anchored opaque syntax cannot be located in source",
             ))?;
         let offset = search_start.saturating_add(relative);
@@ -12068,7 +12218,7 @@ fn run_insertion_position_changes(
     source_offsets: &[usize],
 ) -> Result<Vec<RunInsertionPositionChange>, Error> {
     if operations.len() != source_offsets.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "run-insertion source offsets do not cover every operation",
         ));
     }
@@ -12078,7 +12228,9 @@ fn run_insertion_position_changes(
         .map_err(|_error| Error::Write("could not reserve opaque insertion changes".to_string()))?;
     for (operation, source_offset) in operations.iter().zip(source_offsets) {
         let Operation::RunInsert { span, text, .. } = operation else {
-            return Err(Error::StructuralPropertyConflict);
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
         };
         changes.push(RunInsertionPositionChange {
             semantic_position: span.start,
@@ -12138,7 +12290,7 @@ fn validate_opaque_preservation(
         .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
         .collect::<Vec<_>>();
     if source_nodes.len() != target_nodes.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "body-anchored opaque syntax changed during publication",
         ));
     }
@@ -12166,12 +12318,12 @@ fn validate_opaque_preservation(
         source_nodes.iter().zip(&target_nodes).enumerate()
     {
         let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "source opaque anchor is not a body position",
             ));
         };
         let crate::opaque::Anchor::Body(target_position) = target_node.anchor() else {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "target opaque anchor is not a body position",
             ));
         };
@@ -12181,17 +12333,17 @@ fn validate_opaque_preservation(
             let node_source_offset =
                 *opaque_offsets
                     .get(node_index)
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "body opaque source cursor disappeared",
                     ))?;
             let changes = insertion_position_changes
                 .as_ref()
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "run-insertion position changes are unavailable",
                 ))?;
             project_run_insertion_opaque_position(source_position, node_source_offset, changes)?
         } else {
-            let changes = position_changes.as_ref().ok_or(Error::UnsupportedSource(
+            let changes = position_changes.as_ref().ok_or(Error::unsupported_source(
                 "body position changes are unavailable",
             ))?;
             project_base_position_from_changes(source_position, changes)?
@@ -12200,7 +12352,7 @@ fn validate_opaque_preservation(
             || target_node.kind() != source_node.kind()
             || target_node.source() != source_node.source()
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "body-anchored opaque syntax changed during publication",
             ));
         }
@@ -12304,7 +12456,9 @@ fn encoded_body_with_properties(
         let alignment = alignments
             .get(paragraph)
             .copied()
-            .ok_or(Error::StructuralPropertyConflict)?;
+            .ok_or(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ))?;
         output.append(br"\plain ")?;
         let result = RtfWriter::new(&mut output).write_formatting(&baseline);
         if let Err(error) = result {
@@ -12564,7 +12718,9 @@ fn encoded_body_with_properties(
         paragraph_start = paragraph_end.saturating_add(1);
     }
     if paragraph != alignments.len() {
-        return Err(Error::StructuralPropertyConflict);
+        return Err(Error::unsupported_operation(
+            "paragraph-structure and property changes cannot compose safely",
+        ));
     }
     Ok(output.into_inner())
 }
@@ -12585,7 +12741,9 @@ fn encoded_body_with_paragraph_properties(
     for (position, paragraph) in source.body().paragraphs().enumerate() {
         let properties = properties
             .get(position)
-            .ok_or(Error::StructuralPropertyConflict)?;
+            .ok_or(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ))?;
         let paragraph_end =
             body_position
                 .checked_add(paragraph.len())
@@ -12628,7 +12786,9 @@ fn encoded_body_with_paragraph_properties(
                             limit: limits.max_input_bytes(),
                         })?;
                 if run_end > paragraph_end {
-                    return Err(Error::StructuralPropertyConflict);
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
                 }
                 write_bounded(&mut output, br"\plain\pard ")?;
                 let result = {
@@ -12657,14 +12817,18 @@ fn encoded_body_with_paragraph_properties(
                 run_position = run_end;
             }
             if run_position != paragraph_end {
-                return Err(Error::StructuralPropertyConflict);
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
             }
         }
         body_position = paragraph_end.saturating_add(usize::from(terminated));
         paragraph_count = paragraph_count.saturating_add(1);
     }
     if paragraph_count != properties.len() {
-        return Err(Error::StructuralPropertyConflict);
+        return Err(Error::unsupported_operation(
+            "paragraph-structure and property changes cannot compose safely",
+        ));
     }
     write_text_with_body_opaque(
         &mut output,
@@ -12677,12 +12841,12 @@ fn encoded_body_with_paragraph_properties(
         source.model().bookmarks(),
     )?;
     if opaque_index != opaque_nodes.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "body-anchored opaque syntax was not covered by the source span",
         ));
     }
     if layout_event_index != layout_events.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "body story metadata was not covered by the rewritten body",
         ));
     }
@@ -12700,9 +12864,9 @@ fn body_opaque_nodes<'a>(
     source: &'a Package,
     source_span: &Range<usize>,
 ) -> Result<Vec<&'a crate::opaque::Node>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     let mut nodes = Vec::new();
     nodes
         .try_reserve(source.opaque().len())
@@ -12711,7 +12875,7 @@ fn body_opaque_nodes<'a>(
     let mut source_cursor = 0usize;
     for node in source.opaque() {
         if node.source().is_empty() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "body-anchored opaque syntax has no stable source span",
             ));
         }
@@ -12723,7 +12887,7 @@ fn body_opaque_nodes<'a>(
                     .position(|window| window == node.source())
             })
             .map(|relative| source_cursor.saturating_add(relative))
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "body-anchored opaque syntax is absent from the source span",
             ))?;
         let node_end = node_start.saturating_add(node.source().len());
@@ -12735,21 +12899,21 @@ fn body_opaque_nodes<'a>(
             || !source.text().is_char_boundary(offset)
             || previous.is_some_and(|value| value > offset)
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "body-anchored opaque syntax has no stable source span",
             ));
         }
         previous = Some(offset);
         if node_start < source_span.start {
             if node_end > source_span.start {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "body-anchored opaque syntax crosses the source span boundary",
                 ));
             }
             continue;
         }
         if node_end > source_span.end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "body-anchored opaque syntax exceeds the source span",
             ));
         }
@@ -12783,20 +12947,20 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
     for (source_order, event) in source.model().body_story_events().iter().enumerate() {
         let (position, kind) = match *event {
             crate::BodyStoryEvent::BookmarkStart(index) => {
-                let bookmark = bookmarks.get(index).ok_or(Error::UnsupportedSource(
+                let bookmark = bookmarks.get(index).ok_or(Error::unsupported_source(
                     "bookmark metadata references a missing body bookmark",
                 ))?;
                 (bookmark.position, BodyLayoutEventKind::BookmarkStart(index))
             },
             crate::BodyStoryEvent::BookmarkEnd(index) => {
-                let bookmark = bookmarks.get(index).ok_or(Error::UnsupportedSource(
+                let bookmark = bookmarks.get(index).ok_or(Error::unsupported_source(
                     "bookmark metadata references a missing body bookmark",
                 ))?;
                 (
                     bookmark
                         .position
                         .checked_add(bookmark.content.len())
-                        .ok_or(Error::UnsupportedSource("bookmark body range overflow"))?,
+                        .ok_or(Error::unsupported_source("bookmark body range overflow"))?,
                     BodyLayoutEventKind::BookmarkEnd(index),
                 )
             },
@@ -12811,7 +12975,7 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
                 BodyLayoutEventKind::SoftBreak(soft_break),
             ),
             _ => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "body contains unsupported positioned structure",
                 ));
             },
@@ -12825,7 +12989,7 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
             continue;
         }
         if source.text().get(position..position).is_none() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "bookmark metadata is outside a UTF-8 body boundary",
             ));
         }
@@ -12853,7 +13017,7 @@ fn write_text_with_body_opaque(
     loop {
         let node_offset = nodes.get(*node_index).map(|node| {
             let crate::opaque::Anchor::Body(offset) = node.anchor() else {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "non-body opaque syntax entered body source publication",
                 ));
             };
@@ -12872,7 +13036,7 @@ fn write_text_with_body_opaque(
             break;
         };
         if offset < range.start {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "body metadata fell outside its source span",
             ));
         }
@@ -12883,7 +13047,7 @@ fn write_text_with_body_opaque(
         {
             let event = *layout_events
                 .get(*layout_event_index)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::Internal(
                     "body story metadata index became inconsistent",
                 ))?;
             let result = match event.kind {
@@ -12892,7 +13056,7 @@ fn write_text_with_body_opaque(
                         bookmarks
                             .bookmarks()
                             .get(index)
-                            .ok_or(Error::UnsupportedSource(
+                            .ok_or(Error::unsupported_source(
                                 "bookmark metadata references a missing bookmark",
                             ))?;
                     let mut writer = RtfWriter::new(&mut *output);
@@ -12903,7 +13067,7 @@ fn write_text_with_body_opaque(
                         bookmarks
                             .bookmarks()
                             .get(index)
-                            .ok_or(Error::UnsupportedSource(
+                            .ok_or(Error::unsupported_source(
                                 "bookmark metadata references a missing bookmark",
                             ))?;
                     let mut writer = RtfWriter::new(&mut *output);
@@ -12935,7 +13099,7 @@ fn write_text_with_body_opaque(
             *layout_event_index = layout_event_index.saturating_add(1);
         }
         if node_offset == offset {
-            let node = nodes.get(*node_index).ok_or(Error::UnsupportedSource(
+            let node = nodes.get(*node_index).ok_or(Error::Internal(
                 "body opaque node index became inconsistent",
             ))?;
             write_bounded(output, node.source())?;
@@ -13019,7 +13183,7 @@ fn write_encoded_fragment(
     text: &str,
     range: Range<usize>,
 ) -> Result<(), Error> {
-    let fragment = text.get(range).ok_or(Error::UnsupportedSource(
+    let fragment = text.get(range).ok_or(Error::unsupported_source(
         "property span is not a UTF-8 text boundary",
     ))?;
     match RtfWriter::new(&mut *output).write_text(fragment) {
@@ -13061,7 +13225,9 @@ fn write_underline(output: &mut BoundedVec, underline: UnderlineStyle) -> Result
 }
 
 fn write_alignment(output: &mut BoundedVec, alignment: Option<Alignment>) -> Result<(), Error> {
-    let bytes = match alignment.ok_or(Error::StructuralPropertyConflict)? {
+    let bytes = match alignment.ok_or(Error::unsupported_operation(
+        "paragraph-structure and property changes cannot compose safely",
+    ))? {
         Alignment::Left => br"\ql ".as_slice(),
         Alignment::Right => br"\qr ".as_slice(),
         Alignment::Center => br"\qc ".as_slice(),
@@ -13095,7 +13261,7 @@ fn splice_body(
     let retained = source
         .len()
         .checked_sub(span.end.saturating_sub(span.start))
-        .ok_or(Error::UnsupportedSource("body source span is invalid"))?;
+        .ok_or(Error::unsupported_source("body source span is invalid"))?;
     let total = retained
         .checked_add(replacement.len())
         .ok_or(Error::InputTooLarge {
@@ -13112,11 +13278,11 @@ fn splice_body(
     output
         .try_reserve_exact(total)
         .map_err(|_error| Error::Write("could not reserve candidate RTF bytes".to_string()))?;
-    output.extend_from_slice(source.get(..span.start).ok_or(Error::UnsupportedSource(
+    output.extend_from_slice(source.get(..span.start).ok_or(Error::unsupported_source(
         "body source span starts outside the document",
     ))?);
     output.extend_from_slice(replacement);
-    output.extend_from_slice(source.get(span.end..).ok_or(Error::UnsupportedSource(
+    output.extend_from_slice(source.get(span.end..).ok_or(Error::unsupported_source(
         "body source span ends outside the document",
     ))?);
     Ok(output)
@@ -13131,7 +13297,7 @@ fn splice_body_ranges(
     let mut previous_end = 0usize;
     for (span, replacement) in replacements {
         if span.start < previous_end || span.end < span.start || span.end > source.len() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "paragraph source replacement ranges overlap",
             ));
         }
@@ -13157,12 +13323,12 @@ fn splice_body_ranges(
     let mut cursor = 0usize;
     for (span, replacement) in replacements {
         output.extend_from_slice(source.get(cursor..span.start).ok_or(
-            Error::UnsupportedSource("paragraph source replacement starts outside the source"),
+            Error::unsupported_source("paragraph source replacement starts outside the source"),
         )?);
         output.extend_from_slice(replacement);
         cursor = span.end;
     }
-    output.extend_from_slice(source.get(cursor..).ok_or(Error::UnsupportedSource(
+    output.extend_from_slice(source.get(cursor..).ok_or(Error::unsupported_source(
         "paragraph source replacement ends outside the source",
     ))?);
     Ok(output)
@@ -14542,7 +14708,7 @@ impl Patch {
         if source.options() == self.after.options() {
             return Ok(self.after.clone());
         }
-        let bytes = self.after.source_bytes().ok_or(Error::UnsupportedSource(
+        let bytes = self.after.source_bytes().ok_or(Error::unsupported_source(
             "patch target has no retained source artifact",
         ))?;
         Ok(Package::from_bytes_with_options(bytes, source.options())?)
@@ -15293,9 +15459,9 @@ pub(crate) fn apply_durable<Mode>(
             "RTF durable operations do not accept artifact blobs".to_string(),
         ));
     }
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     let source_hash = litchi_core::patch::BlobId::of(source_bytes).as_hex();
     let picture_operation_count = patch
         .operations()
@@ -15980,7 +16146,7 @@ pub(crate) fn apply_durable<Mode>(
                     .get(raw_position)
                     .and_then(|paragraph| paragraph.boundary_after.as_ref())
                     .and_then(|span| source.source_bytes()?.get(span.clone()))
-                    .ok_or(Error::UnsupportedSource(
+                    .ok_or(Error::unsupported_source(
                         "ordinary paragraph merge has no exact source boundary",
                     ))?;
                 if actual_boundary != boundary.as_slice() {
@@ -16119,9 +16285,9 @@ pub(crate) fn apply_durable<Mode>(
     }
     let snapshot = edit.commit()?.into_package();
     if let Some(expected_hash) = expected_result_hash {
-        let result_bytes = snapshot
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        let result_bytes = snapshot.source_bytes().ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
         let actual_hash = litchi_core::patch::BlobId::of(result_bytes).as_hex();
         if actual_hash != expected_hash {
             return Err(Error::StalePrecondition("durable paragraph result differs"));

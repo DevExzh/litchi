@@ -165,7 +165,9 @@ fn state_changing_controls_inside_the_story_are_refused() {
     let mut edit = source.edit();
     edit.set_table_cell_text(TableCellPath::outer(0, 0, 0), "X")
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(source.to_bytes().unwrap(), exact);
 
     // The neighbouring plain cell still splices exactly.
@@ -189,7 +191,7 @@ fn header_paragraph_breaks_are_refused_before_staging() {
             HeaderFooterParagraph::new(0, HeaderFooterType::Header, 0),
             "two\nlines",
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 

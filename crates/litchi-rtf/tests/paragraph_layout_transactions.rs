@@ -10,7 +10,7 @@ use litchi_rtf::{
     Alignment, CharacterBaseline, EditOptions, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, Package,
     ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
     ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
-    ParagraphFrameWrap, ProtectionType, SemanticLimitKind, SemanticLimits, SourceLimits,
+    ParagraphFrameWrap, SemanticLimitKind, SemanticLimits, SourceLimits,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
@@ -282,7 +282,7 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
         .unwrap();
     assert!(matches!(
         edit.replace_text(TextSpan::new(0, 3).unwrap(), "First"),
-        Err(Error::ParagraphLayoutTextConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-layout updates cannot compose with body text or character changes"
     ));
     let commit = edit.commit().unwrap();
     assert!(layout(commit.package(), 0).keep_together());
@@ -766,9 +766,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
         .unwrap();
     assert!(matches!(
         changed.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::ReadOnly
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     for source in [
@@ -784,7 +782,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
                 Position::new(0),
                 ParagraphLayoutPatch::new().with_space_before(20)
             ),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
         assert_eq!(edit.operation_count(), 0);
         assert_eq!(source.to_bytes().unwrap(), exact);
@@ -798,7 +796,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
             Position::new(0),
             ParagraphLayoutPatch::new().with_space_before(20)
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let mut non_ascii_bytes = br"{\rtf1\ansi\ansicpg1252 Caf".to_vec();
@@ -811,7 +809,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
             Position::new(0),
             ParagraphLayoutPatch::new().with_space_before(20)
         ),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let source_text = r"{\rtf1 A}";

@@ -148,9 +148,7 @@ fn positioned_insert_rejects_protected_sources_after_staging() {
     edit.insert_paragraph(Position::new(1), "").unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: litchi_rtf::ProtectionType::ReadOnly
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 }
 
@@ -466,7 +464,7 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
         .unwrap();
     assert!(matches!(
         property.remove_paragraph(Position::new(1)),
-        Err(Error::StructuralPropertyConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-structure and property changes cannot compose safely"
     ));
     assert_eq!(source.text(), "First\nSecond\nThird\nFourth");
 
@@ -522,7 +520,9 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
         edit.remove_paragraph(Position::new(0)).unwrap();
-        assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+        assert!(
+            matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+        );
         assert_eq!(source.to_bytes().unwrap(), exact);
     }
 
@@ -532,7 +532,9 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     let source = Package::from_bytes(&cp1252).unwrap();
     let mut edit = source.edit();
     edit.remove_paragraph(Position::new(0)).unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(source.to_bytes().unwrap(), cp1252);
 
     let raw = br"{\rtf1\ansi One\par Two}";
@@ -541,7 +543,9 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     let mut edit = source.edit();
     edit.move_paragraph(Position::new(0), Position::new(1))
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(source.to_bytes().unwrap(), compressed);
 }
 

@@ -5,9 +5,7 @@
 )]
 
 use litchi_core::Position;
-use litchi_rtf::{
-    EditOptions, Package, ProtectionType, SemanticLimitKind, SemanticLimits, edit::Error,
-};
+use litchi_rtf::{EditOptions, Package, SemanticLimitKind, SemanticLimits, edit::Error};
 
 fn semantic_limits(max_operations: usize) -> SemanticLimits {
     SemanticLimits::builder()
@@ -206,7 +204,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
         let mut split = source.edit();
         assert!(matches!(
             split.split_paragraph(Position::new(0), 1),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
         assert_eq!(split.operation_count(), 0);
         assert_eq!(source.to_bytes().unwrap(), original);
@@ -214,7 +212,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
         let mut merge = source.edit();
         assert!(matches!(
             merge.merge_paragraphs(Position::new(0), Position::new(1)),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
         assert_eq!(merge.operation_count(), 0);
         assert_eq!(source.to_bytes().unwrap(), original);
@@ -283,16 +281,14 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     edit.split_paragraph(Position::new(0), 1).unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::ReadOnly
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let undelimited_empty = Package::parse(r"{\rtf1\ansi\par First}").unwrap();
     let mut undelimited_edit = undelimited_empty.edit();
     assert!(matches!(
         undelimited_edit.merge_paragraphs(Position::new(0), Position::new(1)),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert_eq!(undelimited_edit.operation_count(), 0);
 }

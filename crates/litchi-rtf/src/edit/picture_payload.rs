@@ -137,10 +137,10 @@ impl Edit {
             });
         }
         for pair in positions.windows(2) {
-            let previous = pair.first().copied().ok_or(Error::UnsupportedSource(
+            let previous = pair.first().copied().ok_or(Error::Internal(
                 "picture removal ordering became inconsistent",
             ))?;
-            let incoming = pair.get(1).copied().ok_or(Error::UnsupportedSource(
+            let incoming = pair.get(1).copied().ok_or(Error::Internal(
                 "picture removal ordering became inconsistent",
             ))?;
             if incoming <= previous {
@@ -167,7 +167,7 @@ impl Edit {
                 count: located.len(),
             })?;
             let group_start = picture.group_span.start.checked_sub(removed_before).ok_or(
-                Error::UnsupportedSource("picture removal provenance overlaps"),
+                Error::unsupported_source("picture removal provenance overlaps"),
             )?;
             staged.push(Operation::PictureRemoval(StagedPictureRemoval {
                 position,
@@ -247,7 +247,9 @@ impl Edit {
             .iter()
             .any(|operation| !operation.is_picture_payload())
         {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         self.ensure_operation_room_for(replacements.len())?;
         let observed_picture_operations = self.operations.len().saturating_add(replacements.len());
@@ -351,7 +353,9 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let mut candidate_bytes = Vec::new();
     candidate_bytes
         .try_reserve(source_bytes.len())
@@ -360,7 +364,9 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
 
     for operation in &edit.operations {
         let Operation::PicturePayload(operation) = operation else {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         };
         let picture = located
             .get(operation.position)
@@ -376,11 +382,11 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
         }
         let target = candidate_bytes
             .get_mut(picture.payload_span.clone())
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "picture payload provenance is outside the source",
             ))?;
         if target.len() != operation.after_transport.len() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "picture payload transport changed length",
             ));
         }
@@ -405,14 +411,18 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
     let source_bytes = edit
         .source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
     let mut removals = Vec::new();
     removals
         .try_reserve(operation_count)
         .map_err(|_error| allocation_error("located picture removals", operation_count))?;
     for operation in &edit.operations {
         let Operation::PictureRemoval(operation) = operation else {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         };
         let picture = located
             .get(operation.position)
@@ -438,14 +448,14 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
     for range in &removals {
         let retained = source_bytes
             .get(cursor..range.start)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "picture group provenance overlaps or leaves the source",
             ))?;
         candidate_bytes.extend_from_slice(retained);
         cursor = range.end;
     }
     candidate_bytes.extend_from_slice(source_bytes.get(cursor..).ok_or(
-        Error::UnsupportedSource("picture group provenance leaves the source"),
+        Error::unsupported_source("picture group provenance leaves the source"),
     )?);
 
     let snapshot = Package::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
@@ -593,9 +603,9 @@ pub(super) fn apply_durable_insertion_patch(
     }
     // Reuse the same closure proof for every picture already in the artifact.
     let _ = locate_standalone_pictures(source, Locate::Group)?;
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     let mut insertions = Vec::new();
     insertions
         .try_reserve(operations.len())
@@ -712,7 +722,7 @@ fn verify_insertion_candidate(
     insertions: &[(usize, usize, Vec<u8>)],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "exact picture restoration changed visible document text",
         ));
     }
@@ -723,29 +733,30 @@ fn verify_insertion_candidate(
             .iter()
             .find(|(_, inserted_position, _)| *inserted_position == position)
         {
-            let actual = located.get(position).ok_or(Error::UnsupportedSource(
+            let actual = located.get(position).ok_or(Error::unsupported_source(
                 "restored picture has no exact group provenance",
             ))?;
             if actual.group_transport != *group {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "restored picture group differs from durable bytes",
                 ));
             }
         } else {
-            let before = source
-                .pictures()
-                .get(source_position)
-                .ok_or(Error::UnsupportedSource(
-                    "picture restoration changed picture ordering",
-                ))?;
+            let before =
+                source
+                    .pictures()
+                    .get(source_position)
+                    .ok_or(Error::unsupported_source(
+                        "picture restoration changed picture ordering",
+                    ))?;
             let after = candidate
                 .pictures()
                 .get(position)
-                .ok_or(Error::UnsupportedSource(
+                .ok_or(Error::unsupported_source(
                     "picture restoration lost a retained picture",
                 ))?;
             if before != after {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "picture restoration changed an existing picture",
                 ));
             }
@@ -753,7 +764,7 @@ fn verify_insertion_candidate(
         }
     }
     if source_position != source.pictures().len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture restoration did not retain every existing picture",
         ));
     }
@@ -892,37 +903,37 @@ fn locate_standalone_pictures(
     source: &Package,
     purpose: Locate,
 ) -> Result<Vec<LocatedPicture>, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware picture rewrite",
         ));
     }
     if !source_bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload editing requires an ASCII RTF transport",
         ));
     }
     if !source.opaque().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload editing refuses unknown RTF syntax",
         ));
     }
     if !source.shapes().is_empty() || !source.objects().is_empty() || !source.fields().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload editing refuses shapes, objects, and fields",
         ));
     }
     if !source.model().picture_compatibility_records().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload editing refuses compatibility picture wrappers",
         ));
     }
 
     let input = std::str::from_utf8(source_bytes).map_err(|_error| {
-        Error::UnsupportedSource("picture payload source is not an ASCII string")
+        Error::unsupported_source("picture payload source is not an ASCII string")
     })?;
     let arena = Bump::new();
     let mut lexer = Lexer::new_with_limits(input, &arena, source.limits())
@@ -959,7 +970,7 @@ fn locate_standalone_pictures(
                 }
             },
             Token::CloseBrace => {
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "picture source has an unmatched closing group",
                 ))?;
             },
@@ -968,12 +979,12 @@ fn locate_standalone_pictures(
         cursor = cursor.saturating_add(1);
     }
     if depth != 0 {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture source has an unterminated group",
         ));
     }
     if located.len() != source.pictures().len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "all pictures must be standalone direct body groups",
         ));
     }
@@ -988,7 +999,7 @@ fn locate_picture_group(
     semantic: Option<&crate::picture::Picture<'_>>,
     purpose: Locate,
 ) -> Result<(LocatedPicture, usize), Error> {
-    let semantic = semantic.ok_or(Error::UnsupportedSource(
+    let semantic = semantic.ok_or(Error::unsupported_source(
         "standalone picture has no matching semantic record",
     ))?;
     if purpose == Locate::Payload {
@@ -1005,7 +1016,7 @@ fn locate_picture_group(
     let mut payload_end = None;
     let mut seen_controls = PictureControlSet::default();
     loop {
-        let token = tokens.get(cursor).ok_or(Error::UnsupportedSource(
+        let token = tokens.get(cursor).ok_or(Error::unsupported_source(
             "standalone picture group is unterminated",
         ))?;
         match token {
@@ -1013,7 +1024,7 @@ fn locate_picture_group(
                 seen_controls.accept(control)?;
             },
             Token::Text(text) => {
-                let span = spans.get(cursor).ok_or(Error::UnsupportedSource(
+                let span = spans.get(cursor).ok_or(Error::unsupported_source(
                     "picture token has no source provenance",
                 ))?;
                 if !text
@@ -1021,7 +1032,7 @@ fn locate_picture_group(
                     .iter()
                     .all(|byte| byte.is_ascii_whitespace() || byte.is_ascii_hexdigit())
                 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "picture payload contains non-hexadecimal text",
                     ));
                 }
@@ -1030,44 +1041,44 @@ fn locate_picture_group(
             },
             Token::CloseBrace => break,
             Token::Binary(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "binary picture payloads are outside the exact hexadecimal closure",
                 ));
             },
             Token::OpenBrace => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "nested picture destinations are outside the exact payload closure",
                 ));
             },
             Token::Control(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "picture controls after payload bytes are ambiguous",
                 ));
             },
         }
         cursor = cursor.saturating_add(1);
     }
-    let start = payload_start.ok_or(Error::UnsupportedSource(
+    let start = payload_start.ok_or(Error::unsupported_source(
         "standalone picture has no hexadecimal payload",
     ))?;
-    let end = payload_end.ok_or(Error::UnsupportedSource(
+    let end = payload_end.ok_or(Error::unsupported_source(
         "standalone picture has no hexadecimal payload",
     ))?;
     let transport = source
         .get(start..end)
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "picture payload provenance is outside the source",
         ))?
         .to_vec();
     if decode_transport(&transport)? != semantic.data() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload provenance differs from parsed media bytes",
         ));
     }
     let group_span = spans
         .get(open_index)
         .and_then(|open| spans.get(cursor).map(|close| open.start..close.end))
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "picture group has no exact source provenance",
         ))?;
     if group_span.len() > MAX_EDITABLE_PICTURE_GROUP_BYTES {
@@ -1078,7 +1089,7 @@ fn locate_picture_group(
     }
     let group_transport = source
         .get(group_span.clone())
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "picture group provenance is outside the source",
         ))?
         .to_vec();
@@ -1101,7 +1112,7 @@ fn verify_removal_candidate(
     operations: &[Operation],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture removal changed visible document text",
         ));
     }
@@ -1122,7 +1133,7 @@ fn verify_removal_candidate(
         }
     }
     if expected != candidate.pictures() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture removal changed an unselected picture or unrelated semantics",
         ));
     }
@@ -1134,13 +1145,13 @@ fn validate_supported_image(image_type: ImageType, payload: &[u8]) -> Result<(),
         ImageType::Png => payload.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
         ImageType::Jpeg => payload.starts_with(&[0xff, 0xd8]) && payload.ends_with(&[0xff, 0xd9]),
         ImageType::Emf | ImageType::Wmf | ImageType::Dib | ImageType::Pict | ImageType::Unknown => {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "exact picture payload editing currently supports PNG and JPEG only",
             ));
         },
     };
     if !supported {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "replacement bytes do not retain the declared picture format",
         ));
     }
@@ -1182,14 +1193,14 @@ impl PictureControlSet {
             ControlWord::BlipTag(_) => 17,
             ControlWord::BlipUnitsPerInch(_) => 18,
             _ => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "picture payload editing refuses unknown or dependent picture controls",
                 ));
             },
         };
         let mask = 1u32 << slot;
         if self.slots & mask != 0 {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "picture payload editing refuses duplicate or conflicting picture controls",
             ));
         }
@@ -1208,7 +1219,7 @@ fn render_payload(template: &[u8], payload: &[u8]) -> Result<Vec<u8>, Error> {
         .filter(|byte| byte.is_ascii_hexdigit())
         .count();
     if actual_digits != expected_digits {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture hexadecimal layout does not match its decoded length",
         ));
     }
@@ -1220,14 +1231,14 @@ fn render_payload(template: &[u8], payload: &[u8]) -> Result<Vec<u8>, Error> {
     let mut nibbles = payload.iter().flat_map(|byte| [byte >> 4, byte & 0x0f]);
     for byte in &mut output {
         if byte.is_ascii_hexdigit() {
-            let nibble = nibbles.next().ok_or(Error::UnsupportedSource(
+            let nibble = nibbles.next().ok_or(Error::unsupported_source(
                 "picture hexadecimal layout ended unexpectedly",
             ))?;
             *byte = hex_digit(nibble, byte.is_ascii_uppercase());
         }
     }
     if nibbles.next().is_some() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture hexadecimal layout has too few digit positions",
         ));
     }
@@ -1268,7 +1279,7 @@ fn decode_transport(input: &[u8]) -> Result<Vec<u8>, Error> {
         .copied()
         .filter(|byte| !byte.is_ascii_whitespace())
     {
-        let nibble = hex_nibble(byte).ok_or(Error::UnsupportedSource(
+        let nibble = hex_nibble(byte).ok_or(Error::unsupported_source(
             "picture payload contains a non-hexadecimal byte",
         ))?;
         if let Some(high_nibble) = high.take() {
@@ -1278,7 +1289,7 @@ fn decode_transport(input: &[u8]) -> Result<Vec<u8>, Error> {
         }
     }
     if high.is_some() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload contains an odd hexadecimal digit count",
         ));
     }
@@ -1327,7 +1338,7 @@ fn verify_candidate(
     operations: &[Operation],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() || source.pictures().len() != candidate.pictures().len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "picture payload edit changed unrelated document semantics",
         ));
     }
@@ -1347,7 +1358,7 @@ fn verify_candidate(
             expected.data = Cow::Owned(operation.after.clone());
         }
         if &expected != after {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "picture metadata or an unselected payload changed during validation",
             ));
         }

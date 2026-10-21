@@ -416,7 +416,9 @@ fn changed_body_text_refuses_opaque_syntax_without_touching_the_source() {
     let mut edit = source.edit();
     edit.replace_body_text("Changed").unwrap();
 
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(source.to_bytes().unwrap(), before);
     assert_eq!(source.text(), "AB");
 }
@@ -497,7 +499,7 @@ fn structural_and_property_operations_fail_closed() {
         .unwrap();
     assert!(matches!(
         edit.replace_paragraph_text(Position::new(0), "One\nInserted"),
-        Err(Error::StructuralPropertyConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-structure and property changes cannot compose safely"
     ));
 }
 
@@ -635,9 +637,7 @@ fn durable_patch_reports_a_stale_semantic_precondition() {
     let mut empty_edit = source.edit();
     assert!(matches!(
         empty_edit.set_text_underline(TextSpan::new(0, 0).unwrap(), UnderlineStyle::Single),
-        Err(Error::UnsupportedSource(
-            "underline edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "underline edits require non-empty text within one paragraph"
     ));
     let limits = durable_limits(1);
     let mut preconditions = BTreeMap::new();
@@ -934,9 +934,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_italic(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed italic state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed italic state"
     ));
 
     let unrelated = Package::parse(r"{\rtf1\ansi \b Alpha\b0 Beta}").unwrap();
@@ -947,9 +945,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
     let unrelated_result = unrelated_edit.commit();
     assert!(matches!(
         unrelated_result,
-        Err(Error::UnsupportedSource(
-            "the body has mixed character formatting"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the body has mixed character formatting"
     ));
 
     let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 Alpha}").unwrap();
@@ -959,16 +955,14 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     assert!(matches!(
         protected_edit.commit(),
-        Err(Error::ProtectedDocument { .. })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let paragraph_source = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph_source.edit();
     assert!(matches!(
         paragraph_edit.set_text_italic(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "italic edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "italic edits require non-empty text within one paragraph"
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
@@ -978,7 +972,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     assert!(matches!(
         opaque_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let field = Package::parse(r"{\rtf1\ansi A{\field{\*\fldinst PAGE}{\fldrslt B}}}").unwrap();
@@ -988,7 +982,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     assert!(matches!(
         field_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let table = Package::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl A\cell\row}").unwrap();
@@ -1007,9 +1001,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "italic edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "italic edits refuse non-ASCII transport encodings"
     ));
 
     let compressed_bytes = litchi_rtf::transport::compress(br"{\rtf1\ansi Alpha}", true).unwrap();
@@ -1020,9 +1012,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     assert!(matches!(
         compressed_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "compressed RTF needs a transport-aware rewrite"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "compressed RTF needs a transport-aware rewrite"
     ));
 }
 
@@ -1122,18 +1112,14 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_underline(TextSpan::new(0, 10).unwrap(), UnderlineStyle::None),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed underline state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed underline state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_underline(TextSpan::new(0, 6).unwrap(), UnderlineStyle::Single),
-        Err(Error::UnsupportedSource(
-            "underline edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "underline edits require non-empty text within one paragraph"
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
@@ -1143,7 +1129,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         .unwrap();
     assert!(matches!(
         opaque_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1159,9 +1145,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "underline edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "underline edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -1277,7 +1261,9 @@ fn body_opaque_validation_cannot_be_masked_by_duplicate_metadata_bytes() {
     let mut edit = source.edit();
     edit.set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
 }
 
 #[test]
@@ -1328,18 +1314,14 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_strike(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed strike state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed strike state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_strike(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "strike edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "strike edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1350,9 +1332,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "strike edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "strike edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -1490,18 +1470,14 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_hidden(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed hidden state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed hidden state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_hidden(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "hidden edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "hidden edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1512,9 +1488,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "hidden edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "hidden edits refuse non-ASCII transport encodings"
     ));
 
     let limits = durable_limits(1);
@@ -1637,18 +1611,14 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_small_caps(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed small-caps state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed small-caps state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_small_caps(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "small-caps edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "small-caps edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1659,9 +1629,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "small-caps edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "small-caps edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -1787,18 +1755,14 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_all_caps(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed all-caps state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed all-caps state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_all_caps(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "all-caps edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "all-caps edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1809,9 +1773,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "all-caps edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "all-caps edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -1937,18 +1899,14 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_double_strike(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed double-strike state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed double-strike state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_double_strike(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "double-strike edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "double-strike edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -1959,9 +1917,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "double-strike edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "double-strike edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -2293,7 +2249,7 @@ fn note_and_annotation_edits_refuse_positioned_and_splice_around_opaque_dependen
     let mut active_edit = active_note.edit();
     assert!(matches!(
         active_edit.set_note_text(0, "replacement"),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let opaque_annotation = Package::parse(
@@ -2402,12 +2358,12 @@ fn shape_text_edit_and_transfer_refuse_active_links() {
     let mut edit = source.edit();
     assert!(matches!(
         edit.set_shape_text(0, "changed"),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     let target = Package::parse(r"{\rtf1 Target}").unwrap();
     assert!(matches!(
         TransferPlan::shape(&source, 0, &target),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
@@ -2634,9 +2590,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_font_size(TextSpan::new(0, 10).unwrap(), NonZeroU16::new(24).unwrap()),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed font-size state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed font-size state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
@@ -2644,9 +2598,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
     assert!(matches!(
         paragraph_edit
             .set_text_font_size(TextSpan::new(0, 6).unwrap(), NonZeroU16::new(23).unwrap()),
-        Err(Error::UnsupportedSource(
-            "font-size edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "font-size edits require non-empty text within one paragraph"
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -2657,9 +2609,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "font-size edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "font-size edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
@@ -2915,7 +2865,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_baseline(TextSpan::new(0, 10).unwrap(), CharacterBaseline::Normal),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
@@ -2923,7 +2873,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     assert!(matches!(
         paragraph_edit
             .set_text_baseline(TextSpan::new(0, 6).unwrap(), CharacterBaseline::Superscript,),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -2934,9 +2884,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "baseline edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "baseline edits refuse non-ASCII transport encodings"
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
@@ -2949,7 +2897,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
         .unwrap();
     assert!(matches!(
         opaque_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
@@ -3066,18 +3014,14 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_outline(TextSpan::new(0, 10).unwrap(), false),
-        Err(Error::UnsupportedSource(
-            "the selected character span has mixed outline state"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "the selected character span has mixed outline state"
     ));
 
     let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_outline(TextSpan::new(0, 6).unwrap(), true),
-        Err(Error::UnsupportedSource(
-            "outline edits require non-empty text within one paragraph"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "outline edits require non-empty text within one paragraph"
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
@@ -3087,7 +3031,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
         .unwrap();
     assert!(matches!(
         opaque_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
@@ -3098,9 +3042,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
         .unwrap();
     assert!(matches!(
         cp1252_edit.commit(),
-        Err(Error::UnsupportedSource(
-            "outline edits refuse non-ASCII transport encodings"
-        ))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "outline edits refuse non-ASCII transport encodings"
     ));
 
     let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();

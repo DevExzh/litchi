@@ -1,0 +1,23 @@
+{
+  "corpus_files": 1020,
+  "changed_rows": 76,
+  "changed_columns": {
+    "revert_detail": 63,
+    "structure_detail": 19
+  },
+  "formats": [
+    "rtf"
+  ],
+  "unchanged": [
+    "file",
+    "format",
+    "noop",
+    "detail",
+    "revert",
+    "structure",
+    "unified refusal codes"
+  ],
+  "review": "76 RTF rows change fixed refusal display text; no operation outcome or non-RTF row changes",
+  "before_tsv_sha256": "1d19248dbb9dfd0c8939e54fc60d3ef3b0117d8541c11d6594a428eeb15faaae",
+  "after_tsv_sha256": "e1bf4ef0ad37b34f97c81cd342a45f3334a7e31f053a6926becd47cd11ea5f3f"
+}

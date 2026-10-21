@@ -1,0 +1,10 @@
+reading file "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-after.zst" - please wait, this might take some time...
+Debuggee command was: /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/after
+finished reading file, now analyzing data:
+
+total runtime: 0.107000s.
+calls to allocation functions: 177971 (1663280/s)
+temporary memory allocations: 1258 (11757/s)
+peak heap memory consumption: 3.57M
+peak RSS (including heaptrack overhead): 10.72M
+total memory leaked: 544B

@@ -71,7 +71,7 @@ impl SectionValue {
     fn validate(self) -> Result<(), Error> {
         let twips = |value: i32, nonnegative: bool| {
             if (nonnegative && value < 0) || !(-31_680 * 5..=31_680 * 5).contains(&value) {
-                Err(Error::UnsupportedSource(
+                Err(Error::unsupported_source(
                     "an RTF section length is outside the page-size range",
                 ))
             } else {
@@ -81,7 +81,7 @@ impl SectionValue {
         match self {
             Self::PageWidth(value) | Self::PageHeight(value) => {
                 if value <= 0 || value > 31_680 * 5 {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "an RTF page extent must be positive and within the page-size range",
                     ));
                 }
@@ -96,7 +96,7 @@ impl SectionValue {
             | Self::ColumnSpacing(value) => twips(value, true),
             Self::Columns(count) => {
                 if count == 0 || count > crate::MAX_SECTION_COLUMNS {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "an RTF section has between 1 and 64 columns",
                     ));
                 }
@@ -131,7 +131,9 @@ impl SectionValue {
 impl super::Edit {
     fn stage_mark(&mut self, mark: Mark) -> Result<&mut Self, Error> {
         if !self.operations.is_empty() {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         admit(&self.source, &self.marks, &mark)?;
         self.charge_replacement(mark.replacement_bytes())?;
@@ -244,7 +246,9 @@ impl super::Edit {
 
     pub(super) fn commit_marks(self) -> Result<Commit, Error> {
         if !self.operations.is_empty() {
-            return Err(Error::BodyDestinationConflict);
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
         }
         let count = self.marks.len();
         commit(self.source, &self.marks, count)
@@ -331,7 +335,7 @@ pub(super) fn admit(source: &Package, staged: &[Mark], mark: &Mark) -> Result<()
             }
             check_text(instruction, "field instruction")?;
             if instruction.trim().is_empty() {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "an RTF field instruction cannot be empty",
                 ));
             }
@@ -347,7 +351,7 @@ pub(super) fn admit(source: &Package, staged: &[Mark], mark: &Mark) -> Result<()
                 .enumerate()
                 .any(|(index, held)| index != *bookmark && held.name == name.as_str())
             {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "another RTF bookmark already has this name",
                 ));
             }
@@ -366,7 +370,7 @@ pub(super) fn admit(source: &Package, staged: &[Mark], mark: &Mark) -> Result<()
             }
             check_name(name)?;
             if model.bookmarks().contains(name) {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "another RTF bookmark already has this name",
                 ));
             }
@@ -379,13 +383,13 @@ pub(super) fn admit(source: &Package, staged: &[Mark], mark: &Mark) -> Result<()
                 });
             }
             if stops.len() > crate::MAX_PARAGRAPH_TAB_STOPS {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "an RTF paragraph holds at most 64 tab stops",
                 ));
             }
             for stop in stops {
                 if !(0..=31_680).contains(&stop.position) {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "an RTF tab stop position runs from 0 to 31680 twips",
                     ));
                 }
@@ -405,7 +409,7 @@ pub(super) fn admit(source: &Package, staged: &[Mark], mark: &Mark) -> Result<()
 
 fn check_text(text: &str, _field: &'static str) -> Result<(), Error> {
     if text.chars().any(|character| character.is_control()) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "RTF field instructions cannot hold control characters",
         ));
     }
@@ -419,7 +423,7 @@ fn check_name(name: &str) -> Result<(), Error> {
             .chars()
             .any(|character| character.is_control() || matches!(character, '{' | '}' | '\\'))
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "an RTF bookmark name is 1 to 255 characters without braces, backslashes or controls",
         ));
     }
@@ -681,7 +685,7 @@ fn field_group<'a>(
         .filter_map(|group| source.child_named(group, b"fldinst"))
         .filter(|instruction| normalized(&source.group_text(instruction)) == target)
         .nth(occurrence)
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "the RTF field's \\fldinst group is not found in the source",
         ))
 }
@@ -707,7 +711,7 @@ fn bookmark_groups<'a>(
         .groups_named(b"bkmkstart")
         .filter(|group| source.group_text(group).trim() == name)
         .nth(occurrence)
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "the RTF bookmark's \\bkmkstart group is not found in the source",
         ))?;
     let end = source.groups_named(b"bkmkend").find(|group| {
@@ -738,7 +742,7 @@ fn rename(source: &Source<'_>, group: &Group, text: &str) -> Splice {
 fn paragraph_ranges(package: &Package, input: &str) -> Result<Vec<Range<usize>>, Error> {
     let cut = super::producer_paragraphs::paragraph_ranges(package, input)?;
     if cut.len() != package.paragraph_count() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the body's paragraphs are not delimited by root-level \\par controls",
         ));
     }
@@ -946,7 +950,7 @@ fn section_splices(
             _ => {},
         }
     }
-    let anchor = anchor.or(first_pard).ok_or(Error::UnsupportedSource(
+    let anchor = anchor.or(first_pard).ok_or(Error::unsupported_source(
         "the RTF section has no \\sectd or paragraph to place page setup at",
     ))?;
     let mut inserts = String::new();
@@ -1010,13 +1014,13 @@ fn assemble(input: &str, mut splices: Vec<Splice>) -> Result<Vec<u8>, Error> {
         if let [left, right] = pair
             && right.range.start < left.range.end
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "two RTF mark edits touch the same source bytes",
             ));
         }
     }
     let bytes = input.as_bytes();
-    let outside = || Error::UnsupportedSource("an RTF mark splice falls outside the source");
+    let outside = || Error::unsupported_source("an RTF mark splice falls outside the source");
     let mut out = Vec::with_capacity(input.len() + 64);
     let mut cursor = 0;
     for splice in splices {
@@ -1146,7 +1150,7 @@ fn coalesced<'a>(
 /// The readback expectations: the candidate reads as the source with the
 /// marks applied, and nothing else changed.
 fn verify(source: &Package, candidate: &Package, marks: &[Mark]) -> Result<(), Error> {
-    let refuse = |what: &'static str| Err(Error::UnsupportedSource(what));
+    let refuse = |what: &'static str| Err(Error::unsupported_source(what));
     if source.text() != candidate.text() {
         return refuse("the RTF mark edit changed the body text");
     }
@@ -1167,7 +1171,7 @@ fn verify(source: &Package, candidate: &Package, marks: &[Mark]) -> Result<(), E
                     expected
                         .tab_stops
                         .push(*stop)
-                        .map_err(|_error| Error::UnsupportedSource("too many RTF tab stops"))?;
+                        .map_err(|_error| Error::unsupported_source("too many RTF tab stops"))?;
                 }
             }
         }
@@ -1303,16 +1307,16 @@ pub(super) fn commit(
     marks: &[Mark],
     operation_count: usize,
 ) -> Result<Commit, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "RTF mark edits refuse compressed RTF",
         ));
     }
     let input = std::str::from_utf8(source_bytes).map_err(|_error| {
-        Error::UnsupportedSource("RTF mark edits require an ASCII or UTF-8 transport")
+        Error::unsupported_source("RTF mark edits require an ASCII or UTF-8 transport")
     })?;
     let bytes = splice(&source, input, marks)?;
     if bytes == source_bytes {
@@ -1325,7 +1329,7 @@ pub(super) fn commit(
     }
     super::ensure_changed_publication_allowed(&source)?;
     let candidate = Package::from_bytes_with_options(&bytes, source.options())
-        .map_err(|_error| Error::UnsupportedSource("the RTF mark edit does not parse as RTF"))?;
+        .map_err(|_error| Error::unsupported_source("the RTF mark edit does not parse as RTF"))?;
     verify(&source, &candidate, marks)?;
     let delta = vec![Change::RootTransfer {
         vocabulary: "mark.transfer",

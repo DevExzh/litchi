@@ -66,7 +66,9 @@ fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     let mut edit = document.edit();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
     assert_eq!(document.to_bytes().unwrap(), LZFU_SPEC);
 }
 

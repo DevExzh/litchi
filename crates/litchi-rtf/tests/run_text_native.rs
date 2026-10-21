@@ -191,7 +191,7 @@ fn native_run_text_batch_is_atomic_and_typed() {
     ));
     assert!(matches!(
         edit.replace_body_run_texts(&[replacement(0, 0, "a\nb")]),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert_eq!(edit.operation_count(), 0);
 }

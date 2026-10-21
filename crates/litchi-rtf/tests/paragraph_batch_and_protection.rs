@@ -6,8 +6,8 @@
 
 use litchi_core::Position;
 use litchi_rtf::{
-    EditOptions, HeaderFooterType, OpenOptions, Package, ProtectionType, SemanticLimitKind,
-    SemanticLimits, SourceLimits,
+    EditOptions, HeaderFooterType, OpenOptions, Package, SemanticLimitKind, SemanticLimits,
+    SourceLimits,
     edit::{Error, HeaderFooterParagraph, ParagraphTextReplacement, TextSpan, TransferPlan},
     transport::compress,
 };
@@ -229,7 +229,7 @@ fn paragraph_batch_preserves_noops_and_conflict_rules() {
         .unwrap();
     assert!(matches!(
         property.replace_body_paragraph_texts(&replacements(&[(1, "Two\nInserted")])),
-        Err(Error::StructuralPropertyConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "paragraph-structure and property changes cannot compose safely"
     ));
     assert_eq!(property.operation_count(), 1);
 
@@ -279,9 +279,7 @@ fn protected_documents_refuse_changed_body_destination_and_root_publication() {
         .unwrap();
     assert!(matches!(
         body.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::ReadOnly
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let protected_destination =
@@ -295,9 +293,7 @@ fn protected_documents_refuse_changed_body_destination_and_root_publication() {
         .unwrap();
     assert!(matches!(
         destination.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::All
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let transfer_source = Package::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
@@ -305,9 +301,7 @@ fn protected_documents_refuse_changed_body_destination_and_root_publication() {
     let transfer = TransferPlan::field(&transfer_source, 0, &protected_target).unwrap();
     assert!(matches!(
         transfer.commit(),
-        Err(Error::ProtectedDocument {
-            protection_type: ProtectionType::Forms
-        })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 }
 
@@ -372,7 +366,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
         .unwrap();
     assert!(matches!(
         compressed_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi A\future42 B\par C}").unwrap();
@@ -383,7 +377,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
         .unwrap();
     assert!(matches!(
         opaque_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert_eq!(opaque.to_bytes().unwrap(), exact);
 }

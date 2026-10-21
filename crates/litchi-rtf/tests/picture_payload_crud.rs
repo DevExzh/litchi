@@ -148,7 +148,7 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
     mixed.replace_picture_payload(0, PNG_C).unwrap();
     assert!(matches!(
         mixed.replace_body_text("not composable"),
-        Err(Error::BodyDestinationConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "body splices and retained-destination edits cannot compose safely"
     ));
 
     let invalid = [
@@ -229,7 +229,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     wrong_format[0] = 0;
     assert!(matches!(
         source.edit().replace_picture_payload(0, wrong_format),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let nested = Package::parse(concat!(
@@ -240,7 +240,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     .unwrap();
     assert!(matches!(
         nested.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let opaque = Package::parse(concat!(
@@ -251,7 +251,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     .unwrap();
     assert!(matches!(
         opaque.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let protected = Package::parse(concat!(
@@ -264,7 +264,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     edit.replace_picture_payload(0, PNG_C).unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument { .. })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     assert!(Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0}}").is_err());
@@ -273,7 +273,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd\picw1}}").unwrap();
     assert!(matches!(
         late_control.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let unknown_picture_control =
@@ -282,7 +282,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         unknown_picture_control
             .edit()
             .replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     for ambiguous in [
@@ -293,7 +293,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         let ambiguous = Package::parse(ambiguous).unwrap();
         assert!(matches!(
             ambiguous.edit().replace_picture_payload(0, PNG_C),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 
@@ -301,7 +301,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Package::parse(r"{\rtf1{\pict\pngblip\blipfile1 89504e470d0a1a0a0102abcd}}").unwrap();
     assert!(matches!(
         external_picture.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 
@@ -315,7 +315,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         binary
             .edit()
             .replace_picture_payload(0, [0xff, 0xd8, 3, 4, 0xff, 0xd9]),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let compressed_bytes =
@@ -323,7 +323,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
     let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     assert!(matches!(
         compressed.edit().replace_picture_payload(0, PNG_C),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let sources = [
@@ -344,7 +344,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         let source = Package::parse(source).unwrap();
         assert!(matches!(
             source.edit().replace_picture_payload(0, PNG_C),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 }

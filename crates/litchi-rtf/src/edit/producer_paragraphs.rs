@@ -150,18 +150,24 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
                 vec![*first, *second],
             )
         },
-        _ => return Err(Error::BodyDestinationConflict),
+        _ => {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        },
     };
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "producer paragraph splicing refuses compressed RTF",
         ));
     }
     let input = std::str::from_utf8(source_bytes).map_err(|_error| {
-        Error::UnsupportedSource("producer paragraph splicing requires an ASCII or UTF-8 transport")
+        Error::unsupported_source(
+            "producer paragraph splicing requires an ASCII or UTF-8 transport",
+        )
     })?;
     // A formatting group that holds several paragraphs is first rewritten
     // as one group per paragraph (the result is then value-exact, not
@@ -169,7 +175,10 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
     let normalized;
     let (source_bytes, cut) = match segments(&source, input) {
         Ok(cut) => (source_bytes, cut),
-        Err(error @ Error::UnsupportedSource(GROUP_CONTINUES)) => {
+        Err(error @ Error::Refused(refusal))
+            if refusal.kind() == super::RefusalKind::UnsupportedContent
+                && refusal.reason() == GROUP_CONTINUES =>
+        {
             normalized = split_paragraph_groups(&source, input)?.ok_or(error)?;
             let cut = segments(&source, &normalized)?;
             (normalized.as_bytes(), cut)
@@ -177,7 +186,7 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
         Err(error) => return Err(error),
     };
     if cut.ranges.len() != count {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the body's paragraphs are not delimited by root-level \\par controls",
         ));
     }
@@ -186,7 +195,7 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
         && touched.contains(&last)
         && !matches!(operation, Operation::RemoveParagraph { .. })
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the last paragraph has no \\par of its own and cannot move",
         ));
     }
@@ -197,7 +206,7 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
         Operation::RemoveParagraph { position, .. } => {
             let range = cut.ranges.get(*position).cloned().unwrap_or_default();
             if cut.unknown.iter().any(|offset| range.contains(offset)) {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "the removed paragraph holds control words this reader does not know",
                 ));
             }
@@ -216,14 +225,17 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
         )?;
         let snapshot =
             Package::from_bytes_with_options(&bytes, source.options()).map_err(|_error| {
-                Error::UnsupportedSource("the spliced paragraph segments do not parse as RTF")
+                Error::unsupported_source("the spliced paragraph segments do not parse as RTF")
             })?;
         verify(&source, &snapshot, &order, removed)?;
         Ok((bytes, snapshot))
     };
     let (bytes, snapshot) = match attempt(false) {
         Ok(done) => done,
-        Err(first @ Error::UnsupportedSource(_)) if !cut.controls.is_empty() => {
+        Err(first @ Error::Refused(refusal))
+            if refusal.kind() == super::RefusalKind::UnsupportedContent
+                && !cut.controls.is_empty() =>
+        {
             attempt(true).map_err(|_second| first)?
         },
         Err(error) => return Err(error),
@@ -239,10 +251,10 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
         return Ok(Commit::new(source, snapshot, 1, delta));
     }
     let candidate_input = std::str::from_utf8(&bytes).map_err(|_error| {
-        Error::UnsupportedSource("the spliced paragraph segments are not UTF-8")
+        Error::unsupported_source("the spliced paragraph segments are not UTF-8")
     })?;
     if segments(&snapshot, candidate_input)?.ranges.len() != snapshot.paragraph_count() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the spliced paragraphs would not be delimited by root-level \\par controls",
         ));
     }
@@ -361,7 +373,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                     continue;
                 },
                 Token::Text(text) if text.trim().is_empty() => continue,
-                _ => return Err(Error::UnsupportedSource(GROUP_CONTINUES)),
+                _ => return Err(Error::unsupported_source(GROUP_CONTINUES)),
             }
         }
         let in_destination = destinations.last().copied().unwrap_or(false);
@@ -448,7 +460,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 pending_group_par = true;
             },
             Token::Control(ControlWord::TableRow | ControlWord::TableCell) if !in_destination => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "producer paragraph splicing refuses table rows that do not open and close at the body's root",
                 ));
             },
@@ -460,7 +472,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                         .last()
                         .copied()
                         .or(first_start)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "a section break precedes the body's first paragraph",
                         ))?;
                 // `\sect` ends the paragraph it follows when no `\par` did.
@@ -471,7 +483,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 in_section = true;
             },
             Token::Control(ControlWord::SectionBreak) if !in_destination => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "producer paragraph splicing refuses section breaks inside groups or table rows",
                 ));
             },
@@ -480,14 +492,16 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     }
     let first_start = first_start
         .or(first_fallback)
-        .ok_or(Error::UnsupportedSource(
+        .ok_or(Error::unsupported_source(
             "the first paragraph has no root-level \\pard or text that proves where it starts",
         ))?;
-    let root_end = root_end.ok_or(Error::UnsupportedSource("the RTF root group is not closed"))?;
+    let root_end = root_end.ok_or(Error::unsupported_source(
+        "the RTF root group is not closed",
+    ))?;
     // Document-level controls before the body are in effect everywhere.
     controls.retain(|(range, _)| range.start >= first_start);
     if in_row {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "a table row of the body has no \\row of its own",
         ));
     }
@@ -498,7 +512,7 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
     let mut start = first_start;
     for (end, row) in boundaries.into_iter().zip(rows) {
         if end <= start {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "a root-level \\par precedes the first paragraph's start",
             ));
         }
@@ -633,7 +647,7 @@ fn split_paragraph_groups(source: &Package, input: &str) -> Result<Option<String
     let mut cursor = 0;
     for group in &groups {
         let text = |range: Range<usize>| {
-            input.get(range).ok_or(Error::UnsupportedSource(
+            input.get(range).ok_or(Error::unsupported_source(
                 "a paragraph group is outside the source",
             ))
         };
@@ -730,7 +744,7 @@ fn group_end(bytes: &[u8]) -> Option<usize> {
 /// Appends the control words at `controls`, each delimited by one space.
 fn push_replay(output: &mut String, input: &str, controls: &[Range<usize>]) -> Result<(), Error> {
     for range in controls {
-        let raw = input.get(range.clone()).ok_or(Error::UnsupportedSource(
+        let raw = input.get(range.clone()).ok_or(Error::unsupported_source(
             "a replayed control word is outside the source",
         ))?;
         output.push_str(raw.strip_suffix(' ').unwrap_or(raw));
@@ -919,7 +933,7 @@ fn tail_has_content(tail: &[u8]) -> bool {
 }
 
 fn part(source: &[u8], range: Range<usize>) -> Result<&[u8], Error> {
-    source.get(range).ok_or(Error::UnsupportedSource(
+    source.get(range).ok_or(Error::unsupported_source(
         "paragraph segment is outside the source",
     ))
 }
@@ -961,7 +975,7 @@ fn arrange<'a>(
     operation: &'a Operation,
     order: &[Slot<'_>],
 ) -> Result<Vec<Item<'a>>, Error> {
-    let missing = || Error::UnsupportedSource("paragraph segment is missing");
+    let missing = || Error::unsupported_source("paragraph segment is missing");
     let block_of = |paragraph: usize| {
         cut.paragraph_blocks
             .get(paragraph)
@@ -1013,7 +1027,11 @@ fn arrange<'a>(
             let right = position_of(&items, block_of(*second)?)?;
             items.swap(left, right);
         },
-        _ => return Err(Error::BodyDestinationConflict),
+        _ => {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        },
     }
     Ok(items)
 }
@@ -1032,7 +1050,7 @@ fn splice(
 ) -> Result<Vec<u8>, Error> {
     let blocks = cut.blocks.as_slice();
     let (Some(first), Some(last)) = (blocks.first(), blocks.last()) else {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "producer paragraph splicing needs a paragraph to anchor to",
         ));
     };
@@ -1047,7 +1065,7 @@ fn splice(
         match item {
             Item::New(text) => {
                 if index + 1 == items.len() && cut.unterminated_last {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "a paragraph cannot be appended after a last paragraph that has no \\par of its own",
                     ));
                 }
@@ -1060,7 +1078,7 @@ fn splice(
             Item::Block(block) => {
                 let current = blocks
                     .get(*block)
-                    .ok_or(Error::UnsupportedSource("paragraph segment is missing"))?;
+                    .ok_or(Error::unsupported_source("paragraph segment is missing"))?;
                 let range = &current.range;
                 if (replay_state || !current.paragraph) && previous != block.checked_sub(1) {
                     replay(source, cut, range.start, &mut output)?;
@@ -1092,7 +1110,7 @@ fn verify(
     let expected: Vec<_> = source.body().paragraphs().collect();
     let observed: Vec<_> = candidate.body().paragraphs().collect();
     if observed.len() != order.len() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the spliced paragraph segments do not read back as the expected paragraph count",
         ));
     }
@@ -1100,7 +1118,7 @@ fn verify(
         let index = match slot {
             Slot::New(text) => {
                 if observed.to_text() != *text {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "the inserted paragraph does not read back with its text",
                     ));
                 }
@@ -1108,16 +1126,16 @@ fn verify(
             },
             Slot::Source(index) => index,
         };
-        let expected = expected.get(*index).ok_or(Error::UnsupportedSource(
+        let expected = expected.get(*index).ok_or(Error::unsupported_source(
             "paragraph order is outside the source",
         ))?;
         if observed.to_text() != expected.to_text() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "a spliced paragraph does not read back with its text",
             ));
         }
         if observed.format().raw() != expected.format().raw() {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "a paragraph inherits paragraph properties from its neighbours and would change",
             ));
         }
@@ -1130,7 +1148,7 @@ fn verify(
                         && left.format().raw() == right.format().raw() => {},
                 (None, None) => break,
                 _ => {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "a paragraph inherits character formatting from its neighbours and would change",
                     ));
                 },
@@ -1153,7 +1171,7 @@ fn verify(
         if occurrences(br"\bkmkstart") != occurrences(br"\bkmkend")
             || occurrences(br"\atrfstart") != occurrences(br"\atrfend")
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "the removed paragraph holds one end of a bookmark or comment range",
             ));
         }
@@ -1174,7 +1192,7 @@ fn verify(
             .zip(candidate.tables())
             .all(|(left, right)| format!("{left:?}") == format!("{right:?}"));
     if !same_tables {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "a table of the body does not read back unchanged",
         ));
     }
@@ -1185,7 +1203,7 @@ fn verify(
             .zip(candidate.sections())
             .all(|(left, right)| format!("{left:?}") == format!("{right:?}"));
     if !same_sections {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "a section of the body does not read back unchanged",
         ));
     }
@@ -1208,7 +1226,7 @@ fn verify(
         && kept(model.math_zones().len(), candidate_model.math_zones().len())
         && model.unknown_syntax_markers() == candidate_model.unknown_syntax_markers();
     if !same_collections {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "the paragraph anchors fields, pictures, bookmarks, notes or other content that the splice would drop or split",
         ));
     }

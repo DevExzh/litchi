@@ -197,7 +197,7 @@ fn marks_and_body_work_do_not_mix() {
     edit.remove_paragraph(Position::new(1)).unwrap();
     assert!(matches!(
         edit.set_field_instruction(0, "PAGE"),
-        Err(Error::BodyDestinationConflict)
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation && refusal.reason() == "body splices and retained-destination edits cannot compose safely"
     ));
     let mut edit = source.edit();
     edit.rename_bookmark(0, "A").unwrap();
@@ -238,5 +238,7 @@ fn a_paragraph_moves_across_a_section_break_and_back() {
     // reads, which is refused.
     let mut edit = source.edit();
     edit.remove_paragraph(Position::new(2)).unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    assert!(
+        matches!(edit.commit(), Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+    );
 }

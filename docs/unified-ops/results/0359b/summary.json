@@ -1,0 +1,70 @@
+{
+  "baseline_commit": "86d708878f",
+  "candidate_base_commit": "dd00ae1611",
+  "candidate_source": "0359b implementation committed with this receipt",
+  "probe": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+  "probe_sha256": "9d9e91c639e47ccc94f154464f6f97a0dc0002a3b2fb37251f61b17bf71cdb22",
+  "cpu": 7,
+  "trials": 3,
+  "order": "A-B-B-A",
+  "warmup": 3,
+  "samples": 31,
+  "timing": "median of six per-run medians; microseconds",
+  "isolated": true,
+  "compiler_monitor_interval_ms": 100,
+  "cases": {
+    "open_1k": {
+      "before_median_us": 151.931,
+      "after_median_us": 150.551,
+      "ratio": 0.9909169293955807
+    },
+    "noop_1k": {
+      "before_median_us": 0.046,
+      "after_median_us": 0.04485,
+      "ratio": 0.9750000000000001
+    },
+    "text_commit_1k": {
+      "before_median_us": 214.58100000000002,
+      "after_median_us": 214.00650000000002,
+      "ratio": 0.9973226893340976
+    },
+    "text_commit_save_1k": {
+      "before_median_us": 214.026,
+      "after_median_us": 213.37650000000002,
+      "ratio": 0.9969653219702279
+    },
+    "replay_1k": {
+      "before_median_us": 0.0113,
+      "after_median_us": 0.0113,
+      "ratio": 1.0
+    },
+    "tail_commit_1k": {
+      "before_median_us": 163.441,
+      "after_median_us": 164.401,
+      "ratio": 1.005873679186985
+    },
+    "unsupported_content": {
+      "before_median_us": 0.013550000000000001,
+      "after_median_us": 0.013995,
+      "ratio": 1.032841328413284
+    },
+    "protected_commit": {
+      "before_median_us": 0.189255,
+      "after_median_us": 0.18295,
+      "ratio": 0.9666851602335473
+    }
+  },
+  "iterations_per_sample": {
+    "open_1k": 1,
+    "noop_1k": 100,
+    "text_commit_1k": 1,
+    "text_commit_save_1k": 1,
+    "replay_1k": 100,
+    "tail_commit_1k": 1,
+    "unsupported_content": 1000,
+    "protected_commit": 100
+  },
+  "build_command": "cargo build --locked --release -p litchi-rtf --example refusal_contract_bench",
+  "run_command": "taskset -c 7 <before-or-after-release-binary>",
+  "isolation": "W4/W8 acknowledged hold; W4b sampling interrupted after release cargo finished; process monitor observed no compiler or heaptrack process."
+}

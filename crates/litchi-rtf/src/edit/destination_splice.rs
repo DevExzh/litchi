@@ -46,21 +46,21 @@ pub(super) fn supports(operations: &[Operation]) -> bool {
 /// Splice every destination replacement into the retained source and return
 /// the validated candidate snapshot.
 pub(super) fn publish(source: &Package, operations: &[Operation]) -> Result<Package, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if crate::compressed::is_compressed_rtf(source_bytes) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "compressed RTF needs a transport-aware destination rewrite",
         ));
     }
     if !source_bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "exact destination editing requires an ASCII RTF transport",
         ));
     }
     let input = std::str::from_utf8(source_bytes)
-        .map_err(|_error| Error::UnsupportedSource("destination source is not ASCII"))?;
+        .map_err(|_error| Error::unsupported_source("destination source is not ASCII"))?;
     let arena = Bump::new();
     let mut lexer = Lexer::new_with_limits(input, &arena, source.limits())
         .for_document(source.options().leniency_value());
@@ -75,7 +75,7 @@ pub(super) fn publish(source: &Package, operations: &[Operation]) -> Result<Pack
         let (story, after, paragraphs) = match operation {
             Operation::TableCellText { path, after, .. } => {
                 if !path.nested.is_empty() {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "nested table cells have no exact source provenance",
                     ));
                 }
@@ -95,9 +95,13 @@ pub(super) fn publish(source: &Package, operations: &[Operation]) -> Result<Pack
             Operation::AnnotationText { index, after, .. } => {
                 (provenance.annotation(*index), after, true)
             },
-            _ => return Err(Error::BodyDestinationConflict),
+            _ => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
         };
-        let story = story.ok_or(Error::UnsupportedSource(
+        let story = story.ok_or(Error::unsupported_source(
             "destination text has no exact source provenance",
         ))?;
         splices.push(locate(
@@ -114,7 +118,7 @@ pub(super) fn publish(source: &Package, operations: &[Operation]) -> Result<Pack
         if let [left, right] = pair
             && right.range.start < left.range.end
         {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "destination source ranges overlap",
             ));
         }
@@ -146,12 +150,12 @@ pub(super) fn publish(source: &Package, operations: &[Operation]) -> Result<Pack
     let mut cursor = 0usize;
     for splice in &splices {
         candidate.extend_from_slice(source_bytes.get(cursor..splice.range.start).ok_or(
-            Error::UnsupportedSource("destination provenance leaves the source"),
+            Error::unsupported_source("destination provenance leaves the source"),
         )?);
         candidate.extend_from_slice(&splice.bytes);
         cursor = splice.range.end;
     }
-    candidate.extend_from_slice(source_bytes.get(cursor..).ok_or(Error::UnsupportedSource(
+    candidate.extend_from_slice(source_bytes.get(cursor..).ok_or(Error::unsupported_source(
         "destination provenance leaves the source",
     ))?);
 
@@ -187,13 +191,13 @@ fn locate(
         (Some(text), _) => text.clone(),
         (None, Some(terminator)) => terminator..terminator,
         (None, None) => {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "empty destination text has no insertion boundary",
             ));
         },
     };
     if range.end > source.len() || range.start > range.end {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "destination provenance is outside the source",
         ));
     }
@@ -260,7 +264,7 @@ fn validate_range(
             break;
         }
         if span.start < range.start || span.end > range.end {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "destination provenance splits a source token",
             ));
         }
@@ -269,12 +273,12 @@ fn validate_range(
             Token::Text(_) => {},
             Token::OpenBrace => depth = depth.saturating_add(1),
             Token::CloseBrace => {
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "destination text closes an enclosing group",
                 ))?;
             },
             Token::Binary(_) => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "destination text contains binary data",
                 ));
             },
@@ -286,7 +290,7 @@ fn validate_range(
                     Some(name) => depth > 0 && is_character_format_control(name),
                 };
                 if word == br"\*" || !admitted {
-                    return Err(Error::UnsupportedSource(
+                    return Err(Error::unsupported_source(
                         "destination text contains a structural or state-changing control",
                     ));
                 }
@@ -294,7 +298,7 @@ fn validate_range(
         }
     }
     if depth != 0 {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "destination text leaves a group open",
         ));
     }
@@ -412,7 +416,7 @@ pub(super) fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) ->
             '\t' => output.extend_from_slice(br"\tab "),
             '\n' if paragraphs => output.extend_from_slice(br"\par "),
             '\n' => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "this destination cannot contain a paragraph break",
                 ));
             },
@@ -421,7 +425,7 @@ pub(super) fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) ->
                 output.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
             },
             character if character.is_control() => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "destination text contains an unsupported control character",
                 ));
             },
@@ -501,7 +505,7 @@ impl<'a> Overrides<'a> {
 
 /// Compare the reparsed candidate with the source on every retained story.
 fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Result<(), Error> {
-    let changed = |reason: &'static str| Error::UnsupportedSource(reason);
+    let changed = |reason: &'static str| Error::unsupported_source(reason);
     let overrides = Overrides::of(source, operations);
     if source.text() != candidate.text() || source.paragraph_count() != candidate.paragraph_count()
     {

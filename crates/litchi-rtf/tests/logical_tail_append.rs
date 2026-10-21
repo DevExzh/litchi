@@ -13,7 +13,7 @@ use litchi_rtf::tail_append::{
     SemanticLimits, TailAppendOutputProgress, TailAppendPublicationError,
     TailAppendPublicationLimits, TailSelector,
 };
-use litchi_rtf::{OpenOptions, Package, ProtectionType, SourceLimits};
+use litchi_rtf::{OpenOptions, Package, SourceLimits};
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 
@@ -463,7 +463,7 @@ fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
         DurableTailAppendPatch::from_deterministic_json(&protected_noop, patch_limits()).unwrap();
     assert!(matches!(
         protected_noop.apply(&protected),
-        Err(Error::ProtectedDocument(ProtectionType::ReadOnly))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 }
 
@@ -550,7 +550,7 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
     active_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         active_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let opaque = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
@@ -573,7 +573,7 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
     protected_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         protected_edit.commit(),
-        Err(Error::ProtectedDocument(ProtectionType::ReadOnly))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
@@ -582,7 +582,7 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         compressed_edit.commit(),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let binary = Package::parse(r"{\rtf1\ansi {\pict\pngblip\bin1 X} A}");
@@ -591,7 +591,7 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
         binary_edit.append_text_paragraphs(&["x"]).unwrap();
         assert!(matches!(
             binary_edit.commit(),
-            Err(Error::UnsupportedSource(_))
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
         ));
     }
 }
@@ -799,7 +799,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     active_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         active_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
@@ -807,7 +807,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     protected_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         protected_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
-        Err(Error::ProtectedDocument(ProtectionType::ReadOnly))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 
     let compressed = litchi_rtf::transport::compress(br"{\rtf1\ansi A}", true).unwrap();
@@ -816,7 +816,7 @@ fn publication_plan_refuses_active_protected_and_compressed_sources_before_outpu
     compressed_edit.append_text_paragraphs(&["x"]).unwrap();
     assert!(matches!(
         compressed_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
 

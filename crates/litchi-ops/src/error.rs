@@ -1914,11 +1914,7 @@ impl Classify for litchi_rtf::Error {
 impl Classify for litchi_rtf::edit::Error {
     fn classify(&self) -> Class {
         match self {
-            Self::UnsupportedSource(_)
-            | Self::OperationAlreadyStaged
-            | Self::BodyDestinationConflict
-            | Self::StructuralPropertyConflict
-            | Self::ParagraphLayoutTextConflict => Class::of(Code::UnsupportedCapability),
+            Self::Refused(refusal) => refusal.kind().classify(),
             Self::Limit { .. } | Self::InputTooLarge { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::EmptyParagraphBatch
@@ -1960,8 +1956,7 @@ impl Classify for litchi_rtf::edit::Error {
             Self::HistorySourceMismatch | Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::History(_) => Class::of(Code::InvalidInput),
             Self::Rtf(error) => error.classify(),
-            Self::Write(_) => Class::of(Code::InternalError),
-            Self::ProtectedDocument { .. } => Class::of(Code::DocumentProtected),
+            Self::Write(_) | Self::Internal(_) => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }

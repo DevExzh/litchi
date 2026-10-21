@@ -308,9 +308,7 @@ fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std
     })?;
     assert!(matches!(
         edit.commit(),
-        Err(litchi_rtf::edit::Error::UnsupportedSource(
-            "changed publication refuses unmatched move-bookmark destinations"
-        ))
+        Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "changed publication refuses unmatched move-bookmark destinations"
     ));
     assert_eq!(source.to_bytes()?, source_bytes);
     Ok(())
@@ -327,9 +325,7 @@ fn changed_publication_refuses_unmatched_move_end() -> Result<(), Box<dyn std::e
     edit.set_smart_tag(0, value)?;
     assert!(matches!(
         edit.commit(),
-        Err(litchi_rtf::edit::Error::UnsupportedSource(
-            "changed publication refuses unmatched move-bookmark destinations"
-        ))
+        Err(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent && refusal.reason() == "changed publication refuses unmatched move-bookmark destinations"
     ));
     assert_eq!(source.to_bytes()?, source_bytes);
     Ok(())

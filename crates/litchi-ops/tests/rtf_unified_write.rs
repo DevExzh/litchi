@@ -202,7 +202,7 @@ fn protected_publication_refuses_changes_but_accepts_exact_noops() {
     assert_eq!(error.code(), Code::DocumentProtected);
     assert!(matches!(
         error.leaf(),
-        Source::RtfEdit(litchi_rtf::edit::Error::ProtectedDocument { .. })
+        Source::RtfEdit(litchi_rtf::edit::Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
     assert_eq!(
         source

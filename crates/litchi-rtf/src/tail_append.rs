@@ -449,16 +449,10 @@ impl TailAppendPublicationReport {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Error {
-    /// The selector is not supported by this transaction family.
-    UnsupportedSelector,
-    /// The existing source cannot be proven safe for an exact tail splice.
-    UnsupportedSource(&'static str),
-    /// The source declares active protection.
-    ProtectedDocument(crate::ProtectionType),
+    /// A well-formed request cannot be carried through this edit route.
+    Refused(Refusal),
     /// A submitted batch contains no paragraphs/runs where one is required.
     EmptyInput,
-    /// A transaction already owns one staged bounded batch.
-    AlreadyStaged,
     /// A configured bound exceeds the supported addressable maximum.
     InvalidLimit {
         kind: LimitKind,
@@ -488,28 +482,32 @@ pub enum Error {
     Sink { kind: io::ErrorKind, written: usize },
 }
 
+/// Shared, content-free refusal details for this family's errors.
+pub use litchi_core::edit::{Refusal, RefusalKind};
+
+impl Error {
+    pub(crate) const fn unsupported_source(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "tail_append",
+            reason,
+        ))
+    }
+
+    pub(crate) const fn unsupported_operation(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedOperation,
+            "tail_append",
+            reason,
+        ))
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnsupportedSelector => {
-                formatter.write_str("RTF logical-tail selector is not supported")
-            },
-            Self::UnsupportedSource(reason) => {
-                write!(
-                    formatter,
-                    "RTF logical-tail source is unsupported: {reason}"
-                )
-            },
-            Self::ProtectedDocument(protection) => {
-                write!(
-                    formatter,
-                    "RTF protected document refuses logical-tail publication ({protection:?})"
-                )
-            },
+            Self::Refused(refusal) => refusal.fmt(formatter),
             Self::EmptyInput => formatter.write_str("RTF logical-tail input must not be empty"),
-            Self::AlreadyStaged => {
-                formatter.write_str("RTF logical-tail edit already has a staged batch")
-            },
             Self::InvalidLimit {
                 kind,
                 value,
@@ -662,7 +660,9 @@ impl Edit {
         paragraphs: &[PlainParagraph<'_>],
     ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(Error::AlreadyStaged);
+            return Err(Error::unsupported_operation(
+                "the edit already has a staged batch",
+            ));
         }
         if paragraphs.is_empty() {
             // An empty append is an exact semantic no-op.  Keeping the edit
@@ -708,7 +708,9 @@ impl Edit {
     /// Convenience staging method for one plain-text run per paragraph.
     pub fn append_text_paragraphs(&mut self, paragraphs: &[&str]) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(Error::AlreadyStaged);
+            return Err(Error::unsupported_operation(
+                "the edit already has a staged batch",
+            ));
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -773,9 +775,9 @@ impl Edit {
                 | TailAppendPublicationError::Execution { .. }
                 | TailAppendPublicationError::LimitExceeded { .. }
                 | TailAppendPublicationError::Sink { .. }
-                | TailAppendPublicationError::IncompleteOutput { .. } => {
-                    Error::UnsupportedSource("publication planning failed outside the source proof")
-                },
+                | TailAppendPublicationError::IncompleteOutput { .. } => Error::unsupported_source(
+                    "publication planning failed outside the source proof",
+                ),
             })
     }
 
@@ -795,12 +797,19 @@ impl Edit {
         planning_context: Option<&ExecutionContext>,
     ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
         if self.selector != TailSelector::Body {
-            return Err(Error::UnsupportedSelector.into());
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::UnsupportedTarget,
+                "tail_append",
+                "the selector is not supported by this edit family",
+            ))
+            .into());
         }
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
         let source_length = source_bytes.len();
         if source_length > self.limits.max_output_bytes {
             return Err(Error::Limit {
@@ -894,7 +903,7 @@ impl Edit {
                 .into_boxed_slice()
         };
         if inserted.len() != inserted_len {
-            return Err(Error::UnsupportedSource(
+            return Err(Error::unsupported_source(
                 "encoded insertion length changed after bounded preflight",
             )
             .into());
@@ -919,7 +928,11 @@ impl Edit {
     /// Atomically validates and publishes the candidate artifact.
     pub fn commit(self) -> Result<Commit, Error> {
         if self.selector != TailSelector::Body {
-            return Err(Error::UnsupportedSelector);
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::UnsupportedTarget,
+                "tail_append",
+                "the selector is not supported by this edit family",
+            )));
         }
         let operation_count = usize::from(!self.paragraphs.is_empty());
         if self.paragraphs.is_empty() {
@@ -944,7 +957,9 @@ impl Edit {
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
         let inserted_len =
             encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
         if inserted_len > self.limits.max_inserted_bytes {
@@ -991,12 +1006,12 @@ impl Edit {
             })?;
         let prefix = source_bytes
             .get(..proof.root_close)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "root-close proof is outside the source",
             ))?;
         let suffix = source_bytes
             .get(proof.root_close..)
-            .ok_or(Error::UnsupportedSource(
+            .ok_or(Error::unsupported_source(
                 "root-close proof is outside the source",
             ))?;
         output.extend_from_slice(prefix);
@@ -1179,13 +1194,19 @@ impl TailAppendPublicationPlan {
     ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
+            return Err(TailAppendPublicationError::Plan(Error::Refused(
+                Refusal::new(
+                    RefusalKind::UnsupportedTarget,
+                    "tail_append",
+                    "the selector is not supported by this edit family",
+                ),
+            )));
         }
         let source_bytes = source
             .source_bytes()
-            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            )))?;
+            .ok_or(TailAppendPublicationError::Plan(
+                Error::unsupported_operation("snapshot has no exact RTF source"),
+            ))?;
         let observed_version = source.source_version();
         if observed_version != self.source_version {
             return Err(TailAppendPublicationError::SourceVersionChanged {
@@ -1219,7 +1240,7 @@ impl TailAppendPublicationPlan {
             },
         )?;
         if output_length != self.output_bytes() {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "publication output length no longer matches its proof",
             )));
         }
@@ -1240,7 +1261,7 @@ impl TailAppendPublicationPlan {
             });
         }
         if self.root_close > source_bytes.len() {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "publication root-close proof is outside the source",
             )));
         }
@@ -1300,12 +1321,12 @@ impl TailAppendPublicationPlan {
         };
         let prefix = source_bytes
             .get(..root_close)
-            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            .ok_or(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "publication prefix proof is outside the source",
             )))?;
         let suffix = source_bytes
             .get(root_close..)
-            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            .ok_or(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "publication suffix proof is outside the source",
             )))?;
         let segments = [prefix, self.inserted.as_ref(), suffix];
@@ -1488,9 +1509,9 @@ impl TailAppendSourceProof {
             prove_splice_source(document, selector).map_err(TailAppendPublicationError::Plan)?;
         let document_bytes = document
             .source_bytes()
-            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            )))?;
+            .ok_or(TailAppendPublicationError::Plan(
+                Error::unsupported_operation("snapshot has no exact RTF source"),
+            ))?;
         let expected_version = source
             .version()
             .map_err(|error| source_publication_io(error, 0))?;
@@ -1697,7 +1718,9 @@ impl TailAppendSourceEdit {
         paragraphs: &[PlainParagraph<'_>],
     ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(Error::AlreadyStaged);
+            return Err(Error::unsupported_operation(
+                "the edit already has a staged batch",
+            ));
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -1715,7 +1738,9 @@ impl TailAppendSourceEdit {
         paragraphs: &[&str],
     ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(Error::AlreadyStaged);
+            return Err(Error::unsupported_operation(
+                "the edit already has a staged batch",
+            ));
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -1787,10 +1812,22 @@ impl TailAppendSourceEdit {
         publication_limits.validate()?;
         let _capability = self.proof.capability;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
+            return Err(TailAppendPublicationError::Plan(Error::Refused(
+                Refusal::new(
+                    RefusalKind::UnsupportedTarget,
+                    "tail_append",
+                    "the selector is not supported by this edit family",
+                ),
+            )));
         }
         if self.selector != self.proof.selector {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
+            return Err(TailAppendPublicationError::Plan(Error::Refused(
+                Refusal::new(
+                    RefusalKind::UnsupportedTarget,
+                    "tail_append",
+                    "the selector is not supported by this edit family",
+                ),
+            )));
         }
         let source_version = self
             .source
@@ -1826,7 +1863,7 @@ impl TailAppendSourceEdit {
             self.proof.root_close
         };
         if root_close > source_length_usize {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed root-close proof is outside the source",
             )));
         }
@@ -1924,7 +1961,7 @@ impl TailAppendSourceEdit {
             .into_boxed_slice()
         };
         if inserted.len() != inserted_len {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed encoded insertion changed after preflight",
             )));
         }
@@ -2164,7 +2201,13 @@ impl TailAppendSourcePublicationPlan {
     ) -> Result<crate::source_backed::Report, TailAppendPublicationError> {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
+            return Err(TailAppendPublicationError::Plan(Error::Refused(
+                Refusal::new(
+                    RefusalKind::UnsupportedTarget,
+                    "tail_append",
+                    "the selector is not supported by this edit family",
+                ),
+            )));
         }
         let expected = u64::try_from(self.source_bytes).unwrap_or(u64::MAX);
         let observed_version = source
@@ -2194,7 +2237,7 @@ impl TailAppendSourcePublicationPlan {
             }
         })?;
         if source_length != self.source_bytes || self.root_close > source_length {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed publication bounds no longer match the proof",
             )));
         }
@@ -2215,7 +2258,7 @@ impl TailAppendSourcePublicationPlan {
             }
         })?;
         if output_length != self.output_bytes() {
-            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed output length no longer matches its plan",
             )));
         }
@@ -3396,7 +3439,9 @@ impl Commit {
         let bytes = self
             .snapshot
             .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
         if bytes.len() > limits.max_output_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
@@ -3442,7 +3487,7 @@ impl Patch {
         if source.options() == self.after.options() {
             return Ok(self.after.clone());
         }
-        let bytes = self.after.source_bytes().ok_or(Error::UnsupportedSource(
+        let bytes = self.after.source_bytes().ok_or(Error::unsupported_source(
             "patch target has no retained source artifact",
         ))?;
         Ok(Package::from_bytes_with_options(bytes, source.options())?)
@@ -3485,10 +3530,10 @@ impl Patch {
 
     /// Converts this patch to a deterministic bounded JSON envelope.
     pub fn to_durable(&self, limits: SemanticLimits) -> Result<DurableTailAppendPatch, Error> {
-        let before = self.before.source_bytes().ok_or(Error::UnsupportedSource(
+        let before = self.before.source_bytes().ok_or(Error::unsupported_source(
             "patch source has no exact RTF source",
         ))?;
-        let after = self.after.source_bytes().ok_or(Error::UnsupportedSource(
+        let after = self.after.source_bytes().ok_or(Error::unsupported_source(
             "patch target has no exact RTF source",
         ))?;
         let wire = DurableTailAppendPatch {
@@ -3691,7 +3736,11 @@ impl DurableTailAppendPatch {
     /// Applies this patch to an exact source artifact and reopens the result.
     pub fn apply(&self, source: &Package) -> Result<Package, Error> {
         if self.selector != TailSelector::Body {
-            return Err(Error::UnsupportedSelector);
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::UnsupportedTarget,
+                "tail_append",
+                "the selector is not supported by this edit family",
+            )));
         }
         validate_wire_fields(self)?;
         validate_wire_bounds(
@@ -3702,9 +3751,9 @@ impl DurableTailAppendPatch {
             self.inserted.len(),
             self.limits,
         )?;
-        let source_bytes = source
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+        let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
         if self.direction == Direction::Append && source_bytes.len() > self.limits.max_output_bytes
         {
             return Err(Error::Limit {
@@ -4129,39 +4178,43 @@ struct SpliceProof {
 
 fn prove_splice_source(source: &Package, selector: TailSelector) -> Result<SpliceProof, Error> {
     if selector != TailSelector::Body {
-        return Err(Error::UnsupportedSelector);
+        return Err(Error::Refused(Refusal::new(
+            RefusalKind::UnsupportedTarget,
+            "tail_append",
+            "the selector is not supported by this edit family",
+        )));
     }
     let provenance = source.model().parse_provenance();
     if !provenance.syntax_valid || !provenance.root_valid || !provenance.document_valid {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "parser provenance does not prove a complete document",
         ));
     }
     if source.model().protection().is_protected() {
-        return Err(Error::ProtectedDocument(
-            source.model().protection().protection_type(),
-        ));
+        return Err(Error::Refused(Refusal::new(
+            RefusalKind::Protected,
+            "tail_append",
+            "document protection refuses changed publication",
+        )));
     }
     if source.model().unknown_syntax_markers() != 0 {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "dropped unknown syntax prevents a safe root-tail splice",
         ));
     }
     reject_active_or_external_surfaces(source)?;
-    if crate::compressed::is_compressed_rtf(
-        source
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?,
-    ) {
-        return Err(Error::UnsupportedSource(
+    if crate::compressed::is_compressed_rtf(source.source_bytes().ok_or(
+        Error::unsupported_operation("snapshot has no exact RTF source"),
+    )?) {
+        return Err(Error::unsupported_source(
             "compressed RTF is not an exact uncompressed splice source",
         ));
     }
-    let bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
     if !bytes.is_ascii() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "non-ASCII transport requires an explicit code-page writer",
         ));
     }
@@ -4180,12 +4233,12 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
         || model.xsl_transform().is_some()
         || model.xsl_transform_usage().is_requested()
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "external document or transformation content is present",
         ));
     }
     if !model.form_fields().is_empty() || !model.objects().is_empty() {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "active form or embedded-object content is present",
         ));
     }
@@ -4194,7 +4247,7 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
         .iter()
         .any(|picture| picture.image_type == crate::ImageType::Unknown)
     {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "an unsupported picture payload is present",
         ));
     }
@@ -4205,13 +4258,13 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
             | crate::validation::FieldSafety::ExternalUnknown
             | crate::validation::FieldSafety::ExternalAndActive
             | crate::validation::FieldSafety::ExternalAndActiveUnknown => {
-                return Err(Error::UnsupportedSource(
+                return Err(Error::unsupported_source(
                     "external field content is present",
                 ));
             },
             crate::validation::FieldSafety::Active
             | crate::validation::FieldSafety::ActiveUnknown => {
-                return Err(Error::UnsupportedSource("active field content is present"));
+                return Err(Error::unsupported_source("active field content is present"));
             },
         }
     }
@@ -4220,37 +4273,37 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
 
 fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
     if bytes.first() != Some(&b'{') {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "source does not begin with one root group",
         ));
     }
     let mut depth = 1usize;
     let mut index = 1usize;
     while index < bytes.len() {
-        let byte = bytes.get(index).copied().ok_or(Error::UnsupportedSource(
+        let byte = bytes.get(index).copied().ok_or(Error::unsupported_source(
             "root scanner offset is outside the source",
         ))?;
         match byte {
             b'{' => {
                 depth = depth
                     .checked_add(1)
-                    .ok_or(Error::UnsupportedSource("root nesting depth overflowed"))?;
+                    .ok_or(Error::unsupported_source("root nesting depth overflowed"))?;
                 index += 1;
             },
             b'}' => {
-                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
                     "root group closed before its opening brace",
                 ))?;
                 if depth == 0 {
                     if bytes
                         .get(index + 1..)
-                        .ok_or(Error::UnsupportedSource(
+                        .ok_or(Error::unsupported_source(
                             "root scanner suffix is outside the source",
                         ))?
                         .iter()
                         .any(|byte| !byte.is_ascii_whitespace())
                     {
-                        return Err(Error::UnsupportedSource(
+                        return Err(Error::unsupported_source(
                             "trailing non-whitespace follows the root group",
                         ));
                     }
@@ -4264,7 +4317,7 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
             _ => index += 1,
         }
     }
-    Err(Error::UnsupportedSource(
+    Err(Error::unsupported_source(
         "root group does not have one exact closing brace",
     ))
 }
@@ -4272,9 +4325,9 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
 fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     let next = slash
         .checked_add(1)
-        .ok_or(Error::UnsupportedSource("control offset overflowed"))?;
+        .ok_or(Error::unsupported_source("control offset overflowed"))?;
     let Some(&byte) = bytes.get(next) else {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "source ends after a control slash",
         ));
     };
@@ -4284,14 +4337,14 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     if byte == b'\'' {
         let end = next
             .checked_add(3)
-            .ok_or(Error::UnsupportedSource("hex control offset overflowed"))?;
+            .ok_or(Error::unsupported_source("hex control offset overflowed"))?;
         let digits = bytes
             .get(next + 1..next + 3)
-            .ok_or(Error::UnsupportedSource("malformed hexadecimal control"))?;
+            .ok_or(Error::unsupported_source("malformed hexadecimal control"))?;
         if !digits.first().is_some_and(u8::is_ascii_hexdigit)
             || !digits.get(1).is_some_and(u8::is_ascii_hexdigit)
         {
-            return Err(Error::UnsupportedSource("malformed hexadecimal control"));
+            return Err(Error::unsupported_source("malformed hexadecimal control"));
         }
         return Ok(end);
     }
@@ -4304,9 +4357,9 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     }
     let name = bytes
         .get(next..end)
-        .ok_or(Error::UnsupportedSource("control word span is invalid"))?;
+        .ok_or(Error::unsupported_source("control word span is invalid"))?;
     if name.eq_ignore_ascii_case(b"bin") {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "binary destinations are outside the exact ASCII splice proof",
         ));
     }
@@ -4556,13 +4609,15 @@ fn verify_candidate(
     let source_text = source.text();
     let candidate_text = candidate.text();
     if !candidate_text.starts_with(source_text) {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate changed the pre-existing body text",
         ));
     }
     let suffix = candidate_text
         .get(source_text.len()..)
-        .ok_or(Error::UnsupportedSource("candidate text prefix is invalid"))?;
+        .ok_or(Error::unsupported_source(
+            "candidate text prefix is invalid",
+        ))?;
     let separator = !source.body().is_empty() && !ends_with_par;
     let mut expected_len = usize::from(separator);
     for paragraph in paragraphs {
@@ -4596,7 +4651,7 @@ fn verify_candidate(
         expected.push('\n');
     }
     if suffix != expected {
-        return Err(Error::UnsupportedSource(
+        return Err(Error::unsupported_source(
             "candidate plain paragraphs did not survive RTF readback",
         ));
     }

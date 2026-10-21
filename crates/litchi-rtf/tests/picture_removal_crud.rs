@@ -170,7 +170,7 @@ fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
     let nested = Package::parse(&format!(r"{{\rtf1{{\*\shppict{FIRST}}}}}")).unwrap();
     assert!(matches!(
         nested.edit().remove_picture(0),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let field = Package::parse(&format!(
@@ -179,13 +179,13 @@ fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
     .unwrap();
     assert!(matches!(
         field.edit().remove_picture(0),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let unknown = Package::parse(&format!(r"{{\rtf1\future42{FIRST}}}")).unwrap();
     assert!(matches!(
         unknown.edit().remove_picture(0),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 
     let protected = Package::parse(&format!(r"{{\rtf1\allprot\enforceprot1{FIRST}}}")).unwrap();
@@ -193,7 +193,7 @@ fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
     edit.remove_picture(0).unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(Error::ProtectedDocument { .. })
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
     ));
 }
 
@@ -287,6 +287,6 @@ fn removes_groups_whose_payload_format_payload_edits_refuse() {
     let mut payload = document.edit();
     assert!(matches!(
         payload.replace_picture_payload(0, [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
-        Err(Error::UnsupportedSource(_))
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
 }
