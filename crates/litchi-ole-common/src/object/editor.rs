@@ -304,6 +304,16 @@ impl Edit {
         )
     }
 
+    fn into_staged_with_current(mut self, current: Arc<Vec<u8>>) -> Package {
+        let state = Arc::make_mut(&mut self.state);
+        state.original = Arc::clone(&current);
+        state.current = current;
+        state.base_package = Arc::clone(&state.package);
+        state.changed = false;
+        state.validated_layout = state.layout;
+        Package::from_state(self.state)
+    }
+
     pub(crate) fn from_package(snapshot: &Package) -> Self {
         Self {
             state: snapshot.state_shared(),
@@ -965,7 +975,7 @@ impl Edit {
             Arc::clone(&self.state.original)
         };
         let package = if self.state.changed {
-            self.staged_with_current(Arc::clone(&after))
+            self.into_staged_with_current(Arc::clone(&after))
         } else {
             Package::from_state(Arc::clone(&self.state))
         };

@@ -43,13 +43,15 @@ pub(crate) struct PackageState {
 
 /// Immutable, cheap-to-clone owner of a captured OLE object package.
 ///
-/// Cloning a package shares the original/current bytes, captured topology and
-/// every stream allocation.  The small owner handle stays inline, so opening
-/// a package does not allocate a second owner-state object when the caller
-/// immediately starts an edit.  Cloning the handle remains O(1): it only
-/// clones the already shared catalogs and byte owners.
-/// An edit clones those `Arc` handles and copies no package topology until a
-/// mutation first needs copy-on-write.
+/// The owner keeps one [`Arc`] to [`PackageState`].  Cloning a package is
+/// therefore O(1) and shares the original/current bytes, captured topology,
+/// stream allocations, limits, and layout policy through that state.  A
+/// default edit retains the same state until its first mutation; an edit that
+/// needs copy-on-write detaches a private state while continuing to share the
+/// immutable byte and catalog allocations.  A changed publication creates one
+/// fresh state only when the edit state is still shared; otherwise it
+/// normalizes that state in place.  A no-op publication reuses the existing
+/// state Arc.
 #[derive(Clone)]
 pub struct Package {
     pub(crate) state: Arc<PackageState>,

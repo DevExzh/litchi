@@ -416,6 +416,25 @@ fn cloned_package_edits_are_isolated_without_reopening_the_source() {
         committed.package().stream(&["WordDocument".into()]),
         Some(&b"changed"[..])
     );
+    let replayed = committed
+        .patch()
+        .apply(&package)
+        .expect("forward patch should replay on the original package");
+    assert_eq!(
+        replayed.package().stream(&["WordDocument".into()]),
+        Some(&b"changed"[..])
+    );
+    let no_op = committed
+        .package()
+        .edit()
+        .expect("published package should remain editable")
+        .commit()
+        .expect("follow-up no-op should commit");
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(
+        no_op.package().stream(&["WordDocument".into()]),
+        Some(&b"changed"[..])
+    );
     let mut sibling_bytes = Vec::new();
     sibling
         .write_to(&mut sibling_bytes)
