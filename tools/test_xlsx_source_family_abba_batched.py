@@ -84,6 +84,10 @@ class XlsxSourceFamilyAdapterTests(unittest.TestCase):
         changed_before = event("before", [105, 115], [8, 8], [70, 70])
         with self.assertRaises(ADAPTER.RunFailure):
             ADAPTER.validate_family_observations("page_margin", "source", [before, changed_before])
+        missing_sink = dict(before)
+        missing_sink["sink"] = {"accepted_bytes": [1000, 1000]}
+        with self.assertRaises(ADAPTER.RunFailure):
+            ADAPTER.validate_family_observations("page_margin", "source", [missing_sink])
 
     def test_elapsed_and_source_vector_lengths_are_checked(self) -> None:
         with self.assertRaises(ADAPTER.RunFailure):
@@ -112,6 +116,14 @@ class XlsxSourceFamilyAdapterTests(unittest.TestCase):
         with mock.patch.object(sys, "argv", argv):
             with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 ADAPTER.parse_args()
+
+    def test_quiet_scan_recognizes_benchmark_children(self) -> None:
+        for executable in (
+            "litchi-perf-baseline", "litchi-perf-baseline-v2", "xlsx_probe",
+            "scoped_patch_probe", "snappy-probe-v1", "ole_w5_probe",
+        ):
+            self.assertTrue(ADAPTER.is_heavy_process(executable, executable))
+        self.assertFalse(ADAPTER.is_heavy_process("python3", "python3 adapter.py"))
 
 
 if __name__ == "__main__":

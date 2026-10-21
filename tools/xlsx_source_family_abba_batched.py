@@ -34,7 +34,7 @@ MAX_SAMPLES = 100_000
 MAX_CHILD_OUTPUT = 64 * 1024 * 1024
 HEAVY_PROCESS_NAMES = {
     "cargo", "rustc", "rustdoc", "rustfmt", "perf", "heaptrack", "valgrind",
-    "clang", "clang++", "gcc", "cc", "ld.lld",
+    "clang", "clang++", "gcc", "cc", "ld.lld", "scoped_patch_probe", "ole_w5_probe",
 }
 HEAVY_PROCESS_WORD = re.compile(
     r"(?:^|[\s/'\"])(?:cargo|rustc|rustdoc|rustfmt|perf|heaptrack|valgrind|"
@@ -246,10 +246,19 @@ def _process_scan() -> list[dict[str, Any]]:
             continue
         executable = Path(parts[0]).name
         command = " ".join(parts)
-        if executable not in HEAVY_PROCESS_NAMES and not HEAVY_PROCESS_WORD.search(command):
+        if not is_heavy_process(executable, command):
             continue
         processes.append({"pid": pid, "executable": executable, "command": parts})
     return sorted(processes, key=lambda process: process["pid"])
+
+
+def is_heavy_process(executable: str, command: str) -> bool:
+    """Recognize build/profiling work and every protected benchmark child."""
+    if executable in HEAVY_PROCESS_NAMES:
+        return True
+    if executable.startswith(("litchi-perf-", "xlsx_", "snappy-")):
+        return True
+    return bool(HEAVY_PROCESS_WORD.search(command))
 
 
 def record_quiet_scan(recorder: Recorder, phase: str) -> dict[str, Any]:
@@ -320,6 +329,10 @@ def run_family_child(
         result = extract_result(report, case, samples)
         sink = sink_signature(result, samples)
         source = source_signature(result, samples)
+        if implementation == "source" and (
+            sink.get("accepted_bytes") is None or sink.get("largest_write") is None
+        ):
+            raise RunFailure(f"{case}: source child must report sink accepted_bytes and largest_write")
     except Exception as error:
         base["status"] = "invalid_report"
         base["error"] = repr(error)
@@ -539,6 +552,9 @@ def validate_family_observations(family: str, implementation: str, observations:
             source = event["source"]
             if not source.get("read_calls") or not source.get("read_bytes"):
                 raise RunFailure(f"{family}/{implementation}: source read evidence absent")
+            sink = event["sink"]
+            if sink.get("accepted_bytes") is None or sink.get("largest_write") is None:
+                raise RunFailure(f"{family}/{implementation}: sink geometry absent")
 
 
 def run_compact(
