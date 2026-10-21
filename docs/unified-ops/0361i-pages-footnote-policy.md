@@ -1,4 +1,4 @@
-# 0362k — Retain Pages footnote resource policies
+# 0361i — Retain Pages footnote resource policies
 
 - Date: 2026-10-21.
 - Status: source slice validated; integration with the final W4/W4b workspace

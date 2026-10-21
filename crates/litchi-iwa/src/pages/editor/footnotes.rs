@@ -269,25 +269,28 @@ impl FootnoteGraphBudget {
     }
 
     fn remaining_rewrite_limits(&self) -> Result<litchi_iwa_text_wire::RewriteLimits> {
-        let input_bytes = self.remaining(
-            self.input_bytes,
-            self.rewrite_limits.max_message_bytes(),
-            LimitKind::InputBytes,
-        )?;
-        let fields = self.remaining(
-            self.fields,
-            self.rewrite_limits.max_fields(),
-            LimitKind::Fields,
-        )?;
-        let work = self.remaining(
-            self.work,
-            self.rewrite_limits.max_rewrite_work(),
-            LimitKind::RewriteWork,
-        )?;
+        // The graph counters are charged against the aggregate package
+        // profile. A storage profile may be tighter than that profile, but it
+        // must not become a second, independent counter by subtracting the
+        // same graph usage from its own ceiling first.
+        let aggregate = self.remaining_limits()?;
+        let input_bytes = self
+            .rewrite_limits
+            .max_message_bytes()
+            .min(aggregate.max_input_bytes());
+        let fields = self.rewrite_limits.max_fields().min(aggregate.max_fields());
+        let nesting = self
+            .rewrite_limits
+            .max_nesting()
+            .min(aggregate.max_nesting());
+        let work = self
+            .rewrite_limits
+            .max_rewrite_work()
+            .min(aggregate.max_rewrite_work());
         litchi_iwa_text_wire::RewriteLimits::new(
             input_bytes,
             fields,
-            self.rewrite_limits.max_nesting(),
+            nesting,
             self.rewrite_limits.max_fragments(),
             self.rewrite_limits.max_text_bytes(),
             self.rewrite_limits.max_table_entries(),
@@ -1543,6 +1546,49 @@ mod tests {
                 limit: 2,
             })
         ));
+    }
+
+    #[test]
+    fn storage_profile_clamps_to_aggregate_residual_without_double_subtracting() {
+        let mut budget = FootnoteGraphBudget {
+            limits: WireLimits::default()
+                .with_input_bytes(8)
+                .unwrap()
+                .with_fields(8)
+                .unwrap()
+                .with_nesting(4)
+                .unwrap()
+                .with_rewrite_work(8)
+                .unwrap(),
+            rewrite_limits: litchi_iwa_text_wire::RewriteLimits::new(
+                4, 4, 4, 4, 4, 4, 4, 4, 8,
+            )
+            .unwrap(),
+            input_bytes: 3,
+            fields: 3,
+            work: 3,
+            ..FootnoteGraphBudget::default()
+        };
+
+        let remaining = budget
+            .remaining_rewrite_limits()
+            .expect("the aggregate budget still has capacity");
+        assert_eq!(remaining.max_message_bytes(), 4);
+        assert_eq!(remaining.max_fields(), 4);
+        assert_eq!(remaining.max_nesting(), 4);
+        assert_eq!(remaining.max_rewrite_work(), 4);
+
+        // Keep the aggregate counters live in the test: changing any of the
+        // three consumed dimensions must affect the returned profile, while
+        // the tighter per-storage ceilings above must never be decremented a
+        // second time.
+        budget.input_bytes = 7;
+        let remaining = budget
+            .remaining_rewrite_limits()
+            .expect("fields and work still have aggregate capacity");
+        assert_eq!(remaining.max_message_bytes(), 1);
+        assert_eq!(remaining.max_fields(), 4);
+        assert_eq!(remaining.max_rewrite_work(), 4);
     }
 
     #[test]
