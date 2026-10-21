@@ -1,5 +1,6 @@
 use super::*;
 use crate::property_set::{CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Value};
+use crate::{Error, LimitKind};
 
 const LINK_BASE_FIXTURE: [u8; 4] = [0x62, 0x00, 0x00, 0x00];
 const HYPERLINKS_FIXTURE: [u8; 64] = [
@@ -27,13 +28,13 @@ fn hyperlink() -> Hyperlink {
 #[test]
 fn compact_fixture_round_trips_and_preserves_the_stored_hash() {
     let mut source = section();
-    let mut edit = Edit::new(&mut source).unwrap();
+    let mut edit = Edit::new(&mut source, Limits::default()).unwrap();
     edit.set_link_base(LinkBase::new("https://example.test/base/").unwrap())
         .unwrap();
     edit.set_hyperlinks(Hyperlinks::new(vec![hyperlink()]))
         .unwrap();
 
-    let typed = Properties::new(&source).unwrap();
+    let typed = Properties::new(&source, Limits::default()).unwrap();
     assert_eq!(
         typed.link_base().unwrap().unwrap().value(),
         "https://example.test/base/"
@@ -62,7 +63,7 @@ fn independent_compact_fixtures_have_exact_tags_hash_and_alignment() {
             Value::Blob(HYPERLINKS_FIXTURE.to_vec()),
         )
         .unwrap();
-    let typed = Properties::new(&source).unwrap();
+    let typed = Properties::new(&source, Limits::default()).unwrap();
     assert_eq!(typed.link_base().unwrap().unwrap().value(), "b");
     let links = typed.hyperlinks().unwrap().unwrap();
     assert_eq!(links.links()[0].stored_hash(), 0x61);
@@ -71,7 +72,7 @@ fn independent_compact_fixtures_have_exact_tags_hash_and_alignment() {
     assert_eq!(links.links()[0].target(), "A");
     assert_eq!(links.links()[0].location(), "");
 
-    let mut edit = Edit::new(&mut source).unwrap();
+    let mut edit = Edit::new(&mut source, Limits::default()).unwrap();
     edit.set_link_base(LinkBase::new("b").unwrap()).unwrap();
     edit.set_hyperlinks(links).unwrap();
     assert_eq!(
@@ -90,14 +91,14 @@ fn independent_compact_fixtures_have_exact_tags_hash_and_alignment() {
     padded_source
         .add_named(2, HYPERLINKS.into(), Value::Blob(padded.to_vec()))
         .unwrap();
-    let padded_links = Properties::new(&padded_source)
+    let padded_links = Properties::new(&padded_source, Limits::default())
         .unwrap()
         .hyperlinks()
         .unwrap()
         .unwrap();
     assert_eq!(padded_links.links()[0].target(), "A");
     assert_eq!(padded_links.links()[0].location(), "");
-    Edit::new(&mut padded_source)
+    Edit::new(&mut padded_source, Limits::default())
         .unwrap()
         .set_hyperlinks(padded_links)
         .unwrap();
@@ -131,7 +132,7 @@ fn property_stream_outer_hyperlink_padding_is_ignored_before_typed_overlay() {
     let section = parsed
         .section(crate::property_set::USER_DEFINED_PROPERTIES_FMTID)
         .unwrap();
-    let links = Properties::new(section)
+    let links = Properties::new(section, Limits::default())
         .unwrap()
         .hyperlinks()
         .unwrap()
@@ -147,12 +148,12 @@ fn reserved_names_are_case_insensitive_and_never_numeric_piddsi() {
         .add_named(42, "_pid_linkbase".into(), Value::Blob(vec![0, 0]))
         .unwrap();
     source.add(0x14, Value::Blob(vec![0, 0])).unwrap();
-    let typed = Properties::new(&source).unwrap();
+    let typed = Properties::new(&source, Limits::default()).unwrap();
     assert_eq!(typed.link_base().unwrap().unwrap().value(), "");
 
     source.update(42, Value::Blob(Vec::new())).unwrap();
     assert_eq!(
-        Properties::new(&source)
+        Properties::new(&source, Limits::default())
             .unwrap()
             .link_base()
             .unwrap()
@@ -161,7 +162,7 @@ fn reserved_names_are_case_insensitive_and_never_numeric_piddsi() {
         ""
     );
 
-    let mut edit = Edit::new(&mut source).unwrap();
+    let mut edit = Edit::new(&mut source, Limits::default()).unwrap();
     edit.set_link_base(LinkBase::new("base").unwrap()).unwrap();
     assert!(source.find_named("_PID_LINKBASE").is_some());
     assert!(matches!(source.property(0x14), Some(Value::Blob(_))));
@@ -174,7 +175,7 @@ fn malformed_values_are_lazy_and_bounded() {
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(vec![4, 0, 0, 0]))
         .unwrap();
-    let typed = Properties::new(&source).unwrap();
+    let typed = Properties::new(&source, Limits::default()).unwrap();
     assert!(typed.hyperlinks().is_err());
 
     let mut source = section();
@@ -183,7 +184,7 @@ fn malformed_values_are_lazy_and_bounded() {
         .unwrap();
     let limits = Limits::builder().max_blob_bytes(4).build().unwrap();
     assert!(
-        Properties::with_limits(&source, limits)
+        Properties::new(&source, limits)
             .unwrap()
             .link_base()
             .is_err()
@@ -197,17 +198,27 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed.clone()))
         .unwrap();
-    assert!(Properties::new(&source).unwrap().hyperlinks().is_err());
+    assert!(
+        Properties::new(&source, Limits::default())
+            .unwrap()
+            .hyperlinks()
+            .is_err()
+    );
 
     malformed[4] = 6;
     let mut source = section();
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed))
         .unwrap();
-    assert!(Properties::new(&source).unwrap().hyperlinks().is_err());
+    assert!(
+        Properties::new(&source, Limits::default())
+            .unwrap()
+            .hyperlinks()
+            .is_err()
+    );
 
     let mut source = section();
-    let mut edit = Edit::new(&mut source).unwrap();
+    let mut edit = Edit::new(&mut source, Limits::default()).unwrap();
     edit.set_hyperlinks(Hyperlinks::new(vec![hyperlink()]))
         .unwrap();
     let Value::Blob(raw) = source.find_named(HYPERLINKS).unwrap().1 else {
@@ -216,7 +227,7 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
     let mut raw = raw.clone();
     raw[10] = 1;
     source.update(2, Value::Blob(raw)).unwrap();
-    let links = Properties::new(&source)
+    let links = Properties::new(&source, Limits::default())
         .unwrap()
         .hyperlinks()
         .unwrap()
@@ -229,7 +240,7 @@ fn hyperlink_grammar_rejects_wrong_elements_but_accepts_retained_padding() {
     let mut raw = raw.clone();
     raw[42] = 0x7f;
     source.update(2, Value::Blob(raw)).unwrap();
-    let links = Properties::new(&source)
+    let links = Properties::new(&source, Limits::default())
         .unwrap()
         .hyperlinks()
         .unwrap()
@@ -244,7 +255,7 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         .add_named(2, LINK_BASE.into(), Value::Blob(LINK_BASE_FIXTURE.to_vec()))
         .unwrap();
     assert!(
-        Properties::with_limits(
+        Properties::new(
             &source,
             Limits::builder()
                 .max_blob_bytes(LINK_BASE_FIXTURE.len())
@@ -256,7 +267,7 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         .is_ok()
     );
     assert!(
-        Properties::with_limits(
+        Properties::new(
             &source,
             Limits::builder()
                 .max_blob_bytes(LINK_BASE_FIXTURE.len() - 1)
@@ -277,7 +288,7 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         )
         .unwrap();
     assert!(
-        Properties::with_limits(
+        Properties::new(
             &source,
             Limits::builder()
                 .max_blob_bytes(HYPERLINKS_FIXTURE.len())
@@ -289,7 +300,7 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         .is_ok()
     );
     assert!(
-        Properties::with_limits(
+        Properties::new(
             &source,
             Limits::builder()
                 .max_blob_bytes(HYPERLINKS_FIXTURE.len() - 1)
@@ -308,7 +319,12 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
         source
             .add_named(2, HYPERLINKS.into(), Value::Blob(malformed.to_vec()))
             .unwrap();
-        assert!(Properties::new(&source).unwrap().hyperlinks().is_err());
+        assert!(
+            Properties::new(&source, Limits::default())
+                .unwrap()
+                .hyperlinks()
+                .is_err()
+        );
     }
     let mut malformed = HYPERLINKS_FIXTURE;
     malformed[48] = 0;
@@ -317,7 +333,12 @@ fn fixtures_enforce_exact_bounds_and_malformed_inner_fields() {
     source
         .add_named(2, HYPERLINKS.into(), Value::Blob(malformed.to_vec()))
         .unwrap();
-    assert!(Properties::new(&source).unwrap().hyperlinks().is_err());
+    assert!(
+        Properties::new(&source, Limits::default())
+            .unwrap()
+            .hyperlinks()
+            .is_err()
+    );
 }
 
 #[test]
@@ -328,7 +349,7 @@ fn limits_cover_link_count_string_and_aggregate_units() {
     ]);
     let mut source = section();
     assert!(
-        Edit::with_limits(&mut source, Limits::builder().max_links(1).build().unwrap())
+        Edit::new(&mut source, Limits::builder().max_links(1).build().unwrap())
             .unwrap()
             .set_hyperlinks(values.clone())
             .is_err()
@@ -337,7 +358,7 @@ fn limits_cover_link_count_string_and_aggregate_units() {
 
     let mut source = section();
     assert!(
-        Edit::with_limits(
+        Edit::new(
             &mut source,
             Limits::builder().max_string_units(1).build().unwrap()
         )
@@ -348,7 +369,7 @@ fn limits_cover_link_count_string_and_aggregate_units() {
 
     let mut source = section();
     assert!(
-        Edit::with_limits(
+        Edit::new(
             &mut source,
             Limits::builder().max_total_utf16_units(3).build().unwrap()
         )
@@ -356,6 +377,83 @@ fn limits_cover_link_count_string_and_aggregate_units() {
         .set_hyperlinks(values)
         .is_err()
     );
+}
+
+#[test]
+fn typed_overlay_limits_keep_their_distinct_dimensions() {
+    let mut source = section();
+    let error = Edit::new(
+        &mut source,
+        Limits::builder().max_blob_bytes(1).build().unwrap(),
+    )
+    .unwrap()
+    .set_link_base(LinkBase::new("base").unwrap())
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedBlobBytes,
+            ..
+        }
+    ));
+
+    let mut source = section();
+    let error = Edit::new(&mut source, Limits::builder().max_links(1).build().unwrap())
+        .unwrap()
+        .set_hyperlinks(Hyperlinks::new(vec![
+            hyperlink(),
+            Hyperlink::new(0, 0, 0, "second", "").unwrap(),
+        ]))
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedLinks,
+            ..
+        }
+    ));
+
+    let mut source = section();
+    let error = Edit::new(
+        &mut source,
+        Limits::builder().max_string_units(1).build().unwrap(),
+    )
+    .unwrap()
+    .set_link_base(LinkBase::new("base").unwrap())
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedStringUnits,
+            ..
+        }
+    ));
+
+    let mut source = section();
+    let error = Edit::new(
+        &mut source,
+        Limits::builder().max_total_utf16_units(1).build().unwrap(),
+    )
+    .unwrap()
+    .set_hyperlinks(Hyperlinks::new(vec![hyperlink()]))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedTotalUtf16Units,
+            ..
+        }
+    ));
+
+    let error = Limits::builder().max_links(0).build().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::InvalidLimit {
+            kind: LimitKind::UserDefinedLinks,
+            value: 0,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -369,7 +467,7 @@ fn decode_limits_accept_exact_boundaries_and_reject_one_over() {
         )
         .unwrap();
     assert!(
-        Properties::with_limits(
+        Properties::new(
             &source,
             Limits::builder()
                 .max_links(1)
@@ -382,39 +480,54 @@ fn decode_limits_accept_exact_boundaries_and_reject_one_over() {
         .hyperlinks()
         .is_ok()
     );
-    assert!(
-        Properties::with_limits(
-            &source,
-            Limits::builder().max_string_units(1).build().unwrap(),
-        )
-        .unwrap()
-        .hyperlinks()
-        .is_err()
-    );
-    assert!(
-        Properties::with_limits(
-            &source,
-            Limits::builder().max_total_utf16_units(2).build().unwrap(),
-        )
-        .unwrap()
-        .hyperlinks()
-        .is_err()
-    );
+    let error = Properties::new(
+        &source,
+        Limits::builder().max_string_units(1).build().unwrap(),
+    )
+    .unwrap()
+    .hyperlinks()
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedStringUnits,
+            ..
+        }
+    ));
+    let error = Properties::new(
+        &source,
+        Limits::builder().max_total_utf16_units(2).build().unwrap(),
+    )
+    .unwrap()
+    .hyperlinks()
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedTotalUtf16Units,
+            ..
+        }
+    ));
 
     let mut two_links = section();
-    Edit::new(&mut two_links)
+    Edit::new(&mut two_links, Limits::default())
         .unwrap()
         .set_hyperlinks(Hyperlinks::new(vec![
             Hyperlink::new(0, 0, 0, "a", "").unwrap(),
             Hyperlink::new(0, 0, 0, "b", "").unwrap(),
         ]))
         .unwrap();
-    assert!(
-        Properties::with_limits(&two_links, Limits::builder().max_links(1).build().unwrap(),)
-            .unwrap()
-            .hyperlinks()
-            .is_err()
-    );
+    let error = Properties::new(&two_links, Limits::builder().max_links(1).build().unwrap())
+        .unwrap()
+        .hyperlinks()
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::UserDefinedLinks,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -440,7 +553,7 @@ fn edits_preserve_existing_identity_order_unknown_values_and_remove_cleanly() {
     let original_order: Vec<_> = source.property_ids().collect();
     let other = source.property(19).cloned();
 
-    let mut edit = Edit::new(&mut source).unwrap();
+    let mut edit = Edit::new(&mut source, Limits::default()).unwrap();
     edit.set_hyperlinks(Hyperlinks::new(vec![hyperlink()]))
         .unwrap();
     assert_eq!(edit.section().property_name(18), Some("_pid_hlinks"));
@@ -457,7 +570,7 @@ fn edits_preserve_existing_identity_order_unknown_values_and_remove_cleanly() {
 #[test]
 fn insertion_establishes_required_scaffolding_and_edits_rollback() {
     let mut blank = Section::new(crate::property_set::USER_DEFINED_PROPERTIES_FMTID);
-    Edit::new(&mut blank)
+    Edit::new(&mut blank, Limits::default())
         .unwrap()
         .set_link_base(LinkBase::new("base").unwrap())
         .unwrap();
@@ -466,7 +579,7 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
 
     let mut unicode = Section::new(crate::property_set::USER_DEFINED_PROPERTIES_FMTID);
     unicode.set_page(CodePage::Utf16Le);
-    Edit::new(&mut unicode)
+    Edit::new(&mut unicode, Limits::default())
         .unwrap()
         .set_link_base(LinkBase::new("base").unwrap())
         .unwrap();
@@ -476,7 +589,7 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
     existing
         .add_named(2, LINK_BASE.into(), Value::Blob(LINK_BASE_FIXTURE.to_vec()))
         .unwrap();
-    Edit::new(&mut existing)
+    Edit::new(&mut existing, Limits::default())
         .unwrap()
         .set_link_base(LinkBase::new("replacement").unwrap())
         .unwrap();
@@ -490,7 +603,7 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
         Value::Blob(LINK_BASE_FIXTURE.to_vec()),
     )
     .unwrap();
-    assert!(Edit::new(&mut high).is_err());
+    assert!(Edit::new(&mut high, Limits::default()).is_err());
 
     let mut at_max = section();
     at_max
@@ -500,7 +613,7 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
             Value::Blob(LINK_BASE_FIXTURE.to_vec()),
         )
         .unwrap();
-    Edit::new(&mut at_max)
+    Edit::new(&mut at_max, Limits::default())
         .unwrap()
         .set_link_base(LinkBase::new("accepted").unwrap())
         .unwrap();
@@ -516,7 +629,7 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
     let linked_order: Vec<_> = linked.property_ids().collect();
     let linked_base = linked.property(30).cloned();
     let linked_companion = linked.property(0x01_00001e).cloned();
-    let mut linked_edit = Edit::new(&mut linked).unwrap();
+    let mut linked_edit = Edit::new(&mut linked, Limits::default()).unwrap();
     linked_edit
         .set_link_base(LinkBase::new("reserved").unwrap())
         .unwrap();
@@ -541,13 +654,13 @@ fn insertion_establishes_required_scaffolding_and_edits_rollback() {
     );
 
     let mut populated = section();
-    let mut edit = Edit::new(&mut populated).unwrap();
+    let mut edit = Edit::new(&mut populated, Limits::default()).unwrap();
     edit.set_link_base(LinkBase::new("base").unwrap()).unwrap();
     edit.set_hyperlinks(Hyperlinks::new(vec![hyperlink()]))
         .unwrap();
     let original = edit.section().clone();
     drop(edit);
-    let mut limited = Edit::with_limits(
+    let mut limited = Edit::new(
         &mut populated,
         Limits::builder().max_blob_bytes(3).build().unwrap(),
     )
@@ -603,6 +716,6 @@ fn hash_is_case_insensitive_and_constructor_uses_the_should_algorithm() {
 fn wrong_section_is_rejected_without_interpreting_piddsi() {
     let mut wrong = Section::new(DOCUMENT_SUMMARY_INFORMATION_FMTID);
     wrong.set_page(CodePage::Utf16Le);
-    assert!(Properties::new(&wrong).is_err());
-    assert!(Edit::new(&mut wrong).is_err());
+    assert!(Properties::new(&wrong, Limits::default()).is_err());
+    assert!(Edit::new(&mut wrong, Limits::default()).is_err());
 }

@@ -5,7 +5,7 @@
 //! and the whole-artifact source check.
 
 use super::{Error, Result};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use litchi_ole_common::property_set::{
     self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
@@ -114,7 +114,7 @@ pub(crate) struct Transaction {
 impl Transaction {
     fn new(source: Snapshot) -> Result<Self> {
         Ok(Self {
-            editor: property_set::Edit::new(source.bytes.to_vec())?,
+            editor: property_set::Edit::new(source.bytes.to_vec(), OleFileLimits::default())?,
             source,
             changed: false,
         })
@@ -265,7 +265,7 @@ impl Transaction {
     /// Returns an error if the operation fails.
     pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let source = self.editor.property_set(Binding::UserDefinedProperties)?;
         let mut candidate = source

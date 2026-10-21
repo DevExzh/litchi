@@ -266,23 +266,24 @@ impl Package {
     ///
     /// The edit shares captured stream allocations until a write replaces
     /// one of them, so starting an edit does not copy large payloads.
-    #[must_use]
     pub fn edit(&self) -> Result<Edit, Error> {
         self.edit_with_options(EditOptions::default())
     }
 
     /// Starts an independent edit under a policy constrained by this package.
     pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit, Error> {
-        let requested_limits = options
-            .has_limits_override()
-            .then(|| options.limits_value())
-            .unwrap_or(self.state.limits);
+        let requested_limits = if options.has_limits_override() {
+            options.limits_value()
+        } else {
+            self.state.limits
+        };
         let limits = requested_limits.constrained_by(self.state.limits);
         limits.validate()?;
-        let cfb_limits = options
-            .has_cfb_limits_override()
-            .then(|| options.cfb_limits_value())
-            .unwrap_or(self.state.cfb_limits);
+        let cfb_limits = if options.has_cfb_limits_override() {
+            options.cfb_limits_value()
+        } else {
+            self.state.cfb_limits
+        };
         let cfb_limits = OleFileLimits::new(
             cfb_limits
                 .max_input_bytes()
@@ -298,10 +299,11 @@ impl Package {
                 .max_allocation_table_bytes()
                 .min(self.state.cfb_limits.max_allocation_table_bytes()),
         )?;
-        let layout = options
-            .has_sector_layout_override()
-            .then(|| options.sector_layout_value())
-            .unwrap_or(self.state.layout);
+        let layout = if options.has_sector_layout_override() {
+            options.sector_layout_value()
+        } else {
+            self.state.layout
+        };
         Ok(Edit::from_package_with_options(
             self, limits, cfb_limits, layout,
         ))

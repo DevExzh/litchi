@@ -10,7 +10,7 @@ use super::semantic::validate_section;
 use super::support::allocation;
 use crate::Error;
 use crate::protection::{Limits as ProtectionLimits, reject_protected_container};
-use litchi_cfb::{OleError, OleFile, OleWriter};
+use litchi_cfb::{OleError, OleFile, OleFileLimits, OleWriter};
 use std::collections::HashMap;
 use std::io::Cursor;
 
@@ -22,16 +22,17 @@ pub struct Edit {
 }
 
 impl Edit {
-    /// Opens a compound file for transactional Property Set editing.
+    /// Opens a compound file for transactional Property Set editing under an
+    /// explicit finite CFB ingress policy.
     ///
     /// # Errors
     ///
     /// Returns an error if `bytes` are not a readable unprotected compound
     /// file, a contained stream cannot be read, or editor storage cannot be
     /// allocated.
-    pub fn new(bytes: Vec<u8>) -> Result<Self, Error> {
+    pub fn new(bytes: Vec<u8>, limits: OleFileLimits) -> Result<Self, Error> {
         let streams = {
-            let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
+            let mut ole = OleFile::open_with_limits(Cursor::new(bytes.as_slice()), limits)?;
             let max_entries = ole.directory_entry_count();
             reject_protected_container(
                 &ole,

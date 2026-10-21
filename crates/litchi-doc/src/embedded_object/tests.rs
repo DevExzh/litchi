@@ -636,12 +636,7 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         .update_native_for(
             &reference,
             litchi_ole_common::ole_streams::Limits::default(),
-            |native| {
-                native
-                    .set_data([0xCC, 0xDD])
-                    .map(|_| ())
-                    .map_err(litchi_ole_common::Error::from)
-            },
+            |native| native.set_data([0xCC, 0xDD]).map(|_| ()),
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
@@ -874,12 +869,7 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
             .update_native_for(
                 &forged_name,
                 litchi_ole_common::ole_streams::Limits::default(),
-                |native| {
-                    native
-                        .set_data([0xF0, 0xF1])
-                        .map(|_| ())
-                        .map_err(litchi_ole_common::Error::from)
-                }
+                |native| { native.set_data([0xF0, 0xF1]).map(|_| ()) }
             )
             .is_err()
     );
@@ -960,12 +950,7 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
             .update_native_for(
                 &ambiguous_reference,
                 litchi_ole_common::ole_streams::Limits::default(),
-                |native| {
-                    native
-                        .set_data([0xF2, 0xF3])
-                        .map(|_| ())
-                        .map_err(litchi_ole_common::Error::from)
-                }
+                |native| { native.set_data([0xF2, 0xF3]).map(|_| ()) }
             )
             .is_err()
     );

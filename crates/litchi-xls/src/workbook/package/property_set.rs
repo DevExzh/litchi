@@ -12,7 +12,7 @@ use crate::Package;
 /// The family error: the package error of the source or republished
 /// package.
 pub use crate::package::{Error, Result};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use litchi_ole_common::property_set::document_summary::Snapshot as DocumentSummary;
 use litchi_ole_common::property_set::summary_information::Snapshot as SummaryInformation;
 use litchi_ole_common::property_set::{
@@ -140,7 +140,8 @@ impl Edit {
             return Err(Error::EncryptionPolicy);
         }
         let source = Snapshot::from_bytes(base.to_bytes()?)?;
-        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        let editor = PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
+            .map_err(crate::Error::from)?;
         Ok(Self {
             base: Some(base.clone()),
             source,
@@ -151,7 +152,8 @@ impl Edit {
     /// A codec-level edit of a bare property-set snapshot (tests only).
     #[cfg(test)]
     fn detached(source: Snapshot) -> Result<Self> {
-        let editor = PropertySetEdit::new(source.bytes.to_vec()).map_err(crate::Error::from)?;
+        let editor = PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
+            .map_err(crate::Error::from)?;
         Ok(Self {
             base: None,
             source,
@@ -252,7 +254,7 @@ impl Edit {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let current = self
             .editor

@@ -1003,10 +1003,10 @@ impl Edit {
 /// CFB policy. The common object edit surface reports a candidate that grows
 /// beyond that policy as its existing stream-byte budget, while direct CFB
 /// ingress keeps the low-level physical label and error intact.
-fn open_candidate_with_limits<'a>(
-    bytes: &'a [u8],
+fn open_candidate_with_limits(
+    bytes: &[u8],
     limits: OleFileLimits,
-) -> Result<OleFile<Cursor<&'a [u8]>>, Error> {
+) -> Result<OleFile<Cursor<&[u8]>>, Error> {
     match OleFile::open_with_limits(Cursor::new(bytes), limits) {
         Ok(file) => Ok(file),
         Err(OleError::LimitExceeded {

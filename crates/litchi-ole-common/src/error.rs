@@ -1,11 +1,11 @@
-//! Typed failures at the bounded object-capture boundary.
+//! Typed failures at bounded shared OLE boundaries.
 
 use std::{error, fmt, io};
 
 use litchi_cfb::OleError;
 use litchi_core::edit::{Refusal, RefusalKind};
 
-/// Finite resource dimensions enforced by object capture and editing.
+/// Finite resource dimensions enforced by shared OLE readers and editors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LimitKind {
     /// Selected object count.
@@ -38,9 +38,17 @@ pub enum LimitKind {
     StreamRemovals,
     /// Components in a stream selector.
     SelectorDepth,
+    /// Encoded bytes in one user-defined hyperlink BLOB.
+    UserDefinedBlobBytes,
+    /// Hyperlink records in one user-defined `_PID_HLINKS` value.
+    UserDefinedLinks,
+    /// UTF-16 code units in one user-defined hyperlink string.
+    UserDefinedStringUnits,
+    /// Aggregate UTF-16 code units in one user-defined hyperlink value.
+    UserDefinedTotalUtf16Units,
 }
 
-/// Object errors preserve low-level CFB failures and identify object budgets.
+/// Shared OLE errors preserve low-level CFB failures and identify typed budgets.
 #[derive(Debug)]
 pub enum Error {
     /// A low-level CFB or raw metadata failure.
@@ -187,13 +195,17 @@ impl LimitKind {
             Self::DirectoryNameBytes | Self::DirectoryTotalBytes => {
                 litchi_core::Resource::InputBytes
             },
+            Self::UserDefinedBlobBytes
+            | Self::UserDefinedStringUnits
+            | Self::UserDefinedTotalUtf16Units => litchi_core::Resource::InputBytes,
             Self::Objects
             | Self::ObjectStreams
             | Self::PackageStreams
             | Self::ObjectStorages
             | Self::PackageStorages
             | Self::DirectoryEntries
-            | Self::StreamRemovals => litchi_core::Resource::Objects,
+            | Self::StreamRemovals
+            | Self::UserDefinedLinks => litchi_core::Resource::Objects,
         }
     }
 }
