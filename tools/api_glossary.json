@@ -18636,9 +18636,66 @@
           "name": "with_limits",
           "scope": "litchi_odraw",
           "replacement": "use new(data, limits)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Package and its View (record 0362d)"
+        },
+        {
+          "name": "Owned",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "Commit returns a Package (record 0362d)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use package() on Commit or view() on Package (record 0362d)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Commit::into_package (record 0362d)"
+        },
+        {
+          "name": "encode",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Package::write_to, save or to_bytes (record 0362d)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Edit (record 0362d)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "drop the Edit (record 0362d)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use diagnostics().changed() (record 0362d)"
+        },
+        {
+          "name": "MAX_NAME_UNITS",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
+        },
+        {
+          "name": "MAX_NAME_BYTES",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
+        },
+        {
+          "name": "MAX_SNAPSHOT_BYTES",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
         }
       ],
-      "families": [],
+      "families": [
+        "litchi_odraw::prop::picture"
+      ],
       "immutable_owners": [
         "litchi_odraw::image::Blip",
         "litchi_odraw::image::Entry",
@@ -18646,8 +18703,12 @@
         "litchi_odraw::image::Delay",
         "litchi_odraw::shape::Shape",
         "litchi_odraw::Parser",
-        "litchi_odraw::Container"
-      ]
+        "litchi_odraw::Container",
+        "litchi_odraw::prop::picture::Package",
+        "litchi_odraw::prop::picture::View",
+        "litchi_odraw::prop::Props"
+      ],
+      "family_methods": true
     }
   ]
 }

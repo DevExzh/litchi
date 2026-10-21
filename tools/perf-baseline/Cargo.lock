@@ -1100,6 +1100,7 @@ name = "litchi-odraw"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "litchi-core",
  "zerocopy",
  "zerocopy-derive",
 ]

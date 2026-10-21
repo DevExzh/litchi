@@ -210,7 +210,9 @@
       "soapberry-zip",
       "xml-minifier"
     ],
-    "litchi-odraw": [],
+    "litchi-odraw": [
+      "litchi-core"
+    ],
     "litchi-ods": [
       "litchi-core",
       "litchi-odf-common"

@@ -9,6 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+litchi-core = { workspace = true }
 bitflags = { workspace = true }
 zerocopy = { workspace = true }
 zerocopy-derive = { workspace = true }

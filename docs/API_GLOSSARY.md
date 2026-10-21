@@ -136,6 +136,12 @@ Record 0362b also inventories the exact name `with_limits`; each migrated
 profile bans that name alongside the suffix. Raw and record constructors take
 their limits as a required argument.
 
+Record 0362d registers the ODraw picture family: `picture::Package` owns the
+record, `View` is read-only, and both edit commit and `Package::apply` return
+the shared triad. `Snapshot`/`Owned` publication is removed. Picture limits
+enter through options for owners and a required argument for raw projections;
+remaining ODraw raw/error/builder work stays open.
+
 ### Migration status by wave (record 0351)
 
 Each wave flips only its own lines, so parallel waves do not edit the same

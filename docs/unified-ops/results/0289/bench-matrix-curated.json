@@ -2838,6 +2838,10 @@
   {
    "record": "0362c",
    "reason": "Required-limit ODraw raw image/shape/traversal before/after probe and constructor equivalence receipts, not a leaf-versus-facade operation pair. Record 0362c keeps complete ABBA samples and source digests; remaining raw/owner/error migrations are required."
+  },
+  {
+   "record": "0362d",
+   "reason": "ODraw standalone picture-package before/after ownership and streaming probes, not a leaf-versus-facade operation pair. The record retains timing/allocation evidence and the raw-source migration remains required."
   }
  ]
 }
