@@ -828,6 +828,14 @@ impl OpcPackage {
         }
     }
 
+    /// Whether this package still carries an admitted source content-types
+    /// member, even when a structural edit temporarily makes its coverage
+    /// incompatible with the current part graph.
+    #[must_use]
+    pub fn has_content_types_source(&self) -> bool {
+        self.source_content_types_xml.is_some() && self.source_content_types.is_some()
+    }
+
     /// Serialize the typed content-type graph under required output limits.
     /// This deterministic authored view does not retain producer XML and does
     /// not grant source-replacement authority. Use the retained projection
