@@ -406,7 +406,11 @@ fn cloned_package_edits_are_isolated_without_reopening_the_source() {
     let mut edit = package.edit().expect("package should be editable");
     edit.put_stream(&["WordDocument".into()], b"changed".to_vec())
         .expect("edit should commit");
+    let shared_edit = edit.clone();
     let committed = edit.commit().expect("changed package should commit");
+    let sibling_commit = shared_edit
+        .commit()
+        .expect("shared changed edit should commit");
 
     assert_eq!(
         sibling.stream(&["WordDocument".into()]),
@@ -415,6 +419,18 @@ fn cloned_package_edits_are_isolated_without_reopening_the_source() {
     assert_eq!(
         committed.package().stream(&["WordDocument".into()]),
         Some(&b"changed"[..])
+    );
+    assert_eq!(committed.patch().before(), original.as_slice());
+    assert_eq!(sibling_commit.patch().before(), original.as_slice());
+    assert_eq!(
+        sibling_commit
+            .patch()
+            .inverse()
+            .apply(sibling_commit.package())
+            .expect("inverse should replay on the sibling publication")
+            .package()
+            .stream(&["WordDocument".into()]),
+        Some(&b"unknown-records"[..])
     );
     let replayed = committed
         .patch()
