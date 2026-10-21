@@ -1110,11 +1110,6 @@ pub(crate) fn package_from_replacement_bytes(source: &Package, bytes: Vec<u8>) -
 }
 
 fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> Result<Package> {
-    let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(snapshot.bytes().len())
-        .map_err(|_| Error::CellValues(crate::Error::Allocation("XLS primary read projection")))?;
-    bytes.extend_from_slice(snapshot.bytes());
     if let super::RetainedPolicy::Source { limits, leniency } = source.inner.policy {
         let selected = snapshot.cfb_limits();
         let cfb_limits = litchi_cfb::SharedOleFileLimits::new(selected.max_input_bytes())
@@ -1125,7 +1120,7 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             .map_err(PackageError::Cfb)?;
         let cfb = Arc::new(
             SharedOleFile::open_with_limits(
-                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                Arc::new(litchi_core::OwnedSource::from_arc(snapshot.bytes_shared())),
                 cfb_limits,
             )
             .map_err(PackageError::Cfb)?,
@@ -1141,6 +1136,11 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         Arc::make_mut(&mut package.inner).edit_snapshot = Some(snapshot);
         return Ok(package);
     }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(snapshot.bytes().len())
+        .map_err(|_| Error::CellValues(crate::Error::Allocation("XLS primary read projection")))?;
+    bytes.extend_from_slice(snapshot.bytes());
     let mut ole =
         litchi_cfb::OleFile::open_with_limits(std::io::Cursor::new(bytes), snapshot.cfb_limits())
             .map_err(PackageError::Cfb)?;

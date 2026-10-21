@@ -52,6 +52,23 @@ impl SourceBackedOverlayPublisher {
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned_with_limits(source, version, limits)?;
+        Self::from_owned_cfb(cfb)
+    }
+
+    /// Opens an already shared immutable vector without converting it to an
+    /// `Arc<[u8]>`.  This keeps the exact source allocation available to
+    /// owners that already retain an `Arc<Vec<u8>>`, while preserving the
+    /// sealed-source planning path of [`Self::open_owned`].
+    pub fn open_owned_vec(
+        source: Arc<Vec<u8>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OverlayError> {
+        let cfb = SharedOleFile::open_owned_vec_with_limits(source, version, limits)?;
+        Self::from_owned_cfb(cfb)
+    }
+
+    fn from_owned_cfb(cfb: SharedOleFile) -> Result<Self, OverlayError> {
         let max_entries = cfb.directory_entry_count();
         reject_protected_shared_container(
             &cfb,
@@ -269,6 +286,14 @@ mod tests {
                 SourceBackedOverlayPublisher::open_owned(
                     Arc::from(bytes),
                     SourceVersion::new(0x0181, 0),
+                    SharedOleFileLimits::default(),
+                ),
+                Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))
+            ));
+            assert!(matches!(
+                SourceBackedOverlayPublisher::open_owned_vec(
+                    Arc::new(bytes_for_shared(marker)),
+                    SourceVersion::new(0x0183, 0),
                     SharedOleFileLimits::default(),
                 ),
                 Err(OverlayError::Ole(litchi_cfb::OleError::InvalidFormat(_)))

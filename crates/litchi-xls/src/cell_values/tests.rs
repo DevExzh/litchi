@@ -378,7 +378,7 @@ fn directory_signature(
     bytes: &[u8],
 ) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec(), Limits::default()).unwrap();
-    let shared = SharedOleFile::open_owned(
+    let shared = SharedOleFile::open_owned_vec(
         Arc::clone(&snapshot.inner.bytes),
         snapshot.inner.source_version,
     )
@@ -1657,6 +1657,22 @@ fn rejected_and_noop_edits_are_failure_atomic() {
     assert!(patch.semantic().is_noop());
     assert_eq!(snapshot.bytes(), source.bytes());
     assert_eq!(diagnostics, Diagnostics::default());
+}
+
+#[test]
+fn snapshot_and_patch_share_artifact_vectors() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let (target, patch) = commit.into_parts();
+
+    assert!(Arc::ptr_eq(&source.inner.bytes, &patch.before));
+    assert!(Arc::ptr_eq(&target.inner.bytes, &patch.after));
+    assert_eq!(patch.before(), source.bytes());
+    assert_eq!(patch.after(), target.bytes());
+    assert_eq!(patch.inverse().before(), target.bytes());
 }
 
 #[test]

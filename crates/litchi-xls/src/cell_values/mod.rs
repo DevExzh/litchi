@@ -672,7 +672,10 @@ impl NumericTargetVerification<'_> {
 }
 
 struct Inner {
-    bytes: Arc<[u8]>,
+    // Keep the complete artifact in the same shared-vector shape accepted by
+    // `OwnedSource::from_arc`. Source-backed publication can therefore move
+    // this handle into its reopened CFB owner without copying the artifact.
+    bytes: Arc<Vec<u8>>,
     source_version: SourceVersion,
     limits: Limits,
     cfb_limits: OleFileLimits,
@@ -867,7 +870,7 @@ impl Snapshot {
         drop(pending);
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(source.as_slice()),
+                bytes: source,
                 source_version,
                 limits,
                 cfb_limits,
@@ -910,7 +913,7 @@ impl Snapshot {
 
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(source.as_slice()),
+                bytes: source,
                 source_version: fresh_snapshot_source_version(),
                 limits: package.limits_value(),
                 cfb_limits: package.cfb_limits_value(),
@@ -962,6 +965,15 @@ impl Snapshot {
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.inner.bytes
+    }
+
+    /// Returns shared ownership of the exact immutable artifact bytes.
+    ///
+    /// This is crate-private so source-backed publication can hand the same
+    /// allocation to `OwnedSource::from_arc`; public callers continue to use
+    /// the borrowed [`Self::bytes`] projection.
+    pub(crate) fn bytes_shared(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.inner.bytes)
     }
 
     /// Effective complete-package capture profile retained by this snapshot.
@@ -5401,13 +5413,13 @@ impl fmt::Debug for SourceBackedCommit {
 /// Successful source-bound fixed-width numeric publication plan.
 ///
 /// Unlike [`SourceBackedCommit`], this value never retains a rendered target
-/// [`Snapshot`], complete target `Vec<u8>`, or target artifact `Arc<[u8]>`.
+/// [`Snapshot`], complete target `Vec<u8>`, or target artifact `Arc<Vec<u8>>`.
 /// It keeps the immutable source and the checked CFB overlay plan. The plan
 /// owns the compact exact physical replacement spans derived from the numeric
 /// splices; logical path and expected-range descriptors are consumed during
 /// validation rather than duplicated here. The plan's source and target
 /// fingerprints are computed once, at planning, over the source's sealed
-/// immutable `Arc<[u8]>`; direct sequential publication, checked composed
+/// immutable `Arc<Vec<u8>>`; direct sequential publication, checked composed
 /// views and atomic saves rely on that ownership instead of re-hashing the
 /// artifact, and atomic saves keep every durability step.
 ///
@@ -7632,13 +7644,13 @@ impl fmt::Debug for SemanticPatch {
 /// Reversible, exact-source-checked replacement of one XLS artifact.
 #[derive(Clone)]
 pub(crate) struct Patch {
-    before: Arc<[u8]>,
-    after: Arc<[u8]>,
+    before: Arc<Vec<u8>>,
+    after: Arc<Vec<u8>>,
     semantic: SemanticPatch,
 }
 
 impl Patch {
-    fn new(before: Arc<[u8]>, after: Arc<[u8]>, semantic: SemanticPatch) -> Self {
+    fn new(before: Arc<Vec<u8>>, after: Arc<Vec<u8>>, semantic: SemanticPatch) -> Self {
         Self {
             before,
             after,
@@ -7815,7 +7827,7 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
     // still checked independently below over the composed positional reader.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
+    let publisher = SourceBackedOverlayPublisher::open_owned_vec(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
@@ -7952,7 +7964,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     // complete reopen.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
+    let publisher = SourceBackedOverlayPublisher::open_owned_vec(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
