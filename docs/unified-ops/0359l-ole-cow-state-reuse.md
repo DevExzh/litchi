@@ -145,3 +145,16 @@ the protected `a84650cd70` binaries and must be measured as a new candidate.
 Native qualification still must cover the owner clone and all eleven OLE
 selectors with the frozen runner, exact output/replay checks, host-overlap
 checks, and accepted batched legs of at least 250 ms.
+
+The first execution of the frozen command was deliberately rejected by its
+host guard and is retained outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/abba-a84650-final` (62 MiB).
+It reached four of five clone blocks and then stopped at
+`clone-b04-1-after-after`. The guard found the real external
+`scripts/test-adblock-ag-antiblock-program.py` process and its
+`/home/zhuhe/code/peculiar/.../peculiar_shell` and
+`/tmp/peculiar-runtime-.../peculiar_shell` children. The failing host snapshot
+has SHA-256
+`c320c25b630c60ca54b70013617216cf553c995d1572c380b29a0b735ae9c6a3`.
+This is a discarded overlap attempt, not native evidence; a fresh quiet grant
+and fresh output directory are required after those processes drain.
