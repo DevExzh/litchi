@@ -3,7 +3,7 @@
 use super::codec::BoundedXml;
 use super::model::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP, CORE_NAMESPACE, Conformance,
-    MAX_STRING_BYTES, MAX_XML_BYTES, STRICT_NAMESPACE,
+    MAX_CONNECTIONS, MAX_STRING_BYTES, MAX_XML_BYTES, STRICT_NAMESPACE,
 };
 use super::*;
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
@@ -298,6 +298,54 @@ fn source_limits_bound_connection_codec_dimensions() {
             maximum: 1,
             ..
         })
+    ));
+}
+
+#[test]
+fn namespace_binding_limits_keep_count_separate_from_malformed_input() {
+    let source = format!(
+        r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:f" xmlns:g="urn:g"><connection xmlns:h="urn:h" xmlns:i="urn:i" id="1" refreshedVersion="0"/></connections>"#
+    );
+    let limits = SourceLimits::builder()
+        .max_xml_attribute_bytes(4)
+        .and_then(|builder| builder.max_relationship_target_bytes(4))
+        .unwrap()
+        .build()
+        .unwrap();
+    let parsed = Connections::parse(source.as_bytes(), &limits);
+    assert!(matches!(
+        parsed,
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::NamespaceBindings),
+            observed: 5,
+            maximum: 4,
+        })
+    ));
+
+    let malformed = format!(r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1""#);
+    assert!(matches!(
+        Connections::parse(malformed.as_bytes(), &limits),
+        Err(Error::Invalid(_))
+    ));
+}
+
+#[test]
+fn connection_collection_limit_survives_public_parser() {
+    let count = MAX_CONNECTIONS + 1;
+    let mut source = String::with_capacity(count * 60 + 32);
+    source.push_str(&format!(r#"<connections xmlns="{CORE_NAMESPACE}">"#));
+    for id in 0..count {
+        source.push_str(&format!(r#"<connection id="{id}" refreshedVersion="0"/>"#));
+    }
+    source.push_str("</connections>");
+
+    assert!(matches!(
+        Connections::parse(source.as_bytes(), &SourceLimits::default()),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Connections(LimitKind::Connections),
+            observed,
+            maximum,
+        }) if observed == count as u64 && maximum == MAX_CONNECTIONS as u64
     ));
 }
 

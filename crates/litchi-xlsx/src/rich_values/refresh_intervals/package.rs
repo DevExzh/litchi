@@ -192,7 +192,11 @@ fn capture_incoming(package: &OpcPackage, target: &PackURI) -> Result<Vec<Relati
 
 fn push_incoming(values: &mut Vec<RelationshipState>, value: RelationshipState) -> Result<()> {
     if values.len() >= MAX_INCOMING_RELATIONSHIPS {
-        return Err(super::limit("rich-value refresh intervals"));
+        return Err(super::limit(
+            LimitKind::Relationships,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            MAX_INCOMING_RELATIONSHIPS,
+        ));
     }
     values.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "rich-value incoming relationship closure",
@@ -211,6 +215,7 @@ crate::record::limit_kinds!("rich-value refresh-interval", RichValueRefresh {
     Types => "rich-value types",
     Intervals => "rich-value refresh intervals",
     ExtensionLocations => "rich-value refresh extension locations",
+    Relationships => "rich-value refresh incoming relationships",
     Depth => "rich-value XML depth",
 });
 
@@ -276,7 +281,11 @@ impl Edit {
             .map(|intervals| intervals.intervals().to_vec())
             .unwrap_or_default();
         if values.len() >= MAX_INTERVALS {
-            return Err(super::limit("rich-value refresh intervals"));
+            return Err(super::limit(
+                LimitKind::Intervals,
+                values.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_INTERVALS,
+            ));
         }
         values.try_reserve(1).map_err(|source| Error::Allocation {
             resource: "rich-value refresh interval edit",

@@ -1020,11 +1020,7 @@ fn active_transition_range(
         })
         .collect::<Result<Vec<_>>>()?;
     let selected = litchi_ooxml_common::mce::active_offsets(xml, &offsets, &capabilities, &limits)
-        .map_err(|error| {
-            Error::Invalid(format!(
-                "source-backed transition MCE selection failed: {error}"
-            ))
-        })?;
+        .map_err(Error::MarkupCompatibility)?;
     if selected.len() > 1 {
         return Err(invalid(
             "active AlternateContent branch contains multiple transitions",

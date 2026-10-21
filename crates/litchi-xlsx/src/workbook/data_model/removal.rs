@@ -2,9 +2,9 @@
 
 use super::codec::{Node, parse_document};
 use super::{
-    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, Definition, Limits, MAX_XML_BYTES,
-    SML, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, STRICT_SML, X15, invalid, limit_at_with_max,
-    xml_error,
+    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, Definition, LimitKind, Limits,
+    MAX_XML_BYTES, SML, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, STRICT_SML, X15, invalid, limit,
+    limit_lower_bound, xml_error,
 };
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -109,8 +109,7 @@ pub(super) fn prepare(
             return Err(invalid("unexpected Connections content type"));
         }
         let limits = package.read_limits();
-        let values = crate::connections::Connections::parse(part.blob(), &limits)
-            .map_err(|error| invalid(error.to_string()))?;
+        let values = crate::connections::Connections::parse(part.blob(), &limits)?;
         model_ids
             .try_reserve(values.connections.len())
             .map_err(|source| litchi_opc::OpcError::Allocation {
@@ -240,15 +239,11 @@ pub(super) fn prepare(
         // decoded (ADR 0030).
         let part = package.get_part(part.partname())?;
         bytes = bytes.checked_add(part.blob().len()).ok_or_else(|| {
-            limit_at_with_max(
-                "dependency bytes",
-                limits.max_dependency_bytes().saturating_add(1),
-                limits.max_dependency_bytes(),
-            )
+            limit_lower_bound(LimitKind::DependencyBytes, limits.max_dependency_bytes())
         })?;
         if bytes > limits.max_dependency_bytes() {
-            return Err(limit_at_with_max(
-                "dependency bytes",
+            return Err(limit(
+                LimitKind::DependencyBytes,
                 bytes,
                 limits.max_dependency_bytes(),
             ));
@@ -367,8 +362,7 @@ pub(super) fn prepare(
         }
         let after = before.update_elements(&updates, MAX_XML_BYTES)?;
         let limits = package.read_limits();
-        crate::connections::Connections::parse(after.bytes(), &limits)
-            .map_err(|error| invalid(error.to_string()))?;
+        crate::connections::Connections::parse(after.bytes(), &limits)?;
         Some(ConnectionChange::Update { before, after })
     };
     Ok(Plan { connection_change })
@@ -551,16 +545,12 @@ fn check_formulas_with_limits(xml: &[u8], limits: Limits) -> Result<()> {
     let mut events = 0usize;
     let mut depth = 0usize;
     loop {
-        events = events.checked_add(1).ok_or_else(|| {
-            limit_at_with_max(
-                "formula events",
-                limits.max_formula_events().saturating_add(1),
-                limits.max_formula_events(),
-            )
-        })?;
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| limit_lower_bound(LimitKind::Events, limits.max_formula_events()))?;
         if events > limits.max_formula_events() {
-            return Err(limit_at_with_max(
-                "formula events",
+            return Err(limit(
+                LimitKind::Events,
                 events,
                 limits.max_formula_events(),
             ));
@@ -592,8 +582,8 @@ fn check_formulas_with_limits(xml: &[u8], limits: Limits) -> Result<()> {
                     )
                 {
                     if attribute.value.len() > limits.max_formula_bytes() {
-                        return Err(limit_at_with_max(
-                            "formula bytes",
+                        return Err(limit(
+                            LimitKind::FormulaBytes,
                             attribute.value.len(),
                             limits.max_formula_bytes(),
                         ));
@@ -623,15 +613,11 @@ fn check_formulas_with_limits(xml: &[u8], limits: Limits) -> Result<()> {
         match event {
             Event::Start(element) => {
                 depth = depth.checked_add(1).ok_or_else(|| {
-                    limit_at_with_max(
-                        "depth",
-                        limits.max_dependency_depth().saturating_add(1),
-                        limits.max_dependency_depth(),
-                    )
+                    limit_lower_bound(LimitKind::Depth, limits.max_dependency_depth())
                 })?;
                 if depth > limits.max_dependency_depth() {
-                    return Err(limit_at_with_max(
-                        "depth",
+                    return Err(limit(
+                        LimitKind::Depth,
                         depth,
                         limits.max_dependency_depth(),
                     ));
@@ -711,19 +697,12 @@ fn append_formula(
     max_formula_bytes: usize,
 ) -> Result<()> {
     if let Some(formula) = formula {
-        let length = formula.len().checked_add(text.len()).ok_or_else(|| {
-            limit_at_with_max(
-                "formula string bytes",
-                max_formula_bytes.saturating_add(1),
-                max_formula_bytes,
-            )
-        })?;
+        let length = formula
+            .len()
+            .checked_add(text.len())
+            .ok_or_else(|| limit_lower_bound(LimitKind::FormulaBytes, max_formula_bytes))?;
         if length > max_formula_bytes {
-            return Err(limit_at_with_max(
-                "formula string bytes",
-                length,
-                max_formula_bytes,
-            ));
+            return Err(limit(LimitKind::FormulaBytes, length, max_formula_bytes));
         }
         formula
             .try_reserve(text.len())

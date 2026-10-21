@@ -183,8 +183,8 @@ pub(crate) fn parse_settings_mail_merge_with_mce_limits(
     xml: &[u8],
     limits: &MceLimits,
 ) -> Result<Option<Settings>> {
-    let processed = process_markup_compatibility(xml, &Capabilities::default(), limits)
-        .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
+    let processed =
+        process_markup_compatibility(xml, &Capabilities::default(), limits).map_err(Error::Mce)?;
     parse_settings_mail_merge_processed(processed.xml.as_ref())
 }
 
@@ -703,8 +703,7 @@ impl Node {
     reason = "separate arms document distinct OOXML states"
 )]
 fn parse_tree(xml: &[u8]) -> Result<Node> {
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)
-        .map_err(|error| invalid(format!("mail-merge MCE error: {error}")))?;
+    let processed = litchi_ooxml_common::mce::process_ooxml(xml).map_err(Error::Mce)?;
     parse_tree_processed(processed.as_ref())
 }
 

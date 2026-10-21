@@ -869,8 +869,8 @@ fn source_related_mce_expansion_is_bounded_before_scene_publication() {
     assert!(matches!(
         error,
         litchi_pptx::Error::MarkupCompatibility(
-            litchi_ooxml_common::mce::Error::LimitExceeded(resource)
-        ) if resource == "output bytes"
+            litchi_ooxml_common::mce::Error::LimitExceeded { kind, .. }
+        ) if kind == litchi_ooxml_common::mce::LimitKind::OutputBytes
     ));
     let diagnostics = presentation.scene_cache_diagnostics();
     assert_eq!(diagnostics.builds, 0);

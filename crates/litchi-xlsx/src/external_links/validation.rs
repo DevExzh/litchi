@@ -12,7 +12,11 @@ use litchi_opc::SourceLimits;
 pub fn link(value: &Link, conformance: Conformance, limits: &SourceLimits) -> Result<()> {
     let xml = value.to_xml_with_conformance(conformance, limits)?;
     if xml.len() > super::model::MAX_CACHE_TEXT_BYTES {
-        return Err(limit("serialized XML"));
+        return Err(limit(
+            super::LimitKind::CacheTextBytes,
+            xml.len(),
+            super::model::MAX_CACHE_TEXT_BYTES,
+        ));
     }
     Ok(())
 }
@@ -20,7 +24,11 @@ pub fn link(value: &Link, conformance: Conformance, limits: &SourceLimits) -> Re
 /// Validate the typed entries and their stable workbook ownership metadata.
 pub fn entries(values: &[Entry], conformance: Conformance, limits: &SourceLimits) -> Result<()> {
     if values.len() > super::model::MAX_LINK_ITEMS {
-        return Err(limit("workbook external links"));
+        return Err(limit(
+            super::LimitKind::Items,
+            values.len(),
+            super::model::MAX_LINK_ITEMS,
+        ));
     }
     let mut relationship_ids = HashSet::with_capacity(values.len());
     let mut part_names = HashSet::with_capacity(values.len());

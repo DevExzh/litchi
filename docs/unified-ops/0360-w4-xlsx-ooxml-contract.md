@@ -98,20 +98,67 @@ sheet-view tests, XLSX/ops all-target clippy, rustdoc and both XLSX glossary
 profiles; commands and log digests are in the
 [verification receipt](results/0360/data-type-icon-limits.json).
 
+## P8–P12 typed-limit and consumer closure
+
+The branch now closes the remaining shared OOXML typing work required by
+P8–P12. Data Model, external links, OLE objects, connections, rich values and
+refresh intervals expose explicit `LimitKind` dimensions with factual
+`observed`/`maximum` values. Form-control owner limits use the same typed
+resource field, including alternate-content choices and branches; malformed
+input and checked-arithmetic overflow remain separate from resource refusal.
+The shared MCE processor now distinguishes invalid caller bounds from an
+exhausted bound, reports a saturated `usize::MAX` observation when arithmetic
+overflow prevents an exact count, and records the ninth observed interrupted
+read rather than the retry policy ceiling.
+
+Every changed producer and consumer is migrated in this slice. XLSX chain,
+connections, mail-merge, transition and spreadsheet-drawing boundaries retain
+the typed MCE error instead of converting it to a diagnostic string. DOCX,
+PPTX, DrawingML and the unified `litchi-ops` classifier consume the same
+wrapper; invalid MCE bounds classify as `invalid_argument`, while exhausted
+MCE resources classify as `limit_exceeded`. The owner mappings preserve
+dimensions that have no XLSX equivalent as the shared typed MCE error rather
+than relabeling them as another counter.
+
+The corresponding raw/record limits, options-carried policy, accessor and
+consumer migrations are included in the branch. The public API scan reports no
+remaining public `Transaction`, `Mutable*`, `*_with_limits` or `BoxedResult`
+in the XLSX/shared OOXML paths. Existing glossary and family/gate rows remain
+registered; native release ABBA is deliberately still open and is not claimed
+by this record.
+
+The completed validation slice is:
+
+- 1,812 XLSX library tests, including the repaired chain MCE boundary;
+- 52 form-control unit tests, 18 form-control property tests, 39 owner-read
+  tests, 32 scalar-lifecycle tests, 26 connections tests, 55 Data Model tests
+  and 6 rich-value tests;
+- 466 shared OOXML library tests, including the focused invalid-bound,
+  retry-observation and four overflow-saturation checks;
+- 32 unified error-classifier tests, 26 DOCX mail-merge tests, 1 PPTX
+  transition test and 235 DrawingML tests;
+- warning-denied all-target Clippy for shared OOXML, XLSX, DOCX, PPTX and
+  unified ops (including all ops features), and workspace formatting and diff
+  checks;
+- both XLSX glossary profiles pass: 211 banned names, 52 minimal-feature
+  families and 53 full-feature families, with five immutable owners and all
+  registered family methods present.
+
+An earlier pre-fix XLSX run had one expected-failure update at the chain
+wrapper boundary; the final 1,812-test run is the completed zero-failure
+result. The source-backed native performance and final ABBA acceptance remain
+pending for the coordinator's separate measurement window.
+
 ## Required work before acceptance
 
-- Finish typed limits for every remaining family whose empty `LimitKind`
-  still conceals an `Invalid` resource failure, including Data Model,
-  external links, OLE objects, connections and rich-value refresh intervals. Check shared error kinds are preserved at each host.
-- Remove remaining convenience and compatibility aliases in changed XLSX/shared
-  OOXML APIs and migrate their consumers. Complete the raw/record required-limit
-  argument audit and the OpenOptions/EditOptions retention and accessor audit.
-- Complete the fresh public inventory and all glossary profiles; inspect
-  every remaining row and preserve all capabilities.
-- Complete crate/consumer tests, feature checks, clippy, rustdoc, harness,
-  Python, corpus and boundary gates.
-- Measure release ABBA for leaf and unified routes, including source-backed
-  output and repeated saves; register evidence in the benchmark matrix.
+- Complete the coordinator's final public inventory/glossary/gate sweep and
+  inspect any rows outside the covered XLSX/shared OOXML paths.
+- Complete rustdoc, Python, corpus and boundary gates for the integrated
+  workspace state; the crate and consumer checks above are the W4 typing-slice
+  evidence.
+- Measure release ABBA for leaf and unified routes, including every new
+  source-backed family, structural replay/inverse, retained patch history and
+  repeated saves; register evidence in the benchmark matrix.
 
 These are engineering work under the owner decision, not accepted exceptions.
 The redaction audit (memo item 22) alone remains deferred; changed diagnostics

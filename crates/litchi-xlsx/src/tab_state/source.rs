@@ -607,7 +607,7 @@ fn audit_xml(content: &[u8], owner: XmlOwner, limits: Limits) -> Result<XmlAudit
     loop {
         events = events
             .checked_add(1)
-            .ok_or_else(|| invalid("tab-state XML event count overflow"))?;
+            .ok_or_else(|| Error::limit(LimitKind::Events, usize::MAX, limits.max_events))?;
         if events > limits.max_events {
             return Err(Error::limit(LimitKind::Events, events, limits.max_events));
         }
@@ -621,7 +621,7 @@ fn audit_xml(content: &[u8], owner: XmlOwner, limits: Limits) -> Result<XmlAudit
             Event::Start(element) => {
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("tab-state XML depth overflow"))?;
+                    .ok_or_else(|| Error::limit(LimitKind::Depth, usize::MAX, limits.max_depth))?;
                 if depth > limits.max_depth {
                     return Err(Error::limit(LimitKind::Depth, depth, limits.max_depth));
                 }

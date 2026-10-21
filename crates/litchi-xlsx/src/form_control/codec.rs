@@ -29,7 +29,7 @@ use super::model::{
     ScalarField, ScalarValue, SelectionType, SharedOption, SharedVec, TextHAlign, TextVAlign,
     is_xml_10_char, validate_multi_selection, validate_xml_text,
 };
-use super::{FORM_CONTROL_NAMESPACE, Limits, Result, allocation, invalid, limit};
+use super::{FORM_CONTROL_NAMESPACE, LimitKind, Limits, Result, allocation, invalid, limit};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const ROOT: &[u8] = b"formControlPr";
@@ -389,7 +389,7 @@ fn replace_scalar_from_parts(
         };
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated output bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -691,7 +691,7 @@ fn replace_items_from_parts(
     layout: &Layout,
 ) -> Result<Vec<u8>> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     let current = properties
         .item_list
@@ -807,7 +807,7 @@ fn preflight_item_xml_replacement(
     };
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -829,7 +829,7 @@ fn replace_nonempty_item_list_source(
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -879,7 +879,7 @@ fn replace_nonempty_item_list_source(
         .ok_or_else(|| invalid("form-control item output size overflow"))?;
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -938,7 +938,7 @@ fn splice_nonempty_item_list_edit(
         let name_len = qname_len(prefix, ITEM)?;
         if name_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated item name",
+                LimitKind::OutputBytes,
                 name_len,
                 limits.max_output_bytes(),
             ));
@@ -958,7 +958,7 @@ fn splice_nonempty_item_list_edit(
             .ok_or_else(|| invalid("form-control item output size overflow"))?;
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated output bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -983,7 +983,7 @@ fn splice_nonempty_item_list_edit(
     };
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -1027,7 +1027,7 @@ fn replace_item_xml_from_parts(
                     .ok_or_else(|| invalid("form-control itemLst output size overflow"))?;
                 if output_len > limits.max_output_bytes() {
                     return Err(limit(
-                        "form-control itemLst output",
+                        LimitKind::OutputBytes,
                         output_len,
                         limits.max_output_bytes(),
                     ));
@@ -1088,7 +1088,7 @@ fn replace_item_xml_from_parts(
             };
             if replacement_len > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control itemLst output",
+                    LimitKind::OutputBytes,
                     replacement_len,
                     limits.max_output_bytes(),
                 ));
@@ -1105,7 +1105,7 @@ fn replace_item_xml_from_parts(
             };
             if output_len > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control itemLst output",
+                    LimitKind::OutputBytes,
                     output_len,
                     limits.max_output_bytes(),
                 ));
@@ -1199,7 +1199,12 @@ fn insert_item_from_parts(
         ));
     }
     validate_item_for_splice(&value, limits)?;
-    validate_item_edit(properties, true, item_list.items().len() + 1, limits)?;
+    let item_count = item_list
+        .items()
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| invalid("form-control item count overflow"))?;
+    validate_item_edit(properties, true, item_count, limits)?;
     if let Some(list) = layout.item_list.as_ref()
         && !list.empty
         && !list.items.is_empty()
@@ -1315,14 +1320,14 @@ struct ItemLayout {
 fn owned_source(xml: &[u8], limits: Limits) -> Result<SourcePayload> {
     if xml.len() > limits.max_part_bytes() {
         return Err(limit(
-            "source part bytes",
+            LimitKind::PartBytes,
             xml.len(),
             limits.max_part_bytes(),
         ));
     }
     if xml.len() > limits.max_retained_bytes() {
         return Err(limit(
-            "retained source bytes",
+            LimitKind::RetainedBytes,
             xml.len(),
             limits.max_retained_bytes(),
         ));
@@ -1343,7 +1348,7 @@ fn inspect_with_limits_owned(
 ) -> Result<Inspected> {
     if xml.len() > limits.max_part_bytes() {
         return Err(limit(
-            "source part bytes",
+            LimitKind::PartBytes,
             xml.len(),
             limits.max_part_bytes(),
         ));
@@ -1360,7 +1365,7 @@ fn inspect_with_limits_owned(
     }
     if source.is_some() && xml.len() > limits.max_retained_bytes() {
         return Err(limit(
-            "retained source bytes",
+            LimitKind::RetainedBytes,
             xml.len(),
             limits.max_retained_bytes(),
         ));
@@ -1424,7 +1429,7 @@ fn inspect_with_limits_owned(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control XML event count overflow"))?;
         if events > limits.max_events() {
-            return Err(limit("XML event count", events, limits.max_events()));
+            return Err(limit(LimitKind::XmlEvents, events, limits.max_events()));
         }
         let start = position(&reader, origin)?;
         let event = reader.read_event().map_err(xml_error)?;
@@ -1507,7 +1512,7 @@ fn inspect_with_limits_owned(
                             )?;
                             if value.byte_len() > limits.max_opaque_bytes() {
                                 return Err(limit(
-                                    "opaque extension bytes",
+                                    LimitKind::OpaqueBytes,
                                     value.byte_len(),
                                     limits.max_opaque_bytes(),
                                 ));
@@ -1678,8 +1683,8 @@ fn inspect_with_limits_owned(
                             }
                             if item_values.len() >= limits.max_items() {
                                 return Err(limit(
-                                    "item count",
-                                    item_values.len().saturating_add(1),
+                                    LimitKind::Items,
+                                    item_values.len().checked_add(1).unwrap_or(usize::MAX),
                                     limits.max_items(),
                                 ));
                             }
@@ -1884,7 +1889,7 @@ fn inspect_with_limits_owned(
                                 )?;
                                 if value.byte_len() > limits.max_opaque_bytes() {
                                     return Err(limit(
-                                        "opaque extension bytes",
+                                        LimitKind::OpaqueBytes,
                                         value.byte_len(),
                                         limits.max_opaque_bytes(),
                                     ));
@@ -1909,8 +1914,8 @@ fn inspect_with_limits_owned(
                             }
                             if item_values.len() >= limits.max_items() {
                                 return Err(limit(
-                                    "item count",
-                                    item_values.len().saturating_add(1),
+                                    LimitKind::Items,
+                                    item_values.len().checked_add(1).unwrap_or(usize::MAX),
                                     limits.max_items(),
                                 ));
                             }
@@ -2006,7 +2011,7 @@ fn inspect_with_limits_owned(
                                 )?;
                                 if value.byte_len() > limits.max_opaque_bytes() {
                                     return Err(limit(
-                                        "opaque extension bytes",
+                                        LimitKind::OpaqueBytes,
                                         value.byte_len(),
                                         limits.max_opaque_bytes(),
                                     ));
@@ -2115,7 +2120,11 @@ fn inspect_with_limits_owned(
         return Err(invalid("form-control XML does not contain one closed root"));
     }
     if item_values.len() > limits.max_items() {
-        return Err(limit("item count", item_values.len(), limits.max_items()));
+        return Err(limit(
+            LimitKind::Items,
+            item_values.len(),
+            limits.max_items(),
+        ));
     }
     if let Some(layout) = item_list.as_mut() {
         if layout.first_content.is_none() {
@@ -2446,7 +2455,7 @@ impl RetainedBudget {
         self.charge(additional_bytes, resource)
     }
 
-    fn check_peak(&self, additional: usize, resource: &'static str) -> Result<()> {
+    fn check_peak(&self, additional: usize, _resource: &'static str) -> Result<()> {
         let peak = self
             .used
             .checked_add(self.temporary_used)
@@ -2456,7 +2465,7 @@ impl RetainedBudget {
             .checked_add(additional)
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::RetainedBytes, peak, self.maximum));
         }
         Ok(())
     }
@@ -2472,11 +2481,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(self.namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(
-                "form-control temporary retained allocation",
-                peak,
-                self.maximum,
-            ));
+            return Err(limit(LimitKind::TemporaryBytes, peak, self.maximum));
         }
         if let Some(lease) = self.lease.as_mut() {
             lease.reserve_temporary(amount)?;
@@ -2492,7 +2497,11 @@ impl RetainedBudget {
         }
     }
 
-    fn reserve_namespace_temporary(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+    fn reserve_namespace_temporary(
+        &mut self,
+        amount: usize,
+        _resource: &'static str,
+    ) -> Result<()> {
         let namespace_temporary_used = self
             .namespace_temporary_used
             .checked_add(amount)
@@ -2503,7 +2512,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::NamespaceBytes, peak, self.maximum));
         }
         if let Some(lease) = self.lease.as_mut() {
             lease.reserve_namespace_temporary(amount)?;
@@ -2522,7 +2531,7 @@ impl RetainedBudget {
     fn charge_inner(
         &mut self,
         amount: usize,
-        resource: &'static str,
+        _resource: &'static str,
         charge_execution: bool,
     ) -> Result<()> {
         let used = self
@@ -2534,7 +2543,7 @@ impl RetainedBudget {
             .and_then(|value| value.checked_add(self.namespace_temporary_used))
             .ok_or_else(|| invalid("form-control retained allocation length overflow"))?;
         if peak > self.maximum {
-            return Err(limit(resource, peak, self.maximum));
+            return Err(limit(LimitKind::RetainedBytes, peak, self.maximum));
         }
         if charge_execution {
             if let Some(lease) = self.lease.as_mut() {
@@ -2691,13 +2700,13 @@ impl ScratchBudget {
         }
     }
 
-    fn charge(&mut self, amount: usize, resource: &'static str) -> Result<()> {
+    fn charge(&mut self, amount: usize, _resource: &'static str) -> Result<()> {
         self.used = self
             .used
             .checked_add(amount)
             .ok_or_else(|| invalid("form-control scratch allocation length overflow"))?;
         if self.used > self.maximum {
-            return Err(limit(resource, self.used, self.maximum));
+            return Err(limit(LimitKind::ScratchBytes, self.used, self.maximum));
         }
         if let Some(context) = self.context.as_ref() {
             if self.reservation.is_some() {
@@ -2776,7 +2785,11 @@ fn source_for_range(
     }
     let length = range.end - range.start;
     if length > limits.max_opaque_bytes() {
-        return Err(limit(resource, length, limits.max_opaque_bytes()));
+        return Err(limit(
+            LimitKind::OpaqueBytes,
+            length,
+            limits.max_opaque_bytes(),
+        ));
     }
     if let Some(source) = source {
         return Ok(Some(RetainedRange {
@@ -2790,7 +2803,7 @@ fn source_for_range(
 
 fn check_depth(depth: usize, limits: Limits) -> Result<()> {
     if depth > limits.max_depth() {
-        return Err(limit("XML depth", depth, limits.max_depth()));
+        return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth()));
     }
     Ok(())
 }
@@ -2807,13 +2820,17 @@ fn charge_opaque_length(
     total: &mut usize,
     length: usize,
     limits: Limits,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> Result<()> {
     *total = total
         .checked_add(length)
         .ok_or_else(|| invalid("form-control aggregate opaque bytes overflow"))?;
     if *total > limits.max_opaque_bytes() {
-        return Err(limit(resource, *total, limits.max_opaque_bytes()));
+        return Err(limit(
+            LimitKind::OpaqueBytes,
+            *total,
+            limits.max_opaque_bytes(),
+        ));
     }
     Ok(())
 }
@@ -3007,7 +3024,7 @@ fn parse_root_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit("attribute count", count, limits.max_attributes()));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if let Some(binding) = attribute.key.as_namespace_binding() {
             let prefix = match binding {
@@ -3022,7 +3039,7 @@ fn parse_root_attributes(
             validate_xml_text(value.as_ref(), "form-control namespace URI")?;
             if value.len() > limits.max_opaque_bytes() {
                 return Err(limit(
-                    "namespace URI bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     limits.max_opaque_bytes(),
                 ));
@@ -3050,7 +3067,7 @@ fn parse_root_attributes(
         let key = attribute.key.as_ref();
         if attribute.value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "attribute lexical value bytes",
+                LimitKind::StringBytes,
                 attribute.value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3109,7 +3126,7 @@ fn parse_root_attributes(
             validate_xml_text(decoded.as_ref(), "form-control attribute value")?;
             if decoded.len() > limits.max_opaque_bytes() {
                 return Err(limit(
-                    "attribute value bytes",
+                    LimitKind::StringBytes,
                     decoded.len(),
                     limits.max_opaque_bytes(),
                 ));
@@ -3161,11 +3178,7 @@ fn parse_item_list_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control itemLst attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "itemLst attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if attribute.key.as_namespace_binding().is_some() {
             continue;
@@ -3221,11 +3234,7 @@ fn parse_item_attributes(
             .checked_add(1)
             .ok_or_else(|| invalid("form-control item attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "item attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
         if attribute.key.as_namespace_binding().is_some() {
             // Namespace declarations are outside CT_FormControlPr's item
@@ -3252,7 +3261,7 @@ fn parse_item_attributes(
             }
             if attribute.value.len() > limits.max_item_value_bytes() {
                 return Err(limit(
-                    "item value lexical bytes",
+                    LimitKind::ItemValueBytes,
                     attribute.value.len(),
                     limits.max_item_value_bytes(),
                 ));
@@ -3275,7 +3284,7 @@ fn parse_item_attributes(
     let value = value.ok_or_else(|| invalid("x14:item requires an unqualified val attribute"))?;
     if value.len() > limits.max_item_value_bytes() {
         return Err(limit(
-            "item value bytes",
+            LimitKind::ItemValueBytes,
             value.len(),
             limits.max_item_value_bytes(),
         ));
@@ -3296,11 +3305,7 @@ fn check_opaque_attribute_budget(element: &BytesStart<'_>, limits: Limits) -> Re
             .checked_add(1)
             .ok_or_else(|| invalid("form-control opaque attribute count overflow"))?;
         if count > limits.max_attributes() {
-            return Err(limit(
-                "opaque element attribute count",
-                count,
-                limits.max_attributes(),
-            ));
+            return Err(limit(LimitKind::Attributes, count, limits.max_attributes()));
         }
     }
     Ok(())
@@ -3354,7 +3359,7 @@ fn validate_extension_element(
         uri_seen = true;
         if attribute.value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "extension uri lexical bytes",
+                LimitKind::StringBytes,
                 attribute.value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3372,7 +3377,7 @@ fn validate_extension_element(
         validate_xml_text(decoded.as_ref(), "form-control extension uri")?;
         if decoded.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "extension uri bytes",
+                LimitKind::StringBytes,
                 decoded.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3444,7 +3449,7 @@ fn namespace_context_for_element(
         validate_xml_text(value.as_ref(), "form-control namespace URI")?;
         if value.len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "namespace URI bytes",
+                LimitKind::StringBytes,
                 value.len(),
                 limits.max_opaque_bytes(),
             ));
@@ -3984,7 +3989,10 @@ fn validate_scalar_value(field: ScalarField, value: Option<&ScalarValue>) -> Res
                 | ScalarField::Page
         ) && *value > 30_000
         {
-            return Err(limit(field.wire_name(), *value as usize, 30_000));
+            return Err(invalid(format!(
+                "{} exceeds the schema maximum 30000",
+                field.wire_name()
+            )));
         }
     }
     if let ScalarValue::String(value) = value {
@@ -3992,7 +4000,7 @@ fn validate_scalar_value(field: ScalarField, value: Option<&ScalarValue>) -> Res
         if field == ScalarField::MultiSel {
             if value.len() > super::MAX_OPAQUE_BYTES {
                 return Err(limit(
-                    "multiSel bytes",
+                    LimitKind::StringBytes,
                     value.len(),
                     super::MAX_OPAQUE_BYTES,
                 ));
@@ -4214,7 +4222,7 @@ fn scalar_lexical_value(value: &ScalarValue) -> std::borrow::Cow<'_, str> {
 
 fn copy_bounded(source: &[u8], maximum: usize, resource: &'static str) -> Result<Vec<u8>> {
     if source.len() > maximum {
-        return Err(limit(resource, source.len(), maximum));
+        return Err(limit(LimitKind::OutputBytes, source.len(), maximum));
     }
     let mut output = Vec::new();
     output
@@ -4266,7 +4274,7 @@ fn splice_ranges(
     }
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated output bytes",
+            LimitKind::OutputBytes,
             output_len,
             limits.max_output_bytes(),
         ));
@@ -4316,7 +4324,7 @@ fn qname(prefix: Option<&[u8]>, local: &[u8]) -> Result<Vec<u8>> {
 fn validate_item_for_splice(item: &Item, limits: Limits) -> Result<()> {
     if item.value().len() > limits.max_item_value_bytes() {
         return Err(limit(
-            "item value bytes",
+            LimitKind::ItemValueBytes,
             item.value().len(),
             limits.max_item_value_bytes(),
         ));
@@ -4324,7 +4332,7 @@ fn validate_item_for_splice(item: &Item, limits: Limits) -> Result<()> {
     if let Some(raw) = item.raw.as_ref() {
         if raw.byte_len() > limits.max_opaque_bytes() {
             return Err(limit(
-                "opaque item bytes",
+                LimitKind::OpaqueBytes,
                 raw.byte_len(),
                 limits.max_opaque_bytes(),
             ));
@@ -4368,7 +4376,7 @@ fn validate_item_edit(
         }
     }
     if item_count > limits.max_items() {
-        return Err(limit("item count", item_count, limits.max_items()));
+        return Err(limit(LimitKind::Items, item_count, limits.max_items()));
     }
     Ok(())
 }
@@ -4383,12 +4391,12 @@ fn items_equal_by_value(left: &[Item], right: &[Item]) -> bool {
 
 fn write_items(prefix: Option<&[u8]>, values: &[Item], limits: Limits) -> Result<Vec<u8>> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -4413,7 +4421,7 @@ fn append_items_direct(
     limits: Limits,
 ) -> Result<()> {
     if values.len() > limits.max_items() {
-        return Err(limit("item count", values.len(), limits.max_items()));
+        return Err(limit(LimitKind::Items, values.len(), limits.max_items()));
     }
     for item in values {
         validate_item_for_splice(item, limits)?;
@@ -4458,12 +4466,12 @@ fn write_items_with_source_edit(
         .and_then(|value| value.checked_sub(usize::from(removal.is_some())))
         .ok_or_else(|| invalid("form-control item edit count underflow"))?;
     if output_count > limits.max_items() {
-        return Err(limit("item count", output_count, limits.max_items()));
+        return Err(limit(LimitKind::Items, output_count, limits.max_items()));
     }
     let name_len = qname_len(prefix, ITEM)?;
     if name_len > limits.max_output_bytes() {
         return Err(limit(
-            "generated item name",
+            LimitKind::OutputBytes,
             name_len,
             limits.max_output_bytes(),
         ));
@@ -4523,7 +4531,7 @@ fn write_items_with_source_edit(
             .ok_or_else(|| invalid("generated item bytes length overflow"))?;
         if output_len > limits.max_output_bytes() {
             return Err(limit(
-                "generated item bytes",
+                LimitKind::OutputBytes,
                 output_len,
                 limits.max_output_bytes(),
             ));
@@ -4649,7 +4657,7 @@ fn items_output_len_with_name_len(
             .ok_or_else(|| invalid("generated item bytes length overflow"))?;
         if length > limits.max_output_bytes() {
             return Err(limit(
-                "generated item bytes",
+                LimitKind::OutputBytes,
                 length,
                 limits.max_output_bytes(),
             ));
@@ -4687,7 +4695,11 @@ fn append_escaped_prechecked(
         .checked_add(encoded_len)
         .ok_or_else(|| invalid("form-control escaped output length overflow"))?;
     if new_len > limits.max_output_bytes() {
-        return Err(limit(resource, new_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            new_len,
+            limits.max_output_bytes(),
+        ));
     }
     output
         .try_reserve_exact(encoded_len)
@@ -4719,7 +4731,11 @@ fn append_checked(
         .checked_add(bytes.len())
         .ok_or_else(|| invalid("form-control generated output length overflow"))?;
     if new_len > limits.max_output_bytes() {
-        return Err(limit(resource, new_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            new_len,
+            limits.max_output_bytes(),
+        ));
     }
     output
         .try_reserve_exact(bytes.len())
@@ -5060,13 +5076,17 @@ fn add_output_len(
     total: &mut usize,
     amount: usize,
     limits: Limits,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> Result<()> {
     *total = total
         .checked_add(amount)
         .ok_or_else(|| invalid("form-control output length overflow"))?;
     if *total > limits.max_output_bytes() {
-        return Err(limit(resource, *total, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            *total,
+            limits.max_output_bytes(),
+        ));
     }
     Ok(())
 }
@@ -5258,7 +5278,7 @@ fn append_opaque(
 ) -> Result<()> {
     if value.byte_len() > limits.max_opaque_bytes() {
         return Err(limit(
-            "opaque extension bytes",
+            LimitKind::OpaqueBytes,
             value.byte_len(),
             limits.max_opaque_bytes(),
         ));
@@ -5535,7 +5555,7 @@ fn detached_scalar_output_len(
         if matches {
             if attribute.raw_value.len() > limits.max_output_bytes() {
                 return Err(limit(
-                    "form-control scalar lexical value",
+                    LimitKind::OutputBytes,
                     attribute.raw_value.len(),
                     limits.max_output_bytes(),
                 ));
@@ -5615,7 +5635,7 @@ fn escape_bounded(value: &str, limits: Limits, resource: &'static str) -> Result
     Ok(output)
 }
 
-fn escaped_length(value: &str, limits: Limits, resource: &'static str) -> Result<usize> {
+fn escaped_length(value: &str, limits: Limits, _resource: &'static str) -> Result<usize> {
     let mut encoded_len = 0usize;
     for byte in value.bytes() {
         let additional = match byte {
@@ -5630,7 +5650,11 @@ fn escaped_length(value: &str, limits: Limits, resource: &'static str) -> Result
             .ok_or_else(|| invalid("form-control escaped output length overflow"))?;
     }
     if encoded_len > limits.max_output_bytes() {
-        return Err(limit(resource, encoded_len, limits.max_output_bytes()));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            encoded_len,
+            limits.max_output_bytes(),
+        ));
     }
     Ok(encoded_len)
 }

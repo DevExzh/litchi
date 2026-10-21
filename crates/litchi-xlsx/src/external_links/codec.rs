@@ -135,7 +135,11 @@ fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
     push_xml_attr(xml, "r:id", &link.target.relationship_id)?;
     xml.push('>');
     if link.sheet_names.len() > MAX_SHEET_NAMES {
-        return Err(limit("sheet names"));
+        return Err(limit(
+            super::LimitKind::SheetNames,
+            link.sheet_names.len(),
+            MAX_SHEET_NAMES,
+        ));
     }
     if !link.sheet_names.is_empty() {
         xml.push_str("<sheetNames>");
@@ -147,7 +151,11 @@ fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
         xml.push_str("</sheetNames>");
     }
     if link.defined_names.len() > MAX_DEFINED_NAMES {
-        return Err(limit("defined names"));
+        return Err(limit(
+            super::LimitKind::DefinedNames,
+            link.defined_names.len(),
+            MAX_DEFINED_NAMES,
+        ));
     }
     if !link.defined_names.is_empty() {
         xml.push_str("<definedNames>");
@@ -165,7 +173,11 @@ fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
         xml.push_str("</definedNames>");
     }
     if link.cached_sheets.len() > MAX_CACHED_SHEETS {
-        return Err(limit("cached sheets"));
+        return Err(limit(
+            super::LimitKind::CachedSheets,
+            link.cached_sheets.len(),
+            MAX_CACHED_SHEETS,
+        ));
     }
     if !link.cached_sheets.is_empty() {
         let mut sheet_ids = std::collections::HashSet::with_capacity(link.cached_sheets.len());
@@ -196,22 +208,30 @@ fn write_external_workbook(xml: &mut String, link: &Workbook) -> Result<()> {
                         row.row
                     )));
                 }
-                row_count = row_count
-                    .checked_add(1)
-                    .ok_or_else(|| limit("cached rows"))?;
+                row_count = row_count.checked_add(1).ok_or_else(|| {
+                    limit(super::LimitKind::CachedRows, usize::MAX, MAX_CACHED_ROWS)
+                })?;
                 if row_count > MAX_CACHED_ROWS {
-                    return Err(limit("cached rows"));
+                    return Err(limit(
+                        super::LimitKind::CachedRows,
+                        row_count,
+                        MAX_CACHED_ROWS,
+                    ));
                 }
                 xml.push_str("<row");
                 push_u32_attr(xml, "r", row.row);
                 xml.push('>');
                 let mut references = std::collections::HashSet::with_capacity(row.cells.len());
                 for cell in &row.cells {
-                    cell_count = cell_count
-                        .checked_add(1)
-                        .ok_or_else(|| limit("cached cells"))?;
+                    cell_count = cell_count.checked_add(1).ok_or_else(|| {
+                        limit(super::LimitKind::CachedCells, usize::MAX, MAX_CACHED_CELLS)
+                    })?;
                     if cell_count > MAX_CACHED_CELLS {
-                        return Err(limit("cached cells"));
+                        return Err(limit(
+                            super::LimitKind::CachedCells,
+                            cell_count,
+                            MAX_CACHED_CELLS,
+                        ));
                     }
                     if let Some(reference) = &cell.reference {
                         validate_cell_reference(reference)?;
@@ -297,7 +317,11 @@ fn validate_alternate_urls(value: &AlternateUrls, primary: Option<&Target>) -> R
     ] {
         if let Some(value) = value {
             if value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
-                return Err(limit(&format!("alternate URL {name}")));
+                return Err(limit(
+                    super::LimitKind::AlternateUrlMetadataBytes,
+                    value.len(),
+                    MAX_ALTERNATE_URL_METADATA_BYTES,
+                ));
             }
             if value.chars().any(|character| {
                 character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -359,7 +383,11 @@ fn validate_alternate_url_target(value: &impl AlternateUrlTarget, description: &
         return Err(invalid(format!("{description} target must not be empty")));
     }
     if value.target().len() > MAX_EXTERNAL_TARGET_BYTES {
-        return Err(limit(&format!("{description} target URI")));
+        return Err(limit(
+            super::LimitKind::TargetUri,
+            value.target().len(),
+            MAX_EXTERNAL_TARGET_BYTES,
+        ));
     }
     if value.target().chars().any(|character| {
         character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -420,7 +448,11 @@ fn write_dde_link(xml: &mut String, link: &Dde) -> Result<()> {
         return Ok(());
     }
     if link.items.len() > MAX_LINK_ITEMS {
-        return Err(limit("DDE items"));
+        return Err(limit(
+            super::LimitKind::Items,
+            link.items.len(),
+            MAX_LINK_ITEMS,
+        ));
     }
     xml.push_str("><ddeItems>");
     for item in &link.items {
@@ -460,7 +492,11 @@ fn write_ole_link(xml: &mut String, link: &Ole) -> Result<()> {
         return Ok(());
     }
     if link.items.len() > MAX_LINK_ITEMS {
-        return Err(limit("OLE items"));
+        return Err(limit(
+            super::LimitKind::Items,
+            link.items.len(),
+            MAX_LINK_ITEMS,
+        ));
     }
     xml.push_str("><oleItems>");
     for item in &link.items {
@@ -497,9 +533,13 @@ fn write_ole_link(xml: &mut String, link: &Ole) -> Result<()> {
 fn write_dde_values(xml: &mut String, element: &str, values: &DdeValues) -> Result<()> {
     let expected = u64::from(values.rows)
         .checked_mul(u64::from(values.columns))
-        .ok_or_else(|| limit("DDE/OLE matrix dimensions"))?;
+        .ok_or_else(|| limit(super::LimitKind::MatrixCells, usize::MAX, MAX_CACHED_CELLS))?;
     if expected == 0 || expected > MAX_CACHED_CELLS as u64 {
-        return Err(limit("DDE/OLE matrix dimensions"));
+        return Err(limit(
+            super::LimitKind::MatrixCells,
+            usize::try_from(expected).unwrap_or(usize::MAX),
+            MAX_CACHED_CELLS,
+        ));
     }
     if expected != values.values.len() as u64 {
         return Err(invalid(format!(
@@ -815,7 +855,11 @@ impl Parser {
             self.add_text(name.as_ref().map_or(0, String::len))?;
             let link = self.dde_mut()?;
             if link.items.len() >= MAX_LINK_ITEMS {
-                return Err(limit("DDE items"));
+                return Err(limit(
+                    super::LimitKind::Items,
+                    link.items.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_LINK_ITEMS,
+                ));
             }
             let index = link.items.len();
             link.items.push(ParsedDdeItem {
@@ -857,12 +901,15 @@ impl Parser {
             let value_type = parse_dde_value_type(
                 unqualified_attribute_value(element, b"t", decoder)?.as_deref(),
             )?;
-            self.cached_cells = self
-                .cached_cells
-                .checked_add(1)
-                .ok_or_else(|| limit("DDE values"))?;
+            self.cached_cells = self.cached_cells.checked_add(1).ok_or_else(|| {
+                limit(super::LimitKind::CachedCells, usize::MAX, MAX_CACHED_CELLS)
+            })?;
             if self.cached_cells > MAX_CACHED_CELLS {
-                return Err(limit("DDE values"));
+                return Err(limit(
+                    super::LimitKind::CachedCells,
+                    self.cached_cells,
+                    MAX_CACHED_CELLS,
+                ));
             }
             let values = &mut self
                 .dde_mut()?
@@ -922,7 +969,11 @@ impl Parser {
             self.add_text(name.len())?;
             let link = self.ole_mut()?;
             if link.items.len() >= MAX_LINK_ITEMS {
-                return Err(limit("OLE items"));
+                return Err(limit(
+                    super::LimitKind::Items,
+                    link.items.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_LINK_ITEMS,
+                ));
             }
             let index = link.items.len();
             link.items.push(ParsedOleItem {
@@ -963,12 +1014,15 @@ impl Parser {
             let value_type = parse_dde_value_type(
                 unqualified_attribute_value(element, b"t", decoder)?.as_deref(),
             )?;
-            self.cached_cells = self
-                .cached_cells
-                .checked_add(1)
-                .ok_or_else(|| limit("OLE values"))?;
+            self.cached_cells = self.cached_cells.checked_add(1).ok_or_else(|| {
+                limit(super::LimitKind::CachedCells, usize::MAX, MAX_CACHED_CELLS)
+            })?;
             if self.cached_cells > MAX_CACHED_CELLS {
-                return Err(limit("OLE values"));
+                return Err(limit(
+                    super::LimitKind::CachedCells,
+                    self.cached_cells,
+                    MAX_CACHED_CELLS,
+                ));
             }
             let values = &mut self
                 .ole_mut()?
@@ -1109,7 +1163,11 @@ impl Parser {
             self.add_text(value.len())?;
             let book = self.book_mut()?;
             if book.sheet_names.len() >= MAX_SHEET_NAMES {
-                return Err(limit("sheet names"));
+                return Err(limit(
+                    super::LimitKind::SheetNames,
+                    book.sheet_names.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_SHEET_NAMES,
+                ));
             }
             book.sheet_names.push(value);
             return Ok(Context::Other);
@@ -1128,7 +1186,14 @@ impl Parser {
             self.add_text(name.len() + refers_to.as_ref().map_or(0, String::len))?;
             let book = self.book_mut()?;
             if book.defined_names.len() >= MAX_DEFINED_NAMES {
-                return Err(limit("defined names"));
+                return Err(limit(
+                    super::LimitKind::DefinedNames,
+                    book.defined_names
+                        .len()
+                        .checked_add(1)
+                        .unwrap_or(usize::MAX),
+                    MAX_DEFINED_NAMES,
+                ));
             }
             book.defined_names.push(DefinedName {
                 name,
@@ -1146,7 +1211,14 @@ impl Parser {
                     .unwrap_or(false);
             let book = self.book_mut()?;
             if book.cached_sheets.len() >= MAX_CACHED_SHEETS {
-                return Err(limit("cached sheets"));
+                return Err(limit(
+                    super::LimitKind::CachedSheets,
+                    book.cached_sheets
+                        .len()
+                        .checked_add(1)
+                        .unwrap_or(usize::MAX),
+                    MAX_CACHED_SHEETS,
+                ));
             }
             if book
                 .cached_sheets
@@ -1175,9 +1247,13 @@ impl Parser {
             self.cached_rows = self
                 .cached_rows
                 .checked_add(1)
-                .ok_or_else(|| limit("cached rows"))?;
+                .ok_or_else(|| limit(super::LimitKind::CachedRows, usize::MAX, MAX_CACHED_ROWS))?;
             if self.cached_rows > MAX_CACHED_ROWS {
-                return Err(limit("cached rows"));
+                return Err(limit(
+                    super::LimitKind::CachedRows,
+                    self.cached_rows,
+                    MAX_CACHED_ROWS,
+                ));
             }
             let book = self.book_mut()?;
             let rows = &mut book.cached_sheets[sheet].rows;
@@ -1203,12 +1279,15 @@ impl Parser {
             let value_metadata_index =
                 optional_u32(element, b"vm", decoder, "external value metadata index")?
                     .unwrap_or(0);
-            self.cached_cells = self
-                .cached_cells
-                .checked_add(1)
-                .ok_or_else(|| limit("cached cells"))?;
+            self.cached_cells = self.cached_cells.checked_add(1).ok_or_else(|| {
+                limit(super::LimitKind::CachedCells, usize::MAX, MAX_CACHED_CELLS)
+            })?;
             if self.cached_cells > MAX_CACHED_CELLS {
-                return Err(limit("cached cells"));
+                return Err(limit(
+                    super::LimitKind::CachedCells,
+                    self.cached_cells,
+                    MAX_CACHED_CELLS,
+                ));
             }
             let book = self.book_mut()?;
             let cells = &mut book.cached_sheets[sheet].rows[row].cells;
@@ -1295,12 +1374,19 @@ impl Parser {
     }
 
     fn add_text(&mut self, bytes: usize) -> Result<()> {
-        self.text_bytes = self
-            .text_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("cache text"))?;
+        self.text_bytes = self.text_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                super::LimitKind::CacheTextBytes,
+                usize::MAX,
+                MAX_CACHE_TEXT_BYTES,
+            )
+        })?;
         if self.text_bytes > MAX_CACHE_TEXT_BYTES {
-            return Err(limit("cache text"));
+            return Err(limit(
+                super::LimitKind::CacheTextBytes,
+                self.text_bytes,
+                MAX_CACHE_TEXT_BYTES,
+            ));
         }
         Ok(())
     }
@@ -1321,7 +1407,9 @@ pub fn parse_external_link(xml: &[u8], limits: &SourceLimits) -> Result<Link> {
     let mut closed_root = false;
     let mut events = 0usize;
     loop {
-        events = events.saturating_add(1);
+        events = events.checked_add(1).ok_or_else(|| {
+            Error::limit(super::LimitKind::Events, usize::MAX, limits.max_events())
+        })?;
         if events > limits.max_events() {
             return Err(Error::limit(
                 super::LimitKind::Events,
@@ -2789,9 +2877,13 @@ fn finalize_dde_values(values: ParsedDdeValues) -> Result<DdeValues> {
     } = values;
     let expected = u64::from(rows)
         .checked_mul(u64::from(columns))
-        .ok_or_else(|| limit("DDE/OLE matrix dimensions"))?;
+        .ok_or_else(|| limit(super::LimitKind::MatrixCells, usize::MAX, MAX_CACHED_CELLS))?;
     if expected > MAX_CACHED_CELLS as u64 {
-        return Err(limit("DDE/OLE matrix dimensions"));
+        return Err(limit(
+            super::LimitKind::MatrixCells,
+            usize::try_from(expected).unwrap_or(usize::MAX),
+            MAX_CACHED_CELLS,
+        ));
     }
     if expected != values.len() as u64 {
         return Err(invalid(format!(
@@ -2903,7 +2995,11 @@ fn bounded_relationship_attribute_value(
 fn validate_alternate_metadata(name: &str, value: Option<&str>) -> Result<()> {
     if let Some(value) = value {
         if value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
-            return Err(limit(&format!("alternate URL {name}")));
+            return Err(limit(
+                super::LimitKind::AlternateUrlMetadataBytes,
+                value.len(),
+                MAX_ALTERNATE_URL_METADATA_BYTES,
+            ));
         }
         if value.chars().any(|character| {
             character.is_control() || character == '\u{fffe}' || character == '\u{ffff}'
@@ -2938,13 +3034,21 @@ fn bounded_unqualified_attribute_value(
         // newly allocated String.  Check again after decoding because one
         // entity can expand beyond the source byte count.
         if attribute.value.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
-            return Err(limit(&format!("alternate URL {description}")));
+            return Err(limit(
+                super::LimitKind::AlternateUrlMetadataBytes,
+                attribute.value.len(),
+                MAX_ALTERNATE_URL_METADATA_BYTES,
+            ));
         }
         let decoded = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Invalid(error.to_string()))?;
         if decoded.len() > MAX_ALTERNATE_URL_METADATA_BYTES {
-            return Err(limit(&format!("alternate URL {description}")));
+            return Err(limit(
+                super::LimitKind::AlternateUrlMetadataBytes,
+                decoded.len(),
+                MAX_ALTERNATE_URL_METADATA_BYTES,
+            ));
         }
         value = Some(decoded.into_owned());
     }
@@ -2994,7 +3098,7 @@ fn validate_cell_reference(value: &str) -> Result<()> {
         if split == MAX_COLUMN_LETTERS {
             return Err(Error::limit(
                 super::LimitKind::ColumnLetters,
-                split.saturating_add(1),
+                split.checked_add(1).unwrap_or(usize::MAX),
                 MAX_COLUMN_LETTERS,
             ));
         }

@@ -923,7 +923,8 @@ fn valid_encoding_name(value: &str) -> bool {
 
 fn require_nested_depth(depth: usize) -> Result<()> {
     if depth >= MAX_DEPTH {
-        Err(limit(LimitKind::Depth, MAX_DEPTH, depth.saturating_add(1)))
+        let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+        Err(limit(LimitKind::Depth, MAX_DEPTH, observed))
     } else {
         Ok(())
     }

@@ -86,6 +86,7 @@ fn minimum_write_retained_limit(properties: &Properties) -> usize {
 fn assert_retained_limit<T>(result: litchi_xlsx::form_control::Result<T>, maximum: usize) {
     match result {
         Err(FormControlError::Limit {
+            kind: litchi_xlsx::form_control::LimitKind::RetainedBytes,
             maximum: observed_maximum,
             ..
         }) => assert_eq!(observed_maximum, maximum),

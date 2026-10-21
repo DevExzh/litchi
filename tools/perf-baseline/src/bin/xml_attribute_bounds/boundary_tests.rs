@@ -10,7 +10,7 @@ use std::convert::Infallible;
 use std::io::Cursor;
 
 use litchi_ooxml_common::mce::{
-    Capabilities, Error, Limits, StreamError, StreamLimits, StreamReport,
+    Capabilities, Error, LimitKind, Limits, StreamError, StreamLimits, StreamReport,
     process_markup_compatibility, process_markup_compatibility_stream,
 };
 
@@ -31,9 +31,26 @@ fn stream(
     })
 }
 
+fn expected_kind(label: &str) -> LimitKind {
+    match label {
+        "namespace bindings" => LimitKind::NamespaceBindings,
+        "directive tokens" => LimitKind::DirectiveTokens,
+        "depth" => LimitKind::Depth,
+        "input bytes" => LimitKind::InputBytes,
+        "output bytes" => LimitKind::OutputBytes,
+        "stream event bytes" => LimitKind::EventBytes,
+        "stream event count" => LimitKind::Events,
+        "stream attribute bytes" => LimitKind::AttributeBytes,
+        "stream name bytes" => LimitKind::NameBytes,
+        "stream context bytes" => LimitKind::ContextBytes,
+        _ => panic!("unknown MCE limit label {label:?}"),
+    }
+}
+
 fn assert_codec_limit(result: Result<Vec<u8>, Error>, label: &str) {
+    let expected = expected_kind(label);
     assert!(
-        matches!(&result, Err(Error::LimitExceeded(message)) if message == label),
+        matches!(&result, Err(Error::LimitExceeded { kind, observed, maximum }) if *kind == expected && *observed > *maximum),
         "expected codec limit {label:?}, got {result:?}"
     );
 }
@@ -42,13 +59,14 @@ fn assert_stream_limit(
     result: Result<StreamReport, StreamError<Infallible, Infallible>>,
     label: &str,
 ) {
+    let expected = expected_kind(label);
     assert!(
         matches!(
             &result,
             Err(StreamError::Mce {
-                error: Error::LimitExceeded(message),
+                error: Error::LimitExceeded { kind, observed, maximum },
                 ..
-            }) if message == label
+            }) if *kind == expected && *observed > *maximum
         ),
         "expected stream limit {label:?}, got {result:?}"
     );

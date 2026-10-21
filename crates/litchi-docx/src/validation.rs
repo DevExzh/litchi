@@ -904,7 +904,7 @@ fn inspect_main_document(
         &mce_limits,
     ) {
         Ok(output) => output,
-        Err(litchi_ooxml_common::mce::Error::LimitExceeded(_)) => {
+        Err(litchi_ooxml_common::mce::Error::LimitExceeded { .. }) => {
             return Err(InspectionFailure::Blocked(
                 "main-document markup compatibility exceeded a configured finite limit",
             ));

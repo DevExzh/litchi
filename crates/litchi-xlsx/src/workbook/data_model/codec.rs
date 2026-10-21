@@ -20,10 +20,10 @@ use super::model::{
 };
 use super::{
     DATA_MODEL_EXTENSION_URI, LimitKind, MAX_CALCULATED_TIME_COLUMNS, MAX_DEPTH,
-    MAX_EXTENSION_BYTES, MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES, MAX_STRING_BYTES,
-    MAX_TABLES, MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES,
+    MAX_EXTENSION_BYTES, MAX_NAMESPACE_BINDINGS, MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES,
+    MAX_STRING_BYTES, MAX_TABLES, MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES,
     MODEL_TIME_GROUPINGS_EXTENSION_URI, MODEL_TIME_GROUPINGS_NAMESPACE, SML, STRICT_SML, X15,
-    invalid, limit, xml_error,
+    invalid, limit, limit_lower_bound, xml_error,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -261,7 +261,11 @@ fn parse_model_time_groupings_node(root: &Node) -> Result<ModelTimeGroupings> {
         ));
     }
     if root.children.len() > MAX_TIME_GROUPINGS {
-        return Err(limit("modelTimeGrouping count"));
+        return Err(limit(
+            LimitKind::TimeGroupings,
+            root.children.len(),
+            MAX_TIME_GROUPINGS,
+        ));
     }
     let groupings = root
         .children
@@ -318,7 +322,7 @@ fn parse_model_time_groupings_fragment(
     wrapped.extend_from_slice(&wrapper_prefix);
     wrapped.extend_from_slice(b":wrapper>");
     if wrapped.len() > MAX_XML_BYTES {
-        return Err(limit("XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, wrapped.len(), MAX_XML_BYTES));
     }
     let wrapper = parse_document(&wrapped)?;
     require(&wrapper, WRAPPER_NAMESPACE, "wrapper")?;
@@ -344,7 +348,7 @@ fn unique_wrapper_prefix(bindings: &[(Vec<u8>, Vec<u8>)]) -> Vec<u8> {
         {
             return candidate;
         }
-        suffix = suffix.saturating_add(1);
+        suffix = suffix.checked_add(1).unwrap_or(usize::MAX);
     }
 }
 
@@ -356,7 +360,7 @@ fn qualified_name_len(owner_qname: &[u8], local_name: &[u8]) -> Result<usize> {
     prefix_len
         .checked_add((prefix_len != 0) as usize)
         .and_then(|length| length.checked_add(local_name.len()))
-        .ok_or_else(|| limit("modelTimeGroupings bytes"))
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
 }
 
 fn append_qualified_name(output: &mut Vec<u8>, owner_qname: &[u8], local_name: &[u8]) {
@@ -380,7 +384,7 @@ fn model_time_groupings_extension_size(owner_qname: &[u8], node_size: usize) -> 
     add_size(&mut size, qname_size)?;
     add_bytes_size(&mut size, b">")?;
     if size > MAX_EXTENSION_BYTES {
-        return Err(limit("modelTimeGroupings bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, size, MAX_EXTENSION_BYTES));
     }
     Ok(size)
 }
@@ -395,7 +399,7 @@ fn new_model_time_groupings_document_size(node_size: usize) -> Result<usize> {
     add_size(&mut size, node_size)?;
     add_bytes_size(&mut size, b"</x15:ext></x15:extLst>")?;
     if size > MAX_EXTENSION_BYTES {
-        return Err(limit("modelTimeGroupings bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, size, MAX_EXTENSION_BYTES));
     }
     Ok(size)
 }
@@ -437,7 +441,11 @@ fn parse_model_time_grouping_node(node: &Node) -> Result<ModelTimeGrouping> {
         ));
     }
     if node.children.len() > MAX_CALCULATED_TIME_COLUMNS {
-        return Err(limit("calculatedTimeColumn count"));
+        return Err(limit(
+            LimitKind::CalculatedTimeColumns,
+            node.children.len(),
+            MAX_CALCULATED_TIME_COLUMNS,
+        ));
     }
     let calculated_time_columns = node
         .children
@@ -565,7 +573,7 @@ fn serialized_model_time_groupings_size(value: &ModelTimeGroupings) -> Result<us
     }
     add_bytes_size(&mut size, b"</x14:modelTimeGroupings>")?;
     if size > MAX_EXTENSION_BYTES {
-        return Err(limit("modelTimeGroupings bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, size, MAX_EXTENSION_BYTES));
     }
     Ok(size)
 }
@@ -588,7 +596,11 @@ fn validate_model_time_groupings_with_policy(
         ));
     }
     if value.groupings.len() > MAX_TIME_GROUPINGS {
-        return Err(limit("modelTimeGrouping count"));
+        return Err(limit(
+            LimitKind::TimeGroupings,
+            value.groupings.len(),
+            MAX_TIME_GROUPINGS,
+        ));
     }
     for grouping in &value.groupings {
         for (field, label) in [
@@ -604,7 +616,11 @@ fn validate_model_time_groupings_with_policy(
             ));
         }
         if grouping.calculated_time_columns.len() > MAX_CALCULATED_TIME_COLUMNS {
-            return Err(limit("calculatedTimeColumn count"));
+            return Err(limit(
+                LimitKind::CalculatedTimeColumns,
+                grouping.calculated_time_columns.len(),
+                MAX_CALCULATED_TIME_COLUMNS,
+            ));
         }
         for column in &grouping.calculated_time_columns {
             bounded_nonempty(&column.column_name, "columnName")?;
@@ -666,7 +682,11 @@ struct ElementFrame {
 
 fn locate_model_time_groupings(xml: &[u8]) -> Result<TimeGroupingSpans> {
     if xml.len() > MAX_EXTENSION_BYTES {
-        return Err(limit("extension bytes"));
+        return Err(limit(
+            LimitKind::ExtensionBytes,
+            xml.len(),
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -676,16 +696,22 @@ fn locate_model_time_groupings(xml: &[u8]) -> Result<TimeGroupingSpans> {
     loop {
         let start = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("modelTimeGroupings source position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
         let event = reader.read_event().map_err(xml_error)?;
         let end = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("modelTimeGroupings source position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
         match event {
             Event::Start(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit_lower_bound(LimitKind::Nodes, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
+                }
+                let prospective_depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if prospective_depth > MAX_DEPTH {
+                    return Err(limit(LimitKind::Depth, prospective_depth, MAX_DEPTH));
                 }
                 let role = time_grouping_role(&reader, &stack, &element)?;
                 let span = ElementSpan {
@@ -703,9 +729,15 @@ fn locate_model_time_groupings(xml: &[u8]) -> Result<TimeGroupingSpans> {
                 stack.push(ElementFrame { role, span });
             },
             Event::Empty(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit("XML structure"))?;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit_lower_bound(LimitKind::Nodes, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
+                }
+                let prospective_depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if prospective_depth > MAX_DEPTH {
+                    return Err(limit(LimitKind::Depth, prospective_depth, MAX_DEPTH));
                 }
                 let role = time_grouping_role(&reader, &stack, &element)?;
                 let span = ElementSpan {
@@ -826,13 +858,8 @@ fn expand_empty(source: &[u8], span: &ElementSpan, child: &[u8]) -> Result<Vec<u
         .and_then(|size| size.checked_add(2))
         .and_then(|size| size.checked_add(span.qname.len()))
         .and_then(|size| size.checked_add(1))
-        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
-    preflight_splice(
-        source,
-        span.start..span.end,
-        replacement_size,
-        "modelTimeGroupings bytes",
-    )?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
+    preflight_splice(source, span.start..span.end, replacement_size)?;
     let mut replacement = Vec::new();
     reserve_bytes(
         &mut replacement,
@@ -873,28 +900,18 @@ fn preflight_expand_empty(source: &[u8], span: &ElementSpan, child_size: usize) 
         .and_then(|size| size.checked_add(2))
         .and_then(|size| size.checked_add(span.qname.len()))
         .and_then(|size| size.checked_add(1))
-        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
-    preflight_splice(
-        source,
-        span.start..span.end,
-        replacement_size,
-        "modelTimeGroupings bytes",
-    )
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
+    preflight_splice(source, span.start..span.end, replacement_size)
 }
 
 fn splice_length(source: &[u8], range: Range<usize>, replacement_len: usize) -> Result<usize> {
     if range.start > range.end || range.end > source.len() {
         return Err(invalid("invalid modelTimeGroupings source range"));
     }
-    preflight_splice(source, range, replacement_len, "modelTimeGroupings bytes")
+    preflight_splice(source, range, replacement_len)
 }
 
-fn preflight_splice(
-    source: &[u8],
-    range: Range<usize>,
-    replacement_len: usize,
-    resource: &'static str,
-) -> Result<usize> {
+fn preflight_splice(source: &[u8], range: Range<usize>, replacement_len: usize) -> Result<usize> {
     if range.start > range.end || range.end > source.len() {
         return Err(invalid("invalid modelTimeGroupings source range"));
     }
@@ -902,9 +919,13 @@ fn preflight_splice(
         .len()
         .checked_sub(range.end - range.start)
         .and_then(|length| length.checked_add(replacement_len))
-        .ok_or_else(|| limit("modelTimeGroupings bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     if length > MAX_EXTENSION_BYTES {
-        return Err(limit(resource));
+        return Err(limit(
+            LimitKind::ExtensionBytes,
+            length,
+            MAX_EXTENSION_BYTES,
+        ));
     }
     Ok(length)
 }
@@ -917,7 +938,11 @@ fn reserve_bytes(output: &mut Vec<u8>, size: usize, resource: &'static str) -> R
 
 fn copy_bounded(source: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     if source.len() > MAX_EXTENSION_BYTES {
-        return Err(limit(resource));
+        return Err(limit(
+            LimitKind::ExtensionBytes,
+            source.len(),
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let mut output = Vec::new();
     reserve_bytes(&mut output, source.len(), resource)?;
@@ -1002,7 +1027,7 @@ pub fn write_data_model(value: &Definition, limits: &SourceLimits) -> Result<Vec
 fn serialized_data_model_size(value: &Definition) -> Result<usize> {
     let size = serialized_data_model_size_unbounded(value)?;
     if size > MAX_XML_BYTES {
-        return Err(limit("serialized descriptor bytes"));
+        return Err(limit(LimitKind::XmlBytes, size, MAX_XML_BYTES));
     }
     Ok(size)
 }
@@ -1069,7 +1094,7 @@ fn serialized_data_model_size_unbounded(value: &Definition) -> Result<usize> {
 fn add_size(total: &mut usize, size: usize) -> Result<()> {
     *total = total
         .checked_add(size)
-        .ok_or_else(|| limit("serialized descriptor bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::XmlBytes, MAX_XML_BYTES))?;
     Ok(())
 }
 
@@ -1147,7 +1172,11 @@ pub(crate) fn parse_data_model_node(root: &Node) -> Result<Definition> {
                     .xml
                     .clone();
                 if xml.len() > MAX_EXTENSION_BYTES {
-                    return Err(limit("extension bytes"));
+                    return Err(limit(
+                        LimitKind::ExtensionBytes,
+                        xml.len(),
+                        MAX_EXTENSION_BYTES,
+                    ));
                 }
                 extension_list = Some(OpaqueXml { xml });
             },
@@ -1171,7 +1200,7 @@ fn parse_tables(node: &Node) -> Result<Vec<Table>> {
         return Err(invalid("modelTables must contain at least one modelTable"));
     }
     if node.children.len() > MAX_TABLES {
-        return Err(limit("table count"));
+        return Err(limit(LimitKind::Tables, node.children.len(), MAX_TABLES));
     }
     node.children
         .iter()
@@ -1197,7 +1226,11 @@ fn parse_relationships(node: &Node) -> Result<Vec<Relationship>> {
         ));
     }
     if node.children.len() > MAX_RELATIONSHIPS {
-        return Err(limit("relationship count"));
+        return Err(limit(
+            LimitKind::Relationships,
+            node.children.len(),
+            MAX_RELATIONSHIPS,
+        ));
     }
     node.children
         .iter()
@@ -1231,10 +1264,14 @@ pub(crate) fn validate_definition(
         return Err(invalid("minVersionLoad must be at least 5"));
     }
     if value.tables.len() > MAX_TABLES {
-        return Err(limit("table count"));
+        return Err(limit(LimitKind::Tables, value.tables.len(), MAX_TABLES));
     }
     if value.relationships.len() > MAX_RELATIONSHIPS {
-        return Err(limit("relationship count"));
+        return Err(limit(
+            LimitKind::Relationships,
+            value.relationships.len(),
+            MAX_RELATIONSHIPS,
+        ));
     }
     let mut ids = HashSet::new();
     let mut names = HashSet::new();
@@ -1295,7 +1332,11 @@ pub(crate) fn validate_definition(
     }
     if let Some(extension) = &value.extension_list {
         if extension.xml.len() > MAX_EXTENSION_BYTES {
-            return Err(limit("extension bytes"));
+            return Err(limit(
+                LimitKind::ExtensionBytes,
+                extension.xml.len(),
+                MAX_EXTENSION_BYTES,
+            ));
         }
         if !extension_already_parsed {
             let root = parse_document(&extension.xml)?;
@@ -1362,11 +1403,11 @@ pub(crate) fn rewrite_data_model_extension(
     loop {
         let start = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         let event = reader.read_event().map_err(xml_error)?;
         let end = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -1418,9 +1459,9 @@ pub(crate) fn rewrite_data_model_extension(
                     .len()
                     .checked_add(core.len())
                     .and_then(|size| size.checked_add(64))
-                    .ok_or_else(|| limit("rewrite bytes"))?;
+                    .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
                 if size > MAX_REWRITE_BYTES {
-                    return Err(limit("rewrite bytes"));
+                    return Err(limit(LimitKind::RewriteBytes, size, MAX_REWRITE_BYTES));
                 }
                 let mut wrapper = Vec::with_capacity(size);
                 wrapper.extend_from_slice(b"<extLst xmlns=\"");
@@ -1436,7 +1477,11 @@ pub(crate) fn rewrite_data_model_extension(
         },
     };
     if updated.bytes().len() > MAX_REWRITE_BYTES {
-        return Err(limit("rewrite bytes"));
+        return Err(limit(
+            LimitKind::RewriteBytes,
+            updated.bytes().len(),
+            MAX_REWRITE_BYTES,
+        ));
     }
     Ok(updated)
 }
@@ -1458,11 +1503,11 @@ pub(crate) fn rewrite_load_version(
     loop {
         let start = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         let event = reader.read_event().map_err(xml_error)?;
         let end = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         let is_start = matches!(&event, Event::Start(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
@@ -1489,7 +1534,11 @@ pub(crate) fn rewrite_load_version(
                         lexical.as_bytes(),
                     )?;
                     if result.bytes().len() > MAX_REWRITE_BYTES {
-                        return Err(limit("rewrite bytes"));
+                        return Err(limit(
+                            LimitKind::RewriteBytes,
+                            result.bytes().len(),
+                            MAX_REWRITE_BYTES,
+                        ));
                     }
                     return Ok(result);
                 }
@@ -1517,11 +1566,11 @@ fn find_data_model_extension(xml: &[u8], core: &str) -> Result<Option<(usize, us
     loop {
         let start = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         let event = reader.read_event().map_err(xml_error)?;
         let end = origin
             .offset(reader.buffer_position())
-            .ok_or_else(|| limit("rewrite position"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::RewriteBytes, MAX_REWRITE_BYTES))?;
         match event {
             Event::Start(element) => {
                 let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
@@ -1536,7 +1585,9 @@ fn find_data_model_extension(xml: &[u8], core: &str) -> Result<Option<(usize, us
                     }
                     open = Some(start);
                 }
-                depth = depth.checked_add(1).ok_or_else(|| limit("rewrite depth"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| limit_lower_bound(LimitKind::Depth, MAX_DEPTH))?;
             },
             Event::Empty(element) => {
                 let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
@@ -1662,7 +1713,10 @@ fn validate_opaque_element(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -
         };
         expanded
             .try_reserve(1)
-            .map_err(|_| limit("opaque attribute allocation"))?;
+            .map_err(|source| Error::Allocation {
+                resource: "opaque attribute names",
+                source,
+            })?;
         if !expanded.insert((namespace, local)) {
             return Err(invalid("duplicate expanded XML attribute"));
         }
@@ -1748,9 +1802,11 @@ pub(crate) fn parse_document_with_base(
         }
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit_lower_bound(LimitKind::Nodes, MAX_NODES))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("XML structure"));
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 if opaque_depth.is_some() {
@@ -1766,7 +1822,11 @@ pub(crate) fn parse_document_with_base(
                             .checked_add(depth)
                             .is_none_or(|depth| depth >= MAX_DEPTH)
                         {
-                            return Err(limit("XML structure"));
+                            let observed =
+                                outer_depth.checked_add(depth).map_or(usize::MAX, |depth| {
+                                    depth.checked_add(1).unwrap_or(usize::MAX)
+                                });
+                            return Err(limit(LimitKind::Depth, observed, MAX_DEPTH));
                         }
                         *opaque_depth
                             .as_mut()
@@ -1775,7 +1835,11 @@ pub(crate) fn parse_document_with_base(
                     continue;
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                    return Err(limit(
+                        LimitKind::Depth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        MAX_DEPTH,
+                    ));
                 }
                 let is_opaque_root = is_element_name(&reader, element, X15, "extLst")?
                     && (stack.is_empty()
@@ -1787,7 +1851,11 @@ pub(crate) fn parse_document_with_base(
                         .checked_sub(start)
                         .is_none_or(|size| size > MAX_EXTENSION_BYTES)
                 {
-                    return Err(limit("extension bytes"));
+                    return Err(limit(
+                        LimitKind::ExtensionBytes,
+                        end.checked_sub(start).unwrap_or(usize::MAX),
+                        MAX_EXTENSION_BYTES,
+                    ));
                 }
                 let mut node = make_node(&reader, element, reader.decoder(), &mut strings)?;
                 let parent_context = contexts
@@ -1999,9 +2067,15 @@ fn opaque_capture(
     let mut binding_count = 0usize;
     for level in 0..=reader.resolver().level() {
         for _ in reader.resolver().bindings_of(level) {
-            binding_count += 1;
-            if binding_count > 4096 {
-                return Err(limit("in-scope namespace count"));
+            binding_count = binding_count.checked_add(1).ok_or_else(|| {
+                limit_lower_bound(LimitKind::NamespaceBindings, MAX_NAMESPACE_BINDINGS)
+            })?;
+            if binding_count > MAX_NAMESPACE_BINDINGS {
+                return Err(limit(
+                    LimitKind::NamespaceBindings,
+                    binding_count,
+                    MAX_NAMESPACE_BINDINGS,
+                ));
             }
         }
     }
@@ -2035,24 +2109,33 @@ fn opaque_capture(
             .len()
             .checked_add(escaped_len)
             .and_then(|size| size.checked_add(10))
-            .ok_or_else(|| limit("namespace bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES))?;
         if declaration_len
             .checked_add(charge)
             .is_none_or(|size| size > MAX_EXTENSION_BYTES)
         {
-            return Err(limit("namespace bytes"));
+            let observed = declaration_len.checked_add(charge).unwrap_or(usize::MAX);
+            return Err(limit(
+                LimitKind::NamespaceBytes,
+                observed,
+                MAX_EXTENSION_BYTES,
+            ));
         }
         declaration_len = declaration_len
             .checked_add(charge)
-            .ok_or_else(|| limit("namespace bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES))?;
     }
     if !has_default {
         declaration_len = declaration_len
             .checked_add(b" xmlns=\"\"".len())
-            .ok_or_else(|| limit("namespace bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES))?;
     }
     if declaration_len > MAX_EXTENSION_BYTES {
-        return Err(limit("namespace bytes"));
+        return Err(limit(
+            LimitKind::NamespaceBytes,
+            declaration_len,
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let local_base = xml_attribute(node, XML_NAMESPACE, "base");
     let local_lang = xml_attribute(node, XML_NAMESPACE, "lang");
@@ -2067,7 +2150,7 @@ fn opaque_capture(
         if let Some(base) = &parent_context.base {
             context_len = context_len
                 .checked_add(context_attribute_len("base", base)?)
-                .ok_or_else(|| limit("XML context bytes"))?;
+                .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
         }
     }
     if local_lang.is_none()
@@ -2075,17 +2158,21 @@ fn opaque_capture(
     {
         context_len = context_len
             .checked_add(context_attribute_len("lang", lang)?)
-            .ok_or_else(|| limit("XML context bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     }
     if local_space.is_none()
         && let Some(space) = &parent_context.space
     {
         context_len = context_len
             .checked_add(context_attribute_len("space", space)?)
-            .ok_or_else(|| limit("XML context bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     }
     if context_len > MAX_EXTENSION_BYTES {
-        return Err(limit("XML context bytes"));
+        return Err(limit(
+            LimitKind::ExtensionBytes,
+            context_len,
+            MAX_EXTENSION_BYTES,
+        ));
     }
 
     let replacement = if let (Some(parent_base), Some(local)) = (&parent_context.base, local_base)
@@ -2111,22 +2198,25 @@ fn opaque_capture(
         .checked_sub(start)
         .and_then(|size| size.checked_add(declaration_len))
         .and_then(|size| size.checked_add(context_len))
-        .ok_or_else(|| limit("extension bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     if let Some((range, effective)) = &replacement {
         let escaped_len = escaped_attribute_len(effective)?;
         size = size
             .checked_sub(range.len())
             .and_then(|size| size.checked_add(escaped_len))
-            .ok_or_else(|| limit("extension bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     }
     if size > MAX_EXTENSION_BYTES {
-        return Err(limit("extension bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, size, MAX_EXTENSION_BYTES));
     }
 
     let mut declarations = Vec::new();
     declarations
         .try_reserve_exact(declaration_len)
-        .map_err(|_| limit("namespace allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model namespace declarations",
+            source,
+        })?;
     for (prefix, namespace) in reader.resolver().bindings() {
         let prefix = match prefix {
             PrefixDeclaration::Default => &b""[..],
@@ -2154,7 +2244,10 @@ fn opaque_capture(
     let mut context_attributes = Vec::new();
     context_attributes
         .try_reserve_exact(context_len)
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context attributes",
+            source,
+        })?;
     if local_base.is_none() {
         if let Some(base) = &parent_context.base {
             append_context_attribute(&mut context_attributes, "base", base)?;
@@ -2175,7 +2268,10 @@ fn opaque_capture(
     if let Some((range, effective)) = replacement {
         replacements
             .try_reserve_exact(1)
-            .map_err(|_| limit("XML context allocation"))?;
+            .map_err(|source| Error::Allocation {
+                resource: "Data Model XML context replacements",
+                source,
+            })?;
         replacements.push(SourceReplacement {
             range,
             value: escaped_attribute_value(effective)?,
@@ -2204,7 +2300,10 @@ fn finish_opaque(node: &mut Node, source: &[u8], end: usize, strings: &mut usize
     capture
         .xml
         .try_reserve_exact(size)
-        .map_err(|_| limit("extension allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model extension source",
+            source,
+        })?;
     append_replaced_source(
         &mut capture.xml,
         source,
@@ -2227,15 +2326,15 @@ fn opaque_size(capture: &OpaqueCapture, end: usize) -> Result<usize> {
         .checked_sub(capture.start)
         .and_then(|size| size.checked_add(capture.declarations.len()))
         .and_then(|size| size.checked_add(capture.context_attributes.len()))
-        .ok_or_else(|| limit("extension bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     for replacement in &capture.replacements {
         size = size
             .checked_sub(replacement.range.len())
             .and_then(|size| size.checked_add(replacement.value.len()))
-            .ok_or_else(|| limit("extension bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     }
     if size > MAX_EXTENSION_BYTES {
-        return Err(limit("extension bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, size, MAX_EXTENSION_BYTES));
     }
     Ok(size)
 }
@@ -2294,13 +2393,16 @@ fn append_context_attribute(output: &mut Vec<u8>, name: &str, value: &str) -> Re
     let total = output
         .len()
         .checked_add(additional)
-        .ok_or_else(|| limit("XML context bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     if total > MAX_EXTENSION_BYTES {
-        return Err(limit("XML context bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, total, MAX_EXTENSION_BYTES));
     }
     output
         .try_reserve(additional)
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     output.extend_from_slice(b" xml:");
     output.extend_from_slice(name.as_bytes());
     output.extend_from_slice(b"=\"");
@@ -2317,18 +2419,25 @@ fn context_attribute_len(name: &str, value: &str) -> Result<usize> {
         .and_then(|size| size.checked_add(b"=\"".len()))
         .and_then(|size| size.checked_add(escaped_len))
         .and_then(|size| size.checked_add(1))
-        .ok_or_else(|| limit("XML context bytes"))
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
 }
 
 fn escaped_attribute_value(value: &str) -> Result<Vec<u8>> {
     let length = escaped_attribute_len(value)?;
     if length > MAX_EXTENSION_BYTES {
-        return Err(limit("XML context bytes"));
+        return Err(limit(
+            LimitKind::ExtensionBytes,
+            length,
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     escape(&mut output, value);
     Ok(output)
 }
@@ -2338,7 +2447,7 @@ fn escaped_attribute_len(value: &str) -> Result<usize> {
         let escaped = escaped_character_len(character);
         length
             .checked_add(escaped)
-            .ok_or_else(|| limit("XML context bytes"))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
     })
 }
 
@@ -2370,7 +2479,7 @@ fn namespace_escaped_len(raw: &str) -> Result<usize> {
         let decoded = quick_xml::escape::unescape(&raw[ampersand..end]).map_err(xml_error)?;
         length = length
             .checked_add(escaped_attribute_len(&decoded)?)
-            .ok_or_else(|| limit("namespace bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES))?;
         cursor = end;
     }
     Ok(length)
@@ -2384,7 +2493,7 @@ fn checked_namespace_literal_len(mut length: usize, literal: &str) -> Result<usi
         };
         length = length
             .checked_add(escaped_character_len(character))
-            .ok_or_else(|| limit("namespace bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES))?;
     }
     Ok(length)
 }
@@ -2550,19 +2659,19 @@ fn compose_uri(
         authority
             .len()
             .checked_add(2)
-            .ok_or_else(|| limit("XML context bytes"))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
     })?;
     let query_length = query.map_or(Ok(0), |query| {
         query
             .len()
             .checked_add(1)
-            .ok_or_else(|| limit("XML context bytes"))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
     })?;
     let fragment_length = fragment.map_or(Ok(0), |fragment| {
         fragment
             .len()
             .checked_add(1)
-            .ok_or_else(|| limit("XML context bytes"))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))
     })?;
     let length = scheme
         .map_or(0, str::len)
@@ -2570,14 +2679,17 @@ fn compose_uri(
         .and_then(|length| length.checked_add(path.len()))
         .and_then(|length| length.checked_add(query_length))
         .and_then(|length| length.checked_add(fragment_length))
-        .ok_or_else(|| limit("XML context bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     if length > max_length {
-        return Err(limit("XML context bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, length, max_length));
     }
     let mut output = String::new();
     output
         .try_reserve_exact(length)
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     if let Some(scheme) = scheme {
         output.push_str(scheme);
     }
@@ -2646,14 +2758,17 @@ fn merge_uri_paths(
             let length = local
                 .len()
                 .checked_add(1)
-                .ok_or_else(|| limit("XML context bytes"))?;
+                .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
             if length > max_length {
-                return Err(limit("XML context bytes"));
+                return Err(limit(LimitKind::ExtensionBytes, length, max_length));
             }
             let mut output = String::new();
             output
                 .try_reserve_exact(length)
-                .map_err(|_| limit("XML context allocation"))?;
+                .map_err(|source| Error::Allocation {
+                    resource: "Data Model XML context",
+                    source,
+                })?;
             output.push('/');
             output.push_str(local);
             Ok(output)
@@ -2664,14 +2779,17 @@ fn merge_uri_paths(
     let prefix_len = parent.rfind('/').map_or(0, |index| index + 1);
     let length = prefix_len
         .checked_add(local.len())
-        .ok_or_else(|| limit("XML context bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES))?;
     if length > max_length {
-        return Err(limit("XML context bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, length, max_length));
     }
     let mut output = String::new();
     output
         .try_reserve_exact(length)
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     output.push_str(&parent[..prefix_len]);
     output.push_str(local);
     Ok(output)
@@ -2679,13 +2797,16 @@ fn merge_uri_paths(
 
 fn remove_dot_segments(value: &str, max_length: usize) -> Result<String> {
     if value.len() > max_length {
-        return Err(limit("XML context bytes"));
+        return Err(limit(LimitKind::ExtensionBytes, value.len(), max_length));
     }
     let mut input = value.as_bytes();
     let mut output = Vec::new();
     output
         .try_reserve(value.len())
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     while !input.is_empty() {
         if input.starts_with(b"../") {
             input = &input[3..];
@@ -2724,12 +2845,16 @@ fn remove_dot_segments(value: &str, max_length: usize) -> Result<String> {
 
 fn clone_bounded(value: &str, max_length: usize, label: &str) -> Result<String> {
     if value.len() > max_length {
-        return Err(limit(label));
+        let _ = label;
+        return Err(limit(LimitKind::ExtensionBytes, value.len(), max_length));
     }
     let mut output = String::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|_| limit("XML context allocation"))?;
+        .map_err(|source| Error::Allocation {
+            resource: "Data Model XML context",
+            source,
+        })?;
     output.push_str(value);
     Ok(output)
 }
@@ -2799,7 +2924,7 @@ fn bounded_nonempty(value: &str, label: &str) -> Result<()> {
         return Err(invalid(format!("{label} cannot be empty")));
     }
     if value.len() > MAX_STRING_BYTES {
-        return Err(limit(label));
+        return Err(limit(LimitKind::StringBytes, value.len(), MAX_STRING_BYTES));
     }
     if let Some(character) = value.chars().find(|character| !is_xml_10_char(*character)) {
         return Err(invalid(format!(
@@ -2821,9 +2946,13 @@ fn is_xml_10_char(character: char) -> bool {
 fn add_strings(total: &mut usize, size: usize) -> Result<()> {
     *total = total
         .checked_add(size)
-        .ok_or_else(|| limit("XML string bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::TotalStringBytes, MAX_TOTAL_STRING_BYTES))?;
     if *total > MAX_TOTAL_STRING_BYTES {
-        Err(limit("XML string bytes"))
+        Err(limit(
+            LimitKind::TotalStringBytes,
+            *total,
+            MAX_TOTAL_STRING_BYTES,
+        ))
     } else {
         Ok(())
     }

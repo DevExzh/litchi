@@ -339,6 +339,10 @@ pub enum LimitKind {
     Connections(crate::connections::LimitKind),
     /// Rich-value refresh interval XML and collection budgets.
     RichValueRefresh(crate::rich_values::refresh_intervals::LimitKind),
+    /// Rich-value XML, collection, and relationship budgets.
+    RichValues(crate::rich_values::LimitKind),
+    /// Form-control XML, model, and retained-memory budgets.
+    FormControl(crate::form_control::LimitKind),
     /// Source-backed tab-state XML audit budgets.
     TabState(crate::tab_state::source::LimitKind),
 }
@@ -394,6 +398,8 @@ impl LimitKind {
             Self::OleObjects(kind) => kind.as_str(),
             Self::Connections(kind) => kind.as_str(),
             Self::RichValueRefresh(kind) => kind.as_str(),
+            Self::RichValues(kind) => kind.as_str(),
+            Self::FormControl(kind) => kind.as_str(),
             Self::TabState(kind) => kind.as_str(),
         }
     }
@@ -441,11 +447,10 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
     fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
         match error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
+            litchi_spreadsheet_drawing::Error::Mce(error) => Self::MarkupCompatibility(error),
             litchi_spreadsheet_drawing::Error::Invalid(message)
             | litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Invalid(message),
-            other @ (litchi_spreadsheet_drawing::Error::Mce(_)
-            | litchi_spreadsheet_drawing::Error::Xml(_)
-            | _) => Self::Invalid(other.to_string()),
+            other => Self::Invalid(other.to_string()),
         }
     }
 }
@@ -731,14 +736,14 @@ mod tests {
     #[test]
     fn form_control_refusal_retains_leaf_limit_details() {
         let error = Error::from(crate::form_control::FormControlError::Limit {
-            resource: "items",
+            kind: crate::form_control::LimitKind::Items,
             observed: 3,
             maximum: 2,
         });
         assert!(matches!(
             error,
             Error::FormControl(crate::form_control::FormControlError::Limit {
-                resource: "items",
+                kind: crate::form_control::LimitKind::Items,
                 observed: 3,
                 maximum: 2,
             })

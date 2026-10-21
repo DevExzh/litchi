@@ -7,7 +7,7 @@ use crate::rich_values::model::{Link, Mode};
 use crate::rich_values::validation::{
     validate_arrays, validate_bags, validate_data, validate_rich_value_rels, validate_structures,
 };
-use crate::rich_values::{MAX_RELATIONSHIPS, invalid, limit};
+use crate::rich_values::{LimitKind, MAX_RELATIONSHIPS, invalid, limit};
 use litchi_opc::{OpcPackage, Relationships};
 
 /// Discover, parse, and validate every rich-value family part in an OPC package.
@@ -68,7 +68,11 @@ fn collect_links(source: Option<&str>, relationships: &Relationships) -> Result<
     let mut result = Vec::new();
     for relationship in relationships.iter() {
         if result.len() >= MAX_RELATIONSHIPS {
-            return Err(limit("relationship edges"));
+            return Err(limit(
+                LimitKind::RelationshipEdges,
+                result.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_RELATIONSHIPS,
+            ));
         }
         let (target, resolved_target, mode) = if relationship.is_external() {
             (relationship.target_ref().to_owned(), None, Mode::External)

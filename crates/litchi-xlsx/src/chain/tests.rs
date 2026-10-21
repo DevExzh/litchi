@@ -395,8 +395,10 @@ fn workbook_mce_expansion_is_rejected_during_bounded_processing() {
     let error = process_workbook_mce_with_limit(source.as_bytes(), source.len()).unwrap_err();
     assert!(matches!(
         error,
-        Error::Invalid(message)
-            if message == "workbook MCE error: markup compatibility resource limit exceeded: output bytes"
+        Error::MarkupCompatibility(litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind: litchi_ooxml_common::mce::LimitKind::OutputBytes,
+            ..
+        })
     ));
 }
 

@@ -31,6 +31,11 @@ path = "src/bin/xlsx_merge_history_alloc.rs"
 required-features = ["allocator-metrics"]
 
 [[bin]]
+name = "xlsx_tab_state_history_alloc"
+path = "src/bin/xlsx_tab_state_history_alloc.rs"
+required-features = ["allocator-metrics"]
+
+[[bin]]
 name = "docx_plain_paragraph_tail_append"
 path = "src/bin/docx_plain_paragraph_tail_append.rs"
 

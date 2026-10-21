@@ -34,25 +34,8 @@ pub use package::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot, 
 pub(crate) const MAX_TYPES: usize = super::MAX_ITEMS;
 pub(crate) const MAX_INTERVALS: usize = super::MAX_ITEMS;
 
-pub(crate) fn limit(resource: &str) -> XlsxError {
-    let (kind, maximum) = if resource.contains("output") {
-        (LimitKind::OutputBytes, super::MAX_OUTPUT_BYTES)
-    } else if resource.contains("depth") {
-        (LimitKind::Depth, super::MAX_DEPTH)
-    } else if resource.contains("types") {
-        (LimitKind::Types, MAX_TYPES)
-    } else if resource.contains("interval") || resource.contains("locations") {
-        if resource.contains("locations") {
-            (LimitKind::ExtensionLocations, MAX_INTERVALS)
-        } else {
-            (LimitKind::Intervals, MAX_INTERVALS)
-        }
-    } else if resource.contains("string") || resource.contains("extension name") {
-        (LimitKind::StringBytes, super::MAX_STRING_BYTES)
-    } else {
-        (LimitKind::XmlBytes, super::MAX_XML_BYTES)
-    };
-    XlsxError::limit(kind, maximum.saturating_add(1), maximum)
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> XlsxError {
+    XlsxError::limit(kind, observed, maximum)
 }
 
 /// XML 1.0 fifth-edition `Char` production.

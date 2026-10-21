@@ -23,7 +23,7 @@ use memchr::memmem;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
 
-use super::model::{Error, Limits};
+use super::model::{Error, LimitKind, Limits};
 use crate::private::BindingTracker;
 use crate::xml::attributes::BytesStartExt as _;
 
@@ -33,8 +33,18 @@ fn bad(message: impl Into<String>) -> Error {
     Error::NonConformant(message.into())
 }
 
-fn limit(resource: &str) -> Error {
-    Error::LimitExceeded(resource.into())
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn limit_lower_bound(kind: LimitKind, maximum: usize) -> Error {
+    // The checked arithmetic which reached this path overflowed, so the
+    // exact observation is unavailable. Report the saturated usize bound.
+    limit(kind, usize::MAX, maximum)
 }
 
 fn xerr(error: impl std::fmt::Display) -> Error {
@@ -118,7 +128,11 @@ impl InScopeNamespaces {
                 return;
             }
             if bindings.len() >= limits.max_namespace_bindings {
-                error = Some(limit("namespace bindings"));
+                error = Some(limit(
+                    LimitKind::NamespaceBindings,
+                    bindings.len().checked_add(1).unwrap_or(usize::MAX),
+                    limits.max_namespace_bindings,
+                ));
                 return;
             }
             if let Err(failure) = reserve_exact(&mut bindings, 1, "MCE in-scope namespaces") {
@@ -197,16 +211,20 @@ impl InScopeNamespaces {
                 + usize::from(!prefix.is_empty())
                 + prefix.len()
                 + escaped_len(namespace);
-            extra = extra
-                .checked_add(declaration)
-                .ok_or_else(|| limit("output bytes"))?;
+            extra = extra.checked_add(declaration).ok_or_else(|| {
+                limit_lower_bound(LimitKind::OutputBytes, limits.max_output_bytes)
+            })?;
         }
         let total = fragment
             .len()
             .checked_add(extra)
-            .ok_or_else(|| limit("output bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::OutputBytes, limits.max_output_bytes))?;
         if total > limits.max_output_bytes {
-            return Err(limit("output bytes"));
+            return Err(limit(
+                LimitKind::OutputBytes,
+                total,
+                limits.max_output_bytes,
+            ));
         }
         let mut out = Vec::new();
         reserve_exact(&mut out, total, "MCE self-contained fragment")?;
@@ -316,9 +334,11 @@ fn walked_tracker(document: &[u8], offset: usize, limits: &Limits) -> R<BindingT
         }
         match reader.read_event_into(&mut buffer).map_err(xerr)? {
             Event::Start(element) => {
-                depth = depth.checked_add(1).ok_or_else(|| limit("depth"))?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| limit_lower_bound(LimitKind::Depth, limits.max_depth))?;
                 if depth > limits.max_depth {
-                    return Err(limit("depth"));
+                    return Err(limit(LimitKind::Depth, depth, limits.max_depth));
                 }
                 push(&mut tracker, &element, limits)?;
             },
@@ -338,7 +358,11 @@ fn push(tracker: &mut BindingTracker, element: &BytesStart<'_>, limits: &Limits)
         .push(element)
         .map_err(|error| bad(format!("invalid namespace: {error}")))?;
     if tracker.declaration_count() > limits.max_namespace_bindings {
-        return Err(limit("namespace bindings"));
+        return Err(limit(
+            LimitKind::NamespaceBindings,
+            tracker.declaration_count(),
+            limits.max_namespace_bindings,
+        ));
     }
     Ok(())
 }
@@ -408,5 +432,22 @@ fn escape_into(out: &mut Vec<u8>, value: &[u8]) {
         } else {
             out.push(*byte);
         }
+    }
+}
+
+#[cfg(test)]
+mod limit_lower_bound_tests {
+    use super::{Error, LimitKind};
+
+    #[test]
+    fn arithmetic_overflow_reports_saturated_observation() {
+        assert!(matches!(
+            super::limit_lower_bound(LimitKind::OutputBytes, 10),
+            Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                observed: usize::MAX,
+                maximum: 10,
+            }
+        ));
     }
 }

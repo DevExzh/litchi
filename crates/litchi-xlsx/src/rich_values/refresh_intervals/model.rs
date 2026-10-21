@@ -133,7 +133,11 @@ pub(crate) fn validate_intervals(value: &[RefreshInterval]) -> Result<()> {
         ));
     }
     if value.len() > MAX_INTERVALS {
-        return Err(super::limit("rich-value refresh intervals"));
+        return Err(super::limit(
+            super::LimitKind::Intervals,
+            value.len(),
+            MAX_INTERVALS,
+        ));
     }
     for interval in value {
         if interval.resource_id_int.is_none() && interval.resource_id_str.is_none() {
@@ -150,7 +154,11 @@ pub(crate) fn validate_intervals(value: &[RefreshInterval]) -> Result<()> {
 
 fn validate_string(value: &str, field: &str) -> Result<()> {
     if value.len() > MAX_STRING_BYTES {
-        return Err(super::limit("rich-value refresh string bytes"));
+        return Err(super::limit(
+            super::LimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ));
     }
     if !value.chars().all(valid_xml10) {
         return Err(invalid(format!(

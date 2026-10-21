@@ -46,7 +46,8 @@ use std::borrow::Cow;
 use std::io::{BufRead, Cursor};
 
 use litchi_ooxml_common::mce::{
-    ActiveFlow, Capabilities, SemanticElement, SemanticEvent, StreamError, StreamLimits,
+    ActiveFlow, Capabilities, LimitKind as MceLimitKind, SemanticElement, SemanticEvent,
+    StreamError, StreamLimits,
 };
 use litchi_sheet::{Cell as Address, Rect};
 use quick_xml::encoding::Decoder;
@@ -366,8 +367,16 @@ pub(crate) fn scan_targets_bytes(
             let mut input = Cursor::new(content);
             scan_targets(&mut input, capabilities, limits, targets)
         },
-        Err(PlainScanError::Limit(resource)) => Err(StreamError::Mce {
-            error: litchi_ooxml_common::mce::Error::LimitExceeded(resource.into()),
+        Err(PlainScanError::Limit {
+            kind,
+            observed,
+            maximum,
+        }) => Err(StreamError::Mce {
+            error: litchi_ooxml_common::mce::Error::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            },
             prior_mce_error: None,
             raw_error: None,
             active_error: None,
@@ -418,7 +427,11 @@ enum PlainScan {
 enum PlainScanError {
     Callback(crate::Error),
     Fallback,
-    Limit(&'static str),
+    Limit {
+        kind: MceLimitKind,
+        observed: usize,
+        maximum: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -483,7 +496,11 @@ impl<'a> PlainScanner<'a> {
 
     fn push(&mut self, frame: PlainFrame) -> std::result::Result<(), PlainScanError> {
         if self.stack.len() >= MAX_XML_DEPTH {
-            return Err(PlainScanError::Limit("depth"));
+            return Err(PlainScanError::Limit {
+                kind: MceLimitKind::Depth,
+                observed: self.stack.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_XML_DEPTH,
+            });
         }
         self.stack.try_reserve(1).map_err(|source| {
             PlainScanError::Callback(allocation("plain worksheet stack", source))
@@ -848,18 +865,32 @@ fn plain_attributes<'a>(
     attributes.with_checks(check_duplicates);
     for attribute in attributes {
         let attribute = attribute.map_err(|_error| PlainScanError::Fallback)?;
-        count = count
-            .checked_add(1)
-            .ok_or(PlainScanError::Limit("stream attributes per event"))?;
+        count = count.checked_add(1).ok_or(PlainScanError::Limit {
+            kind: MceLimitKind::Attributes,
+            observed: usize::MAX,
+            maximum: limits.max_attributes_per_event,
+        })?;
         bytes = bytes
             .checked_add(attribute.key.as_ref().len())
             .and_then(|bytes| bytes.checked_add(attribute.value.as_ref().len()))
-            .ok_or(PlainScanError::Limit("stream attribute bytes"))?;
+            .ok_or(PlainScanError::Limit {
+                kind: MceLimitKind::AttributeBytes,
+                observed: usize::MAX,
+                maximum: limits.max_attribute_bytes_per_event,
+            })?;
         if count > limits.max_attributes_per_event {
-            return Err(PlainScanError::Limit("stream attributes per event"));
+            return Err(PlainScanError::Limit {
+                kind: MceLimitKind::Attributes,
+                observed: count,
+                maximum: limits.max_attributes_per_event,
+            });
         }
         if bytes > limits.max_attribute_bytes_per_event {
-            return Err(PlainScanError::Limit("stream attribute bytes"));
+            return Err(PlainScanError::Limit {
+                kind: MceLimitKind::AttributeBytes,
+                observed: bytes,
+                maximum: limits.max_attribute_bytes_per_event,
+            });
         }
         let key = attribute.key.as_ref();
         if key == b"xmlns" {
@@ -912,7 +943,11 @@ fn scan_plain_targets(
     targets: &[Address],
 ) -> std::result::Result<PlainScan, PlainScanError> {
     if content.len() > limits.processing.max_input_bytes {
-        return Err(PlainScanError::Limit("input bytes"));
+        return Err(PlainScanError::Limit {
+            kind: MceLimitKind::InputBytes,
+            observed: content.len(),
+            maximum: limits.processing.max_input_bytes,
+        });
     }
     let mut reader = NsReader::from_reader(content);
     reader.config_mut().trim_text(false);
@@ -926,11 +961,17 @@ fn scan_plain_targets(
     loop {
         let event = reader.read_event().map_err(|_| PlainScanError::Fallback)?;
         if !matches!(&event, Event::Eof | Event::DocType(_) | Event::PI(_)) {
-            events = events
-                .checked_add(1)
-                .ok_or(PlainScanError::Limit("stream event count"))?;
+            events = events.checked_add(1).ok_or(PlainScanError::Limit {
+                kind: MceLimitKind::Events,
+                observed: usize::MAX,
+                maximum: limits.max_events,
+            })?;
             if events > limits.max_events {
-                return Err(PlainScanError::Limit("stream event count"));
+                return Err(PlainScanError::Limit {
+                    kind: MceLimitKind::Events,
+                    observed: events,
+                    maximum: limits.max_events,
+                });
             }
         }
         let (namespace, event) = reader.resolver().resolve_event(event);
@@ -948,7 +989,11 @@ fn scan_plain_targets(
             Event::Eof => 0,
         };
         if event_bytes > limits.max_event_bytes {
-            return Err(PlainScanError::Limit("stream event bytes"));
+            return Err(PlainScanError::Limit {
+                kind: MceLimitKind::EventBytes,
+                observed: event_bytes,
+                maximum: limits.max_event_bytes,
+            });
         }
         if !matches!(&event, Event::Eof | Event::Decl(_)) && !scanner.root_seen {
             scanner.pre_root_event_seen = true;

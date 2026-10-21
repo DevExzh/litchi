@@ -29,6 +29,7 @@ crate::record::limit_kinds!("Data Model", DataModel {
     RewriteBytes => "Data Model rewrite bytes",
     ExtensionBytes => "Data Model extension bytes",
     NamespaceBytes => "Data Model namespace bytes",
+    NamespaceBindings => "Data Model namespace bindings",
     PayloadBytes => "Data Model payload bytes",
     StringBytes => "Data Model string bytes",
     TotalStringBytes => "Data Model total string bytes",
@@ -75,6 +76,7 @@ pub(crate) const MAX_STRING_BYTES: usize = 1024 * 1024;
 pub(crate) const MAX_TOTAL_STRING_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_NODES: usize = 200_000;
 pub(crate) const MAX_DEPTH: usize = 128;
+pub(crate) const MAX_NAMESPACE_BINDINGS: usize = 4096;
 pub(crate) const MAX_TABLES: usize = 65_536;
 pub(crate) const MAX_RELATIONSHIPS: usize = 65_536;
 pub(crate) const MAX_TIME_GROUPINGS: usize = 65_536;
@@ -193,60 +195,12 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(name: &str) -> Error {
-    let (kind, maximum) = limit_bound(name);
-    Error::limit(kind, maximum.saturating_add(1), maximum)
-}
-
-pub(crate) fn limit_at_with_max(name: &str, observed: usize, maximum: usize) -> Error {
-    let (kind, _) = limit_bound(name);
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     Error::limit(kind, observed, maximum)
 }
 
-fn limit_bound(name: &str) -> (LimitKind, usize) {
-    let (kind, maximum) = if name.contains("payload") {
-        (LimitKind::PayloadBytes, MAX_PAYLOAD_BYTES)
-    } else if name.contains("dependency") {
-        (LimitKind::DependencyBytes, MAX_DEPENDENCY_BYTES)
-    } else if name.contains("event") {
-        (LimitKind::Events, MAX_FORMULA_EVENTS)
-    } else if name.contains("formula") {
-        (LimitKind::FormulaBytes, MAX_STRING_BYTES)
-    } else if name.contains("rewrite") {
-        (LimitKind::RewriteBytes, MAX_REWRITE_BYTES)
-    } else if name.contains("calculatedTimeColumn") {
-        (
-            LimitKind::CalculatedTimeColumns,
-            MAX_CALCULATED_TIME_COLUMNS,
-        )
-    } else if name.contains("modelTimeGrouping") || name.contains("time grouping") {
-        if name.contains("count") {
-            (LimitKind::TimeGroupings, MAX_TIME_GROUPINGS)
-        } else {
-            (LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES)
-        }
-    } else if name.contains("table") {
-        (LimitKind::Tables, MAX_TABLES)
-    } else if name.contains("relationship") {
-        (LimitKind::Relationships, MAX_RELATIONSHIPS)
-    } else if name.contains("depth") {
-        (LimitKind::Depth, MAX_DEPTH)
-    } else if name.contains("structure") || name.contains("node") {
-        (LimitKind::Nodes, MAX_NODES)
-    } else if name.contains("string") || name.contains("attribute") {
-        if name.contains("total") {
-            (LimitKind::TotalStringBytes, MAX_TOTAL_STRING_BYTES)
-        } else {
-            (LimitKind::StringBytes, MAX_STRING_BYTES)
-        }
-    } else if name.contains("namespace") {
-        (LimitKind::NamespaceBytes, MAX_EXTENSION_BYTES)
-    } else if name.contains("extension") || name.contains("context") || name.contains("opaque") {
-        (LimitKind::ExtensionBytes, MAX_EXTENSION_BYTES)
-    } else {
-        (LimitKind::XmlBytes, MAX_XML_BYTES)
-    };
-    (kind, maximum)
+pub(crate) fn limit_lower_bound(kind: LimitKind, maximum: usize) -> Error {
+    Error::limit(kind, maximum.checked_add(1).unwrap_or(usize::MAX), maximum)
 }
 
 pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -255,14 +209,14 @@ pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{LimitKind, MAX_DEPENDENCY_BYTES, MAX_FORMULA_EVENTS, limit_at_with_max};
+    use super::{LimitKind, MAX_DEPENDENCY_BYTES, MAX_FORMULA_EVENTS, limit};
     use crate::Error;
 
     #[test]
     fn removal_budgets_have_typed_kinds() {
         assert!(matches!(
-            limit_at_with_max(
-                "dependency bytes",
+            limit(
+                LimitKind::DependencyBytes,
                 MAX_DEPENDENCY_BYTES + 1,
                 MAX_DEPENDENCY_BYTES
             ),
@@ -272,14 +226,18 @@ mod tests {
             }
         ));
         assert!(matches!(
-            limit_at_with_max("formula events", MAX_FORMULA_EVENTS + 1, MAX_FORMULA_EVENTS),
+            limit(
+                LimitKind::Events,
+                MAX_FORMULA_EVENTS + 1,
+                MAX_FORMULA_EVENTS,
+            ),
             Error::Limit {
                 kind: crate::LimitKind::DataModel(LimitKind::Events),
                 ..
             }
         ));
         assert!(matches!(
-            limit_at_with_max("formula attribute bytes", 2, 1),
+            limit(LimitKind::FormulaBytes, 2, 1),
             Error::Limit {
                 kind: crate::LimitKind::DataModel(LimitKind::FormulaBytes),
                 ..

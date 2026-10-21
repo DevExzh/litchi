@@ -79,6 +79,23 @@ pub const MAX_OPAQUE_BYTES: usize = 16 * 1024 * 1024;
 /// The maximum aggregate bytes retained by one parsed/detached model.
 pub const MAX_RETAINED_BYTES: usize = MAX_PART_BYTES + MAX_OPAQUE_BYTES;
 
+crate::record::limit_kinds!("form-control", FormControl {
+    PartBytes => "form-control source part bytes",
+    OutputBytes => "form-control generated output bytes",
+    XmlDepth => "form-control XML depth",
+    XmlEvents => "form-control XML events",
+    Items => "form-control items",
+    Attributes => "form-control XML attributes",
+    ItemValueBytes => "form-control item value bytes",
+    FormulaBytes => "form-control formula bytes",
+    OpaqueBytes => "form-control opaque bytes",
+    StringBytes => "form-control string bytes",
+    NamespaceBytes => "form-control namespace bytes",
+    RetainedBytes => "form-control retained bytes",
+    TemporaryBytes => "form-control temporary bytes",
+    ScratchBytes => "form-control scratch bytes",
+});
+
 /// A bounded local policy for this leaf XML codec.
 ///
 /// Package owners should derive this policy from their retained OPC limits.
@@ -241,10 +258,10 @@ pub enum FormControlError {
     #[error("invalid form-control properties: {0}")]
     Invalid(String),
     /// The source or candidate exceeds one of the retained safety ceilings.
-    #[error("form-control properties {resource} exceeds {maximum} (observed {observed})")]
+    #[error("form-control properties {kind} exceeds {maximum} (observed {observed})")]
     Limit {
-        /// Bounded resource name.
-        resource: &'static str,
+        /// The typed bounded dimension.
+        kind: LimitKind,
         /// Observed resource use.
         observed: usize,
         /// Caller/effective maximum.
@@ -268,9 +285,9 @@ pub(crate) fn invalid(message: impl Into<String>) -> FormControlError {
     FormControlError::Invalid(message.into())
 }
 
-pub(crate) fn limit(resource: &'static str, observed: usize, maximum: usize) -> FormControlError {
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> FormControlError {
     FormControlError::Limit {
-        resource,
+        kind,
         observed,
         maximum,
     }

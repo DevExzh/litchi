@@ -2607,7 +2607,7 @@ fn caller_name_limit_is_typed_before_control_projection() {
 }
 
 #[test]
-fn worksheet_control_identity_name_limit_reports_object_resource() {
+fn worksheet_control_identity_name_limit_reports_input_resource() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     // The canonical worksheet carries an XDR namespace QName whose bounded
     // attribute identity is 69 bytes.  Keep this independent name-limit
@@ -2630,7 +2630,7 @@ fn worksheet_control_identity_name_limit_reports_object_resource() {
     ] {
         match result {
             Err(Error::ResourceLimit(limit)) => {
-                assert_eq!(limit.resource, Resource::Objects, "{label}: {limit:?}");
+                assert_eq!(limit.resource, Resource::InputBytes, "{label}: {limit:?}");
                 assert_eq!(limit.observed, 71, "{label}: {limit:?}");
                 assert_eq!(limit.limit, 70, "{label}: {limit:?}");
                 assert!(

@@ -44,31 +44,51 @@ pub(crate) const OFFICE_MAX_COUNT: u32 = 2_147_483_647;
 pub(crate) const MAX_ARRAY_ROWS: u32 = 1_048_576;
 pub(crate) const MAX_ARRAY_COLUMNS: u32 = 16_384;
 
+crate::record::limit_kinds!("rich-values", RichValues {
+    XmlBytes => "rich-values XML bytes",
+    OutputBytes => "rich-values output bytes",
+    OpaqueBytes => "rich-values opaque XML bytes",
+    StringBytes => "rich-values string bytes",
+    Nodes => "rich-values XML nodes",
+    Depth => "rich-values XML depth",
+    ValueItems => "rich-value items",
+    StructureItems => "rich-value structure items",
+    StructureKeys => "rich-value structure keys",
+    ArrayItems => "rich-value array items",
+    BagItems => "feature property bags",
+    RelationshipItems => "rich-value relationships",
+    ExtensionItems => "rich-value extension items",
+    PropertyItems => "feature property items",
+    PropertyArrayItems => "feature property array items",
+    ArrayValues => "rich-array values",
+    RelationshipEdges => "rich-value relationship edges",
+});
+
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(resource: &str) -> Error {
-    invalid(format!("rich-values {resource} limit exceeded"))
+pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
 }
 
-pub(crate) fn bounded(value: &str, resource: &str) -> Result<()> {
+pub(crate) fn bounded(value: &str, kind: LimitKind) -> Result<()> {
     if value.len() <= MAX_STRING_BYTES {
         Ok(())
     } else {
-        Err(limit(resource))
+        Err(limit(kind, value.len(), MAX_STRING_BYTES))
     }
 }
 
-pub(crate) fn bounded_nonempty(value: &str, resource: &str) -> Result<()> {
+pub(crate) fn bounded_nonempty(value: &str, field: &'static str, kind: LimitKind) -> Result<()> {
     if value.is_empty() {
-        return Err(invalid(format!("{resource} cannot be empty")));
+        return Err(invalid(format!("{field} cannot be empty")));
     }
-    bounded(value, resource)
+    bounded(value, kind)
 }
 
 pub use model::{

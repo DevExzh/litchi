@@ -177,7 +177,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                             extensions: Vec::new(),
                             extension_list_seen: false,
                         },
-                        "rich-value types",
+                        super::LimitKind::Types,
                     )?;
                     FrameKind::Type(types.len() - 1)
                 } else if parent.is_some_and(|parent| {
@@ -254,7 +254,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                         non_whitespace_text: false,
                         intervals: Vec::new(),
                     },
-                    "rich-value XML depth",
+                    super::LimitKind::Depth,
                 )?;
             },
             Event::Empty(element) => {
@@ -298,7 +298,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                                 extensions: Vec::new(),
                                 extension_list_seen: false,
                             },
-                            "rich-value types",
+                            super::LimitKind::Types,
                         )?;
                     } else if matches!(parent.kind, FrameKind::Type(_))
                         && info.namespace == SPREADSHEETML
@@ -331,7 +331,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                             &mut refresh.intervals,
                             MAX_INTERVALS,
                             interval,
-                            "rich-value refresh intervals",
+                            super::LimitKind::Intervals,
                         )?;
                         let _ = type_index;
                     } else if direct_refresh_parent(&stack).is_some_and(|(_, _)| {
@@ -419,7 +419,7 @@ pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
                             &mut refresh.intervals,
                             MAX_INTERVALS,
                             interval,
-                            "rich-value refresh intervals",
+                            super::LimitKind::Intervals,
                         )?;
                         let _ = type_index;
                     },
@@ -700,7 +700,7 @@ fn parse_refresh_node(node: &Node) -> Result<RefreshIntervals> {
             &mut intervals,
             MAX_INTERVALS,
             parse_interval_node(child)?,
-            "refresh intervals",
+            super::LimitKind::Intervals,
         )?;
     }
     RefreshIntervals::new(intervals)
@@ -1009,7 +1009,11 @@ fn resolve_namespace(value: ResolveResult<'_>) -> Result<String> {
 fn bounded_qname(element: &BytesStart<'_>) -> Result<Vec<u8>> {
     let name = element.name();
     if name.as_ref().len() > MAX_STRING_BYTES {
-        return Err(super::limit("rich-value extension name"));
+        return Err(super::limit(
+            super::LimitKind::StringBytes,
+            name.as_ref().len(),
+            MAX_STRING_BYTES,
+        ));
     }
     Ok(name.as_ref().to_vec())
 }
@@ -1030,7 +1034,11 @@ fn checked_position(origin: ReaderOrigin, position: u64, source_len: usize) -> R
 
 fn push_extension(values: &mut Vec<ExtensionLocation>, value: ExtensionLocation) -> Result<usize> {
     if values.len() >= MAX_INTERVALS {
-        return Err(super::limit("rich-value extension locations"));
+        return Err(super::limit(
+            super::LimitKind::ExtensionLocations,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            MAX_INTERVALS,
+        ));
     }
     values
         .try_reserve(1)
@@ -1043,14 +1051,18 @@ fn push_bounded<T>(
     values: &mut Vec<T>,
     maximum: usize,
     value: T,
-    resource: &'static str,
+    kind: super::LimitKind,
 ) -> Result<()> {
     if values.len() >= maximum {
-        return Err(super::limit(resource));
+        return Err(super::limit(
+            kind,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum,
+        ));
     }
     values
         .try_reserve(1)
-        .map_err(|source| allocation(resource, source))?;
+        .map_err(|source| allocation("rich-value bounded values", source))?;
     values.push(value);
     Ok(())
 }

@@ -28,8 +28,8 @@ use super::model::{
 };
 use super::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, DATA_MODEL_CONTENT_TYPE,
-    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, EditOptions, Limits, MAX_PAYLOAD_BYTES,
-    STRICT_CONNECTIONS_RELATIONSHIP_TYPE, invalid, limit,
+    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, EditOptions, LimitKind, Limits,
+    MAX_PAYLOAD_BYTES, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, invalid, limit,
 };
 
 /// Load an independently owned Data Model, explicitly copying its inert payload.
@@ -86,11 +86,7 @@ fn load_shared_model(
     }
     let maximum = limits.max_part_bytes().min(MAX_PAYLOAD_BYTES as u64) as usize;
     if blob.len() > maximum {
-        return Err(Error::limit(
-            super::LimitKind::PayloadBytes,
-            blob.len(),
-            maximum,
-        ));
+        return Err(Error::limit(LimitKind::PayloadBytes, blob.len(), maximum));
     }
     let profile = inspect_xldm(blob)?.profile();
     if !part.rels().is_empty() {
@@ -490,7 +486,11 @@ fn validate_model_contents(
         return Err(invalid("Data Model payload cannot be empty"));
     }
     if data.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
+        return Err(limit(
+            LimitKind::PayloadBytes,
+            data.len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
     let profile = inspect_xldm(data)?.profile();
     validate_inbound_relationships(
@@ -1855,9 +1855,9 @@ mod tests {
                 assert!(matches!(
                     result,
                     Err(Error::Limit {
-                        kind: crate::LimitKind::DataModel(
-                            crate::workbook::data_model::LimitKind::NamespaceBytes,
-                        ),
+                        kind: crate::LimitKind::DataModel(LimitKind::NamespaceBindings,),
+                        observed: 4097,
+                        maximum: 4096,
                         ..
                     })
                 ));

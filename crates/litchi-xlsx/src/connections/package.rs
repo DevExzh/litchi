@@ -142,7 +142,6 @@ fn query_table_connection_id(xml: &[u8], limits: &SourceLimits) -> Result<u32> {
         max_attributes,
         max_temporary_bytes,
     )
-    .map_err(|error| invalid(error.to_string()))
 }
 
 fn query_table_connection_id_with_limits(
@@ -158,11 +157,7 @@ fn query_table_connection_id_with_limits(
 ) -> XlsxResult<u32> {
     let maximum = max_bytes.min(MAX_XML_BYTES);
     if xml.len() > maximum {
-        return Err(super::limit(
-            "query-table input XML bytes",
-            xml.len(),
-            maximum,
-        ));
+        return Err(super::limit(LimitKind::XmlBytes, xml.len(), maximum));
     }
     codec::preflight_xml_with_limits(
         xml,
@@ -198,21 +193,10 @@ fn query_table_connection_id_with_limits(
                 litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
         },
     )
-    .map_err(|error| {
-        codec::map_mce_error(
-            error,
-            maximum,
-            mce_output_limit,
-            depth,
-            max_attributes.min(4096),
-            max_events.min(4096),
-            max_events.min(1024),
-            "query-table",
-        )
-    })?;
+    .map_err(codec::map_mce_error)?;
     if processed.xml.len() > maximum {
         return Err(super::limit(
-            "query-table processed XML bytes",
+            LimitKind::OutputBytes,
             processed.xml.len(),
             maximum,
         ));
@@ -225,12 +209,10 @@ fn query_table_connection_id_with_limits(
         max_string_bytes,
         max_namespace_bytes,
         max_attributes,
-    )
-    .map_err(|error| XlsxError::Invalid(error.to_string()))?;
-    codec::expect(&root, "queryTable").map_err(|error| XlsxError::Invalid(error.to_string()))?;
-    let _name = codec::req(&root, "name").map_err(|error| XlsxError::Invalid(error.to_string()))?;
-    let connection_id = codec::u32req(&root, "connectionId")
-        .map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    )?;
+    codec::expect(&root, "queryTable")?;
+    let _name = codec::req(&root, "name")?;
+    let connection_id = codec::u32req(&root, "connectionId")?;
     codec::only_unqualified(
         &root,
         &[
@@ -257,9 +239,8 @@ fn query_table_connection_id_with_limits(
             "applyAlignmentFormats",
             "applyWidthHeightFormats",
         ],
-    )
-    .map_err(|error| XlsxError::Invalid(error.to_string()))?;
-    codec::kids(&root).map_err(|error| XlsxError::Invalid(error.to_string()))?;
+    )?;
+    codec::kids(&root)?;
     Ok(connection_id)
 }
 
@@ -554,7 +535,7 @@ pub(crate) fn validate_graph_with_limits(
         let part = package.get_part(part.partname())?;
         if part.blob().len() > limits.max_connections_bytes() {
             return Err(super::limit(
-                "connections graph XML bytes",
+                LimitKind::XmlBytes,
                 part.blob().len(),
                 limits.max_connections_bytes(),
             ));
@@ -844,6 +825,7 @@ crate::record::limit_kinds!("connections", Connections {
     RelationshipCount => "connection relationships",
     Events => "connections XML events",
     Attributes => "connections XML attributes",
+    NamespaceBindings => "connections XML namespace bindings",
     NamespaceBytes => "connections XML namespace bytes",
 });
 

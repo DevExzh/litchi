@@ -265,6 +265,24 @@ fn part_len(bytes: &[u8], member: &str) -> u64 {
         .len() as u64
 }
 
+fn padded_workbook_fixture(source: Vec<u8>) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(&source).unwrap();
+    let workbook = PackURI::new(MAIN).unwrap();
+    let original = package.get_part(&workbook).unwrap().blob().to_vec();
+    let closing = b"</workbook>";
+    let position = original
+        .windows(closing.len())
+        .rposition(|window| window == closing)
+        .unwrap();
+    let padding = format!("<!--{}-->", "x".repeat(192 * 1024));
+    let mut rewritten = Vec::with_capacity(original.len() + padding.len());
+    rewritten.extend_from_slice(&original[..position]);
+    rewritten.extend_from_slice(padding.as_bytes());
+    rewritten.extend_from_slice(&original[position..]);
+    package.get_part_mut(&workbook).unwrap().set_blob(rewritten);
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
 fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
     let budget = Budget::root(
         "xlsx-tab-state-managed-test",
@@ -591,6 +609,73 @@ fn noop_signed_source_is_exact_and_changed_signatures_are_refused() {
     edit.very_hide("Three").unwrap();
     // A changed edit of a signed source is refused at commit.
     assert!(edit.commit().is_err());
+}
+
+#[test]
+fn cross_owner_noop_preserves_signed_artifact_and_changed_replay_checks_policy() {
+    let source = fixture(Fixture::default());
+    let producer = open_editor(source.clone());
+    let noop = producer.edit_tab_state().unwrap().commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+
+    // A no-op is an exact artifact copy.  A signed recipient may therefore
+    // accept it: no publication is requested and the recipient's signature is
+    // left untouched.
+    let signed = fixture(Fixture {
+        signed: true,
+        ..Fixture::default()
+    });
+    let signed_recipient = open_editor(signed.clone());
+    let replayed = signed_recipient.apply_tab_state(noop.patch()).unwrap();
+    assert_eq!(replayed.package().to_bytes().unwrap(), signed);
+
+    // A changed unsigned patch over the same selected workbook/sheet closure
+    // must still refuse a signed recipient.  Force publication so the
+    // recipient policy is exercised rather than merely constructing a
+    // deferred commit.
+    let mut edit = producer.edit_tab_state().unwrap();
+    edit.hide("Three").unwrap();
+    let changed = edit.commit().unwrap();
+    let signed_recipient = open_editor(signed);
+    let result = signed_recipient.apply_tab_state(changed.patch());
+    assert!(matches!(
+        result,
+        Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+}
+
+#[test]
+fn replay_rechecks_tab_state_target_under_recipient_source_limits() {
+    // Keep the before workbook above the bounded extraction scratch size so an
+    // exact max_part_bytes policy can admit the source while refusing the
+    // slightly larger visibility rewrite.
+    let source = padded_workbook_fixture(fixture(Fixture::default()));
+    let producer = open_editor(source.clone());
+    let mut edit = producer.edit_tab_state().unwrap();
+    edit.hide("Three").unwrap();
+    let commit = edit.commit().unwrap();
+    let before_workbook_bytes = part_len(&source, MAIN);
+    let recipient_limits = SourceLimits::builder()
+        .max_part_bytes(before_workbook_bytes)
+        .unwrap()
+        .build()
+        .unwrap();
+    let recipient = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(source)),
+        litchi_xlsx::OpenOptions::new().source_limits(recipient_limits),
+    )
+    .unwrap();
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    assert!(part_len(&output, MAIN) > before_workbook_bytes);
+
+    let result = recipient
+        .apply_tab_state(commit.patch())
+        .and_then(|next| next.package().to_bytes());
+    assert!(matches!(
+        result,
+        Err(Error::Package(OpcError::Limit { .. }))
+    ));
 }
 
 #[test]

@@ -451,7 +451,7 @@ fn rejects_mce_output_that_exceeds_the_drawing_budget_after_expansion() {
     assert!(matches!(
         parse(&expanded),
         Err(litchi_xlsx::Error::MarkupCompatibility(
-            litchi_ooxml_common::mce::Error::LimitExceeded(resource)
-        )) if resource == "output bytes"
+            litchi_ooxml_common::mce::Error::LimitExceeded { kind, .. }
+        )) if kind == litchi_ooxml_common::mce::LimitKind::OutputBytes
     ));
 }

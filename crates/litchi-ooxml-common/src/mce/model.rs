@@ -471,7 +471,62 @@ pub struct Output<'a> {
     pub report: Report,
 }
 
-/// A malformed, unsupported, or resource-limited MCE document.
+/// The bounded resource dimension that stopped MCE processing.
+///
+/// Keeping this vocabulary typed prevents consumers from inferring a budget
+/// dimension from a diagnostic string.  `observed` and `maximum` on
+/// [`Error::LimitExceeded`] are the values at the failing check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    InputBytes,
+    OutputBytes,
+    SourceBytes,
+    MarkedBytes,
+    OffsetCount,
+    MarkerBytes,
+    Depth,
+    NamespaceBindings,
+    DirectiveTokens,
+    Choices,
+    Branches,
+    Attributes,
+    Events,
+    EventBytes,
+    AttributeBytes,
+    ContextBytes,
+    NameBytes,
+    ReportCounters,
+    RetryCount,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::SourceBytes => "active-offset source bytes",
+            Self::MarkedBytes => "active-offset marked XML bytes",
+            Self::OffsetCount => "active-offset count",
+            Self::MarkerBytes => "active-offset marker bytes",
+            Self::Depth => "depth",
+            Self::NamespaceBindings => "namespace bindings",
+            Self::DirectiveTokens => "directive tokens",
+            Self::Choices => "choices",
+            Self::Branches => "alternate-content branch count",
+            Self::Attributes => "attributes per element",
+            Self::Events => "stream event count",
+            Self::EventBytes => "stream event bytes",
+            Self::AttributeBytes => "stream attribute bytes",
+            Self::ContextBytes => "stream context bytes",
+            Self::NameBytes => "stream name bytes",
+            Self::ReportCounters => "stream report counters",
+            Self::RetryCount => "input Interrupted retries",
+        })
+    }
+}
+
+/// A malformed, unsupported, or resource-limited MCE operation.
 #[derive(Debug, ThisError, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
@@ -479,8 +534,23 @@ pub enum Error {
     NonConformant(String),
     #[error("unsupported namespace required by MustUnderstand: {0}")]
     MustUnderstand(String),
-    #[error("markup compatibility resource limit exceeded: {0}")]
-    LimitExceeded(String),
+    #[error("invalid markup compatibility limit: {kind}")]
+    InvalidLimit {
+        /// Resource dimension whose configured bound is invalid.
+        kind: LimitKind,
+        /// Configured value supplied by the caller.
+        value: usize,
+        /// Smallest accepted value for this bound.
+        minimum: usize,
+        /// Largest accepted value for this bound.
+        maximum: usize,
+    },
+    #[error("markup compatibility resource limit exceeded: {kind}")]
+    LimitExceeded {
+        kind: LimitKind,
+        observed: usize,
+        maximum: usize,
+    },
     #[error("markup compatibility XML error: {0}")]
     Xml(String),
 

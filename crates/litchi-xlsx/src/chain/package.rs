@@ -271,7 +271,7 @@ pub(super) fn process_workbook_mce_with_limit(
         &limits,
     )
     .map(|output| output.xml)
-    .map_err(|error| invalid(format!("workbook MCE error: {error}")))
+    .map_err(Error::MarkupCompatibility)
 }
 
 fn load_for_workbook(

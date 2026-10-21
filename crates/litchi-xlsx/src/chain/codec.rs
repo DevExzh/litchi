@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use crate::error::{Result, allocation, invalid};
+use crate::error::{Error, Result, allocation, invalid};
 use litchi_core::xml::ReaderOrigin;
 use litchi_sheet::Cell as Address;
 use quick_xml::Reader;
@@ -113,8 +113,8 @@ pub(crate) fn read_with_projection(xml: &[u8]) -> Result<(Chain, bool)> {
         )));
     }
     preflight_raw_attributes(xml)?;
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)
-        .map_err(|error| invalid(format!("calculation-chain MCE error: {error}")))?;
+    let processed =
+        litchi_ooxml_common::mce::process_ooxml(xml).map_err(Error::MarkupCompatibility)?;
     let projected = matches!(&processed, Cow::Owned(_));
     let bytes = processed.as_ref();
     if bytes.len() > MAX_XML_BYTES {
@@ -790,7 +790,7 @@ fn raw_range(bytes: &[u8], start: usize, end: usize) -> Result<String> {
         end - start,
         &litchi_ooxml_common::mce::Limits::default(),
     )
-    .map_err(|error| invalid(format!("calculation-chain MCE error: {error}")))?;
+    .map_err(Error::MarkupCompatibility)?;
     match declared {
         Cow::Borrowed(_) => Ok(span.to_owned()),
         Cow::Owned(declared) => String::from_utf8(declared)
