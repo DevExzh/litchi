@@ -109,11 +109,11 @@ pub(crate) fn validate_catalog(
 ) -> Result<Vec<Projection>, OleError> {
     limits.validate()?;
     if entries.len() > limits.max_entries {
-        return Err(OleError::InvalidFormat(format!(
-            "CFB directory catalog contains {} entries, exceeding limit {}",
-            entries.len(),
-            limits.max_entries
-        )));
+        return Err(OleError::LimitExceeded {
+            resource: "directory entries",
+            observed: entries.len() as u64,
+            maximum: limits.max_entries as u64,
+        });
     }
     let root = entries.first().ok_or_else(|| {
         OleError::InvalidFormat("CFB directory catalog must begin with SID-zero Root Entry".into())
@@ -145,9 +145,11 @@ pub(crate) fn validate_catalog(
     let mut raw_children = 0usize;
     while let Some((entry, depth)) = pending.pop() {
         if depth > limits.max_raw_depth {
-            return Err(OleError::InvalidFormat(
-                "CFB directory raw child depth exceeds the catalog limit".into(),
-            ));
+            return Err(OleError::LimitExceeded {
+                resource: "directory depth",
+                observed: depth as u64,
+                maximum: limits.max_raw_depth as u64,
+            });
         }
         seen.try_reserve(1).map_err(|source| OleError::Allocation {
             resource: "CFB directory catalog SID index",
@@ -161,9 +163,11 @@ pub(crate) fn validate_catalog(
         }
         validate_name(&entry.name, limits.max_name_bytes)?;
         if entry.clsid.len() > limits.max_name_bytes {
-            return Err(OleError::InvalidFormat(
-                "CFB directory CLSID exceeds the catalog name limit".into(),
-            ));
+            return Err(OleError::LimitExceeded {
+                resource: "directory name bytes",
+                observed: entry.clsid.len() as u64,
+                maximum: limits.max_name_bytes as u64,
+            });
         }
         total_bytes = total_bytes
             .checked_add(entry.name.len())
@@ -172,9 +176,11 @@ pub(crate) fn validate_catalog(
                 OleError::InvalidFormat("CFB directory catalog size overflows".into())
             })?;
         if total_bytes > limits.max_total_bytes {
-            return Err(OleError::InvalidFormat(
-                "CFB directory catalog metadata exceeds the total byte limit".into(),
-            ));
+            return Err(OleError::LimitExceeded {
+                resource: "directory total bytes",
+                observed: total_bytes as u64,
+                maximum: limits.max_total_bytes as u64,
+            });
         }
         let _ = codec::decode_links(entry)?;
         for child in &entry.children {
@@ -182,9 +188,11 @@ pub(crate) fn validate_catalog(
                 .checked_add(1)
                 .ok_or_else(|| OleError::InvalidFormat("CFB raw child count overflows".into()))?;
             if raw_children > limits.max_raw_children {
-                return Err(OleError::InvalidFormat(
-                    "CFB directory raw child count exceeds the catalog limit".into(),
-                ));
+                return Err(OleError::LimitExceeded {
+                    resource: "directory entries",
+                    observed: raw_children as u64,
+                    maximum: limits.max_raw_children as u64,
+                });
             }
             pending
                 .try_reserve(1)
@@ -206,9 +214,11 @@ fn validate_name(name: &str, max_bytes: usize) -> Result<(), OleError> {
         ));
     }
     if name.len() > max_bytes {
-        return Err(OleError::InvalidFormat(
-            "CFB directory entry name exceeds the catalog limit".into(),
-        ));
+        return Err(OleError::LimitExceeded {
+            resource: "directory name bytes",
+            observed: name.len() as u64,
+            maximum: max_bytes as u64,
+        });
     }
     if name.contains('\0') {
         return Err(OleError::InvalidFormat(

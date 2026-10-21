@@ -3,7 +3,7 @@
 use super::catalog::Catalog;
 use super::snapshot::Snapshot;
 use super::transaction::Revision;
-use litchi_cfb::{DirectoryEntry, OleError};
+use litchi_cfb::DirectoryEntry;
 
 /// The typed before/after catalog values represented by a patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,11 +146,9 @@ impl Patch {
     ///
     /// Returns an error when `source` does not match the patch's exact base
     /// catalog and revision.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, crate::Error> {
         if source.revision() != self.base || !source.catalog().raw_equal(&self.before) {
-            return Err(OleError::InvalidFormat(
-                "CFB directory patch source does not match its base snapshot".into(),
-            ));
+            return Err(crate::Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -164,7 +162,7 @@ impl Patch {
     ///
     /// Returns an error when `target` does not match the patch's exact result
     /// catalog and revision.
-    pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn revert(&self, target: &Snapshot) -> Result<Snapshot, crate::Error> {
         self.inverse().apply(target)
     }
 

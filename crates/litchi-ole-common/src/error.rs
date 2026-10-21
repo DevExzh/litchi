@@ -66,16 +66,43 @@ impl From<OleError> for Error {
     fn from(error: OleError) -> Self {
         match error {
             OleError::LimitExceeded {
-                resource: "directory entries",
+                resource,
                 observed,
                 maximum,
             } => Self::Limit {
-                kind: LimitKind::DirectoryEntries,
+                kind: limit_kind(resource),
                 observed,
+                maximum,
+            },
+            OleError::InvalidLimit {
+                resource,
+                value,
+                maximum,
+            } => Self::InvalidLimit {
+                kind: limit_kind(resource),
+                value,
                 maximum,
             },
             error => Self::Cfb(error),
         }
+    }
+}
+
+/// Maps the fixed low-level resource labels used by the shared raw helpers to
+/// the common dimensions exposed by their public errors.  Unknown CFB labels
+/// remain stream-sized input because the substrate only supplies that
+/// physical dimension to this boundary.
+fn limit_kind(resource: &str) -> LimitKind {
+    if resource.contains("directory")
+        || resource.contains("entries")
+        || resource.contains("TOC")
+        || resource.contains("toc")
+    {
+        LimitKind::DirectoryEntries
+    } else if resource.contains("depth") {
+        LimitKind::StorageDepth
+    } else {
+        LimitKind::StreamBytes
     }
 }
 
@@ -123,7 +150,53 @@ impl error::Error for Error {
     }
 }
 
+impl From<Error> for OleError {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::Cfb(error) => error,
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => OleError::LimitExceeded {
+                resource: kind.resource_name(),
+                observed,
+                maximum,
+            },
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => OleError::InvalidLimit {
+                resource: kind.resource_name(),
+                value,
+                maximum,
+            },
+            Error::PatchConflict => OleError::InvalidFormat(
+                "OLE patch base does not match recipient".to_string(),
+            ),
+        }
+    }
+}
+
 impl LimitKind {
+    fn resource_name(self) -> &'static str {
+        match self {
+            Self::Objects => "objects",
+            Self::StorageDepth => "storage depth",
+            Self::ObjectStreams => "object streams",
+            Self::PackageStreams => "package streams",
+            Self::StreamBytes => "stream bytes",
+            Self::ObjectBytes => "object bytes",
+            Self::TotalBytes => "total bytes",
+            Self::ObjectStorages => "object storages",
+            Self::PackageStorages => "package storages",
+            Self::DirectoryEntries => "directory entries",
+            Self::StreamRemovals => "stream removals",
+            Self::SelectorDepth => "selector depth",
+        }
+    }
+
     fn resource(self) -> litchi_core::Resource {
         match self {
             Self::StorageDepth | Self::SelectorDepth => litchi_core::Resource::Depth,

@@ -41,7 +41,7 @@ fn decode_link(raw: u32) -> Result<Option<Sid>, OleError> {
     if raw == NOSTREAM {
         Ok(None)
     } else {
-        Sid::new(raw).map(Some)
+        Sid::new(raw).map(Some).map_err(OleError::from)
     }
 }
 
