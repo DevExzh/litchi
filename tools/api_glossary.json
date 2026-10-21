@@ -5357,6 +5357,60 @@
           "name": "Editor",
           "scope": "litchi_doc::parts::ole_controls",
           "replacement": "use the codec-level Edit (record 0359)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Edit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Patch",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Composition",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "ThreeWayPlan",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "History",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "PreparedEdit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "OpenOptions",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
         }
       ],
       "families": [
@@ -5737,6 +5791,60 @@
           "name": "Editor",
           "scope": "litchi_doc::parts::ole_controls",
           "replacement": "use the codec-level Edit (record 0359)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Edit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Patch",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "Composition",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "ThreeWayPlan",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "History",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "PreparedEdit",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
+        },
+        {
+          "name": "OpenOptions",
+          "scope": "litchi_doc::body_text",
+          "replacement": "record 0359a: the body-text engine is crate-private; use Package::edit and the Package body routes",
+          "recursive": false
         }
       ],
       "families": [
@@ -5816,11 +5924,6 @@
           "name": "transaction",
           "scope": "litchi_xls::cell_values::Snapshot",
           "replacement": "use Snapshot::edit()"
-        },
-        {
-          "name": "is_empty",
-          "scope": "litchi_xls::cell_values::Patch",
-          "replacement": "use is_noop()"
         },
         {
           "name": "is_empty",
@@ -6134,6 +6237,128 @@
           "scope": "litchi_xls",
           "replacement": "a package-level scoped family Edit or a builder (record 0359)",
           "match": "suffix"
+        },
+        {
+          "name": "Edit",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "Commit",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "Patch",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "History",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "SourceBackedCommit",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "SourceBackedPlanCommit",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "SourceBackedDiagnostics",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "commit_source_backed",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "commit_source_backed_plan",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "copy_cells_from",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "record 0359a: the cell-values engine is crate-private; edit through Package::edit (primary) or SourceBackedWorkbook::edit_cells (source-backed)"
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "record 0359a: Package::cell_values() is a read view; edits go through Package::edit"
+        },
+        {
+          "name": "history",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "record 0359a: Package::cell_values() is a read view; edits go through Package::edit"
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "record 0359a: Package::cell_values() is a read view; edits go through Package::edit"
+        },
+        {
+          "name": "from_bytes_with_cfb",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "record 0359a: Package::cell_values() is a read view; edits go through Package::edit"
+        },
+        {
+          "name": "from_shared_ole_file",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "record 0359a: Package::cell_values() is a read view; edits go through Package::edit"
+        },
+        {
+          "name": "SourceBackedCommit",
+          "scope": "litchi_xls::comments",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_comments (litchi_xls::source_backed::comments)"
+        },
+        {
+          "name": "SourceBackedDiagnostics",
+          "scope": "litchi_xls::comments",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_comments (litchi_xls::source_backed::comments)"
+        },
+        {
+          "name": "commit_source_backed",
+          "scope": "litchi_xls::comments",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_comments (litchi_xls::source_backed::comments)"
+        },
+        {
+          "name": "SourceBackedCommit",
+          "scope": "litchi_xls::sheet_visibility",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_sheet_visibility (litchi_xls::source_backed::sheet_visibility)"
+        },
+        {
+          "name": "SourceBackedDiagnostics",
+          "scope": "litchi_xls::sheet_visibility",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_sheet_visibility (litchi_xls::source_backed::sheet_visibility)"
+        },
+        {
+          "name": "commit_source_backed",
+          "scope": "litchi_xls::sheet_visibility",
+          "replacement": "record 0359a: use SourceBackedWorkbook::edit_sheet_visibility (litchi_xls::source_backed::sheet_visibility)"
+        },
+        {
+          "name": "edit_snapshot",
+          "scope": "litchi_xls::Package",
+          "replacement": "record 0359a: use Package::edit, or Package::cell_values for reads"
+        },
+        {
+          "name": "edit_snapshot_with_options",
+          "scope": "litchi_xls::Package",
+          "replacement": "record 0359a: use Package::edit, or Package::cell_values for reads"
+        },
+        {
+          "name": "SourceBacked",
+          "scope": "litchi_xls::source_backed",
+          "replacement": "record 0359a: source-backed family names are unprefixed",
+          "match": "prefix",
+          "recursive": false
         }
       ],
       "families": [
@@ -6146,11 +6371,15 @@
         "litchi_xls::pivot_view",
         "litchi_xls::sheet_visibility",
         "litchi_xls::user_names::publication",
-        "litchi_xls::workbook::package::property_set"
+        "litchi_xls::workbook::package::property_set",
+        "litchi_xls::source_backed::cells",
+        "litchi_xls::source_backed::comments",
+        "litchi_xls::source_backed::sheet_visibility"
       ],
       "immutable_owners": [
         "litchi_xls::Package",
-        "litchi_xls::Workbook"
+        "litchi_xls::Workbook",
+        "litchi_xls::SourceBackedWorkbook"
       ],
       "family_methods": true
     },

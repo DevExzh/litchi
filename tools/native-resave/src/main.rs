@@ -360,10 +360,8 @@ fn readback_rtf(input: &Path) -> Result<()> {
 #[cfg(feature = "xls")]
 fn generate_xls(output: &Path) -> Result<()> {
     let source = fixture("test-data/libreoffice-core/sc/qa/extras/testdocuments/tdf78897.xls");
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
-        fs::read(source)?,
-        litchi_xls::cell_values::Limits::default(),
-    )?;
+    let package = litchi_xls::Package::from_bytes(&fs::read(source)?)?;
+    let snapshot = package.cell_values()?;
     let mut candidates = Vec::new();
     for sheet in snapshot.worksheets() {
         for cell in sheet.cells() {
@@ -374,7 +372,9 @@ fn generate_xls(output: &Path) -> Result<()> {
     }
     let mut changed = None;
     for (sheet, reference) in candidates {
-        let mut edit = snapshot.edit();
+        let Ok(mut edit) = package.edit() else {
+            continue;
+        };
         if edit
             .set_value(
                 litchi_xls::cell_values::Selector::Name(&sheet),
@@ -394,7 +394,7 @@ fn generate_xls(output: &Path) -> Result<()> {
             reference.row(),
             reference.column()
         );
-        changed = Some(commit.package().bytes().to_vec());
+        changed = Some(commit.patch().after().to_vec());
         break;
     }
     fs::write(
@@ -406,10 +406,7 @@ fn generate_xls(output: &Path) -> Result<()> {
 
 #[cfg(feature = "xls")]
 fn readback_xls(input: &Path) -> Result<()> {
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
-        fs::read(input)?,
-        litchi_xls::cell_values::Limits::default(),
-    )?;
+    let snapshot = litchi_xls::Package::from_bytes(&fs::read(input)?)?.cell_values()?;
     let found = snapshot.worksheets().any(|sheet| {
         sheet.cells().any(|cell| {
             matches!(

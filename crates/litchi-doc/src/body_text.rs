@@ -505,7 +505,7 @@ impl Paragraph {
     /// Zero-based paragraph position in the selected projection.
     ///
     /// Constructing a [`Position`] is infallible. Resolving it against a
-    /// snapshot collection is checked by [`Edit::replace_paragraph`].
+    /// snapshot collection is checked by [`crate::Edit::replace_paragraph`].
     #[must_use]
     pub const fn position(&self) -> Position {
         self.position

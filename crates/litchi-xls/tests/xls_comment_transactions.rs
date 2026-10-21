@@ -12,6 +12,15 @@ fn xls_package(snapshot: &Snapshot) -> litchi_xls::Package {
     litchi_xls::Package::from_bytes(snapshot.bytes()).unwrap()
 }
 
+/// The source-backed workbook over `bytes`, for the source-backed comment
+/// family (record 0359a).
+fn source_workbook(bytes: &[u8]) -> litchi_xls::SourceBackedWorkbook {
+    litchi_xls::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(bytes.to_vec()),
+    ))
+    .unwrap()
+}
+
 fn authored(comments: usize) -> Vec<u8> {
     let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Notes").unwrap();
@@ -479,14 +488,14 @@ fn updates_poi_fixture_and_reopens() {
 #[test]
 fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
-    let mut one = xls_package(&snapshot).edit_comments().unwrap();
+    let mut one = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     one.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("AuthoR 0", "texT 0").unwrap(),
     )
     .unwrap();
-    let one = one.commit_source_backed().unwrap();
+    let one = one.commit().unwrap();
     assert_eq!(one.diagnostics().changed_comments(), 1);
     assert_eq!(one.diagnostics().touched_streams(), 1);
     assert_eq!(one.diagnostics().splice_count(), 2);
@@ -496,7 +505,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
         one.diagnostics().target_workbook_bytes()
     );
     let mut output = Vec::new();
-    one.write_to(&mut output).unwrap();
+    one.package().write_to(&mut output).unwrap();
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
@@ -511,7 +520,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     );
 
     let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
-    let mut all = xls_package(&snapshot).edit_comments().unwrap();
+    let mut all = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     let updates = (0..256).map(|row| {
         Update::new(
             Reference::new(row, 1).unwrap(),
@@ -520,14 +529,14 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     });
     all.replace_many(Selector::Position(Position::new(0)), updates)
         .unwrap();
-    let all = all.commit_source_backed().unwrap();
+    let all = all.commit().unwrap();
     assert_eq!(all.diagnostics().changed_comments(), 256);
     assert_eq!(all.diagnostics().touched_streams(), 1);
     assert_eq!(all.diagnostics().splice_count(), 512);
     assert!(all.diagnostics().replacement_bytes() > 0);
-    assert!(!all.is_noop());
+    assert!(!all.patch().is_noop());
     let mut output = Vec::new();
-    all.write_to(&mut output).unwrap();
+    all.package().write_to(&mut output).unwrap();
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
@@ -551,7 +560,7 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
+    let mut edit = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
@@ -564,12 +573,12 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
         Value::new("文字", "😃😃").unwrap(),
     )
     .unwrap();
-    let commit = edit.commit_source_backed().unwrap();
+    let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().changed_comments(), 2);
     assert_eq!(commit.diagnostics().splice_count(), 4);
     assert!(commit.diagnostics().replacement_bytes() > 0);
     let mut output = Vec::new();
-    commit.write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
@@ -587,14 +596,14 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
 #[test]
 fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
-    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
+    let mut edit = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 0", "text 00").unwrap(),
     )
     .unwrap();
-    assert!(edit.commit_source_backed().is_err());
+    assert!(edit.commit().is_err());
 
     let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Widths").unwrap();
@@ -602,7 +611,7 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
-    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
+    let mut edit = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     // Both strings occupy two encoded bytes, but this changes compressed BIFF
     // text into UTF-16 and must remain an explicit refusal.
     edit.replace(
@@ -611,7 +620,7 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
         Value::new("é", "é").unwrap(),
     )
     .unwrap();
-    assert!(edit.commit_source_backed().is_err());
+    assert!(edit.commit().is_err());
 }
 
 #[test]
@@ -620,40 +629,37 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     let before_streams = streams(&source);
     let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
     let original = read_value(snapshot.bytes(), 0, 0);
-    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
+    let mut edit = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         original,
     )
     .unwrap();
-    let noop = edit.commit_source_backed().unwrap();
-    assert!(noop.is_noop());
+    let noop = edit.commit().unwrap();
+    assert!(noop.patch().is_noop());
     assert_eq!(noop.diagnostics().changed_comments(), 0);
     assert_eq!(noop.diagnostics().splice_count(), 0);
     assert_eq!(noop.diagnostics().replacement_bytes(), 0);
     let mut output = Vec::new();
-    noop.write_to(&mut output).unwrap();
+    noop.package().write_to(&mut output).unwrap();
     assert_eq!(output, source);
 
-    let mut edit = litchi_xls::Package::from_bytes(&source)
-        .unwrap()
-        .edit_comments()
-        .unwrap();
+    let mut edit = source_workbook(&source).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 9", "text 9").unwrap(),
     )
     .unwrap();
-    let changed = edit.commit_source_backed().unwrap();
+    let changed = edit.commit().unwrap();
     let path = std::env::temp_dir().join(format!(
         "litchi-xls-source-backed-{}-{}.xls",
         std::process::id(),
         changed.diagnostics().target_fingerprint().as_bytes()[0]
     ));
     let _ = std::fs::remove_file(&path);
-    changed.save(&path).unwrap();
+    changed.package().save(&path).unwrap();
     let saved = std::fs::read(&path).unwrap();
     let _ = std::fs::remove_file(&path);
     let after_streams = streams(&saved);
@@ -712,31 +718,33 @@ impl Write for PartialSink {
 #[test]
 fn source_backed_commit_handles_short_and_partial_sinks() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
-    let mut edit = xls_package(&snapshot).edit_comments().unwrap();
+    let mut edit = source_workbook(snapshot.bytes()).edit_comments().unwrap();
     edit.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 9", "text 9").unwrap(),
     )
     .unwrap();
-    let commit = edit.commit_source_backed().unwrap();
+    let commit = edit.commit().unwrap();
     let mut short = ShortSink {
         bytes: Vec::new(),
         maximum: 7,
     };
-    commit.write_to(&mut short).unwrap();
+    commit.package().write_to(&mut short).unwrap();
     assert_eq!(short.bytes.len(), snapshot.bytes().len());
 
     let mut partial = PartialSink {
         accepted: 0,
         limit: 23,
     };
-    let error = commit.write_to(&mut partial).unwrap_err();
+    let error = commit.package().write_to(&mut partial).unwrap_err();
     assert!(matches!(
         error,
-        litchi_cfb::OverlayError::IncompleteOutput {
-            progress: litchi_cfb::OutputProgress::Prefix { .. },
-            ..
-        }
+        litchi_xls::source_backed::OutputError::Overlay(
+            litchi_cfb::OverlayError::IncompleteOutput {
+                progress: litchi_cfb::OutputProgress::Prefix { .. },
+                ..
+            }
+        )
     ));
 }

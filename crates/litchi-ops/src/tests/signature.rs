@@ -436,7 +436,8 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
         File::Xls(handle) => {
             use litchi_xls::cell_values::{Selector, Value};
 
-            let snapshot = handle.cell_values_editor().unwrap();
+            let package = handle.cell_values_editor().unwrap();
+            let snapshot = package.cell_values().unwrap();
             let (sheet, reference) = snapshot
                 .worksheets()
                 .find_map(|sheet| {
@@ -446,7 +447,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                         .map(|cell| (sheet.position(), cell.reference()))
                 })
                 .expect("a numeric XLS cell");
-            let mut edit = snapshot.edit();
+            let mut edit = package.edit().unwrap();
             edit.set_value(
                 Selector::Position(Position::new(sheet)),
                 reference,
@@ -454,7 +455,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             )
             .unwrap();
             let commit = edit.commit().unwrap();
-            (commit.package().bytes().to_vec(), "4242".to_owned())
+            (commit.package().to_bytes().unwrap(), "4242".to_owned())
         },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
@@ -607,11 +608,10 @@ fn assert_exact_noop(input: &Input) {
         ),
         #[cfg(feature = "xls")]
         FileFormat::Xls => assert!(
-            litchi_xls::cell_values::Snapshot::from_bytes(
-                bytes.clone(),
-                litchi_ole_common::object::Limits::default()
-            )
-            .is_err(),
+            litchi_xls::Package::from_bytes(bytes)
+                .unwrap()
+                .edit()
+                .is_err(),
             "{label}: the XLS editor admitted a signed container"
         ),
         #[cfg(feature = "ppt")]

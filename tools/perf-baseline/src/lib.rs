@@ -29979,21 +29979,49 @@ fn xls_visibility_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn E
     }
 }
 
+/// The `hide` verb shared by the primary and source-backed sheet-visibility
+/// edits, so one staging closure drives both routes.
+trait XlsVisibilityHide {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsVisibilityHide for litchi_xls::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
+impl XlsVisibilityHide for litchi_xls::source_backed::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
 fn stage_xls_visibility_updates(
-    transaction: &mut litchi_xls::sheet_visibility::Edit,
+    transaction: &mut impl XlsVisibilityHide,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     if update_count == 1 {
-        transaction.hide(1usize.into())?;
+        transaction.hide_position(1)?;
         return Ok(());
     }
     if update_count != XLS_VISIBILITY_BATCH_COUNT {
         return Err("XLS visibility benchmark update count is outside its fixed closure".into());
     }
     for position in 1..=XLS_VISIBILITY_BATCH_COUNT {
-        transaction.hide(position.into())?;
+        transaction.hide_position(position)?;
     }
     Ok(())
+}
+
+/// Open owned XLS bytes as the source-backed workbook that owns the
+/// source-backed edit families.
+fn xls_source_workbook(bytes: Vec<u8>) -> Result<litchi_xls::SourceBackedWorkbook, Box<dyn Error>> {
+    Ok(litchi_xls::SourceBackedWorkbook::from_read_at(Arc::new(
+        litchi_core::OwnedSource::new(bytes),
+    ))?)
 }
 
 enum XlsVisibilityPublication {
@@ -30002,7 +30030,7 @@ enum XlsVisibilityPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::sheet_visibility::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::sheet_visibility::Commit>),
 }
 
 impl XlsVisibilityPublication {
@@ -30018,7 +30046,7 @@ impl XlsVisibilityPublication {
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -30089,14 +30117,17 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction =
-        litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
-    stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
-        Ok(XlsVisibilityPublication::SourceBacked(
-            transaction.commit_source_backed()?,
-        ))
+        let mut transaction =
+            xls_source_workbook(source.bytes().to_vec())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
+        Ok(XlsVisibilityPublication::SourceBacked(Box::new(
+            transaction.commit()?,
+        )))
     } else {
+        let mut transaction =
+            litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
         Ok(XlsVisibilityPublication::Eager {
             commit: transaction.commit()?,
             source_bytes,
@@ -30229,19 +30260,20 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = package.edit_sheet_visibility()?.commit_source_backed()?;
-    if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
+    let workbook = xls_source_workbook(source.to_vec())?;
+    let noop = workbook.edit_sheet_visibility()?.commit()?;
+    if !noop.patch().is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
     let mut noop_bytes = Vec::new();
-    noop.write_to(&mut noop_bytes)?;
+    noop.package().write_to(&mut noop_bytes)?;
     if noop_bytes != source {
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = package.edit_sheet_visibility()?;
+    let mut capped = workbook.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
-    let capped = capped.commit_source_backed()?;
+    let capped = capped.commit()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
         || capped.diagnostics().touched_streams() != 1
         || capped.diagnostics().splice_count() != XLS_VISIBILITY_BATCH_COUNT
@@ -30250,7 +30282,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility exact-cap plan has unexpected diagnostics".into());
     }
     let mut capped_bytes = Vec::new();
-    capped.write_to(&mut capped_bytes)?;
+    capped.package().write_to(&mut capped_bytes)?;
     verify_xls_visibility_output(
         &Corpus {
             manifest: CorpusManifest {
@@ -30281,7 +30313,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = package.edit_sheet_visibility()?;
+    let mut over_cap = workbook.edit_sheet_visibility()?;
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -30291,7 +30323,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     {
         return Err("XLS visibility cap-plus-one staging unexpectedly succeeded".into());
     }
-    if !over_cap.commit_source_backed()?.is_noop() {
+    if !over_cap.commit()?.patch().is_noop() {
         return Err("XLS visibility cap-plus-one refusal mutated its source".into());
     }
 
@@ -30485,8 +30517,67 @@ fn xls_comments_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn Err
     }
 }
 
+/// The comment replacement verbs shared by the primary and source-backed
+/// comment edits, so one staging closure drives both routes.
+trait XlsCommentReplace {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>>;
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsCommentReplace for litchi_xls::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
+impl XlsCommentReplace for litchi_xls::source_backed::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
 fn stage_xls_comment_updates(
-    edit: &mut litchi_xls::comments::Edit,
+    edit: &mut impl XlsCommentReplace,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     use litchi_xls::cell_values::{Reference, Selector};
@@ -30522,7 +30613,7 @@ enum XlsCommentsPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::comments::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::comments::Commit>),
 }
 
 impl XlsCommentsPublication {
@@ -30538,7 +30629,7 @@ impl XlsCommentsPublication {
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -30609,13 +30700,15 @@ fn prepare_xls_comments_publication(
 ) -> Result<XlsCommentsPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
-    stage_xls_comment_updates(&mut edit, update_count)?;
     if source_backed {
-        Ok(XlsCommentsPublication::SourceBacked(
-            edit.commit_source_backed()?,
-        ))
+        let mut edit = xls_source_workbook(source.bytes().to_vec())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
+        Ok(XlsCommentsPublication::SourceBacked(Box::new(
+            edit.commit()?,
+        )))
     } else {
+        let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
         Ok(XlsCommentsPublication::Eager {
             commit: edit.commit()?,
             source_bytes,
@@ -30799,23 +30892,23 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     use litchi_xls::comments::Value;
 
     litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
-    let mut rejected = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
+    let mut rejected = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
-    if rejected.commit_source_backed().is_ok() {
+    if rejected.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted a length change".into());
     }
 
-    let mut rejected_width = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
+    let mut rejected_width = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected_width.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "作者作者作者作者作")?,
     )?;
-    if rejected_width.commit_source_backed().is_ok() {
+    if rejected_width.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted an encoding-width change".into());
     }
 
@@ -31037,13 +31130,12 @@ fn verify_semantic_xls(
     shape: WriterShape,
     updated: Option<(usize, usize, usize)>,
 ) -> Result<(), Box<dyn Error>> {
-    use litchi_xls::cell_values::{Reference, Snapshot, Value};
+    use litchi_xls::cell_values::{Reference, Value};
 
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot =
-        Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
+    let snapshot = litchi_xls::Package::from_bytes(bytes)?.cell_values()?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -31079,7 +31171,7 @@ fn run_semantic_xls(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     use litchi_core::sheet::{Cell as _, Worksheet as _};
-    use litchi_xls::cell_values::{Reference, Snapshot};
+    use litchi_xls::cell_values::Reference;
 
     let shape = writer_shape(corpus)?;
     let (sheet_count, rows, columns) = shape
@@ -31089,13 +31181,10 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(
-            corpus.archive.clone(),
-            litchi_ole_common::object::Limits::default(),
-        )?;
-        let mut edit = source.edit();
-        edit.set_number(selected.0.into(), reference, replacement)?;
-        edit.commit()?.package().bytes().to_vec()
+        let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
+        let mut edit = source.edit()?;
+        edit.set_number(selected.0, reference, replacement)?;
+        edit.commit()?.patch().after().to_vec()
     } else {
         corpus.archive.clone()
     };
@@ -31197,18 +31286,15 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(
-                    corpus.archive.clone(),
-                    litchi_ole_common::object::Limits::default(),
-                )?;
+                let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
-                let mut edit = source.edit();
+                let mut edit = source.edit()?;
                 if updated {
-                    edit.set_number(selected.0.into(), reference, replacement)?;
+                    edit.set_number(selected.0, reference, replacement)?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.package().bytes().to_vec();
+                let bytes = commit.patch().after().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
                 if commit.patch().is_noop() == updated
@@ -31220,12 +31306,12 @@ fn run_semantic_xls(
                 {
                     return Err("semantic XLS edit/save has unexpected publication state".into());
                 }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.package().bytes() {
+                let applied = source.apply(commit.patch())?;
+                if applied.patch().after() != commit.patch().after() {
                     return Err("semantic XLS exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.package().apply(&commit.patch().inverse())?;
+                if restored.patch().after() != corpus.archive.as_slice() {
                     return Err("semantic XLS inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_xls(&bytes, shape, updated.then_some(selected))?;
