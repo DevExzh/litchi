@@ -380,7 +380,7 @@ pub enum Source {
     DocWrite(litchi_doc::writer::WriteError),
     /// A source-backed legacy Word main-story edit error.
     #[cfg(feature = "doc")]
-    DocBodyText(litchi_doc::body_text::source::Error),
+    DocBodyText(litchi_doc::source_backed::Error),
     /// A legacy Word document-property (metadata) transaction error.
     #[cfg(feature = "doc")]
     DocMetadata(litchi_doc::package::metadata::Error),
@@ -2017,9 +2017,9 @@ impl Classify for litchi_cfb::OverlayError {
 }
 
 #[cfg(feature = "doc")]
-impl Classify for litchi_doc::body_text::source::Error {
+impl Classify for litchi_doc::source_backed::Error {
     fn classify(&self) -> Class {
-        use litchi_doc::body_text::source::Refusal;
+        use litchi_doc::source_backed::Refusal;
 
         match self {
             Self::Ole(error) => error.classify(),
@@ -2207,7 +2207,7 @@ impl From<litchi_doc::writer::WriteError> for Error {
 }
 from_leaf!(
     #[cfg(feature = "doc")]
-    litchi_doc::body_text::source::Error => DocBodyText, Some(FileFormat::Doc)
+    litchi_doc::source_backed::Error => DocBodyText, Some(FileFormat::Doc)
 );
 from_leaf!(#[cfg(feature = "xls")] litchi_xls::Error => Xls, Some(FileFormat::Xls));
 from_leaf!(

@@ -61,7 +61,7 @@ pub fn source_backed_workbook_from_shared_ole_file(
 ///
 /// # Errors
 /// Returns the typed package or cell-values error if admission fails.
-pub fn cell_values_snapshot_from_bytes(
+pub(crate) fn cell_values_snapshot_from_bytes(
     package: &crate::Package,
     bytes: Vec<u8>,
 ) -> crate::package::Result<crate::cell_values::Snapshot> {

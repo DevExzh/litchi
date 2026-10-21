@@ -1,12 +1,5 @@
-//! Positional, source-backed edits of one ordinary Unicode main-story
-//! paragraph in a legacy Word document.
-//!
-//! This owner is deliberately smaller than the ordinary, owned body editor.
-//! It does not rebuild a FIB, CLX, or any property table.  A transaction is
-//! admitted only when one complete paragraph (including its paragraph mark)
-//! is represented by one uncompressed Unicode piece and the replacement has
-//! exactly the same UTF-16 width.  Publication is then a checked equal-length
-//! splice in the existing `WordDocument` stream.
+//! The source-backed DOC owner and its paragraph family implementation; see
+//! [`crate::source_backed`].
 
 use crate::package::Error as PackageError;
 use crate::parts::{
@@ -225,7 +218,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Finite limits for source-backed DOC parsing and publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceLimits {
+pub struct Limits {
     max_input_bytes: u64,
     max_fib_bytes: usize,
     max_clx_bytes: usize,
@@ -236,7 +229,7 @@ pub struct SourceLimits {
     splice_limits: StreamSpliceLimits,
 }
 
-impl SourceLimits {
+impl Limits {
     /// Creates a finite source-backed DOC policy.
     pub fn new(
         max_input_bytes: u64,
@@ -375,7 +368,7 @@ impl SourceLimits {
     }
 }
 
-impl Default for SourceLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self {
             max_input_bytes: SharedOleFileLimits::MAX_INPUT_BYTES,
@@ -392,21 +385,21 @@ impl Default for SourceLimits {
 
 /// Options for a source-backed DOC paragraph snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct SourceBackedOptions {
+pub struct OpenOptions {
     /// Finite source and publication limits.
-    pub limits: SourceLimits,
+    pub limits: Limits,
 }
 
-impl SourceBackedOptions {
+impl OpenOptions {
     /// Creates options with explicit source limits.
     #[must_use]
-    pub const fn new(limits: SourceLimits) -> Self {
+    pub const fn new(limits: Limits) -> Self {
         Self { limits }
     }
 
     /// Returns the bounded source policy.
     #[must_use]
-    pub const fn limits(self) -> SourceLimits {
+    pub const fn limits(self) -> Limits {
         self.limits
     }
 }
@@ -435,11 +428,14 @@ impl Paragraph {
 #[derive(Clone)]
 struct SourceInner {
     source: Arc<dyn ReadAt>,
+    /// The checked overlay plan a committed package writes; `None` for an
+    /// opened package, which writes its source.
+    pending: Option<Arc<ValidatedOverlayPlan>>,
     shared: Arc<SharedOleFile>,
     version: SourceVersion,
     length: u64,
     fingerprint: ArtifactFingerprint,
-    limits: SourceLimits,
+    limits: Limits,
     protection: EditProtection,
     protection_policy: ProtectionPolicy,
     layout: Layout,
@@ -485,14 +481,14 @@ impl fmt::Debug for SourceInner {
 
 /// Immutable positional source snapshot for safe Unicode main-story edits.
 #[derive(Clone)]
-pub struct SourceSnapshot {
+pub struct Package {
     inner: Arc<SourceInner>,
 }
 
-impl fmt::Debug for SourceSnapshot {
+impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SourceSnapshot")
+            .debug_struct("Package")
             .field("length", &self.inner.length)
             .field("version", &self.inner.version)
             .field("fingerprint", &self.inner.fingerprint)
@@ -500,10 +496,10 @@ impl fmt::Debug for SourceSnapshot {
     }
 }
 
-impl SourceSnapshot {
+impl Package {
     /// Opens a positional DOC source with the default finite limits.
     pub fn open(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::open_with_options(source, SourceBackedOptions::default())
+        Self::open_with_options(source, OpenOptions::default())
     }
 
     /// Opens a positional DOC source with an explicit protected-edit policy.
@@ -511,25 +507,18 @@ impl SourceSnapshot {
         source: Arc<dyn ReadAt>,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
-        Self::open_with_options_and_policy(
-            source,
-            SourceBackedOptions::default(),
-            protection_policy,
-        )
+        Self::open_with_options_and_policy(source, OpenOptions::default(), protection_policy)
     }
 
     /// Opens a positional DOC source under explicit options.
-    pub fn open_with_options(
-        source: Arc<dyn ReadAt>,
-        options: SourceBackedOptions,
-    ) -> Result<Self> {
+    pub fn open_with_options(source: Arc<dyn ReadAt>, options: OpenOptions) -> Result<Self> {
         Self::open_with_options_and_policy(source, options, ProtectionPolicy::default())
     }
 
     /// Opens a positional DOC source under explicit options and protection policy.
     pub fn open_with_options_and_policy(
         source: Arc<dyn ReadAt>,
-        options: SourceBackedOptions,
+        options: OpenOptions,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let limits = options.limits;
@@ -565,7 +554,7 @@ impl SourceSnapshot {
     pub fn from_shared(shared: Arc<SharedOleFile>) -> Result<Self> {
         Self::from_shared_with_options_and_policy(
             shared,
-            SourceBackedOptions::default(),
+            OpenOptions::default(),
             ProtectionPolicy::default(),
         )
     }
@@ -590,7 +579,7 @@ impl SourceSnapshot {
     /// Returns the errors [`Self::open_with_options_and_policy`] returns.
     pub fn from_shared_with_options_and_policy(
         shared: Arc<SharedOleFile>,
-        options: SourceBackedOptions,
+        options: OpenOptions,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let limits = options.limits;
@@ -655,7 +644,7 @@ impl SourceSnapshot {
         length: u64,
         first_shared: &SharedOleFile,
         shared_limits: SharedOleFileLimits,
-        limits: SourceLimits,
+        limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         ensure_source_identity(&source, version, length)?;
@@ -724,7 +713,7 @@ impl SourceSnapshot {
         length: u64,
         opening_fingerprint: ArtifactFingerprint,
         shared: Arc<SharedOleFile>,
-        limits: SourceLimits,
+        limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         reject_container_components(&shared)?;
@@ -780,6 +769,7 @@ impl SourceSnapshot {
         Ok(Self {
             inner: Arc::new(SourceInner {
                 source,
+                pending: None,
                 shared,
                 version,
                 length,
@@ -809,11 +799,7 @@ impl SourceSnapshot {
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
-        Self::open_owned_source_with_policy(
-            source,
-            SourceBackedOptions::default(),
-            protection_policy,
-        )
+        Self::open_owned_source_with_policy(source, OpenOptions::default(), protection_policy)
     }
 
     /// Opens a source whose immutable ownership was established by this
@@ -822,13 +808,13 @@ impl SourceSnapshot {
     /// private `OwnedSource` adapter, so the opening fingerprint and the
     /// validated index necessarily describe the same immutable bytes.
     #[cfg(test)]
-    fn open_owned_source(source: Arc<dyn ReadAt>, options: SourceBackedOptions) -> Result<Self> {
+    fn open_owned_source(source: Arc<dyn ReadAt>, options: OpenOptions) -> Result<Self> {
         Self::open_owned_source_with_policy(source, options, ProtectionPolicy::default())
     }
 
     fn open_owned_source_with_policy(
         source: Arc<dyn ReadAt>,
-        options: SourceBackedOptions,
+        options: OpenOptions,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let limits = options.limits;
@@ -874,7 +860,7 @@ impl SourceSnapshot {
 
     /// Parses and validates a borrowed byte slice by taking one owned copy.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
-        let maximum = SourceLimits::default().max_input_bytes;
+        let maximum = Limits::default().max_input_bytes;
         let length = u64::try_from(bytes.len())
             .map_err(|_error| Error::Limit("borrowed source length does not fit u64".into()))?;
         if length > maximum {
@@ -905,8 +891,8 @@ impl SourceSnapshot {
     /// mutation that first becomes visible between that last comparison and
     /// the open's return is no longer refused *by the open*: it is refused by
     /// the first call that consumes a byte.  Every such path — [`Self::paragraph`],
-    /// [`Self::edit_paragraph`], [`Self::edit`] and [`Self::transaction`] —
-    /// goes through the same complete-artifact comparison and returns
+    /// [`Self::edit_paragraph`], [`Self::apply_paragraph`] and
+    /// [`Self::write_to`] — goes through the same complete-artifact comparison and returns
     /// `Overlay(SourceFingerprintChanged)`, so no byte is ever served past a
     /// fence.  A caller that opens and then reads only these accessors is
     /// reading what the open saw, which may no longer be what the source
@@ -945,7 +931,7 @@ impl SourceSnapshot {
     ///
     /// Retained state; see [`Self::source_version`].
     #[must_use]
-    pub fn limits(&self) -> SourceLimits {
+    pub fn limits(&self) -> Limits {
         self.inner.limits
     }
 
@@ -968,14 +954,98 @@ impl SourceSnapshot {
         })
     }
 
-    /// Alias for [`Self::edit_paragraph`].
-    pub fn transaction(&self, position: Position) -> Result<Edit> {
-        self.edit_paragraph(position)
+    /// Replays a paragraph patch onto a package with the exact source
+    /// version and fingerprint the patch was made from (the package it was
+    /// committed on, or an equal reopen of it).
+    ///
+    /// # Errors
+    ///
+    /// Returns an overlay refusal for another source or a replay whose
+    /// target differs, and the commit errors of [`Edit::commit`].
+    pub fn apply_paragraph(&self, patch: &Patch) -> Result<Commit> {
+        self.ensure_current()?;
+        if self.source_version() != patch.before.source_version() {
+            return Err(Error::Overlay(OverlayError::SourceChanged {
+                expected: patch.before.source_version(),
+                observed: self.source_version(),
+            }));
+        }
+        if self.fingerprint() != patch.before.fingerprint() {
+            return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
+                expected: patch.before.fingerprint(),
+                observed: self.fingerprint(),
+            }));
+        }
+        let Some(operation) = patch.operation.clone() else {
+            return publish_noop(self.clone(), patch.position);
+        };
+        let commit = publish_operation(self.clone(), operation)?;
+        if commit.package().fingerprint() != patch.after.fingerprint() {
+            return Err(Error::Overlay(OverlayError::TargetFingerprintChanged {
+                expected: patch.after.fingerprint(),
+                observed: commit.package().fingerprint(),
+            }));
+        }
+        Ok(commit)
     }
 
-    /// Short alias for [`Self::edit_paragraph`].
-    pub fn edit(&self, position: Position) -> Result<Edit> {
-        self.edit_paragraph(position)
+    /// Streams this package's exact bytes: the checked overlay output for a
+    /// committed package, the source (through a checked identity plan) for
+    /// an opened one.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, overlay or sink error; a sink failure may
+    /// leave a prefix in the sink.
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
+        self.output_plan()?.write_to(writer).map_err(Error::Overlay)
+    }
+
+    /// Atomically replaces `path` with this package's exact bytes through
+    /// the common synced sibling-temp/atomic-rename path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::write_to`], plus the atomic-rename errors.
+    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
+        self.output_plan()?.save(path).map_err(Error::Overlay)
+    }
+
+    /// [`Self::save`] at a caller-chosen
+    /// [`Durability`](litchi_core::Durability); see
+    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+        durability: litchi_core::Durability,
+    ) -> Result<PublishReport> {
+        self.output_plan()?
+            .save_with_durability(path, durability)
+            .map_err(Error::Overlay)
+    }
+
+    /// The plan this package writes: the committed plan, or a checked
+    /// identity plan of the opened source.
+    fn output_plan(&self) -> Result<Arc<ValidatedOverlayPlan>> {
+        if let Some(plan) = &self.inner.pending {
+            return Ok(Arc::clone(plan));
+        }
+        self.ensure_current()?;
+        let plan = self
+            .inner
+            .shared
+            .plan_same_length_stream_splices(Vec::new(), self.inner.limits.splice_limits)?;
+        if plan.source_fingerprint() != self.fingerprint() {
+            return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
+                expected: self.fingerprint(),
+                observed: plan.source_fingerprint(),
+            }));
+        }
+        Ok(Arc::new(plan))
     }
 
     fn resolve(&self, position: Position) -> Result<ResolvedParagraph> {
@@ -1025,7 +1095,7 @@ impl SourceSnapshot {
 /// One staged, equal-UTF-16-width paragraph replacement. Dropping it
 /// discards it.
 pub struct Edit {
-    source: SourceSnapshot,
+    source: Package,
     resolved: ResolvedParagraph,
     replacement: Option<String>,
 }
@@ -1094,6 +1164,12 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
+    /// Whether the commit changed the package's bytes.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed_spans > 0
+    }
+
     /// Selected paragraph position.
     #[must_use]
     pub const fn position(self) -> Position {
@@ -1149,78 +1225,16 @@ impl Diagnostics {
     }
 }
 
-/// A published source-backed DOC target and its reversible patch.
-pub struct Commit {
-    snapshot: SourceSnapshot,
-    patch: Patch,
-    plan: ValidatedOverlayPlan,
-    diagnostics: Diagnostics,
-}
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("snapshot", &self.snapshot)
-            .field("diagnostics", &self.diagnostics)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Commit {
-    /// Reopened composed target snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceSnapshot {
-        &self.snapshot
-    }
-
-    /// Exact-source reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Whether the transaction changed no artifact bytes.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        self.plan.is_noop()
-    }
-
-    /// Streams the complete validated target to a sequential sink.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport> {
-        self.plan.write_to(writer).map_err(Error::Overlay)
-    }
-
-    /// Publishes through the common synced sibling-temp/atomic-rename path.
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<PublishReport> {
-        self.plan.save(path).map_err(Error::Overlay)
-    }
-
-    /// Publishes through the common sibling-temp/atomic-rename path at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<PublishReport> {
-        self.plan
-            .save_with_durability(path, durability)
-            .map_err(Error::Overlay)
-    }
-}
+/// A published source-backed paragraph edit: the committed package, its
+/// exact-source patch and diagnostics.
+pub(super) type Commit = litchi_core::edit::Commit<Package, Patch, Diagnostics>;
 
 /// A source-checked reversible equal-length DOC paragraph splice.
 #[derive(Clone)]
 pub struct Patch {
-    before: SourceSnapshot,
-    after: SourceSnapshot,
+    before: Package,
+    after: Package,
+    position: Position,
     operation: Option<Operation>,
 }
 
@@ -1238,13 +1252,13 @@ impl fmt::Debug for Patch {
 impl Patch {
     /// Exact source snapshot required for forward application.
     #[must_use]
-    pub const fn source(&self) -> &SourceSnapshot {
+    pub const fn source(&self) -> &Package {
         &self.before
     }
 
     /// Exact target snapshot produced by forward application.
     #[must_use]
-    pub const fn target(&self) -> &SourceSnapshot {
+    pub const fn target(&self) -> &Package {
         &self.after
     }
 
@@ -1260,39 +1274,10 @@ impl Patch {
         self.after.fingerprint()
     }
 
-    /// Whether this patch changes no bytes.
+    /// Whether applying this patch changes no bytes.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.operation.is_none()
-    }
-
-    /// Applies only to the exact source version and fingerprint captured by
-    /// this patch.
-    pub fn apply(&self, current: &SourceSnapshot) -> Result<SourceSnapshot> {
-        current.ensure_current()?;
-        if current.source_version() != self.before.source_version() {
-            return Err(Error::Overlay(OverlayError::SourceChanged {
-                expected: self.before.source_version(),
-                observed: current.source_version(),
-            }));
-        }
-        if current.fingerprint() != self.before.fingerprint() {
-            return Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
-                expected: self.before.fingerprint(),
-                observed: current.fingerprint(),
-            }));
-        }
-        let Some(operation) = self.operation.clone() else {
-            return Ok(current.clone());
-        };
-        let commit = publish_operation(current.clone(), operation)?;
-        if commit.snapshot.fingerprint() != self.after.fingerprint() {
-            return Err(Error::Overlay(OverlayError::TargetFingerprintChanged {
-                expected: self.after.fingerprint(),
-                observed: commit.snapshot.fingerprint(),
-            }));
-        }
-        Ok(commit.snapshot)
     }
 
     /// Returns the exact-source-checked inverse patch.
@@ -1301,6 +1286,7 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            position: self.position,
             operation: self.operation.as_ref().map(Operation::inverse),
         }
     }
@@ -1333,11 +1319,7 @@ impl Operation {
     }
 }
 
-fn publish(
-    source: SourceSnapshot,
-    resolved: ResolvedParagraph,
-    replacement: String,
-) -> Result<Commit> {
+fn publish(source: Package, resolved: ResolvedParagraph, replacement: String) -> Result<Commit> {
     if replacement == resolved.text {
         return publish_noop(source, resolved.position);
     }
@@ -1371,7 +1353,7 @@ fn publish(
     publish_operation(source, operation)
 }
 
-fn publish_noop(source: SourceSnapshot, position: Position) -> Result<Commit> {
+fn publish_noop(source: Package, position: Position) -> Result<Commit> {
     source.ensure_current()?;
     let plan = source
         .inner
@@ -1395,20 +1377,17 @@ fn publish_noop(source: SourceSnapshot, position: Position) -> Result<Commit> {
         source_version: source.source_version(),
         target_version: source.source_version(),
     };
+    drop(plan);
     let patch = Patch {
         before: source.clone(),
         after: source.clone(),
+        position,
         operation: None,
     };
-    Ok(Commit {
-        snapshot: source,
-        patch,
-        plan,
-        diagnostics,
-    })
+    Ok(Commit::new(source, patch, diagnostics))
 }
 
-fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Commit> {
+fn publish_operation(source: Package, operation: Operation) -> Result<Commit> {
     authorize_changed_source(&source)?;
     source.ensure_current()?;
     let current = source.resolve(operation.position)?;
@@ -1436,9 +1415,9 @@ fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Com
             source.inner.limits.splice_limits,
             |composed| {
                 let candidate_source: Arc<dyn ReadAt> = Arc::new(composed.clone());
-                let candidate = SourceSnapshot::open_with_options_and_policy(
+                let candidate = Package::open_with_options_and_policy(
                     Arc::clone(&candidate_source),
-                    SourceBackedOptions::new(source.inner.limits),
+                    OpenOptions::new(source.inner.limits),
                     source.inner.protection_policy.clone(),
                 )?;
                 let candidate_paragraph = candidate.resolve(operation.position)?;
@@ -1485,17 +1464,15 @@ fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Com
         source_version: source.source_version(),
         target_version,
     };
+    let mut candidate = candidate;
+    Arc::make_mut(&mut candidate.inner).pending = Some(Arc::new(plan));
     let patch = Patch {
         before: source,
         after: candidate.clone(),
+        position: operation.position,
         operation: Some(operation),
     };
-    Ok(Commit {
-        snapshot: candidate,
-        patch,
-        plan,
-        diagnostics,
-    })
+    Ok(Commit::new(candidate, patch, diagnostics))
 }
 
 #[derive(Clone, Copy)]
@@ -1520,7 +1497,7 @@ impl Fib {
     }
 }
 
-fn read_fib(shared: &SharedOleFile, limits: SourceLimits) -> Result<(String, Fib)> {
+fn read_fib(shared: &SharedOleFile, limits: Limits) -> Result<(String, Fib)> {
     if limits.max_fib_bytes < FIB_BASE_PREFIX {
         return Err(Error::Limit(format!(
             "FIB limit {} is below the required {FIB_BASE_PREFIX}-byte prefix",
@@ -1687,7 +1664,7 @@ fn reject_fib_policy(
     shared: &SharedOleFile,
     table_name: &str,
     fib: &Fib,
-    limits: SourceLimits,
+    limits: Limits,
 ) -> Result<EditProtection> {
     if fib.flags & (FIB_FLAG_ENCRYPTED | FIB_FLAG_OBFUSCATED) != 0 {
         return Err(Error::Refused(Refusal::Encrypted));
@@ -1752,7 +1729,7 @@ fn classify_source_protection(
     shared: &SharedOleFile,
     table_name: &str,
     fib: &Fib,
-    limits: SourceLimits,
+    limits: Limits,
 ) -> Result<(EditProtection, bool)> {
     let parsed_fib = FileInformationBlock::parse(&fib.raw)
         .map_err(|error| Error::InvalidData(format!("FIB protection view is invalid: {error}")))?;
@@ -1792,7 +1769,7 @@ fn classify_source_protection(
     Ok((protection, revision_marking))
 }
 
-fn authorize_changed_source(source: &SourceSnapshot) -> Result<()> {
+fn authorize_changed_source(source: &Package) -> Result<()> {
     match source.inner.protection {
         EditProtection::Unknown | EditProtection::Unrecognized => {
             return Err(Error::Refused(Refusal::UnknownProtection));
@@ -1856,7 +1833,7 @@ fn parse_clx(
     ccp_text: u32,
     fc_min: u32,
     fc_mac: u32,
-    limits: SourceLimits,
+    limits: Limits,
 ) -> Result<Vec<Piece>> {
     if fc_min > fc_mac || u64::from(fc_mac) > word_len {
         return Err(Error::Refused(Refusal::AmbiguousTopology));
@@ -1991,7 +1968,7 @@ fn resolve_paragraph(
     shared: &SharedOleFile,
     layout: &Layout,
     position: Position,
-    limits: SourceLimits,
+    limits: Limits,
 ) -> Result<ResolvedParagraph> {
     let target = position.get();
     let mut paragraph_index = 0usize;
@@ -2128,7 +2105,7 @@ fn reject_selected_property_revisions(
     shared: &SharedOleFile,
     layout: &Layout,
     paragraph: &ResolvedParagraph,
-    limits: SourceLimits,
+    limits: Limits,
 ) -> Result<()> {
     // DOP and STTBFRMark are checked during open.  The FKP check below covers
     // revision SPRMs attached only to the selected physical character range.
@@ -2412,10 +2389,7 @@ fn ensure_source_identity(
     Ok(())
 }
 
-fn identity_fingerprint(
-    shared: &SharedOleFile,
-    limits: SourceLimits,
-) -> Result<ArtifactFingerprint> {
+fn identity_fingerprint(shared: &SharedOleFile, limits: Limits) -> Result<ArtifactFingerprint> {
     let plan = shared.plan_same_length_stream_splices(Vec::new(), limits.splice_limits)?;
     Ok(plan.source_fingerprint())
 }
@@ -2754,7 +2728,7 @@ mod tests {
     #[test]
     fn ordinary_fixture_has_a_source_backed_paragraph() {
         let bytes = fixture("documentProperties.doc");
-        let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
+        let source = Package::from_bytes(bytes).expect("source-backed DOC fixture");
         let paragraph = source.paragraph(Position::new(0)).expect("first paragraph");
         assert!(!paragraph.text().is_empty());
     }
@@ -2762,7 +2736,7 @@ mod tests {
     #[test]
     fn adopted_shared_owner_matches_an_owned_byte_open() {
         let bytes = fixture("documentProperties.doc");
-        let opened = SourceSnapshot::from_bytes(bytes.clone()).expect("owned DOC open");
+        let opened = Package::from_bytes(bytes.clone()).expect("owned DOC open");
         let ole = litchi_cfb::OleFile::open(io::Cursor::new(bytes.clone())).unwrap();
         let shared = Arc::new(
             SharedOleFile::from_owned_ole_file(
@@ -2772,7 +2746,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let adopted = SourceSnapshot::from_shared(Arc::clone(&shared)).expect("adopted DOC open");
+        let adopted = Package::from_shared(Arc::clone(&shared)).expect("adopted DOC open");
         assert!(Arc::ptr_eq(&adopted.inner.shared, &shared));
         assert_eq!(adopted.fingerprint(), opened.fingerprint());
         assert_eq!(adopted.len(), opened.len());
@@ -2786,16 +2760,16 @@ mod tests {
         let counted: Arc<dyn ReadAt> = counter.clone();
         let first = Arc::new(SharedOleFile::open(counted).unwrap());
         assert!(!first.is_owned_immutable());
-        let generic = SourceSnapshot::from_shared(Arc::clone(&first)).expect("generic DOC adopt");
+        let generic = Package::from_shared(Arc::clone(&first)).expect("generic DOC adopt");
         assert!(!Arc::ptr_eq(&generic.inner.shared, &first));
         assert_eq!(generic.fingerprint(), opened.fingerprint());
 
-        let limited = SourceBackedOptions::new(SourceLimits {
+        let limited = OpenOptions::new(Limits {
             max_input_bytes: 1,
-            ..SourceLimits::default()
+            ..Limits::default()
         });
         assert!(matches!(
-            SourceSnapshot::from_shared_with_options_and_policy(
+            Package::from_shared_with_options_and_policy(
                 shared,
                 limited,
                 ProtectionPolicy::default()
@@ -2808,7 +2782,7 @@ mod tests {
     // Risk R3 of unified-ops record 0003: the unified `Doc` handle retains
     // these owners behind an `Arc`, so they must stay thread-safe.
     const _: () = {
-        assert_send_sync::<SourceSnapshot>();
+        assert_send_sync::<Package>();
         assert_send_sync::<crate::body_text::Snapshot>();
         assert_send_sync::<crate::Document>();
     };
@@ -2819,12 +2793,12 @@ mod tests {
 
         let generic_counter = Arc::new(CountingSource::new(&bytes));
         let generic_source: Arc<dyn ReadAt> = generic_counter.clone();
-        SourceSnapshot::open(generic_source).expect("generic source-backed DOC fixture");
+        Package::open(generic_source).expect("generic source-backed DOC fixture");
         let generic_reads = generic_counter.total_bytes.load(Ordering::SeqCst);
 
         let owned_counter = Arc::new(CountingSource::new(&bytes));
         let owned_source: Arc<dyn ReadAt> = owned_counter.clone();
-        SourceSnapshot::open_owned_source(owned_source, SourceBackedOptions::default())
+        Package::open_owned_source(owned_source, OpenOptions::default())
             .expect("owned source-backed DOC fixture");
         let owned_reads = owned_counter.total_bytes.load(Ordering::SeqCst);
 
@@ -2837,7 +2811,7 @@ mod tests {
     #[test]
     fn fixture_replacement_is_reversible_and_same_width() {
         let bytes = fixture("documentProperties.doc");
-        let source = SourceSnapshot::from_bytes_with_policy(bytes, fixture_edit_policy())
+        let source = Package::from_bytes_with_policy(bytes, fixture_edit_policy())
             .expect("source-backed DOC fixture");
         let original_fingerprint = source.fingerprint();
         let mut transaction = source
@@ -2858,20 +2832,16 @@ mod tests {
             .set_text(replacement.clone())
             .expect("same UTF-16 width");
         let commit = transaction.commit().expect("source-backed commit");
-        assert!(!commit.is_noop());
+        assert!(!commit.patch().is_noop());
         assert_eq!(
-            commit
-                .snapshot()
-                .paragraph(Position::new(0))
-                .unwrap()
-                .text(),
+            commit.package().paragraph(Position::new(0)).unwrap().text(),
             replacement
         );
         let restored = commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
-            .expect("inverse");
+            .package()
+            .apply_paragraph(&commit.patch().inverse())
+            .expect("inverse")
+            .into_package();
         assert_eq!(restored.fingerprint(), original_fingerprint);
         assert_eq!(
             restored.paragraph(Position::new(0)).unwrap().text(),
@@ -2883,25 +2853,28 @@ mod tests {
     fn exact_noop_keeps_snapshot_and_artifact_identity() {
         let bytes = fixture("documentProperties.doc");
         let original = bytes.clone();
-        let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
+        let source = Package::from_bytes(bytes).expect("source-backed DOC fixture");
         let commit = source
             .edit_paragraph(Position::new(0))
             .expect("first paragraph")
             .commit()
             .expect("no-op commit");
-        assert!(commit.is_noop());
-        assert!(commit.patch().is_empty());
-        assert_eq!(commit.snapshot().fingerprint(), source.fingerprint());
-        assert!(Arc::ptr_eq(&commit.snapshot().inner, &source.inner));
+        assert!(commit.patch().is_noop());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.package().fingerprint(), source.fingerprint());
+        assert!(Arc::ptr_eq(&commit.package().inner, &source.inner));
         let mut output = Vec::new();
-        commit.write_to(&mut output).expect("no-op output");
+        commit
+            .package()
+            .write_to(&mut output)
+            .expect("no-op output");
         assert_eq!(output, original);
     }
 
     #[test]
     fn length_change_and_partial_sink_are_typed_failures() {
         let bytes = fixture("documentProperties.doc");
-        let source = SourceSnapshot::from_bytes(bytes).expect("source-backed DOC fixture");
+        let source = Package::from_bytes(bytes).expect("source-backed DOC fixture");
         let mut transaction = source
             .edit_paragraph(Position::new(0))
             .expect("first paragraph");
@@ -2914,7 +2887,7 @@ mod tests {
             .commit()
             .expect("unchanged transaction is a no-op");
         let mut sink = FailingSink { remaining: 9 };
-        let error = commit.write_to(&mut sink).unwrap_err();
+        let error = commit.package().write_to(&mut sink).unwrap_err();
         assert!(matches!(
             error,
             Error::Overlay(OverlayError::IncompleteOutput { .. })
@@ -2924,7 +2897,7 @@ mod tests {
     #[test]
     fn piece_relative_payload_readback_uses_a_later_paragraph() {
         let bytes = fixture("lists-margins.doc");
-        let source = SourceSnapshot::from_bytes_with_policy(bytes, fixture_edit_policy())
+        let source = Package::from_bytes_with_policy(bytes, fixture_edit_policy())
             .expect("source-backed DOC fixture");
         let mut transaction = source
             .edit_paragraph(Position::new(1))
@@ -2944,11 +2917,7 @@ mod tests {
             .expect("same width");
         let commit = transaction.commit().expect("second paragraph commit");
         assert_eq!(
-            commit
-                .snapshot()
-                .paragraph(Position::new(1))
-                .unwrap()
-                .text(),
+            commit.package().paragraph(Position::new(1)).unwrap().text(),
             replacement
         );
     }
@@ -2956,23 +2925,20 @@ mod tests {
     #[test]
     fn fib_limit_below_fixed_prefix_is_rejected_before_open() {
         let bytes = fixture("documentProperties.doc");
-        let limits = SourceLimits::default().with_max_fib_bytes(FIB_BASE_PREFIX - 1);
+        let limits = Limits::default().with_max_fib_bytes(FIB_BASE_PREFIX - 1);
         assert!(matches!(
-            SourceSnapshot::open_with_options(
-                Arc::new(OwnedSource::new(bytes)),
-                SourceBackedOptions::new(limits),
-            ),
+            Package::open_with_options(Arc::new(OwnedSource::new(bytes)), OpenOptions::new(limits),),
             Err(Error::Limit(_))
         ));
     }
 
     #[test]
     fn zero_builder_limits_are_rejected_before_open() {
-        let limits = SourceLimits::default().with_max_prefix_units(0);
+        let limits = Limits::default().with_max_prefix_units(0);
         assert!(matches!(
-            SourceSnapshot::open_with_options(
+            Package::open_with_options(
                 Arc::new(OwnedSource::new(Vec::new())),
-                SourceBackedOptions::new(limits),
+                OpenOptions::new(limits),
             ),
             Err(Error::Limit(message)) if message.contains("non-zero")
         ));
@@ -3015,7 +2981,7 @@ mod tests {
         let malformed = u32::try_from(fib_len - 1).expect("FIB length");
         bytes[physical..physical + 4].copy_from_slice(&malformed.to_le_bytes());
         assert!(matches!(
-            SourceSnapshot::from_bytes(bytes),
+            Package::from_bytes(bytes),
             Err(Error::InvalidData(message)) if message.contains("fcMin overlaps")
         ));
     }
@@ -3032,7 +2998,7 @@ mod tests {
             data
         }
 
-        let limits = SourceLimits::default();
+        let limits = Limits::default();
         assert!(matches!(
             parse_clx(&one_piece(198, 2), 1_024, 2, 200, 300, limits),
             Err(Error::Refused(Refusal::AmbiguousTopology))
@@ -3049,7 +3015,7 @@ mod tests {
 
     /// A same-width replacement of paragraph 0 that changes its first ASCII
     /// letter.
-    fn same_width_edit(source: &SourceSnapshot) -> String {
+    fn same_width_edit(source: &Package) -> String {
         let mut replacement = source
             .paragraph(Position::new(0))
             .expect("first paragraph")
@@ -3070,8 +3036,8 @@ mod tests {
         policy: ProtectionPolicy,
         replacement: &str,
     ) -> Result<Commit> {
-        let mut transaction = SourceSnapshot::from_bytes_with_policy(bytes, policy)?
-            .edit_paragraph(Position::new(0))?;
+        let mut transaction =
+            Package::from_bytes_with_policy(bytes, policy)?.edit_paragraph(Position::new(0))?;
         transaction.set_text(replacement.to_owned())?;
         transaction.commit()
     }
@@ -3080,10 +3046,10 @@ mod tests {
     fn a_libreoffice_fib_and_dop_as_checked_in_are_editable() {
         // nFib 0x0101 with a zero cswNew and a 610-byte DOP (change 0768).
         let bytes = fixture("documentProperties.doc");
-        let source = SourceSnapshot::from_bytes(bytes.clone()).expect("LibreOffice DOC");
+        let source = Package::from_bytes(bytes.clone()).expect("LibreOffice DOC");
         assert_eq!(source.inner.protection, EditProtection::None);
         let replacement = same_width_edit(&source);
-        commit_first_paragraph(bytes, ProtectionPolicy::default(), &replacement)
+        let _commit = commit_first_paragraph(bytes, ProtectionPolicy::default(), &replacement)
             .expect("unprotected same-width edit");
     }
 
@@ -3096,20 +3062,20 @@ mod tests {
             dop[7] |= 0x40;
             dop[5] |= 0x80;
         });
-        let source = SourceSnapshot::from_bytes(bytes.clone()).expect("locked DOC");
+        let source = Package::from_bytes(bytes.clone()).expect("locked DOC");
         assert_eq!(source.inner.protection, EditProtection::Document);
         let replacement = same_width_edit(&source);
         assert!(matches!(
             commit_first_paragraph(bytes.clone(), ProtectionPolicy::default(), &replacement),
             Err(Error::Refused(Refusal::Protected))
         ));
-        commit_first_paragraph(bytes, fixture_edit_policy(), &replacement)
+        let _commit = commit_first_paragraph(bytes, fixture_edit_policy(), &replacement)
             .expect("authorized protected edit");
 
         // Revision marking alone is refused at open.
         let marking = with_dop("documentProperties.doc", |dop| dop[5] |= 0x80);
         assert!(matches!(
-            SourceSnapshot::from_bytes(marking),
+            Package::from_bytes(marking),
             Err(Error::Refused(Refusal::Revision))
         ));
     }
@@ -3126,7 +3092,7 @@ mod tests {
                 dop[598] = (dop[598] & 0x87) | flags;
             });
             assert_eq!(
-                SourceSnapshot::from_bytes(bytes)
+                Package::from_bytes(bytes)
                     .expect("DOC fixture")
                     .inner
                     .protection,
@@ -3150,7 +3116,7 @@ mod tests {
             word[pointer..pointer + 4].copy_from_slice(&83u32.to_le_bytes());
         });
         for bytes in [malformed_fields, short_dop] {
-            let source = SourceSnapshot::from_bytes(bytes.clone()).expect("malformed DOC fixture");
+            let source = Package::from_bytes(bytes.clone()).expect("malformed DOC fixture");
             assert_eq!(source.inner.protection, EditProtection::Unrecognized);
             let replacement = same_width_edit(&source);
             for policy in [ProtectionPolicy::default(), fixture_edit_policy()] {
@@ -3166,7 +3132,7 @@ mod tests {
     /// feeding the shared classifier, before its other admission refusals
     /// (fields, drawings and so on).
     fn source_protection(bytes: &[u8]) -> Result<EditProtection> {
-        let limits = SourceLimits::default();
+        let limits = Limits::default();
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.to_vec()));
         let shared = SharedOleFile::open_with_limits(
             source,
@@ -3516,7 +3482,7 @@ mod tests {
             fired: AtomicBool::new(false),
         });
         let source: Arc<dyn ReadAt> = hostile.clone();
-        let snapshot = SourceSnapshot::open(source).expect("source-backed DOC fixture");
+        let snapshot = Package::open(source).expect("source-backed DOC fixture");
         hostile.armed.store(true, Ordering::SeqCst);
         assert!(matches!(
             snapshot.paragraph(Position::new(0)),
@@ -3533,7 +3499,7 @@ mod tests {
             fired: AtomicBool::new(false),
         });
         let source: Arc<dyn ReadAt> = hostile.clone();
-        let snapshot = SourceSnapshot::open(source).expect("source-backed DOC fixture");
+        let snapshot = Package::open(source).expect("source-backed DOC fixture");
         let transaction = snapshot
             .edit_paragraph(Position::new(0))
             .expect("first paragraph");
@@ -3561,7 +3527,7 @@ mod tests {
             .expect("DOC fixture");
         let counted = Arc::new(CountingSource::new(&output.into_inner()));
         let source: Arc<dyn ReadAt> = counted.clone();
-        let snapshot = SourceSnapshot::open(source).expect("source-backed DOC fixture");
+        let snapshot = Package::open(source).expect("source-backed DOC fixture");
         let scan_chunk_cp = u32::try_from(SCAN_CHUNK_UNITS).expect("scan chunk size");
         assert!(
             snapshot
@@ -3706,7 +3672,7 @@ mod tests {
         let bytes = documentproperties_bytes();
         let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
         let clean_source: Arc<dyn ReadAt> = clean.clone();
-        SourceSnapshot::open(clean_source).expect("clean source-backed DOC fixture");
+        Package::open(clean_source).expect("clean source-backed DOC fixture");
         let reads = clean.reads.load(Ordering::SeqCst);
         let first_identity = clean.first_identity_read(bytes.len());
         assert!(
@@ -3718,7 +3684,7 @@ mod tests {
         for ordinal in 1..=reads {
             let hostile = Arc::new(ScheduledMutationSource::new(bytes.clone(), ordinal));
             let source: Arc<dyn ReadAt> = hostile.clone();
-            let outcome = SourceSnapshot::open(source).and_then(|snapshot| {
+            let outcome = Package::open(source).and_then(|snapshot| {
                 snapshot.paragraph(Position::new(0))?;
                 Ok(snapshot)
             });
@@ -3736,7 +3702,7 @@ mod tests {
                         ordinal < first_identity,
                         "read {ordinal} served an artifact that changed after its identity"
                     );
-                    let settled = SourceSnapshot::from_bytes(hostile.current_bytes())
+                    let settled = Package::from_bytes(hostile.current_bytes())
                         .expect("mutated artifact reopens");
                     assert_eq!(
                         snapshot.fingerprint(),
@@ -3759,7 +3725,7 @@ mod tests {
         let bytes = documentproperties_bytes();
         let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
         let clean_source: Arc<dyn ReadAt> = clean.clone();
-        let snapshot = SourceSnapshot::open(clean_source).expect("clean source-backed DOC fixture");
+        let snapshot = Package::open(clean_source).expect("clean source-backed DOC fixture");
         let open_reads = clean.reads.load(Ordering::SeqCst);
         snapshot
             .paragraph(Position::new(0))
@@ -3776,7 +3742,7 @@ mod tests {
                 open_reads + ordinal,
             ));
             let source: Arc<dyn ReadAt> = hostile.clone();
-            let snapshot = SourceSnapshot::open(source).expect("clean open");
+            let snapshot = Package::open(source).expect("clean open");
             assert!(
                 matches!(
                     snapshot.paragraph(Position::new(0)),
@@ -3804,11 +3770,11 @@ mod tests {
     #[test]
     fn the_retained_identity_is_the_complete_source_artifact_digest() {
         let bytes = documentproperties_bytes();
-        let owned = SourceSnapshot::from_bytes(bytes.clone()).expect("source-backed DOC");
+        let owned = Package::from_bytes(bytes.clone()).expect("source-backed DOC");
 
         let generic: Arc<dyn ReadAt> =
             Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
-        let generic = SourceSnapshot::open(generic).expect("generic source-backed DOC");
+        let generic = Package::open(generic).expect("generic source-backed DOC");
         assert_eq!(generic.fingerprint(), owned.fingerprint());
 
         let commit = owned
@@ -3816,9 +3782,12 @@ mod tests {
             .expect("first paragraph")
             .commit()
             .expect("no-op commit");
-        assert!(commit.is_noop());
+        assert!(commit.patch().is_noop());
         let mut output = Vec::new();
-        commit.write_to(&mut output).expect("no-op output");
+        commit
+            .package()
+            .write_to(&mut output)
+            .expect("no-op output");
         assert_eq!(output, bytes);
     }
 
@@ -3885,7 +3854,7 @@ mod tests {
 
         let counted = Arc::new(CountingSource::new(&bytes));
         let source: Arc<dyn ReadAt> = counted.clone();
-        let snapshot = SourceSnapshot::open(source).expect("generic source-backed DOC fixture");
+        let snapshot = Package::open(source).expect("generic source-backed DOC fixture");
         assert_eq!(counted.complete_reads.load(Ordering::SeqCst), 3);
         snapshot
             .paragraph(Position::new(0))
@@ -3913,7 +3882,7 @@ mod tests {
     #[test]
     fn a_table_mutated_after_the_opening_scan_is_still_an_identity_change() {
         let bytes = documentproperties_bytes();
-        let clean = SourceSnapshot::from_bytes(bytes.clone()).expect("clean DOC fixture");
+        let clean = Package::from_bytes(bytes.clone()).expect("clean DOC fixture");
 
         // Reads 7, 8 and 9 are the composed reopen inside the opening identity
         // call; a mutation of FAT byte 520 after any of them is invisible to
@@ -3925,7 +3894,7 @@ mod tests {
                 520,
             ));
             let source: Arc<dyn ReadAt> = hostile.clone();
-            match SourceSnapshot::open(source) {
+            match Package::open(source) {
                 Err(Error::Overlay(OverlayError::SourceFingerprintChanged {
                     expected,
                     observed,
@@ -3949,7 +3918,7 @@ mod tests {
         // structural error: the digest has not moved, so nothing is relocated.
         let mut damaged = bytes.clone();
         damaged[520] ^= 0xff;
-        match SourceSnapshot::open(Arc::new(OwnedSource::new(damaged))) {
+        match Package::open(Arc::new(OwnedSource::new(damaged))) {
             Err(Error::Ole(OleError::CorruptedFile(_))) => {},
             other => panic!("a corrupt file must still be reported as one: {other:?}"),
         }
@@ -3967,7 +3936,7 @@ mod tests {
                 520,
             ));
             let source: Arc<dyn ReadAt> = hostile.clone();
-            match SourceSnapshot::open(source) {
+            match Package::open(source) {
                 Err(Error::Overlay(OverlayError::Ole(OleError::CorruptedFile(_)))) => {},
                 other => panic!("read {ordinal} reported {other:?}, not the reopen's own error"),
             }
@@ -3982,13 +3951,12 @@ mod tests {
         let bytes = documentproperties_bytes();
         let clean = Arc::new(ScheduledMutationSource::new(bytes.clone(), usize::MAX));
         let clean_source: Arc<dyn ReadAt> = clean.clone();
-        let reference = SourceSnapshot::open(clean_source).expect("clean open");
+        let reference = Package::open(clean_source).expect("clean open");
         let open_reads = clean.reads.load(Ordering::SeqCst);
 
         let hostile = Arc::new(ScheduledMutationSource::new(bytes, open_reads));
         let source: Arc<dyn ReadAt> = hostile.clone();
-        let snapshot =
-            SourceSnapshot::open(source).expect("the open's last read is a compared scan");
+        let snapshot = Package::open(source).expect("the open's last read is a compared scan");
         assert!(hostile.fired.load(Ordering::SeqCst));
 
         // The retained accessors report what the open saw; that is what their

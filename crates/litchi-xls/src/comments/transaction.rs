@@ -14,8 +14,8 @@ use crate::workbook::{KeptCells, ValidationWorkbook};
 use crate::{Error, Result, raw::Reader};
 use litchi_biff::Records;
 use litchi_cfb::{
-    ArtifactFingerprint, ComposedOverlaySource, OverlayError, PublishReport,
-    SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
+    ArtifactFingerprint, ComposedOverlaySource, OverlayError, SameLengthStreamSplice,
+    StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
@@ -24,8 +24,7 @@ use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
-use std::io::{Cursor, Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::sync::Arc;
 
 const EOF: u16 = 0x000A;
@@ -638,7 +637,7 @@ impl Edit {
     /// Returns a typed refusal for protected CFB markers, stale or malformed
     /// source state, unsupported encoding transitions, length/topology changes,
     /// overlapping NOTE/TXO ownership, or failed semantic readback.
-    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit_source_backed(self) -> Result<SourceBackedCommit> {
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -1035,86 +1034,104 @@ impl crate::Package {
         ))
     }
 }
-/// Content-free evidence for a same-length source-backed comment publication.
-///
-/// The diagnostics intentionally retain only counts, lengths, and opaque CFB
-/// fingerprints. Comment authors, text, and physical payload bytes are never
-/// copied into this value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBackedDiagnostics {
-    changed_comments: usize,
-    touched_streams: usize,
-    splice_count: usize,
-    replacement_bytes: u64,
-    changed_spans: usize,
-    source_bytes: u64,
-    source_workbook_bytes: u64,
-    target_workbook_bytes: u64,
-    source_fingerprint: ArtifactFingerprint,
-    target_fingerprint: ArtifactFingerprint,
+/// The content-free diagnostics of a source-backed publication, published
+/// as a source-backed family's `Diagnostics` (`crate::source_backed`).
+pub(crate) mod source_diagnostics {
+    #[allow(
+        unused_imports,
+        reason = "the definition keeps its parent module's vocabulary"
+    )]
+    use super::*;
+
+    /// Content-free evidence for a same-length source-backed comment publication.
+    ///
+    /// The diagnostics intentionally retain only counts, lengths, and opaque CFB
+    /// fingerprints. Comment authors, text, and physical payload bytes are never
+    /// copied into this value.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Diagnostics {
+        pub(super) changed_comments: usize,
+        pub(super) touched_streams: usize,
+        pub(super) splice_count: usize,
+        pub(super) replacement_bytes: u64,
+        pub(super) changed_spans: usize,
+        pub(super) source_bytes: u64,
+        pub(super) source_workbook_bytes: u64,
+        pub(super) target_workbook_bytes: u64,
+        pub(super) source_fingerprint: ArtifactFingerprint,
+        pub(super) target_fingerprint: ArtifactFingerprint,
+    }
+
+    impl Diagnostics {
+        /// Whether the commit changed the workbook.
+        #[must_use]
+        pub const fn changed(self) -> bool {
+            self.changed_spans > 0
+        }
+
+        /// Number of semantic comments changed by the transaction.
+        #[must_use]
+        pub const fn changed_comments(self) -> usize {
+            self.changed_comments
+        }
+
+        /// Number of logical streams selected for the overlay.
+        #[must_use]
+        pub const fn touched_streams(self) -> usize {
+            self.touched_streams
+        }
+
+        /// Number of source-relative NOTE/TXO splices submitted to CFB.
+        #[must_use]
+        pub const fn splice_count(self) -> usize {
+            self.splice_count
+        }
+
+        /// Aggregate replacement bytes retained by the splice plan.
+        #[must_use]
+        pub const fn replacement_bytes(self) -> u64 {
+            self.replacement_bytes
+        }
+
+        /// Number of physical CFB spans changed by the overlay.
+        #[must_use]
+        pub const fn changed_spans(self) -> usize {
+            self.changed_spans
+        }
+
+        /// Complete source CFB length.
+        #[must_use]
+        pub const fn source_bytes(self) -> u64 {
+            self.source_bytes
+        }
+
+        /// Source Workbook/Book stream length.
+        #[must_use]
+        pub const fn source_workbook_bytes(self) -> u64 {
+            self.source_workbook_bytes
+        }
+
+        /// Candidate Workbook/Book stream length.
+        #[must_use]
+        pub const fn target_workbook_bytes(self) -> u64 {
+            self.target_workbook_bytes
+        }
+
+        /// Exact source CFB fingerprint.
+        #[must_use]
+        pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+            self.source_fingerprint
+        }
+
+        /// Exact candidate CFB fingerprint.
+        #[must_use]
+        pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+            self.target_fingerprint
+        }
+    }
 }
 
-impl SourceBackedDiagnostics {
-    /// Number of semantic comments changed by the transaction.
-    #[must_use]
-    pub const fn changed_comments(self) -> usize {
-        self.changed_comments
-    }
-
-    /// Number of logical streams selected for the overlay.
-    #[must_use]
-    pub const fn touched_streams(self) -> usize {
-        self.touched_streams
-    }
-
-    /// Number of source-relative NOTE/TXO splices submitted to CFB.
-    #[must_use]
-    pub const fn splice_count(self) -> usize {
-        self.splice_count
-    }
-
-    /// Aggregate replacement bytes retained by the splice plan.
-    #[must_use]
-    pub const fn replacement_bytes(self) -> u64 {
-        self.replacement_bytes
-    }
-
-    /// Number of physical CFB spans changed by the overlay.
-    #[must_use]
-    pub const fn changed_spans(self) -> usize {
-        self.changed_spans
-    }
-
-    /// Complete source CFB length.
-    #[must_use]
-    pub const fn source_bytes(self) -> u64 {
-        self.source_bytes
-    }
-
-    /// Source Workbook/Book stream length.
-    #[must_use]
-    pub const fn source_workbook_bytes(self) -> u64 {
-        self.source_workbook_bytes
-    }
-
-    /// Candidate Workbook/Book stream length.
-    #[must_use]
-    pub const fn target_workbook_bytes(self) -> u64 {
-        self.target_workbook_bytes
-    }
-
-    /// Exact source CFB fingerprint.
-    #[must_use]
-    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
-        self.source_fingerprint
-    }
-
-    /// Exact candidate CFB fingerprint.
-    #[must_use]
-    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
-        self.target_fingerprint
-    }
-}
+use source_diagnostics::Diagnostics as SourceBackedDiagnostics;
 
 /// A checked source-bound same-length XLS comment publication plan.
 ///
@@ -1123,74 +1140,16 @@ impl SourceBackedDiagnostics {
 /// validated candidate to either a sequential sink or an atomic destination.
 /// A caller that needs variable-length record edits must explicitly use
 /// [`Edit::commit`].
-pub struct SourceBackedCommit {
+pub(crate) struct SourceBackedCommit {
     source: Snapshot,
     plan: ValidatedOverlayPlan,
     diagnostics: SourceBackedDiagnostics,
 }
 
 impl SourceBackedCommit {
-    /// Exact immutable source snapshot used by this plan.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
-    /// Underlying checked common CFB overlay plan.
-    #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
-        &self.plan
-    }
-
-    /// Content-free publication evidence.
-    #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
-        self.diagnostics
-    }
-
-    /// Whether this publication is an exact source identity no-op.
-    #[must_use]
-    pub fn is_noop(&self) -> bool {
-        self.plan.is_noop()
-    }
-
-    /// Streams the complete source-backed candidate to a sequential sink.
-    ///
-    /// The plan computed the exact source and target fingerprints once, over
-    /// the snapshot's sealed immutable bytes, so publication does not re-hash
-    /// them: immutable provenance makes every outer mutation preflight and
-    /// the emission hash redundant for direct sequential and atomic
-    /// publication. The atomic path keeps its flush, sync, rename, and
-    /// parent-sync durability sequence. A sink failure retains the typed
-    /// [`litchi_cfb::OutputProgress`] inside [`OverlayError`].
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
-        self.plan.write_to(writer)
-    }
-
-    /// Alias for [`Self::write_to`] emphasizing that this is publication.
-    pub fn publish_to_stream<W: Write>(
-        &self,
-        writer: &mut W,
-    ) -> Result<PublishReport, OverlayError> {
-        self.write_to(writer)
-    }
-
-    /// Streams the candidate through the common synced sibling-file and
-    /// atomic-rename path.
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
-        self.plan.save(path)
-    }
-
-    /// Streams the candidate through the common sibling-file and
-    /// atomic-rename path at a caller-chosen
-    /// [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<PublishReport, OverlayError> {
-        self.plan.save_with_durability(path, durability)
+    /// The checked overlay plan and its diagnostics.
+    pub(crate) fn into_plan(self) -> (ValidatedOverlayPlan, SourceBackedDiagnostics) {
+        (self.plan, self.diagnostics)
     }
 }
 

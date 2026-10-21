@@ -21,18 +21,16 @@
 )]
 
 mod properties;
-/// Positional, source-backed same-length Unicode paragraph edits.
-pub mod source;
 
 use properties::MarkChange;
 pub use properties::{FieldPart, HyperlinkInsert, SectionValue};
 
 use crate::DateTime;
 use crate::package::{Error as PackageError, OpenOptions as PackageOpenOptions};
-use crate::parts::dofr::{DofrArray, DofrPatch};
+use crate::parts::dofr::{DofrArray, Patch as DofrPatch};
 use crate::parts::protection::ProtectionPolicy;
 use crate::parts::saved_selection::{
-    FIB_INDEX_WSS, SavedSelection, SavedSelectionEdit, SavedSelectionPatch,
+    Edit as SavedSelectionEdit, FIB_INDEX_WSS, Patch as SavedSelectionPatch, SavedSelection,
     SavedSelectionSpliceError,
 };
 use crate::tracked_revision::{
@@ -42,7 +40,7 @@ use litchi_cfb::OleFile;
 use litchi_core::Position;
 use litchi_core::patch::{
     BlobBundle, BlobId, CompositionError, JoinedSubEdits, PatchError, PatchLimits, PatchOperation,
-    Reversible, ReversibleOperation, SubEdit,
+    Reversible, ReversibleOperation, SubEdit as CoreSubEdit,
 };
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 #[cfg(feature = "performance-diagnostics")]
@@ -66,7 +64,8 @@ pub(crate) fn intersect_revision_limits(left: Limits, right: Limits) -> Limits {
 }
 
 /// Bounded undo/redo history over immutable DOC snapshots.
-pub type History = litchi_core::patch::History<Snapshot>;
+#[cfg(test)]
+pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 /// Configuration for opening an owned body-text package.
 ///
@@ -76,7 +75,7 @@ pub type History = litchi_core::patch::History<Snapshot>;
 /// set of format-specific knobs can grow without exposing an unstable struct
 /// layout.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct OpenOptions {
+pub(crate) struct OpenOptions {
     source_limits: crate::package::SourceLimits,
     revision_limits: Limits,
     transaction_limits: TransactionLimits,
@@ -84,36 +83,36 @@ pub struct OpenOptions {
 }
 
 impl OpenOptions {
-    /// Creates the default body-text open configuration.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Selects the complete-source and DOC-entry admission limits.
     #[must_use]
-    pub const fn source_limits(mut self, source_limits: crate::package::SourceLimits) -> Self {
+    pub(crate) const fn source_limits(
+        mut self,
+        source_limits: crate::package::SourceLimits,
+    ) -> Self {
         self.source_limits = source_limits;
         self
     }
 
     /// Selects limits for strict tracked-revision ownership and parsing.
     #[must_use]
-    pub const fn revision_limits(mut self, revision_limits: Limits) -> Self {
+    pub(crate) const fn revision_limits(mut self, revision_limits: Limits) -> Self {
         self.revision_limits = revision_limits;
         self
     }
 
     /// Selects staged operation and replacement-payload limits.
     #[must_use]
-    pub const fn transaction_limits(mut self, transaction_limits: TransactionLimits) -> Self {
+    pub(crate) const fn transaction_limits(
+        mut self,
+        transaction_limits: TransactionLimits,
+    ) -> Self {
         self.transaction_limits = transaction_limits;
         self
     }
 
     /// Selects the explicit policy for changed publication of protected DOCs.
     #[must_use]
-    pub fn protection_policy(mut self, protection_policy: ProtectionPolicy) -> Self {
+    pub(crate) fn protection_policy(mut self, protection_policy: ProtectionPolicy) -> Self {
         self.protection_policy = protection_policy;
         self
     }
@@ -504,7 +503,7 @@ impl Paragraph {
     /// Zero-based paragraph position in the selected projection.
     ///
     /// Constructing a [`Position`] is infallible. Resolving it against a
-    /// snapshot collection is checked by [`Edit::replace_paragraph`].
+    /// snapshot collection is checked by [`crate::Edit::replace_paragraph`].
     #[must_use]
     pub const fn position(&self) -> Position {
         self.position
@@ -906,7 +905,7 @@ where
 }
 
 /// Immutable, exact-source snapshot for the body-text transaction seam.
-pub struct Snapshot {
+pub(crate) struct Snapshot {
     source: Arc<[u8]>,
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
@@ -941,7 +940,14 @@ impl Snapshot {
     ///
     /// Returns [`Error::Invalid`] when the CFB, Word 97+ FIB, selected table
     /// stream, piece table, or FKP basis cannot support safe editing.
-    pub fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn open(input: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
         Self::open_bounded(input, limits, TransactionLimits::default())
     }
 
@@ -951,7 +957,14 @@ impl Snapshot {
     ///
     /// Returns [`Error::Invalid`] when the complete package or its safe edit
     /// basis cannot be reopened.
-    pub fn open_bounded(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn open_bounded(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
@@ -970,7 +983,14 @@ impl Snapshot {
     /// under the default policy. Supplying
     /// [`ProtectionPolicy::AllowProtected`] is an explicit capability that
     /// authorizes changed publication.
-    pub fn open_bounded_with_policy(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn open_bounded_with_policy(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
@@ -1012,37 +1032,6 @@ impl Snapshot {
         })
     }
 
-    /// Opens an owned DOC source while reporting deterministic phase
-    /// boundaries to an external observer.
-    ///
-    /// This is an opt-in profiling equivalent of [`Self::open_bounded`]. It
-    /// performs package-size preflight, strict-owner validation (including
-    /// one nested top-level in-memory CFB parse), complete public-reader
-    /// validation, and exact-source retention in the same order. The observer
-    /// receives no document content or physical identifiers, and no clock or
-    /// other ambient runtime state is consulted.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same error as [`Self::open_bounded`]. A failed validation
-    /// phase is closed with [`DiagnosticOutcome::Error`] before the error is
-    /// returned.
-    #[cfg(feature = "performance-diagnostics")]
-    pub fn open_bounded_profiled(
-        input: impl Into<Vec<u8>>,
-        limits: Limits,
-        transaction_limits: TransactionLimits,
-        observer: impl FnMut(DiagnosticEvent),
-    ) -> Result<Self> {
-        Self::open_bounded_profiled_with_cfb_observer(
-            input,
-            limits,
-            transaction_limits,
-            observer,
-            |_| {},
-        )
-    }
-
     /// Opens an owned DOC source while reporting both semantic phases and the
     /// operation-local top-level in-memory CFB parse separately.
     ///
@@ -1064,7 +1053,7 @@ impl Snapshot {
     /// physical parses close their respective observer events before the
     /// error is returned.
     #[cfg(feature = "performance-diagnostics")]
-    pub fn open_bounded_profiled_with_cfb_observer(
+    pub(crate) fn open_bounded_profiled_with_cfb_observer(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
@@ -1139,7 +1128,14 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns the same validation failure as [`Self::open`].
-    pub fn parse(input: &[u8]) -> Result<Self> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn parse(input: &[u8]) -> Result<Self> {
         Self::from_bytes_with_options(input.to_vec(), OpenOptions::default())
     }
 
@@ -1148,7 +1144,14 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns the same validation failure as [`Self::open`].
-    pub fn from_bytes(input: Vec<u8>) -> Result<Self> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn from_bytes(input: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_options(input, OpenOptions::default())
     }
 
@@ -1157,7 +1160,7 @@ impl Snapshot {
     /// The selected package and strict-owner limits are retained by the
     /// immutable snapshot and reused for every changed commit and inverse
     /// patch application.
-    pub fn from_bytes_with_options(
+    pub(crate) fn from_bytes_with_options(
         input: impl Into<Vec<u8>>,
         options: OpenOptions,
     ) -> Result<Self> {
@@ -1166,13 +1169,13 @@ impl Snapshot {
 
     /// Exact CFB source bytes retained for source checks and byte-exact no-ops.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub(crate) fn bytes(&self) -> &[u8] {
         &self.source
     }
 
     /// Shared ownership of the exact source allocation.
     #[must_use]
-    pub fn bytes_shared(&self) -> Arc<[u8]> {
+    pub(crate) fn bytes_shared(&self) -> Arc<[u8]> {
         Arc::clone(&self.source)
     }
 
@@ -1183,7 +1186,7 @@ impl Snapshot {
     /// this diagnostic value. A clone copies an already initialized value;
     /// otherwise each immutable snapshot may initialize its own cache.
     #[must_use]
-    pub fn fingerprint(&self) -> u64 {
+    pub(crate) fn fingerprint(&self) -> u64 {
         *self
             .fingerprint_cache
             .get_or_init(|| fingerprint(&self.source))
@@ -1191,7 +1194,7 @@ impl Snapshot {
 
     /// Configured finite semantic-operation and text-payload bounds.
     #[must_use]
-    pub const fn transaction_limits(&self) -> TransactionLimits {
+    pub(crate) const fn transaction_limits(&self) -> TransactionLimits {
         self.transaction_limits
     }
 
@@ -1208,7 +1211,7 @@ impl Snapshot {
     /// Configured outer-package and aggregate stream limits retained by this
     /// immutable source owner.
     #[must_use]
-    pub const fn source_limits(&self) -> crate::package::SourceLimits {
+    pub(crate) const fn source_limits(&self) -> crate::package::SourceLimits {
         self.source_limits
     }
 
@@ -1218,7 +1221,7 @@ impl Snapshot {
     ///
     /// Returns [`Error::Invalid`] for an invalid source or [`Error::Refused`]
     /// when tracked text ranges overlap ambiguously for the projection.
-    pub fn paragraphs(&self, projection: Projection) -> Result<Vec<Paragraph>> {
+    pub(crate) fn paragraphs(&self, projection: Projection) -> Result<Vec<Paragraph>> {
         let editor = self.editor()?;
         projected_paragraphs(&editor, projection)
     }
@@ -1226,26 +1229,26 @@ impl Snapshot {
     /// Lists ordinary paragraphs from any DOC story. Main-story review
     /// projection remains available through [`Self::paragraphs`]; non-main
     /// stories expose their exact stored text.
-    pub fn story_paragraphs(&self, story: Story) -> Result<Vec<TextItem>> {
+    pub(crate) fn story_paragraphs(&self, story: Story) -> Result<Vec<TextItem>> {
         let editor = self.editor()?;
         target_spans(&editor, TargetCollection::Story(story)).map(items_from_spans)
     }
 
     /// Lists simple main-story table cells that can be edited without changing
     /// table marks or PAPX/TAP structure.
-    pub fn table_cells(&self) -> Result<Vec<TextItem>> {
+    pub(crate) fn table_cells(&self) -> Result<Vec<TextItem>> {
         let editor = self.editor()?;
         target_spans(&editor, TargetCollection::TableCells).map(items_from_spans)
     }
 
     /// Lists cached results of balanced, non-nested main-story fields.
-    pub fn field_results(&self) -> Result<Vec<TextItem>> {
+    pub(crate) fn field_results(&self) -> Result<Vec<TextItem>> {
         let editor = self.editor()?;
         target_spans(&editor, TargetCollection::FieldResults).map(items_from_spans)
     }
 
     /// Managed embedded fields and their passive `ObjectPool` metadata.
-    pub fn embedded_objects(&self) -> Result<crate::embedded_object::Inventory> {
+    pub(crate) fn embedded_objects(&self) -> Result<crate::embedded_object::Inventory> {
         crate::embedded_object::Snapshot::open(self.finish(), self.limits)
             .map_err(Error::Invalid)?
             .inventory()
@@ -1253,7 +1256,14 @@ impl Snapshot {
     }
 
     /// Lists tracked main-story ranges in stable CP/kind order.
-    pub fn revisions(&self) -> Result<Vec<Revision>> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn revisions(&self) -> Result<Vec<Revision>> {
         self.editor()?.revisions().map_err(Error::Invalid)
     }
 
@@ -1262,7 +1272,7 @@ impl Snapshot {
     /// The public value exposes only the fixed record bytes, while its private
     /// owner handle keeps source-bound edits tied to this immutable snapshot.
     /// No selection is applied to document or host UI state.
-    pub fn saved_selection(&self) -> Result<Option<SavedSelection>> {
+    pub(crate) fn saved_selection(&self) -> Result<Option<SavedSelection>> {
         self.editor()?
             .saved_selection()
             .map(|selection| selection.map(|selection| selection.with_owner(self.bytes_shared())))
@@ -1271,7 +1281,7 @@ impl Snapshot {
 
     /// Reads the optional bounded `RgDofr` frame-set/list records through the
     /// strict DOC owner. Frame names and paths remain inert bytes.
-    pub fn dofr_records(&self) -> Result<Option<DofrArray>> {
+    pub(crate) fn dofr_records(&self) -> Result<Option<DofrArray>> {
         self.editor()?
             .dofr_records()
             .map(|records| records.map(|records| records.with_owner(self.bytes_shared())))
@@ -1283,7 +1293,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns [`Error::Invalid`] if the retained source no longer validates.
-    pub fn edit(&self) -> Result<Edit> {
+    pub(crate) fn edit(&self) -> Result<Edit> {
         Edit::new(self.clone())
     }
 
@@ -1295,7 +1305,14 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns [`Error::Invalid`] if the retained source no longer validates.
-    pub fn edit_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn edit_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
         let mut edit = Edit::new(self.clone())?;
         edit.source.transaction_limits = edit
             .source
@@ -1308,7 +1325,7 @@ impl Snapshot {
 
     /// Starts a bounded disjoint composition for this exact artifact.
     #[must_use]
-    pub fn compose(&self, limits: CompositionLimits) -> Composition {
+    pub(crate) fn compose(&self, limits: CompositionLimits) -> Composition {
         Composition {
             source: self.clone(),
             joined: JoinedSubEdits::new(self.lineage(), limits),
@@ -1318,7 +1335,8 @@ impl Snapshot {
 
     /// Starts explicit bounded undo/redo history at this immutable snapshot.
     #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> History {
+    #[cfg(test)]
+    pub(crate) fn history(&self, limits: HistoryLimits) -> History {
         History::new(self.clone(), limits)
     }
 
@@ -1329,18 +1347,18 @@ impl Snapshot {
     ///
     /// Returns the same typed validation refusal as [`Edit::replace_paragraph`]
     /// or a common composition-bound error.
-    pub fn prepare_replace(
+    pub(crate) fn prepare_replace(
         &self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
         position: Position,
         replacement: impl Into<String>,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let replacement = replacement.into();
         let mut validation = self.edit()?;
         let target = TextTarget::body_paragraph(position);
         validation.replace_text(target, &replacement)?;
-        PreparedEdit::new(
+        SubEdit::new(
             self.lineage(),
             limits,
             identifier,
@@ -1358,17 +1376,17 @@ impl Snapshot {
     ///
     /// Returns the same typed validation refusal as
     /// [`Edit::set_paragraph_bold`] or a common composition-bound error.
-    pub fn prepare_bold(
+    pub(crate) fn prepare_bold(
         &self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
         position: Position,
         enabled: bool,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let mut validation = self.edit()?;
         let target = TextTarget::body_paragraph(position);
         validation.set_character_property(target, CharacterProperty::Bold, enabled)?;
-        PreparedEdit::new(
+        SubEdit::new(
             self.lineage(),
             limits,
             identifier,
@@ -1382,17 +1400,17 @@ impl Snapshot {
     }
 
     /// Prepares one independently composable semantic text replacement.
-    pub fn prepare_text(
+    pub(crate) fn prepare_text(
         &self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
         target: TextTarget,
         replacement: impl Into<String>,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let replacement = replacement.into();
         let mut validation = self.edit()?;
         validation.replace_text(target, &replacement)?;
-        PreparedEdit::new(
+        SubEdit::new(
             self.lineage(),
             limits,
             identifier,
@@ -1405,17 +1423,17 @@ impl Snapshot {
     }
 
     /// Prepares one independently composable direct-format mutation.
-    pub fn prepare_format(
+    pub(crate) fn prepare_format(
         &self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
         target: TextTarget,
         property: CharacterProperty,
         enabled: bool,
-    ) -> Result<PreparedEdit> {
+    ) -> Result<SubEdit> {
         let mut validation = self.edit()?;
         validation.set_character_property(target, property, enabled)?;
-        PreparedEdit::new(
+        SubEdit::new(
             self.lineage(),
             limits,
             identifier,
@@ -1435,7 +1453,10 @@ impl Snapshot {
     /// Returns an error for a foreign vocabulary, malformed selector,
     /// artifact or semantic precondition conflict, bound violation, or typed
     /// body-edit refusal.
-    pub fn apply_durable<Mode>(&self, patch: &litchi_core::patch::Patch<Mode>) -> Result<Self> {
+    pub(crate) fn stage_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Edit> {
         if patch.format() != "litchi-doc-body" {
             return Err(invalid_durable_patch("unsupported format"));
         }
@@ -1445,7 +1466,7 @@ impl Snapshot {
                     "operation-free durable patch has unreferenced blobs",
                 ));
             }
-            return Ok(self.clone());
+            return self.edit();
         }
         let expected_artifact = BlobId::of(self.bytes()).as_hex();
         let mut edit = self.edit()?;
@@ -1525,13 +1546,13 @@ impl Snapshot {
                 "durable patch has unreferenced blobs",
             ));
         }
-        edit.commit().map(Commit::into_package)
+        Ok(edit)
     }
 
     /// Plans an inert text transfer while proving the receiving selector and
     /// exact target artifact. Text carries no DOC style, drawing, or resource
     /// identifiers, so its dependency closure is empty.
-    pub fn plan_text_transfer_from(
+    pub(crate) fn plan_text_transfer_from(
         &self,
         donor: &Self,
         source: TextTarget,
@@ -1565,7 +1586,7 @@ impl Snapshot {
     /// The donor's standalone object CFB and exact preview block are retained;
     /// the receiver regenerates the field text, field PLCF, CHPX picture
     /// references, Data-stream offset, and `ObjectPool` storage identity.
-    pub fn plan_embedded_transfer_from(
+    pub(crate) fn plan_embedded_transfer_from(
         &self,
         donor: &Self,
         source_storage_id: u32,
@@ -1627,7 +1648,7 @@ impl Snapshot {
         clippy::unwrap_used,
         reason = "picture transfer planning is a checked binary-resource boundary"
     )]
-    pub fn plan_picture_transfer_from(
+    pub(crate) fn plan_picture_transfer_from(
         &self,
         donor: &Self,
         source: TextTarget,
@@ -1673,7 +1694,7 @@ impl Snapshot {
     /// Opaque `RgDofr` and `Selsf` auxiliary-table changes are refused because
     /// this plan merges semantic body changes and cannot combine those byte
     /// ranges without silently dropping one side.
-    pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
+    pub(crate) fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before != *self || right.before != *self {
             return Err(Error::Conflict);
         }
@@ -1685,7 +1706,7 @@ impl Snapshot {
 
     /// Exact source bytes. A snapshot has no implicit serialization step.
     #[must_use]
-    pub fn finish(&self) -> Vec<u8> {
+    pub(crate) fn finish(&self) -> Vec<u8> {
         self.source.as_ref().to_vec()
     }
 
@@ -1773,7 +1794,7 @@ pub(crate) struct ValidatedPackage {
 }
 
 /// Clone-first staged text edit over one immutable source snapshot.
-pub struct Edit {
+pub(crate) struct Edit {
     source: Snapshot,
     editor: RevisionEditor,
     signed: bool,
@@ -1915,35 +1936,29 @@ impl Edit {
         }
     }
 
-    /// Immutable source snapshot that authorizes this transaction.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
-    }
-
     /// Exact source bytes retained by this staged edit.
     #[must_use]
-    pub fn source_bytes(&self) -> &[u8] {
+    pub(crate) fn source_bytes(&self) -> &[u8] {
         self.source.bytes()
     }
 
     /// Borrowed semantic changes staged so far, including authored text.
     #[must_use]
-    pub fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
+    pub(crate) fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
         self.changes.iter().map(Change::as_ref)
     }
 
     /// Allocation capacity held by the already-validated rendered handoff,
     /// when the transaction's finite retention ceiling admitted it.
     #[must_use]
-    pub fn retained_render_bytes(&self) -> Option<usize> {
+    pub(crate) fn retained_render_bytes(&self) -> Option<usize> {
         self.editor.retained_render_capacity()
     }
 
     /// Releases the retained rendered handoff without changing the staged
     /// document or any semantic transaction result. Later mutations may retain
     /// a new output under the transaction's ceiling.
-    pub fn release_retained_render(&mut self) {
+    pub(crate) fn release_retained_render(&mut self) {
         self.editor.release_retained_render();
     }
 
@@ -1951,7 +1966,10 @@ impl Edit {
     /// edit through the normal package owner. A changed patch must have been
     /// produced from this exact immutable snapshot; the component patch also
     /// checks the FIB-selected record before cloning the table stream.
-    pub fn apply_saved_selection_patch(&mut self, patch: &SavedSelectionPatch) -> Result<bool> {
+    pub(crate) fn apply_saved_selection_patch(
+        &mut self,
+        patch: &SavedSelectionPatch,
+    ) -> Result<bool> {
         let changed = self
             .editor
             .preflight_saved_selection_patch(patch)
@@ -1983,7 +2001,7 @@ impl Edit {
     /// The closure receives the typed transaction and returns the package
     /// error produced by its field setters. A document without `Selsf` is
     /// reported as a missing semantic target.
-    pub fn edit_saved_selection(
+    pub(crate) fn edit_saved_selection(
         &mut self,
         edit: impl FnOnce(&mut SavedSelectionEdit) -> crate::package::Result<()>,
     ) -> Result<bool> {
@@ -2004,7 +2022,7 @@ impl Edit {
     /// produced from this exact immutable snapshot; the lower-level component
     /// patch methods intentionally retain their narrower `RgDofr` source
     /// checks.
-    pub fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
+    pub(crate) fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
         let changed = self
             .editor
             .preflight_dofr_patch(patch)
@@ -2034,7 +2052,7 @@ impl Edit {
     /// Replaces one complete, validated `RgDofr` record in this staged edit.
     /// Record size and frame-set/list sequence invariants are checked before
     /// the candidate table stream is published.
-    pub fn replace_dofr_record(&mut self, index: usize, replacement: &[u8]) -> Result<bool> {
+    pub(crate) fn replace_dofr_record(&mut self, index: usize, replacement: &[u8]) -> Result<bool> {
         let source = self
             .editor
             .dofr_records()
@@ -2074,7 +2092,11 @@ impl Edit {
     /// Returns a typed [`Refusal`] for every operation outside the proven
     /// bounded dependency closure and [`Error::Invalid`] for a failed package
     /// update.
-    pub fn replace_paragraph(&mut self, position: Position, replacement: &str) -> Result<()> {
+    pub(crate) fn replace_paragraph(
+        &mut self,
+        position: Position,
+        replacement: &str,
+    ) -> Result<()> {
         self.replace_text(TextTarget::body_paragraph(position), replacement)
             .map_err(|error| match error {
                 Error::Refused(Refusal::TargetNotFound) => {
@@ -2089,7 +2111,7 @@ impl Edit {
     /// every `Selsf` CP has a deterministic splice-boundary mapping; a `Selsf`
     /// CP strictly inside the replaced text is refused. Non-main story
     /// paragraphs require equal UTF-16 length.
-    pub fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
+    pub(crate) fn replace_text(&mut self, target: TextTarget, replacement: &str) -> Result<()> {
         let span = resolve_target(&self.editor, target)?;
         if let Some(dependency) = drawing_dependency(&span.text) {
             return Err(Error::Refused(Refusal::DrawingDependency { dependency }));
@@ -2199,7 +2221,7 @@ impl Edit {
     ///
     /// Returns a typed refusal when the paragraph is absent, empty,
     /// structural, tracked, or has non-uniform direct bold semantics.
-    pub fn set_paragraph_bold(&mut self, position: Position, enabled: bool) -> Result<()> {
+    pub(crate) fn set_paragraph_bold(&mut self, position: Position, enabled: bool) -> Result<()> {
         self.set_character_property(
             TextTarget::body_paragraph(position),
             CharacterProperty::Bold,
@@ -2209,7 +2231,7 @@ impl Edit {
 
     /// Sets a direct bold, italic, or single-underline override on one semantic
     /// text target without creating or rewriting style-table resources.
-    pub fn set_character_property(
+    pub(crate) fn set_character_property(
         &mut self,
         target: TextTarget,
         property: CharacterProperty,
@@ -2228,7 +2250,7 @@ impl Edit {
     /// Returns a typed refusal when the target is absent, empty, structural
     /// or tracked, when its direct value is not uniform, when the size is out
     /// of range, or when the font table does not name the font.
-    pub fn set_character_value(
+    pub(crate) fn set_character_value(
         &mut self,
         target: TextTarget,
         value: CharacterValue<'_>,
@@ -2345,7 +2367,7 @@ impl Edit {
     ///
     /// Returns a typed refusal for a position past the end, structural text,
     /// a tracked neighbour mark, unmodeled CP-indexed tables, or a limit.
-    pub fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
+    pub(crate) fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
         if has_structural_content(text) {
             return Err(Error::Refused(
                 Refusal::ReplacementContainsStructuralContent,
@@ -2397,7 +2419,7 @@ impl Edit {
     /// Returns a typed refusal when the paragraph is absent or the only one,
     /// holds structural or tracked content or an anchored range, or when its
     /// removal would join two tables or end the story in a table.
-    pub fn remove_paragraph(&mut self, position: Position) -> Result<()> {
+    pub(crate) fn remove_paragraph(&mut self, position: Position) -> Result<()> {
         let paragraphs = source_paragraphs(&self.editor)?;
         if paragraphs.get(position.get()).is_none() {
             return Err(Error::Refused(Refusal::ParagraphNotFound));
@@ -2424,7 +2446,7 @@ impl Edit {
     /// Returns the refusals of [`Self::remove_paragraph`] for the moved
     /// paragraph, and [`Refusal::ParagraphNotFound`] for a destination past
     /// the end.
-    pub fn move_paragraph(&mut self, from: Position, to: Position) -> Result<()> {
+    pub(crate) fn move_paragraph(&mut self, from: Position, to: Position) -> Result<()> {
         let paragraphs = source_paragraphs(&self.editor)?;
         if from.get() >= paragraphs.len() || to.get() >= paragraphs.len() {
             return Err(Error::Refused(Refusal::ParagraphNotFound));
@@ -2542,7 +2564,7 @@ impl Edit {
 
     /// Applies a dependency-checked text transfer prepared for this exact
     /// receiving artifact.
-    pub fn apply_transfer(&mut self, plan: &TransferPlan) -> Result<()> {
+    pub(crate) fn apply_transfer(&mut self, plan: &TransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
@@ -2553,7 +2575,7 @@ impl Edit {
 
     /// Applies a dependency-closed embedded-object transfer prepared for this
     /// exact receiving artifact.
-    pub fn apply_embedded_transfer(&mut self, plan: &EmbeddedTransferPlan) -> Result<()> {
+    pub(crate) fn apply_embedded_transfer(&mut self, plan: &EmbeddedTransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
@@ -2563,7 +2585,7 @@ impl Edit {
     }
 
     /// Applies a canonical picture graph prepared for this exact receiver.
-    pub fn apply_picture_transfer(&mut self, plan: &PictureTransferPlan) -> Result<()> {
+    pub(crate) fn apply_picture_transfer(&mut self, plan: &PictureTransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
             return Err(Error::Conflict);
         }
@@ -2687,7 +2709,7 @@ impl Edit {
 
     /// Adds one inert embedded object through the dedicated field,
     /// `ObjectPool`, Data-stream, CHPX, CLX, and field-PLCF owner.
-    pub fn add_embedded_object(
+    pub(crate) fn add_embedded_object(
         &mut self,
         mut options: crate::embedded_object::WriteOptions,
     ) -> Result<()> {
@@ -2730,7 +2752,7 @@ impl Edit {
     /// Removes one managed embedded field together with its preview and owning
     /// `ObjectPool` storage. The exact dependency closure is retained in the
     /// reversible patch.
-    pub fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
+    pub(crate) fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
         let bytes = self.finish_candidate()?;
         let snapshot = crate::embedded_object::Snapshot::open_with_policy(
             bytes,
@@ -2771,7 +2793,7 @@ impl Edit {
     /// Accepts an insertion/move-to mark or rejects a deletion/move-from mark
     /// while retaining the stored text. Destructive dispositions and property
     /// revision restoration are explicitly refused.
-    pub fn dispose_revision(
+    pub(crate) fn dispose_revision(
         &mut self,
         position: Position,
         disposition: RevisionDisposition,
@@ -2810,7 +2832,11 @@ impl Edit {
     /// Changes the passive display-as-icon bit of one existing managed
     /// embedded object through the dedicated `ObjectPool` owner, then reopens the
     /// complete candidate into this root transaction.
-    pub fn set_embedded_display_as_icon(&mut self, storage_id: u32, enabled: bool) -> Result<()> {
+    pub(crate) fn set_embedded_display_as_icon(
+        &mut self,
+        storage_id: u32,
+        enabled: bool,
+    ) -> Result<()> {
         let bytes = self.finish_candidate()?;
         let snapshot = crate::embedded_object::Snapshot::open_with_policy(
             bytes,
@@ -2854,7 +2880,14 @@ impl Edit {
     /// reopened with the original safety limits, or
     /// `Error::Refused(Refusal::SignedSource)` when a changed candidate
     /// would leave retained signature metadata stale.
-    pub fn commit(mut self) -> Result<Commit> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the engine directly; Package is the public route"
+        )
+    )]
+    pub(crate) fn commit(mut self) -> Result<Commit> {
         let bytes = self.take_candidate()?;
         let snapshot = if bytes == self.source.bytes() {
             self.source.clone()
@@ -2942,43 +2975,6 @@ impl Edit {
         })
     }
 
-    /// Publishes a commit while reporting deterministic, content-free phase
-    /// boundaries to an external observer.
-    ///
-    /// This is an opt-in profiling equivalent of [`Self::commit`]. Changed
-    /// candidates report editor finish, strict-owner validation, complete
-    /// public-reader validation, source retention, and patch construction. A
-    /// separate CFB observer is available through
-    /// [`Self::commit_profiled_with_cfb_observer`]. An exact byte-for-byte
-    /// no-op reports finish, the no-op decision, and patch construction; it
-    /// shares the source allocation and does not reopen or retain a new
-    /// candidate.
-    ///
-    /// The safe public edit verbs do not provide a raw WordDocument/table
-    /// injection path: each binary mutation validates its candidate before it
-    /// is installed in the editor. Consequently a deterministic typed
-    /// `Finish` or candidate-reopen failure cannot be manufactured through a
-    /// public `Edit`; those failures remain possible for lower-level render or
-    /// allocation conditions. The profiled open tests cover the reachable
-    /// strict-owner and public-reader validation failures, while the phase
-    /// helper test locks the finish-error event contract.
-    /// The ordinary commit path is unchanged and the observer cannot alter the
-    /// returned document semantics. Auxiliary `RgDofr` and `Selsf` changes
-    /// remain outside the semantic three-way merge boundary and are refused by
-    /// [`Snapshot::plan_three_way`].
-    ///
-    /// # Errors
-    ///
-    /// Returns the same error as [`Self::commit`], including
-    /// `Error::Refused(Refusal::SignedSource)`. A failed phase is closed
-    /// before the error is returned. Auxiliary `RgDofr` and `Selsf` changes
-    /// remain outside the semantic three-way merge boundary and are refused by
-    /// [`Snapshot::plan_three_way`].
-    #[cfg(feature = "performance-diagnostics")]
-    pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
-        self.commit_profiled_with_cfb_observer(&mut observer, |_| {})
-    }
-
     /// Publishes a profiled commit with separate semantic and in-memory CFB
     /// observers.
     ///
@@ -3003,7 +2999,7 @@ impl Edit {
     /// semantic three-way merge boundary and are refused by
     /// [`Snapshot::plan_three_way`].
     #[cfg(feature = "performance-diagnostics")]
-    pub fn commit_profiled_with_cfb_observer(
+    pub(crate) fn commit_profiled_with_cfb_observer(
         mut self,
         observer: impl FnMut(DiagnosticEvent),
         mut cfb_observer: impl FnMut(CfbParseEvent),
@@ -3130,13 +3126,13 @@ impl Edit {
 
 /// Validated commit result for one body-text edit: the published snapshot,
 /// its reversible exact-source patch and diagnostics.
-pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
+pub(crate) type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
 
 /// Content-free diagnostics of one body-text commit.
-pub use litchi_core::edit::Diagnostics;
+pub(crate) use litchi_core::edit::Diagnostics;
 /// In-memory reversible replacement guarded by exact source bytes.
 #[derive(Clone, PartialEq, Eq)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
     changes: Vec<Change>,
@@ -3172,7 +3168,7 @@ impl Patch {
 
     /// Semantic text and formatting changes in application order.
     #[must_use]
-    pub fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
+    pub(crate) fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
         self.changes.iter().map(Change::as_ref)
     }
 
@@ -3182,19 +3178,19 @@ impl Patch {
     /// operations; the durable semantic envelope intentionally refuses them
     /// until it has a dedicated wire vocabulary.
     #[must_use]
-    pub const fn has_auxiliary_changes(&self) -> bool {
+    pub(crate) const fn has_auxiliary_changes(&self) -> bool {
         self.auxiliary_changed
     }
 
     /// Exact source snapshot required for application.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Snapshot produced by the transaction.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
@@ -3205,7 +3201,7 @@ impl Patch {
     /// was `const`, but no public constructor could produce a `Patch` in a
     /// const context.
     #[must_use]
-    pub fn source_fingerprint(&self) -> u64 {
+    pub(crate) fn source_fingerprint(&self) -> u64 {
         self.before.fingerprint()
     }
 
@@ -3214,13 +3210,13 @@ impl Patch {
     /// See [`Self::source_fingerprint`] for the lazy-cache and const-accessor
     /// compatibility note.
     #[must_use]
-    pub fn target_fingerprint(&self) -> u64 {
+    pub(crate) fn target_fingerprint(&self) -> u64 {
         self.after.fingerprint()
     }
 
     /// Whether this patch preserves the exact artifact.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         same_source_allocation(&self.before.source, &self.after.source)
             || self.before.bytes() == self.after.bytes()
     }
@@ -3231,7 +3227,7 @@ impl Patch {
     ///
     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let limits = intersect_revision_limits(
             intersect_revision_limits(source.limits, self.before.limits),
             self.after.limits,
@@ -3289,7 +3285,7 @@ impl Patch {
 
     /// Exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -3307,7 +3303,7 @@ impl Patch {
     /// every semantic operation and inverse. In-memory auxiliary-table edits
     /// are intentionally refused until the durable envelope has a matching
     /// binary-table vocabulary.
-    pub fn to_durable(
+    pub(crate) fn to_durable(
         &self,
         limits: PatchLimits,
     ) -> std::result::Result<litchi_core::patch::Patch<Reversible>, PatchError> {
@@ -4018,12 +4014,12 @@ impl PreparedOperation {
 }
 
 /// One independently prepared body-text or formatting edit.
-pub struct PreparedEdit {
-    inner: SubEdit<Lineage, PreparedOperation>,
+pub struct SubEdit {
+    inner: CoreSubEdit<Lineage, PreparedOperation>,
     transaction_limits: TransactionLimits,
 }
 
-impl PreparedEdit {
+impl SubEdit {
     fn new(
         lineage: Lineage,
         limits: CompositionLimits,
@@ -4032,7 +4028,7 @@ impl PreparedEdit {
         transaction_limits: TransactionLimits,
     ) -> Result<Self> {
         let writes = [operation.effect()];
-        let inner = SubEdit::new(
+        let inner = CoreSubEdit::new(
             lineage,
             limits,
             identifier,
@@ -4059,10 +4055,10 @@ impl PreparedEdit {
     }
 }
 
-impl std::fmt::Debug for PreparedEdit {
+impl std::fmt::Debug for SubEdit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("PreparedEdit")
+            .debug_struct("SubEdit")
             .field("identifier", &self.identifier())
             .field("target", &self.target())
             .finish_non_exhaustive()
@@ -4072,7 +4068,7 @@ impl std::fmt::Debug for PreparedEdit {
 /// Recoverable failure to join one independently prepared edit.
 pub struct JoinError {
     failure: SubEditJoinFailure,
-    rejected: PreparedEdit,
+    rejected: SubEdit,
 }
 
 impl JoinError {
@@ -4084,7 +4080,7 @@ impl JoinError {
 
     /// Recovers the rejected prepared edit.
     #[must_use]
-    pub fn into_rejected(self) -> PreparedEdit {
+    pub fn into_rejected(self) -> SubEdit {
         self.rejected
     }
 }
@@ -4100,7 +4096,7 @@ impl std::fmt::Debug for JoinError {
 }
 
 /// Bounded deterministic composition of provably disjoint body edits.
-pub struct Composition {
+pub(crate) struct Composition {
     source: Snapshot,
     joined: JoinedSubEdits<Lineage, PreparedOperation>,
     transaction_limits: TransactionLimits,
@@ -4118,13 +4114,13 @@ impl Composition {
         clippy::result_large_err,
         reason = "composition refusals intentionally return the rejected prepared edit to the caller"
     )]
-    pub fn join(&mut self, incoming: PreparedEdit) -> std::result::Result<&mut Self, JoinError> {
+    pub(crate) fn join(&mut self, incoming: SubEdit) -> std::result::Result<&mut Self, JoinError> {
         let transaction_limits = incoming.transaction_limits;
         if let Err(error) = self.joined.join(incoming.inner) {
             let (failure, rejected) = error.into_parts();
             return Err(JoinError {
                 failure,
-                rejected: PreparedEdit {
+                rejected: SubEdit {
                     inner: rejected,
                     transaction_limits,
                 },
@@ -4136,13 +4132,13 @@ impl Composition {
 
     /// Number of accepted independently prepared edits.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.joined.len()
     }
 
     /// Whether no edits have been accepted.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.joined.is_empty()
     }
 
@@ -4152,7 +4148,7 @@ impl Composition {
     ///
     /// Returns the same staging, publication, and full-reopen errors as an
     /// ordinary multi-operation [`Edit`].
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn into_edit(self) -> Result<Edit> {
         let source = self.source.with_transaction_limits(self.transaction_limits);
         let mut edit = source.edit()?;
         for prepared in self.joined.into_sub_edits() {
@@ -4170,7 +4166,7 @@ impl Composition {
                 },
             }
         }
-        edit.commit()
+        Ok(edit)
     }
 }
 
@@ -4274,7 +4270,7 @@ impl ThreeWayConflict {
 
 /// Non-mutating three-way merge plan over one exact immutable DOC source.
 #[derive(Clone, Debug)]
-pub struct ThreeWayPlan {
+pub(crate) struct ThreeWayPlan {
     source: Snapshot,
     changes: Vec<Change>,
     conflicts: Vec<ThreeWayConflict>,
@@ -4309,18 +4305,18 @@ impl ThreeWayPlan {
     }
 
     #[must_use]
-    pub fn conflicts(&self) -> &[ThreeWayConflict] {
+    pub(crate) fn conflicts(&self) -> &[ThreeWayConflict] {
         &self.conflicts
     }
 
     #[must_use]
-    pub fn is_conflict_free(&self) -> bool {
+    pub(crate) fn is_conflict_free(&self) -> bool {
         self.conflicts.is_empty()
     }
 
     /// Publishes the conflict-free combined plan through the ordinary bounded
     /// transaction and full reopen boundary.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn into_edit(self) -> Result<Edit> {
         if !self.conflicts.is_empty() {
             return Err(Error::Conflict);
         }
@@ -4328,7 +4324,7 @@ impl ThreeWayPlan {
         for change in &self.changes {
             apply_change_after(&mut edit, change)?;
         }
-        edit.commit()
+        Ok(edit)
     }
 }
 
@@ -5716,6 +5712,43 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 
 fn same_source_allocation(left: &Arc<[u8]>, right: &Arc<[u8]>) -> bool {
     Arc::ptr_eq(left, right) && left.len() == right.len()
+}
+
+#[cfg(test)]
+impl Snapshot {
+    /// Unit-test shorthand: replay a durable patch through the engine.
+    pub(crate) fn apply_durable<Mode>(
+        &self,
+        patch: &litchi_core::patch::Patch<Mode>,
+    ) -> Result<Self> {
+        self.stage_durable(patch)?
+            .commit()
+            .map(Commit::into_package)
+    }
+}
+
+#[cfg(test)]
+impl Composition {
+    /// Unit-test shorthand: commit through the engine.
+    pub(crate) fn commit(self) -> Result<Commit> {
+        self.into_edit()?.commit()
+    }
+}
+
+#[cfg(test)]
+impl ThreeWayPlan {
+    /// Unit-test shorthand: commit through the engine.
+    pub(crate) fn commit(self) -> Result<Commit> {
+        self.into_edit()?.commit()
+    }
+}
+
+#[cfg(test)]
+impl Edit {
+    /// Unit-test shorthand: the immutable source snapshot.
+    pub(crate) const fn source(&self) -> &Snapshot {
+        &self.source
+    }
 }
 
 #[cfg(test)]

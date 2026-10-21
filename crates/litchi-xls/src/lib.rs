@@ -113,7 +113,13 @@ mod cell;
 pub mod cell_values;
 /// Lossless, source-backed BIFF8 worksheet visibility transactions.
 mod scoped;
+
+#[cfg(test)]
+extern crate self as litchi_xls;
+#[cfg(test)]
+mod internal_tests;
 pub mod sheet_visibility;
+pub mod source_backed;
 /// Finite physical source limits shared by the eager XLS owners.
 pub mod source_limits;
 

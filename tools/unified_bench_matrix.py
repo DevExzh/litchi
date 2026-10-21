@@ -2840,6 +2840,108 @@ def p0359():
     return out
 
 
+W5_SOURCE_BACKED = {
+    "doc/source_set": ("doc", "set", "source_backed::Package open + edit_paragraph + set_text + commit + write_to", "1k paragraphs"),
+    "xls/source_cells1": ("xls", "set", "SourceBackedWorkbook open + edit_cells (1 cell) + commit + write_to", "100×10 cells"),
+    "xls/source_cells100": ("xls", "set", "SourceBackedWorkbook open + edit_cells (100 cells) + commit + write_to", "100×10 cells"),
+    "xls/source_comments1": ("xls", "set", "SourceBackedWorkbook open + edit_comments (1 comment) + commit + write_to", "256 comments"),
+    "xls/source_comments256": ("xls", "set", "SourceBackedWorkbook open + edit_comments (256 comments) + commit + write_to", "256 comments"),
+    "xls/source_hide7": ("xls", "set", "SourceBackedWorkbook open + edit_sheet_visibility (7 sheets) + commit + write_to", "8 sheets"),
+    "rtf/source_append": ("rtf", "add", "source_backed::Package open + edit_tail_append + commit + write_to", "1k paragraphs"),
+}
+W5A_SAME_WORK = ("explained residual: the same work (callgrind instructions within 0.03% on both builds, "
+                 "results/0359a/callgrind-totals.txt); the other A-B-B-A run is {other}")
+W5A_LEAF = ("explained residual: process state, not the leaf edit. The leaf batch runs after the ops "
+            "batch in one process; on the base that batch faults in about 15 GB first, and the leaf "
+            "reuses the warmed heap. Alone in its process the leaf edit takes the same time on both "
+            "builds (1.684-1.688 s vs 1.669-1.690 s, results/0359a/doc-batch-isolated.txt)")
+
+
+def w5a_legs(paths):
+    legs: dict = {"before": {}, "after": {}}
+    for path in paths:
+        leg = path.name.split("-")[1]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    return legs
+
+
+@needs("0359a")
+def p0359a():
+    """Record 0359a §7: legacy_w5_source_probe (the source-backed routes and
+    the DOC 1k batch; only its `routes` module differs between the base,
+    record 0359's tip, and the head) and legacy_w5_probe (the 0359 routes),
+    A-B-B-A twice pinned in release. Ratios span both runs (run 2 is
+    `results/0359a/*.json`, run 1 `results/0359a/run1/`); the DOC batch row
+    is the head's unified/leaf ratio per run."""
+    base = RES / "0359a"
+    runs = [base, base / "run1"]
+    out = []
+    for probe in ("source", "ops"):
+        per_run = [w5a_legs(sorted(r.glob(f"{probe}-*-*.json"))) for r in runs]
+        paths = sorted(base.glob(f"{probe}-*-*.json"))
+        for scen, after in per_run[0]["after"].items():
+            before = per_run[0]["before"].get(scen)
+            if not before:
+                continue
+            b, a = med(before), med(after)
+            ratios = [med(legs["after"][scen]) / med(legs["before"][scen]) for legs in per_run
+                      if scen in legs["after"] and scen in legs["before"]]
+            if probe == "source" and scen in W5_SOURCE_BACKED:
+                fmt, op, scenario, size = W5_SOURCE_BACKED[scen]
+                scenario += ", family route vs former publisher"
+                explanation = ""
+                series = f"legacy_w5_source_probe:{scen}:after-before"
+            elif probe == "source":
+                fmt, op = scen.split("/")
+                label = {"doc/batch1k_ops": "File::edit_with_limits, 1,000 paragraph bold sets",
+                         "doc/batch1k_leaf": "Package::edit_with_options, 1,000 set_paragraph_bold"}[scen]
+                scenario, size, op = f"{label}, 0359a head vs 0359 head", "1k ops", "batch"
+                explanation = W5A_LEAF if scen == "doc/batch1k_leaf" else ""
+                series = f"legacy_w5_source_probe:{scen}:after-before"
+            else:
+                fmt, op = scen.split("/")
+                scenario = f"File {op.replace('_', ' ')} ({fmt}, 0359a head vs 0359 head)"
+                size = {"batch1k": "1k ops", "batch256": "256 ops"}.get(op, "")
+                op = W5_LEGACY_OPS.get(op, op)
+                explanation = ""
+                if max(ratios) > 1.05:
+                    other = ", ".join(f"{r:.3f}" for r in ratios)
+                    explanation = W5A_SAME_WORK.format(other=other)
+                series = f"legacy_w5_probe:{scen}:after-before"
+            out.append(row("0359a", fmt, op, scenario, size, b, a, ratios, regression("0359a"),
+                           series, src(paths), comparison="after/before", explanation=explanation))
+        if probe == "source":
+            for scen in ("xls/source_cells1", "xls/source_cells100"):
+                plan = per_run[0]["before"].get(scen + "_plan")
+                if not plan:
+                    continue
+                b, a = med(plan), med(per_run[0]["after"][scen])
+                ratios = [med(legs["after"][scen]) / med(legs["before"][scen + "_plan"])
+                          for legs in per_run if scen + "_plan" in legs["before"]]
+                fmt, op, scenario, size = W5_SOURCE_BACKED[scen]
+                out.append(row("0359a", fmt, op, scenario + ", family route vs former plan-only publisher",
+                               size, b, a, ratios, regression("0359a"),
+                               f"legacy_w5_source_probe:{scen}:after-before_plan", src(paths),
+                               comparison="after/before",
+                               explanation=("explained residual: the family commit reopens the "
+                                            "committed workbook over the plan's composed source, "
+                                            "which the forward-only plan publisher did not; the "
+                                            "former materializing publisher it replaces is the "
+                                            "after/before row") if max(ratios) > 1.05 else ""))
+    per_run = [w5a_legs(sorted(r.glob("source-after-*.json")) + sorted(r.glob("source-before-*.json")))
+               for r in runs]
+    ratios = [med(legs["after"]["doc/batch1k_ops"]) / med(legs["after"]["doc/batch1k_leaf"])
+              for legs in per_run]
+    legs = per_run[0]
+    out.append(row("0359a", "doc", "batch",
+                   "File::edit_with_limits, 1,000 paragraph bold sets vs the leaf edit with its operation bound raised through EditOptions",
+                   "1k ops", med(legs["after"]["doc/batch1k_leaf"]), med(legs["after"]["doc/batch1k_ops"]),
+                   ratios, BATCH, "legacy_w5_source_probe:doc/batch1k:unified-leaf",
+                   src(sorted(base.glob("source-after-*.json")))))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -2938,7 +3040,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0358a,
-           p0359, p0361]
+           p0359, p0359a, p0361]
 
 
 

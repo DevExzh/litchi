@@ -19,7 +19,7 @@ pub use model::{
     ObjectProperties, ObjectSubrecord, RecordKind, TextOrientation, TextProperties, TextRun,
     VerticalAlignment, Visibility,
 };
+pub(crate) use transaction::source_diagnostics;
 pub use transaction::{
-    Commit, Diagnostics, Edit, LimitKind, Operation, Patch, Snapshot, SourceBackedCommit,
-    SourceBackedDiagnostics, Update, Value, Worksheet,
+    Commit, Diagnostics, Edit, LimitKind, Operation, Patch, Snapshot, Update, Value, Worksheet,
 };

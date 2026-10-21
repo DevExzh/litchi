@@ -699,7 +699,14 @@ pub struct Snapshot {
 }
 
 /// Explicit bounded undo/redo history of immutable XLS snapshots.
-pub type History = litchi_core::patch::History<Snapshot>;
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+    )
+)]
+pub(crate) type History = litchi_core::patch::History<Snapshot>;
 
 impl Snapshot {
     /// Opens an unencrypted XLS package under an explicit object capture
@@ -707,7 +714,7 @@ impl Snapshot {
     ///
     /// The bounded corpus and other security-sensitive callers use this entry
     /// point instead of inheriting the broad convenience defaults.
-    pub fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let package = PackageEditor::open_with_cfb_limits(
             bytes,
             Targets::default(),
@@ -719,7 +726,7 @@ impl Snapshot {
 
     /// Opens an unencrypted XLS package under explicit object and CFB
     /// admission profiles before publishing the editable snapshot.
-    pub fn from_bytes_with_cfb(
+    pub(crate) fn from_bytes_with_cfb(
         bytes: Vec<u8>,
         limits: Limits,
         cfb_limits: OleFileLimits,
@@ -745,7 +752,7 @@ impl Snapshot {
     /// Returns [`Error::Cfb`] when the source changed or exceeds
     /// `cfb_limits`, [`Error::Allocation`] when the copy cannot be reserved,
     /// and otherwise the errors of [`Self::from_bytes_with_cfb`].
-    pub fn from_shared_ole_file(
+    pub(crate) fn from_shared_ole_file(
         cfb: &litchi_cfb::SharedOleFile,
         limits: Limits,
         cfb_limits: OleFileLimits,
@@ -928,6 +935,13 @@ impl Snapshot {
         })
     }
 
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     fn retag_source_version(self, source_version: SourceVersion) -> Self {
         if self.inner.source_version == source_version {
             return self;
@@ -1088,7 +1102,7 @@ impl Snapshot {
 
     /// Starts a detached edit against this immutable artifact.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             source: self.clone(),
             changes: Vec::new(),
@@ -1102,8 +1116,15 @@ impl Snapshot {
     }
 
     /// Starts bounded undo/redo history at this immutable snapshot.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> History {
+    pub(crate) fn history(&self, limits: HistoryLimits) -> History {
         History::new(self.clone(), limits)
     }
 
@@ -1663,7 +1684,7 @@ impl StructuralChangeIndex {
 
 /// Detached, failure-atomic edits of existing fixed-width BIFF8 cell fields.
 #[derive(Clone)]
-pub struct Edit {
+pub(crate) struct Edit {
     source: Snapshot,
     changes: Vec<Change>,
     structural_changes: Vec<StructuralChange>,
@@ -1789,7 +1810,7 @@ impl Edit {
     ///
     /// Returns the exact-source, structured cell-conflict, allocation, or
     /// finite-bound reason for refusing the incoming transaction.
-    pub fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
+    pub(crate) fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
         if self.source.bytes() != incoming.source.bytes() {
             return Err(JoinError::DifferentSource);
         }
@@ -2055,7 +2076,7 @@ impl Edit {
     ///
     /// Returns an error for an invalid Xnum, a missing or ambiguous worksheet,
     /// a duplicate cell, a non-`Number` cell family, or allocation failure.
-    pub fn set_number(
+    pub(crate) fn set_number(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2105,7 +2126,7 @@ impl Edit {
     /// Returns a typed refusal for an absent or ambiguous cell, a nonnumeric
     /// source family, an invalid `Xnum`, a non-RK-representable replacement,
     /// or a transaction staging bound.
-    pub fn set_numeric(
+    pub(crate) fn set_numeric(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2141,7 +2162,7 @@ impl Edit {
     ///
     /// Returns a typed selector, security, dependency, occupancy, allocation,
     /// or representability refusal without partially staging a transfer.
-    pub fn copy_scalar_cells_from<'source, 'target>(
+    pub(crate) fn copy_scalar_cells_from<'source, 'target>(
         &mut self,
         donor: &Snapshot,
         source_selector: impl Into<Selector<'source>>,
@@ -2393,27 +2414,8 @@ impl Edit {
         Ok(Some(self))
     }
 
-    /// Alias for [`Self::copy_scalar_cells_from`] using the conventional
-    /// worksheet-copy spelling.
-    pub fn copy_cells_from<'source, 'target>(
-        &mut self,
-        donor: &Snapshot,
-        source_selector: impl Into<Selector<'source>>,
-        source_range: CellRange,
-        target_selector: impl Into<Selector<'target>>,
-        target_anchor: Reference,
-    ) -> Result<Option<&mut Self>> {
-        self.copy_scalar_cells_from(
-            donor,
-            source_selector,
-            source_range,
-            target_selector,
-            target_anchor,
-        )
-    }
-
     /// Copies one exact scalar cell from another snapshot.
-    pub fn copy_scalar_cell_from<'source, 'target>(
+    pub(crate) fn copy_scalar_cell_from<'source, 'target>(
         &mut self,
         donor: &Snapshot,
         source_selector: impl Into<Selector<'source>>,
@@ -2462,7 +2464,7 @@ impl Edit {
     /// Returns an error for a missing or duplicate cell, an unrepresentable
     /// storage conversion, an invalid numeric/cache value, or a finite bound.
     /// Failed validation leaves this edit unchanged.
-    pub fn set_value(
+    pub(crate) fn set_value(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2594,7 +2596,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error unless the selected source cell is an existing `Blank`.
-    pub fn clear_cell(&mut self, selector: Selector<'_>, reference: Reference) -> Result<()> {
+    pub(crate) fn clear_cell(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+    ) -> Result<()> {
         let sheet_index = self
             .source
             .resolve_sheet(selector)?
@@ -2625,7 +2631,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed grid, resource, occupancy, dependency, or bound error.
-    pub fn insert_cell(
+    pub(crate) fn insert_cell(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2646,7 +2652,7 @@ impl Edit {
     ///
     /// Returns a typed text, formatting-run, resource, occupancy, dependency,
     /// allocation, or transaction-bound refusal without partially staging.
-    pub fn insert_rich_text_cell(
+    pub(crate) fn insert_rich_text_cell(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2693,7 +2699,7 @@ impl Edit {
     ///
     /// Returns a tokenizer, token-size, occupancy, style, allocation, or
     /// transaction-bound refusal without partially staging.
-    pub fn insert_formula(
+    pub(crate) fn insert_formula(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2709,7 +2715,7 @@ impl Edit {
     ///
     /// Returns a tokenizer, token-size, occupancy, style, allocation, or
     /// transaction-bound refusal without partially staging.
-    pub fn insert_formula_with_style(
+    pub(crate) fn insert_formula_with_style(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2765,17 +2771,17 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
+    /// use litchi_xls::cell_values::{Reference, Selector, Storage};
     /// # let mut builder = litchi_xls::Builder::new();
     /// # let sheet = builder.add_worksheet("Data")?;
     /// # builder.write_number(sheet, 0, 0, 2.0)?;
     /// # builder.write_number(sheet, 0, 1, 7.0)?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// let b1 = Reference::new(0, 1)?;
     /// edit.set_formula(Selector::Name("Data"), b1, "A1*3")?;
-    /// let target = edit.commit()?.into_parts().0;
+    /// let target = edit.commit()?.into_package().cell_values()?;
     /// let cell = target.worksheet(Selector::Position(Position::new(0)))?.unwrap().cell(b1)?.unwrap();
     /// assert_eq!(cell.storage(), Storage::Formula);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -2785,7 +2791,7 @@ impl Edit {
     ///
     /// Returns a tokenizer, token-size, existing-formula, style, dependency,
     /// allocation, or transaction-bound refusal without partially staging.
-    pub fn set_formula(
+    pub(crate) fn set_formula(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2875,7 +2881,7 @@ impl Edit {
     /// Returns a typed refusal for an occupied location, unsupported value,
     /// stale style resource, dependency closure, or finite transaction bound.
     /// Failed validation leaves this edit unchanged.
-    pub fn insert_cell_with_style(
+    pub(crate) fn insert_cell_with_style(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2946,7 +2952,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed absence, ambiguity, dependency, or bound error.
-    pub fn remove_cell(&mut self, selector: Selector<'_>, reference: Reference) -> Result<()> {
+    pub(crate) fn remove_cell(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+    ) -> Result<()> {
         let sheet = self.require_sheet(selector, "cell removal")?;
         let entry = self.source.inner.sheets[sheet]
             .unique_entry_index(reference)?
@@ -2978,7 +2988,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed absence, ambiguity, stale-resource, or bound error.
-    pub fn set_style(
+    pub(crate) fn set_style(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -3014,14 +3024,14 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_xls::cell_values::{FormatChange, Reference, Selector, Snapshot};
+    /// use litchi_xls::cell_values::{FormatChange, Reference, Selector};
     /// use litchi_xls::HorizontalAlignment;
     /// # let mut builder = litchi_xls::Builder::new();
     /// # let sheet = builder.add_worksheet("Data")?;
     /// # builder.write_number(sheet, 0, 0, 1.0)?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// let mut change = FormatChange::default();
     /// change.horizontal = Some(HorizontalAlignment::Right);
     /// edit.set_cell_format(Selector::Position(Position::new(0)), Reference::new(0, 0)?, &change)?;
@@ -3033,7 +3043,7 @@ impl Edit {
     ///
     /// Returns a typed indent, palette-color, selector, formula-dependency,
     /// style-resource or bound refusal without staging.
-    pub fn set_cell_format(
+    pub(crate) fn set_cell_format(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -3113,7 +3123,7 @@ impl Edit {
     ///
     /// Returns a stale source resource, index overflow, allocation, or bound
     /// error without staging a partial resource.
-    pub fn duplicate_style(&mut self, source: StyleIndex) -> Result<StyleIndex> {
+    pub(crate) fn duplicate_style(&mut self, source: StyleIndex) -> Result<StyleIndex> {
         self.require_effective_style(source)?;
         let payload = self
             .effective_xf_payload(source)
@@ -3139,7 +3149,7 @@ impl Edit {
     ///
     /// Returns a payload-length, index-overflow, allocation, or transaction
     /// bound error without staging a partial resource.
-    pub fn author_style(&mut self, payload: &[u8]) -> Result<StyleIndex> {
+    pub(crate) fn author_style(&mut self, payload: &[u8]) -> Result<StyleIndex> {
         validate_xf_payload(payload)?;
         let mut retained = Vec::new();
         retained
@@ -3519,7 +3529,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed grid, dependency-closure, or finite-bound error.
-    pub fn insert_rows(&mut self, selector: Selector<'_>, start: u16, count: u16) -> Result<()> {
+    pub(crate) fn insert_rows(
+        &mut self,
+        selector: Selector<'_>,
+        start: u16,
+        count: u16,
+    ) -> Result<()> {
         self.stage_rows(selector, start, count, true)
     }
 
@@ -3529,7 +3544,12 @@ impl Edit {
     ///
     /// Returns a typed dependency or reversibility refusal. Deletion is
     /// durable only when the deleted coordinate span contains no cells.
-    pub fn delete_rows(&mut self, selector: Selector<'_>, start: u16, count: u16) -> Result<()> {
+    pub(crate) fn delete_rows(
+        &mut self,
+        selector: Selector<'_>,
+        start: u16,
+        count: u16,
+    ) -> Result<()> {
         self.stage_rows(selector, start, count, false)
     }
 
@@ -3538,7 +3558,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed grid, dependency-closure, or finite-bound error.
-    pub fn insert_columns(&mut self, selector: Selector<'_>, start: u8, count: u8) -> Result<()> {
+    pub(crate) fn insert_columns(
+        &mut self,
+        selector: Selector<'_>,
+        start: u8,
+        count: u8,
+    ) -> Result<()> {
         self.stage_columns(selector, start, count, true)
     }
 
@@ -3548,7 +3573,12 @@ impl Edit {
     ///
     /// Returns a typed dependency or reversibility refusal. Deletion is
     /// durable only when the deleted coordinate span contains no cells.
-    pub fn delete_columns(&mut self, selector: Selector<'_>, start: u8, count: u8) -> Result<()> {
+    pub(crate) fn delete_columns(
+        &mut self,
+        selector: Selector<'_>,
+        start: u8,
+        count: u8,
+    ) -> Result<()> {
         self.stage_columns(selector, start, count, false)
     }
 
@@ -3557,7 +3587,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns a typed name, ambiguity, allocation, or finite-bound error.
-    pub fn rename_sheet(&mut self, selector: Selector<'_>, name: &str) -> Result<()> {
+    pub(crate) fn rename_sheet(&mut self, selector: Selector<'_>, name: &str) -> Result<()> {
         let sheet = self.require_sheet(selector, "worksheet rename")?;
         structural::validate_sheet_name(name)?;
         if self
@@ -3593,10 +3623,10 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// use litchi_xls::cell_values::{Selector};
     /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// edit.set_row_height(Selector::Position(Position::new(0)), 4, 600)?;
     /// edit.set_row_hidden(Selector::Position(Position::new(0)), 5, true)?;
     /// let committed = edit.commit()?;
@@ -3608,7 +3638,12 @@ impl Edit {
     ///
     /// Returns a typed range, selector, axis-overlap, or bound refusal
     /// without staging.
-    pub fn set_row_height(&mut self, selector: Selector<'_>, row: u16, twips: u16) -> Result<()> {
+    pub(crate) fn set_row_height(
+        &mut self,
+        selector: Selector<'_>,
+        row: u16,
+        twips: u16,
+    ) -> Result<()> {
         if twips == 0 || twips > layout::MAX_ROW_TWIPS {
             return Err(Error::InvalidData(
                 "row height must be 1 through 8,180 twips (409 pt)".into(),
@@ -3627,7 +3662,12 @@ impl Edit {
     ///
     /// Returns a typed selector, axis-overlap, or bound refusal without
     /// staging.
-    pub fn set_row_hidden(&mut self, selector: Selector<'_>, row: u16, hidden: bool) -> Result<()> {
+    pub(crate) fn set_row_hidden(
+        &mut self,
+        selector: Selector<'_>,
+        row: u16,
+        hidden: bool,
+    ) -> Result<()> {
         self.stage_row_layout(selector, row, |state| {
             if state.present || hidden {
                 state.present = true;
@@ -3643,7 +3683,7 @@ impl Edit {
     ///
     /// Returns a typed range, selector, record-layout, axis-overlap, or bound
     /// refusal without staging.
-    pub fn set_column_width(
+    pub(crate) fn set_column_width(
         &mut self,
         selector: Selector<'_>,
         column: u8,
@@ -3667,7 +3707,7 @@ impl Edit {
     ///
     /// Returns a typed selector, record-layout, axis-overlap, or bound
     /// refusal without staging.
-    pub fn set_column_hidden(
+    pub(crate) fn set_column_hidden(
         &mut self,
         selector: Selector<'_>,
         column: u8,
@@ -3828,15 +3868,15 @@ impl Edit {
     /// A tab-structure change must be the only operation of its edit.
     ///
     /// ```
-    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// use litchi_xls::cell_values::{Selector};
     /// # let mut builder = litchi_xls::Builder::new();
     /// # builder.add_worksheet("First")?;
     /// # builder.add_worksheet("Second")?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// edit.reorder_sheets(&[Selector::Name("Second"), Selector::Name("first")])?;
-    /// let target = edit.commit()?.into_parts().0;
+    /// let target = edit.commit()?.into_package().cell_values()?;
     /// let names: Vec<_> = target.worksheets().map(|sheet| sheet.name().to_owned()).collect();
     /// assert_eq!(names, ["Second", "First"]);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -3847,7 +3887,7 @@ impl Edit {
     /// Returns a typed selector, ambiguity, protection, dependency-closure
     /// (for example a 3-D reference range made noncontiguous), exclusivity or
     /// allocation refusal without staging.
-    pub fn reorder_sheets(&mut self, order: &[Selector<'_>]) -> Result<()> {
+    pub(crate) fn reorder_sheets(&mut self, order: &[Selector<'_>]) -> Result<()> {
         self.require_tab_edit(false)?;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
         if order.len() != catalog.len() {
@@ -3880,12 +3920,12 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_xls::cell_values::Snapshot;
+    ///
     /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// edit.insert_sheet(Position::new(0), "Summary")?;
-    /// let target = edit.commit()?.into_parts().0;
+    /// let target = edit.commit()?.into_package().cell_values()?;
     /// assert_eq!(target.worksheets().next().map(|sheet| sheet.name()), Some("Summary"));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -3894,7 +3934,7 @@ impl Edit {
     ///
     /// Returns a typed name, uniqueness, position, protection, macro-project,
     /// dependency-closure, exclusivity or allocation refusal without staging.
-    pub fn insert_sheet(&mut self, position: Position, name: &str) -> Result<()> {
+    pub(crate) fn insert_sheet(&mut self, position: Position, name: &str) -> Result<()> {
         self.require_tab_edit(true)?;
         structural::validate_sheet_name(name)?;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
@@ -3932,15 +3972,15 @@ impl Edit {
     /// first remaining visible tab becomes active and selected.
     ///
     /// ```
-    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// use litchi_xls::cell_values::{Selector};
     /// # let mut builder = litchi_xls::Builder::new();
     /// # builder.add_worksheet("Keep")?;
     /// # builder.add_worksheet("Drop")?;
     /// # let bytes = builder.build()?.to_bytes()?;
-    /// let source = Snapshot::from_bytes(bytes, litchi_xls::ole_object::Limits::default())?;
-    /// let mut edit = source.edit();
+    /// let source = litchi_xls::Package::from_bytes(&bytes)?;
+    /// let mut edit = source.edit()?;
     /// edit.remove_sheet(Selector::Name("Drop"))?;
-    /// let target = edit.commit()?.into_parts().0;
+    /// let target = edit.commit()?.into_package().cell_values()?;
     /// assert_eq!(target.worksheet_count(), 1);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -3950,7 +3990,7 @@ impl Edit {
     /// Returns a typed selector, dependency, last-tab, last-visible-tab,
     /// protection, macro-project, exclusivity or allocation refusal without
     /// staging.
-    pub fn remove_sheet(&mut self, selector: Selector<'_>) -> Result<()> {
+    pub(crate) fn remove_sheet(&mut self, selector: Selector<'_>) -> Result<()> {
         self.require_tab_edit(true)?;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
         let position = resolve_tab(&catalog, selector)?;
@@ -4284,7 +4324,14 @@ impl Edit {
     /// signed/encrypted, or macro-bearing sources, stale source ranges,
     /// invalid RK values, CFB limits, failed complete reopen, worksheet
     /// coverage, or numeric readback.
-    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn commit_source_backed(self) -> Result<SourceBackedCommit> {
         commit_source_backed_numeric(self)
     }
 
@@ -4316,14 +4363,8 @@ impl Edit {
     /// signed, encrypted, or macro-bearing sources, stale numeric ranges,
     /// invalid RK values, CFB limits, failed public raw-reader validation, or
     /// source freshness/fingerprint changes.
-    pub fn commit_source_backed_plan(self) -> Result<SourceBackedPlanCommit> {
+    pub(crate) fn commit_source_backed_plan(self) -> Result<SourceBackedPlanCommit> {
         commit_source_backed_numeric_plan(self)
-    }
-
-    /// Alias for [`Self::commit_source_backed_plan`] emphasizing that the
-    /// returned target is evaluated lazily at publication time.
-    pub fn commit_source_backed_lazy(self) -> Result<SourceBackedPlanCommit> {
-        self.commit_source_backed_plan()
     }
 
     /// Publishes a fully reopened snapshot and reversible exact-source patch.
@@ -4332,7 +4373,7 @@ impl Edit {
     ///
     /// Returns an error if stream patching, CFB reconstruction, complete XLS
     /// reopen, or typed semantic readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
         if let Some(change) = self.tab_change {
             return commit_tab_change(self.source, *change);
         }
@@ -5007,7 +5048,7 @@ impl Diagnostics {
 
 /// Successful immutable cell-value publication.
 #[derive(Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
@@ -5032,7 +5073,14 @@ impl Commit {
     ///
     /// Returns a stale-history error or a finite history-weight refusal
     /// without changing the history.
-    pub fn record_in(self, history: &mut History) -> Result<Vec<Snapshot>> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn record_in(self, history: &mut History) -> Result<Vec<Snapshot>> {
         if history.current().bytes() != self.patch.before() {
             return Err(Error::PatchConflict {
                 operation: "edit cells",
@@ -5065,26 +5113,34 @@ impl Commit {
     }
 
     /// Returns the reopened target snapshot.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn package(&self) -> &Snapshot {
+    pub(crate) const fn package(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Consumes the commit into its reopened target snapshot.
-    #[must_use]
-    pub fn into_package(self) -> Snapshot {
-        self.snapshot
-    }
-
     /// Returns the exact-source reversible patch.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Returns content-free publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
     }
 
@@ -5093,115 +5149,132 @@ impl Commit {
     /// Publication diagnostics remain available through [`Self::diagnostics`]
     /// before consuming the commit.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
 
-/// Content-free evidence for a source-backed fixed-width numeric publication.
-///
-/// The value retains bounded counts, lengths, opaque CFB fingerprints, and
-/// source lineage tokens only. Its operation shape is a low-level contract
-/// derived from the validated CFB plan; it reports logical pass scopes rather
-/// than runtime counters or allocator/syscall activity. It never copies
-/// workbook payloads or semantic cell values.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBackedDiagnostics {
-    changed_cells: usize,
-    touched_streams: usize,
-    splice_count: usize,
-    replacement_bytes: u64,
-    changed_spans: usize,
-    source_bytes: u64,
-    source_workbook_bytes: u64,
-    target_workbook_bytes: u64,
-    source_version: SourceVersion,
-    target_version: SourceVersion,
-    source_fingerprint: ArtifactFingerprint,
-    target_fingerprint: ArtifactFingerprint,
-    operation_shape: OverlayOperationShape,
+/// The content-free diagnostics of a source-backed publication, published
+/// as a source-backed family's `Diagnostics` (`crate::source_backed`).
+pub(crate) mod source_diagnostics {
+    #[allow(
+        unused_imports,
+        reason = "the definition keeps its parent module's vocabulary"
+    )]
+    use super::*;
+
+    /// Content-free evidence for a source-backed fixed-width numeric publication.
+    ///
+    /// The value retains bounded counts, lengths, opaque CFB fingerprints, and
+    /// source lineage tokens only. Its operation shape is a low-level contract
+    /// derived from the validated CFB plan; it reports logical pass scopes rather
+    /// than runtime counters or allocator/syscall activity. It never copies
+    /// workbook payloads or semantic cell values.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Diagnostics {
+        pub(super) changed_cells: usize,
+        pub(super) touched_streams: usize,
+        pub(super) splice_count: usize,
+        pub(super) replacement_bytes: u64,
+        pub(super) changed_spans: usize,
+        pub(super) source_bytes: u64,
+        pub(super) source_workbook_bytes: u64,
+        pub(super) target_workbook_bytes: u64,
+        pub(super) source_version: SourceVersion,
+        pub(super) target_version: SourceVersion,
+        pub(super) source_fingerprint: ArtifactFingerprint,
+        pub(super) target_fingerprint: ArtifactFingerprint,
+        pub(super) operation_shape: OverlayOperationShape,
+    }
+
+    impl Diagnostics {
+        /// Whether the commit changed the workbook.
+        #[must_use]
+        pub const fn changed(self) -> bool {
+            self.changed_spans > 0
+        }
+
+        /// Number of semantically changed numeric cells.
+        #[must_use]
+        pub const fn changed_cells(self) -> usize {
+            self.changed_cells
+        }
+
+        /// Number of logical CFB streams selected for publication.
+        #[must_use]
+        pub const fn touched_streams(self) -> usize {
+            self.touched_streams
+        }
+
+        /// Number of source-relative numeric ranges submitted to CFB.
+        #[must_use]
+        pub const fn splice_count(self) -> usize {
+            self.splice_count
+        }
+
+        /// Aggregate replacement bytes submitted to CFB.
+        #[must_use]
+        pub const fn replacement_bytes(self) -> u64 {
+            self.replacement_bytes
+        }
+
+        /// Number of physical CFB spans retained by the validated plan.
+        #[must_use]
+        pub const fn changed_spans(self) -> usize {
+            self.changed_spans
+        }
+
+        /// Complete source CFB artifact length.
+        #[must_use]
+        pub const fn source_bytes(self) -> u64 {
+            self.source_bytes
+        }
+
+        /// Source `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn source_workbook_bytes(self) -> u64 {
+            self.source_workbook_bytes
+        }
+
+        /// Candidate `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn target_workbook_bytes(self) -> u64 {
+            self.target_workbook_bytes
+        }
+
+        /// Source lineage/version checked before and during publication.
+        #[must_use]
+        pub const fn source_version(self) -> SourceVersion {
+            self.source_version
+        }
+
+        /// Target lineage/version derived by the validated overlay.
+        #[must_use]
+        pub const fn target_version(self) -> SourceVersion {
+            self.target_version
+        }
+
+        /// Complete source CFB fingerprint.
+        #[must_use]
+        pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+            self.source_fingerprint
+        }
+
+        /// Complete composed target CFB fingerprint.
+        #[must_use]
+        pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+            self.target_fingerprint
+        }
+
+        /// Exact low-level CFB pass shape for this source-backed operation.
+        #[must_use]
+        pub const fn operation_shape(self) -> OverlayOperationShape {
+            self.operation_shape
+        }
+    }
 }
 
-impl SourceBackedDiagnostics {
-    /// Number of semantically changed numeric cells.
-    #[must_use]
-    pub const fn changed_cells(self) -> usize {
-        self.changed_cells
-    }
-
-    /// Number of logical CFB streams selected for publication.
-    #[must_use]
-    pub const fn touched_streams(self) -> usize {
-        self.touched_streams
-    }
-
-    /// Number of source-relative numeric ranges submitted to CFB.
-    #[must_use]
-    pub const fn splice_count(self) -> usize {
-        self.splice_count
-    }
-
-    /// Aggregate replacement bytes submitted to CFB.
-    #[must_use]
-    pub const fn replacement_bytes(self) -> u64 {
-        self.replacement_bytes
-    }
-
-    /// Number of physical CFB spans retained by the validated plan.
-    #[must_use]
-    pub const fn changed_spans(self) -> usize {
-        self.changed_spans
-    }
-
-    /// Complete source CFB artifact length.
-    #[must_use]
-    pub const fn source_bytes(self) -> u64 {
-        self.source_bytes
-    }
-
-    /// Source `Workbook`/`Book` stream length.
-    #[must_use]
-    pub const fn source_workbook_bytes(self) -> u64 {
-        self.source_workbook_bytes
-    }
-
-    /// Candidate `Workbook`/`Book` stream length.
-    #[must_use]
-    pub const fn target_workbook_bytes(self) -> u64 {
-        self.target_workbook_bytes
-    }
-
-    /// Source lineage/version checked before and during publication.
-    #[must_use]
-    pub const fn source_version(self) -> SourceVersion {
-        self.source_version
-    }
-
-    /// Target lineage/version derived by the validated overlay.
-    #[must_use]
-    pub const fn target_version(self) -> SourceVersion {
-        self.target_version
-    }
-
-    /// Complete source CFB fingerprint.
-    #[must_use]
-    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
-        self.source_fingerprint
-    }
-
-    /// Complete composed target CFB fingerprint.
-    #[must_use]
-    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
-        self.target_fingerprint
-    }
-
-    /// Exact low-level CFB pass shape for this source-backed operation.
-    #[must_use]
-    pub const fn operation_shape(self) -> OverlayOperationShape {
-        self.operation_shape
-    }
-}
-
+use source_diagnostics::Diagnostics as SourceBackedDiagnostics;
 /// Successful source-backed fixed-width numeric publication.
 ///
 /// The reusable [`ValidatedOverlayPlan`] owns only the immutable positional
@@ -5210,7 +5283,14 @@ impl SourceBackedDiagnostics {
 /// callers that need immediate readback or inverse application. Consequently,
 /// this API avoids Workbook-stream reserialization but still materializes one
 /// complete target CFB allocation; it is not a bounded-artifact-memory API.
-pub struct SourceBackedCommit {
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+    )
+)]
+pub(crate) struct SourceBackedCommit {
     source: Snapshot,
     snapshot: Snapshot,
     plan: ValidatedOverlayPlan,
@@ -5220,38 +5300,67 @@ pub struct SourceBackedCommit {
 
 impl SourceBackedCommit {
     /// Exact immutable source snapshot used by this publication.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Fully reopened target snapshot.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn package(&self) -> &Snapshot {
+    pub(crate) const fn package(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Exact-source reversible semantic/artifact patch.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Reusable checked CFB publication plan.
-    #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
-        &self.plan
-    }
-
     /// Content-free source/target publication evidence.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
         self.diagnostics
     }
 
     /// Whether every staged numeric replacement was an exact byte no-op.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.plan.is_noop()
     }
 
@@ -5259,38 +5368,33 @@ impl SourceBackedCommit {
     ///
     /// A sink failure may leave a typed prefix in the sink. The returned
     /// [`OverlayError`] retains that partial-output progress.
-    pub fn write_to<W: Write>(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn write_to<W: Write>(
         &self,
         writer: &mut W,
     ) -> std::result::Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
     }
 
-    /// Alias emphasizing the forward-only publication boundary.
-    pub fn publish_to_stream<W: Write>(
-        &self,
-        writer: &mut W,
-    ) -> std::result::Result<PublishReport, OverlayError> {
-        self.write_to(writer)
-    }
-
     /// Publishes through the common synced sibling-temp/atomic-rename path.
-    pub fn save<P: AsRef<std::path::Path>>(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn save<P: AsRef<std::path::Path>>(
         &self,
         path: P,
     ) -> std::result::Result<PublishReport, OverlayError> {
         self.plan.save(path)
-    }
-
-    /// Publishes through the common sibling-temp and atomic-rename path at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> std::result::Result<PublishReport, OverlayError> {
-        self.plan.save_with_durability(path, durability)
     }
 }
 
@@ -5325,84 +5429,73 @@ impl fmt::Debug for SourceBackedCommit {
 /// existing [`Patch`] contract instead retains complete before/after
 /// artifacts. Use [`Edit::commit_source_backed`] when that inverse
 /// contract is required.
-pub struct SourceBackedPlanCommit {
+pub(crate) struct SourceBackedPlanCommit {
     source: Snapshot,
     plan: ValidatedOverlayPlan,
     diagnostics: SourceBackedDiagnostics,
 }
 
 impl SourceBackedPlanCommit {
+    /// The checked overlay plan and its diagnostics.
+    pub(crate) fn into_plan(self) -> (ValidatedOverlayPlan, SourceBackedDiagnostics) {
+        (self.plan, self.diagnostics)
+    }
+
     /// Exact immutable source snapshot used by this plan.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
-    /// Underlying checked common CFB overlay plan.
-    #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
-        &self.plan
-    }
-
     /// Content-free publication evidence.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
         self.diagnostics
     }
 
     /// Whether every staged numeric replacement was an exact byte no-op.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.plan.is_noop()
-    }
-
-    /// Returns a checked positional view of the composed target without
-    /// materializing the complete artifact.
-    ///
-    /// The view shares the plan's once-computed source and target
-    /// fingerprints over the sealed immutable source and repeats source
-    /// freshness checks on each positional read.
-    pub fn composed_source(&self) -> std::result::Result<ComposedOverlaySource, OverlayError> {
-        self.plan.composed_source()
     }
 
     /// Streams the complete validated target to a sequential sink.
     ///
     /// A sink failure may leave a typed prefix in the sink; inspect the
     /// returned [`OverlayError`] before deciding whether to retry.
-    pub fn write_to<W: Write>(
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn write_to<W: Write>(
         &self,
         writer: &mut W,
     ) -> std::result::Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
-    }
-
-    /// Alias for [`Self::write_to`] emphasizing sequential publication.
-    pub fn publish_to_stream<W: Write>(
-        &self,
-        writer: &mut W,
-    ) -> std::result::Result<PublishReport, OverlayError> {
-        self.write_to(writer)
-    }
-
-    /// Publishes through the common synced sibling-temp and atomic-rename
-    /// path.
-    pub fn save<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-    ) -> std::result::Result<PublishReport, OverlayError> {
-        self.plan.save(path)
-    }
-
-    /// Publishes through the common sibling-temp and atomic-rename path at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> std::result::Result<PublishReport, OverlayError> {
-        self.plan.save_with_durability(path, durability)
     }
 }
 
@@ -5702,13 +5795,13 @@ impl SemanticPatch {
     ///
     /// Returns a malformed-operation, stale-precondition, storage, or commit
     /// error without changing the source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
+    pub(crate) fn stage(&self, source: &Snapshot) -> Result<Edit> {
         let mut transaction = source.edit();
         let mut sheet_names = semantic_sheet_names(source);
         for operation in self.inner.operations() {
             apply_semantic_operation(source, &mut transaction, operation, &mut sheet_names)?;
         }
-        transaction.commit()
+        Ok(transaction)
     }
 
     /// Plans a deterministic three-way semantic merge against a common base.
@@ -5721,7 +5814,11 @@ impl SemanticPatch {
     ///
     /// Returns a stale-precondition, malformed-operation, allocation, or
     /// finite-patch-bound error before a plan is returned.
-    pub fn plan_three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<ThreeWayPlan> {
+    pub(crate) fn plan_three_way(
+        base: &Snapshot,
+        left: &Self,
+        right: &Self,
+    ) -> Result<ThreeWayPlan> {
         preflight_semantic(base, left)?;
         preflight_semantic(base, right)?;
         build_three_way_plan(left, right)
@@ -5733,7 +5830,7 @@ impl SemanticPatch {
     /// structural-closure refusals. No candidate bytes are built until an
     /// executable plan is applied.
     #[must_use]
-    pub fn plan_transfer(&self, target: &Snapshot) -> TransferPlan {
+    pub(crate) fn plan_transfer(&self, target: &Snapshot) -> TransferPlan {
         let mut refusals = Vec::new();
         let mut transaction = target.edit();
         let mut sheet_names = semantic_sheet_names(target);
@@ -5863,7 +5960,7 @@ impl TransferPlan {
     /// # Errors
     ///
     /// Returns the first retained refusal or a typed commit/reopen error.
-    pub fn execute(&self, target: &Snapshot) -> Result<Commit> {
+    pub(crate) fn stage(&self, target: &Snapshot) -> Result<Edit> {
         if !self.refusals.is_empty() {
             return Err(Error::refused(
                 RefusalKind::UnsupportedTarget,
@@ -5871,7 +5968,7 @@ impl TransferPlan {
                 "a target of the semantic transfer is not executable",
             ));
         }
-        self.patch.apply(target)
+        self.patch.stage(target)
     }
 }
 
@@ -7547,7 +7644,7 @@ impl fmt::Debug for SemanticPatch {
 
 /// Reversible, exact-source-checked replacement of one XLS artifact.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,
     semantic: SemanticPatch,
@@ -7564,25 +7661,25 @@ impl Patch {
 
     /// Returns whether the patch is a byte-exact no-op.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
     /// Returns the exact required source artifact.
     #[must_use]
-    pub fn before(&self) -> &[u8] {
+    pub(crate) fn before(&self) -> &[u8] {
         &self.before
     }
 
     /// Returns the exact produced artifact.
     #[must_use]
-    pub fn after(&self) -> &[u8] {
+    pub(crate) fn after(&self) -> &[u8] {
         &self.after
     }
 
     /// Durable semantic operation patch for this exact artifact transition.
     #[must_use]
-    pub const fn semantic(&self) -> &SemanticPatch {
+    pub(crate) const fn semantic(&self) -> &SemanticPatch {
         &self.semantic
     }
 
@@ -7592,7 +7689,7 @@ impl Patch {
     /// the forward and inverse semantic data retained by [`Self::semantic`].
     /// No serialization or inverse cloning is performed.
     #[must_use]
-    pub fn retained_bytes(&self) -> usize {
+    pub(crate) fn retained_bytes(&self) -> usize {
         self.before
             .len()
             .saturating_add(self.after.len())
@@ -7605,7 +7702,7 @@ impl Patch {
     ///
     /// Returns [`Error::PatchConflict`] for a stale source, or a typed package
     /// validation error if the retained target can no longer be reopened.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.bytes() != self.before() {
             return Err(Error::PatchConflict {
                 operation: "edit cells",
@@ -7624,7 +7721,7 @@ impl Patch {
 
     /// Returns the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: Arc::clone(&self.after),
             after: Arc::clone(&self.before),
@@ -7825,6 +7922,13 @@ fn verify_source_backed_numeric_plan_target(
     candidate.version().map_err(Error::Io)
 }
 
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+    )
+)]
 fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit> {
     let Edit {
         source,
@@ -8116,6 +8220,13 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
     ))
 }
 
+#[cfg_attr(
+    not(test),
+    allow(
+        dead_code,
+        reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+    )
+)]
 fn materialize_numeric_plan(plan: &ValidatedOverlayPlan, capacity: usize) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
@@ -10271,6 +10382,22 @@ fn verify_shifted_cells(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+impl SemanticPatch {
+    /// Unit-test shorthand: replay through the engine.
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Commit> {
+        self.stage(source)?.commit()
+    }
+}
+
+#[cfg(test)]
+impl TransferPlan {
+    /// Unit-test shorthand: execute through the engine.
+    pub(crate) fn execute(&self, target: &Snapshot) -> Result<Commit> {
+        self.stage(target)?.commit()
+    }
 }
 
 #[cfg(test)]

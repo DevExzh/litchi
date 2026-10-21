@@ -10,9 +10,12 @@ use super::{
     SourceSnapshot, SourceSummary, sha256_hex,
 };
 use litchi_cfb::{OleFile, OleWriter, OverlayOperationShape, PublishReport};
-use litchi_core::{Position, ReadAt};
+use litchi_core::{OwnedSource, Position, ReadAt};
+use litchi_xls::SourceBackedWorkbook;
+use litchi_xls::source_backed::cells;
 use serde::Serialize;
 use std::io::{self, Cursor, Write};
+use std::sync::Arc;
 use std::time::Instant;
 
 const CORPUS_GENERATOR: &str = "litchi-xls-rk-mulrk-publication-v1";
@@ -60,6 +63,36 @@ fn clone_bytes(bytes: &[u8], label: &str) -> Result<Vec<u8>, Box<dyn std::error:
     reserve_exact(&mut cloned, bytes.len(), label)?;
     cloned.extend_from_slice(bytes);
     Ok(cloned)
+}
+
+/// The public cell-values read view of complete XLS bytes.
+fn cell_view(
+    bytes: &[u8],
+) -> Result<litchi_xls::cell_values::Snapshot, Box<dyn std::error::Error>> {
+    Ok(litchi_xls::Package::from_bytes(bytes)?.cell_values()?)
+}
+
+/// Open owned XLS bytes as a source-backed workbook (the deferred owner of
+/// the `source_backed::cells` family).
+fn source_workbook(bytes: Vec<u8>) -> Result<SourceBackedWorkbook, litchi_xls::SourceBackedError> {
+    SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes)))
+}
+
+/// A refusal to open a security fixture on the source-backed cell route:
+/// by the source-backed owner, or by the cell family's edit open.
+#[derive(Debug)]
+enum SecurityOpenError {
+    Source(litchi_xls::SourceBackedError),
+    Edit(litchi_xls::Error),
+}
+
+impl std::fmt::Display for SecurityOpenError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Source(error) => std::fmt::Display::fmt(error, formatter),
+            Self::Edit(error) => std::fmt::Display::fmt(error, formatter),
+        }
+    }
 }
 
 fn clone_record(record: &RawRecord, label: &str) -> Result<RawRecord, Box<dyn std::error::Error>> {
@@ -328,10 +361,7 @@ pub(crate) fn build_rk_mulrk_corpus() -> Result<Corpus, Box<dyn std::error::Erro
         .and_then(|bytes| bytes.checked_add(b"litchi-xls-rk-mulrk-opaque-metadata-v1".len()))
         .ok_or("XLS RK/MulRK corpus payload size overflow")?;
 
-    let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
-        clone_bytes(&archive, "XLS RK/MulRK corpus snapshot")?,
-        litchi_ole_common::object::Limits::default(),
-    )?;
+    let snapshot = cell_view(&archive)?;
     let sheet = snapshot
         .worksheet(litchi_xls::cell_values::Selector::Name("Packed"))?
         .ok_or("XLS RK/MulRK corpus lost Packed worksheet")?;
@@ -677,8 +707,71 @@ fn edits_for(
     }
 }
 
+/// A staged numeric edit on one public route: the primary package edit or
+/// the source-backed cell family.
+enum Transaction {
+    Eager(Box<litchi_xls::Edit>),
+    Source(Box<cells::Edit>),
+}
+
+impl Transaction {
+    fn set_number(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'static>,
+        reference: litchi_xls::cell_values::Reference,
+        value: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match self {
+            Self::Eager(edit) => edit.set_number(selector, reference, value)?,
+            Self::Source(edit) => edit.set_number(selector, reference, value)?,
+        }
+        Ok(())
+    }
+
+    fn set_numeric(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'static>,
+        reference: litchi_xls::cell_values::Reference,
+        value: f64,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match self {
+            Self::Eager(edit) => edit.set_numeric(selector, reference, value)?,
+            Self::Source(edit) => edit.set_numeric(selector, reference, value)?,
+        }
+        Ok(())
+    }
+}
+
+/// The per-sample source of one route: the immutable package or the
+/// source-backed workbook a commit's exact-pair patch is bound to.
+enum Source {
+    Eager(litchi_xls::Package),
+    Source(SourceBackedWorkbook),
+}
+
+impl Source {
+    fn open(
+        bytes: Vec<u8>,
+        implementation: Implementation,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(match implementation {
+            Implementation::Eager => Self::Eager(litchi_xls::Package::from_bytes(&bytes)?),
+            Implementation::SourceBacked | Implementation::PlanOnly => {
+                Self::Source(source_workbook(bytes)?)
+            },
+        })
+    }
+
+    fn edit(&self) -> Result<Transaction, Box<dyn std::error::Error>> {
+        Ok(match self {
+            Self::Eager(package) => Transaction::Eager(Box::new(package.edit()?)),
+            Self::Source(workbook) => Transaction::Source(Box::new(workbook.edit_cells()?)),
+        })
+    }
+}
+
 fn stage(
-    transaction: &mut litchi_xls::cell_values::Edit,
+    transaction: &mut Transaction,
     edits: &[CellEdit],
     family: Family,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -712,25 +805,34 @@ fn read_owned(source: &[u8]) -> Result<(Vec<u8>, SourceSnapshot), Box<dyn std::e
 }
 
 enum Publication {
-    Eager(Box<litchi_xls::cell_values::Commit>),
-    SourceBacked(Box<litchi_xls::cell_values::SourceBackedCommit>),
-    PlanOnly(Box<litchi_xls::cell_values::SourceBackedPlanCommit>),
+    Eager(Box<litchi_xls::Commit>),
+    SourceBacked(Box<cells::Commit>),
+    PlanOnly(Box<cells::Commit>),
 }
 
 impl Publication {
-    fn snapshot(&self) -> &litchi_xls::cell_values::Snapshot {
-        match self {
-            Self::Eager(commit) => commit.package(),
-            Self::SourceBacked(commit) => commit.package(),
-            Self::PlanOnly(commit) => commit.source(),
-        }
+    fn commit(
+        transaction: Transaction,
+        implementation: Implementation,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(match (transaction, implementation) {
+            (Transaction::Eager(edit), Implementation::Eager) => {
+                Self::Eager(Box::new(edit.commit()?))
+            },
+            (Transaction::Source(edit), Implementation::SourceBacked) => {
+                Self::SourceBacked(Box::new(edit.commit()?))
+            },
+            (Transaction::Source(edit), Implementation::PlanOnly) => {
+                Self::PlanOnly(Box::new(edit.commit()?))
+            },
+            _ => return Err("XLS numeric transaction route differs from implementation".into()),
+        })
     }
 
-    fn patch(&self) -> Option<&litchi_xls::cell_values::Patch> {
+    fn source_backed(&self) -> Option<&cells::Commit> {
         match self {
-            Self::Eager(commit) => Some(commit.patch()),
-            Self::SourceBacked(commit) => Some(commit.patch()),
-            Self::PlanOnly(_) => None,
+            Self::Eager(_) => None,
+            Self::SourceBacked(commit) | Self::PlanOnly(commit) => Some(commit),
         }
     }
 
@@ -741,87 +843,57 @@ impl Publication {
     fn is_noop(&self) -> bool {
         match self {
             Self::Eager(commit) => commit.patch().is_noop(),
-            Self::SourceBacked(commit) => commit.is_noop(),
-            Self::PlanOnly(commit) => commit.is_noop(),
+            Self::SourceBacked(commit) | Self::PlanOnly(commit) => commit.patch().is_noop(),
         }
     }
 
+    /// The committed source-backed workbook writes its checked plan; only
+    /// the primary package commit holds complete target bytes.
     fn complete_target_materialized_bytes(&self) -> u64 {
         match self {
-            Self::Eager(commit) => u64::try_from(commit.package().bytes().len()).unwrap_or(0),
-            Self::SourceBacked(commit) => {
-                u64::try_from(commit.package().bytes().len()).unwrap_or(0)
-            },
-            Self::PlanOnly(_) => 0,
+            Self::Eager(commit) => u64::try_from(commit.patch().after().len()).unwrap_or(0),
+            Self::SourceBacked(_) | Self::PlanOnly(_) => 0,
         }
     }
 
-    fn target_workbook_bytes(&self) -> u64 {
-        match self {
+    fn target_workbook_bytes(&self) -> Result<u64, Box<dyn std::error::Error>> {
+        Ok(match self {
             Self::Eager(commit) => {
-                u64::try_from(commit.package().workbook_stream().len()).unwrap_or(0)
+                u64::try_from(commit.package().cell_values()?.workbook_stream().len())?
             },
-            Self::SourceBacked(commit) => {
-                u64::try_from(commit.package().workbook_stream().len()).unwrap_or(0)
+            Self::SourceBacked(commit) | Self::PlanOnly(commit) => {
+                commit.diagnostics().target_workbook_bytes()
             },
-            Self::PlanOnly(commit) => commit.diagnostics().target_workbook_bytes(),
-        }
+        })
     }
 
-    fn diagnostics(&self, source_workbook_bytes: u64) -> NumericDiagnostics {
-        match self {
-            Self::Eager(commit) => NumericDiagnostics {
-                source_bytes: u64::try_from(commit.patch().before().len()).unwrap_or(0),
-                source_workbook_bytes,
-                target_workbook_bytes: u64::try_from(commit.package().workbook_stream().len())
-                    .unwrap_or(0),
-                operation_shape: None,
-                candidate_reopen_logical_artifact_bytes: 0,
-                selected_stream_logical_bytes: u64::try_from(
-                    commit.package().workbook_stream().len(),
-                )
-                .unwrap_or(0),
-                target_materialization_vec_bytes: 0,
-                target_materialization_clone_bytes: 0,
-                splice_count: None,
-                replacement_bytes: None,
-                changed_spans: None,
-                source_fingerprint: None,
-                target_fingerprint: None,
-            },
-            Self::SourceBacked(commit) => {
-                let diagnostics = commit.diagnostics();
-                let target_bytes = u64::try_from(commit.package().bytes().len()).unwrap_or(0);
-                let target_materialized = !commit.is_noop();
+    fn diagnostics(
+        &self,
+        source_workbook_bytes: u64,
+    ) -> Result<NumericDiagnostics, Box<dyn std::error::Error>> {
+        Ok(match self {
+            Self::Eager(commit) => {
+                let target_workbook_bytes = self.target_workbook_bytes()?;
                 NumericDiagnostics {
-                    source_bytes: diagnostics.source_bytes(),
-                    source_workbook_bytes: diagnostics.source_workbook_bytes(),
-                    target_workbook_bytes: diagnostics.target_workbook_bytes(),
-                    operation_shape: Some(diagnostics.operation_shape()),
-                    candidate_reopen_logical_artifact_bytes: target_bytes,
-                    selected_stream_logical_bytes: diagnostics.target_workbook_bytes(),
-                    target_materialization_vec_bytes: if target_materialized {
-                        target_bytes
-                    } else {
-                        0
-                    },
-                    target_materialization_clone_bytes: if target_materialized {
-                        target_bytes
-                    } else {
-                        0
-                    },
-                    splice_count: Some(diagnostics.splice_count()),
-                    replacement_bytes: Some(diagnostics.replacement_bytes()),
-                    changed_spans: Some(diagnostics.changed_spans()),
-                    source_fingerprint: Some(fingerprint_hex(
-                        diagnostics.source_fingerprint().as_bytes(),
-                    )),
-                    target_fingerprint: Some(fingerprint_hex(
-                        diagnostics.target_fingerprint().as_bytes(),
-                    )),
+                    source_bytes: u64::try_from(commit.patch().before().len())?,
+                    source_workbook_bytes,
+                    target_workbook_bytes,
+                    operation_shape: None,
+                    candidate_reopen_logical_artifact_bytes: 0,
+                    selected_stream_logical_bytes: target_workbook_bytes,
+                    target_materialization_vec_bytes: 0,
+                    target_materialization_clone_bytes: 0,
+                    splice_count: None,
+                    replacement_bytes: None,
+                    changed_spans: None,
+                    source_fingerprint: None,
+                    target_fingerprint: None,
                 }
             },
-            Self::PlanOnly(commit) => {
+            // The committed workbook reopens over the plan's composed
+            // source (same-length splices: the source length); nothing is
+            // materialized at commit.
+            Self::SourceBacked(commit) | Self::PlanOnly(commit) => {
                 let diagnostics = commit.diagnostics();
                 NumericDiagnostics {
                     source_bytes: diagnostics.source_bytes(),
@@ -843,7 +915,7 @@ impl Publication {
                     )),
                 }
             },
-        }
+        })
     }
 
     fn write_to<W: Write>(
@@ -852,14 +924,15 @@ impl Publication {
     ) -> Result<Option<PublishReport>, Box<dyn std::error::Error>> {
         match self {
             Self::Eager(commit) => {
-                for chunk in commit.package().bytes().chunks(64 * 1024) {
+                for chunk in commit.patch().after().chunks(64 * 1024) {
                     writer.write_all(chunk)?;
                 }
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
-            Self::PlanOnly(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) | Self::PlanOnly(commit) => {
+                Ok(commit.package().write_to(writer)?)
+            },
         }
     }
 }
@@ -943,22 +1016,14 @@ fn operation_evidence_from_diagnostics(
 }
 
 fn prepare(
-    snapshot: litchi_xls::cell_values::Snapshot,
+    source: &Source,
     implementation: Implementation,
     family: Family,
     edits: &[CellEdit],
 ) -> Result<Publication, Box<dyn std::error::Error>> {
-    let mut transaction = snapshot.edit();
+    let mut transaction = source.edit()?;
     stage(&mut transaction, edits, family)?;
-    match implementation {
-        Implementation::Eager => Ok(Publication::Eager(Box::new(transaction.commit()?))),
-        Implementation::SourceBacked => Ok(Publication::SourceBacked(Box::new(
-            transaction.commit_source_backed()?,
-        ))),
-        Implementation::PlanOnly => Ok(Publication::PlanOnly(Box::new(
-            transaction.commit_source_backed_plan()?,
-        ))),
-    }
+    Publication::commit(transaction, implementation)
 }
 
 fn fingerprint_hex(bytes: &[u8; 32]) -> String {
@@ -976,29 +1041,32 @@ fn verify_noop_and_security(
     implementation: Implementation,
     edits: &[CellEdit],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_xls::cell_values::{Snapshot, Value};
+    use litchi_xls::cell_values::Value;
 
-    let source = Snapshot::from_bytes(
-        clone_bytes(&corpus.archive, "XLS numeric no-op source")?,
-        litchi_ole_common::object::Limits::default(),
-    )?;
-    let noop = commit_source_backed_transaction(source.edit(), implementation)?;
-    if !noop.is_noop() || noop.snapshot().bytes() != source.bytes() {
+    let source = source_workbook(clone_bytes(&corpus.archive, "XLS numeric no-op source")?)?;
+    let noop = commit_source_backed_transaction(source.edit_cells()?, implementation)?;
+    if !noop.is_noop() {
         return Err("XLS numeric source-backed no-op changed source identity".into());
     }
+    // A no-op commit publishes a share of the source workbook (the exact
+    // pair's identity), which streams the source and has no overlay report;
+    // its diagnostics still carry the plan's fingerprints.
     let mut noop_bytes = Vec::new();
-    let report = noop
-        .write_to(&mut noop_bytes)?
-        .ok_or("XLS numeric no-op guard did not produce overlay evidence")?;
+    let report = noop.write_to(&mut noop_bytes)?;
+    let diagnostics = noop
+        .source_backed()
+        .ok_or("XLS numeric no-op guard did not publish source-backed")?
+        .diagnostics();
     if noop_bytes != corpus.archive
-        || report.bytes() != u64::try_from(corpus.archive.len())?
-        || report.changed_spans() != 0
-        || report.source_fingerprint() != report.target_fingerprint()
+        || report.is_some()
+        || diagnostics.source_bytes() != u64::try_from(corpus.archive.len())?
+        || diagnostics.changed_spans() != 0
+        || diagnostics.source_fingerprint() != diagnostics.target_fingerprint()
     {
         return Err("XLS numeric no-op fingerprint/publication gate failed".into());
     }
 
-    let mut unsupported = source.edit();
+    let mut unsupported = source.edit_cells()?;
     let staged = unsupported
         .set_value(
             edits[0].selector,
@@ -1016,7 +1084,7 @@ fn verify_noop_and_security(
             return Err("XLS numeric unsupported edit was not failure-atomic".into());
         }
     }
-    let mut bad_family = source.edit();
+    let mut bad_family = source.edit_cells()?;
     if family == Family::Number
         && bad_family
             .set_numeric(edits[0].selector, edits[0].reference, edits[0].replacement)
@@ -1025,7 +1093,7 @@ fn verify_noop_and_security(
         return Err("XLS Number set_numeric unexpectedly refused Number".into());
     }
     if family == Family::RkMulrk {
-        let mut wrong = source.edit();
+        let mut wrong = source.edit_cells()?;
         if wrong
             .set_number(edits[0].selector, edits[0].reference, edits[0].replacement)
             .is_ok()
@@ -1066,21 +1134,17 @@ fn verify_noop_and_security(
 }
 
 fn commit_source_backed_transaction(
-    transaction: litchi_xls::cell_values::Edit,
+    transaction: cells::Edit,
     implementation: Implementation,
 ) -> Result<Publication, Box<dyn std::error::Error>> {
-    match implementation {
-        // Guard replays for eager cases intentionally use the established
-        // source-backed contract, matching the pre-plan-only harness gates.
-        // The measured eager publication still calls `Edit::commit`
-        // directly in the timed loop.
-        Implementation::Eager | Implementation::SourceBacked => Ok(Publication::SourceBacked(
-            Box::new(transaction.commit_source_backed()?),
-        )),
-        Implementation::PlanOnly => Ok(Publication::PlanOnly(Box::new(
-            transaction.commit_source_backed_plan()?,
-        ))),
-    }
+    // Guard replays for eager cases intentionally use the source-backed cell
+    // family, matching the pre-plan-only harness gates. The measured eager
+    // publication still calls the primary `Edit::commit` in the timed loop.
+    let implementation = match implementation {
+        Implementation::Eager => Implementation::SourceBacked,
+        other => other,
+    };
+    Publication::commit(Transaction::Source(Box::new(transaction)), implementation)
 }
 
 #[derive(Clone, Copy)]
@@ -1099,7 +1163,7 @@ fn verify_security_refusal(
     expectation: SecurityFixtureExpectation,
     implementation: Implementation,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_xls::cell_values::{Selector, Snapshot, Storage, Value};
+    use litchi_xls::cell_values::{Selector, Storage, Value};
 
     match expectation {
         SecurityFixtureExpectation::Open => {},
@@ -1110,15 +1174,20 @@ fn verify_security_refusal(
             require_encrypted_marker(bytes)?;
         },
     }
-    let snapshot = match Snapshot::from_bytes(
-        clone_bytes(bytes, "XLS security fixture")?,
-        litchi_ole_common::object::Limits::default(),
-    ) {
-        Ok(snapshot) => {
+    let opened = source_workbook(clone_bytes(bytes, "XLS security fixture")?)
+        .map_err(SecurityOpenError::Source)
+        .and_then(|workbook| {
+            workbook
+                .edit_cells()
+                .map(|edit| (workbook, edit))
+                .map_err(SecurityOpenError::Edit)
+        });
+    let (workbook, mut edit) = match opened {
+        Ok(opened) => {
             if !matches!(expectation, SecurityFixtureExpectation::Open) {
                 return Err(format!("XLS {label} fixture unexpectedly opened").into());
             }
-            snapshot
+            opened
         },
         Err(error) => {
             if matches!(expectation, SecurityFixtureExpectation::Open) {
@@ -1137,6 +1206,7 @@ fn verify_security_refusal(
             };
         },
     };
+    let snapshot = litchi_xls::Package::from_source(workbook)?.cell_values()?;
     let Some((sheet, reference, storage, value)) = snapshot.worksheets().find_map(|sheet| {
         sheet.cells().find_map(|cell| {
             let Value::Number(value) = cell.value() else {
@@ -1151,7 +1221,6 @@ fn verify_security_refusal(
     }) else {
         return Err(format!("XLS {label} fixture has no numeric guard cell").into());
     };
-    let mut edit = snapshot.edit();
     let staged = match storage {
         Storage::Number => edit.set_number(
             Selector::Position(Position::new(sheet)),
@@ -1181,15 +1250,21 @@ const EXPECTED_PROTECTED_REFUSAL: &str =
     "signed, encrypted, or DRM containers are not eligible for object editing";
 
 fn require_signed_refusal(
-    error: litchi_xls::Error,
+    error: SecurityOpenError,
     label: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    use litchi_xls::SourceBackedError;
+
     match error {
-        litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(message))
-            if message == EXPECTED_PROTECTED_REFUSAL =>
-        {
-            Ok(())
-        },
+        SecurityOpenError::Edit(litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(
+            message,
+        )))
+        | SecurityOpenError::Source(SourceBackedError::Cfb(litchi_cfb::OleError::InvalidFormat(
+            message,
+        )))
+        | SecurityOpenError::Source(SourceBackedError::Parse(litchi_xls::Error::Cfb(
+            litchi_cfb::OleError::InvalidFormat(message),
+        ))) if message == EXPECTED_PROTECTED_REFUSAL => Ok(()),
         other => Err(format!(
             "XLS {label} fixture returned an unexpected security refusal: {other:?}"
         )
@@ -1198,11 +1273,14 @@ fn require_signed_refusal(
 }
 
 fn require_encrypted_refusal(
-    error: litchi_xls::Error,
+    error: SecurityOpenError,
     label: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match error {
-        litchi_xls::Error::PasswordRequired => Ok(()),
+        // The source-backed owner reads no FILEPASS workbook; the cell
+        // family's edit open would ask for the password.
+        SecurityOpenError::Source(litchi_xls::SourceBackedError::EncryptedUnsupported)
+        | SecurityOpenError::Edit(litchi_xls::Error::PasswordRequired) => Ok(()),
         other => Err(format!(
             "XLS {label} fixture returned an unexpected encryption refusal: {other:?}"
         )
@@ -1353,13 +1431,10 @@ fn verify_output(
     source_backed: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::sheet::Cell as _;
-    use litchi_xls::cell_values::{Snapshot, Storage, Value};
+    use litchi_xls::cell_values::{Storage, Value};
 
     super::verify_xls_untouched_streams(&corpus.archive, output, source_backed)?;
-    let snapshot = Snapshot::from_bytes(
-        clone_bytes(output, "XLS numeric output reopen")?,
-        litchi_ole_common::object::Limits::default(),
-    )?;
+    let snapshot = cell_view(output)?;
     for edit in edits {
         let sheet = snapshot
             .worksheet(edit.selector)?
@@ -1416,20 +1491,54 @@ fn verify_output(
 }
 
 fn verify_patch(
-    source: &litchi_xls::cell_values::Snapshot,
+    source: &Source,
     publication: &Publication,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(patch) = publication.patch() else {
-        return Ok(());
-    };
-    let applied = patch.apply(source)?;
-    if applied.bytes() != publication.snapshot().bytes()
-        || patch.apply(publication.snapshot()).is_ok()
-    {
+    match (source, publication) {
+        (Source::Eager(source), Publication::Eager(commit)) => {
+            let patch = commit.patch();
+            let applied = source.apply(patch)?;
+            if applied.patch().after() != patch.after() || commit.package().apply(patch).is_ok() {
+                return Err("XLS numeric patch source/stale precondition gate failed".into());
+            }
+            let restored = applied.package().apply(&patch.inverse())?;
+            if restored.patch().after() != patch.before() {
+                return Err("XLS numeric patch inverse did not restore source".into());
+            }
+        },
+        (
+            Source::Source(source),
+            Publication::SourceBacked(commit) | Publication::PlanOnly(commit),
+        ) => {
+            verify_source_patch(source, commit)?;
+        },
+        _ => return Err("XLS numeric patch gate route differs from publication".into()),
+    }
+    Ok(())
+}
+
+/// The exact-pair gate of a source-backed cell patch: it replays onto the
+/// workbook it was committed on, refuses the committed workbook, and its
+/// inverse restores the source bytes.
+fn verify_source_patch(
+    source: &SourceBackedWorkbook,
+    commit: &cells::Commit,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let patch = commit.patch();
+    let applied = source.apply_cells(patch)?;
+    let mut applied_bytes = Vec::new();
+    applied.package().write_to(&mut applied_bytes)?;
+    let mut committed_bytes = Vec::new();
+    commit.package().write_to(&mut committed_bytes)?;
+    if applied_bytes != committed_bytes || commit.package().apply_cells(patch).is_ok() {
         return Err("XLS numeric patch source/stale precondition gate failed".into());
     }
-    let restored = patch.inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = commit.package().apply_cells(&patch.inverse())?;
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    let mut source_bytes = Vec::new();
+    source.write_to(&mut source_bytes)?;
+    if restored_bytes != source_bytes {
         return Err("XLS numeric patch inverse did not restore source".into());
     }
     Ok(())
@@ -1474,12 +1583,10 @@ fn verify_partial_publication(
 }
 
 fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_xls::cell_values::{Selector, Snapshot, Storage, Value};
+    use litchi_xls::cell_values::{Selector, Storage, Value};
 
-    let source = Snapshot::from_bytes(
-        clone_bytes(REAL_PRODUCER, "XLS real-producer source")?,
-        litchi_ole_common::object::Limits::default(),
-    )?;
+    let workbook = source_workbook(clone_bytes(REAL_PRODUCER, "XLS real-producer source")?)?;
+    let source = cell_view(REAL_PRODUCER)?;
     let mut selected = None;
     for sheet in source.worksheets() {
         for cell in sheet.cells() {
@@ -1490,7 +1597,9 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
                 continue;
             }
             let replacement = [*value + 1.0, *value - 1.0].into_iter().find(|candidate| {
-                let mut edit = source.edit();
+                let Ok(mut edit) = workbook.edit_cells() else {
+                    return false;
+                };
                 edit.set_numeric(
                     Selector::Position(Position::new(sheet.position())),
                     cell.reference(),
@@ -1509,7 +1618,7 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
     }
     let (sheet, reference, replacement) =
         selected.ok_or("XLS real-producer fixture has no representable RK/MulRK replacement")?;
-    let mut edit = source.edit();
+    let mut edit = workbook.edit_cells()?;
     edit.set_numeric(
         Selector::Position(Position::new(sheet)),
         reference,
@@ -1518,7 +1627,7 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
     let commit = commit_source_backed_transaction(edit, implementation)?;
     let mut output = Vec::new();
     commit.write_to(&mut output)?;
-    let reopened = Snapshot::from_bytes(output, litchi_ole_common::object::Limits::default())?;
+    let reopened = cell_view(&output)?;
     let cell = reopened
         .worksheet(Selector::Position(Position::new(sheet)))?
         .ok_or("XLS real-producer output lost worksheet")?
@@ -1527,9 +1636,13 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
     if cell.value() != &Value::Number(replacement) {
         return Err("XLS real-producer RK/MulRK reopen gate failed".into());
     }
-    if let Some(patch) = commit.patch()
-        && patch.inverse().apply(commit.snapshot())?.bytes() != source.bytes()
-    {
+    let commit = commit
+        .source_backed()
+        .ok_or("XLS real-producer guard did not publish source-backed")?;
+    let restored = commit.package().apply_cells(&commit.patch().inverse())?;
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes)?;
+    if restored_bytes != REAL_PRODUCER {
         return Err("XLS real-producer RK/MulRK inverse gate failed".into());
     }
     Ok(())
@@ -1540,13 +1653,14 @@ fn prepare_expected(
     implementation: Implementation,
     family: Family,
 ) -> Result<Expected, Box<dyn std::error::Error>> {
-    let source = litchi_xls::cell_values::Snapshot::from_bytes(
-        clone_bytes(&corpus.archive, "XLS numeric expected source")?,
-        litchi_ole_common::object::Limits::default(),
-    )?;
+    let source = cell_view(&corpus.archive)?;
     let edits = edits_for(&source, family)?;
     verify_noop_and_security(corpus, family, implementation, &edits)?;
-    let publication = prepare(source.clone(), implementation, family, &edits)?;
+    let route = Source::open(
+        clone_bytes(&corpus.archive, "XLS numeric expected source")?,
+        implementation,
+    )?;
+    let publication = prepare(&route, implementation, family, &edits)?;
     let mut output = Vec::new();
     let report = publication.write_to(&mut output)?;
     if output == corpus.archive {
@@ -1559,14 +1673,14 @@ fn prepare_expected(
         &edits,
         !matches!(implementation, Implementation::Eager),
     )?;
-    verify_patch(&source, &publication)?;
+    verify_patch(&route, &publication)?;
     verify_partial_publication(&publication, output.len())?;
     if let Some(report) = report
         && (report.bytes() != u64::try_from(output.len())? || report.changed_spans() == 0)
     {
         return Err("XLS numeric source-backed publication report is incomplete".into());
     }
-    let target_workbook_bytes = publication.target_workbook_bytes();
+    let target_workbook_bytes = publication.target_workbook_bytes()?;
     Ok(Expected {
         source,
         edits,
@@ -1681,29 +1795,18 @@ pub(crate) fn run(
 
     for iteration in 0..super::iteration_count(warmup_iterations, samples)? {
         let (owned, source_metrics) = read_owned(&corpus.archive)?;
-        let snapshot = litchi_xls::cell_values::Snapshot::from_bytes(
-            owned,
-            litchi_ole_common::object::Limits::default(),
-        )?;
+        let route = Source::open(owned, implementation)?;
         let mut sink = CountingSink::bounded(maximum, MAX_WRITE);
         sink.reserve_budget()?;
 
         let edit_started = Instant::now();
-        let mut transaction = snapshot.edit();
+        let mut transaction = route.edit()?;
         let edit_duration = edit_started.elapsed();
         let set_started = Instant::now();
         stage(&mut transaction, &expected.edits, family)?;
         let set_duration = set_started.elapsed();
         let commit_started = Instant::now();
-        let publication = match implementation {
-            Implementation::Eager => Publication::Eager(Box::new(transaction.commit()?)),
-            Implementation::SourceBacked => {
-                Publication::SourceBacked(Box::new(transaction.commit_source_backed()?))
-            },
-            Implementation::PlanOnly => {
-                Publication::PlanOnly(Box::new(transaction.commit_source_backed_plan()?))
-            },
-        };
+        let publication = Publication::commit(transaction, implementation)?;
         let commit_duration = commit_started.elapsed();
         let publication_started = Instant::now();
         let report = publication.write_to(&mut sink)?;
@@ -1714,7 +1817,7 @@ pub(crate) fn run(
             .and_then(|duration| duration.checked_add(publication_duration))
             .ok_or("XLS numeric sample duration overflow")?;
         let metrics = source_metrics;
-        let diagnostics = publication.diagnostics(source_workbook_bytes);
+        let diagnostics = publication.diagnostics(source_workbook_bytes)?;
 
         if diagnostics.operation_shape.is_some() != source_backed {
             return Err(
@@ -1783,7 +1886,7 @@ pub(crate) fn run(
             &expected.edits,
             !matches!(implementation, Implementation::Eager),
         )?;
-        verify_patch(&expected.source, &publication)?;
+        verify_patch(&route, &publication)?;
         let digest = sha256_hex(&sink.bytes);
         if digest != expected.output_digest {
             return Err("XLS numeric measured output digest is unstable".into());

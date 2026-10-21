@@ -30,11 +30,14 @@ use std::sync::{Arc, OnceLock};
 /// alias local makes the owner independent of the public root re-exports.
 type RawReader = crate::raw::Reader<Cursor<Vec<u8>>>;
 
+#[path = "package/cells.rs"]
+mod cells;
 /// The canonical primary transaction for an immutable XLS package.
 #[path = "package/edit.rs"]
 pub mod edit;
 #[path = "package/metadata.rs"]
 pub mod metadata;
+pub use cells::History;
 pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
 
 /// Errors returned by the canonical XLS package and projection APIs.
@@ -747,7 +750,7 @@ impl Package {
     /// No snapshot is constructed while a package is opened. Primary edits
     /// retain their validated snapshot for subsequent operations; this explicit
     /// low-level adapter also retains and intersects that selected profile.
-    pub fn edit_snapshot_with_options(
+    pub(crate) fn edit_snapshot_with_options(
         &self,
         options: EditOptions,
     ) -> Result<crate::cell_values::Snapshot> {
@@ -818,8 +821,14 @@ impl Package {
         Ok((limits, cfb_limits))
     }
 
-    /// Begin the editable cell-values adapter with its default object limits.
-    pub fn edit_snapshot(&self) -> Result<crate::cell_values::Snapshot> {
+    /// The cell-values read view of this package (its worksheets, cells,
+    /// styles and Workbook stream) under its retained edit profile. Edits go
+    /// through [`Package::edit`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the workbook cannot be read as cell values.
+    pub fn cell_values(&self) -> Result<crate::cell_values::Snapshot> {
         self.edit_snapshot_with_options(EditOptions::default())
     }
 }

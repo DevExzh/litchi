@@ -344,8 +344,8 @@ impl SavedSelection {
 
     /// Start a source-bound edit of this record.
     #[must_use]
-    pub fn edit(&self) -> SavedSelectionEdit {
-        SavedSelectionEdit {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             draft: self.source,
             owner: self.owner.clone(),
@@ -646,13 +646,13 @@ impl SavedSelection {
 /// candidate. This keeps CP, insertion, table, and block invariants together,
 /// while bytes outside the field being edited remain untouched.
 #[derive(Debug, Clone)]
-pub struct SavedSelectionEdit {
+pub struct Edit {
     source: SavedSelection,
     draft: [u8; SELSF_SIZE],
     owner: Option<Arc<[u8]>>,
 }
 
-impl SavedSelectionEdit {
+impl Edit {
     /// The source snapshot against which this edit was opened.
     #[must_use]
     pub fn source(&self) -> &SavedSelection {
@@ -840,16 +840,16 @@ impl SavedSelectionEdit {
     }
 
     /// Commit the staged record and return its reversible source patch.
-    pub fn commit(self) -> Result<SavedSelectionCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let owner = self.owner;
         let snapshot = SavedSelection::parse_bytes(&self.draft)?.with_optional_owner(owner.clone());
-        let patch = SavedSelectionPatch {
+        let patch = Patch {
             source: self.source.source,
             replacement: snapshot.source,
             owner,
         };
         let diagnostics = Diagnostics::new(!patch.is_noop());
-        Ok(SavedSelectionCommit::new(snapshot, patch, diagnostics))
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
     fn stage(&mut self, edit: impl FnOnce(&mut [u8; SELSF_SIZE])) -> Result<&mut Self> {
@@ -861,21 +861,21 @@ impl SavedSelectionEdit {
     }
 }
 
-/// The result of committing a [`SavedSelectionEdit`]: the validated
+/// The result of committing a [`Edit`]: the validated
 /// post-edit record, its source-checked byte patch and diagnostics.
-pub type SavedSelectionCommit = litchi_core::edit::Commit<SavedSelection, SavedSelectionPatch>;
+pub type Commit = litchi_core::edit::Commit<SavedSelection, Patch>;
 
 /// Content-free diagnostics of one saved-selection commit.
 pub use litchi_core::edit::Diagnostics;
 /// A reversible, source-checked byte patch for one `Selsf` record.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedSelectionPatch {
+pub struct Patch {
     source: [u8; SELSF_SIZE],
     replacement: [u8; SELSF_SIZE],
     owner: Option<Arc<[u8]>>,
 }
 
-impl SavedSelectionPatch {
+impl Patch {
     /// Exact source bytes required before applying this patch.
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
