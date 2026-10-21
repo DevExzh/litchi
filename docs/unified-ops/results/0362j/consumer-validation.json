@@ -1,0 +1,54 @@
+{
+  "tested_base": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+  "change": "Add the required non-exhaustive fallback in the File PPT slide-order error classifier.",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "RUST_TEST_THREADS": "8"
+  },
+  "validation": [
+    {
+      "name": "ops-check",
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 122.35549521446228,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-0362j-consumer-fix/ops-check.log",
+        "bytes": 8293,
+        "sha256": "45b425c88002605e0aed964167033902b0499f62fa7c25b40f48704a2a278b69"
+      }
+    },
+    {
+      "name": "ops-lib",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 190.9776647090912,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-0362j-consumer-fix/ops-lib.log",
+        "bytes": 85505,
+        "sha256": "c1414d378b590ce298f89dff470f5eede4c23e25cb7f41d5a6a2322fc8ac45c0"
+      }
+    }
+  ],
+  "library_tests_passed": 957
+}

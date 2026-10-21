@@ -17,6 +17,7 @@
 //! publishes the source package unchanged (signatures included); a changed
 //! commit of a signed package is refused ([`Failure::Signed`]).
 
+#[cfg(test)]
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ use crate::slide_order;
 mod digest;
 
 pub(crate) use digest::ExactCache;
-use digest::{BlockDigests, Digest, Recipe};
+use digest::{BlockDigests, BlockSpan, Digest, Recipe};
 
 /// One side of an exact byte patch: the package length and its block root
 /// (record 0357b).
@@ -72,6 +73,7 @@ pub(crate) struct BytePatch {
     source: Endpoint,
     target: Endpoint,
     ranges: Arc<[Range]>,
+    block_spans: Arc<[BlockSpan]>,
     /// Whether the patch runs from each range's `after` to its `before`.
     inverted: bool,
 }
@@ -101,6 +103,7 @@ impl BytePatch {
             source: endpoint.clone(),
             target: endpoint,
             ranges: Arc::from([]),
+            block_spans: Arc::from([]),
             inverted: false,
         }
     }
@@ -163,6 +166,7 @@ impl BytePatch {
             source: self.target.clone(),
             target: self.source.clone(),
             ranges: Arc::clone(&self.ranges),
+            block_spans: Arc::clone(&self.block_spans),
             inverted: !self.inverted,
         }
     }
@@ -179,8 +183,8 @@ impl BytePatch {
 
     /// The block-index spans the changed ranges cover, sorted and disjoint:
     /// the target differs from the source only in these blocks.
-    fn spans(&self) -> Vec<std::ops::Range<usize>> {
-        spans(&self.ranges)
+    fn spans(&self) -> &[BlockSpan] {
+        &self.block_spans
     }
 
     /// The bytes the changed ranges span (the longer side of each range).
@@ -205,13 +209,12 @@ impl BytePatch {
         self.source.len == len && &self.source.digest == digest
     }
 
-    /// The exact target rebuilt from the exact source bytes: copy them,
-    /// resize to the target length and write every range's target side.
+    /// The exact target rebuilt from the exact source bytes: resize the owned
+    /// source buffer to the target length and write every range's target side.
     /// The caller has checked [`Self::is_source`]; with the source bound by
     /// length and block root the result is the exact target by construction
     /// (debug builds re-hash it).
-    fn rebuild(&self, source: &[u8]) -> Option<Vec<u8>> {
-        let mut target = source.to_vec();
+    fn rebuild(&self, mut target: Vec<u8>) -> Option<Vec<u8>> {
         target.resize(self.target.len, 0);
         for range in self.ranges.iter() {
             let (_, after) = self.sides(range);
@@ -225,14 +228,14 @@ impl BytePatch {
 
 /// The block-index spans of `ranges` (block-aligned offsets; a range covers
 /// the blocks its longer side touches).
-fn spans(ranges: &[Range]) -> Vec<std::ops::Range<usize>> {
+fn spans(ranges: &[Range]) -> Vec<BlockSpan> {
     ranges
         .iter()
         .map(|range| {
             let stop = range
                 .offset
                 .saturating_add(range.before.len().max(range.after.len()));
-            range.offset / BLOCK..stop.div_ceil(BLOCK)
+            BlockSpan::new(range.offset / BLOCK, stop.div_ceil(BLOCK))
         })
         .collect()
 }
@@ -246,6 +249,14 @@ impl std::fmt::Debug for BytePatch {
             .field("ranges", &self.ranges.len())
             .field("changed_bytes", &self.changed_bytes())
             .field("payload_bytes", &self.payload_bytes())
+            .field("block_span_count", &self.block_spans.len())
+            .field(
+                "block_span_bytes",
+                &(self
+                    .block_spans
+                    .len()
+                    .saturating_mul(size_of::<BlockSpan>())),
+            )
             .finish()
     }
 }
@@ -387,9 +398,7 @@ impl Base {
     /// Whether the source carries a digital-signature component, cached on
     /// the package.
     pub(crate) fn is_signed(&self) -> Result<bool, Failure> {
-        self.package
-            .exact()
-            .signed(|| contains_signature(&self.bytes))
+        source_signed(&self.package)
     }
 
     /// A shared handle on the exact source package bytes.
@@ -406,8 +415,9 @@ impl Base {
     /// The source as the native slide-order read view, for families whose
     /// records live in the live document or a slide.
     pub(crate) fn native(&self) -> Result<slide_order::Snapshot, Failure> {
-        Ok(slide_order::Snapshot::from_bytes_with_options(
-            self.bytes.to_vec(),
+        Ok(slide_order::Snapshot::from_package_with_options(
+            &self.package,
+            Arc::clone(&self.bytes),
             self.open_options(),
         )?)
     }
@@ -429,20 +439,51 @@ impl Base {
     /// only the changed and appended blocks, and seeds the published
     /// package's cache, so a later edit or patch of it hashes nothing it
     /// did not change.
+    ///
+    /// This is an internal, closed publication boundary. Its callers are the
+    /// typed `font`, `picture_bullets`, `document_comparison`, `animation`
+    /// and `embedded::object` editors, plus [`Self::publish_owner`]. The
+    /// former editors emit a validated record projection; the latter first
+    /// uses `slide_order::records::publish`, which rewrites one admitted
+    /// owner record and verifies the reopened result. The embedded-object
+    /// edit exposes only the typed `ExObjList` and generated persisted-object
+    /// stream operations; its lower editor's unrelated stream helper is not
+    /// reachable from this publication path. Every changed source is
+    /// authenticated by
+    /// [`Self::is_signed`] before the target is opened, and each editor
+    /// refuses a changed signed source.
+    ///
+    /// `Base`, `BytePatch` and the family patch payloads are crate-private;
+    /// the public family patches have a private field and no byte decoder.
+    /// Thus a downstream caller cannot inject arbitrary package bytes into
+    /// this boundary or make replay manufacture a new target. If a future
+    /// publisher can import a package or add a reachable signature entry, it
+    /// must not use the unsigned-cache seed without an equivalent proof.
     pub(crate) fn publish(self, after: Vec<u8>) -> Result<Published, Failure> {
+        self.admit_output_length(after.len())?;
         let ranges = BytePatch::ranges(&self.bytes, &after);
         if ranges.is_empty() {
             return Ok(self.unchanged());
         }
+        let block_spans = Arc::from(spans(&ranges));
         let source = self.package.exact().blocks(&self.bytes);
-        let target = Arc::new(source.derive(&after, &spans(&ranges)));
+        let target = Arc::new(source.derive(&after, &block_spans));
         let patch = BytePatch {
             source: Endpoint::new(self.bytes.len(), source.root()),
             target: Endpoint::new(after.len(), target.root()),
             ranges,
+            block_spans,
             inverted: false,
         };
         self.publish_patched(after, patch, Seed::Blocks(target))
+    }
+
+    /// Admit the candidate before constructing compact spans or block lists.
+    /// The source is already admitted, so both endpoints then fit the compact
+    /// index bound. Preserve the publication path's freshness/signature error
+    /// precedence for an oversized changed candidate.
+    fn admit_output_length(&self, observed: usize) -> Result<(), Failure> {
+        admit_output_length(&self.package, observed)
     }
 
     /// Publish the exact target `after` of `patch`, made from this source,
@@ -453,19 +494,7 @@ impl Base {
         patch: BytePatch,
         seed: Seed,
     ) -> Result<Published, Failure> {
-        if self.is_signed()? {
-            return Err(Failure::Signed);
-        }
-        let package = Package::from_owned_bytes_with_options(after, self.open_options())?;
-        match seed {
-            Seed::Blocks(blocks) => package.exact().seed_blocks(blocks),
-            Seed::Derived(recipe) => package.exact().seed_derived(patch.target.digest, recipe),
-        }
-        Ok(Published {
-            package,
-            patch,
-            diagnostics: Diagnostics::CHANGED,
-        })
+        publish_patched(&self.package, after, patch, seed)
     }
 
     /// Publish one persisted owner record replacement through the
@@ -518,18 +547,92 @@ enum Seed {
 /// The receiving package's block root (cached, seeded, or computed once)
 /// must equal the patch source's. The rebuilt package is seeded with the
 /// patch's target root and the recipe of its block list, so the replay
-/// hashes no block.
+/// hashes no block. The public family patch is opaque and is created only by
+/// the closed publishers above; there is no public byte/JSON decoder that
+/// could supply an arbitrary target to this path.
 pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, Failure> {
-    let base = Base::capture(package)?;
-    if !patch.is_source(base.bytes().len(), &base.digest()) {
+    if package.is_encrypted() {
+        return Err(Failure::Package(PackageError::EncryptionPolicy));
+    }
+    // Keep the one exact source image in its original Vec. `Base::capture`
+    // converts that Vec to a short-lived `Arc<[u8]>` owner even though replay
+    // only borrows the bytes until it has rebuilt the target. The edit/native
+    // path still uses `Base::capture`, because those paths retain the source
+    // bytes for their staged projection.
+    let bytes = package.to_encrypted_bytes()?;
+    let digest = package.exact().root(&bytes);
+    if !patch.is_source(bytes.len(), &digest) {
         return Err(Failure::PatchConflict);
     }
     if patch.is_noop() {
-        return Ok(base.unchanged());
+        return Ok(Published {
+            patch: BytePatch::noop(bytes.len(), digest),
+            package: package.clone(),
+            diagnostics: Diagnostics::UNCHANGED,
+        });
     }
-    let target = patch.rebuild(base.bytes()).ok_or(Failure::PatchConflict)?;
-    let recipe = package.exact().child(base.bytes(), &patch.spans());
-    base.publish_patched(target, patch.clone(), Seed::Derived(recipe))
+    admit_output_length(package, patch.target_len())?;
+    let recipe = package.exact().child(&bytes, patch.spans());
+    let target = patch.rebuild(bytes).ok_or(Failure::PatchConflict)?;
+    publish_patched(package, target, patch.clone(), Seed::Derived(recipe))
+}
+
+/// Authenticate the source package before a changed target is admitted or
+/// opened. The source-version fence is required for positional packages even
+/// when the signature answer is already cached.
+fn source_signed(package: &Package) -> Result<bool, Failure> {
+    package.source_version()?;
+    Ok(package
+        .exact()
+        .signed(|| package.contains_signature_component())?)
+}
+
+/// Admit a candidate package before a replay allocates its rebuilt bytes.
+/// Preserve the established signed-source precedence for an over-limit
+/// target: changed signed packages are refused before target publication.
+fn admit_output_length(package: &Package, observed: usize) -> Result<(), Failure> {
+    let maximum = package.source_limits().max_input_bytes();
+    if observed > maximum {
+        if source_signed(package)? {
+            return Err(Failure::Signed);
+        }
+        return Err(Failure::Package(PackageError::Limit {
+            kind: crate::SourceLimitKind::InputBytes,
+            observed,
+            maximum,
+        }));
+    }
+    Ok(())
+}
+
+/// Publish a rebuilt target against an already-authenticated source owner.
+/// This borrowed form lets replay retain the source in its one `Vec` instead
+/// of wrapping it in a short-lived `Base` and `Arc<[u8]>`.
+fn publish_patched(
+    source: &Package,
+    after: Vec<u8>,
+    patch: BytePatch,
+    seed: Seed,
+) -> Result<Published, Failure> {
+    let signed = source_signed(source)?;
+    if signed {
+        return Err(Failure::Signed);
+    }
+    let package = Package::from_owned_bytes_with_options(after, open_options(source))?;
+    match seed {
+        Seed::Blocks(blocks) => package.exact().seed_blocks(blocks),
+        Seed::Derived(recipe) => package.exact().seed_derived(patch.target.digest, recipe),
+    }
+    // The closed publisher set above proves that an unsigned source stays
+    // unsigned. Do not turn this into a target directory scan: that scan is
+    // precisely the replay cost this seed removes.
+    debug_assert!(!signed);
+    package.exact().seed_unsigned();
+    Ok(Published {
+        package,
+        patch,
+        diagnostics: Diagnostics::CHANGED,
+    })
 }
 
 fn open_options(package: &Package) -> OpenOptions<'static> {
@@ -538,6 +641,7 @@ fn open_options(package: &Package) -> OpenOptions<'static> {
         .leniency(package.leniency())
 }
 
+#[cfg(test)]
 fn contains_signature(bytes: &[u8]) -> Result<bool, Failure> {
     Ok(crate::raw::Reader::from_reader(Cursor::new(bytes))?.contains_signature_component()?)
 }
@@ -636,7 +740,7 @@ macro_rules! family {
         #[doc = concat!(
                             "An exact, reversible ", $noun, " patch: the changed byte ranges ",
                             "between two packages, bound to the exact source package (length ",
-                            "and SHA-256 block root) it was made from."
+                            "and block root, record 0362) it was made from."
                         )]
         #[derive(Clone, PartialEq, Eq)]
         pub struct Patch($crate::scoped::BytePatch);
@@ -735,11 +839,144 @@ pub(crate) fn signed(package: &Package) -> Package {
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
+    reason = "a test fixture builder panics on failure by design"
+)]
+fn signature_package(package: &Package, marker: &str) -> Package {
+    use litchi_cfb::{OleFile, OleWriter};
+
+    let mut source = OleFile::open(Cursor::new(package.to_bytes().unwrap())).unwrap();
+    let mut writer = OleWriter::new();
+    for path in source.list_streams() {
+        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = source.open_stream(&refs).unwrap();
+        writer.create_stream(&refs, &data).unwrap();
+    }
+    writer
+        .create_stream(&[marker, "origin.sigs"], b"signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    Package::from_bytes(&output.into_inner()).unwrap()
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "CFB fixture mutation is bounded by the writer output"
+)]
+fn cfb_read_u32(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "CFB fixture mutation is bounded by the writer output"
+)]
+fn cfb_directory_offsets(bytes: &[u8]) -> Vec<usize> {
+    let sector_shift = u16::from_le_bytes(bytes[0x1e..0x20].try_into().unwrap());
+    let sector_size = 1usize << sector_shift;
+    let mut offsets = Vec::new();
+    let mut directory_sector = cfb_read_u32(bytes, 0x30);
+    while directory_sector != u32::MAX && directory_sector != u32::MAX - 1 {
+        let base = (directory_sector as usize + 1) * sector_size;
+        offsets.extend((0..sector_size / 128).map(|index| base + index * 128));
+        directory_sector = cfb_read_u32(
+            bytes,
+            (cfb_read_u32(bytes, 0x4c) as usize + 1) * sector_size + directory_sector as usize * 4,
+        );
+    }
+    offsets
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "CFB fixture mutation is bounded by the writer output"
+)]
+fn cfb_entry_name(bytes: &[u8], offset: usize) -> String {
+    let name_len = usize::from(u16::from_le_bytes(
+        bytes[offset + 64..offset + 66].try_into().unwrap(),
+    ));
+    let units = bytes[offset..offset + name_len.saturating_sub(2)]
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes(pair.try_into().unwrap()))
+        .collect::<Vec<_>>();
+    String::from_utf16(&units).unwrap()
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "CFB fixture mutation is bounded by the writer output"
+)]
+fn rename_cfb_root(bytes: &mut [u8], name: &str) {
+    let offset = *cfb_directory_offsets(bytes).first().unwrap();
+    let mut encoded = name.encode_utf16().collect::<Vec<_>>();
+    encoded.push(0);
+    assert!(encoded.len() <= 32);
+    bytes[offset..offset + 64].fill(0);
+    for (index, unit) in encoded.iter().enumerate() {
+        bytes[offset + index * 2..offset + index * 2 + 2].copy_from_slice(&unit.to_le_bytes());
+    }
+    bytes[offset + 64..offset + 66]
+        .copy_from_slice(&u16::try_from(encoded.len() * 2).unwrap().to_le_bytes());
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "CFB fixture mutation is bounded by the writer output"
+)]
+fn detach_cfb_leaf(bytes: &mut [u8], name: &str) {
+    let offsets = cfb_directory_offsets(bytes);
+    let (sid, offset) = offsets
+        .iter()
+        .enumerate()
+        .find(|&(_, &offset)| bytes[offset + 66] != 0 && cfb_entry_name(bytes, offset) == name)
+        .map(|(sid, &offset)| (u32::try_from(sid).unwrap(), offset))
+        .unwrap();
+    // The marker sorts after the generated PowerPoint entries, so it has no
+    // right subtree. Reattach its lower subtree at the parent link to keep
+    // every non-marker stream reachable while leaving the marker physical
+    // directory slot in place as an orphan.
+    assert_eq!(cfb_read_u32(bytes, offset + 72), u32::MAX);
+    let replacement = cfb_read_u32(bytes, offset + 68);
+    let mut detached = false;
+    for parent in offsets {
+        for link in [parent + 68, parent + 72, parent + 76] {
+            if cfb_read_u32(bytes, link) == sid {
+                bytes[link..link + 4].copy_from_slice(&replacement.to_le_bytes());
+                detached = true;
+                break;
+            }
+        }
+        if detached {
+            break;
+        }
+    }
+    assert!(detached, "{name} has no reachable parent link");
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
     clippy::indexing_slicing,
     reason = "byte-patch unit tests use panic-driven assertions"
 )]
 mod tests {
     use super::{BLOCK, BlockDigests, BytePatch, Endpoint};
+    use crate::package::{Error, OpenOptions, Package, SourceLimits};
+    use litchi_cfb::OleError;
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    };
 
     fn root(bytes: &[u8]) -> super::Digest {
         BlockDigests::of(bytes).root()
@@ -747,10 +984,12 @@ mod tests {
 
     impl BytePatch {
         fn diff(before: &[u8], after: &[u8]) -> Self {
+            let ranges = Self::ranges(before, after);
             Self {
                 source: Endpoint::new(before.len(), root(before)),
                 target: Endpoint::new(after.len(), root(after)),
-                ranges: Self::ranges(before, after),
+                block_spans: Arc::from(super::spans(&ranges)),
+                ranges,
                 inverted: false,
             }
         }
@@ -761,7 +1000,7 @@ mod tests {
             if !self.is_source(source.len(), &root(source)) {
                 return None;
             }
-            let target = self.rebuild(source)?;
+            let target = self.rebuild(source.to_vec())?;
             (root(&target) == self.target.digest).then_some(target)
         }
     }
@@ -770,6 +1009,338 @@ mod tests {
         (0..len)
             .map(|index| (index as u8).wrapping_mul(31).wrapping_add(seed))
             .collect()
+    }
+
+    struct VersionedSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn change(&self) {
+            self.revision.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x5050,
+                self.revision.load(Ordering::Acquire),
+            ))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+            let input = self.bytes.get(offset..).unwrap_or_default();
+            let count = input.len().min(output.len());
+            output[..count].copy_from_slice(&input[..count]);
+            Ok(count)
+        }
+    }
+
+    #[test]
+    fn signed_cache_rechecks_a_changed_positional_source() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = super::Base::capture(&package).unwrap();
+
+        assert!(!base.is_signed().unwrap());
+        source.change();
+        assert!(matches!(
+            base.is_signed(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn changed_owned_publication_seeds_its_unsigned_signature_result() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/unified-ops/0294/video.ppt");
+        let source = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+        let mut edit = source.edit_external_media().unwrap();
+        edit.set_path(1, Some("seeded-signature-cache.avi".into()))
+            .unwrap();
+        let published = edit.commit().unwrap();
+
+        let mut scans = 0;
+        let signed = published
+            .package()
+            .exact()
+            .signed(|| {
+                scans += 1;
+                Ok::<bool, ()>(true)
+            })
+            .unwrap();
+        assert!(!signed);
+        assert_eq!(scans, 0);
+    }
+
+    #[test]
+    fn replay_works_on_an_independent_copy_and_fences_positional_sources() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/unified-ops/0294/video.ppt");
+        let bytes = std::fs::read(path).unwrap();
+        let source = Package::from_bytes(&bytes).unwrap();
+        let mut edit = source.edit_external_media().unwrap();
+        edit.set_path(1, Some("independent-copy-check.avi".into()))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+
+        let independent = Package::from_bytes(&bytes).unwrap();
+        let replayed = independent.apply_external_media(commit.patch()).unwrap();
+        assert_eq!(
+            replayed.package().to_bytes().unwrap(),
+            commit.package().to_bytes().unwrap()
+        );
+        let restored = replayed
+            .package()
+            .apply_external_media(&commit.patch().inverse())
+            .unwrap();
+        assert_eq!(restored.package().to_bytes().unwrap(), bytes);
+
+        let versioned = Arc::new(VersionedSource::new(bytes));
+        let positional = Package::from_read_at(versioned.clone()).unwrap();
+        versioned.change();
+        assert!(matches!(
+            positional.apply_external_media(commit.patch()),
+            Err(crate::external_media::Error::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn replay_admits_a_growing_target_under_the_recipient_limit() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/unified-ops/0294/video.ppt");
+        let source_bytes = std::fs::read(path).unwrap();
+        let source = Package::from_bytes(&source_bytes).unwrap();
+        let mut edit = source.edit_external_media().unwrap();
+        edit.set_path(1, Some(format!("{}.avi", "long-path".repeat(1024))))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(commit.patch().target_len() > source_bytes.len());
+
+        let limits = SourceLimits::builder()
+            .max_input_bytes(source_bytes.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        let recipient = Package::from_bytes_with_options(
+            &source_bytes,
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
+        assert!(matches!(
+            recipient.apply_external_media(commit.patch()),
+            Err(crate::external_media::Error::Package(Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed,
+                maximum,
+            })) if observed == commit.patch().target_len() && maximum == source_bytes.len()
+        ));
+    }
+
+    #[test]
+    fn signature_scan_follows_reachable_nested_case_insensitive_entries() {
+        let package = Package::new().unwrap();
+        assert!(!package.contains_signature_component().unwrap());
+
+        let mixed_case = super::signature_package(&package, "_XMLSIGNATURES");
+        assert!(mixed_case.contains_signature_component().unwrap());
+
+        let mut renamed_root_bytes = package.to_bytes().unwrap();
+        super::rename_cfb_root(&mut renamed_root_bytes, "_signatures");
+        let raw = crate::raw::Reader::from_reader(std::io::Cursor::new(renamed_root_bytes.clone()))
+            .unwrap();
+        assert!(!raw.contains_signature_component().unwrap());
+        let renamed_root = Package::from_bytes(&renamed_root_bytes).unwrap();
+        assert!(!renamed_root.contains_signature_component().unwrap());
+
+        let mut orphan_bytes = mixed_case.to_bytes().unwrap();
+        super::detach_cfb_leaf(&mut orphan_bytes, "_XMLSIGNATURES");
+        let raw =
+            crate::raw::Reader::from_reader(std::io::Cursor::new(orphan_bytes.clone())).unwrap();
+        assert!(!raw.contains_signature_component().unwrap());
+        let orphan = Package::from_bytes(&orphan_bytes).unwrap();
+        assert!(!orphan.contains_signature_component().unwrap());
+
+        let nested = super::signed(&package);
+        assert!(nested.contains_signature_component().unwrap());
+
+        let strict_events = SourceLimits::builder()
+            .max_events(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let bounded = crate::raw::Reader::from_reader_with_options(
+            std::io::Cursor::new(nested.to_bytes().unwrap()),
+            OpenOptions::new().source_limits(strict_events),
+        )
+        .unwrap();
+        assert!(matches!(
+            bounded.contains_signature_component(),
+            Err(Error::Ole(OleError::LimitExceeded {
+                resource: "directory entries",
+                maximum: 1,
+                ..
+            }))
+        ));
+        // The canonical owner admits its presentation at open, so this
+        // tighter profile fails before a signature projection is available.
+        assert!(matches!(
+            Package::from_bytes_with_options(
+                &nested.to_bytes().unwrap(),
+                OpenOptions::new().source_limits(strict_events),
+            ),
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn compact_span_publication_admits_length_before_constructing_ranges() {
+        let source = Package::new().unwrap();
+        let bytes = source.to_bytes().unwrap();
+        let maximum = bytes.len();
+        let limits = SourceLimits::builder()
+            .max_input_bytes(maximum)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
+        let base = super::Base::capture(&package).unwrap();
+        base.admit_output_length(maximum).unwrap();
+        for observed in [maximum + 1, usize::MAX] {
+            assert!(matches!(
+                base.admit_output_length(observed),
+                Err(super::Failure::Package(Error::Limit {
+                    kind: crate::SourceLimitKind::InputBytes,
+                    observed: actual,
+                    maximum: ceiling,
+                })) if actual == observed && ceiling == maximum
+            ));
+        }
+        let mut oversized = bytes;
+        oversized.push(0);
+        assert!(matches!(
+            base.publish(oversized),
+            Err(super::Failure::Package(Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed,
+                maximum: ceiling,
+            })) if observed == maximum + 1 && ceiling == maximum
+        ));
+
+        let signed = super::signed(&source);
+        let signed_base = super::Base::capture(&signed).unwrap();
+        assert!(matches!(
+            signed_base.admit_output_length(usize::MAX),
+            Err(super::Failure::Signed)
+        ));
+        let versioned = Arc::new(VersionedSource::new(source.to_bytes().unwrap()));
+        let package = Package::from_read_at(versioned.clone()).unwrap();
+        let base = super::Base::capture(&package).unwrap();
+        versioned.change();
+        assert!(matches!(
+            base.admit_output_length(usize::MAX),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn signature_projection_bounds_a_large_admitted_directory() {
+        use litchi_cfb::{OleFile, OleWriter};
+
+        let package = Package::new().unwrap();
+        let mut source = OleFile::open(std::io::Cursor::new(package.to_bytes().unwrap())).unwrap();
+        let mut writer = OleWriter::new();
+        for path in source.list_streams() {
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            writer
+                .create_stream(&refs, &source.open_stream(&refs).unwrap())
+                .unwrap();
+        }
+        for index in 0..1025 {
+            writer
+                .create_stream(&[&format!("Unused{index:04}")], &[])
+                .unwrap();
+        }
+        let mut output = std::io::Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let limits = SourceLimits::builder()
+            .max_events(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = Package::from_bytes_with_options(
+            &output.into_inner(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
+        assert!(matches!(
+            package.contains_signature_component(),
+            Err(Error::Ole(OleError::LimitExceeded {
+                resource: "directory entries",
+                observed: 1025,
+                maximum: 1024,
+            }))
+        ));
+    }
+
+    #[test]
+    fn unsigned_publication_does_not_reach_an_orphan_signature_component() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/unified-ops/0294/video.ppt");
+        let source = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+        let signed = super::signature_package(&source, "_XMLSIGNATURES");
+        let mut bytes = signed.to_bytes().unwrap();
+        super::detach_cfb_leaf(&mut bytes, "_XMLSIGNATURES");
+        let orphan = Package::from_bytes(&bytes).unwrap();
+        assert!(!orphan.contains_signature_component().unwrap());
+
+        let mut edit = orphan.edit_external_media().unwrap();
+        edit.set_path(1, Some("orphan-marker-check.avi".into()))
+            .unwrap();
+        let published = edit.commit().unwrap();
+        assert!(!published.package().contains_signature_component().unwrap());
+
+        let mut scans = 0;
+        let cached = published
+            .package()
+            .exact()
+            .signed(|| {
+                scans += 1;
+                Ok::<bool, ()>(true)
+            })
+            .unwrap();
+        assert!(!cached);
+        assert_eq!(scans, 0);
     }
 
     /// `patch` maps `before` to `after` exactly, its inverse maps back, and
@@ -847,6 +1418,19 @@ mod tests {
         assert_eq!(patch.ranges[0].after.len(), 0);
         assert_exact(&before, &[]);
         assert_exact(&[], &before);
+    }
+
+    #[test]
+    fn rebuild_reuses_an_owned_source_buffer_when_lengths_fit() {
+        let before = image(3 * BLOCK + 11, 19);
+        let mut after = before.clone();
+        after[BLOCK + 3] ^= 0x5a;
+        let patch = BytePatch::diff(&before, &after);
+        let source = before.clone();
+        let source_pointer = source.as_ptr();
+        let rebuilt = patch.rebuild(source).unwrap();
+        assert_eq!(rebuilt.as_ptr(), source_pointer);
+        assert_eq!(rebuilt, after);
     }
 
     #[test]

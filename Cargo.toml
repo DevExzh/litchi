@@ -188,6 +188,7 @@ sha1_legacy   = { package = "sha1", version = "0.10" }
 sha2          = "0.11"
 sha2_legacy   = { package = "sha2", version = "0.10" }
 signature     = "2.2"
+siphasher     = { version = "1.0.4", default-features = false }
 smallvec      = "1.15"
 snap          = "1"
 soapberry-zip       = { path = "crates/soapberry-zip" }

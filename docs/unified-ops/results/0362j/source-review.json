@@ -1,0 +1,16 @@
+{
+  "candidate": "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+  "review": "root coordinator; W8 independently checked replay growth, shrinkage, empty target, and block-tail boundaries",
+  "change": "BytePatch::rebuild consumes the authenticated owned Vec, resizing and writing ranges in place. Its parent digest recipe is derived before the Vec is consumed. This removes the second whole-source allocation/copy.",
+  "preserved": [
+    "Candidate-length admission before reconstruction",
+    "Recorded content and length authentication for independent copies",
+    "Source freshness fences before authentication/signature memo use",
+    "Signed-source refusal and unchanged no-op legality",
+    "Receiver options and limits on the published package",
+    "Forward and inverse exact bytes including growth, shrinkage and empty output"
+  ],
+  "ownership": "Reconstruction mutates an owned local Vec only; a failure cannot mutate the receiver. Same-length rebuild has a pointer-stability test.",
+  "validation": "2110 unique passing PPT/CFB tests; three existing ignored tests; both all-target/all-feature Clippy commands pass. Integrated eight changed files match the measured commit byte-for-byte. Final workspace gate remains required.",
+  "performance": "Five complete ABBA blocks per reference; every first/steady/forward/inverse block improves. All observations retained; no pooling with prior candidates."
+}
