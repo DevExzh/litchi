@@ -14,6 +14,9 @@
 //!   transaction's default operation bound);
 //! - `xls/batch1k`, `rtf/batch1k`: one `File::edit` with 1,000 sets.
 //!
+//! `LITCHI_PROBE_ONLY=<prefix>` runs only the scenarios starting with it
+//! (record 0359a, for profiling one route).
+//!
 //! Output: one JSON array of `{scenario, samples, median_us, min_us}` on
 //! stdout. Run pinned, release:
 //! `taskset -c 29 cargo run --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_probe -- [rounds]`.
@@ -62,6 +65,12 @@ mod probe {
         format!(r"{{\rtf1\ansi {}}}", body.join(r"\par ")).into_bytes()
     }
 
+    /// Whether `scenario` runs: every one, or those starting with
+    /// `LITCHI_PROBE_ONLY` (for profiling one route; record 0359a).
+    fn selected(scenario: &str) -> bool {
+        std::env::var("LITCHI_PROBE_ONLY").map_or(true, |prefix| scenario.starts_with(&prefix))
+    }
+
     struct Probe {
         rounds: usize,
         rows: Vec<serde_json::Value>,
@@ -69,6 +78,9 @@ mod probe {
 
     impl Probe {
         fn time(&mut self, scenario: &str, calls: usize, mut run: impl FnMut()) {
+            if !selected(scenario) {
+                return;
+            }
             for _ in 0..2 {
                 run();
             }

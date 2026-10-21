@@ -22,6 +22,8 @@
 //! raised to 1,000 and 1,000 `set_paragraph_bold` calls; both run
 //! `LITCHI_PROBE_BATCH_ROUNDS` rounds (default 7).
 //!
+//! `LITCHI_PROBE_ONLY=<prefix>` runs only the scenarios starting with it.
+//!
 //! Output: one JSON array of `{scenario, samples, median_us, min_us}` on
 //! stdout. Run pinned, release:
 //! `taskset -c 29 cargo run --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe -- [rounds]`.
@@ -101,12 +103,26 @@ mod probe {
         format!(r"{{\rtf1\ansi {}}}", body.join(r"\par ")).into_bytes()
     }
 
+    /// Whether `scenario` runs: every one, or those starting with
+    /// `LITCHI_PROBE_ONLY` (for profiling one route; record 0359a).
+    fn selected(scenario: &str) -> bool {
+        std::env::var("LITCHI_PROBE_ONLY").map_or(true, |prefix| scenario.starts_with(&prefix))
+    }
+
     struct Probe {
         rounds: usize,
         rows: Vec<serde_json::Value>,
     }
 
     impl Probe {
+        /// Record the SHA-256 of the scenario's output on its row, so the
+        /// base and head outputs can be compared byte for byte.
+        fn output(&mut self, bytes: &[u8]) {
+            if let Some(row) = self.rows.last_mut() {
+                row["output_sha256"] = litchi_core::BlobId::of(bytes).as_hex().into();
+            }
+        }
+
         fn time(&mut self, scenario: &str, calls: usize, run: impl FnMut()) {
             self.time_rounds(scenario, calls, self.rounds, run);
         }
@@ -118,6 +134,9 @@ mod probe {
             rounds: usize,
             mut run: impl FnMut(),
         ) {
+            if !selected(scenario) {
+                return;
+            }
             for _ in 0..2 {
                 run();
             }
@@ -156,6 +175,7 @@ mod probe {
         probe.time("doc/source_set", 5, || {
             assert_eq!(super::routes::doc_source_set(&bytes), expected);
         });
+        probe.output(&expected);
 
         let file = litchi_ops::open_bytes(bytes.clone()).expect("open");
         let paragraphs: Vec<String> = (1..=1_000)
@@ -209,6 +229,7 @@ mod probe {
                     expected
                 );
             });
+            probe.output(&expected);
             if super::routes::PLAN_ONLY_ROUTE {
                 let scenario = format!("{scenario}_plan");
                 probe.time(&scenario, 5, || {
@@ -217,6 +238,7 @@ mod probe {
                         expected
                     );
                 });
+                probe.output(&expected);
             }
         }
 
@@ -226,6 +248,7 @@ mod probe {
             probe.time(scenario, 5, || {
                 assert_eq!(super::routes::xls_source_comments(&bytes, count), expected);
             });
+            probe.output(&expected);
         }
 
         let bytes = xls_sheets(8);
@@ -233,6 +256,7 @@ mod probe {
         probe.time("xls/source_hide7", 5, || {
             assert_eq!(super::routes::xls_source_hide(&bytes, 7), expected);
         });
+        probe.output(&expected);
 
         let bytes = rtf(1_000);
         let document = litchi_rtf::Package::from_bytes(&bytes).expect("document");
@@ -243,6 +267,7 @@ mod probe {
                 expected
             );
         });
+        probe.output(&expected);
 
         println!(
             "{}",
