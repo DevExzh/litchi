@@ -339,6 +339,8 @@ pub enum LimitKind {
     Connections(crate::connections::LimitKind),
     /// Rich-value refresh interval XML and collection budgets.
     RichValueRefresh(crate::rich_values::refresh_intervals::LimitKind),
+    /// Source-backed tab-state XML audit budgets.
+    TabState(crate::tab_state::source::LimitKind),
 }
 
 impl LimitKind {
@@ -392,6 +394,7 @@ impl LimitKind {
             Self::OleObjects(kind) => kind.as_str(),
             Self::Connections(kind) => kind.as_str(),
             Self::RichValueRefresh(kind) => kind.as_str(),
+            Self::TabState(kind) => kind.as_str(),
         }
     }
 }

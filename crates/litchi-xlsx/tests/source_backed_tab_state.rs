@@ -16,7 +16,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
-use litchi_xlsx::tab_state::source::Commit;
+use litchi_xlsx::tab_state::source::{Commit, EditOptions, Limits};
 use litchi_xlsx::{Error, Package, SourceBackedWorkbook, SourceLimits, Visibility, WorksheetKind};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -501,6 +501,61 @@ fn staged_activation_can_return_to_source_and_noop_activation_does_not_pin_reloc
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().after().active_tab().unwrap().name(), "Three");
     assert_eq!(commit.diagnostics().touched_parts(), 3);
+}
+
+#[test]
+fn tab_state_xml_audit_limits_are_configurable_and_typed() {
+    let bytes = fixture(Fixture::default());
+    let xml_bytes = Limits::new().with_max_xml_bytes(1).unwrap();
+    let editor = open_editor(bytes.clone());
+    let mut edit = editor
+        .edit_tab_state_with_options(EditOptions::default().limits(xml_bytes))
+        .unwrap();
+    edit.show("Two").unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::TabState(
+                litchi_xlsx::tab_state::source::LimitKind::XmlBytes
+            ),
+            ..
+        })
+    ));
+
+    let events = Limits::new().with_max_events(1).unwrap();
+    let editor = open_editor(bytes.clone());
+    let mut edit = editor
+        .edit_tab_state_with_options(EditOptions::default().limits(events))
+        .unwrap();
+    edit.show("Two").unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::TabState(
+                litchi_xlsx::tab_state::source::LimitKind::Events
+            ),
+            ..
+        })
+    ));
+
+    let depth = Limits::new().with_max_depth(1).unwrap();
+    let editor = open_editor(bytes);
+    let mut edit = editor
+        .edit_tab_state_with_options(EditOptions::default().limits(depth))
+        .unwrap();
+    edit.show("Two").unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsx::LimitKind::TabState(
+                litchi_xlsx::tab_state::source::LimitKind::Depth
+            ),
+            ..
+        })
+    ));
+
+    assert!(Limits::new().with_max_xml_bytes(0).is_err());
+    assert!(Limits::new().with_max_depth(usize::MAX).is_err());
 }
 
 #[test]

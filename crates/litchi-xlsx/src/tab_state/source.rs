@@ -39,15 +39,107 @@ crate::workbook::source::deferred::source_family!(
     own_diagnostics
 );
 
-/// The configured budgets of the source-backed tab-state family. It has none
-/// of its own: the workbook's source limits bound every part it reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {}
+crate::record::limit_kinds!("source-backed tab-state", TabState {
+    /// XML bytes audited by one tab-state edit.
+    XmlBytes => "tab-state XML bytes",
+    /// Element depth of one audited XML part.
+    Depth => "tab-state XML depth",
+    /// XML events visited by one audited XML part.
+    Events => "tab-state XML events",
+});
 
-impl std::fmt::Display for LimitKind {
-    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {}
+/// Resource limits for one source-backed tab-state edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_xml_bytes: usize,
+    max_depth: usize,
+    max_events: usize,
+}
+
+impl Limits {
+    /// Construct the default tab-state edit limits.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_xml_bytes: MAX_EDIT_XML_BYTES,
+            max_depth: MAX_EDIT_XML_DEPTH,
+            max_events: MAX_EDIT_XML_EVENTS,
+        }
+    }
+
+    /// Maximum bytes audited in one workbook or worksheet XML part.
+    #[must_use]
+    pub const fn max_xml_bytes(self) -> usize {
+        self.max_xml_bytes
+    }
+
+    /// Maximum element depth audited in one XML part.
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    /// Maximum XML events audited in one XML part.
+    #[must_use]
+    pub const fn max_events(self) -> usize {
+        self.max_events
+    }
+
+    /// Set the maximum XML bytes audited in one part.
+    pub fn with_max_xml_bytes(mut self, value: usize) -> Result<Self> {
+        self.max_xml_bytes = checked_limit(LimitKind::XmlBytes, value, MAX_EDIT_XML_BYTES)?;
+        Ok(self)
+    }
+
+    /// Set the maximum element depth audited in one part.
+    pub fn with_max_depth(mut self, value: usize) -> Result<Self> {
+        self.max_depth = checked_limit(LimitKind::Depth, value, MAX_EDIT_XML_DEPTH)?;
+        Ok(self)
+    }
+
+    /// Set the maximum XML events audited in one part.
+    pub fn with_max_events(mut self, value: usize) -> Result<Self> {
+        self.max_events = checked_limit(LimitKind::Events, value, MAX_EDIT_XML_EVENTS)?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn checked_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<usize> {
+    if value == 0 {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value: 0,
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        });
+    }
+    if value > maximum {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        });
+    }
+    Ok(value)
+}
+
+/// Options for one source-backed tab-state edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the XML audit by `limits` instead of the default policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
     }
 }
 
@@ -161,8 +253,13 @@ impl SourceBackedWorkbook {
     /// Returns an error when the workbook catalog is invalid or the source
     /// cannot be read.
     pub fn edit_tab_state(&self) -> Result<Edit> {
+        self.edit_tab_state_with_options(EditOptions::default())
+    }
+
+    /// Begin an isolated tab-state edit with explicit XML audit limits.
+    pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
         let before = Snapshot::load_source_backed(self.edit_package()?, Arc::new(()))?;
-        Edit::new(self.clone(), before)
+        Edit::new(self.clone(), before, options.limits.unwrap_or_default())
     }
 
     /// Replay a tab-state patch onto this workbook.
@@ -182,12 +279,13 @@ impl SourceBackedWorkbook {
 pub struct Edit {
     workbook: SourceBackedWorkbook,
     before: Snapshot,
+    limits: Limits,
     staged_visibility: Vec<Visibility>,
     requested_active: Option<usize>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Result<Self> {
+    fn new(workbook: SourceBackedWorkbook, before: Snapshot, limits: Limits) -> Result<Self> {
         let mut staged_visibility = Vec::new();
         staged_visibility
             .try_reserve_exact(before.tabs().len())
@@ -196,6 +294,7 @@ impl Edit {
         Ok(Self {
             workbook,
             before,
+            limits,
             staged_visibility,
             requested_active: None,
         })
@@ -291,7 +390,7 @@ impl Edit {
             return Err(self.block(active, TabEditBlock::ActiveTabLimit));
         }
 
-        let audit = audit_xml(self.before.workbook_xml(), XmlOwner::Workbook)?;
+        let audit = audit_xml(self.before.workbook_xml(), XmlOwner::Workbook, self.limits)?;
         let context = visibility_changed.first().copied().unwrap_or(active);
         if audit.protected_structure {
             return Err(self.block(context, TabEditBlock::ProtectedWorkbook));
@@ -308,7 +407,7 @@ impl Edit {
             self.before
         };
         for part in before.touched() {
-            let audit = audit_xml(part.part.bytes.as_bytes(), XmlOwner::Sheet)?;
+            let audit = audit_xml(part.part.bytes.as_bytes(), XmlOwner::Sheet, self.limits)?;
             if audit.alternate_content {
                 return Err(Error::TabEditBlocked {
                     sheet: before.tabs()[part.position].name().to_owned(),
@@ -450,9 +549,13 @@ struct XmlAudit {
     alternate_content: bool,
 }
 
-fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
-    if content.len() > MAX_EDIT_XML_BYTES {
-        return Err(invalid("tab-state XML exceeds the 32 MiB edit bound"));
+fn audit_xml(content: &[u8], owner: XmlOwner, limits: Limits) -> Result<XmlAudit> {
+    if content.len() > limits.max_xml_bytes {
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            content.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(content);
     // Names are recognized on namespace values as written; a declaration that
@@ -468,8 +571,8 @@ fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
         events = events
             .checked_add(1)
             .ok_or_else(|| invalid("tab-state XML event count overflow"))?;
-        if events > MAX_EDIT_XML_EVENTS {
-            return Err(invalid("tab-state XML exceeds the event bound"));
+        if events > limits.max_events {
+            return Err(Error::limit(LimitKind::Events, events, limits.max_events));
         }
         let event = reader
             .read_event()
@@ -482,8 +585,8 @@ fn audit_xml(content: &[u8], owner: XmlOwner) -> Result<XmlAudit> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("tab-state XML depth overflow"))?;
-                if depth > MAX_EDIT_XML_DEPTH {
-                    return Err(invalid("tab-state XML exceeds the depth bound"));
+                if depth > limits.max_depth {
+                    return Err(Error::limit(LimitKind::Depth, depth, limits.max_depth));
                 }
                 observe_element(&mut audit, owner, &namespace, &element, reader.decoder())?;
             },
