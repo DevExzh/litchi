@@ -77,12 +77,12 @@ The repaired allocator pair was rerun sequentially in the fresh directory
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-14370-v1`, with
 the same 64-step, two-name fixture and two warmups. The e63 JSON was unchanged
 from the protected baseline; its SHA-256 is
-`539a1c9c6643f15a4c7988a7e3663d5f26065797c060535b9b53fab8e41ccac8`.
+`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`.
 The repaired binary is outside the repository at
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-14370-alloc/release/xlsx_tab_state_history_alloc`,
 SHA-256 `87973a079fc1bb5e3b87032c8b58702b320bde817bbfdf5096517ac530935173`;
 its JSON receipt SHA-256 is
-`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`.
+`539a1c9c6643f15a4c7988a7e3663d5f26065797c060535b9b53fab8e41ccac8`.
 
 | interval | e63 | 14370c12c9 | change vs e63 |
 | --- | ---: | ---: | ---: |
