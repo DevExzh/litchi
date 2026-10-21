@@ -1,0 +1,135 @@
+{
+  "comparison_key": [
+    "name",
+    "version",
+    "source",
+    "checksum"
+  ],
+  "locks": {
+    "original": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-base-prep-20261021/Cargo.lock",
+      "bytes": 139425,
+      "sha256": "950690b5cad8b3e62c06553660a6310d28197bd305c4333b4d6fd3e96fffcb22"
+    },
+    "sip_historical": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-e4bd-prep-20261021/Cargo.lock",
+      "bytes": 139487,
+      "sha256": "7ffc6778f9dc85acbeee601d436dfa08135c0a6e318511c65dabaa271547163e"
+    },
+    "sip_matched": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/Cargo.lock",
+      "bytes": 139487,
+      "sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc"
+    },
+    "candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/uo2-w8-file/Cargo.lock",
+      "bytes": 139487,
+      "sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc"
+    },
+    "final_candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/Cargo.lock",
+      "bytes": 139505,
+      "sha256": "40dcbcff741065997d9bc583140a22d921ebe2b4f321570af2587d1cf22d3b5c"
+    }
+  },
+  "registry_comparison_to_candidate": {
+    "original": {
+      "only_here": [],
+      "only_candidate": [],
+      "count": 518
+    },
+    "sip_historical": {
+      "only_here": [
+        [
+          "crypto-common",
+          "0.1.6",
+          "registry+https://github.com/rust-lang/crates.io-index",
+          "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
+        ],
+        [
+          "generic-array",
+          "0.14.9",
+          "registry+https://github.com/rust-lang/crates.io-index",
+          "4bb6743198531e02858aeaea5398fcc883e71851fcbcb5a2f773e2fb6cb1edf2"
+        ]
+      ],
+      "only_candidate": [
+        [
+          "crypto-common",
+          "0.1.7",
+          "registry+https://github.com/rust-lang/crates.io-index",
+          "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
+        ],
+        [
+          "generic-array",
+          "0.14.7",
+          "registry+https://github.com/rust-lang/crates.io-index",
+          "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
+        ]
+      ],
+      "count": 518
+    },
+    "sip_matched": {
+      "only_here": [],
+      "only_candidate": [],
+      "count": 518
+    },
+    "candidate": {
+      "only_here": [],
+      "only_candidate": [],
+      "count": 518
+    },
+    "final_candidate": {
+      "only_here": [],
+      "only_candidate": [],
+      "count": 518
+    }
+  },
+  "release_profiles": {
+    "original": {
+      "lto": true,
+      "panic": "abort",
+      "package": {
+        "litchi-py": {
+          "opt-level": 3,
+          "strip": true,
+          "codegen-units": 1
+        }
+      }
+    },
+    "sip_matched": {
+      "lto": true,
+      "panic": "abort",
+      "package": {
+        "litchi-py": {
+          "opt-level": 3,
+          "strip": true,
+          "codegen-units": 1
+        }
+      }
+    },
+    "candidate": {
+      "lto": true,
+      "panic": "abort",
+      "package": {
+        "litchi-py": {
+          "opt-level": 3,
+          "strip": true,
+          "codegen-units": 1
+        }
+      }
+    },
+    "final_candidate": {
+      "lto": true,
+      "panic": "abort",
+      "package": {
+        "litchi-py": {
+          "opt-level": 3,
+          "strip": true,
+          "codegen-units": 1
+        }
+      }
+    }
+  },
+  "conclusion": "Original and rebuilt Sip reference use the same registry package identities and release profile as the candidate; historical Sip lock differs and its binary is excluded from final comparison."
+}
