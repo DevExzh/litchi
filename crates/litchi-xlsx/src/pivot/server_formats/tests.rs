@@ -89,9 +89,9 @@ fn reads_and_edits_server_formats() {
     transaction
         .update_server_format(
             0,
-            ServerFormatEdit {
-                culture: AttributeEdit::Clear,
-                format: AttributeEdit::Set("#,##0".to_owned()),
+            Format {
+                culture: Attribute::Clear,
+                format: Attribute::Set("#,##0".to_owned()),
             },
         )
         .unwrap();
@@ -218,10 +218,13 @@ fn ordinary_workbook_structural_edit_uses_same_public_path() {
         .unwrap();
     edit.reorder_server_formats(&[2, 0, 1]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().formats().len(), 3);
-    assert_eq!(commit.snapshot().formats()[0].format.as_deref(), Some("0"));
+    assert_eq!(commit.patch().after().formats().len(), 3);
+    assert_eq!(
+        commit.patch().after().formats()[0].format.as_deref(),
+        Some("0")
+    );
     let round_trip = commit.patch().inverse().apply(commit.package()).unwrap();
-    assert_eq!(round_trip.snapshot().formats().len(), 2);
+    assert_eq!(round_trip.patch().after().formats().len(), 2);
 }
 
 #[test]
@@ -271,16 +274,16 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
     let mut edit = workbook.edit_pivot_table("Pivot").unwrap();
     edit.update_server_format(
         0,
-        ServerFormatEdit {
-            culture: AttributeEdit::Clear,
-            format: AttributeEdit::Set("#,##0".to_owned()),
+        Format {
+            culture: Attribute::Clear,
+            format: Attribute::Set("#,##0".to_owned()),
         },
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().formats()[0].format.as_deref(),
+        commit.patch().after().formats()[0].format.as_deref(),
         Some("#,##0")
     );
 
@@ -294,7 +297,7 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
     let inverse = commit.patch().inverse();
     let restored = inverse.apply(next).unwrap();
     assert_eq!(
-        restored.snapshot().formats()[0].culture.as_deref(),
+        restored.patch().after().formats()[0].culture.as_deref(),
         Some("en-US")
     );
 }

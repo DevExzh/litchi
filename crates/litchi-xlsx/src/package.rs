@@ -362,77 +362,116 @@ impl Package {
         patch.apply_to(&self.workbook)
     }
 
-    /// Begin an ordinary semantic edit handle for one workbook PivotCache.
-    /// Select the cache field with [`crate::pivot::PivotCacheEdit::field`]
-    /// before staging an existing-name replacement.
-    #[must_use]
-    pub fn edit_pivot_cache(
+    /// Start a cached unique-name edit of one field of one workbook
+    /// PivotCache.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused and the resolution and validation errors of the cache field.
+    pub fn edit_pivot_cache<'a>(
         &self,
-        selector: impl Into<crate::pivot::PivotCacheSelector>,
-    ) -> crate::pivot::PivotCacheEdit {
-        crate::pivot::cached_unique_names::edit_workbook(&self.workbook, selector)
+        cache: impl Into<crate::pivot::PivotCacheSelector>,
+        field: crate::pivot::PivotCacheFieldSelector<'a>,
+    ) -> Result<crate::pivot::cached_unique_names::Edit> {
+        self.workbook.ensure_mutation_allowed("edit_pivot_cache")?;
+        crate::pivot::cached_unique_names::edit_workbook(&self.workbook, cache, field)
     }
 
-    /// Start an ordinary semantic PivotTable server-format edit.
+    /// Apply an exact cached unique-name patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
+    pub fn apply_pivot_cache(
+        &self,
+        patch: &crate::pivot::cached_unique_names::Patch,
+    ) -> Result<crate::pivot::cached_unique_names::Commit> {
+        self.workbook.ensure_mutation_allowed("apply_pivot_cache")?;
+        patch.apply(self)
+    }
+
+    /// Start a server-format edit of one semantic PivotTable.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused and the resolution and validation errors of the PivotTable.
     pub fn edit_pivot_table<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
+    ) -> Result<crate::pivot::server_formats::Edit> {
         self.workbook.ensure_mutation_allowed("edit_pivot_table")?;
         crate::pivot::server_formats::edit_workbook(&self.workbook, selector)
     }
 
-    /// Apply an exact ordinary server-format patch.
+    /// Apply an exact server-format patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
     pub fn apply_pivot_table(
         &self,
-        patch: &crate::pivot::PivotTableServerFormatsPackagePatch,
-    ) -> Result<crate::pivot::PivotTableServerFormatsPackageCommit> {
+        patch: &crate::pivot::server_formats::Patch,
+    ) -> Result<crate::pivot::server_formats::Commit> {
         self.workbook.ensure_mutation_allowed("apply_pivot_table")?;
         patch.apply(self)
     }
 
-    /// Begin an ordinary semantic scalar edit of one `pivotTableData` owner.
+    /// Start a scalar edit of one PivotTable's `pivotTableData` owner under
+    /// the package's semantic limits
+    /// ([`crate::SemanticLimits::pivot_table_data`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused and the resolution, limit and validation errors of the owner.
     pub fn edit_pivot_table_data<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.workbook
-            .ensure_mutation_allowed("edit_pivot_table_data")?;
-        crate::pivot::server_formats::table_data::edit_workbook(&self.workbook, selector)
-    }
-
-    /// Start a `pivotTableData` edit with a caller-lowered semantic resource
-    /// policy.
-    pub fn edit_pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.workbook
-            .ensure_mutation_allowed("edit_pivot_table_data_with_limits")?;
-        crate::pivot::server_formats::table_data::edit_workbook_with_limits(
-            &self.workbook,
+    ) -> Result<crate::pivot::table_data::Edit> {
+        self.edit_pivot_table_data_with_options(
             selector,
-            limits,
+            crate::pivot::table_data::EditOptions::default(),
         )
     }
 
-    /// Apply an exact ordinary `pivotTableData` patch.
-    pub fn apply_pivot_table_data(
+    /// Start a `pivotTableData` edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// See [`Self::edit_pivot_table_data`].
+    pub fn edit_pivot_table_data_with_options<'a>(
         &self,
-        patch: &crate::pivot::PivotTableDataPackagePatch,
-    ) -> Result<crate::pivot::PivotTableDataPackageCommit> {
+        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
+        options: crate::pivot::table_data::EditOptions,
+    ) -> Result<crate::pivot::table_data::Edit> {
         self.workbook
-            .ensure_mutation_allowed("apply_pivot_table_data")?;
-        patch.apply(self)
+            .ensure_mutation_allowed("edit_pivot_table_data")?;
+        let limits = options.limits_or(self.semantic_limits().pivot_table_data_value());
+        crate::pivot::table_data::edit_workbook_with_limits(&self.workbook, selector, &limits)
     }
 
-    /// Apply an exact ordinary cached-unique-names patch.
-    pub fn apply_pivot_cache(
+    /// Apply an exact `pivotTableData` patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::PatchConflict`] when this package is not the
+    /// patch's before state and [`crate::Error::Signed`] for a changed patch
+    /// of a signed workbook.
+    pub fn apply_pivot_table_data(
         &self,
-        patch: &crate::pivot::cached_unique_names::PackagePatch,
-    ) -> Result<crate::pivot::cached_unique_names::PackageCommit> {
-        self.workbook.ensure_mutation_allowed("apply_pivot_cache")?;
+        patch: &crate::pivot::table_data::Patch,
+    ) -> Result<crate::pivot::table_data::Commit> {
+        self.workbook
+            .ensure_mutation_allowed("apply_pivot_table_data")?;
         patch.apply(self)
     }
 

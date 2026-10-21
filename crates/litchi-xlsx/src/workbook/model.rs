@@ -1008,8 +1008,8 @@ impl Workbook {
     pub fn pivot_table_server_formats_source<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
-        crate::pivot::load_pivot_server_formats(&self.inner.package, selector)
+    ) -> Result<crate::pivot::server_formats::Snapshot> {
+        crate::pivot::server_formats::load(&self.inner.package, selector)
     }
 
     /// Resolve one semantic PivotTable through the ordinary workbook facade.
@@ -1035,7 +1035,7 @@ impl Workbook {
     pub fn pivot_server_formats_source<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
+    ) -> Result<crate::pivot::server_formats::Snapshot> {
         self.pivot_table_server_formats_source(selector)
     }
 
@@ -1046,16 +1046,11 @@ impl Workbook {
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
     ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook(self, selector)
-    }
-
-    /// Resolve C444 with a caller-lowered semantic resource policy.
-    pub fn pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
+        crate::pivot::table_data::view_workbook_with_limits(
+            self,
+            selector,
+            &self.semantic_limits().pivot_table_data_value(),
+        )
     }
 
     pub(crate) fn pivot_package(&self) -> &OpcPackage {

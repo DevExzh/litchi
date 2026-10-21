@@ -24,15 +24,15 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::pivot::server_formats::{
+    Attribute, Format, PivotTableSelector, ServerFormat, apply_patch, edit, load,
+};
+use crate::pivot::table_data::load as load_pivot_table_data;
+use crate::{Cell, Error, SourceLimits, Value};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceLimitKind, TargetMode,
 };
-use litchi_xlsx::pivot::server_formats::table_data::load as load_pivot_table_data;
-use litchi_xlsx::pivot::server_formats::{
-    AttributeEdit, PivotTableSelector, ServerFormat, ServerFormatEdit, apply_patch, edit, load,
-};
-use litchi_xlsx::{Cell, Error, SourceLimits, Value};
 use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 
@@ -441,7 +441,7 @@ fn prefixed_server_format_fixture(dialect: Dialect, prefix: &'static str) -> Fix
 #[test]
 fn workbook_facade_resolves_server_formats_by_semantic_selector() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
 
     let by_name = workbook
         .workbook_ref()
@@ -468,7 +468,7 @@ fn workbook_facade_resolves_server_formats_by_semantic_selector() {
 #[test]
 fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let source_xml = workbook
         .workbook_ref()
         .pivot_table_server_formats_source("Pivot")
@@ -481,7 +481,7 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!no_op.changed());
+    assert!(!no_op.diagnostics().changed());
     assert!(no_op.patch().is_noop());
     assert_eq!(no_op.patch().before(), no_op.patch().after());
     assert_eq!(
@@ -498,9 +498,9 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
     assert!(
         edit.update_server_format(
             0,
-            ServerFormatEdit {
-                culture: AttributeEdit::Keep,
-                format: AttributeEdit::Clear,
+            Format {
+                culture: Attribute::Keep,
+                format: Attribute::Clear,
             },
         )
         .unwrap()
@@ -508,17 +508,17 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
     assert!(
         edit.update_server_format(
             1,
-            ServerFormatEdit {
-                culture: AttributeEdit::Set("fr-FR".to_owned()),
-                format: AttributeEdit::Set("0.00".to_owned()),
+            Format {
+                culture: Attribute::Set("fr-FR".to_owned()),
+                format: Attribute::Set("0.00".to_owned()),
             },
         )
         .unwrap()
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().formats(),
+        commit.patch().after().formats(),
         &[
             ServerFormat::new(Some("en-US".to_owned()), None),
             ServerFormat::new(Some("fr-FR".to_owned()), Some("0.00".to_owned())),
@@ -528,21 +528,21 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("pivot-server-formats.xlsx");
     commit.package().save(&path).unwrap();
-    let reopened = litchi_xlsx::Package::open(&path).unwrap();
+    let reopened = crate::Package::open(&path).unwrap();
     assert_eq!(
         reopened
             .workbook_ref()
             .pivot_table("Pivot")
             .unwrap()
             .formats(),
-        commit.snapshot().formats()
+        commit.patch().after().formats()
     );
 
     let restored = commit
         .package()
         .apply_pivot_table(&commit.patch().inverse())
         .unwrap();
-    assert!(restored.changed());
+    assert!(restored.diagnostics().changed());
     assert_eq!(
         restored
             .package()
@@ -557,7 +557,7 @@ fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
 #[test]
 fn workbook_facade_patch_is_stale_checked_and_composes_with_ordinary_edit() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
 
     let mut pivot_edit = workbook.edit_pivot_table("Pivot").unwrap();
     pivot_edit.set_culture(0, Some("de-DE".to_owned())).unwrap();
@@ -613,11 +613,11 @@ fn workbook_facade_patch_is_stale_checked_and_composes_with_ordinary_edit() {
 #[cfg(feature = "encryption")]
 #[test]
 fn ordinary_workbook_patch_apply_refuses_encrypted_provenance() {
-    use litchi_xlsx::encryption::Mode as EncryptionMode;
+    use crate::encryption::Mode as EncryptionMode;
 
     const PASSWORD: &str = "pivot-server-formats-password";
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let mut transaction = workbook.edit_pivot_table("Pivot").unwrap();
     transaction
         .set_culture(0, Some("de-DE".to_owned()))
@@ -628,13 +628,12 @@ fn ordinary_workbook_patch_apply_refuses_encrypted_provenance() {
     let encrypted_bytes = workbook
         .to_encrypted(PASSWORD, EncryptionMode::Standard)
         .unwrap();
-    let encrypted =
-        litchi_xlsx::Package::from_bytes_with_password(&encrypted_bytes, PASSWORD).unwrap();
+    let encrypted = crate::Package::from_bytes_with_password(&encrypted_bytes, PASSWORD).unwrap();
     let before = encrypted.to_plain_bytes().unwrap();
     assert!(matches!(
-        patch.apply(&encrypted),
+        encrypted.apply_pivot_table(&patch),
         Err(Error::EncryptionPolicy {
-            operation: "apply_pivot_table_server_formats_patch",
+            operation: "apply_pivot_table",
             ..
         })
     ));
@@ -1442,9 +1441,9 @@ fn explicit_keep_set_clear_distinguishes_absent_attributes() {
         transaction
             .update_server_format(
                 0,
-                ServerFormatEdit {
-                    culture: AttributeEdit::Keep,
-                    format: AttributeEdit::Set("0".to_owned()),
+                Format {
+                    culture: Attribute::Keep,
+                    format: Attribute::Set("0".to_owned()),
                 },
             )
             .unwrap()
@@ -1453,9 +1452,9 @@ fn explicit_keep_set_clear_distinguishes_absent_attributes() {
         transaction
             .update_server_format(
                 1,
-                ServerFormatEdit {
-                    culture: AttributeEdit::Clear,
-                    format: AttributeEdit::Set("0.00".to_owned()),
+                Format {
+                    culture: Attribute::Clear,
+                    format: Attribute::Set("0.00".to_owned()),
                 },
             )
             .unwrap()
@@ -1559,7 +1558,7 @@ fn structural_list_crud_preserves_order_count_comments_and_prefix_in_both_dialec
 fn ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse() {
     for (dialect, prefix) in [(Dialect::Transitional, "x15"), (Dialect::Strict, "p")] {
         let fixture = prefixed_server_format_fixture(dialect, prefix);
-        let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
         let original = workbook
             .workbook_ref()
             .pivot_table_server_formats_source("Pivot")
@@ -1577,9 +1576,9 @@ fn ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse() {
             ServerFormat::new(Some("first".to_owned()), None)
         );
         let commit = transaction.commit().unwrap();
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         assert_eq!(
-            commit.snapshot().formats(),
+            commit.patch().after().formats(),
             &[
                 ServerFormat::new(Some("second".to_owned()), None),
                 ServerFormat::new(Some("middle".to_owned()), None),
@@ -1589,21 +1588,21 @@ fn ordinary_workbook_facade_supports_structural_list_edits_and_exact_inverse() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("pivot-server-formats-list.xlsx");
         commit.package().save(&path).unwrap();
-        let reopened = litchi_xlsx::Package::open(&path).unwrap();
+        let reopened = crate::Package::open(&path).unwrap();
         assert_eq!(
             reopened
                 .workbook_ref()
                 .pivot_table("Pivot")
                 .unwrap()
                 .formats(),
-            commit.snapshot().formats()
+            commit.patch().after().formats()
         );
 
         let restored = commit
             .package()
             .apply_pivot_table(&commit.patch().inverse())
             .unwrap();
-        assert!(restored.changed());
+        assert!(restored.diagnostics().changed());
         assert_eq!(
             restored
                 .package()
@@ -1986,7 +1985,7 @@ fn stale_signed_and_limited_publications_refuse_before_mutation() {
 #[test]
 fn ordinary_patch_rejects_stale_workbook_root_namespace_and_mce_context() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let mut transaction = workbook.edit_pivot_table("Pivot").unwrap();
     transaction
         .set_culture(0, Some("de-DE".to_owned()))
@@ -2003,15 +2002,14 @@ fn ordinary_patch_rejects_stale_workbook_root_namespace_and_mce_context() {
     assert_ne!(stale_root, fixture.workbook_xml);
     workbook_part.set_blob(stale_root.into_bytes());
     let stale_root =
-        litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&stale_root_package).unwrap())
-            .unwrap();
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&stale_root_package).unwrap()).unwrap();
     let stale_root_before = stale_root
         .workbook_ref()
         .pivot_table_server_formats_source("Pivot")
         .unwrap()
         .source_xml()
         .to_vec();
-    assert!(patch.apply(&stale_root).is_err());
+    assert!(stale_root.apply_pivot_table(&patch).is_err());
     assert_eq!(
         stale_root
             .workbook_ref()
@@ -2030,15 +2028,14 @@ fn ordinary_patch_rejects_stale_workbook_root_namespace_and_mce_context() {
     assert_ne!(stale_mce, fixture.workbook_xml);
     workbook_part.set_blob(stale_mce.into_bytes());
     let stale_mce =
-        litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&stale_mce_package).unwrap())
-            .unwrap();
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&stale_mce_package).unwrap()).unwrap();
     let stale_mce_before = stale_mce
         .workbook_ref()
         .pivot_table_server_formats_source("Pivot")
         .unwrap()
         .source_xml()
         .to_vec();
-    assert!(patch.apply(&stale_mce).is_err());
+    assert!(stale_mce.apply_pivot_table(&patch).is_err());
     assert_eq!(
         stale_mce
             .workbook_ref()

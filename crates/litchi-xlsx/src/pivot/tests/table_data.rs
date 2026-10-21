@@ -13,15 +13,15 @@
 //! are schema and source-preservation tests; they do not claim native Office
 //! producer interoperability.
 
+use crate::pivot::table_data::{
+    Attribute, CellChange, CellExtra, Limits, edit as edit_pivot_table_data,
+    edit_with_limits as edit_pivot_table_data_with_limits, load as load_pivot_table_data,
+    load_with_limits as load_pivot_table_data_with_limits,
+};
+use crate::pivot::{PivotCacheId, PivotCellType, PivotTableDataDiagnostic, PivotTableSelector};
+use crate::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
-use litchi_xlsx::pivot::{
-    PivotCacheId, PivotCellType, PivotCellValueEdit, PivotTableDataDiagnostic,
-    PivotTableDataLimits, PivotTableSelector, PivotValueAttributeEdit, PivotValueCellExtraEdit,
-    edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_table_data,
-    load_pivot_table_data_with_limits,
-};
-use litchi_xlsx::{Error, SourceLimits};
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -580,8 +580,8 @@ impl Fixture {
         }
     }
 
-    fn workbook(&self) -> litchi_xlsx::Package {
-        litchi_xlsx::Package::from_bytes(&self.bytes).unwrap()
+    fn workbook(&self) -> crate::Package {
+        crate::Package::from_bytes(&self.bytes).unwrap()
     }
 
     fn package(&self) -> OpcPackage {
@@ -597,12 +597,12 @@ fn table_blob(package: &OpcPackage) -> Vec<u8> {
         .to_vec()
 }
 
-fn workbook_table_blob(workbook: &litchi_xlsx::Package) -> Vec<u8> {
+fn workbook_table_blob(workbook: &crate::Package) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
     table_blob(&OpcPackage::from_bytes(&bytes).unwrap())
 }
 
-fn workbook_blob(workbook: &litchi_xlsx::Package) -> Vec<u8> {
+fn workbook_blob(workbook: &crate::Package) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
     OpcPackage::from_bytes(&bytes)
         .unwrap()
@@ -612,7 +612,7 @@ fn workbook_blob(workbook: &litchi_xlsx::Package) -> Vec<u8> {
         .to_vec()
 }
 
-fn workbook_member_blob(workbook: &litchi_xlsx::Package, uri: &str) -> Vec<u8> {
+fn workbook_member_blob(workbook: &crate::Package, uri: &str) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
     OpcPackage::from_bytes(&bytes)
         .unwrap()
@@ -742,7 +742,7 @@ fn fixture_with_oversized_duplicate_c444_payload() -> Fixture {
     fixture
 }
 
-fn assert_refused_or_diagnostic_read_only(workbook: &litchi_xlsx::Package) {
+fn assert_refused_or_diagnostic_read_only(workbook: &crate::Package) {
     match workbook.workbook_ref().pivot_table_data("Pivot") {
         Err(_) => {},
         Ok(Some(view)) => {
@@ -758,7 +758,7 @@ fn assert_refused_or_diagnostic_read_only(workbook: &litchi_xlsx::Package) {
     }
 }
 
-fn assert_diagnostic_read_only(workbook: &litchi_xlsx::Package) {
+fn assert_diagnostic_read_only(workbook: &crate::Package) {
     let view = workbook
         .workbook_ref()
         .pivot_table_data("Pivot")
@@ -831,7 +831,7 @@ fn assert_resource_limit(error: &Error, expected_scope: &str) {
 }
 
 fn retained_limit_admits(package: &OpcPackage, maximum: usize) -> bool {
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
+    let limits = Limits::new().with_max_retained_bytes(maximum);
     match load_pivot_table_data_with_limits(package, "Pivot", &limits) {
         Ok(_) => true,
         Err(Error::ResourceLimit(_)) => false,
@@ -841,7 +841,7 @@ fn retained_limit_admits(package: &OpcPackage, maximum: usize) -> bool {
 
 fn minimum_semantic_limit(mut admits: impl FnMut(usize) -> bool) -> usize {
     let mut lower = 0usize;
-    let mut upper = PivotTableDataLimits::new().max_retained_bytes();
+    let mut upper = Limits::new().max_retained_bytes();
     assert!(admits(upper));
     while upper.saturating_sub(lower) > 1 {
         let midpoint = lower + (upper - lower) / 2;
@@ -860,8 +860,11 @@ fn minimum_retained_limit(package: &OpcPackage) -> usize {
 
 fn transaction_limit_admits(fixture: &Fixture, maximum: usize) -> bool {
     let workbook = fixture.workbook();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
-    match workbook.edit_pivot_table_data_with_limits("Pivot", &limits) {
+    let limits = Limits::new().with_max_retained_bytes(maximum);
+    match workbook.edit_pivot_table_data_with_options(
+        "Pivot",
+        crate::pivot::table_data::EditOptions::default().limits(limits),
+    ) {
         Ok(_) => true,
         Err(Error::ResourceLimit(_)) => false,
         Err(error) => panic!("transaction-limit search hit an unrelated error: {error:?}"),
@@ -874,8 +877,11 @@ fn minimum_transaction_limit(fixture: &Fixture) -> usize {
 
 fn setter_limit_admits(fixture: &Fixture, replacement: &str, maximum: usize) -> bool {
     let workbook = fixture.workbook();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
-    let mut edit = match workbook.edit_pivot_table_data_with_limits("Pivot", &limits) {
+    let limits = Limits::new().with_max_retained_bytes(maximum);
+    let mut edit = match workbook.edit_pivot_table_data_with_options(
+        "Pivot",
+        crate::pivot::table_data::EditOptions::default().limits(limits),
+    ) {
         Ok(edit) => edit,
         Err(Error::ResourceLimit(_)) => return false,
         Err(error) => panic!("setter-limit search hit an unrelated error: {error:?}"),
@@ -891,11 +897,11 @@ fn minimum_setter_limit(fixture: &Fixture, replacement: &str) -> usize {
     minimum_semantic_limit(|maximum| setter_limit_admits(fixture, replacement, maximum))
 }
 
-fn owned_text_with_capacity(length: usize, capacity: usize) -> PivotCellValueEdit {
+fn owned_text_with_capacity(length: usize, capacity: usize) -> CellChange {
     let mut value = String::with_capacity(capacity);
     value.push_str(&"q".repeat(length));
     assert!(value.capacity() >= capacity);
-    PivotCellValueEdit::text(value)
+    CellChange::text(value)
 }
 
 fn owned_setter_limit_admits(
@@ -905,8 +911,11 @@ fn owned_setter_limit_admits(
     maximum: usize,
 ) -> bool {
     let workbook = fixture.workbook();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
-    let mut edit = match workbook.edit_pivot_table_data_with_limits("Pivot", &limits) {
+    let limits = Limits::new().with_max_retained_bytes(maximum);
+    let mut edit = match workbook.edit_pivot_table_data_with_options(
+        "Pivot",
+        crate::pivot::table_data::EditOptions::default().limits(limits),
+    ) {
         Ok(edit) => edit,
         Err(Error::ResourceLimit(_)) => return false,
         Err(error) => panic!("owned setter-limit search hit an unrelated error: {error:?}"),
@@ -929,8 +938,11 @@ fn repeated_replacement_limit_admits(
     maximum: usize,
 ) -> bool {
     let workbook = fixture.workbook();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
-    let mut edit = match workbook.edit_pivot_table_data_with_limits("Pivot", &limits) {
+    let limits = Limits::new().with_max_retained_bytes(maximum);
+    let mut edit = match workbook.edit_pivot_table_data_with_options(
+        "Pivot",
+        crate::pivot::table_data::EditOptions::default().limits(limits),
+    ) {
         Ok(edit) => edit,
         Err(Error::ResourceLimit(_)) => return false,
         Err(error) => panic!("repeated-limit search hit an unrelated error: {error:?}"),
@@ -965,7 +977,7 @@ fn minimum_repeated_replacement_limit(fixture: &Fixture, first: &str, second: &s
 
 fn low_level_transaction_limit_admits(fixture: &Fixture, maximum: usize) -> bool {
     let mut package = fixture.package();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
+    let limits = Limits::new().with_max_retained_bytes(maximum);
     match edit_pivot_table_data_with_limits(&mut package, "Pivot", &limits) {
         Ok(_) => true,
         Err(Error::ResourceLimit(_)) => false,
@@ -981,7 +993,7 @@ fn minimum_low_level_transaction_limit(fixture: &Fixture) -> usize {
 
 fn low_level_setter_limit_admits(fixture: &Fixture, replacement: &str, maximum: usize) -> bool {
     let mut package = fixture.package();
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(maximum);
+    let limits = Limits::new().with_max_retained_bytes(maximum);
     let mut edit = match edit_pivot_table_data_with_limits(&mut package, "Pivot", &limits) {
         Ok(edit) => edit,
         Err(Error::ResourceLimit(_)) => return false,
@@ -1248,10 +1260,9 @@ fn external_cache_without_f057_or_connection_id_ignores_unrelated_connections() 
         .unwrap()
         .set_blob(candidate_connections.into_bytes());
     let candidate =
-        litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&candidate_package).unwrap())
-            .unwrap();
-    let applied = patch.apply(&candidate).unwrap();
-    assert!(applied.changed());
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&candidate_package).unwrap()).unwrap();
+    let applied = candidate.apply_pivot_table_data(&patch).unwrap();
+    assert!(applied.diagnostics().changed());
     assert_eq!(
         applied
             .package()
@@ -1289,7 +1300,7 @@ fn authored_counts_coordinates_and_omissions_are_checked_without_dense_assumptio
         workbook
             .edit_pivot_table_data("Pivot")
             .unwrap()
-            .set_value((0, 0), PivotCellValueEdit::text("unresolvable"),)
+            .set_value((0, 0), CellChange::text("unresolvable"),)
             .is_err()
     );
 
@@ -1388,18 +1399,18 @@ fn c444_value_cdata_is_readable_source_preserving_and_scalar_editable() {
     let mut noop = workbook.edit_pivot_table_data("Pivot").unwrap();
     assert!(
         !noop
-            .set_value((0, 0), PivotCellValueEdit::text("alpha & beta"))
+            .set_value((0, 0), CellChange::text("alpha & beta"))
             .unwrap()
     );
     let noop_commit = noop.commit().unwrap();
-    assert!(!noop_commit.changed());
+    assert!(!noop_commit.diagnostics().changed());
     assert_eq!(
         table_blob(&OpcPackage::from_bytes(&noop_commit.package().to_bytes().unwrap()).unwrap()),
         before
     );
 
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
-    edit.set_value((0, 0), PivotCellValueEdit::text("changed & value"))
+    edit.set_value((0, 0), CellChange::text("changed & value"))
         .unwrap();
     let commit = edit.commit().unwrap();
     let changed = commit
@@ -1677,8 +1688,7 @@ fn unknown_c444_siblings_survive_read_and_scalar_publication() {
             .is_some()
     );
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
-    edit.set_value((0, 0), PivotCellValueEdit::text("changed"))
-        .unwrap();
+    edit.set_value((0, 0), CellChange::text("changed")).unwrap();
     let commit = edit.commit().unwrap();
     let table = workbook_table_blob(commit.package());
     let text = String::from_utf8(table).unwrap();
@@ -1735,16 +1745,12 @@ fn recognized_uri_tokens_trim_xml_schema_whitespace_without_rewriting_lexical_so
     assert!(source.contains("uri=\" \n{44433962-1CF7-4059-B4EE-95C3D5FFCF73}&#x9; \""));
     assert!(source.contains("in=\"+0\""));
 
-    let borrowed = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let borrowed = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let before = borrowed.to_bytes().unwrap();
     let mut edit = borrowed.edit_pivot_table_data("Pivot").unwrap();
-    assert!(
-        !edit
-            .set_value((0, 0), PivotCellValueEdit::text("alpha"))
-            .unwrap()
-    );
+    assert!(!edit.set_value((0, 0), CellChange::text("alpha")).unwrap());
     let committed = edit.commit().unwrap();
-    assert!(!committed.changed());
+    assert!(!committed.diagnostics().changed());
     assert!(committed.patch().is_noop());
     assert_eq!(committed.package().to_bytes().unwrap(), before);
 }
@@ -1848,13 +1854,13 @@ fn existing_x_allows_safe_insertion_of_absent_extra_attributes() {
     assert!(
         edit.set_extra(
             (0, 0),
-            PivotValueCellExtraEdit {
-                background_color: PivotValueAttributeEdit::Set("0000000A".to_owned()),
-                foreground_color: PivotValueAttributeEdit::Set("000000FF".to_owned()),
-                italic: PivotValueAttributeEdit::Set(true),
-                underline: PivotValueAttributeEdit::Set(false),
-                strike: PivotValueAttributeEdit::Set(false),
-                bold: PivotValueAttributeEdit::Set(true),
+            CellExtra {
+                background_color: Attribute::Set("0000000A".to_owned()),
+                foreground_color: Attribute::Set("000000FF".to_owned()),
+                italic: Attribute::Set(true),
+                underline: Attribute::Set(false),
+                strike: Attribute::Set(false),
+                bold: Attribute::Set(true),
             },
         )
         .unwrap()
@@ -1903,29 +1909,26 @@ fn public_scalar_edits_cover_text_boolean_error_blank_and_existing_extra_attribu
     let original_table = workbook_table_blob(&original);
     let mut edit = original.edit_pivot_table_data("Pivot").unwrap();
     assert!(
-        edit.set_value((0, 0), PivotCellValueEdit::text("beta & 😀"))
+        edit.set_value((0, 0), CellChange::text("beta & 😀"))
             .unwrap()
     );
+    assert!(edit.set_value((0, 1), CellChange::Boolean(false)).unwrap());
     assert!(
-        edit.set_value((0, 1), PivotCellValueEdit::Boolean(false))
-            .unwrap()
-    );
-    assert!(
-        edit.set_value((1, 0), PivotCellValueEdit::error("#DIV/0!"))
+        edit.set_value((1, 0), CellChange::error("#DIV/0!"))
             .unwrap()
     );
     assert!(!edit.set_blank((1, 1)).unwrap());
-    let extra = PivotValueCellExtraEdit {
-        background_color: PivotValueAttributeEdit::Set("0000BEEF".to_owned()),
-        foreground_color: PivotValueAttributeEdit::Clear,
-        italic: PivotValueAttributeEdit::Clear,
-        underline: PivotValueAttributeEdit::Set(true),
-        strike: PivotValueAttributeEdit::Keep,
-        bold: PivotValueAttributeEdit::Set(false),
+    let extra = CellExtra {
+        background_color: Attribute::Set("0000BEEF".to_owned()),
+        foreground_color: Attribute::Clear,
+        italic: Attribute::Clear,
+        underline: Attribute::Set(true),
+        strike: Attribute::Keep,
+        bold: Attribute::Set(false),
     };
     assert!(edit.set_extra((0, 0), extra).unwrap());
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(!commit.patch().is_noop());
     assert_eq!(original.to_bytes().unwrap(), original_bytes);
 
@@ -1958,35 +1961,31 @@ fn public_scalar_edits_cover_text_boolean_error_blank_and_existing_extra_attribu
     let mut invalid = edited.edit_pivot_table_data("Pivot").unwrap();
     assert!(
         invalid
-            .set_value((0, 0), PivotCellValueEdit::Boolean(true))
+            .set_value((0, 0), CellChange::Boolean(true))
             .is_err()
     );
     assert!(
         invalid
-            .set_value((0, 1), PivotCellValueEdit::text("wrong kind"))
+            .set_value((0, 1), CellChange::text("wrong kind"))
             .is_err()
     );
     assert!(
         invalid
-            .set_value((1, 0), PivotCellValueEdit::error("#REF!"))
+            .set_value((1, 0), CellChange::error("#REF!"))
             .is_err()
     );
     assert!(
         invalid
             .set_extra(
                 (0, 0),
-                PivotValueCellExtraEdit {
-                    background_color: PivotValueAttributeEdit::Set("not-hex".to_owned()),
-                    ..PivotValueCellExtraEdit::keep()
+                CellExtra {
+                    background_color: Attribute::Set("not-hex".to_owned()),
+                    ..CellExtra::keep()
                 },
             )
             .is_err()
     );
-    assert!(
-        invalid
-            .set_value((9, 9), PivotCellValueEdit::Blank)
-            .is_err()
-    );
+    assert!(invalid.set_value((9, 9), CellChange::Blank).is_err());
 }
 
 #[test]
@@ -2011,11 +2010,11 @@ fn numeric_and_datetime_cells_are_readable_but_scalar_editing_is_explicitly_unsu
     );
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
     assert!(matches!(
-        edit.set_value((0, 0), PivotCellValueEdit::text("13")),
+        edit.set_value((0, 0), CellChange::text("13")),
         Err(Error::Unsupported { .. })
     ));
     assert!(matches!(
-        edit.set_value((0, 1), PivotCellValueEdit::Blank),
+        edit.set_value((0, 1), CellChange::Blank),
         Err(Error::Unsupported { .. })
     ));
 }
@@ -2026,15 +2025,14 @@ fn workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_reversible() {
     let base = fixture.workbook();
     let base_bytes = base.to_bytes().unwrap();
     let mut edit = base.edit_pivot_table_data("Pivot").unwrap();
-    edit.set_value((0, 0), PivotCellValueEdit::text("changed"))
-        .unwrap();
+    edit.set_value((0, 0), CellChange::text("changed")).unwrap();
     let committed = edit.commit().unwrap();
-    assert!(committed.changed());
+    assert!(committed.diagnostics().changed());
     let patch = committed.patch().clone();
 
     let fresh = Fixture::build(FixtureOptions::default()).workbook();
     let forwarded = fresh.apply_pivot_table_data(&patch).unwrap();
-    assert!(forwarded.changed());
+    assert!(forwarded.diagnostics().changed());
     assert_eq!(
         forwarded.package().to_bytes().unwrap(),
         committed.package().to_bytes().unwrap()
@@ -2060,8 +2058,8 @@ fn workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_reversible() {
         .get_part_mut(&PackURI::new(CONNECTIONS_URI).unwrap())
         .unwrap()
         .set_blob(stale_connections.into_bytes());
-    let stale = litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&stale_package).unwrap())
-        .unwrap();
+    let stale =
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&stale_package).unwrap()).unwrap();
     let stale_before = stale.to_bytes().unwrap();
     assert!(stale.apply_pivot_table_data(&patch).is_err());
     assert_eq!(stale.to_bytes().unwrap(), stale_before);
@@ -2086,10 +2084,9 @@ fn workbook_patch_apply_binds_to_reopened_source_and_inverse() {
         )))
         .unwrap();
     let reopened =
-        litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&candidate_package).unwrap())
-            .unwrap();
-    let applied = patch.apply(&reopened).unwrap();
-    assert!(applied.changed());
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&candidate_package).unwrap()).unwrap();
+    let applied = reopened.apply_pivot_table_data(&patch).unwrap();
+    assert!(applied.diagnostics().changed());
     assert_eq!(
         applied
             .package()
@@ -2109,7 +2106,7 @@ fn workbook_patch_apply_binds_to_reopened_source_and_inverse() {
     );
 
     let restored = applied.patch().inverse().apply(applied.package()).unwrap();
-    assert!(restored.changed());
+    assert!(restored.diagnostics().changed());
     assert_eq!(
         restored
             .package()
@@ -2138,7 +2135,7 @@ fn signed_scalar_publication_refuses_before_mutating_source() {
     let workbook = fixture.workbook();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
-    edit.set_value((0, 0), PivotCellValueEdit::text("signed change"))
+    edit.set_value((0, 0), CellChange::text("signed change"))
         .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Signed)));
     assert_eq!(workbook.to_bytes().unwrap(), before);
@@ -2163,7 +2160,7 @@ fn st_xstring_utf16_decoding_and_reencoding_preserve_literal_escape_intent() {
 
     let mut literal = workbook.edit_pivot_table_data("Pivot").unwrap();
     literal
-        .set_value((0, 0), PivotCellValueEdit::text("_x0041_"))
+        .set_value((0, 0), CellChange::text("_x0041_"))
         .unwrap();
     let literal_commit = literal.commit().unwrap();
     let literal_table = String::from_utf8(workbook_table_blob(literal_commit.package())).unwrap();
@@ -2174,7 +2171,7 @@ fn st_xstring_utf16_decoding_and_reencoding_preserve_literal_escape_intent() {
         .edit_pivot_table_data("Pivot")
         .unwrap();
     control
-        .set_value((0, 0), PivotCellValueEdit::text("\u{1}"))
+        .set_value((0, 0), CellChange::text("\u{1}"))
         .unwrap();
     let control_commit = control.commit().unwrap();
     let control_table = String::from_utf8(workbook_table_blob(control_commit.package())).unwrap();
@@ -2226,9 +2223,9 @@ fn utf16_text_limit_counts_code_units_and_rejects_over_limit_source() {
         .build()
         .unwrap();
     assert_eq!(
-        litchi_xlsx::Package::from_bytes_with_options(
+        crate::Package::from_bytes_with_options(
             &supplementary.bytes,
-            litchi_xlsx::OpenOptions::new().source_limits(generous_limits)
+            crate::OpenOptions::new().source_limits(generous_limits)
         )
         .unwrap()
         .workbook_ref()
@@ -2261,9 +2258,9 @@ fn utf16_text_limit_counts_code_units_and_rejects_over_limit_source() {
         ..FixtureOptions::default()
     });
     assert!(
-        litchi_xlsx::Package::from_bytes_with_options(
+        crate::Package::from_bytes_with_options(
             &over_supplementary.bytes,
-            litchi_xlsx::OpenOptions::new().source_limits(generous_limits)
+            crate::OpenOptions::new().source_limits(generous_limits)
         )
         .unwrap()
         .workbook_ref()
@@ -2280,9 +2277,9 @@ fn borrowed_workbook_limit_constructor_accepts_valid_source_and_enforces_event_b
         .unwrap()
         .build()
         .unwrap();
-    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+    let workbook = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(generous),
+        crate::OpenOptions::new().source_limits(generous),
     )
     .unwrap();
     assert_eq!(
@@ -2304,9 +2301,9 @@ fn borrowed_workbook_limit_constructor_accepts_valid_source_and_enforces_event_b
         .build()
         .unwrap();
     assert!(
-        litchi_xlsx::Package::from_bytes_with_options(
+        crate::Package::from_bytes_with_options(
             &fixture.bytes,
-            litchi_xlsx::OpenOptions::new().source_limits(event_limits)
+            crate::OpenOptions::new().source_limits(event_limits)
         )
         .is_err()
     );
@@ -2381,9 +2378,9 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
         .unwrap()
         .build()
         .unwrap();
-    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+    let workbook = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(attribute_limited),
+        crate::OpenOptions::new().source_limits(attribute_limited),
     )
     .unwrap();
     let original = workbook.to_bytes().unwrap();
@@ -2394,7 +2391,7 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
     assert!(edit.set_text((0, 0), "borrowed").unwrap());
     assert!(edit.set_error((1, 0), "#VALUE!").unwrap());
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(workbook.to_bytes().unwrap(), original);
     let edited = commit.package();
     let view = edited
@@ -2413,9 +2410,9 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
         .unwrap()
         .build()
         .unwrap();
-    let constrained = litchi_xlsx::Package::from_bytes_with_options(
+    let constrained = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(part_limited),
+        crate::OpenOptions::new().source_limits(part_limited),
     )
     .unwrap();
     let before_failed_commit = constrained.to_bytes().unwrap();
@@ -2432,31 +2429,33 @@ fn lowered_limits_charge_authored_rows_cells_and_dimensions_independently() {
     for (scope, limits) in [
         (
             "pivotTableData authored rows",
-            PivotTableDataLimits::new().with_max_authored_rows(1),
+            Limits::new().with_max_authored_rows(1),
         ),
         (
             "pivotTableData authored cells",
-            PivotTableDataLimits::new().with_max_authored_cells(3),
+            Limits::new().with_max_authored_cells(3),
         ),
         (
             "pivotTableData rowCount",
-            PivotTableDataLimits::new().with_max_row_count(1),
+            Limits::new().with_max_row_count(1),
         ),
         (
             "pivotTableData columnCount",
-            PivotTableDataLimits::new().with_max_column_count(1),
+            Limits::new().with_max_column_count(1),
         ),
     ] {
         let error = workbook
+            .with_semantic_limits(crate::SemanticLimits::default().pivot_table_data(limits))
             .workbook_ref()
-            .pivot_table_data_with_limits("Pivot", &limits)
+            .pivot_table_data("Pivot")
             .unwrap_err();
         assert_resource_limit(&error, scope);
     }
 
     let view = workbook
+        .with_semantic_limits(crate::SemanticLimits::default().pivot_table_data(Limits::new()))
         .workbook_ref()
-        .pivot_table_data_with_limits("Pivot", &PivotTableDataLimits::new())
+        .pivot_table_data("Pivot")
         .unwrap()
         .unwrap();
     assert_eq!(view.rows().len(), 2);
@@ -2470,7 +2469,7 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
     let required = minimum_retained_limit(&package);
     assert!(required > 0);
 
-    let exact_limits = PivotTableDataLimits::new().with_max_retained_bytes(required);
+    let exact_limits = Limits::new().with_max_retained_bytes(required);
     let snapshot = load_pivot_table_data_with_limits(&package, "Pivot", &exact_limits).unwrap();
     assert_eq!(snapshot.limits().max_retained_bytes(), required);
     let expected_data = snapshot.data().clone();
@@ -2483,7 +2482,7 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
     assert_eq!(cloned.source_owner_range(), expected_owner);
     assert_eq!(cloned.limits(), exact_limits);
 
-    let one_under = PivotTableDataLimits::new().with_max_retained_bytes(required - 1);
+    let one_under = Limits::new().with_max_retained_bytes(required - 1);
     let package_error =
         load_pivot_table_data_with_limits(&package, "Pivot", &one_under).unwrap_err();
     assert_resource_limit(&package_error, "pivotTableData");
@@ -2491,14 +2490,17 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
     let workbook = fixture.workbook();
     let before = workbook.to_bytes().unwrap();
     let read_error = workbook
+        .with_semantic_limits(crate::SemanticLimits::default().pivot_table_data(one_under))
         .workbook_ref()
-        .pivot_table_data_with_limits("Pivot", &one_under)
+        .pivot_table_data("Pivot")
         .unwrap_err();
     assert_resource_limit(&read_error, "pivotTableData");
     assert_eq!(workbook.to_bytes().unwrap(), before);
 
-    let transaction_error = match workbook.edit_pivot_table_data_with_limits("Pivot", &exact_limits)
-    {
+    let transaction_error = match workbook.edit_pivot_table_data_with_options(
+        "Pivot",
+        crate::pivot::table_data::EditOptions::default().limits(exact_limits),
+    ) {
         Err(error) => error,
         Ok(_) => panic!("exact retained limit unexpectedly admitted staged transaction"),
     };
@@ -2516,21 +2518,21 @@ fn exact_wire_part_cap_does_not_become_semantic_retained_cap() {
         .unwrap();
     assert_eq!(wire_limits.max_part_bytes(), fixture.table_xml.len() as u64);
 
-    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+    let workbook = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(wire_limits),
+        crate::OpenOptions::new().source_limits(wire_limits),
     )
     .unwrap();
     let view = workbook
+        .with_semantic_limits(crate::SemanticLimits::default().pivot_table_data(Limits::new()))
         .workbook_ref()
-        .pivot_table_data_with_limits("Pivot", &PivotTableDataLimits::new())
+        .pivot_table_data("Pivot")
         .unwrap()
         .unwrap();
     assert_eq!(view.cell((0, 0)).unwrap().unwrap().value_text(), "alpha");
 
     let package = OpcPackage::from_bytes_with_limits(&fixture.bytes, wire_limits).unwrap();
-    let snapshot =
-        load_pivot_table_data_with_limits(&package, "Pivot", &PivotTableDataLimits::new()).unwrap();
+    let snapshot = load_pivot_table_data_with_limits(&package, "Pivot", &Limits::new()).unwrap();
     assert_eq!(
         snapshot.cell((0, 0)).unwrap().unwrap().value_text(),
         "alpha"
@@ -2540,26 +2542,30 @@ fn exact_wire_part_cap_does_not_become_semantic_retained_cap() {
 #[test]
 fn borrowed_workbook_limits_noop_preserves_source_and_snapshot_clone_is_observable() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+    let workbook = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(SourceLimits::default()),
+        crate::OpenOptions::new().source_limits(SourceLimits::default()),
     )
     .unwrap();
-    let limits = PivotTableDataLimits::new();
+    let limits = Limits::new();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook
-        .edit_pivot_table_data_with_limits("Pivot", &limits)
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(limits),
+        )
         .unwrap();
     assert!(!edit.set_text((0, 0), "alpha").unwrap());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(workbook.to_bytes().unwrap(), before);
     assert_eq!(commit.package().to_bytes().unwrap(), before);
     assert_eq!(
         workbook
+            .with_semantic_limits(crate::SemanticLimits::default().pivot_table_data(limits))
             .workbook_ref()
-            .pivot_table_data_with_limits("Pivot", &limits)
+            .pivot_table_data("Pivot")
             .unwrap()
             .unwrap()
             .cell((0, 0))
@@ -2583,18 +2589,21 @@ fn lowered_retained_budget_rejects_borrowed_setter_before_staging_mutation() {
         transaction_required
     );
 
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(setter_required - 1);
+    let limits = Limits::new().with_max_retained_bytes(setter_required - 1);
     let workbook = fixture.workbook();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook
-        .edit_pivot_table_data_with_limits("Pivot", &limits)
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(limits),
+        )
         .unwrap();
     let error = edit.set_text((0, 0), replacement.as_str()).unwrap_err();
     assert_resource_limit(&error, "pivotTableData");
     assert!(!edit.is_changed());
 
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(workbook.to_bytes().unwrap(), before);
     assert_eq!(commit.package().to_bytes().unwrap(), before);
@@ -2613,7 +2622,7 @@ fn low_level_lowered_retained_budget_rejects_borrowed_setter_atomically() {
         transaction_required
     );
 
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(setter_required - 1);
+    let limits = Limits::new().with_max_retained_bytes(setter_required - 1);
     let mut package = fixture.package();
     let before = table_blob(&package);
     let mut edit = edit_pivot_table_data_with_limits(&mut package, "Pivot", &limits).unwrap();
@@ -2641,11 +2650,14 @@ fn owned_scalar_capacity_is_charged_before_staging() {
         inflated_required
     );
 
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(inflated_required - 1);
+    let limits = Limits::new().with_max_retained_bytes(inflated_required - 1);
     {
         let workbook = fixture.workbook();
         let mut compact = workbook
-            .edit_pivot_table_data_with_limits("Pivot", &limits)
+            .edit_pivot_table_data_with_options(
+                "Pivot",
+                crate::pivot::table_data::EditOptions::default().limits(limits),
+            )
             .unwrap();
         assert!(
             compact
@@ -2660,7 +2672,10 @@ fn owned_scalar_capacity_is_charged_before_staging() {
     let workbook = fixture.workbook();
     let before = workbook.to_bytes().unwrap();
     let mut inflated = workbook
-        .edit_pivot_table_data_with_limits("Pivot", &limits)
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(limits),
+        )
         .unwrap();
     let error = match inflated.set_value(
         (0, 0),
@@ -2672,7 +2687,7 @@ fn owned_scalar_capacity_is_charged_before_staging() {
     assert_resource_limit(&error, "pivotTableData");
     assert!(!inflated.is_changed());
     let commit = inflated.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(workbook.to_bytes().unwrap(), before);
     assert_eq!(commit.package().to_bytes().unwrap(), before);
@@ -2690,11 +2705,14 @@ fn empty_owned_scalar_replacement_is_charged_at_the_boundary() {
         transaction_required
     );
 
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(empty_required - 1);
+    let limits = Limits::new().with_max_retained_bytes(empty_required - 1);
     let workbook = fixture.workbook();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook
-        .edit_pivot_table_data_with_limits("Pivot", &limits)
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(limits),
+        )
         .unwrap();
     let error = match edit.set_value((0, 0), owned_text_with_capacity(0, 0)) {
         Err(error) => error,
@@ -2703,7 +2721,7 @@ fn empty_owned_scalar_replacement_is_charged_at_the_boundary() {
     assert_resource_limit(&error, "pivotTableData");
     assert!(!edit.is_changed());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert_eq!(workbook.to_bytes().unwrap(), before);
     assert_eq!(commit.package().to_bytes().unwrap(), before);
@@ -2729,10 +2747,13 @@ fn repeated_scalar_replacements_use_net_retained_delta() {
         !setter_limit_admits(&fixture, oversized.as_str(), exact),
         "oversized replacement unexpectedly fit the committed retained-byte budget"
     );
-    let limits = PivotTableDataLimits::new().with_max_retained_bytes(exact);
+    let limits = Limits::new().with_max_retained_bytes(exact);
     let workbook = fixture.workbook();
     let mut edit = workbook
-        .edit_pivot_table_data_with_limits("Pivot", &limits)
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(limits),
+        )
         .unwrap();
 
     assert!(edit.set_text((0, 0), first.as_str()).unwrap());
@@ -2747,7 +2768,7 @@ fn repeated_scalar_replacements_use_net_retained_delta() {
     }
 
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let view = commit
         .package()
         .workbook_ref()
@@ -2771,14 +2792,14 @@ fn selected_part_relationship_closure_needs_semantic_retained_budget() {
         related_required
     );
 
-    let exact = PivotTableDataLimits::new().with_max_retained_bytes(related_required);
+    let exact = Limits::new().with_max_retained_bytes(related_required);
     let snapshot = load_pivot_table_data_with_limits(&related_package, "Pivot", &exact).unwrap();
     assert_eq!(
         snapshot.cell((0, 0)).unwrap().unwrap().value_text(),
         "alpha"
     );
 
-    let one_under = PivotTableDataLimits::new().with_max_retained_bytes(related_required - 1);
+    let one_under = Limits::new().with_max_retained_bytes(related_required - 1);
     let error =
         load_pivot_table_data_with_limits(&related_package, "Pivot", &one_under).unwrap_err();
     assert_resource_limit(&error, "pivotTableData");
@@ -2787,10 +2808,10 @@ fn selected_part_relationship_closure_needs_semantic_retained_budget() {
 #[test]
 fn invalid_extra_edit_is_atomic_on_low_level_and_workbook_transactions() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let invalid_extra = || PivotValueCellExtraEdit {
-        background_color: PivotValueAttributeEdit::Set("0000BEEF".to_owned()),
-        foreground_color: PivotValueAttributeEdit::Set("not-hex".to_owned()),
-        ..PivotValueCellExtraEdit::keep()
+    let invalid_extra = || CellExtra {
+        background_color: Attribute::Set("0000BEEF".to_owned()),
+        foreground_color: Attribute::Set("not-hex".to_owned()),
+        ..CellExtra::keep()
     };
 
     let mut package = fixture.package();
@@ -2809,7 +2830,7 @@ fn invalid_extra_edit_is_atomic_on_low_level_and_workbook_transactions() {
     assert!(workbook_edit.set_extra((0, 0), invalid_extra()).is_err());
     assert!(!workbook_edit.is_changed());
     let workbook_commit = workbook_edit.commit().unwrap();
-    assert!(!workbook_commit.changed());
+    assert!(!workbook_commit.diagnostics().changed());
     assert!(workbook_commit.patch().is_noop());
     assert_eq!(workbook.to_bytes().unwrap(), before_workbook);
     assert_eq!(
@@ -2838,9 +2859,9 @@ fn caller_limits_reject_source_and_candidate_before_publication() {
         .build()
         .unwrap();
     assert!(
-        litchi_xlsx::Package::from_bytes_with_options(
+        crate::Package::from_bytes_with_options(
             &fixture.bytes,
-            litchi_xlsx::OpenOptions::new().source_limits(event_limits)
+            crate::OpenOptions::new().source_limits(event_limits)
         )
         .is_err()
     );
@@ -2853,9 +2874,9 @@ fn caller_limits_reject_source_and_candidate_before_publication() {
         .build()
         .unwrap();
     assert!(
-        litchi_xlsx::Package::from_bytes_with_options(
+        crate::Package::from_bytes_with_options(
             &fixture.bytes,
-            litchi_xlsx::OpenOptions::new().source_limits(attribute_limits)
+            crate::OpenOptions::new().source_limits(attribute_limits)
         )
         .is_err()
     );
@@ -2865,14 +2886,14 @@ fn caller_limits_reject_source_and_candidate_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+    let workbook = crate::Package::from_bytes_with_options(
         &fixture.bytes,
-        litchi_xlsx::OpenOptions::new().source_limits(part_limits),
+        crate::OpenOptions::new().source_limits(part_limits),
     )
     .unwrap();
     let before = workbook.to_bytes().unwrap();
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
-    edit.set_value((0, 0), PivotCellValueEdit::text("z".repeat(4_096)))
+    edit.set_value((0, 0), CellChange::text("z".repeat(4_096)))
         .unwrap();
     assert!(edit.commit().is_err());
     assert_eq!(workbook.to_bytes().unwrap(), before);

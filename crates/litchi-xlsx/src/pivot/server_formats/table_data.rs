@@ -19,7 +19,7 @@ use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use super::cached_unique_names::PivotCacheId;
 use super::*;
 use crate::Workbook;
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 
 const DATA_PAYLOAD: &[u8] = b"pivotTableData";
 const ROW_PAYLOAD: &[u8] = b"pivotRow";
@@ -57,7 +57,7 @@ const MAX_RETAINED_BYTES: usize = 64 * 1024 * 1024;
 /// dimensions, and bytes retained by the sparse typed view and its source
 /// bindings.  Setters only lower the finite owner ceilings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PivotTableDataLimits {
+pub struct Limits {
     max_authored_rows: usize,
     max_authored_cells: usize,
     max_row_count: usize,
@@ -65,13 +65,13 @@ pub struct PivotTableDataLimits {
     max_retained_bytes: usize,
 }
 
-impl Default for PivotTableDataLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PivotTableDataLimits {
+impl Limits {
     /// Construct the default bounded C444 semantic policy.
     #[must_use]
     pub const fn new() -> Self {
@@ -181,7 +181,7 @@ struct RetainedBudget {
 }
 
 impl RetainedBudget {
-    fn new(policy: PivotTableDataLimits) -> Self {
+    fn new(policy: Limits) -> Self {
         Self {
             maximum: policy.max_retained_bytes,
             retained: 0,
@@ -386,14 +386,14 @@ pub enum PivotCellType {
 /// A safe scalar value replacement.  Numeric and date-time cells remain
 /// readable but deliberately have no edit variant in this first owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PivotCellValueEdit {
+pub enum CellChange {
     Boolean(bool),
     Text(String),
     Error(String),
     Blank,
 }
 
-impl PivotCellValueEdit {
+impl CellChange {
     #[must_use]
     pub fn text(value: impl Into<String>) -> Self {
         Self::Text(value.into())
@@ -426,13 +426,13 @@ pub struct PivotValueCellExtraView {
 
 /// A tri-state edit for one typed cell-extra attribute.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PivotValueAttributeEdit<T> {
+pub enum Attribute<T> {
     Keep,
     Set(T),
     Clear,
 }
 
-impl<T> PivotValueAttributeEdit<T> {
+impl<T> Attribute<T> {
     #[must_use]
     pub const fn keep() -> Self {
         Self::Keep
@@ -447,25 +447,25 @@ impl<T> PivotValueAttributeEdit<T> {
 /// Explicit scalar edits for an existing `x` element.  The `in` association
 /// is intentionally read-only and therefore has no field here.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PivotValueCellExtraEdit {
-    pub background_color: PivotValueAttributeEdit<String>,
-    pub foreground_color: PivotValueAttributeEdit<String>,
-    pub italic: PivotValueAttributeEdit<bool>,
-    pub underline: PivotValueAttributeEdit<bool>,
-    pub strike: PivotValueAttributeEdit<bool>,
-    pub bold: PivotValueAttributeEdit<bool>,
+pub struct CellExtra {
+    pub background_color: Attribute<String>,
+    pub foreground_color: Attribute<String>,
+    pub italic: Attribute<bool>,
+    pub underline: Attribute<bool>,
+    pub strike: Attribute<bool>,
+    pub bold: Attribute<bool>,
 }
 
-impl PivotValueCellExtraEdit {
+impl CellExtra {
     #[must_use]
     pub const fn keep() -> Self {
         Self {
-            background_color: PivotValueAttributeEdit::Keep,
-            foreground_color: PivotValueAttributeEdit::Keep,
-            italic: PivotValueAttributeEdit::Keep,
-            underline: PivotValueAttributeEdit::Keep,
-            strike: PivotValueAttributeEdit::Keep,
-            bold: PivotValueAttributeEdit::Keep,
+            background_color: Attribute::Keep,
+            foreground_color: Attribute::Keep,
+            italic: Attribute::Keep,
+            underline: Attribute::Keep,
+            strike: Attribute::Keep,
+            bold: Attribute::Keep,
         }
     }
 }
@@ -693,7 +693,7 @@ struct CellRecord {
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     value: PivotTableDataView,
-    limits: PivotTableDataLimits,
+    limits: Limits,
     table: SourcePart,
     cache: SourcePart,
     connections: Option<SourcePart>,
@@ -712,14 +712,14 @@ impl Snapshot {
         package: &OpcPackage,
         selector: impl Into<PivotTableSelector<'a>>,
     ) -> Result<Self> {
-        Self::load_with_limits(package, selector, &PivotTableDataLimits::default())
+        Self::load_with_limits(package, selector, &Limits::default())
     }
 
     /// Load a C444 snapshot with an owner-specific semantic resource policy.
-    pub fn load_with_limits<'a>(
+    pub(crate) fn load_with_limits<'a>(
         package: &OpcPackage,
         selector: impl Into<PivotTableSelector<'a>>,
-        limits: &PivotTableDataLimits,
+        limits: &Limits,
     ) -> Result<Self> {
         let selector = selector.into();
         let policy = *limits;
@@ -853,15 +853,6 @@ impl Snapshot {
         Self::load(package, selector)
     }
 
-    /// Read a C444 snapshot with an owner-specific semantic policy.
-    pub fn read_with_limits<'a>(
-        package: &OpcPackage,
-        selector: impl Into<PivotTableSelector<'a>>,
-        limits: &PivotTableDataLimits,
-    ) -> Result<Self> {
-        Self::load_with_limits(package, selector, limits)
-    }
-
     #[must_use]
     pub fn data(&self) -> &PivotTableDataView {
         &self.value
@@ -911,7 +902,7 @@ impl Snapshot {
 
     /// The owner-specific semantic resource policy used for this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> PivotTableDataLimits {
+    pub const fn limits(&self) -> Limits {
         self.limits
     }
 
@@ -2102,7 +2093,8 @@ fn is_xml_space(byte: u8) -> bool {
 }
 
 /// A scalar transaction over existing authored C444 cells.
-pub struct Transaction<'a> {
+#[cfg(test)]
+pub(crate) struct Transaction<'a> {
     target: &'a mut OpcPackage,
     before: Snapshot,
     staged: Vec<CellState>,
@@ -2112,19 +2104,20 @@ pub struct Transaction<'a> {
     selection: usize,
 }
 
+#[cfg(test)]
 impl<'a> Transaction<'a> {
-    pub fn new<'selector>(
+    pub(crate) fn new<'selector>(
         target: &'a mut OpcPackage,
         selector: impl Into<PivotTableSelector<'selector>>,
     ) -> Result<Self> {
-        Self::with_limits(target, selector, &PivotTableDataLimits::default())
+        Self::with_limits(target, selector, &Limits::default())
     }
 
     /// Start a low-level transaction with an owner-specific semantic policy.
-    pub fn with_limits<'selector>(
+    pub(crate) fn with_limits<'selector>(
         target: &'a mut OpcPackage,
         selector: impl Into<PivotTableSelector<'selector>>,
-        limits: &PivotTableDataLimits,
+        limits: &Limits,
     ) -> Result<Self> {
         let before = Snapshot::load_with_limits(target, selector, limits)?;
         ensure_editable(&before)?;
@@ -2168,20 +2161,10 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    #[must_use]
-    pub fn data(&self) -> &PivotTableDataView {
-        &self.before.value
-    }
-
-    pub fn set_value(
+    pub(crate) fn set_value(
         &mut self,
         address: impl Into<PivotCellAddress>,
-        value: PivotCellValueEdit,
+        value: CellChange,
     ) -> Result<bool> {
         stage_set_value(
             &mut self.staged,
@@ -2200,7 +2183,7 @@ impl<'a> Transaction<'a> {
     /// The value is checked before any staged `String` is allocated.  This is
     /// the preferred path for callers that do not already own the replacement
     /// text.
-    pub fn set_text(
+    pub(crate) fn set_text(
         &mut self,
         address: impl Into<PivotCellAddress>,
         value: impl AsRef<str>,
@@ -2223,7 +2206,7 @@ impl<'a> Transaction<'a> {
     /// The value is checked before any staged `String` is allocated.  This is
     /// the preferred path for callers that do not already own the replacement
     /// error text.
-    pub fn set_error(
+    pub(crate) fn set_error(
         &mut self,
         address: impl Into<PivotCellAddress>,
         value: impl AsRef<str>,
@@ -2241,14 +2224,10 @@ impl<'a> Transaction<'a> {
         )
     }
 
-    pub fn set_blank(&mut self, address: impl Into<PivotCellAddress>) -> Result<bool> {
-        self.set_value(address, PivotCellValueEdit::Blank)
-    }
-
-    pub fn set_extra(
+    pub(crate) fn set_extra(
         &mut self,
         address: impl Into<PivotCellAddress>,
-        edit: PivotValueCellExtraEdit,
+        edit: CellExtra,
     ) -> Result<bool> {
         stage_set_extra(
             &mut self.staged,
@@ -2260,7 +2239,7 @@ impl<'a> Transaction<'a> {
     }
 
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub(crate) fn is_changed(&self) -> bool {
         self.before
             .cells
             .iter()
@@ -2268,10 +2247,10 @@ impl<'a> Transaction<'a> {
             .any(|(before, after)| before.state != *after)
     }
 
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<SourceCommit> {
         if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            let patch = SourcePatch::new(self.before.clone(), self.before.clone());
+            return Ok(SourceCommit::new(self.before, patch, false));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
@@ -2309,9 +2288,9 @@ impl<'a> Transaction<'a> {
                 "pivotTableData publication changed semantic state or read set",
             ));
         }
-        let patch = Patch::new(self.before, after.clone());
+        let patch = SourcePatch::new(self.before, after.clone());
         *self.target = candidate;
-        Ok(Commit::new(after, patch, true))
+        Ok(SourceCommit::new(after, patch, true))
     }
 }
 
@@ -2351,11 +2330,7 @@ fn validate_edited_text(value: &str, limits: SourceLimits) -> Result<()> {
     Ok(())
 }
 
-fn apply_extra_edit(
-    extra: &mut ExtraState,
-    edit: PivotValueCellExtraEdit,
-    limits: SourceLimits,
-) -> Result<()> {
+fn apply_extra_edit(extra: &mut ExtraState, edit: CellExtra, limits: SourceLimits) -> Result<()> {
     apply_hex_edit(&mut extra.background_color, edit.background_color, limits)?;
     apply_hex_edit(&mut extra.foreground_color, edit.foreground_color, limits)?;
     apply_bool_edit(&mut extra.italic, edit.italic)?;
@@ -2367,13 +2342,13 @@ fn apply_extra_edit(
 
 fn apply_hex_edit(
     slot: &mut Option<u32>,
-    edit: PivotValueAttributeEdit<String>,
+    edit: Attribute<String>,
     limits: SourceLimits,
 ) -> Result<()> {
     match edit {
-        PivotValueAttributeEdit::Keep => {},
-        PivotValueAttributeEdit::Clear => *slot = None,
-        PivotValueAttributeEdit::Set(value) => {
+        Attribute::Keep => {},
+        Attribute::Clear => *slot = None,
+        Attribute::Set(value) => {
             if value.len() > caller_attribute_limit(limits) {
                 return Err(invalid("pivotTableData color exceeds its caller limit"));
             }
@@ -2383,11 +2358,11 @@ fn apply_hex_edit(
     Ok(())
 }
 
-fn apply_bool_edit(slot: &mut Option<bool>, edit: PivotValueAttributeEdit<bool>) -> Result<()> {
+fn apply_bool_edit(slot: &mut Option<bool>, edit: Attribute<bool>) -> Result<()> {
     match edit {
-        PivotValueAttributeEdit::Keep => {},
-        PivotValueAttributeEdit::Clear => *slot = None,
-        PivotValueAttributeEdit::Set(value) => *slot = Some(value),
+        Attribute::Keep => {},
+        Attribute::Clear => *slot = None,
+        Attribute::Set(value) => *slot = Some(value),
     }
     Ok(())
 }
@@ -2410,7 +2385,7 @@ fn stage_set_value(
     staged_text_ledger: &mut [usize],
     staged_text_bytes: &mut usize,
     address: PivotCellAddress,
-    value: PivotCellValueEdit,
+    value: CellChange,
     limits: SourceLimits,
 ) -> Result<bool> {
     let position = staged_cell_position(positions, address)?;
@@ -2419,7 +2394,7 @@ fn stage_set_value(
         .map(|slot| slot.kind)
         .ok_or_else(|| invalid("pivotTableData cell address did not resolve"))?;
     let (replacement, replacement_bytes, transient_bytes) = match (kind, &value) {
-        (PivotCellType::Boolean, PivotCellValueEdit::Boolean(value)) => {
+        (PivotCellType::Boolean, CellChange::Boolean(value)) => {
             let replacement = if *value { "true" } else { "false" };
             (
                 replacement,
@@ -2427,7 +2402,7 @@ fn stage_set_value(
                 0,
             )
         },
-        (PivotCellType::Text, PivotCellValueEdit::Text(value)) => {
+        (PivotCellType::Text, CellChange::Text(value)) => {
             validate_edited_text(value, limits)?;
             (
                 value.as_str(),
@@ -2435,7 +2410,7 @@ fn stage_set_value(
                 value.capacity(),
             )
         },
-        (PivotCellType::Error, PivotCellValueEdit::Error(value)) => {
+        (PivotCellType::Error, CellChange::Error(value)) => {
             validate_cell_value(PivotCellType::Error, value)?;
             validate_edited_text(value, limits)?;
             (
@@ -2444,9 +2419,7 @@ fn stage_set_value(
                 value.capacity(),
             )
         },
-        (PivotCellType::Blank, PivotCellValueEdit::Blank) => {
-            ("", replacement_text_retained_bytes(0)?, 0)
-        },
+        (PivotCellType::Blank, CellChange::Blank) => ("", replacement_text_retained_bytes(0)?, 0),
         (PivotCellType::Number | PivotCellType::DateTime, _) => {
             return Err(Error::Unsupported {
                 feature: "pivotTableData numeric/date-time scalar editing",
@@ -2477,9 +2450,9 @@ fn stage_set_value(
         .ok_or_else(|| invalid("pivotTableData staged transient bytes overflow"))?;
     admit_staged_text(before, staged.len(), updated_bytes, transient_peak_bytes)?;
     let next: Arc<str> = match value {
-        PivotCellValueEdit::Boolean(value) => Arc::from(if value { "true" } else { "false" }),
-        PivotCellValueEdit::Text(value) | PivotCellValueEdit::Error(value) => Arc::from(value),
-        PivotCellValueEdit::Blank => Arc::from(""),
+        CellChange::Boolean(value) => Arc::from(if value { "true" } else { "false" }),
+        CellChange::Text(value) | CellChange::Error(value) => Arc::from(value),
+        CellChange::Blank => Arc::from(""),
     };
     staged[position].value_text = next;
     staged_text_ledger[position] = replacement_bytes;
@@ -2555,7 +2528,7 @@ fn stage_set_extra(
     staged: &mut [CellState],
     positions: &HashMap<PivotCellAddress, CellPosition>,
     address: PivotCellAddress,
-    edit: PivotValueCellExtraEdit,
+    edit: CellExtra,
     limits: SourceLimits,
 ) -> Result<bool> {
     let position = staged_cell_position(positions, address)?;
@@ -2577,18 +2550,18 @@ fn stage_set_extra(
 
 /// Exact reversible source patch for one C444 owner.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct SourcePatch {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl SourcePatch {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -2596,11 +2569,11 @@ impl Patch {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.table.bytes == self.after.table.bytes
     }
 
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         let current = Snapshot::load_with_limits(
             package,
             PivotTableSelector::Position(self.before.selection),
@@ -2636,14 +2609,16 @@ impl Patch {
 }
 
 #[derive(Clone, Debug)]
-pub struct Commit {
+#[cfg(test)]
+pub(crate) struct SourceCommit {
     snapshot: Snapshot,
-    patch: Patch,
+    patch: SourcePatch,
     changed: bool,
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
+#[cfg(test)]
+impl SourceCommit {
+    fn new(snapshot: Snapshot, patch: SourcePatch, changed: bool) -> Self {
         Self {
             snapshot,
             patch,
@@ -2652,17 +2627,17 @@ impl Commit {
     }
 
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &SourcePatch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
     }
 }
@@ -3229,18 +3204,10 @@ fn caller_attribute_limit(limits: SourceLimits) -> usize {
     MAX_ATTRIBUTE_TEXT_BYTES.min(limits.max_xml_attribute_bytes())
 }
 
-/// Ordinary Workbook read handle.
-pub(crate) fn view_workbook<'a>(
-    workbook: &Workbook,
-    selector: impl Into<PivotTableSelector<'a>>,
-) -> Result<Option<PivotTableDataView>> {
-    view_workbook_with_limits(workbook, selector, &PivotTableDataLimits::default())
-}
-
 pub(crate) fn view_workbook_with_limits<'a>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'a>>,
-    limits: &PivotTableDataLimits,
+    limits: &Limits,
 ) -> Result<Option<PivotTableDataView>> {
     match Snapshot::load_with_limits(workbook.pivot_package(), selector, limits) {
         Ok(snapshot) => Ok(Some(snapshot.data().clone())),
@@ -3251,23 +3218,53 @@ pub(crate) fn view_workbook_with_limits<'a>(
     }
 }
 
-pub(crate) fn edit_workbook<'a>(
-    workbook: &Workbook,
-    selector: impl Into<PivotTableSelector<'a>>,
-) -> Result<PackageEdit> {
-    PackageEdit::new(workbook, selector)
+crate::record::record_family!("pivotTableData");
+
+crate::record::no_limits!("pivotTableData");
+
+/// The configuration of a `pivotTableData` edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound the edit by `limits` instead of the package's semantic limits
+    /// ([`crate::SemanticLimits::pivot_table_data`]).
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    pub(crate) fn limits_or(self, default: Limits) -> Limits {
+        match self.limits {
+            Some(limits) => limits,
+            None => default,
+        }
+    }
+}
+
+fn package_commit(workbook: Workbook, patch: Patch, changed: bool) -> Commit {
+    Commit::new(
+        crate::Package::from_workbook(workbook),
+        patch,
+        Diagnostics::new(changed),
+    )
 }
 
 pub(crate) fn edit_workbook_with_limits<'a>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'a>>,
-    limits: &PivotTableDataLimits,
-) -> Result<PackageEdit> {
-    PackageEdit::with_limits(workbook, selector, limits)
+    limits: &Limits,
+) -> Result<Edit> {
+    Edit::with_limits(workbook, selector, limits)
 }
 
-/// Ordinary Workbook transaction over one data owner.
-pub struct PackageEdit {
+/// A staged scalar edit of one PivotTable's `pivotTableData` owner of a
+/// [`crate::Package`], started by [`crate::Package::edit_pivot_table_data`].
+/// Dropping it discards it.
+pub struct Edit {
     source: Workbook,
     before: Snapshot,
     staged: Vec<CellState>,
@@ -3276,18 +3273,11 @@ pub struct PackageEdit {
     staged_text_bytes: usize,
 }
 
-impl PackageEdit {
-    pub(crate) fn new<'a>(
-        source: &Workbook,
-        selector: impl Into<PivotTableSelector<'a>>,
-    ) -> Result<Self> {
-        Self::with_limits(source, selector, &PivotTableDataLimits::default())
-    }
-
+impl Edit {
     pub(crate) fn with_limits<'a>(
         source: &Workbook,
         selector: impl Into<PivotTableSelector<'a>>,
-        limits: &PivotTableDataLimits,
+        limits: &Limits,
     ) -> Result<Self> {
         let before = Snapshot::load_with_limits(source.pivot_package(), selector, limits)?;
         ensure_editable(&before)?;
@@ -3338,7 +3328,7 @@ impl PackageEdit {
     pub fn set_value(
         &mut self,
         address: impl Into<PivotCellAddress>,
-        value: PivotCellValueEdit,
+        value: CellChange,
     ) -> Result<bool> {
         stage_set_value(
             &mut self.staged,
@@ -3399,13 +3389,13 @@ impl PackageEdit {
     }
 
     pub fn set_blank(&mut self, address: impl Into<PivotCellAddress>) -> Result<bool> {
-        self.set_value(address, PivotCellValueEdit::Blank)
+        self.set_value(address, CellChange::Blank)
     }
 
     pub fn set_extra(
         &mut self,
         address: impl Into<PivotCellAddress>,
-        edit: PivotValueCellExtraEdit,
+        edit: CellExtra,
     ) -> Result<bool> {
         stage_set_extra(
             &mut self.staged,
@@ -3416,21 +3406,41 @@ impl PackageEdit {
         )
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn changed(&self) -> bool {
         !states_equal(&self.before, &self.staged)
     }
 
-    pub fn commit(self) -> Result<PackageCommit> {
-        let changed = self.is_changed();
+    #[cfg(test)]
+    pub(crate) fn is_changed(&self) -> bool {
+        self.changed()
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.clear();
+        self.staged
+            .extend(self.before.cells.iter().map(|record| record.state.clone()));
+        self.staged_text_ledger.fill(0);
+        self.staged_text_bytes = 0;
+    }
+
+    /// Validate and publish the staged cells as a new package. An unchanged
+    /// edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
+    /// the rewrite and validation errors of the publication.
+    pub fn commit(self) -> Result<Commit> {
+        let changed = self.changed();
         let source = self.source;
         let before = self.before;
         let staged = self.staged;
         if !changed {
             let workbook = source.clone();
-            let low_patch = Patch::new(before.clone(), before);
-            let patch = PackagePatch::new(source, workbook.clone(), low_patch);
-            return Ok(PackageCommit::new(workbook, patch, false));
+            let low_patch = SourcePatch::new(before.clone(), before);
+            let patch = Patch::new(source, workbook.clone(), low_patch);
+            return Ok(package_commit(workbook, patch, false));
         }
         if source.pivot_package().is_signed()
             || source.pivot_package().requires_signature_edit_policy()
@@ -3461,23 +3471,23 @@ impl PackageEdit {
                 "pivotTableData Workbook publication verification failed",
             ));
         }
-        let low_patch = Patch::new(before, after);
+        let low_patch = SourcePatch::new(before, after);
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = PackagePatch::new(source, workbook.clone(), low_patch);
-        Ok(PackageCommit::new(workbook, patch, true))
+        let patch = Patch::new(source, workbook.clone(), low_patch);
+        Ok(package_commit(workbook, patch, true))
     }
 }
 
 /// Exact reversible ordinary Workbook patch.
 #[derive(Clone, Debug)]
-pub struct PackagePatch {
+pub struct Patch {
     before: Workbook,
     after: Workbook,
-    source_patch: Patch,
+    source_patch: SourcePatch,
 }
 
-impl PackagePatch {
-    fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
+impl Patch {
+    fn new(before: Workbook, after: Workbook, source_patch: SourcePatch) -> Self {
         Self {
             before,
             after,
@@ -3485,6 +3495,19 @@ impl PackagePatch {
         }
     }
 
+    /// Typed `pivotTableData` state required before application.
+    #[must_use]
+    pub fn before(&self) -> &PivotTableDataView {
+        &self.source_patch.before.value
+    }
+
+    /// Typed `pivotTableData` state produced by application.
+    #[must_use]
+    pub fn after(&self) -> &PivotTableDataView {
+        &self.source_patch.after.value
+    }
+
+    /// The reverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
@@ -3494,77 +3517,35 @@ impl PackagePatch {
         }
     }
 
+    /// Whether the patch changes nothing.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.source_patch.is_empty()
     }
 
-    pub fn apply(&self, source: &crate::Package) -> Result<PackageCommit> {
+    pub(crate) fn apply(&self, source: &crate::Package) -> Result<Commit> {
         let source = source.workbook_ref();
-        source.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
+        source.ensure_mutation_allowed("apply_pivot_table_data")?;
         let mut candidate = source.pivot_package().clone();
         self.source_patch.apply(&mut candidate)?;
+        if self.is_noop() {
+            return Ok(package_commit(
+                source.clone(),
+                Self::new(source.clone(), source.clone(), self.source_patch.clone()),
+                false,
+            ));
+        }
         let selection = self.source_patch.before.selection;
         let before = Snapshot::load(
             source.pivot_package(),
             PivotTableSelector::Position(selection),
         )?;
         let after = Snapshot::load(&candidate, PivotTableSelector::Position(selection))?;
-        let low_patch = Patch::new(before, after);
+        let low_patch = SourcePatch::new(before, after);
         let changed = !low_patch.is_empty();
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = PackagePatch::new(source.clone(), workbook.clone(), low_patch);
-        Ok(PackageCommit::new(workbook, patch, changed))
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct PackageCommit {
-    package: crate::Package,
-    patch: PackagePatch,
-    changed: bool,
-}
-
-impl PackageCommit {
-    fn new(workbook: Workbook, patch: PackagePatch, changed: bool) -> Self {
-        Self {
-            package: crate::Package::from_workbook(workbook),
-            patch,
-            changed,
-        }
-    }
-
-    /// The published immutable package.
-    #[must_use]
-    pub const fn package(&self) -> &crate::Package {
-        &self.package
-    }
-
-    /// Consume the commit into its published package.
-    #[must_use]
-    pub fn into_package(self) -> crate::Package {
-        self.package
-    }
-
-    #[must_use]
-    pub fn snapshot(&self) -> &PivotTableDataView {
-        self.patch.after_data()
-    }
-
-    #[must_use]
-    pub fn patch(&self) -> &PackagePatch {
-        &self.patch
-    }
-
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
-
-impl PackagePatch {
-    fn after_data(&self) -> &PivotTableDataView {
-        &self.source_patch.after.value
+        let patch = Patch::new(source.clone(), workbook.clone(), low_patch);
+        Ok(package_commit(workbook, patch, changed))
     }
 }
 
@@ -3576,15 +3557,17 @@ pub fn load<'a>(
 }
 
 /// Read a C444 owner with an explicit semantic resource policy.
-pub fn load_with_limits<'a>(
+#[cfg(test)]
+pub(crate) fn load_with_limits<'a>(
     package: &OpcPackage,
     selector: impl Into<PivotTableSelector<'a>>,
-    limits: &PivotTableDataLimits,
+    limits: &Limits,
 ) -> Result<Snapshot> {
     Snapshot::load_with_limits(package, selector, limits)
 }
 
-pub fn edit<'a>(
+#[cfg(test)]
+pub(crate) fn edit<'a>(
     package: &'a mut OpcPackage,
     selector: impl Into<PivotTableSelector<'a>>,
 ) -> Result<Transaction<'a>> {
@@ -3592,10 +3575,11 @@ pub fn edit<'a>(
 }
 
 /// Start a low-level C444 edit with an explicit semantic resource policy.
-pub fn edit_with_limits<'a>(
+#[cfg(test)]
+pub(crate) fn edit_with_limits<'a>(
     package: &'a mut OpcPackage,
     selector: impl Into<PivotTableSelector<'a>>,
-    limits: &PivotTableDataLimits,
+    limits: &Limits,
 ) -> Result<Transaction<'a>> {
     Transaction::with_limits(package, selector, limits)
 }
@@ -3688,13 +3672,13 @@ mod tests {
             transaction
                 .set_extra(
                     (0, 1),
-                    PivotValueCellExtraEdit {
-                        background_color: PivotValueAttributeEdit::Keep,
-                        foreground_color: PivotValueAttributeEdit::Keep,
-                        italic: PivotValueAttributeEdit::Keep,
-                        underline: PivotValueAttributeEdit::Keep,
-                        strike: PivotValueAttributeEdit::Keep,
-                        bold: PivotValueAttributeEdit::Set(false),
+                    CellExtra {
+                        background_color: Attribute::Keep,
+                        foreground_color: Attribute::Keep,
+                        italic: Attribute::Keep,
+                        underline: Attribute::Keep,
+                        strike: Attribute::Keep,
+                        bold: Attribute::Set(false),
                     },
                 )
                 .unwrap()
@@ -3726,16 +3710,16 @@ mod tests {
             })
             .and_then(|bytes| bytes.checked_add(first.capacity()))
             .unwrap();
-        let limits = PivotTableDataLimits::new().with_max_retained_bytes(required);
+        let limits = Limits::new().with_max_retained_bytes(required);
         let mut package = package;
         let mut transaction = Transaction::with_limits(&mut package, "Pivot", &limits).unwrap();
         assert!(
             transaction
-                .set_value((0, 0), PivotCellValueEdit::text(first))
+                .set_value((0, 0), CellChange::text(first))
                 .unwrap()
         );
         let error = transaction
-            .set_value((0, 0), PivotCellValueEdit::text("S".repeat(1_024)))
+            .set_value((0, 0), CellChange::text("S".repeat(1_024)))
             .unwrap_err();
         assert!(matches!(error, Error::ResourceLimit(_)));
         assert!(transaction.is_changed());
@@ -3754,10 +3738,10 @@ mod tests {
             })
             .and_then(|bytes| bytes.checked_add(first.len()))
             .unwrap();
-        let limits = PivotTableDataLimits::new().with_max_retained_bytes(required);
+        let limits = Limits::new().with_max_retained_bytes(required);
         let workbook = crate::Package::from_opc(package).unwrap();
         let mut transaction = workbook
-            .edit_pivot_table_data_with_limits("Pivot", &limits)
+            .edit_pivot_table_data_with_options("Pivot", EditOptions::default().limits(limits))
             .unwrap();
         assert!(transaction.set_text((0, 0), &first).unwrap());
         let error = transaction.set_text((0, 0), "S".repeat(1_024)).unwrap_err();
@@ -3767,13 +3751,13 @@ mod tests {
 
     #[test]
     fn extra_edits_are_failure_atomic_for_low_level_and_workbook_transactions() {
-        let invalid_edit = || PivotValueCellExtraEdit {
-            background_color: PivotValueAttributeEdit::Set("00112233".to_owned()),
-            foreground_color: PivotValueAttributeEdit::Set("not-a-color".to_owned()),
-            italic: PivotValueAttributeEdit::Keep,
-            underline: PivotValueAttributeEdit::Keep,
-            strike: PivotValueAttributeEdit::Keep,
-            bold: PivotValueAttributeEdit::Keep,
+        let invalid_edit = || CellExtra {
+            background_color: Attribute::Set("00112233".to_owned()),
+            foreground_color: Attribute::Set("not-a-color".to_owned()),
+            italic: Attribute::Keep,
+            underline: Attribute::Keep,
+            strike: Attribute::Keep,
+            bold: Attribute::Keep,
         };
 
         let mut low_level_package = package();
@@ -3786,7 +3770,7 @@ mod tests {
         let mut transaction = workbook.edit_pivot_table_data("Pivot").unwrap();
         assert!(transaction.set_extra((0, 1), invalid_edit()).is_err());
         assert!(!transaction.is_changed());
-        assert!(!transaction.commit().unwrap().changed());
+        assert!(!transaction.commit().unwrap().diagnostics().changed());
     }
 
     #[test]
@@ -3834,7 +3818,7 @@ mod tests {
         let source = xml.into_bytes();
         let scan = scan_xml(&source, "pivotTableDefinition", SourceLimits::default()).unwrap();
         LOCAL_SUBTREE_BOUNDARY_VISITS.with(|counter| counter.set(0));
-        let mut retained = RetainedBudget::new(PivotTableDataLimits::default());
+        let mut retained = RetainedBudget::new(Limits::default());
         let parsed =
             parse_data_payload(&scan, &source, 7, SourceLimits::default(), &mut retained).unwrap();
         assert_eq!(parsed.cells.len(), cell_count);

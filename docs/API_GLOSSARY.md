@@ -1808,7 +1808,10 @@ the crate error (module split pending). Removed: `Package::create`,
 `*_with_leniency` ingress, `Package::into_workbook`, `Commit::{workbook,
 into_workbook}`, `Patch::{is_empty, len}`, `Workbook::unsigned` (use
 `Package::unsign`) and the pivot `Workbook{Transaction,Patch,Commit}` types,
-now `PackageEdit`/`PackagePatch`/`PackageCommit` with `Package::apply_pivot_*`.
+now `pivot::{server_formats, table_data, cached_unique_names}::{Edit, Patch,
+Commit, Diagnostics, Error, LimitKind}` with `Package::{edit_pivot_table,
+edit_pivot_table_data(_with_options), edit_pivot_cache(cache, field)}` and
+`Package::apply_pivot_*` (0360).
 Scoped `&mut` families and `SourceBackedWorkbook` ingress names remain W2
 residue.
 

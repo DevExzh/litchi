@@ -28,6 +28,7 @@ pub struct SemanticLimits {
     custom_data: crate::custom_data::Limits,
     survey: crate::survey::Limits,
     calculation_properties: crate::calculation_properties::Limits,
+    pivot_table_data: crate::pivot::table_data::Limits,
 }
 
 macro_rules! copy_limit {
@@ -65,5 +66,11 @@ impl SemanticLimits {
         calculation_properties_value,
         crate::calculation_properties::Limits,
         "the workbook calculation metadata and its edits"
+    );
+    copy_limit!(
+        pivot_table_data,
+        pivot_table_data_value,
+        crate::pivot::table_data::Limits,
+        "the `pivotTableData` reads and edits"
     );
 }

@@ -12,13 +12,13 @@
 //! no invented `cacheField/items` element and these tests make no native
 //! Office interoperability claim.
 
-use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
-use litchi_xlsx::Error;
-use litchi_xlsx::pivot::cached_unique_names::{
+use crate::Error;
+use crate::pivot::cached_unique_names::{
     CacheSelector, CachedUniqueName, DiagnosticStatus, FieldSelector, PivotCacheId, Snapshot,
     Transaction,
 };
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -2213,7 +2213,7 @@ fn duplicate_field_names_are_not_a_semantic_name_selector() {
 #[test]
 fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let by_ordinal = workbook
         .workbook_ref()
         .pivot_cache(cache_selector())
@@ -2247,16 +2247,15 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
 #[test]
 fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let original = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let original = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let original_bytes = original.to_bytes().unwrap();
     let mut edit = original
-        .edit_pivot_cache(cache_selector())
-        .field(field_selector())
+        .edit_pivot_cache(cache_selector(), field_selector())
         .unwrap();
     assert!(edit.set_cached_unique_name(7, "South").unwrap());
     let committed = edit.commit().unwrap();
-    assert!(committed.changed());
-    assert_eq!(committed.snapshot().entries()[1].name, "South");
+    assert!(committed.diagnostics().changed());
+    assert_eq!(committed.patch().after().entries()[1].name, "South");
 
     assert_eq!(original.to_bytes().unwrap(), original_bytes);
     assert_eq!(
@@ -2273,7 +2272,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
     let edited = committed.package();
     let edited_bytes = edited.to_bytes().unwrap();
     assert_ne!(edited_bytes, original_bytes);
-    let reopened = litchi_xlsx::Package::from_bytes(&edited_bytes).unwrap();
+    let reopened = crate::Package::from_bytes(&edited_bytes).unwrap();
     assert_eq!(
         reopened
             .workbook_ref()
@@ -2290,16 +2289,15 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
 #[test]
 fn ordinary_workbook_no_op_preserves_bytes_and_reports_empty_patch() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let original = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let original = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let before = original.to_bytes().unwrap();
     let mut edit = original
-        .edit_pivot_cache(cache_selector())
-        .field(field_selector())
+        .edit_pivot_cache(cache_selector(), field_selector())
         .unwrap();
     assert!(!edit.set_cached_unique_name(0, "North & South").unwrap());
     let committed = edit.commit().unwrap();
 
-    assert!(!committed.changed());
+    assert!(!committed.diagnostics().changed());
     assert!(committed.patch().is_noop());
     assert_eq!(committed.package().to_bytes().unwrap(), before);
 }
@@ -2307,20 +2305,19 @@ fn ordinary_workbook_no_op_preserves_bytes_and_reports_empty_patch() {
 #[test]
 fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_reversible() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let base = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
+    let base = crate::Package::from_bytes(&fixture.bytes).unwrap();
     let base_bytes = base.to_bytes().unwrap();
     let mut edit = base
-        .edit_pivot_cache(cache_selector())
-        .field(field_selector())
+        .edit_pivot_cache(cache_selector(), field_selector())
         .unwrap();
     assert!(edit.set_cached_unique_name(7, "South").unwrap());
     let committed = edit.commit().unwrap();
     let patch = committed.patch().clone();
     assert!(!patch.is_noop());
 
-    let fresh = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
-    let forwarded = patch.apply(&fresh).unwrap();
-    assert!(forwarded.changed());
+    let fresh = crate::Package::from_bytes(&fixture.bytes).unwrap();
+    let forwarded = fresh.apply_pivot_cache(&patch).unwrap();
+    assert!(forwarded.diagnostics().changed());
     assert_eq!(
         forwarded.package().to_bytes().unwrap(),
         committed.package().to_bytes().unwrap()
@@ -2334,10 +2331,10 @@ fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_revers
         .get_part_mut(&PackURI::new(CACHE_URI).unwrap())
         .unwrap()
         .set_blob(stale_cache_xml.into_bytes());
-    let stale = litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&stale_package).unwrap())
-        .unwrap();
+    let stale =
+        crate::Package::from_bytes(&PackageWriter::to_bytes(&stale_package).unwrap()).unwrap();
     let stale_before = stale.to_bytes().unwrap();
-    assert!(patch.apply(&stale).is_err());
+    assert!(stale.apply_pivot_cache(&patch).is_err());
     assert_eq!(stale.to_bytes().unwrap(), stale_before);
 
     let restored = patch.inverse().apply(committed.package()).unwrap();
