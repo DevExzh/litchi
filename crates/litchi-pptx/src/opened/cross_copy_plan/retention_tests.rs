@@ -58,8 +58,7 @@ fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
             "test slide {index} has no canonical producer name"
         )));
     }
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(renamed.into_bytes());
     Ok(())
@@ -413,7 +412,9 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         let stale = String::from_utf8_lossy(drifted.opc.get_part(&slide)?.blob())
             .replace("retain-destination-a", "retain-destination-z")
             .into_bytes();
-        drifted.opc.get_part_mut(&slide)?.set_blob(stale);
+        Arc::make_mut(&mut drifted.opc)
+            .get_part_mut(&slide)?
+            .set_blob(stale);
         Ok(format!(
             "{:?}",
             drifted.apply_cross_slide_copy_plan(&source, plan)
@@ -447,7 +448,9 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         let stale = String::from_utf8_lossy(drifted.opc.get_part(&slide)?.blob())
             .replace("retain-source", "retain-source-z")
             .into_bytes();
-        drifted.opc.get_part_mut(&slide)?.set_blob(stale);
+        Arc::make_mut(&mut drifted.opc)
+            .get_part_mut(&slide)?
+            .set_blob(stale);
         let mut target = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         Ok(format!(
             "{:?}",
@@ -558,7 +561,9 @@ fn a_dirty_planning_destination_and_a_clean_applying_one_agree() -> Result<()> {
         let renamed = String::from_utf8_lossy(dirty.opc.get_part(&slide)?.blob())
             .replace("retain-destination-b", "retain-destination-c")
             .into_bytes();
-        dirty.opc.get_part_mut(&slide)?.set_blob(renamed);
+        Arc::make_mut(&mut dirty.opc)
+            .get_part_mut(&slide)?
+            .set_blob(renamed);
     }
     assert!(
         !dirty.opc.is_unmodified_owned_source(),

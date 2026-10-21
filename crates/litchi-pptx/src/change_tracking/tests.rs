@@ -173,7 +173,7 @@ fn facade_publishes_and_reverses_exact_source_checked_commit() {
     ));
 
     let mut signed = restored;
-    signed.opc.relate_to(
+    std::sync::Arc::make_mut(&mut signed.opc).relate_to(
         "_xmlsignatures/origin.sigs",
         litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
     );

@@ -57,12 +57,117 @@ fn add_relationships(graph: &mut Relationships, states: &[Relationship]) -> Resu
     Ok(())
 }
 
+/// Exact publication bytes without retaining the package's unrelated parts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RelationshipImage {
+    bytes: Arc<Vec<u8>>,
+    member_present: bool,
+}
+
+impl RelationshipImage {
+    fn new(package: &OpcPackage, owner: &PackURI) -> Result<Self> {
+        let (bytes, member_present) = match package.retained_relationships_xml(owner)? {
+            Some(retained) => retained,
+            None => {
+                let graph = if owner.as_str() == "/" {
+                    package.rels()
+                } else {
+                    package.get_part(owner)?.rels()
+                };
+                (
+                    package.authored_relationships_xml(owner, package.read_limits())?,
+                    owner.as_str() == "/" || !graph.is_empty(),
+                )
+            },
+        };
+        Ok(Self {
+            bytes,
+            member_present,
+        })
+    }
+}
+
+/// Compact manifest state. Canonical structural output is reconstructible
+/// from the typed graph. Only an explicit lexical patch needs an exact digest
+/// of a canonical base; producer source bytes always remain exact images.
+#[derive(Debug, Clone)]
+struct ContentTypesImage {
+    retained: Option<Arc<Vec<u8>>>,
+    exact_canonical: Option<[u8; 32]>,
+}
+
+impl ContentTypesImage {
+    fn new(package: &OpcPackage) -> Result<Self> {
+        Ok(Self {
+            retained: package.retained_content_types_xml()?,
+            exact_canonical: None,
+        })
+    }
+
+    fn bind_exact(&mut self, package: &OpcPackage) -> Result<()> {
+        use sha2::Digest as _;
+        if self.retained.is_none() {
+            let bytes = package.authored_content_types_xml(package.read_limits())?;
+            self.exact_canonical = Some(sha2::Sha256::digest(&*bytes).into());
+        }
+        Ok(())
+    }
+
+    fn publication_bytes(package: &OpcPackage) -> Result<Arc<Vec<u8>>> {
+        match package.retained_content_types_xml()? {
+            Some(bytes) => Ok(bytes),
+            None => Ok(package.authored_content_types_xml(package.read_limits())?),
+        }
+    }
+
+    fn matches_view(&self, package: &OpcPackage) -> Result<bool> {
+        use sha2::Digest as _;
+        if let Some(expected) = &self.retained {
+            return Ok(*expected == Self::publication_bytes(package)?);
+        }
+        if let Some(expected) = self.exact_canonical {
+            let bytes = Self::publication_bytes(package)?;
+            let digest: [u8; 32] = sha2::Sha256::digest(&*bytes).into();
+            return Ok(digest == expected);
+        }
+        // A structural patch composes with unrelated typed graph changes.
+        // A reopened canonical artifact is equivalent to an authored view.
+        match package.retained_content_types_xml()? {
+            None => Ok(true),
+            Some(bytes) => Ok(bytes == package.authored_content_types_xml(package.read_limits())?),
+        }
+    }
+
+    fn bytes_for(&self, package: &OpcPackage) -> Result<Arc<Vec<u8>>> {
+        use sha2::Digest as _;
+        if let Some(bytes) = &self.retained {
+            return Ok(Arc::clone(bytes));
+        }
+        let bytes = package.authored_content_types_xml(package.read_limits())?;
+        if let Some(expected) = self.exact_canonical {
+            let digest: [u8; 32] = sha2::Sha256::digest(&*bytes).into();
+            if digest != expected {
+                return Err(Error::PatchConflict);
+            }
+        }
+        Ok(bytes)
+    }
+}
+
+impl PartialEq for ContentTypesImage {
+    fn eq(&self, other: &Self) -> bool {
+        self.retained == other.retained && self.exact_canonical == other.exact_canonical
+    }
+}
+impl Eq for ContentTypesImage {}
+
 /// One part's exact state: its content type, payload and relationships.
 #[derive(Debug, Clone)]
 struct State {
     content_type: String,
     blob: Arc<Vec<u8>>,
     relationships: Vec<Relationship>,
+    relationship_xml: RelationshipImage,
 }
 
 impl PartialEq for State {
@@ -70,28 +175,31 @@ impl PartialEq for State {
         self.content_type == other.content_type
             && (Arc::ptr_eq(&self.blob, &other.blob) || self.blob == other.blob)
             && self.relationships == other.relationships
+            && self.relationship_xml == other.relationship_xml
     }
 }
 
 impl Eq for State {}
 
 impl State {
-    fn read(part: &dyn Part) -> Self {
-        Self {
+    fn read(package: &Arc<OpcPackage>, part: &dyn Part) -> Result<Self> {
+        Ok(Self {
             content_type: part.content_type().to_owned(),
             blob: part.blob_arc(),
             relationships: relationships(part.rels()),
-        }
+            relationship_xml: RelationshipImage::new(package, part.partname())?,
+        })
     }
 
     /// Whether `part` holds exactly this state, without copying its payload.
-    fn matches(&self, part: &dyn Part) -> bool {
-        self.content_type == part.content_type()
+    fn matches(&self, package: &OpcPackage, part: &dyn Part) -> Result<bool> {
+        Ok(self.content_type == part.content_type()
             && {
                 let blob = part.blob();
                 std::ptr::eq(self.blob.as_slice(), blob) || self.blob.as_slice() == blob
             }
             && self.relationships == relationships(part.rels())
+            && self.relationship_xml == RelationshipImage::new(package, part.partname())?)
     }
 
     fn to_part(&self, name: PackURI) -> Result<BlobPart> {
@@ -130,12 +238,14 @@ struct Delta {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
-    root: Option<(Vec<Relationship>, Vec<Relationship>)>,
+    root: Option<(RelationshipImage, RelationshipImage)>,
+    content_types: Option<(ContentTypesImage, ContentTypesImage)>,
+    exact_content_types: bool,
 }
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
-        self.deltas.is_empty() && self.root.is_none()
+        self.deltas.is_empty() && self.root.is_none() && self.content_types.is_none()
     }
 
     pub(crate) fn inverse(&self) -> Self {
@@ -153,6 +263,11 @@ impl PartPatch {
                 .root
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
+            exact_content_types: self.exact_content_types,
+            content_types: self
+                .content_types
+                .as_ref()
+                .map(|(before, after)| (after.clone(), before.clone())),
         }
     }
 
@@ -161,12 +276,15 @@ impl PartPatch {
     /// The staged graph is a clone of the source, so an untouched part shares
     /// its payload allocation and compares by pointer; only touched parts are
     /// compared by value.
-    pub(crate) fn capture(before: &OpcPackage, after: &OpcPackage) -> Result<Self> {
+    pub(crate) fn capture(before: &Arc<OpcPackage>, after: &Arc<OpcPackage>) -> Result<Self> {
         // One commit changes at most as many parts as the package's source
         // limits admit.
         let maximum = before.read_limits().max_parts();
         let mut deltas = Vec::new();
         let mut push = |delta: Delta| -> Result<()> {
+            if delta.before == delta.after {
+                return Ok(());
+            }
             if deltas.len() >= maximum {
                 return Err(Error::EditLimit {
                     kind: crate::opened::LimitKind::Parts,
@@ -180,11 +298,13 @@ impl PartPatch {
             let part = part?;
             let name = part.partname();
             match optional_part(after, name)? {
-                Some(other) if same_part(part, other) => {},
+                Some(other)
+                    if same_part(part, other)
+                        && before.same_retained_relationships(after, name)? => {},
                 other => push(Delta {
                     name: name.clone(),
-                    before: Some(State::read(part)),
-                    after: other.map(State::read),
+                    before: Some(State::read(before, part)?),
+                    after: other.map(|part| State::read(after, part)).transpose()?,
                 })?,
             }
         }
@@ -194,17 +314,53 @@ impl PartPatch {
                 push(Delta {
                     name: part.partname().clone(),
                     before: None,
-                    after: Some(State::read(part)),
+                    after: Some(State::read(after, part)?),
                 })?;
             }
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
-        let root = if crate::opened::relationships_equal(before.rels(), after.rels()) {
+        let owner = PackURI::new("/").map_err(Error::Uri)?;
+        let root = if crate::opened::relationships_equal(before.rels(), after.rels())
+            && before.same_retained_relationships(after, &owner)?
+        {
             None
         } else {
-            Some((relationships(before.rels()), relationships(after.rels())))
+            let pair = (
+                RelationshipImage::new(before, &owner)?,
+                RelationshipImage::new(after, &owner)?,
+            );
+            (!crate::opened::relationships_equal(before.rels(), after.rels()) || pair.0 != pair.1)
+                .then_some(pair)
         };
-        Ok(Self { deltas, root })
+        let changes_types = deltas
+            .iter()
+            .any(|delta| match (&delta.before, &delta.after) {
+                (Some(before), Some(after)) => before.content_type != after.content_type,
+                _ => true,
+            });
+        let mut content_types = if changes_types || !before.same_retained_content_types(after)? {
+            let pair = (
+                ContentTypesImage::new(before)?,
+                ContentTypesImage::new(after)?,
+            );
+            (changes_types || !pair.0.matches_view(after)?).then_some(pair)
+        } else {
+            None
+        };
+        let exact_content_types = content_types.as_ref().is_some_and(|(_, image)| {
+            image.retained.is_some()
+                && before.content_types_source_bytes() != after.content_types_source_bytes()
+        });
+        if exact_content_types && let Some((old, new)) = &mut content_types {
+            old.bind_exact(before)?;
+            new.bind_exact(after)?;
+        }
+        Ok(Self {
+            deltas,
+            root,
+            content_types,
+            exact_content_types,
+        })
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
@@ -215,16 +371,17 @@ impl PartPatch {
         }
         package.ensure_plain_mutation(operation)?;
         let source = &package.opc;
-        if let Some((before, _)) = &self.root
-            && relationships(source.rels()) != *before
-        {
-            return Err(Error::PatchConflict);
+        if let Some((before, _)) = &self.root {
+            let owner = PackURI::new("/").map_err(Error::Uri)?;
+            if RelationshipImage::new(source, &owner)? != *before {
+                return Err(Error::PatchConflict);
+            }
         }
         for delta in &self.deltas {
             let current = optional_part(source, &delta.name)?;
             let matches = match (&delta.before, current) {
                 (None, None) => true,
-                (Some(state), Some(part)) => state.matches(part),
+                (Some(state), Some(part)) => state.matches(source, part)?,
                 _ => false,
             };
             if !matches {
@@ -232,19 +389,68 @@ impl PartPatch {
             }
         }
         crate::package::signature::refuse_signed_change(source)?;
-        let mut target = source.clone();
+        let mut target = (**source).clone();
         for delta in &self.deltas {
+            if let (Some(before), Some(after)) = (&delta.before, &delta.after)
+                && before.content_type == after.content_type
+                && before.relationship_xml == after.relationship_xml
+            {
+                target
+                    .get_part_mut(&delta.name)?
+                    .set_blob_shared(Arc::clone(&after.blob));
+                continue;
+            }
             target.remove_part(&delta.name);
             if let Some(after) = &delta.after {
                 target.add_part(Box::new(after.to_part(delta.name.clone())?));
+                let limits = target.read_limits();
+                let current = RelationshipImage::new(&target, &delta.name)?;
+                if current != after.relationship_xml {
+                    let token = target.source_relationships_with_limits(&delta.name, limits)?;
+                    target.try_replace_relationships_bytes_with_limits(
+                        &token,
+                        Arc::clone(&after.relationship_xml.bytes),
+                        after.relationship_xml.member_present,
+                        limits,
+                    )?;
+                }
             }
         }
-        if let Some((before, after)) = &self.root {
-            let graph = target.rels_mut();
-            for relationship in before {
-                graph.remove(&relationship.id);
+        if let Some((_, after)) = &self.root {
+            let limits = target.read_limits();
+            let owner = PackURI::new("/").map_err(Error::Uri)?;
+            let current = target.source_relationships_with_limits(&owner, limits)?;
+            target.try_replace_relationships_bytes_with_limits(
+                &current,
+                Arc::clone(&after.bytes),
+                after.member_present,
+                limits,
+            )?;
+        }
+        if let Some((before, after)) = &self.content_types {
+            let limits = target.read_limits();
+            // Ordinary structural patches compose with unrelated changes.
+            // An explicit raw manifest replacement has an exact byte guard
+            // in both directions, even when parts changed in the same edit.
+            let needs_restore = self.exact_content_types
+                || after.retained.as_ref().is_some_and(|expected| {
+                    target.content_types_source_bytes().as_ref() != Some(expected)
+                });
+            if needs_restore {
+                if before.matches_view(source)? {
+                    let current = ContentTypesImage::publication_bytes(&target)?;
+                    let replacement = after.bytes_for(&target)?;
+                    if current != replacement {
+                        target.try_replace_content_types_bytes_with_limits(
+                            &current,
+                            replacement,
+                            limits,
+                        )?;
+                    }
+                } else if self.exact_content_types {
+                    return Err(Error::PatchConflict);
+                }
             }
-            add_relationships(graph, after)?;
         }
         crate::package::signature::settle_unsigned_change(&mut target)?;
         Ok(package.derive(target))
@@ -255,7 +461,8 @@ impl PartPatch {
 #[derive(Debug)]
 pub(crate) struct Staged<'a> {
     package: &'a Package,
-    staged: OpcPackage,
+    source: &'a OpcPackage,
+    staged: Option<OpcPackage>,
     changed: bool,
 }
 
@@ -266,7 +473,8 @@ impl<'a> Staged<'a> {
         package.ensure_plain_mutation(operation)?;
         Ok(Self {
             package,
-            staged: package.opc.clone(),
+            source: &package.opc,
+            staged: None,
             changed: false,
         })
     }
@@ -276,14 +484,18 @@ impl<'a> Staged<'a> {
     pub(crate) fn raw(package: &'a Package) -> Self {
         Self {
             package,
-            staged: package.opc.clone(),
+            source: &package.opc,
+            staged: None,
             changed: false,
         }
     }
 
     /// The staged OPC graph.
     pub(crate) const fn opc(&self) -> &OpcPackage {
-        &self.staged
+        match &self.staged {
+            Some(staged) => staged,
+            None => self.source,
+        }
     }
 
     /// Run one typed graph operation on the staged graph. An error leaves
@@ -292,16 +504,16 @@ impl<'a> Staged<'a> {
         &mut self,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
-        let mut candidate = self.staged.clone();
+        let mut candidate = self.opc().clone();
         let value = operation(&mut candidate)?;
-        self.staged = candidate;
+        self.staged = Some(candidate);
         self.changed = true;
         Ok(value)
     }
 
     /// Discard every staged change.
     pub(crate) fn reset(&mut self) {
-        self.staged = self.package.opc.clone();
+        self.staged = None;
         self.changed = false;
     }
 
@@ -311,11 +523,15 @@ impl<'a> Staged<'a> {
         if !self.changed {
             return Ok((self.package.duplicate(), PartPatch::default()));
         }
-        let patch = PartPatch::capture(&self.package.opc, &self.staged)?;
+        let Some(staged) = self.staged else {
+            return Ok((self.package.duplicate(), PartPatch::default()));
+        };
+        let staged = Arc::new(staged);
+        let patch = PartPatch::capture(&self.package.opc, &staged)?;
         if patch.is_noop() {
             return Ok((self.package.duplicate(), patch));
         }
-        Ok((self.package.derive(self.staged), patch))
+        Ok((self.package.derive(staged), patch))
     }
 }
 

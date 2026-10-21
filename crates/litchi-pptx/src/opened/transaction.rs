@@ -3540,7 +3540,7 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (crate::Package, Patch) {
         let package = Arc::try_unwrap(self.package).unwrap_or_else(|package| {
-            crate::Package::from_opened_candidate(package.opc.clone(), &self.snapshot)
+            crate::Package::from_opened_candidate((*package.opc).clone(), &self.snapshot)
         });
         (package, self.patch)
     }
@@ -3598,7 +3598,9 @@ mod compaction_tests {
         changed.extend_from_slice(&original[..declaration_end]);
         changed.extend_from_slice(b"\r\n");
         changed.extend_from_slice(&original[declaration_end..]);
-        package.opc.get_part_mut(&part_name)?.set_blob(changed);
+        Arc::make_mut(&mut package.opc)
+            .get_part_mut(&part_name)?
+            .set_blob(changed);
         Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 

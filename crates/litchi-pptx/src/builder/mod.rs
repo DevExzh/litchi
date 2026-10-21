@@ -75,7 +75,7 @@ impl Builder {
     /// embedding failures are returned by [`Self::build`].
     #[cfg(feature = "automatic-fonts")]
     pub fn font_embedding(&mut self, mode: litchi_fonts::embedding::Mode) -> Result<&mut Self> {
-        self.package.opc.with_fonts(match mode {
+        std::sync::Arc::make_mut(&mut self.package.opc).with_fonts(match mode {
             litchi_fonts::embedding::Mode::Full => litchi_opc::FontEmbedding::Full,
             litchi_fonts::embedding::Mode::Subset => litchi_opc::FontEmbedding::Subset,
         });

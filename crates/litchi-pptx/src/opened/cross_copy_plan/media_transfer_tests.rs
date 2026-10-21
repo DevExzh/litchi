@@ -372,8 +372,7 @@ fn a_modified_source_lends_the_members_it_publishes() -> Result<()> {
     let changed = noisy(48 * 1024, 0x0742_3333);
     for replacement in [photo.clone(), changed] {
         let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
-        source
-            .opc
+        std::sync::Arc::make_mut(&mut source.opc)
             .get_part_mut(&photo_uri)?
             .set_blob(replacement.clone());
         assert!(!source.opc.is_unmodified_owned_source());
@@ -472,7 +471,7 @@ fn a_byte_identical_modified_destination_accepts_the_same_copy() -> Result<()> {
     // revokes the destination's exact-source authorization.
     let modified = || -> Result<Package> {
         let mut modified = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
-        modified.opc.get_part_mut(&presentation_uri())?;
+        std::sync::Arc::make_mut(&mut modified.opc).get_part_mut(&presentation_uri())?;
         assert!(!modified.opc.is_unmodified_owned_source());
         Ok(modified)
     };
@@ -504,7 +503,7 @@ fn the_inverse_of_a_transferring_copy_applies_to_a_modified_destination() -> Res
     let copied = destination.to_bytes()?;
 
     let mut modified = Package::from_reader(std::io::Cursor::new(copied.clone()))?;
-    modified.opc.get_part_mut(&presentation_uri())?;
+    std::sync::Arc::make_mut(&mut modified.opc).get_part_mut(&presentation_uri())?;
     assert!(!modified.opc.is_unmodified_owned_source());
     let inverse = crate::cross_slide_copy::Patch::from_bytes(
         &plan.patch().inverse().to_bytes()?,
@@ -576,7 +575,9 @@ fn stale_and_foreign_sources_are_refused_and_a_reprovenanced_one_is_not() -> Res
     let mut reprovenanced = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let photo_uri = PackURI::new(PHOTO).map_err(Error::Invalid)?;
     let same = reprovenanced.opc.get_part(&photo_uri)?.blob().to_vec();
-    reprovenanced.opc.get_part_mut(&photo_uri)?.set_blob(same);
+    std::sync::Arc::make_mut(&mut reprovenanced.opc)
+        .get_part_mut(&photo_uri)?
+        .set_blob(same);
     let mut released = plan.clone();
     released.release_retained_candidate();
     for candidate in [&plan, &released] {
@@ -641,7 +642,7 @@ fn a_source_member_whose_local_header_disagrees_keeps_the_recompressing_route() 
     // The verdict does not depend on the destination: a modified
     // destination gives the same plan and the same bytes.
     let mut modified = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
-    modified.opc.get_part_mut(&presentation_uri())?;
+    std::sync::Arc::make_mut(&mut modified.opc).get_part_mut(&presentation_uri())?;
     let replanned = plan_copy(&source, &modified)?;
     assert_eq!(replanned, plan);
     modified.apply_cross_slide_copy_plan(&source, &replanned)?;
@@ -1264,7 +1265,7 @@ fn with_sentinel(
 ) -> Result<(Package, std::sync::Arc<std::sync::atomic::AtomicUsize>)> {
     let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let writes = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    package.opc.try_add_part(Box::new(Sentinel {
+    std::sync::Arc::make_mut(&mut package.opc).try_add_part(Box::new(Sentinel {
         inner: litchi_opc::BlobPart::new(
             sentinel_uri(),
             "application/octet-stream".to_owned(),
@@ -1285,15 +1286,16 @@ fn assert_sentinel_behaves(
     let uri = sentinel_uri();
     assert_eq!(package.opc.get_part(&uri)?.rel_ref_count("rId1"), 0x51_7e);
     assert!(
-        package
-            .opc
+        std::sync::Arc::make_mut(&mut package.opc)
             .get_part_mut(&uri)?
             .set_content_type("application/x-retyped".to_owned())
             .is_err(),
         "the sentinel refuses retyping"
     );
     let before = writes.load(std::sync::atomic::Ordering::SeqCst);
-    package.opc.get_part_mut(&uri)?.set_blob(b"logged".to_vec());
+    std::sync::Arc::make_mut(&mut package.opc)
+        .get_part_mut(&uri)?
+        .set_blob(b"logged".to_vec());
     assert_eq!(
         writes.load(std::sync::atomic::Ordering::SeqCst),
         before + 1,
@@ -1377,7 +1379,7 @@ fn a_transferring_copy_into_a_modified_destination_keeps_its_save_options() -> R
     let (source_bytes, destination_bytes) = media_fixture()?;
     let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
-    destination.opc.set_save_options(litchi_opc::SaveOptions {
+    std::sync::Arc::make_mut(&mut destination.opc).set_save_options(litchi_opc::SaveOptions {
         fonts: litchi_opc::FontEmbedding::Full,
     });
     assert!(!destination.opc.is_unmodified_owned_source());
@@ -1475,13 +1477,13 @@ fn outgrown(bytes: &[u8]) -> Result<Package> {
         std::io::Cursor::new(bytes.to_vec()),
         crate::OpenOptions::default().source_limits(limits),
     )?;
-    package
-        .opc
-        .try_add_part(Box::new(litchi_opc::BlobPart::new(
+    std::sync::Arc::make_mut(&mut package.opc).try_add_part(Box::new(
+        litchi_opc::BlobPart::new(
             PackURI::new("/custom/extra.bin").map_err(Error::Invalid)?,
             "application/octet-stream".to_owned(),
             b"extra".to_vec(),
-        )))?;
+        ),
+    ))?;
     Ok(package)
 }
 

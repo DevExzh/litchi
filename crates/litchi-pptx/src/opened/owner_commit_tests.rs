@@ -80,7 +80,7 @@ fn direct_publication_keeps_the_candidate_independent_of_source_drift() -> Resul
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let extra = PackURI::new("/private-drift.bin").map_err(crate::Error::Invalid)?;
-    source.opc.try_add_part(Box::new(BlobPart::new(
+    std::sync::Arc::make_mut(&mut source.opc).try_add_part(Box::new(BlobPart::new(
         extra.clone(),
         "application/octet-stream".into(),
         b"later".to_vec(),

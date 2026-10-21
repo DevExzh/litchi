@@ -3039,6 +3039,21 @@ def p0356b():
                        comparison="after/before"))
     return out
 
+@needs("0356c")
+def p0356c():
+    """PPTX manifest fidelity: identical raw-edit probe, three isolated ABBAs."""
+    path = RES / "0356c" / "summary.json"
+    out = []
+    for case, values in load_json(path)["cases"].items():
+        before, after = values["before_median_us"], values["after_median_us"]
+        out.append(row("0356c", "pptx", "edit", case, "", before, after,
+                       [after / before], regression("0356c"),
+                       f"opc_manifest:{case}:after-before", src([path]),
+                       comparison="after/before",
+                       explanation="Three isolated ABBA trials; identical probe and separate targets."))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -3047,7 +3062,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0306, p0307, p0308, p0309, p0310, p0311, p0312,
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
-           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0357, p0357a, p0357b, p0358, p0358a,
+           p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0361, p0361a]
 
 

@@ -82,8 +82,7 @@ fn add_mce_marker(package: &mut Package, index: usize) -> Result<()> {
     if marked == xml {
         return Err(Error::Invalid("retention fixture has no p:sld root".into()));
     }
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(marked.into_bytes());
     Ok(())
@@ -508,7 +507,7 @@ fn counted_marked_slides_package() -> Result<(Package, Arc<AtomicUsize>)> {
     let package = marked_slides_package(1, &[0])?;
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let observations = Arc::new(AtomicUsize::new(0));
-    let mut opc = package.opc.clone();
+    let mut opc = (*package.opc).clone();
     let counted =
         CountingBlobPart::from_part(opc.get_part(&slide_name)?, Arc::clone(&observations))?;
     assert!(opc.remove_part(&slide_name));
@@ -638,8 +637,7 @@ fn remove_slide_relationship(package: &mut Package, index: usize) -> Result<()> 
         .ok_or_else(|| Error::Invalid("retention fixture slide is absent".into()))?
         .relationship_id()
         .to_owned();
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&presentation_name)?
         .rels_mut()
         .remove(&relationship_id);
@@ -673,8 +671,7 @@ fn rewrite_slide(
     let xml = std::str::from_utf8(package.opc.get_part(&part_name)?.blob())
         .map_err(|error| Error::Xml(error.to_string()))?
         .to_owned();
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(rewrite(xml).into_bytes());
     Ok(())
@@ -682,8 +679,7 @@ fn rewrite_slide(
 
 fn replace_notes_root(package: &mut Package) -> Result<()> {
     let part_name = PackURI::new("/ppt/notesSlides/notesSlide1.xml").map_err(Error::Invalid)?;
-    package
-        .opc
+    Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(format!(r#"<p:wrong xmlns:p="{PRESENTATION_NAMESPACE}"/>"#).into_bytes());
     Ok(())
@@ -828,7 +824,7 @@ fn foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_paylo
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let foreign = Arc::new(b"foreign payload with a different identity".to_vec());
 
-    let mut mismatched = package.opc.clone();
+    let mut mismatched = (*package.opc).clone();
     let foreign_part =
         MismatchedBlobArcPart::from_part(mismatched.get_part(&slide_name)?, Arc::clone(&foreign))?;
     assert!(mismatched.remove_part(&slide_name));
@@ -845,7 +841,7 @@ fn foreign_blob_arc_and_clone_allocations_cannot_pin_or_answer_for_foreign_paylo
 
     // A separate allocation carrying equal visible bytes is not an identity
     // proof. Reopening it must not answer from the first snapshot's output.
-    let mut separate = mismatched.opc.clone();
+    let mut separate = (*mismatched.opc).clone();
     let copied = separate.get_part(&slide_name)?.blob().to_vec();
     let relationships = separate.get_part(&slide_name)?.rels().clone();
     assert!(separate.remove_part(&slide_name));
@@ -911,12 +907,12 @@ fn rebound_keeps_a_package_owned_allocation_but_new_equal_slide_bytes_miss() -> 
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let unrelated_name = PackURI::new("/retained-source.bin").map_err(Error::Invalid)?;
     let raw = package.opc.get_part(&slide_name)?.blob_arc();
-    package.opc.try_add_part(Box::new(BlobPart::new_shared(
+    Arc::make_mut(&mut package.opc).try_add_part(Box::new(BlobPart::new_shared(
         unrelated_name.clone(),
         "application/octet-stream".into(),
         Arc::clone(&raw),
     )))?;
-    let package = Package::from_opc_package(package.opc)?;
+    let package = Package::from_opc_package((*package.opc).clone())?;
     let source = package.opened_presentation_with_limits(Limits::default())?;
     let original_output = output(&source, 0).expect("marked source output");
 

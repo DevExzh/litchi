@@ -173,7 +173,7 @@ impl Package {
         package.add_part(Box::new(extended_properties));
 
         Ok(Self {
-            opc: package,
+            opc: std::sync::Arc::new(package),
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: false,
             tolerance: crate::leniency::ToleranceReport::default(),
@@ -301,7 +301,7 @@ impl Package {
         let _deferred_presentation_properties_error =
             crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
         Ok(Self {
-            opc,
+            opc: std::sync::Arc::new(opc),
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance,
             tolerance,
@@ -415,7 +415,7 @@ impl Package {
                 .collect()
         };
         {
-            let part = self.opc.get_part_mut(&presentation_name)?;
+            let part = std::sync::Arc::make_mut(&mut self.opc).get_part_mut(&presentation_name)?;
             for relationship_id in old_slide_relationships {
                 part.rels_mut().remove(&relationship_id);
             }
@@ -428,7 +428,7 @@ impl Package {
             .map(|part| part.partname().clone())
             .collect();
         for part in old_slides {
-            self.opc.remove_part(&part);
+            std::sync::Arc::make_mut(&mut self.opc).remove_part(&part);
         }
         let old_notes_slides: Vec<_> = self
             .opc
@@ -437,7 +437,7 @@ impl Package {
             .map(|part| part.partname().clone())
             .collect();
         for part in old_notes_slides {
-            self.opc.remove_part(&part);
+            std::sync::Arc::make_mut(&mut self.opc).remove_part(&part);
         }
 
         let mut relationship_ids = Vec::with_capacity(presentation.slide_count());
@@ -448,8 +448,7 @@ impl Package {
             .enumerate()
         {
             let target = format!("slides/slide{}.xml", index.saturating_add(1));
-            let relationship_id = self
-                .opc
+            let relationship_id = std::sync::Arc::make_mut(&mut self.opc)
                 .get_part_mut(&presentation_name)?
                 .relate_to(&target, rt::SLIDE);
             relationship_ids.push(relationship_id);
@@ -467,7 +466,7 @@ impl Package {
                     rt::NOTES_SLIDE,
                 );
             }
-            self.opc.add_part(Box::new(slide_part));
+            std::sync::Arc::make_mut(&mut self.opc).add_part(Box::new(slide_part));
 
             if let Some(text) = slide.notes() {
                 let notes_name =
@@ -479,13 +478,13 @@ impl Package {
                 );
                 notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);
-                self.opc.add_part(Box::new(notes_part));
+                std::sync::Arc::make_mut(&mut self.opc).add_part(Box::new(notes_part));
             }
         }
 
         let xml =
             presentation.generate_presentation_xml_with_designer(&relationship_ids, &designer)?;
-        self.opc
+        std::sync::Arc::make_mut(&mut self.opc)
             .get_part_mut(&presentation_name)?
             .set_blob(xml.into_bytes());
         Ok(())

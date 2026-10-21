@@ -304,7 +304,7 @@ fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
     let mut package = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let custom = PackURI::new("/custom/copying.bin").expect("URI");
-    package.opc.try_add_part(Box::new(CopyingPart::new(
+    Arc::make_mut(&mut package.opc).try_add_part(Box::new(CopyingPart::new(
         custom.clone(),
         b"copied on clone".to_vec(),
     )))?;

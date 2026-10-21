@@ -1,0 +1,10 @@
+reading file "../.coord/pptx-manifest/compact-heap-before.zst" - please wait, this might take some time...
+Debuggee command was: ../.coord/pptx-manifest/binaries/compact-before
+finished reading file, now analyzing data:
+
+total runtime: 27.197000s.
+calls to allocation functions: 58831913 (2163176/s)
+temporary memory allocations: 133311 (4901/s)
+peak heap memory consumption: 2.98M
+peak RSS (including heaptrack overhead): 10.71M
+total memory leaked: 544B

@@ -10,7 +10,7 @@ use crate::{Error, Result};
 
 /// Main entry point for `PresentationML` package ownership.
 pub struct Package {
-    pub(crate) opc: OpcPackage,
+    pub(crate) opc: std::sync::Arc<OpcPackage>,
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
@@ -246,7 +246,7 @@ impl Package {
         patch: &crate::slide_removal::Patch,
     ) -> Result<(Self, crate::opened::Snapshot)> {
         self.ensure_plain_mutation("remove_slide")?;
-        let mut opc = self.opc.clone();
+        let mut opc = (*self.opc).clone();
         let snapshot =
             crate::opened::apply_removal_patch(&mut opc, patch, self.physical_source_provenance)?;
         Ok(self.published(opc, snapshot))
@@ -271,7 +271,7 @@ impl Package {
         patch: &crate::cross_slide_copy::Patch,
     ) -> Result<(Self, crate::opened::Snapshot)> {
         self.require_physical_provenance(source)?;
-        let mut opc = self.opc.clone();
+        let mut opc = (*self.opc).clone();
         let snapshot = crate::opened::cross_copy_plan::apply_patch(
             &source.opc,
             &mut opc,
@@ -425,9 +425,9 @@ impl Package {
     /// A new package holding `opc` under this package's retained policy
     /// (tolerance report, encryption provenance, physical-source flag). The
     /// payload-digest memo starts empty, because `opc` is another graph.
-    pub(crate) fn derive(&self, opc: OpcPackage) -> Self {
+    pub(crate) fn derive(&self, opc: impl Into<std::sync::Arc<OpcPackage>>) -> Self {
         Self {
-            opc,
+            opc: opc.into(),
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::OnceLock::new(),
@@ -455,7 +455,7 @@ impl Package {
     ) -> Self {
         let state = &snapshot.owner_state;
         let mut package = Self {
-            opc,
+            opc: std::sync::Arc::new(opc),
             physical_source_provenance: snapshot.physical_source_provenance,
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::OnceLock::new(),
@@ -817,7 +817,7 @@ impl Package {
             return Ok(self.duplicate());
         }
         self.ensure_plain_mutation("unsign")?;
-        let mut opc = self.opc.clone();
+        let mut opc = (*self.opc).clone();
         opc.unsign();
         Ok(self.derive(opc))
     }

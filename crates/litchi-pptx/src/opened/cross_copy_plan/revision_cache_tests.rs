@@ -43,8 +43,7 @@ fn rename_slide(package: &mut Package, index: usize, name: &str) -> Result<()> {
             "test slide {index} has no canonical producer name"
         )));
     }
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .get_part_mut(&part_name)?
         .set_blob(renamed.into_bytes());
     Ok(())
@@ -256,8 +255,10 @@ fn warm_snapshot_caches_do_not_hide_a_stale_source_or_destination() -> Result<()
         .map_err(|error| Error::Xml(error.to_string()))?
         .replace("cache-destination-a", "cache-destination-x")
         .into_bytes();
-    drifted.opc.get_part_mut(&slide)?.set_blob(stale);
-    let drifted_before = drifted.opc.clone();
+    std::sync::Arc::make_mut(&mut drifted.opc)
+        .get_part_mut(&slide)?
+        .set_blob(stale);
+    let drifted_before = (*drifted.opc).clone();
     assert!(matches!(
         drifted.apply_cross_slide_copy_plan(&source, &plan),
         Err(Error::PatchConflict)

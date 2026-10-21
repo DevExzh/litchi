@@ -456,7 +456,7 @@ impl litchi_opc::Part for CallerPart {
 /// Open `bytes` and add a [`CallerPart`].
 fn with_caller_part(bytes: &[u8]) -> Result<Package> {
     let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
-    package.opc.try_add_part(Box::new(CallerPart::new(
+    std::sync::Arc::make_mut(&mut package.opc).try_add_part(Box::new(CallerPart::new(
         b"change-0751 caller-defined payload".to_vec(),
     )))?;
     Ok(package)

@@ -99,8 +99,7 @@ fn fresh_and_opened_packages_have_canonical_edit_roots() {
 #[test]
 fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsign() {
     let mut package = Package::new().expect("new package");
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.opc.is_signed());
 
@@ -131,8 +130,7 @@ fn custom_property_no_ops_preserve_signatures_and_changes_require_explicit_unsig
         .expect("write custom properties");
     assert!(!package.opc.is_signed());
 
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     let props = package.custom_props().expect("read custom properties");
     package
@@ -188,8 +186,7 @@ fn task_panes_facade_publishes_compact_source_checked_reversible_patches() {
 #[test]
 fn empty_task_pane_patch_preserves_signatures() {
     let mut package = Package::new().expect("new package");
-    package
-        .opc
+    std::sync::Arc::make_mut(&mut package.opc)
         .relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.opc.is_signed());
 

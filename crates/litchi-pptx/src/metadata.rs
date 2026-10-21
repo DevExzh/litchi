@@ -202,10 +202,10 @@ impl Package {
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// package.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
-        let mut opc = self.opc.clone();
+        let mut opc = (*self.opc).clone();
         patch.apply(&mut opc)?;
         Ok(Self {
-            opc,
+            opc: std::sync::Arc::new(opc),
             part_digests: std::sync::OnceLock::new(),
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),

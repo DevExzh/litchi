@@ -29,7 +29,7 @@ impl Package {
             return Ok(());
         }
 
-        let mut staged = self.opc.clone();
+        let mut staged = (*self.opc).clone();
         let mut fonts = font::load(&staged)?.unwrap_or_else(Fonts::new);
         let mut changed = false;
         for mut prepared in prepared {
@@ -38,7 +38,7 @@ impl Package {
         }
         if changed {
             let _ = font::put(&mut staged, fonts)?;
-            self.opc = staged;
+            self.opc = std::sync::Arc::new(staged);
         }
         Ok(())
     }

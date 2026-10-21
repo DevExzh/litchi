@@ -465,7 +465,7 @@ fn replace_part(package: &mut OpcPackage, part: Box<dyn Part>) -> Result<()> {
 #[test]
 fn a_foreign_arc_that_does_not_alias_its_payload_is_never_memoized_or_pinned() -> Result<()> {
     let package = text_box_package(3, 2)?;
-    let mut opc = package.opc.clone();
+    let mut opc = (*package.opc).clone();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let foreign = Arc::new(b"foreign payload with a different identity".to_vec());
     let inner = copied_part(opc.get_part(&slide_name)?)?;
@@ -508,7 +508,7 @@ fn a_foreign_arc_that_does_not_alias_its_payload_is_never_memoized_or_pinned() -
 #[test]
 fn a_memo_hit_adds_no_payload_observation_over_a_plain_recapture() -> Result<()> {
     let package = text_box_package(2, 2)?;
-    let mut opc = package.opc.clone();
+    let mut opc = (*package.opc).clone();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
     let observations = Arc::new(AtomicUsize::new(0));
     let inner = copied_part(opc.get_part(&slide_name)?)?;

@@ -1,0 +1,97 @@
+{
+  "baseline_commit": "86d708878f",
+  "candidate_base_commit": "f93b9e1c32",
+  "candidate_source": "0356c implementation committed with this receipt",
+  "probe": "crates/litchi-pptx/examples/opc_manifest_bench.rs",
+  "probe_sha256": "0ffb5036de2574c1a3bb09eb3015bb9e81b99a1b9ffeba944ba0d252dea0b843",
+  "cpu": 7,
+  "trials": 3,
+  "order": "A-B-B-A",
+  "warmup": 3,
+  "samples": 31,
+  "timing": "median of six per-run medians; microseconds",
+  "isolated": true,
+  "compiler_monitor_interval_ms": 100,
+  "cases": {
+    "noop": {
+      "before_median_us": 80.8555,
+      "after_median_us": 39.5305,
+      "ratio": 0.48890304308303084
+    },
+    "payload_commit": {
+      "before_median_us": 58.14,
+      "after_median_us": 43.2,
+      "ratio": 0.7430340557275542
+    },
+    "payload_save": {
+      "before_median_us": 12219.6245,
+      "after_median_us": 12133.4135,
+      "ratio": 0.9929448732242141
+    },
+    "payload_save_twice": {
+      "before_median_us": 24320.5685,
+      "after_median_us": 24188.317000000003,
+      "ratio": 0.9945621542522742
+    },
+    "part_add_commit": {
+      "before_median_us": 54.0555,
+      "after_median_us": 52.2205,
+      "ratio": 0.9660534080713341
+    },
+    "part_add_save": {
+      "before_median_us": 12239.964,
+      "after_median_us": 12142.884,
+      "ratio": 0.9920686041233455
+    },
+    "root_relationship_commit": {
+      "before_median_us": 57.666,
+      "after_median_us": 49.06,
+      "ratio": 0.850761280477231
+    },
+    "payload_replay_warm": {
+      "before_median_us": 82.31,
+      "after_median_us": 73.92999999999999,
+      "ratio": 0.8981897703802696
+    },
+    "payload_inverse_warm": {
+      "before_median_us": 84.26599999999999,
+      "after_median_us": 75.9005,
+      "ratio": 0.9007250848503549
+    },
+    "payload_commit_and_first_replay": {
+      "before_median_us": 143.146,
+      "after_median_us": 122.52600000000001,
+      "ratio": 0.8559512665390582
+    },
+    "payload_commit_and_first_inverse": {
+      "before_median_us": 148.2055,
+      "after_median_us": 127.051,
+      "ratio": 0.857262382300252
+    },
+    "payload_patch_history_128": {
+      "before_median_us": 7576.723,
+      "after_median_us": 6281.051,
+      "ratio": 0.828993088436782
+    },
+    "part_add_replay_warm": {
+      "before_median_us": 73.37049999999999,
+      "after_median_us": 72.63050000000001,
+      "ratio": 0.9899142025746045
+    },
+    "part_add_inverse_warm": {
+      "before_median_us": 74.24549999999999,
+      "after_median_us": 72.75999999999999,
+      "ratio": 0.9799920533904412
+    },
+    "part_add_patch_history_128": {
+      "before_median_us": 7638.6735,
+      "after_median_us": 7251.091,
+      "ratio": 0.9492604966032389
+    },
+    "batch1000": {
+      "before_median_us": 28169.379999999997,
+      "after_median_us": 28442.277000000002,
+      "ratio": 1.0096877176565477
+    }
+  }
+}

@@ -41,7 +41,9 @@ fn slide_xml(package: &Package) -> Result<String> {
 
 fn set_slide_xml(package: &mut Package, xml: Vec<u8>) -> Result<()> {
     let name = PackURI::new(SLIDE).map_err(Error::Invalid)?;
-    package.opc.get_part_mut(&name)?.set_blob(xml);
+    std::sync::Arc::make_mut(&mut package.opc)
+        .get_part_mut(&name)?
+        .set_blob(xml);
     Ok(())
 }
 
@@ -178,7 +180,7 @@ fn no_text_verb_panics_on_mutated_text_run_markup() -> Result<()> {
     let mut refused = 0usize;
     let mut edited = 0usize;
     for (index, variant) in variants.iter().enumerate() {
-        let mut package = Package::from_opc_package(base.opc.clone())?;
+        let mut package = Package::from_opc_package((*base.opc).clone())?;
         set_slide_xml(&mut package, variant.clone().into_bytes())?;
         let outcome = catch_unwind(AssertUnwindSafe(|| -> (usize, usize) {
             let mut refused = 0usize;
