@@ -78,7 +78,7 @@ pub fn find_worksheet_query_table(
 /// Adding changes the package, so a signed package is refused with
 /// [`crate::Error::Signed`] before anything is changed: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn add_worksheet_query_table(
+pub(crate) fn add_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     query_table: Table,
@@ -122,7 +122,7 @@ pub fn add_worksheet_query_table(
 /// [`crate::Error::Signed`] before anything is changed, even when the
 /// serialized definition equals the stored one: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn replace_worksheet_query_table(
+pub(crate) fn replace_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     relationship_id: &str,
@@ -144,32 +144,13 @@ pub fn replace_worksheet_query_table(
     Ok(())
 }
 
-/// Replace the definition of one existing query-table part.
-///
-/// The signature policy is [`replace_worksheet_query_table`]'s.
-pub fn update_worksheet_query_table(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-    relationship_id: &str,
-    query_table: Table,
-    conformance: Conformance,
-) -> Result<()> {
-    replace_worksheet_query_table(
-        package,
-        worksheet_part,
-        relationship_id,
-        query_table,
-        conformance,
-    )
-}
-
 /// Remove one query-table relationship and its unreferenced part.
 ///
 /// An absent relationship leaves the package untouched and returns `false`,
 /// signed or not. Removing a query table changes the package, so a signed
 /// package is refused with [`crate::Error::Signed`]: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn remove_worksheet_query_table(
+pub(crate) fn remove_worksheet_query_table(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     relationship_id: &str,
@@ -198,7 +179,7 @@ pub fn remove_worksheet_query_table(
 /// signature byte for byte. Any other reorder changes the package, so a signed
 /// package is refused with [`crate::Error::Signed`]: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn reorder_worksheet_query_tables(
+pub(crate) fn reorder_worksheet_query_tables(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     ordered_relationship_ids: &[String],

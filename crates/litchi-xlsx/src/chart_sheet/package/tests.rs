@@ -1797,3 +1797,37 @@ mod chart_outbound_tests {
         );
     }
 }
+
+#[test]
+fn package_route_adds_a_chartsheet_and_replays_its_patch() {
+    let conformance = Conformance::Transitional;
+    let expected = value(conformance);
+    let source = crate::Package::new().unwrap();
+    let workbook = source
+        .opc()
+        .main_document_part()
+        .unwrap()
+        .partname()
+        .clone();
+    let mut edit = source.edit_chart_sheets().unwrap();
+    edit.add(&expected, conformance).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let after = commit.package();
+    assert_eq!(after.workbook_ref().sheets().count(), 2);
+    assert_eq!(
+        load_chartsheet(after.opc(), &workbook, "rIdChartSheet").unwrap(),
+        expected
+    );
+
+    let replayed = source.apply_chart_sheets(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.package().to_bytes().unwrap(),
+        after.to_bytes().unwrap()
+    );
+    let restored = after.apply_chart_sheets(&commit.patch().inverse()).unwrap();
+    assert_eq!(
+        restored.package().to_bytes().unwrap(),
+        source.to_bytes().unwrap()
+    );
+}

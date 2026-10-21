@@ -4,7 +4,7 @@
 //! It never contacts RTD servers, opens OLAP connections, or evaluates
 //! formulas.
 
-use crate::BoxedResult as Result;
+use crate::error::Result;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::invalid;
@@ -35,11 +35,11 @@ pub fn load_from_package_with_conformance(
 /// persists the supplied dependency records and never performs RTD, cube, or
 /// formula evaluation work.
 ///
-/// Storing always writes the part, so a signed package is refused with a
-/// boxed [`crate::Error::Signed`] before anything is changed, even when the
+/// Storing always writes the part, so a signed package is refused with
+/// [`crate::Error::Signed`] before anything is changed, even when the
 /// serialized records equal the stored ones: remove the signature explicitly
 /// first ([`OpcPackage::unsign`]).
-pub fn store_in_package(
+pub(crate) fn store_in_package(
     package: &mut OpcPackage,
     value: &VolatileDependencies,
     conformance: VolatileDependenciesConformance,
@@ -94,9 +94,9 @@ pub fn store_in_package(
 ///
 /// A workbook without the part is left untouched and returns `false`, signed
 /// or not. Removing it changes the package, so a signed package is refused
-/// with a boxed [`crate::Error::Signed`]: remove the signature explicitly first
+/// with [`crate::Error::Signed`]: remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove_from_package(package: &mut OpcPackage) -> Result<bool> {
     let workbook_uri = main_workbook_uri(package)?;
     let Some(existing) = volatile_dependencies_relationship(package, &workbook_uri)? else {
         validate_volatile_dependencies_graph(package, &workbook_uri, None)?;
@@ -308,7 +308,7 @@ fn next_volatile_dependencies_part_name(package: &OpcPackage) -> Result<PackURI>
         } else {
             format!("/xl/volatileDependencies{suffix}.xml")
         };
-        let candidate = PackURI::new(&name)?;
+        let candidate = PackURI::new(&name).map_err(invalid)?;
         match package.get_part(&candidate) {
             Ok(_) => {},
             Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(candidate),

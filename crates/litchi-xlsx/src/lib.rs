@@ -183,8 +183,7 @@ pub use litchi_opc::{
 pub use active_x::{
     Binary, Control, ControlProperties, ControlSet, Controls, Descriptor, Font, LoadedControl,
     Marker, ObjectAnchor, Persistence, Picture, PreviewImage, Property, PropertyObject,
-    load_from_worksheet, remove_from_worksheet, replace_controls_xml, replace_on_worksheet,
-    store_on_worksheet,
+    load_from_worksheet, replace_controls_xml,
 };
 pub use auto_filter::{
     Calendar, Condition, Custom, Customs, DateGroup, Definition, Dynamic, DynamicType, Grouping,
@@ -254,8 +253,7 @@ pub use litchi_sheet::{
     Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 pub use named_sheet_view::{
-    load_worksheet_named_sheet_views, parse_named_sheet_views, remove_worksheet_named_sheet_views,
-    store_worksheet_named_sheet_views, write_named_sheet_views,
+    load_worksheet_named_sheet_views, parse_named_sheet_views, write_named_sheet_views,
 };
 pub use ole_objects::{
     Aspect, OleObject, OleObjectAnchor, OleObjectConformance, OleObjectMarker, OleObjectProperties,
@@ -298,7 +296,8 @@ pub use streaming::{
     StreamingWorkbookWriter,
 };
 // Query-table semantic types remain under the contextual `query_table` owner;
-// package operations are also available at this convenience facade.
+// its package reads are also available at this convenience facade (edits go
+// through `Package::edit_query_tables`).
 pub use data_validation::{
     Commit as DataValidationCommit, Diagnostics as DataValidationDiagnostics,
     Patch as DataValidationPatch, Snapshot as DataValidationSnapshot,
@@ -307,10 +306,8 @@ pub use data_validation::{
 };
 pub use query_table::{
     QUERY_TABLE_CONTENT_TYPE, QUERY_TABLE_RELATIONSHIP_TYPE, STRICT_QUERY_TABLE_RELATIONSHIP_TYPE,
-    add_worksheet_query_table, find_worksheet_query_table, is_query_table_relationship_type,
-    load_worksheet_query_tables, parse_query_table, remove_worksheet_query_table,
-    reorder_worksheet_query_tables, replace_worksheet_query_table, update_worksheet_query_table,
-    write_query_table,
+    find_worksheet_query_table, is_query_table_relationship_type, load_worksheet_query_tables,
+    parse_query_table, write_query_table,
 };
 pub use revisions::{
     RevisionAttribute, RevisionAttributeNamespace, RevisionConformance, RevisionHeader,

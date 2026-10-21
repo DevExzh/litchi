@@ -59,7 +59,7 @@ pub fn load_from_worksheet(package: &OpcPackage, worksheet_uri: &PackURI) -> Res
 /// Storing changes the package, so a signed package is refused with
 /// [`crate::Error::Signed`] before anything is changed: remove the signature
 /// explicitly first ([`OpcPackage::unsign`]).
-pub fn store_on_worksheet(
+pub(crate) fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
     value: &ControlSet,
@@ -75,7 +75,7 @@ pub fn store_on_worksheet(
 /// The signature policy is [`remove_from_worksheet`]'s and
 /// [`store_on_worksheet`]'s: a signed package is refused unless the call
 /// removes nothing from a worksheet without controls.
-pub fn replace_on_worksheet(
+pub(crate) fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_uri: &PackURI,
     value: &ControlSet,
@@ -106,7 +106,10 @@ pub fn replace_on_worksheet(
 /// or not. Removing controls changes the package, so a signed package is
 /// refused with [`crate::Error::Signed`]: remove the signature explicitly
 /// first ([`OpcPackage::unsign`]).
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_uri: &PackURI) -> Result<bool> {
+pub(crate) fn remove_from_worksheet(
+    package: &mut OpcPackage,
+    worksheet_uri: &PackURI,
+) -> Result<bool> {
     let loaded = load_from_worksheet(package, worksheet_uri)?;
     if loaded.controls.is_empty() {
         return Ok(false);

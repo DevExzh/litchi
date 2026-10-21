@@ -67,7 +67,7 @@ pub fn load_worksheet_named_sheet_views(
 /// [`crate::Error::Signed`] before anything is changed, even when the
 /// serialized views equal the stored ones: remove the signature explicitly
 /// first ([`OpcPackage::unsign`]).
-pub fn store_worksheet_named_sheet_views(
+pub(crate) fn store_worksheet_named_sheet_views(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Views,
@@ -104,7 +104,7 @@ pub fn store_worksheet_named_sheet_views(
 /// or not. Removing it changes the package, so a signed package is refused
 /// with [`crate::Error::Signed`]: remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn remove_worksheet_named_sheet_views(
+pub(crate) fn remove_worksheet_named_sheet_views(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
 ) -> Result<bool> {
