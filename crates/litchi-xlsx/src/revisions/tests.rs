@@ -83,9 +83,12 @@ fn package() -> OpcPackage {
 }
 #[test]
 fn loads_libreoffice_and_poi_reference_packages() {
-    let a = load_workbook_revisions(&OpcPackage::from_bytes(LO).unwrap())
-        .unwrap()
-        .unwrap();
+    let a = load_workbook_revisions(
+        &OpcPackage::from_bytes(LO).unwrap(),
+        &litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(a.logs.len(), 5);
     assert!(
         a.logs
@@ -99,25 +102,29 @@ fn loads_libreoffice_and_poi_reference_packages() {
             .flat_map(|l| &l.log.records)
             .any(|r| r.kind == RevisionRecordKind::CustomView)
     );
-    let b = load_workbook_revisions(&OpcPackage::from_bytes(POI).unwrap())
-        .unwrap()
-        .unwrap();
+    let b = load_workbook_revisions(
+        &OpcPackage::from_bytes(POI).unwrap(),
+        &litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(b.logs.len(), 3);
     assert_eq!(b.logs.iter().map(|l| l.log.records.len()).sum::<usize>(), 2);
 }
 #[test]
 fn strict_writers_are_deterministic_and_round_trip() {
     let v = value();
-    let u = write_revision_users(&v.users, RevisionConformance::Strict).unwrap();
-    let h = write_revision_headers(&v.headers, RevisionConformance::Strict).unwrap();
-    let l = write_revision_log(&v.logs[0].log, RevisionConformance::Strict).unwrap();
+    let limits = litchi_opc::SourceLimits::default();
+    let u = write_revision_users(&v.users, RevisionConformance::Strict, &limits).unwrap();
+    let h = write_revision_headers(&v.headers, RevisionConformance::Strict, &limits).unwrap();
+    let l = write_revision_log(&v.logs[0].log, RevisionConformance::Strict, &limits).unwrap();
     assert_eq!(
         u,
-        write_revision_users(&v.users, RevisionConformance::Strict).unwrap()
+        write_revision_users(&v.users, RevisionConformance::Strict, &limits).unwrap()
     );
-    assert_eq!(parse_revision_users(&u).unwrap(), v.users);
-    assert_eq!(parse_revision_headers(&h).unwrap(), v.headers);
-    assert_eq!(parse_revision_log(&l).unwrap(), v.logs[0].log);
+    assert_eq!(parse_revision_users(&u, &limits).unwrap(), v.users);
+    assert_eq!(parse_revision_headers(&h, &limits).unwrap(), v.headers);
+    assert_eq!(parse_revision_log(&l, &limits).unwrap(), v.logs[0].log);
 }
 #[test]
 fn mce_fallback() {
@@ -126,7 +133,10 @@ fn mce_fallback() {
         guid(3)
     );
     assert_eq!(
-        parse_revision_log(x.as_bytes()).unwrap().records[0].kind,
+        parse_revision_log(x.as_bytes(), &litchi_opc::SourceLimits::default())
+            .unwrap()
+            .records[0]
+            .kind,
         RevisionRecordKind::CustomView
     );
 }
@@ -135,7 +145,12 @@ fn package_writer_round_trip() {
     let mut p = package();
     let v = value();
     store_workbook_revisions(&mut p, &v, RevisionConformance::Strict).unwrap();
-    assert_eq!(load_workbook_revisions(&p).unwrap().unwrap(), v);
+    assert_eq!(
+        load_workbook_revisions(&p, &litchi_opc::SourceLimits::default())
+            .unwrap()
+            .unwrap(),
+        v
+    );
 }
 
 fn revision_user(id: i32, name: &str) -> RevisionUser {
@@ -149,7 +164,9 @@ fn revision_user(id: i32, name: &str) -> RevisionUser {
 }
 
 fn owner_bytes(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
-    let value = load_workbook_revisions(package).unwrap().unwrap();
+    let value = load_workbook_revisions(package, &package.read_limits())
+        .unwrap()
+        .unwrap();
     let workbook = package.main_document_part().unwrap();
     let mut parts = vec![(
         format!("{}::rels", workbook.partname()),
@@ -191,7 +208,7 @@ fn transaction_edits_one_typed_user() {
     let commit = transaction.commit().unwrap();
     assert!(commit.changed());
     assert_eq!(
-        load_workbook_revisions(&package)
+        load_workbook_revisions(&package, &package.read_limits())
             .unwrap()
             .unwrap()
             .users
@@ -204,7 +221,12 @@ fn transaction_edits_one_typed_user() {
             .snapshot()
             .source_xml("/xl/revisions/userNames.xml")
             .unwrap(),
-        write_revision_users(&RevisionUsers::default(), RevisionConformance::Strict).unwrap()
+        write_revision_users(
+            &RevisionUsers::default(),
+            RevisionConformance::Strict,
+            &package.read_limits(),
+        )
+        .unwrap()
     );
     let after = owner_bytes(&package);
     assert_ne!(after, before);
@@ -275,21 +297,64 @@ fn malformed_and_caps() {
         format!(r#"<!DOCTYPE x><revisions xmlns="{NS}"/>"#),
     ] {
         assert!(if x.contains("<users") {
-            parse_revision_users(x.as_bytes()).is_err()
+            parse_revision_users(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
         } else if x.contains("<headers") {
-            parse_revision_headers(x.as_bytes()).is_err()
+            parse_revision_headers(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
         } else {
-            parse_revision_log(x.as_bytes()).is_err()
+            parse_revision_log(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
         });
     }
-    assert!(parse_revision_log(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
+    assert!(
+        parse_revision_log(
+            &vec![b' '; MAX_PART_BYTES + 1],
+            &litchi_opc::SourceLimits::default(),
+        )
+        .is_err()
+    );
     let deep = format!(
         r#"<revisions xmlns="{NS}"><rcc>{}{}</rcc></revisions>"#,
         "<x>".repeat(MAX_DEPTH),
         "</x>".repeat(MAX_DEPTH)
     );
-    assert!(parse_revision_log(deep.as_bytes()).is_err());
+    assert!(parse_revision_log(deep.as_bytes(), &litchi_opc::SourceLimits::default()).is_err());
 }
+
+#[test]
+fn source_limits_bound_codec_input_and_output() {
+    let limits = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = parse_revision_log(
+        br#"<revisions xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+        &limits,
+    )
+    .expect_err("the caller's source part budget must be enforced");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Revisions(LimitKind::PartBytes),
+            maximum: 16,
+            ..
+        }
+    ));
+    let error = write_revision_users(
+        &RevisionUsers::default(),
+        RevisionConformance::Strict,
+        &limits,
+    )
+    .expect_err("the caller's source part budget must bound generated XML");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Revisions(LimitKind::PartBytes),
+            maximum: 16,
+            ..
+        }
+    ));
+}
+
 #[test]
 fn graph_and_reference_errors() {
     let mut v = value();
@@ -307,5 +372,5 @@ fn graph_and_reference_errors() {
             "rId2".into(),
             true,
         );
-    assert!(load_workbook_revisions(&p).is_err());
+    assert!(load_workbook_revisions(&p, &p.read_limits()).is_err());
 }

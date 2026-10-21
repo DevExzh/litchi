@@ -3,6 +3,7 @@
 use super::LimitKind;
 use crate::error::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
+use litchi_opc::SourceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -29,8 +30,8 @@ struct Node {
     text: String,
 }
 
-pub fn parse_revision_users(xml: &[u8]) -> Result<RevisionUsers> {
-    let root = parse_document(xml)?;
+pub fn parse_revision_users(xml: &[u8], limits: &SourceLimits) -> Result<RevisionUsers> {
+    let root = parse_document(xml, limits)?;
     let ns = root_ns(&root, "users")?;
     whitespace(&root)?;
     let count = required_u32_attr(&root, "count")? as usize;
@@ -77,8 +78,8 @@ pub fn parse_revision_users(xml: &[u8]) -> Result<RevisionUsers> {
     Ok(RevisionUsers { users })
 }
 
-pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
-    let root = parse_document(xml)?;
+pub fn parse_revision_headers(xml: &[u8], limits: &SourceLimits) -> Result<RevisionHeaders> {
+    let root = parse_document(xml, limits)?;
     let ns = root_ns(&root, "headers")?;
     whitespace(&root)?;
     let properties = RevisionHeaderProperties {
@@ -229,8 +230,8 @@ pub fn parse_revision_headers(xml: &[u8]) -> Result<RevisionHeaders> {
     })
 }
 
-pub fn parse_revision_log(xml: &[u8]) -> Result<RevisionLog> {
-    let root = parse_document(xml)?;
+pub fn parse_revision_log(xml: &[u8], limits: &SourceLimits) -> Result<RevisionLog> {
+    let root = parse_document(xml, limits)?;
     let ns = root_ns(&root, "revisions")?;
     whitespace(&root)?;
     only_attrs(&root, &[])?;
@@ -276,6 +277,7 @@ pub fn parse_revision_log(xml: &[u8]) -> Result<RevisionLog> {
 pub fn write_revision_users(
     value: &RevisionUsers,
     conformance: RevisionConformance,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     validate_users(value)?;
     let mut out = start("users", conformance);
@@ -298,12 +300,13 @@ pub fn write_revision_users(
         }
     }
     out.push_str("</users>");
-    finish(out)
+    finish(out, limits)
 }
 
 pub fn write_revision_headers(
     value: &RevisionHeaders,
     conformance: RevisionConformance,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     validate_headers(value)?;
     let mut out = start("headers", conformance);
@@ -354,18 +357,19 @@ pub fn write_revision_headers(
         out.push_str("</header>");
     }
     out.push_str("</headers>");
-    finish(out)
+    finish(out, limits)
 }
 
 pub fn write_revision_log(
     value: &RevisionLog,
     conformance: RevisionConformance,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     validate_log(value)?;
     let mut out = start("revisions", conformance);
     if value.records.is_empty() {
         out.push_str("/>");
-        return finish(out);
+        return finish(out, limits);
     }
     out.push('>');
     for record in &value.records {
@@ -392,23 +396,24 @@ pub fn write_revision_log(
         out.push('>');
     }
     out.push_str("</revisions>");
-    finish(out)
+    finish(out, limits)
 }
 
-fn parse_document(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_PART_BYTES {
+fn parse_document(xml: &[u8], limits: &SourceLimits) -> Result<Node> {
+    let max_part_bytes = limits.max_part_bytes().min(MAX_PART_BYTES as u64) as usize;
+    if xml.len() > max_part_bytes {
         return Err(Error::limit(
             LimitKind::PartBytes,
             xml.len(),
-            MAX_PART_BYTES,
+            max_part_bytes,
         ));
     }
     let processed = process_ooxml(xml)?;
-    if processed.len() > MAX_PART_BYTES {
+    if processed.len() > max_part_bytes {
         return Err(Error::limit(
             LimitKind::PartBytes,
             processed.len(),
-            MAX_PART_BYTES,
+            max_part_bytes,
         ));
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
@@ -600,9 +605,10 @@ fn start(name: &str, c: RevisionConformance) -> String {
         c.relationship_namespace()
     )
 }
-fn finish(s: String) -> Result<Vec<u8>> {
-    if s.len() > MAX_PART_BYTES {
-        Err(Error::limit(LimitKind::PartBytes, s.len(), MAX_PART_BYTES))
+fn finish(s: String, limits: &SourceLimits) -> Result<Vec<u8>> {
+    let max_part_bytes = limits.max_part_bytes().min(MAX_PART_BYTES as u64) as usize;
+    if s.len() > max_part_bytes {
+        Err(Error::limit(LimitKind::PartBytes, s.len(), max_part_bytes))
     } else {
         Ok(s.into_bytes())
     }
@@ -812,7 +818,8 @@ mod limit_tests {
                 "</node>".repeat(MAX_DEPTH)
             )
             .replacen("<node>", &format!("<node xmlns=\"{NS}\">"), 1);
-            let error = parse_document(xml.as_bytes()).expect_err("depth refusal");
+            let error = parse_document(xml.as_bytes(), &SourceLimits::default())
+                .expect_err("depth refusal");
             assert!(
                 matches!(error, Error::Limit {
                 kind: crate::LimitKind::Revisions(LimitKind::XmlDepth),
@@ -828,7 +835,7 @@ mod limit_tests {
                 "</node>".repeat(MAX_DEPTH - 1)
             )
             .replacen("<node>", &format!("<node xmlns=\"{NS}\">"), 1);
-            assert!(parse_document(within.as_bytes()).is_ok());
+            assert!(parse_document(within.as_bytes(), &SourceLimits::default()).is_ok());
         }
     }
 }

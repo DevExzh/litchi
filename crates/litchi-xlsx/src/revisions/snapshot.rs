@@ -25,7 +25,7 @@ pub struct Snapshot {
 impl Snapshot {
     /// Load and validate the revision graph from an OPC package.
     pub fn load(package: &OpcPackage) -> Result<Self> {
-        let revisions = load_workbook_revisions(package)?;
+        let revisions = load_workbook_revisions(package, &package.read_limits())?;
         let source = SourceState::capture(package, revisions.as_ref())?;
         Ok(Self { revisions, source })
     }
