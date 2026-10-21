@@ -106,7 +106,7 @@ Focused validation on this review tree:
 | `cargo test -p litchi-xlsb --all-features comments` | 18 passed |
 | `cargo test -p litchi-xlsb --all-features conditional` | 58 passed |
 | `cargo test -p litchi-xlsb --all-features --lib opc` | 13 passed |
-| `cargo test -p litchi-xlsb --all-features --lib` | 738 unit tests passed |
+| `cargo test -p litchi-xlsb --all-features --lib` | 741 unit tests passed |
 | `cargo test -p litchi-opc --all-features --lib` | 694 unit tests passed |
 | raw OPC lexical relationship and content-types regressions, including mixed and invalid-source inverse replay | passed |
 | source-backed metadata replay regression | passed |
@@ -417,8 +417,64 @@ reachable afterward. The recipient-edge regression test proves the converse:
 an unrelated inbound edge to a changed part forces eager projection
 revalidation. Root edits, reachable deltas, malformed targets, and dangling
 targets still use the full reparse path. Focused validation now passes 13 `opc`
-tests and the full XLSB library suite passes 741 tests. A new paired release
-ABBA, plus the final same-binary retained-history heap comparison, is required
-before this repair can be accepted.
+tests and the full XLSB library suite passes 741 tests. The corrected paired
+release ABBA and direct same-binary retained-history heap comparison are
+recorded in §10.
+
+## 10. Final closure-repair measurement and heap receipt
+
+The closure-traversal repair is measured from commit
+`3f085b89a6c3c0472bdfcc5287722b53ea2a98ee`. The baseline probe source hash
+is `74f2271ca386e08515e50f5b0d87e9b4d6e514e7284084179114d2571e794a44` and
+the candidate source hash is
+`65d0629300694e7bab1bbc15b053223e58f77db2832bf75523ac3ddf5b7615b4`. The
+release binaries were built into separate absolute target directories:
+
+| Binary | Size | SHA-256 |
+|---|---:|---|
+| `tgt-expanded-before-3f085b89a6/release/w4b-expanded-probe-before-v2` | 7,643,696 bytes | `c38df593f0083aa3c0379d67363796adeb4f97076976393b8f6dddd61e5bce01` |
+| `tgt-expanded-after-3f085b89a6/release/w4b-expanded-probe` | 7,489,816 bytes | `5cb9b6794318da9eaf19a57878b8c6d00a4b26d27cf66af2f555f3e3150efadb` |
+
+The isolated native run is outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-3f085b89a6-abba-20261021`.
+It used `taskset -c 29 <binary> 31`, in the order
+`before, after, after, before`; each route used 31 samples. Every leg reported
+the same exact preflight: `base_parts=7 after_parts=8 base_bytes=5155
+after_bytes=5320`. The table gives the range of the two leg medians and the
+ratio of their mean medians, in microseconds:
+
+| Case | Before leg range | After leg range | After / before |
+|---|---:|---:|---:|
+| `structural/commit` | 10.6180–10.6420 | 6.3620–6.5320 | 0.606491 |
+| `structural/commit_save` | 44.6122–46.0542 | 41.9622–41.9744 | 0.925774 |
+| `structural/forward_replay` | 72.5044–74.2204 | 67.4342–68.3904 | 0.925710 |
+| `structural/inverse_replay` | 75.6704–76.6986 | 75.1044–76.1486 | 0.992676 |
+| `history/retained128_build` | 4603.1260–4624.2160 | 2653.6150–2668.0050 | 0.576723 |
+
+The capture manifest hashes are recorded in the external `binaries.sha256`
+(`edd3306c0dd9206ef0a5258bfba838531952b9f088297803bfc762575ce0929f`) and
+`captures.sha256`
+(`a0340df3ef59c863b622b721f8ca60578773d70990e0ffa5be2e197b590825b6`).
+These native results close the inverse-replay regression identified in §9.
+
+The final retained-history heap receipt uses direct heaptrack invocation so
+the debuggee is the probe itself:
+`LITCHI_PROBE_ONLY=history/retained128_build taskset -c 29 heaptrack --output
+<capture> <binary> 1`. Its external directory is
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/history-heap-3f085b89a6-direct`;
+the four legs use the same `before, after, after, before` order. The
+`heaptrack_print` K/M units below are decimal. Baseline legs report
+594,916/594,920 allocation calls, 1,986/1,990 temporary allocations,
+4.40M peak heap and 15.13M/14.98M peak RSS. Candidate legs report
+210,153/210,154 allocation calls, 7,787/7,787 temporary allocations,
+748.15K peak heap and 9.94M/10.03M peak RSS. Each leg reports 544B leaked.
+Heaptrack timings are excluded from the native timing ratios above.
+
+The earlier directory
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/history-heap-3f085b89a6`
+is explicitly discarded: its command put `taskset` under heaptrack, and its
+reports contain only `taskset`/locale allocations with no `litchi_xlsb` stack.
+It contributes no heap claim. The direct captures in §4 and §6 invoke the
+probe as heaptrack's debuggee and remain the cited receipts.
 
 [0351]: 0351-api-contract.md
