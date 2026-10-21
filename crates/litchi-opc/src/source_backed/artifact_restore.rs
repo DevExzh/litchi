@@ -89,7 +89,6 @@ impl SourceBackedPackage {
         }
         let _monitored_current = self.source.monitor_publication();
         let _monitored_retained = retained.monitor_publication();
-        let mut use_heap_buffer = context.is_none();
         let _workspace = if let Some(context) = context.as_ref() {
             let requested = SOURCE_PUBLICATION_CHUNK_BYTES;
             match context.reserve(Resource::Memory, requested as u64) {
@@ -113,29 +112,12 @@ impl SourceBackedPackage {
         } else {
             None
         };
-        if _workspace.is_some() {
-            use_heap_buffer = true;
-        }
         const RESTORE_STACK_BYTES: usize = 4 * 1024;
         let mut stack_buffer = [0_u8; RESTORE_STACK_BYTES];
-        let mut heap_buffer = Vec::new();
-        let buffer: &mut [u8] = if use_heap_buffer {
-            heap_buffer
-                .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
-                .map_err(|source| OpcError::Allocation {
-                    resource: "exact artifact restore buffer",
-                    source,
-                })?;
-            if heap_buffer.capacity() > SOURCE_PUBLICATION_CHUNK_BYTES {
-                return Err(overlay_unavailable(
-                    "exact artifact restore allocation exceeds its reserved window",
-                ));
-            }
-            heap_buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
-            heap_buffer.as_mut_slice()
-        } else {
-            &mut stack_buffer
-        };
+        // Keep the managed 64 KiB reservation and its refusal boundary above,
+        // but use the bounded stack window for the actual reads. This avoids
+        // one heap buffer per exact inverse while retaining recipient policy.
+        let buffer: &mut [u8] = &mut stack_buffer;
         let current_hash =
             fingerprint_inverse_snapshot(self, &self.source, retained, context.as_ref(), buffer)?;
         if current_hash != proof.current_sha256 {

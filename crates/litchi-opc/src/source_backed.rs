@@ -4301,7 +4301,6 @@ impl SourceArtifact {
                 .min(SOURCE_PUBLICATION_CHUNK_BYTES as u64),
         )
         .map_err(|_| overlay_unavailable("source length does not fit this platform"))?;
-        let mut use_heap_buffer = chunk_bytes != 0 && self.snapshot.context.is_none();
         let _workspace_reservation = if chunk_bytes == 0 {
             None
         } else if let Some(context) = self.snapshot.context.as_ref() {
@@ -4332,31 +4331,14 @@ impl SourceArtifact {
         } else {
             None
         };
-        if _workspace_reservation.is_some() {
-            use_heap_buffer = true;
-        }
         let mut hasher = Sha256::new();
         const FINGERPRINT_STACK_BYTES: usize = 4 * 1024;
         let mut stack_buffer = [0_u8; FINGERPRINT_STACK_BYTES];
-        let mut heap_buffer = Vec::new();
-        let buffer: &mut [u8] = if use_heap_buffer {
-            heap_buffer
-                .try_reserve_exact(chunk_bytes)
-                .map_err(|source| OpcError::Allocation {
-                    resource: "source artifact fingerprint buffer",
-                    source,
-                })?;
-            if heap_buffer.capacity() != chunk_bytes {
-                return Err(overlay_unavailable(
-                    "source artifact fingerprint allocation reported capacity beyond its reservation",
-                ));
-            }
-            heap_buffer.resize(chunk_bytes, 0);
-            heap_buffer.as_mut_slice()
-        } else {
-            let length = chunk_bytes.min(FINGERPRINT_STACK_BYTES);
-            &mut stack_buffer[..length]
-        };
+        // The managed reservation above keeps the historical admission
+        // policy and refusal boundary. The bytes themselves live in a fixed
+        // stack window so repeated authentication does not retain a heap
+        // allocation for every deferred replay.
+        let buffer: &mut [u8] = &mut stack_buffer[..chunk_bytes.min(FINGERPRINT_STACK_BYTES)];
         let mut offset = 0_u64;
         while offset < self.snapshot.length {
             let remaining =
