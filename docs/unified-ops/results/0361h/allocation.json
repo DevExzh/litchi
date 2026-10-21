@@ -1,0 +1,861 @@
+{
+  "status": "v2 returned; v3 allocation improvement; native pending",
+  "candidates": [
+    {
+      "candidate": "base",
+      "manifest": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-base/manifest.json",
+        "bytes": 4943,
+        "sha256": "c455c9fff951e8f0c47baaed79538d56fabcd067c1cacbfa1c04d09abacde6b0"
+      },
+      "binary": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+        "bytes": 2244440,
+        "sha256": "f8be7484ea4f3a80abfac227708c826baacd537eef7a047ecdc1342038219826"
+      },
+      "claim": "Allocation counts only; concurrent builds present; no latency or process RSS claim.",
+      "time_ns": 1792621846280266545,
+      "rows": [
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "runs",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 700,
+            "requested_bytes": 67200,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "styles",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 800,
+            "requested_bytes": 73600,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "restyle",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 2200,
+            "requested_bytes": 125000,
+            "peak_live_bytes": 554,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "stylesheet",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 1200,
+            "requested_bytes": 109300,
+            "peak_live_bytes": 570,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "runs",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 13900,
+            "requested_bytes": 1833600,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "styles",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 14100,
+            "requested_bytes": 1852800,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "restyle",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 28700,
+            "requested_bytes": 2942700,
+            "peak_live_bytes": 7579,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "stylesheet",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 7900,
+            "requested_bytes": 2491400,
+            "peak_live_bytes": 12484,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "variation",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "variation",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 1400,
+            "requested_bytes": 30400,
+            "peak_live_bytes": 144,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "properties",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "properties",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 600,
+            "requested_bytes": 68100,
+            "peak_live_bytes": 393,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "parent",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "parent",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 300,
+            "requested_bytes": 28800,
+            "peak_live_bytes": 192,
+            "retained_bytes": 0
+          }
+        }
+      ]
+    },
+    {
+      "candidate": "v2",
+      "manifest": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-v2/manifest.json",
+        "bytes": 8191,
+        "sha256": "09bd9bdf8af01f20ac3f850f5d747d829bf4d72f51fcf26d16bb06ecbbc41935"
+      },
+      "binary": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+        "bytes": 2252600,
+        "sha256": "d71b8921c3a8df839545a90979d32e0d5b6106306f8399cdaac2fd9926acd9af"
+      },
+      "claim": "Allocation counts only; concurrent builds present; no latency or process RSS claim.",
+      "time_ns": 1792621975923157456,
+      "rows": [
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "runs",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 700,
+            "requested_bytes": 67200,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "styles",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 800,
+            "requested_bytes": 73600,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "restyle",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 1800,
+            "requested_bytes": 132700,
+            "peak_live_bytes": 622,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "stylesheet",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 1100,
+            "requested_bytes": 96400,
+            "peak_live_bytes": 416,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "runs",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 13900,
+            "requested_bytes": 1833600,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "styles",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 14100,
+            "requested_bytes": 1852800,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "restyle",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 22200,
+            "requested_bytes": 3068400,
+            "peak_live_bytes": 7852,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "stylesheet",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 8200,
+            "requested_bytes": 2261600,
+            "peak_live_bytes": 8192,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "variation",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "variation",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 1200,
+            "requested_bytes": 30000,
+            "peak_live_bytes": 144,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "properties",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "properties",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 600,
+            "requested_bytes": 68100,
+            "peak_live_bytes": 393,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "parent",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "parent",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 300,
+            "requested_bytes": 28800,
+            "peak_live_bytes": 192,
+            "retained_bytes": 0
+          }
+        }
+      ],
+      "fidelity": [
+        {
+          "size": 2,
+          "name": "parent.txt",
+          "bytes": 9,
+          "sha256": "00ff1a6ad64c3f7071aac4d3e478ef84018f0dcdcd722841a6fc042f815ed0f0"
+        },
+        {
+          "size": 2,
+          "name": "properties.txt",
+          "bytes": 189,
+          "sha256": "158e2c313d79b06e244c7def4648049568b686644a6c5ae639f29fa1910f318c"
+        },
+        {
+          "size": 2,
+          "name": "registered.bin",
+          "bytes": 172,
+          "sha256": "49a0e5408ec1cf42cfe49312e3599f3bc2138220b877c6f06f439c47b04e81c4"
+        },
+        {
+          "size": 2,
+          "name": "restyled.bin",
+          "bytes": 186,
+          "sha256": "4a96b5b19d9f5cd36dad1d1c2dd7912064e8cec123e401ddc979558d5e739032"
+        },
+        {
+          "size": 2,
+          "name": "runs.txt",
+          "bytes": 90,
+          "sha256": "5b686fc73d9ba3a87b3b2506ac1a624ed06ca228507c101b8efa2e40d7f7f344"
+        },
+        {
+          "size": 2,
+          "name": "storage.bin",
+          "bytes": 168,
+          "sha256": "2f54787483bba4f8c08c6896dfd9de7fe4e208e404261b1cd93689138f6877bc"
+        },
+        {
+          "size": 2,
+          "name": "style.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 2,
+          "name": "styles.txt",
+          "bytes": 22,
+          "sha256": "0027d13f7d43fce13b4945ed27be099038b416c2d6c4703ed72f0524b1a97d78"
+        },
+        {
+          "size": 2,
+          "name": "stylesheet.bin",
+          "bytes": 162,
+          "sha256": "9f37c81d6b48740a4d05458a602c5e43cc324397ee42be7c610e5902a76cf56f"
+        },
+        {
+          "size": 2,
+          "name": "variation.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 64,
+          "name": "parent.txt",
+          "bytes": 9,
+          "sha256": "00ff1a6ad64c3f7071aac4d3e478ef84018f0dcdcd722841a6fc042f815ed0f0"
+        },
+        {
+          "size": 64,
+          "name": "properties.txt",
+          "bytes": 189,
+          "sha256": "158e2c313d79b06e244c7def4648049568b686644a6c5ae639f29fa1910f318c"
+        },
+        {
+          "size": 64,
+          "name": "registered.bin",
+          "bytes": 1174,
+          "sha256": "eb5557ede94855e0e9146e21fd3da521caf65d831a79061191e1ec7e161cfc71"
+        },
+        {
+          "size": 64,
+          "name": "restyled.bin",
+          "bytes": 1291,
+          "sha256": "df277c95cab4387dc25a65868c23c2aabf919eb013927db6adb6d00ee074bfd6"
+        },
+        {
+          "size": 64,
+          "name": "runs.txt",
+          "bytes": 2993,
+          "sha256": "baac98b1b03f2cb2cdfaa3be4fa2dafc78e6250e4d3f0c6250403d73e096706f"
+        },
+        {
+          "size": 64,
+          "name": "storage.bin",
+          "bytes": 1210,
+          "sha256": "eec9cae7a0f47104558f289ab723b99fafd64c0690b3fd9c0564db33bb5f49d5"
+        },
+        {
+          "size": 64,
+          "name": "style.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 64,
+          "name": "styles.txt",
+          "bytes": 88,
+          "sha256": "eb69060a82b0bf5a2e943dbb528f3e66beffc3da86fbe7800313892287d943b5"
+        },
+        {
+          "size": 64,
+          "name": "stylesheet.bin",
+          "bytes": 1164,
+          "sha256": "f9e589424e63f641f64ac34a7af454292151fa4f8c1c5559b46d0488ccef524d"
+        },
+        {
+          "size": 64,
+          "name": "variation.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        }
+      ]
+    },
+    {
+      "candidate": "v3",
+      "manifest": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-v3/manifest.json",
+        "bytes": 8186,
+        "sha256": "dd6313a395ad4a26fcbcf68fa67976ea0c1d97b67e61871f07fb641c28de82cb"
+      },
+      "binary": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+        "bytes": 2252296,
+        "sha256": "7823d60fe24185ffe6eed817945160238757fe9d0039218ba02fab4c708f128f"
+      },
+      "claim": "Allocation counts only; concurrent builds present; no latency or process RSS claim.",
+      "time_ns": 1792622343496563423,
+      "rows": [
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "runs",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 700,
+            "requested_bytes": 67200,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "styles",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 800,
+            "requested_bytes": 73600,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "restyle",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 1000,
+            "requested_bytes": 98800,
+            "peak_live_bytes": 480,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "stylesheet",
+            "2",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 2,
+            "count": 100,
+            "allocation_calls": 700,
+            "requested_bytes": 84400,
+            "peak_live_bytes": 384,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "runs",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "runs",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 13900,
+            "requested_bytes": 1833600,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "styles",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "styles",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 14100,
+            "requested_bytes": 1852800,
+            "peak_live_bytes": 3360,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "restyle",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "restyle",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 14700,
+            "requested_bytes": 2631600,
+            "peak_live_bytes": 4704,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "stylesheet",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "stylesheet",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 7400,
+            "requested_bytes": 1970200,
+            "peak_live_bytes": 7318,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "variation",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "variation",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 100,
+            "requested_bytes": 6400,
+            "peak_live_bytes": 64,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "properties",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "properties",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 600,
+            "requested_bytes": 68100,
+            "peak_live_bytes": 393,
+            "retained_bytes": 0
+          }
+        },
+        {
+          "command": [
+            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "parent",
+            "64",
+            "100"
+          ],
+          "result": {
+            "route": "parent",
+            "runs": 64,
+            "count": 100,
+            "allocation_calls": 300,
+            "requested_bytes": 28800,
+            "peak_live_bytes": 192,
+            "retained_bytes": 0
+          }
+        }
+      ],
+      "fidelity": [
+        {
+          "size": 2,
+          "name": "parent.txt",
+          "bytes": 9,
+          "sha256": "00ff1a6ad64c3f7071aac4d3e478ef84018f0dcdcd722841a6fc042f815ed0f0"
+        },
+        {
+          "size": 2,
+          "name": "properties.txt",
+          "bytes": 189,
+          "sha256": "158e2c313d79b06e244c7def4648049568b686644a6c5ae639f29fa1910f318c"
+        },
+        {
+          "size": 2,
+          "name": "registered.bin",
+          "bytes": 172,
+          "sha256": "49a0e5408ec1cf42cfe49312e3599f3bc2138220b877c6f06f439c47b04e81c4"
+        },
+        {
+          "size": 2,
+          "name": "restyled.bin",
+          "bytes": 186,
+          "sha256": "4a96b5b19d9f5cd36dad1d1c2dd7912064e8cec123e401ddc979558d5e739032"
+        },
+        {
+          "size": 2,
+          "name": "runs.txt",
+          "bytes": 90,
+          "sha256": "5b686fc73d9ba3a87b3b2506ac1a624ed06ca228507c101b8efa2e40d7f7f344"
+        },
+        {
+          "size": 2,
+          "name": "storage.bin",
+          "bytes": 168,
+          "sha256": "2f54787483bba4f8c08c6896dfd9de7fe4e208e404261b1cd93689138f6877bc"
+        },
+        {
+          "size": 2,
+          "name": "style.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 2,
+          "name": "styles.txt",
+          "bytes": 22,
+          "sha256": "0027d13f7d43fce13b4945ed27be099038b416c2d6c4703ed72f0524b1a97d78"
+        },
+        {
+          "size": 2,
+          "name": "stylesheet.bin",
+          "bytes": 162,
+          "sha256": "9f37c81d6b48740a4d05458a602c5e43cc324397ee42be7c610e5902a76cf56f"
+        },
+        {
+          "size": 2,
+          "name": "variation.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 64,
+          "name": "parent.txt",
+          "bytes": 9,
+          "sha256": "00ff1a6ad64c3f7071aac4d3e478ef84018f0dcdcd722841a6fc042f815ed0f0"
+        },
+        {
+          "size": 64,
+          "name": "properties.txt",
+          "bytes": 189,
+          "sha256": "158e2c313d79b06e244c7def4648049568b686644a6c5ae639f29fa1910f318c"
+        },
+        {
+          "size": 64,
+          "name": "registered.bin",
+          "bytes": 1174,
+          "sha256": "eb5557ede94855e0e9146e21fd3da521caf65d831a79061191e1ec7e161cfc71"
+        },
+        {
+          "size": 64,
+          "name": "restyled.bin",
+          "bytes": 1291,
+          "sha256": "df277c95cab4387dc25a65868c23c2aabf919eb013927db6adb6d00ee074bfd6"
+        },
+        {
+          "size": 64,
+          "name": "runs.txt",
+          "bytes": 2993,
+          "sha256": "baac98b1b03f2cb2cdfaa3be4fa2dafc78e6250e4d3f0c6250403d73e096706f"
+        },
+        {
+          "size": 64,
+          "name": "storage.bin",
+          "bytes": 1210,
+          "sha256": "eec9cae7a0f47104558f289ab723b99fafd64c0690b3fd9c0564db33bb5f49d5"
+        },
+        {
+          "size": 64,
+          "name": "style.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        },
+        {
+          "size": 64,
+          "name": "styles.txt",
+          "bytes": 88,
+          "sha256": "eb69060a82b0bf5a2e943dbb528f3e66beffc3da86fbe7800313892287d943b5"
+        },
+        {
+          "size": 64,
+          "name": "stylesheet.bin",
+          "bytes": 1164,
+          "sha256": "f9e589424e63f641f64ac34a7af454292151fa4f8c1c5559b46d0488ccef524d"
+        },
+        {
+          "size": 64,
+          "name": "variation.bin",
+          "bytes": 64,
+          "sha256": "9dad39ade70651069d879cdbec38be5b0d71d2508496695e328b70cbf65d5814"
+        }
+      ]
+    }
+  ]
+}

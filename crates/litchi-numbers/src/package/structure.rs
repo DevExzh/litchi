@@ -646,7 +646,7 @@ impl Artifacts {
 /// `UnsupportedDependency`, `LimitExceeded`, `Allocation` and
 /// `Verification`).
 macro_rules! structural_family {
-    ($family:literal) => {
+    ($family:literal $(, $wire_variant:ident($wire_kind:ty))?) => {
         /// A finite resource governed by the transaction.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[non_exhaustive]
@@ -657,6 +657,10 @@ macro_rules! structural_family {
             PayloadBytes,
             /// Native object identifiers.
             Identifiers,
+            $(
+                /// A bounded wire operation performed by this family.
+                $wire_variant($wire_kind),
+            )?
         }
 
         impl ::std::fmt::Display for LimitKind {
@@ -665,6 +669,7 @@ macro_rules! structural_family {
                     Self::PackageBytes => "package bytes",
                     Self::PayloadBytes => "payload bytes",
                     Self::Identifiers => "object identifiers",
+                    $(Self::$wire_variant(kind) => return ::std::fmt::Display::fmt(kind, formatter),)?
                 })
             }
         }

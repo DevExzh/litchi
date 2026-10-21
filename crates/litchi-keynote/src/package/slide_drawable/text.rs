@@ -254,9 +254,9 @@ fn effective_style(
         current = source
             .get(identifier)
             .and_then(|object| unique_message(object, CHARACTER_STYLE).ok())
-            .map(|(_, payload)| litchi_iwa_text_wire::character_style_parent(payload))
+            .map(|(_, payload)| litchi_iwa_text_wire::character_style_parent(payload, wire))
             .transpose()
-            .map_err(|_error| StructureError::Malformed)?
+            .map_err(StructureError::from)?
             .flatten();
     }
     Ok(style)
