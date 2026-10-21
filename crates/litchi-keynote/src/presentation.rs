@@ -486,11 +486,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::SourceChanged { .. }
         | litchi_iwa_archive::Error::DirectoryChanged { .. } => Error::InvalidSource,
-        litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidFormat,
+        _ => Error::InvalidFormat,
     }
 }
 
@@ -511,10 +507,7 @@ fn map_iwa_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidFormat,
+        _ => Error::InvalidFormat,
     }
 }
 

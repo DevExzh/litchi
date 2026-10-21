@@ -108,13 +108,7 @@ fn map_transaction_snappy_error(
             observed: budget.work.saturating_add(observed) as u64,
             maximum: budget.max_work as u64,
         },
-        other @ (litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::Limit { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. }
-        | litchi_iwa_core::Error::Allocation { .. }) => map_core_error(other),
+        other => map_core_error(other),
     }
 }
 

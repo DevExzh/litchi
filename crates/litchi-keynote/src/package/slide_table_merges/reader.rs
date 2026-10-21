@@ -259,15 +259,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
             maximum,
         },
         ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
-        ArchiveError::Io(_)
-        | ArchiveError::Zip { .. }
-        | ArchiveError::Iwa(_)
-        | ArchiveError::InvalidLimits(_)
-        | ArchiveError::Encrypted
-        | ArchiveError::SourceChanged { .. }
-        | ArchiveError::DirectoryChanged { .. }
-        | ArchiveError::Reassembly(_)
-        | ArchiveError::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

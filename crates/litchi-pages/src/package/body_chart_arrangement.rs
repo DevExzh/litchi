@@ -3065,13 +3065,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
         ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Iwa(error) => map_core_error(error),
         ArchiveError::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
-        ArchiveError::Io(_)
-        | ArchiveError::Zip { .. }
-        | ArchiveError::InvalidLimits(_)
-        | ArchiveError::Encrypted
-        | ArchiveError::SourceChanged { .. }
-        | ArchiveError::DirectoryChanged { .. }
-        | ArchiveError::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

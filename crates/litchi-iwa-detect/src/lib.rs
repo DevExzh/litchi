@@ -204,9 +204,7 @@ impl From<litchi_iwa_core::Error> for Error {
             litchi_iwa_core::Error::Allocation { requested, .. } => {
                 Self::Allocation { amount: requested }
             },
-            other @ (litchi_iwa_core::Error::InvalidArchive { .. }
-            | litchi_iwa_core::Error::HeaderCodec { .. }
-            | litchi_iwa_core::Error::Snappy { .. }) => Self::IwaCore(other),
+            other => Self::IwaCore(other),
         }
     }
 }
@@ -1694,6 +1692,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Reassembly(message) => {
             Error::Archive(format!("iWork archive reassembly: {message}"))
         },
+        _ => Error::Archive("iWork archive ingress rejected the source".to_owned()),
     }
 }
 
