@@ -26,10 +26,10 @@ const OLE_DATA_SOURCE_RELATIONSHIP_TYPES: &[&str] = &[
 ];
 
 #[derive(Debug)]
-struct MergeBlockLayout {
-    ranges: Vec<MergedCell>,
-    block_span: Option<(usize, usize)>,
-    insertion_offset: usize,
+pub(crate) struct MergeBlockLayout {
+    pub(crate) ranges: Vec<MergedCell>,
+    pub(crate) block_span: Option<(usize, usize)>,
+    pub(crate) insertion_offset: usize,
 }
 
 impl Workbook {
@@ -44,46 +44,10 @@ impl Workbook {
         .collect())
     }
 
-    /// Atomically replace workbook slicer caches.
-    pub fn set_slicer_caches(&mut self, caches: Vec<crate::slicer::Cache>) -> Result<()> {
-        self.edit_opc(|package| {
-            let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-            crate::slicer::package::store_caches(package, &workbook, &caches)
-        })
-    }
-
-    /// Remove all workbook slicer caches. Returns whether any were present.
-    pub fn remove_slicer_caches(&mut self) -> Result<bool> {
-        let had = !self.slicer_caches()?.is_empty();
-        if had {
-            self.set_slicer_caches(Vec::new())?;
-        }
-        Ok(had)
-    }
-
     /// Return inert slicer views attached to one worksheet.
     pub fn slicers(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
         Ok(crate::slicer::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
-    }
-
-    /// Atomically replace one worksheet's slicer views.
-    pub fn set_slicers(
-        &mut self,
-        worksheet_index: usize,
-        views: crate::slicer::Views,
-    ) -> Result<()> {
-        let worksheet = self.worksheet_uri(worksheet_index)?;
-        self.edit_opc(|package| crate::slicer::package::store_views(package, &worksheet, &views))
-    }
-
-    /// Remove one worksheet's slicer views. Returns whether a part was present.
-    pub fn remove_slicers(&mut self, worksheet_index: usize) -> Result<bool> {
-        let had = self.slicers(worksheet_index)?.is_some();
-        if had {
-            self.set_slicers(worksheet_index, crate::slicer::Views::new())?;
-        }
-        Ok(had)
     }
 
     /// Return inert timeline cache snapshots in workbook relationship order.
@@ -97,46 +61,10 @@ impl Workbook {
         .collect())
     }
 
-    /// Atomically replace workbook timeline caches.
-    pub fn set_timeline_caches(&mut self, caches: Vec<crate::timeline::Cache>) -> Result<()> {
-        self.edit_opc(|package| {
-            let workbook = litchi_opc::PackURI::new("/xl/workbook.bin")?;
-            crate::timeline::package::store_caches(package, &workbook, &caches)
-        })
-    }
-
-    /// Remove all workbook timeline caches. Returns whether any were present.
-    pub fn remove_timeline_caches(&mut self) -> Result<bool> {
-        let had = !self.timeline_caches()?.is_empty();
-        if had {
-            self.set_timeline_caches(Vec::new())?;
-        }
-        Ok(had)
-    }
-
     /// Return inert timeline views attached to one worksheet.
     pub fn timelines(&self, worksheet_index: usize) -> Result<Option<crate::timeline::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
         Ok(crate::timeline::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
-    }
-
-    /// Atomically replace one worksheet's timeline views.
-    pub fn set_timelines(
-        &mut self,
-        worksheet_index: usize,
-        views: crate::timeline::Views,
-    ) -> Result<()> {
-        let worksheet = self.worksheet_uri(worksheet_index)?;
-        self.edit_opc(|package| crate::timeline::package::store_views(package, &worksheet, &views))
-    }
-
-    /// Remove one worksheet's timeline views. Returns whether a part was present.
-    pub fn remove_timelines(&mut self, worksheet_index: usize) -> Result<bool> {
-        let had = self.timelines(worksheet_index)?.is_some();
-        if had {
-            self.set_timelines(worksheet_index, crate::timeline::Views::new())?;
-        }
-        Ok(had)
     }
 
     /// Return the typed Scenario Manager stored in one worksheet, if any.
@@ -161,66 +89,8 @@ impl Workbook {
         self.scenarios(index)
     }
 
-    /// Atomically replace or add a worksheet's Scenario Manager.
-    ///
-    /// The scenario owner validates the complete candidate worksheet before
-    /// this method publishes it. Existing record order and opaque records are
-    /// retained by the owner; malformed or ambiguous structure is refused.
-    pub fn set_scenarios(
-        &mut self,
-        worksheet_index: usize,
-        scenarios: crate::package::scenarios::Manager,
-    ) -> Result<()> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        let original = self.package.get_part(&uri)?.blob().to_vec();
-        let updated = crate::package::scenarios::replace_worksheet(&original, Some(&scenarios))?;
-        crate::package::scenarios::parse_worksheet(&updated)?;
-        if updated == original {
-            return Ok(());
-        }
-        self.edit_opc(|package| {
-            crate::worksheet_index::maintain(package, &uri, &original, &updated)?;
-            package.get_part_mut(&uri)?.set_blob(updated);
-            Ok(())
-        })
-    }
-
-    /// Atomically remove a worksheet's Scenario Manager.
-    ///
-    /// Returns `true` only when a scenario collection was removed. Unknown
-    /// worksheet records remain byte-for-byte in their original order.
-    pub fn remove_scenarios(&mut self, worksheet_index: usize) -> Result<bool> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        let original = self.package.get_part(&uri)?.blob().to_vec();
-        let updated = crate::package::scenarios::replace_worksheet(&original, None)?;
-        if updated == original {
-            return Ok(false);
-        }
-        crate::package::scenarios::parse_worksheet(&updated)?;
-        self.edit_opc(|package| {
-            crate::worksheet_index::maintain(package, &uri, &original, &updated)?;
-            package.get_part_mut(&uri)?.set_blob(updated);
-            Ok(())
-        })?;
-        Ok(true)
-    }
-
-    /// Atomically replace or add a worksheet's Scenario Manager by name.
-    pub fn set_scenarios_by_name(
-        &mut self,
-        worksheet_name: &str,
-        scenarios: crate::package::scenarios::Manager,
-    ) -> Result<()> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.set_scenarios(index, scenarios)
-    }
-
-    /// Remove a worksheet's Scenario Manager by name.
-    pub fn remove_scenarios_by_name(&mut self, worksheet_name: &str) -> Result<bool> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.remove_scenarios(index)
-    }
-
+    /// List the merged ranges of the worksheet at worksheet ordinal
+    /// `worksheet_index`.
     pub fn merged_cell_ranges(&self, worksheet_index: usize) -> Result<Vec<MergedCell>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;
@@ -232,8 +102,9 @@ impl Workbook {
         self.merged_cell_ranges(self.worksheet_index(worksheet_name)?)
     }
 
-    /// Atomically replace all merged ranges in a worksheet selected by index.
-    pub fn set_merged_cell_ranges(
+    /// Replace all merged ranges of a worksheet in place (the structural
+    /// replay seam of [`crate::cell_values::structure`]).
+    pub(crate) fn set_merged_cell_ranges(
         &mut self,
         worksheet_index: usize,
         ranges: &[MergedCell],
@@ -246,15 +117,7 @@ impl Workbook {
         let (start, end) = layout
             .block_span
             .unwrap_or((layout.insertion_offset, layout.insertion_offset));
-        let capacity = original
-            .len()
-            .checked_sub(end - start)
-            .and_then(|value| value.checked_add(replacement.len()))
-            .ok_or(crate::package::error::Error::InvalidLength {
-                expected: usize::MAX,
-                found: original.len(),
-            })?;
-        let mut updated = Vec::with_capacity(capacity);
+        let mut updated = Vec::with_capacity(original.len() - (end - start) + replacement.len());
         updated.extend_from_slice(&original[..start]);
         updated.extend_from_slice(&replacement);
         updated.extend_from_slice(&original[end..]);
@@ -267,73 +130,6 @@ impl Workbook {
             package.get_part_mut(&uri)?.set_blob(updated);
             Ok(())
         })
-    }
-
-    /// Atomically replace all merged ranges in a worksheet selected by name.
-    pub fn set_merged_cell_ranges_by_name(
-        &mut self,
-        worksheet_name: &str,
-        ranges: &[MergedCell],
-    ) -> Result<()> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.set_merged_cell_ranges(index, ranges)
-    }
-
-    /// Atomically add one merged range to a worksheet selected by index.
-    pub fn add_merged_cell_range(
-        &mut self,
-        worksheet_index: usize,
-        range: MergedCell,
-    ) -> Result<()> {
-        let mut ranges = self.merged_cell_ranges(worksheet_index)?;
-        ranges.push(range);
-        self.set_merged_cell_ranges(worksheet_index, &ranges)
-    }
-
-    /// Atomically add one merged range to a worksheet selected by name.
-    pub fn add_merged_cell_range_by_name(
-        &mut self,
-        worksheet_name: &str,
-        range: MergedCell,
-    ) -> Result<()> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.add_merged_cell_range(index, range)
-    }
-
-    /// Atomically remove an exact merged range from a worksheet by index.
-    pub fn remove_merged_cell_range(
-        &mut self,
-        worksheet_index: usize,
-        range: &MergedCell,
-    ) -> Result<bool> {
-        let mut ranges = self.merged_cell_ranges(worksheet_index)?;
-        let Some(index) = ranges.iter().position(|candidate| candidate == range) else {
-            return Ok(false);
-        };
-        ranges.remove(index);
-        self.set_merged_cell_ranges(worksheet_index, &ranges)?;
-        Ok(true)
-    }
-
-    /// Atomically remove an exact merged range from a worksheet by name.
-    pub fn remove_merged_cell_range_by_name(
-        &mut self,
-        worksheet_name: &str,
-        range: &MergedCell,
-    ) -> Result<bool> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.remove_merged_cell_range(index, range)
-    }
-
-    /// Atomically clear all merged ranges in a worksheet selected by index.
-    pub fn clear_merged_cell_ranges(&mut self, worksheet_index: usize) -> Result<()> {
-        self.set_merged_cell_ranges(worksheet_index, &[])
-    }
-
-    /// Atomically clear all merged ranges in a worksheet selected by name.
-    pub fn clear_merged_cell_ranges_by_name(&mut self, worksheet_name: &str) -> Result<()> {
-        let index = self.worksheet_index(worksheet_name)?;
-        self.clear_merged_cell_ranges(index)
     }
 
     /// Open an XLSB workbook from a reader
@@ -389,7 +185,7 @@ impl Workbook {
         )
     }
 
-    fn normalize_merge_ranges(ranges: &[MergedCell]) -> Result<Vec<MergedCell>> {
+    pub(crate) fn normalize_merge_ranges(ranges: &[MergedCell]) -> Result<Vec<MergedCell>> {
         if ranges.len() > MAX_MERGED_CELL_RANGES {
             return Err(crate::package::error::Error::InvalidLength {
                 expected: MAX_MERGED_CELL_RANGES,
@@ -474,7 +270,7 @@ impl Workbook {
         )
     }
 
-    fn inspect_merge_block(data: &[u8]) -> Result<MergeBlockLayout> {
+    pub(crate) fn inspect_merge_block(data: &[u8]) -> Result<MergeBlockLayout> {
         let mut records = Records::new(data);
         let mut begin_offset = None;
         let mut block_span = None;
@@ -612,7 +408,7 @@ impl Workbook {
         })
     }
 
-    fn serialize_merge_block(ranges: &[MergedCell]) -> Result<Vec<u8>> {
+    pub(crate) fn serialize_merge_block(ranges: &[MergedCell]) -> Result<Vec<u8>> {
         if ranges.is_empty() {
             return Ok(Vec::new());
         }

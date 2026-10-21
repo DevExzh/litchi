@@ -11,6 +11,8 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
+use litchi_xlsb::builder::{self, Builder, ChartAnchor, Image, ImageFormat};
+use litchi_xlsb::builder::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, LimitKind, Patch};
 use litchi_xlsb::cell_values::{
     CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
@@ -25,13 +27,15 @@ use litchi_xlsb::shapes::{
     Preset,
 };
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
-use litchi_xlsb::writer::{Builder, ChartAnchor, Image, ImageFormat, MutableWorksheet};
-use litchi_xlsb::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 use litchi_xlsb::{Package, Workbook};
 use litchi_xlsb::{Parser, TableColumns, TableDataType, TableReference, TableRowType, Token};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _};
 
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -40,7 +44,7 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
-    let mut sheet = MutableWorksheet::new(name);
+    let mut sheet = builder::Worksheet::new(name);
     if let Some(value) = initial_value {
         sheet.set_cell(0, 0, value);
     }
@@ -101,7 +105,7 @@ fn workbook_with_bundle_suffix(workbook: &Workbook, suffix: &[u8]) -> Workbook {
         .set_blob(rewritten);
     Package::from_opc(package)
         .expect("suffix-tolerant package")
-        .into_workbook()
+        .owned_workbook()
         .expect("suffix-tolerant workbook")
 }
 
@@ -161,7 +165,7 @@ fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
         .set_blob(rewritten);
     Package::from_opc(package)
         .expect("unpaired-name package")
-        .into_workbook()
+        .owned_workbook()
         .expect("unpaired-name workbook")
 }
 
@@ -169,15 +173,16 @@ fn assert_limit(error: PackageError, expected: LimitKind) {
     let PackageError::Limit { kind, .. } = error else {
         panic!("expected typed limit error, got {error:?}");
     };
-    assert_eq!(kind, expected);
+    assert_eq!(kind, expected.into());
 }
 
 fn publish_structure_patch(workbook: &mut Workbook, patch: &Patch) {
     *workbook = workbook
         .to_package()
         .apply(patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("publish structure patch")
-        .into_workbook()
+        .owned_workbook()
         .expect("reopen published structure patch");
 }
 
@@ -230,7 +235,7 @@ fn shape_graph_workbook(name: &str) -> Workbook {
             site: 2,
         },
     );
-    let mut sheet = MutableWorksheet::new(name);
+    let mut sheet = builder::Worksheet::new(name);
     sheet
         .add_shape(ShapeSpec::shape(
             "Standalone",
@@ -336,7 +341,7 @@ fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, Str
 }
 
 fn formula_dependency_workbook(source_order: bool) -> Workbook {
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "Region");
     data.set_cell(0, 1, "Amount");
     data.set_cell(1, 0, "North");
@@ -368,7 +373,7 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
         ..Table::default()
     })
     .expect("valid structured table");
-    let mut summary = MutableWorksheet::new("Summary");
+    let mut summary = builder::Worksheet::new("Summary");
     summary.set_cell(
         0,
         0,
@@ -433,7 +438,9 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
         .expect("durable patch");
     let decoded =
         Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("validated durable patch");
-    decoded.apply(&mut target).expect("atomic publication");
+    target
+        .apply_structure(&decoded)
+        .expect("atomic publication");
 
     assert_eq!(target.worksheet_names(), &["Imported".to_string()]);
     let snapshot = target.cell_values(0).expect("target cells");
@@ -550,7 +557,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .expect("durable resources");
     let patch =
         Patch::from_bytes(&bytes, TransferLimits::DEFAULT).expect("durable resource replay");
-    patch.apply(&mut workbook).expect("publish resources");
+    workbook.apply_structure(&patch).expect("publish resources");
 
     let snapshot = workbook.cell_values(0).expect("authored snapshot");
     assert!(matches!(
@@ -648,10 +655,11 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable appended image");
-    Patch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
-        .expect("decode appended image patch")
-        .apply(&mut transfer_target)
-        .expect("publish appended image");
+    publish_structure_patch(
+        &mut transfer_target,
+        &Patch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
+            .expect("decode appended image patch"),
+    );
     let appended_drawing = transfer_target.sheet_drawing(0).expect("appended drawing");
     assert_eq!(appended_drawing.images.len(), 2);
     assert_eq!(
@@ -710,7 +718,9 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
         .expect("drawing/name merge");
     assert!(merged.conflicts().is_empty());
     let merged = merged.patch().expect("merged drawing patch").clone();
-    merged.apply(&mut target).expect("publish drawing graph");
+    target
+        .apply_structure(&merged)
+        .expect("publish drawing graph");
 
     let drawing = target.sheet_drawing(0).expect("transferred drawing");
     assert_eq!(drawing.drawing.anchors.len(), 5);
@@ -746,7 +756,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
 
     let mut history = History::new(TransferLimits::DEFAULT).expect("drawing history");
     history.push(merged).expect("retain drawing patch");
-    history.undo(&mut target).expect("undo drawing graph");
+    target.undo_with(&mut history).expect("undo drawing graph");
     assert_eq!(
         target
             .sheet_drawing(0)
@@ -756,7 +766,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
             .len(),
         3
     );
-    history.redo(&mut target).expect("redo drawing graph");
+    target.redo_with(&mut history).expect("redo drawing graph");
     assert_eq!(
         target.worksheet_names(),
         &["Transferred graphs".to_string()]
@@ -781,7 +791,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         ExternalDataPart::embedded_workbook(b"PK exact chart workbook".to_vec()),
         Some(false),
     );
-    let mut source_sheet = MutableWorksheet::new("Source");
+    let mut source_sheet = builder::Worksheet::new("Source");
     source_sheet.add_chart(chart).expect("source chart");
     let mut source_writer = Builder::new();
     source_writer.add_worksheet(source_sheet);
@@ -793,7 +803,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .expect("source save");
     let source = Workbook::new(Cursor::new(source_bytes.into_inner())).expect("source reopen");
 
-    let mut target_sheet = MutableWorksheet::new("Target");
+    let mut target_sheet = builder::Worksheet::new("Target");
     target_sheet
         .add_image(
             Image::new(
@@ -825,10 +835,10 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable chart graph");
-    Patch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("chart graph replay")
-        .apply(&mut target)
-        .expect("publish chart graph");
+    publish_structure_patch(
+        &mut target,
+        &Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("chart graph replay"),
+    );
 
     let transferred_drawing_xml = standard_drawing_xml(&target);
     let root_close = existing_drawing_xml
@@ -910,7 +920,9 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         .expect("hyperlink/name merge");
     assert!(merged.conflicts().is_empty());
     let merged = merged.patch().expect("merged hyperlink patch").clone();
-    merged.apply(&mut target).expect("publish hyperlink shape");
+    target
+        .apply_structure(&merged)
+        .expect("publish hyperlink shape");
     assert_eq!(
         standard_drawing_external_hyperlinks(&target),
         vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
@@ -918,9 +930,13 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
 
     let mut history = History::new(TransferLimits::DEFAULT).expect("hyperlink history");
     history.push(merged).expect("retain hyperlink patch");
-    history.undo(&mut target).expect("inverse hyperlink patch");
+    target
+        .undo_with(&mut history)
+        .expect("inverse hyperlink patch");
     assert!(target.sheet_drawing(0).is_none());
-    history.redo(&mut target).expect("redo hyperlink patch");
+    target
+        .redo_with(&mut history)
+        .expect("redo hyperlink patch");
 
     let mut reopened_bytes = Cursor::new(Vec::new());
     target
@@ -1157,7 +1173,9 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("durable dependency patch");
     let patch =
         Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("decode dependency patch");
-    patch.apply(&mut target).expect("publish dependency patch");
+    target
+        .apply_structure(&patch)
+        .expect("publish dependency patch");
 
     let cells = target.cell_values(0).expect("target cells");
     let name_formula = cells
@@ -1314,16 +1332,16 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
     assert!(Patch::from_bytes(&corrupt, TransferLimits::DEFAULT).is_err());
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
 
-    merged.apply(&mut target).expect("apply merge");
+    target.apply_structure(&merged).expect("apply merge");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
     assert!(
-        merged.apply(&mut target).is_err(),
+        target.apply_structure(&merged).is_err(),
         "stale reapply must fail"
     );
 
     let mut history = History::new(TransferLimits::DEFAULT).expect("history");
     history.push(merged).expect("retain patch");
-    history.undo(&mut target).expect("undo");
+    target.undo_with(&mut history).expect("undo");
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
     assert!(
         target
@@ -1333,7 +1351,7 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
             .expect("unique destination")
             .is_none()
     );
-    history.redo(&mut target).expect("redo");
+    target.redo_with(&mut history).expect("redo");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
 }
 
@@ -1364,7 +1382,7 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
         .expect("wire");
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode");
     assert!(decoded.is_noop());
-    decoded.apply(&mut workbook).expect("no-op apply");
+    workbook.apply_structure(&decoded).expect("no-op apply");
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
 
     let mut edit = workbook.to_package().edit().expect("edit");
@@ -1374,9 +1392,9 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     let changed = edit.commit().expect("changed commit");
     assert!(changed.diagnostics().changed());
     assert!(!changed.patch().is_noop());
-    changed.patch().apply(&mut workbook).expect("apply");
-    assert!(empty.patch().apply(&mut workbook).is_err());
-    assert!(same.patch().apply(&mut workbook).is_err());
+    workbook.apply_structure(changed.patch()).expect("apply");
+    assert!(workbook.apply_structure(empty.patch()).is_err());
+    assert!(workbook.apply_structure(same.patch()).is_err());
     assert_eq!(workbook.worksheet_names(), &["Changed".to_owned()]);
     let inverse = changed.patch().inverse();
     assert_eq!(inverse.operation_count(), 0);
@@ -1386,7 +1404,7 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
         .expect("inverse wire");
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("inverse decode");
     assert!(!decoded.is_noop());
-    decoded.apply(&mut workbook).expect("inverse apply");
+    workbook.apply_structure(&decoded).expect("inverse apply");
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
     assert_eq!(changed.patch().before(), empty.patch().before());
     assert_eq!(changed.clone().diagnostics(), changed.diagnostics());
@@ -1410,6 +1428,7 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
     let replayed = workbook
         .to_package()
         .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("replay suffix patch");
     assert_eq!(
         replayed.to_bytes().unwrap(),
@@ -1417,6 +1436,7 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
     );
     let restored = replayed
         .apply(&decoded.inverse())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("inverse suffix patch");
     assert_eq!(
         restored.to_bytes().unwrap(),
@@ -1424,7 +1444,7 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
     );
     let renamed = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("renamed workbook");
 
     let package = renamed.to_package().into_opc();
@@ -1466,7 +1486,11 @@ fn same_tolerated_unpaired_name_is_an_exact_durable_noop() {
         .expect("durable no-op");
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode no-op");
     assert!(decoded.is_noop());
-    let applied = workbook.to_package().apply(&decoded).expect("apply no-op");
+    let applied = workbook
+        .to_package()
+        .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("apply no-op");
     assert_eq!(applied.to_bytes().expect("applied bytes"), source_bytes);
 }
 

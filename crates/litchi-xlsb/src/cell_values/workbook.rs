@@ -15,30 +15,6 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
 
-/// Read editable cell values from one binary worksheet part with safe limits.
-///
-/// # Errors
-///
-/// Returns an error when the part is missing, not a worksheet, or has an
-/// invalid BIFF12 record stream.
-pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
-    read_with_limits(package, worksheet, Limits::DEFAULT)
-}
-
-/// Read editable cell values with an explicit finite policy.
-///
-/// # Errors
-///
-/// Returns an error when the part is missing, not a worksheet, exceeds a
-/// selected limit, or has an invalid BIFF12 record stream.
-pub fn read_with_limits(
-    package: &OpcPackage,
-    worksheet: &PackURI,
-    limits: Limits,
-) -> Result<Snapshot> {
-    read_with_limits_and_leniency(package, worksheet, limits, crate::Leniency::Strict)
-}
-
 /// Read editable cell values under an explicit [`crate::Leniency`].
 pub(crate) fn read_with_limits_and_leniency(
     package: &OpcPackage,
@@ -49,67 +25,6 @@ pub(crate) fn read_with_limits_and_leniency(
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     super::worksheet::read_with_limits_and_leniency(part.blob(), limits, leniency)
-}
-
-/// Apply one source-checked cell-value commit atomically to an OPC package.
-///
-/// Only the selected worksheet part is changed. The complete XLSB workbook is
-/// reparsed before publication, so invalid candidates never escape this
-/// boundary and every untouched part remains owned by the existing lossless
-/// OPC package machinery.
-///
-/// # Errors
-///
-/// Returns an error for a stale patch, a non-worksheet target, or a candidate
-/// that fails complete XLSB workbook validation.
-pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> Result<Snapshot> {
-    apply_with_external_link_limits(package, worksheet, commit, ExternalLinkLimits::default())
-}
-
-/// Apply one source-checked cell-value commit while validating candidate
-/// workbook reparses with an explicit external-link policy.
-pub fn apply_with_external_link_limits(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-) -> Result<Snapshot> {
-    apply_with_external_link_limits_and_drawing_policy(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        DrawingLoadPolicy::Eager,
-    )
-}
-
-/// Apply a cell commit while retaining the caller's typed drawing boundary.
-///
-/// Workbook-level publication uses this internal seam so a skipped drawing
-/// projection validates only the selected worksheet dependency closure and
-/// leaves unrelated drawing XML opaque.
-pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-) -> Result<Snapshot> {
-    let applied = apply_retaining_parse(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        drawing_load_policy,
-        crate::Leniency::Strict,
-    )?;
-    match applied {
-        Applied::Unchanged(snapshot) => Ok(snapshot),
-        Applied::Published { snapshot, workbook } => {
-            *package = workbook.into_opc_package();
-            Ok(snapshot)
-        },
-    }
 }
 
 /// The outcome of one validated cell-value publication.
@@ -123,11 +38,9 @@ pub(crate) enum Applied {
     /// The patch reproduced the stored worksheet bytes exactly, so there is no
     /// candidate: nothing was cloned, nothing was parsed, and the caller's
     /// package is already the published package.
-    Unchanged(Snapshot),
+    Unchanged,
     /// The patch changed the worksheet and the candidate passed every check.
     Published {
-        /// The published snapshot, identical to the committed one.
-        snapshot: Snapshot,
         /// The validated candidate workbook. Its package carries the updated
         /// worksheet part; a signed source is refused before any candidate is
         /// built. Boxed because a parsed workbook is far larger than a
@@ -161,7 +74,7 @@ pub(crate) fn apply_retaining_parse(
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
     if updated.as_slice() == part.blob() {
-        return Ok(Applied::Unchanged(commit.snapshot().clone()));
+        return Ok(Applied::Unchanged);
     }
     crate::signature_policy::ensure_unsigned(package)?;
 
@@ -188,7 +101,6 @@ pub(crate) fn apply_retaining_parse(
     let _ = parsed.worksheet(worksheet_index)?;
     validate_dependencies(commit.snapshot(), &parsed)?;
     Ok(Applied::Published {
-        snapshot: commit.snapshot().clone(),
         workbook: Box::new(parsed),
     })
 }

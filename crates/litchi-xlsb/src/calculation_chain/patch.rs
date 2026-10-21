@@ -35,9 +35,9 @@ impl Patch {
         &self.after
     }
 
-    /// Whether publication changes the owner bytes or graph topology.
+    /// Whether publication changes no owner byte or graph topology.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub const fn is_noop(&self) -> bool {
         !self.changed
     }
 
@@ -74,9 +74,7 @@ impl Patch {
 
     pub(crate) fn check_publication_policy(&self, package: &OpcPackage) -> Result<()> {
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         Ok(())
     }
@@ -93,7 +91,7 @@ impl Patch {
         candidate: &mut OpcPackage,
         current: Snapshot,
     ) -> Result<Snapshot> {
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         self.check_publication_policy(candidate)?;
@@ -139,40 +137,9 @@ impl Patch {
     }
 }
 
-/// A detached result containing a planned snapshot and reversible patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owner bytes or topology.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Calculation Chain edit's `commit`: the new package, the
+/// patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 fn remove_graph(
     package: &mut OpcPackage,

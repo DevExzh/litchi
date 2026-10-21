@@ -105,13 +105,9 @@ pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
     )
 }
 
-/// Parse one complete XLSB External Link part stream.
-pub fn parse_external_link(data: &[u8]) -> Result<Parsed> {
-    parse_external_link_with_limits(data, ExternalLinkLimits::DEFAULT)
-}
-
-/// Parse one complete stream under an explicit finite resource policy.
-pub fn parse_external_link_with_limits(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
+/// Parse one complete XLSB External Link part stream under an explicit
+/// finite resource policy.
+pub fn parse_external_link(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
     let mut budget = limits.budget();
     parse_external_link_with_budget(data, &mut budget)
 }
@@ -495,31 +491,18 @@ pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) 
     })
 }
 
-/// Explicitly named alias for callers that need the unresolved relationship
-/// metadata as well as the typed link.
-pub fn parse_external_link_with_relationship(data: &[u8]) -> Result<Parsed> {
-    parse_external_link(data)
-}
-
-/// Explicitly named relationship-aware parser under an explicit policy.
-pub fn parse_external_link_with_relationship_with_limits(
+/// Explicitly named relationship-aware parser: the unresolved relationship
+/// metadata as well as the typed link, under an explicit policy.
+pub fn parse_external_link_with_relationship(
     data: &[u8],
     limits: ExternalLinkLimits,
 ) -> Result<Parsed> {
-    parse_external_link_with_limits(data, limits)
+    parse_external_link(data, limits)
 }
 
-/// Parse a stream when the caller only needs its inert semantic model.
-pub fn parse_external_link_model(data: &[u8]) -> Result<Link> {
-    parse_external_link(data).map(Parsed::into_link)
-}
-
-/// Parse only the inert semantic model under an explicit policy.
-pub fn parse_external_link_model_with_limits(
-    data: &[u8],
-    limits: ExternalLinkLimits,
-) -> Result<Link> {
-    parse_external_link_with_limits(data, limits).map(Parsed::into_link)
+/// Parse only the inert semantic model of a stream under an explicit policy.
+pub fn parse_external_link_model(data: &[u8], limits: ExternalLinkLimits) -> Result<Link> {
+    parse_external_link(data, limits).map(Parsed::into_link)
 }
 
 fn parse_external_cached_value(
@@ -878,8 +861,9 @@ mod tests {
         )
         .unwrap();
 
-        let bytes = write_external_link_stream(&link, Some("rIdPath")).unwrap();
-        let parsed = parse_external_link(&bytes).unwrap();
+        let bytes = write_external_link_stream(&link, Some("rIdPath"), ExternalLinkLimits::DEFAULT)
+            .unwrap();
+        let parsed = parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).unwrap();
         assert_eq!(parsed.relationship_id(), Some("rIdPath"));
         assert_eq!(parsed.link().source(), "rIdPath");
         assert_eq!(parsed.link().sheet_names(), link.sheet_names());
@@ -911,8 +895,11 @@ mod tests {
             ],
         )
         .unwrap();
-        let dde_bytes = write_external_link_stream(&dde, None).unwrap();
-        let parsed_dde = parse_external_link(&dde_bytes).unwrap().into_link();
+        let dde_bytes =
+            write_external_link_stream(&dde, None, ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_dde = parse_external_link(&dde_bytes, ExternalLinkLimits::DEFAULT)
+            .unwrap()
+            .into_link();
         assert_eq!(parsed_dde, dde);
 
         let ole = Link::ole_with_items(
@@ -928,8 +915,9 @@ mod tests {
             ],
         )
         .unwrap();
-        let ole_bytes = write_external_link_stream(&ole, Some("rIdOle")).unwrap();
-        let parsed_ole = parse_external_link(&ole_bytes).unwrap();
+        let ole_bytes =
+            write_external_link_stream(&ole, Some("rIdOle"), ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_ole = parse_external_link(&ole_bytes, ExternalLinkLimits::DEFAULT).unwrap();
         assert_eq!(parsed_ole.relationship_id(), Some("rIdOle"));
         assert_eq!(parsed_ole.resolve_source("Model.xlsx").unwrap(), ole);
     }
@@ -937,10 +925,11 @@ mod tests {
     #[test]
     fn owner_parser_rejects_trailing_records_after_end() {
         let link = Link::dde("Excel", "System", vec!["StatusItem".to_string()]).unwrap();
-        let mut bytes = write_external_link_stream(&link, None).unwrap();
+        let mut bytes =
+            write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
         Encoder::new(&mut bytes)
             .write_record(crate::raw::kind::SUP_NAME_END, &[])
             .unwrap();
-        assert!(parse_external_link(&bytes).is_err());
+        assert!(parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).is_err());
     }
 }

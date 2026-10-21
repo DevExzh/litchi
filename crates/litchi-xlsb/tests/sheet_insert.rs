@@ -20,6 +20,7 @@ use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
@@ -37,7 +38,6 @@ use litchi_xlsb::volatile_dependencies::{
     CONTENT_TYPE as VOLATILE_CONTENT_TYPE, CachedValue, CellReference, DEFAULT_PART_NAME,
     Dependencies, DependencyKind, MainTopic, Topic, VolatileType,
 };
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 #[derive(Debug, Clone)]
 struct BundleEntry {
@@ -50,7 +50,7 @@ struct BundleEntry {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for (index, name) in names.iter().enumerate() {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} identity {index}"));
         builder.add_worksheet(sheet);
     }
@@ -69,12 +69,12 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data identity");
     builder.add_worksheet(data);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail identity");
     builder.add_worksheet(tail);
     builder.build().expect("chart-first package")
@@ -319,7 +319,7 @@ fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
 fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .add_external_link(
@@ -411,7 +411,7 @@ fn with_unknown_workbook_record(package: &Package) -> Package {
 fn package_with_data_model() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).unwrap())
@@ -422,7 +422,7 @@ fn package_with_data_model() -> Package {
 fn package_with_connections() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_connections(Connections {
@@ -482,7 +482,7 @@ fn package_with_vba_project() -> Package {
 }
 
 fn package_with_shared_workbook() -> Package {
-    let mut opc = worksheets(&["A", "B", "C"]).into_opc();
+    let source = worksheets(&["A", "B", "C"]);
     let guid = Guid::from_bytes([7; 16]);
     let date = ShortDateTime {
         year: 2024,
@@ -528,8 +528,9 @@ fn package_with_shared_workbook() -> Package {
             b"opaque-log".to_vec(),
         )])],
     };
-    litchi_xlsb::shared_workbook::store(&mut opc, &catalog).unwrap();
-    Package::from_opc(opc).unwrap()
+    let mut edit = source.edit_shared_workbook().unwrap();
+    edit.replace(catalog).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
 fn package_with_volatile_dependencies() -> Package {
@@ -551,7 +552,10 @@ fn package_with_volatile_dependencies() -> Package {
     let mut edit = package.edit_volatile_dependencies().unwrap();
     edit.set_dependencies(dependencies).unwrap();
     let commit = edit.commit().unwrap();
-    package.apply_volatile_dependencies(&commit).unwrap()
+    package
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
 }
 
 fn volatile_ref_indices(package: &Package) -> Vec<u32> {
@@ -756,11 +760,19 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
     let offset = operation_offset(&wire);
     assert_eq!(wire[offset], 9, "insert operation tag");
     let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
-    let replay = source.apply(&patch).unwrap();
+    let replay = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     assert_eq!(catalog_names(&replay), vec!["A", "Inserted", "B"]);
     assert_eq!(catalog(&replay)[1].2, State::Hidden);
     assert_eq!(
-        replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        replay
+            .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         before
     );
 
@@ -814,7 +826,7 @@ fn insertion_merge_conflicts_on_topology_and_preserves_both_sources() {
 fn named_range_scopes_and_xti_endpoints_shift_with_an_insertion() {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Scoped".to_owned(), Some(1)).with_formula(vec![
@@ -943,6 +955,7 @@ fn modeled_volatile_owner_shifts_inserted_sheet_references_and_inverse_is_exact(
         commit
             .package()
             .apply(&commit.patch().inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .unwrap()
             .to_bytes()
             .unwrap(),

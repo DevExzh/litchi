@@ -166,7 +166,7 @@ pub(crate) struct Parsed {
 /// Parse the workbook's optional `BrtBeginDataModel` block.
 pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Parsed> {
     let limits = limits.validate()?;
-    let mut iterator = Records::try_with_limits(data, limits.raw)?;
+    let mut iterator = Records::bounded(data, limits.raw)?;
     let mut record_count = 0_usize;
     let mut begin: Option<usize> = None;
     let mut end: Option<usize> = None;
@@ -444,7 +444,7 @@ pub(crate) fn parse_workbook(data: &[u8], limits: SemanticLimits) -> Result<Pars
 
 #[cfg(test)]
 fn collect_records(data: &[u8], limits: RawLimits, max_records: usize) -> Result<Vec<WireRecord>> {
-    let mut iterator = Records::try_with_limits(data, limits)?;
+    let mut iterator = Records::bounded(data, limits)?;
     let mut records = Vec::new();
     while let Some(record) = iterator.next() {
         let record = record?;
@@ -576,7 +576,7 @@ fn start_cursor<'a>(
     validate_frt_blank(header, context)?;
     Ok((
         header,
-        Cursor::try_with_limits(&payload[FRT_HEADER_LEN..], context, limits)?,
+        Cursor::bounded(&payload[FRT_HEADER_LEN..], context, limits)?,
     ))
 }
 
@@ -765,7 +765,7 @@ fn serialize_definition(
             source,
         })?;
     {
-        let mut writer = Encoder::try_with_limits(&mut output, limits.raw)?;
+        let mut writer = Encoder::bounded(&mut output, limits.raw)?;
         let begin_header = layout.map_or([0; FRT_HEADER_LEN], |layout| layout.begin_header);
         let mut begin_payload = begin_header.to_vec();
         begin_payload.push(value.min_version_load);
@@ -998,7 +998,7 @@ fn write_payload(
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
     let mut writer = PayloadWriter {
-        inner: Encoder::try_with_limits(&mut payload, limits)?,
+        inner: Encoder::bounded(&mut payload, limits)?,
     };
     write(&mut writer)?;
     Ok(payload)

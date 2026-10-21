@@ -44,7 +44,6 @@ use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type;
 
 use super::{Formatting, RecordKind, write_conditional_formattings};
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, splice};
@@ -298,9 +297,9 @@ impl DifferentialStyle {
 }
 
 /// A staged conditional-format edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -309,7 +308,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_conditional_formats(&self) -> Result<Edit<'_>> {
+    pub fn edit_conditional_formats(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -323,18 +322,8 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a conditional-format edit of this workbook without first
-    /// copying it into a package.
-    pub fn edit_conditional_formats(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
@@ -370,7 +359,12 @@ pub(crate) fn classic(formats: Vec<Formatting>) -> Vec<Formatting> {
         .collect()
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     /// The staged classic conditional formats of the worksheet at
     /// complete-catalog position `sheet`, in stream order.
     ///
@@ -668,6 +662,7 @@ mod tests {
         assert_eq!(
             package
                 .apply_conditional_formats(&patch)
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

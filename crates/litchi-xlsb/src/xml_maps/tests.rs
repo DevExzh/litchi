@@ -1,7 +1,7 @@
 use super::*;
+use crate::builder::{self, Builder};
 use crate::package::table::{Column, Range, Table};
 use crate::raw::{Encoder, Records, kind};
-use crate::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
 fn binding(column_id: u32) -> ColumnBinding {
@@ -319,7 +319,7 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
 
 #[test]
 fn ordinary_unmapped_table_does_not_require_map_info() {
-    let mut worksheet = MutableWorksheet::new("Plain");
+    let mut worksheet = builder::Worksheet::new("Plain");
     worksheet.set_cell(0, 0, "Value");
     worksheet.set_cell(1, 0, "data");
     worksheet

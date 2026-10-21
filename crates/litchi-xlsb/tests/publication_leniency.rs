@@ -16,12 +16,16 @@ use litchi_core::sheet::WorkbookTrait as _;
 use std::io::Cursor;
 
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
 use litchi_xlsb::cell_watches::Watch;
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sparkline::{Color, Colors, Group, Groups, Location, Sparkline, SparklineType};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 
@@ -39,7 +43,7 @@ fn c1() -> Reference {
 
 /// One worksheet with two ordinary `BrtCellReal` values.
 fn numbers_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Numbers");
+    let mut sheet = builder::Worksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
     let mut writer = Builder::new();
@@ -177,7 +181,7 @@ fn assert_strict_cell_read_refuses(bytes: &[u8]) {
     let package = Package::from_bytes(bytes).expect("strict package open");
     assert!(
         package
-            .into_workbook()
+            .owned_workbook()
             .expect("strict package projection")
             .cell_values(0)
             .is_err(),
@@ -206,19 +210,17 @@ fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
     let mut workbook = tolerant_workbook();
     let original_record = nan_cell_record(&worksheet_blob(&workbook));
 
-    // Keep the raw OPC escape hatch explicit: this commit is owned by the
-    // worksheet codec, so it is applied through the raw helper and reopened
+    // Keep the raw OPC escape hatch explicit: this draft is owned by the
+    // worksheet codec, so its bytes are written into raw OPC and reopened
     // under the strict workbook projection.
-    let mut raw_edit = workbook.cell_values(0).expect("raw cell snapshot").edit();
-    raw_edit.set_number(b1(), 3.5).expect("raw change B1");
-    let raw_commit = raw_edit.commit().expect("raw cell commit");
+    let mut raw_draft = workbook.cell_values(0).expect("raw cell snapshot").draft();
+    raw_draft.set_number(b1(), 3.5).expect("raw change B1");
+    let (_, raw_patch) = raw_draft.finish().expect("raw cell patch");
     let mut raw_package = workbook.opc_package().clone();
-    litchi_xlsb::cell_values::workbook::apply(
-        &mut raw_package,
-        &PackURI::new(SHEET1).expect("worksheet URI"),
-        &raw_commit,
-    )
-    .expect("publish an explicitly raw commit to raw OPC");
+    raw_package
+        .get_part_mut(&PackURI::new(SHEET1).expect("worksheet URI"))
+        .expect("raw worksheet part")
+        .set_blob(raw_patch.after().to_vec());
     let raw_workbook = Workbook::from_opc_package(raw_package).expect("raw output workbook");
     assert_eq!(raw_workbook.leniency(), Leniency::Strict);
     assert!(
@@ -235,7 +237,7 @@ fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
     let commit = edit.commit().expect("cell commit");
     workbook = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("tolerant cell publication");
     assert_tolerant_nan_with_b1(&workbook, 3.5);
     assert_eq!(
@@ -258,13 +260,18 @@ fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
 fn cell_watch_publication_retains_tolerant_cell_values_atomically() {
     let mut workbook = tolerant_workbook();
     let original_record = nan_cell_record(&worksheet_blob(&workbook));
-    let mut edit = workbook.edit_cell_watches(0).expect("watch edit");
-    edit.add(Watch::new(3, 5).expect("watch"))
+    let mut edit = workbook
+        .to_package()
+        .edit_cell_watches()
+        .expect("watch edit");
+    edit.add(0, Watch::new(3, 5).expect("watch"))
         .expect("add watch");
     let commit = edit.commit().expect("watch commit");
-    let snapshot = workbook
-        .apply_cell_watches(0, &commit)
+    workbook = commit
+        .into_package()
+        .owned_workbook()
         .expect("tolerant watch publication");
+    let snapshot = workbook.cell_watches(0).expect("watch snapshot");
     assert_eq!(snapshot.watches(), &[Watch::new(3, 5).expect("watch")]);
     assert_tolerant_nan(&workbook);
     assert_eq!(
@@ -292,12 +299,17 @@ fn sparkline_publication_retains_tolerant_cell_values_atomically() {
     let mut workbook = tolerant_workbook();
     let original_record = nan_cell_record(&worksheet_blob(&workbook));
     let groups = sparkline_groups();
-    let mut edit = workbook.edit_sparklines(0).expect("sparkline edit");
-    edit.set(groups.clone());
+    let mut edit = workbook
+        .to_package()
+        .edit_sparklines()
+        .expect("sparkline edit");
+    assert!(edit.set(0, groups.clone()).expect("stage sparklines"));
     let commit = edit.commit().expect("sparkline commit");
-    let snapshot = workbook
-        .apply_sparklines(0, commit)
+    workbook = commit
+        .into_package()
+        .owned_workbook()
         .expect("tolerant sparkline publication");
+    let snapshot = workbook.sparklines(0).expect("sparkline snapshot");
     assert_eq!(snapshot.groups(), Some(&groups));
     assert_tolerant_nan(&workbook);
     assert_eq!(
@@ -340,17 +352,16 @@ fn structural_transfer_into_tolerant_package_retains_nan_policy_and_bytes() {
         .expect("legacy transfer");
     let legacy_commit = legacy_edit.commit().expect("legacy commit");
     let legacy_inverse = legacy_commit.patch().inverse();
-    legacy_commit
-        .patch()
-        .apply(&mut legacy_target)
+    legacy_target
+        .apply_structure(legacy_commit.patch())
         .expect("legacy tolerant transfer apply");
     assert_tolerant_nan(&legacy_target);
     assert_eq!(
         nan_cell_record(&worksheet_blob(&legacy_target)),
         original_record
     );
-    legacy_inverse
-        .apply(&mut legacy_target)
+    legacy_target
+        .apply_structure(&legacy_inverse)
         .expect("legacy inverse apply");
     assert_eq!(
         legacy_target
@@ -378,10 +389,13 @@ fn structural_transfer_into_tolerant_package_retains_nan_policy_and_bytes() {
     let commit = edit.commit().expect("transfer commit");
     let applied = target
         .apply(commit.patch())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("tolerant transfer apply");
     assert_eq!(applied.leniency(), Leniency::TolerateCachedNumbers);
 
-    let published = applied.into_workbook().expect("tolerant transfer workbook");
+    let published = applied
+        .owned_workbook()
+        .expect("tolerant transfer workbook");
     assert_tolerant_nan(&published);
     let published_cells = published.cell_values(0).expect("published cells");
     let transferred = published_cells
@@ -414,7 +428,7 @@ fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
     assert!(cell_commit.patch().is_noop());
     cells = cell_commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("cell no-op publication");
     assert_eq!(save(&cells), cells_before);
     assert_tolerant_nan(&cells);
@@ -422,12 +436,15 @@ fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
     let mut watches = tolerant_workbook();
     let watches_before = save(&watches);
     let watch_commit = watches
-        .edit_cell_watches(0)
+        .to_package()
+        .edit_cell_watches()
         .expect("watch edit")
         .commit()
         .expect("watch no-op commit");
-    watches
-        .apply_cell_watches(0, &watch_commit)
+    assert!(watch_commit.patch().is_noop());
+    watches = watch_commit
+        .into_package()
+        .owned_workbook()
         .expect("watch no-op publication");
     assert_eq!(save(&watches), watches_before);
     assert_tolerant_nan(&watches);
@@ -435,13 +452,15 @@ fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
     let mut sparklines = tolerant_workbook();
     let sparklines_before = save(&sparklines);
     let sparkline_commit = sparklines
-        .edit_sparklines(0)
+        .to_package()
+        .edit_sparklines()
         .expect("sparkline edit")
         .commit()
         .expect("sparkline no-op commit");
-    assert!(sparkline_commit.is_noop());
-    sparklines
-        .apply_sparklines(0, sparkline_commit)
+    assert!(sparkline_commit.patch().is_noop());
+    sparklines = sparkline_commit
+        .into_package()
+        .owned_workbook()
         .expect("sparkline no-op publication");
     assert_eq!(save(&sparklines), sparklines_before);
     assert_tolerant_nan(&sparklines);
@@ -456,10 +475,11 @@ fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
     assert!(commit.patch().is_noop());
     let applied = package
         .apply(commit.patch())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("structure no-op apply");
     assert_eq!(applied.leniency(), Leniency::TolerateCachedNumbers);
     assert_eq!(applied.to_bytes().expect("applied bytes"), package_before);
-    assert_tolerant_nan(&applied.into_workbook().expect("no-op package workbook"));
+    assert_tolerant_nan(&applied.owned_workbook().expect("no-op package workbook"));
 }
 
 #[test]
@@ -503,14 +523,14 @@ fn mutable_structural_application_retains_destination_input_budget() {
         litchi_xlsb::OpenOptions::new().source_limits(limits),
     )
     .unwrap()
-    .into_workbook()
+    .owned_workbook()
     .unwrap();
-    assert!(commit.patch().apply(&mut destination).is_err());
+    assert!(destination.apply_structure(commit.patch()).is_err());
     assert_eq!(destination.to_package().to_bytes().unwrap(), bytes);
     assert_eq!(destination.opc_package().read_limits(), limits);
     let noop = source.edit().unwrap().commit().unwrap();
-    noop.patch()
-        .apply(&mut destination)
+    destination
+        .apply_structure(noop.patch())
         .expect("bounded exact no-op");
     assert_eq!(destination.to_package().to_bytes().unwrap(), bytes);
     assert_eq!(destination.opc_package().read_limits(), limits);

@@ -966,6 +966,36 @@ fn xlsx_refusals_conflicts_and_limits_have_their_codes() {
     );
 }
 
+#[cfg(feature = "xlsb")]
+#[test]
+fn xlsb_refusals_conflicts_and_invalid_limits_classify_by_kind() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+    use litchi_xlsb::package::PackageError;
+
+    assert_code(
+        PackageError::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit_timelines",
+            "non-canonical source",
+        )),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        PackageError::PatchConflict {
+            part: "Custom Data source closure".into(),
+        },
+        Code::InvalidInput,
+    );
+    assert_code(
+        PackageError::InvalidLimit {
+            kind: litchi_xlsb::package::LimitKind::Opc(litchi_xlsb::opc::LimitKind::Parts),
+            value: 0,
+            maximum: 1,
+        },
+        Code::InvalidArgument,
+    );
+}
+
 #[cfg(feature = "xlsx")]
 #[test]
 fn wildcard_xlsx_errors_are_corrupt_file() {

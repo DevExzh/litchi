@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let mut builder = xlsb::Builder::new();
         for sheet in 0..8 {
-            let mut worksheet = xlsb::writer::MutableWorksheet::new(format!("S{sheet}"));
+            let mut worksheet = xlsb::builder::Worksheet::new(format!("S{sheet}"));
             for row in 0..200_u32 {
                 for column in 0..10_u32 {
                     worksheet.set_cell(row, column, f64::from(row * 10 + column));

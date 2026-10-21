@@ -175,29 +175,31 @@ fn rejects_invalid_coordinates_domains_and_duplicate_watches() {
 #[test]
 fn workbook_facade_publishes_only_a_valid_commit() {
     let package = crate::Package::new().unwrap();
-    let mut workbook = package.into_workbook().unwrap();
-    let mut edit = workbook.edit_cell_watches(0).unwrap();
-    edit.add(Watch::new(3, 5).unwrap()).unwrap();
-    let commit = edit.commit().unwrap();
-    let snapshot = workbook.apply_cell_watches(0, &commit).unwrap();
-    assert_eq!(snapshot.watches(), &[Watch::new(3, 5).unwrap()]);
+    let mut edit = package.edit_cell_watches().unwrap();
+    edit.add(0, Watch::new(3, 5).unwrap()).unwrap();
+    let published = edit.commit().unwrap().into_package();
+    let workbook = published.workbook().unwrap();
     assert_eq!(
         workbook.cell_watches(0).unwrap().watches(),
-        snapshot.watches()
+        &[Watch::new(3, 5).unwrap()]
     );
     let reparsed = crate::Workbook::from_opc_package(workbook.opc_package().clone()).unwrap();
     assert_eq!(format!("{workbook:?}"), format!("{reparsed:?}"));
 
-    let mut stale = workbook.edit_cell_watches(0).unwrap();
-    stale.add(Watch::new(4, 4).unwrap()).unwrap();
+    let mut stale = published.edit_cell_watches().unwrap();
+    stale.add(0, Watch::new(4, 4).unwrap()).unwrap();
     let stale_commit = stale.commit().unwrap();
-    let mut other = workbook.edit_cell_watches(0).unwrap();
-    other.add(Watch::new(5, 5).unwrap()).unwrap();
-    let other_commit = other.commit().unwrap();
-    workbook.apply_cell_watches(0, &other_commit).unwrap();
-    assert!(workbook.apply_cell_watches(0, &stale_commit).is_err());
+    let mut other = published.edit_cell_watches().unwrap();
+    other.add(0, Watch::new(5, 5).unwrap()).unwrap();
+    let current = other.commit().unwrap().into_package();
+    assert!(current.apply_cell_watches(stale_commit.patch()).is_err());
     assert_eq!(
-        workbook.cell_watches(0).unwrap().watches(),
+        current
+            .workbook()
+            .unwrap()
+            .cell_watches(0)
+            .unwrap()
+            .watches(),
         &[Watch::new(3, 5).unwrap(), Watch::new(5, 5).unwrap()]
     );
 }

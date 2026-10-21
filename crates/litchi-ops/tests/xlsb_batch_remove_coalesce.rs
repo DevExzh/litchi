@@ -7,10 +7,10 @@ use std::io::Cursor;
 use litchi_ops::{BatchItem, BatchMode, File, ItemResult};
 
 fn fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
     for column in 0..1_000_u32 {
         sheet.set_cell(0, column, (column + 1) as i32);
     }

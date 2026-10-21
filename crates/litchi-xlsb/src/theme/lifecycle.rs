@@ -43,7 +43,7 @@ fn content_types_output_limit() -> usize {
 /// retains the Workbook relationship list so a create/remove patch detects
 /// unrelated graph changes that could alter the selected relationship ID.
 #[derive(Clone, Debug)]
-pub struct OwnerSnapshot {
+pub(crate) struct OwnerSnapshot {
     theme: Option<Snapshot>,
     source: OwnerSource,
     plan: CreationPlan,
@@ -51,53 +51,33 @@ pub struct OwnerSnapshot {
 }
 
 impl OwnerSnapshot {
-    /// Borrow the typed Theme, or `None` when the owner is absent.
-    #[must_use]
-    pub fn theme(&self) -> Option<&Theme> {
-        self.theme.as_ref().map(Snapshot::theme)
+    /// The present Theme, if any.
+    pub(crate) const fn snapshot(&self) -> Option<&Snapshot> {
+        self.theme.as_ref()
+    }
+
+    /// The part name of the present Theme, or the one a new Theme is
+    /// created at.
+    pub(crate) fn part_name(&self) -> &str {
+        &self.plan.theme_name
     }
 
     /// Borrow the optional applied-theme family metadata.
     #[must_use]
-    pub fn family(&self) -> Option<&Family> {
+    pub(crate) fn family(&self) -> Option<&Family> {
         self.theme.as_ref().and_then(Snapshot::family)
-    }
-
-    /// Borrow the present Theme snapshot, or `None` when the owner is absent.
-    #[must_use]
-    pub fn snapshot(&self) -> Option<&Snapshot> {
-        self.theme.as_ref()
-    }
-
-    /// Borrow the exact Theme XML when the owner is present.
-    #[must_use]
-    pub fn source_xml(&self) -> Option<&[u8]> {
-        self.theme.as_ref().map(Snapshot::source_xml)
     }
 
     /// Whether the Workbook owns a Theme part.
     #[must_use]
-    pub fn is_present(&self) -> bool {
+    pub(crate) fn is_present(&self) -> bool {
         self.theme.is_some()
-    }
-
-    /// Return the finite limits used to inspect and stage this owner.
-    #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
-    }
-
-    /// Return the absolute Theme part name used by the current or planned
-    /// owner.  This is a diagnostic string rather than an OPC URI type.
-    #[must_use]
-    pub fn part_name(&self) -> &str {
-        &self.plan.theme_name
     }
 
     /// Start a detached create, replace, or remove transaction.
     #[must_use]
-    pub fn edit(&self) -> OwnerTransaction {
-        OwnerTransaction {
+    pub(crate) fn edit(&self) -> OwnerDraft {
+        OwnerDraft {
             before: self.clone(),
             staged: self.theme.as_ref().map(|snapshot| snapshot.theme().clone()),
             staged_family: self.family().cloned(),
@@ -172,33 +152,33 @@ impl OwnerSnapshot {
 
 /// Detached optional Theme owner edit.
 #[derive(Clone, Debug)]
-pub struct OwnerTransaction {
+pub(crate) struct OwnerDraft {
     before: OwnerSnapshot,
     staged: Option<Theme>,
     staged_family: Option<Family>,
 }
 
-impl OwnerTransaction {
+impl OwnerDraft {
     /// Immutable owner source used for stale checks.
     #[must_use]
-    pub fn before(&self) -> &OwnerSnapshot {
+    pub(crate) fn before(&self) -> &OwnerSnapshot {
         &self.before
     }
 
     /// Borrow the currently staged Theme, or `None` when removal is staged.
     #[must_use]
-    pub fn theme(&self) -> Option<&Theme> {
+    pub(crate) fn theme(&self) -> Option<&Theme> {
         self.staged.as_ref()
     }
 
     /// Borrow the currently staged applied-theme family metadata.
     #[must_use]
-    pub fn family(&self) -> Option<&Family> {
+    pub(crate) fn family(&self) -> Option<&Family> {
         self.staged_family.as_ref()
     }
 
     /// Replace or remove the complete typed Theme owner.
-    pub fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
+    pub(crate) fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
         if let Some(value) = theme.as_ref() {
             validate_model(value, self.before.limits)?;
             if !self.before.is_present() && value.name.is_empty() {
@@ -222,12 +202,12 @@ impl OwnerTransaction {
     }
 
     /// Set or create the complete typed Theme owner.
-    pub fn set_theme(&mut self, theme: Theme) -> Result<bool> {
+    pub(crate) fn set_theme(&mut self, theme: Theme) -> Result<bool> {
         self.replace(Some(theme))
     }
 
     /// Set or replace the applied-theme family metadata.
-    pub fn set_family(&mut self, family: Family) -> Result<bool> {
+    pub(crate) fn set_family(&mut self, family: Family) -> Result<bool> {
         let family = super::preserve_family_source(self.before.family(), family)?;
         if self.staged_family.as_ref() == Some(&family) {
             return Ok(false);
@@ -237,7 +217,7 @@ impl OwnerTransaction {
     }
 
     /// Remove the applied-theme family metadata while retaining the Theme.
-    pub fn remove_family(&mut self) -> Result<bool> {
+    pub(crate) fn remove_family(&mut self) -> Result<bool> {
         if self.staged_family.is_none() {
             return Ok(false);
         }
@@ -246,12 +226,12 @@ impl OwnerTransaction {
     }
 
     /// Remove the optional Theme part and its Workbook owner edge.
-    pub fn remove(&mut self) -> Result<bool> {
+    pub(crate) fn remove(&mut self) -> Result<bool> {
         self.replace(None)
     }
 
     /// Change the Theme display name while retaining its other typed fields.
-    pub fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
+    pub(crate) fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -261,7 +241,7 @@ impl OwnerTransaction {
     }
 
     /// Replace the complete twelve-slot color palette.
-    pub fn set_palette(&mut self, colors: super::Palette) -> Result<bool> {
+    pub(crate) fn set_palette(&mut self, colors: super::Palette) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -271,7 +251,7 @@ impl OwnerTransaction {
     }
 
     /// Replace the complete major/minor font set.
-    pub fn set_fonts(&mut self, fonts: super::FontSet) -> Result<bool> {
+    pub(crate) fn set_fonts(&mut self, fonts: super::FontSet) -> Result<bool> {
         let mut candidate = self
             .staged
             .clone()
@@ -281,7 +261,7 @@ impl OwnerTransaction {
     }
 
     /// Commit the detached create, replace, or remove operation.
-    pub fn commit(self) -> Result<OwnerCommit> {
+    pub(crate) fn commit(self) -> Result<OwnerCommit> {
         let before_theme = self
             .before
             .theme
@@ -356,7 +336,7 @@ impl OwnerTransaction {
 
 /// Result of an optional Theme owner transaction.
 #[derive(Clone, Debug)]
-pub struct OwnerCommit {
+pub(crate) struct OwnerCommit {
     patch: OwnerPatch,
     changed: bool,
 }
@@ -368,25 +348,13 @@ impl OwnerCommit {
 
     /// Whether the Theme payload or owner topology changes.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
-    }
-
-    /// Planned resulting owner snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &OwnerSnapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked publication patch.
-    #[must_use]
-    pub fn patch(&self) -> &OwnerPatch {
-        &self.patch
     }
 
     /// Consume the commit into its planned snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (OwnerSnapshot, OwnerPatch) {
+    pub(crate) fn into_parts(self) -> (OwnerSnapshot, OwnerPatch) {
         let snapshot = self.patch.after().clone();
         (snapshot, self.patch)
     }
@@ -394,7 +362,7 @@ impl OwnerCommit {
 
 /// A source-checked, reversible create/replace/remove Theme owner patch.
 #[derive(Clone, Debug)]
-pub struct OwnerPatch {
+pub(crate) struct OwnerPatch {
     before: OwnerSnapshot,
     after: OwnerSnapshot,
     changed: bool,
@@ -411,26 +379,25 @@ impl OwnerPatch {
     }
 
     /// Source state required before publication.
-    #[must_use]
-    pub fn before(&self) -> &OwnerSnapshot {
+    pub(crate) fn before(&self) -> &OwnerSnapshot {
         &self.before
     }
 
     /// Exact state produced by publication.
     #[must_use]
-    pub fn after(&self) -> &OwnerSnapshot {
+    pub(crate) fn after(&self) -> &OwnerSnapshot {
         &self.after
     }
 
     /// Whether applying this patch changes bytes or owner topology.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         !self.changed
     }
 
     /// Return a patch that restores the source state represented by `before`.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -448,9 +415,7 @@ impl OwnerPatch {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         candidate.unsign();

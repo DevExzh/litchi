@@ -16,18 +16,18 @@ use std::io::Cursor;
 use litchi_core::sheet::WorkbookTrait as _;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part as _, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Kind as RawKind, Records, kind};
 use litchi_xlsb::sheet::State;
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for name in names {
-        builder.add_worksheet(MutableWorksheet::new(*name));
+        builder.add_worksheet(builder::Worksheet::new(*name));
     }
     builder.build().expect("worksheet fixture")
 }
@@ -44,10 +44,10 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    builder.add_worksheet(MutableWorksheet::new("Data"));
-    builder.add_worksheet(MutableWorksheet::new("Tail"));
+    builder.add_worksheet(builder::Worksheet::new("Data"));
+    builder.add_worksheet(builder::Worksheet::new("Tail"));
     builder.build().expect("chart-first fixture")
 }
 
@@ -91,8 +91,8 @@ fn selector_missing_is_distinct_from_a_resolved_noop() {
 #[test]
 fn ambiguous_catalog_names_are_rejected_before_state_selection() {
     let mut builder = Builder::new();
-    builder.add_worksheet(MutableWorksheet::new("DATA"));
-    builder.add_worksheet(MutableWorksheet::new("Else"));
+    builder.add_worksheet(builder::Worksheet::new("DATA"));
+    builder.add_worksheet(builder::Worksheet::new("Else"));
     let mut bytes = Cursor::new(Vec::new());
     builder
         .build()
@@ -201,6 +201,7 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
         Package::from_bytes(
             &package
                 .apply(&Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode"))
+                .map(litchi_xlsb::cell_values::structure::Commit::into_package)
                 .expect("replay")
                 .to_bytes()
                 .expect("replayed bytes"),
@@ -229,7 +230,10 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
 // old patch rather than test backward compatibility.
 fn metadata_only_name_wire(package: &Package, patch: &Patch) -> Vec<u8> {
     let mut legacy = package.opc_package().clone();
-    let renamed = package.apply(patch).expect("new rename package");
+    let renamed = package
+        .apply(patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("new rename package");
     let uri = legacy.main_document_part().unwrap().partname().clone();
     let workbook = renamed
         .opc_package()
@@ -280,7 +284,10 @@ fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
     );
 
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode rename");
-    let replayed = package.apply(&decoded).expect("replay rename");
+    let replayed = package
+        .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("replay rename");
     assert_eq!(
         replayed
             .workbook()
@@ -425,6 +432,7 @@ fn multi_sheet_visibility_preserves_opaque_records_and_exact_inverse() {
 
     let restored = hidden
         .apply(&commit.patch().inverse())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
         .expect("apply exact inverse");
     assert_eq!(
         restored.to_bytes().expect("inverse bytes"),
@@ -782,14 +790,14 @@ fn every_kind_workbook() -> Vec<u8> {
     )
     .expect("chart fixture");
     let mut builder = Builder::new();
-    builder.add_worksheet(MutableWorksheet::new("Data"));
+    builder.add_worksheet(builder::Worksheet::new("Data"));
     builder
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart sheet");
     for name in ["Dialog", "Macro", "Intl"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
-    builder.add_worksheet(MutableWorksheet::new("Tail"));
+    builder.add_worksheet(builder::Worksheet::new("Tail"));
     let mut bytes = Cursor::new(Vec::new());
     builder
         .build()
@@ -1033,7 +1041,10 @@ fn every_catalog_kind_supports_name_patch_replay_and_inverse() {
         let commit = edit.commit().unwrap();
         let wire = commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
         let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
-        let replay = package.apply(&patch).unwrap();
+        let replay = package
+            .apply(&patch)
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap();
         assert_eq!(
             replay
                 .workbook()
@@ -1045,7 +1056,12 @@ fn every_catalog_kind_supports_name_patch_replay_and_inverse() {
             "Renamed"
         );
         assert_eq!(
-            replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+            replay
+                .apply(&patch.inverse())
+                .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
             before
         );
     }
@@ -1080,7 +1096,10 @@ fn historical_catalog_name_patch_retains_metadata_only_after_image() {
     let commit = edit.commit().unwrap();
     let wire = metadata_only_name_wire(&package, commit.patch());
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
-    let replay = package.apply(&decoded).unwrap();
+    let replay = package
+        .apply(&decoded)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     assert_eq!(replay.workbook().unwrap().worksheet_names()[0], "Renamed");
     let app = PackURI::new("/docProps/app.xml").unwrap();
     assert_eq!(
@@ -1099,6 +1118,7 @@ fn historical_catalog_name_patch_retains_metadata_only_after_image() {
     assert_eq!(
         replay
             .apply(&decoded.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -1118,7 +1138,10 @@ fn dependency_name_patch_quotes_formulas_and_preserves_unrelated_payloads() {
         TransferLimits::DEFAULT,
     )
     .unwrap();
-    let replay = package.apply(&patch).unwrap();
+    let replay = package
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     for metadata in package.opc_package().iter_parts() {
         let part = package.opc_package().get_part(metadata.partname()).unwrap();
         let changed = replay.opc_package().get_part(part.partname()).unwrap();
@@ -1141,7 +1164,12 @@ fn dependency_name_patch_quotes_formulas_and_preserves_unrelated_payloads() {
         }
     }
     assert_eq!(
-        replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        replay
+            .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         before
     );
 }

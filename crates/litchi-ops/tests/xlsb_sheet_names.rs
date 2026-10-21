@@ -9,8 +9,8 @@ const CHART: &str = "/sheet[1]";
 const WORKSHEET: &str = "/sheet[2]";
 
 fn fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -23,10 +23,10 @@ fn fixture() -> Vec<u8> {
     .expect("build chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("add chart sheet");
-    builder.add_worksheet(MutableWorksheet::new("Data"));
-    builder.add_worksheet(MutableWorksheet::new("Tail"));
+    builder.add_worksheet(builder::Worksheet::new("Data"));
+    builder.add_worksheet(builder::Worksheet::new("Tail"));
 
     let mut output = Cursor::new(Vec::new());
     builder

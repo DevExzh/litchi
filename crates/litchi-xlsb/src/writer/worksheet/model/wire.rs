@@ -10,7 +10,7 @@ use crate::package::error::{Error, Result};
 use crate::package::formula::{CompilationContext, GroupKind, ParsedFormula, Range};
 use litchi_core::sheet::CellValue;
 
-use super::semantic::MutableWorksheet;
+use super::semantic::Worksheet;
 
 /// Cell data for storage
 #[derive(Debug, Clone)]
@@ -122,7 +122,7 @@ pub(crate) fn formula_requires_context_free_authoring(error: &Error) -> bool {
     matches!(error, Error::UnresolvedDependency(_))
 }
 
-impl MutableWorksheet {
+impl Worksheet {
     pub(crate) fn compile_contextual_formulas(
         &mut self,
         context: &CompilationContext<'_>,

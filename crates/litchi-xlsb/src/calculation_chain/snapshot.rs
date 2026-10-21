@@ -88,11 +88,14 @@ impl Snapshot {
         self.part.is_some()
     }
 
-    /// Start a detached source-bound transaction. The only supported change
-    /// is removal of the optional cache owner.
-    #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
+    /// Start an edit of the package this snapshot was read from (the unit
+    /// tests' route; packages start one with `edit_calculation_chain`).
+    #[cfg(test)]
+    pub(crate) fn edit(&self) -> super::Edit {
+        super::Edit::new(
+            crate::Package::from(self.package().as_ref().clone()),
+            self.clone(),
+        )
     }
 
     /// Exact finite limits retained by this snapshot.

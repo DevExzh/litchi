@@ -452,7 +452,11 @@ fn remove_cache_parts(package: &mut OpcPackage, workbook: &PackURI) -> Result<Ve
 }
 
 /// Replace workbook slicer caches and their BIFF12 relationship collection.
-pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cache]) -> Result<()> {
+pub(crate) fn store_caches(
+    package: &mut OpcPackage,
+    workbook: &PackURI,
+    caches: &[Cache],
+) -> Result<()> {
     validate_cache_set(caches)?;
     crate::signature_policy::ensure_unsigned(package)?;
     let _ = load_caches(package, workbook)?;
@@ -575,7 +579,11 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
 }
 
 /// Replace a worksheet's slicer views and relationship references.
-pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+pub(crate) fn store_views(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+) -> Result<()> {
     let mut candidate = package.clone();
     store_views_inner(&mut candidate, worksheet, views)?;
     *package = candidate;

@@ -85,7 +85,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         bytes.clone(),
         &litchi_ops::OpenOptions::new().source_mode(litchi_ops::SourceMode::Eager),
     )?;
-    let workbook = xlsb::Package::from_bytes(&bytes)?.into_workbook()?;
+    let package = xlsb::Package::from_bytes(&bytes)?;
+    let workbook = package.workbook()?;
 
     fn stats(mut samples: Vec<f64>) -> (f64, f64) {
         samples.sort_by(f64::total_cmp);
@@ -182,7 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             paired(
                 5,
                 || {
-                    let mut edit = workbook.edit_comments();
+                    let mut edit = package.edit_comments().expect("edit");
                     edit.add(0, 98, 25, "Author", "added").expect("add");
                     black_box(edit.commit().expect("commit").into_package());
                 },
@@ -217,7 +218,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .max()
                         .unwrap_or(0)
                         + 1;
-                    let mut edit = workbook.edit_conditional_formats();
+                    let mut edit = package.edit_conditional_formats().expect("edit");
                     let dxf = edit
                         .add_differential(&xlsb::conditional_formatting::edit::DifferentialStyle {
                             fill: Some(0x00FF_C7CE),
@@ -257,7 +258,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             paired(
                 5,
                 || {
-                    let mut edit = workbook.edit_hyperlinks();
+                    let mut edit = package.edit_hyperlinks().expect("edit");
                     let links = edit.hyperlinks(0).expect("links");
                     black_box(&links);
                     edit.add(
@@ -292,7 +293,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             paired(
                 5,
                 || {
-                    let mut edit = workbook.edit_data_validations();
+                    let mut edit = package.edit_data_validations().expect("edit");
                     let existing = edit.validations(0).expect("validations");
                     black_box(&existing);
                     let mut validation =
@@ -324,7 +325,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 5,
                 || {
                     use xlsb::drawing::edit::{ElementKind, Marker, Placement, ShapeSpec};
-                    let mut edit = workbook.edit_drawings();
+                    let mut edit = package.edit_drawings().expect("edit");
                     let count = edit
                         .elements(0)
                         .expect("elements")
@@ -358,7 +359,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             paired(
                 5,
                 || {
-                    let mut edit = workbook.edit_page_breaks();
+                    let mut edit = package.edit_page_breaks().expect("edit");
                     let mut breaks = edit.page_breaks(0).expect("breaks");
                     breaks.rows.push(xlsb::page_breaks::Break::row(20));
                     edit.set_page_breaks(0, &breaks).expect("set");

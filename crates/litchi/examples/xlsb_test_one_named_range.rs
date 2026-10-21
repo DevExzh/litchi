@@ -3,15 +3,15 @@
 #![allow(clippy::all)]
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::named_ranges::Definition;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test: ONE named range...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Simple data
     sheet.set_cell(0, 0, CellValue::String("Value".to_string()));

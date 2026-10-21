@@ -23,9 +23,13 @@ const SINGLE_CELLS_CONTENT_TYPE: &str = "application/vnd.ms-excel.tableSingleCel
 const SINGLE_CELLS_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells";
 
-/// A validated draft whose commit remains bound to the exact source graph.
+crate::part_edit::limits_options!(super::SemanticLimits, "Custom XML Maps");
+
+/// A staged Custom XML Maps edit of one package, bound to its exact source
+/// graph. Dropping it discards it.
 #[derive(Clone, Debug)]
 pub struct Edit {
+    source: crate::Package,
     before: Snapshot,
     catalog: Option<XmlMapInfo>,
     conformance: XmlMapConformance,
@@ -34,8 +38,9 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub(crate) fn new(before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
         Self {
+            source,
             catalog: before.map_info().cloned(),
             conformance: before.conformance(),
             mapped_tables: before.mapped_tables().to_vec(),
@@ -288,8 +293,7 @@ impl Edit {
             })?;
             columns.push(binding);
         }
-        let replacement =
-            MappedTable::new_with_limits(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
         let source = self.source_table(table_id, column_id)?;
         patch_table_bindings(&source, &replacement, self.before.limits().bindings)?;
         let previous = if let Some(index) = table_index {
@@ -345,8 +349,7 @@ impl Edit {
             return Ok(None);
         };
         let removed = columns.remove(column_index);
-        let replacement =
-            MappedTable::new_with_limits(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
         let previous = std::mem::replace(&mut self.mapped_tables[table_index], replacement);
         match validate_draft(
             self.catalog.as_ref(),
@@ -365,6 +368,17 @@ impl Edit {
 
     /// Build a reversible source-bound commit without touching a workbook.
     pub fn commit(self) -> Result<Commit> {
+        let source = self.source.clone();
+        let patch = self.plan()?;
+        source.apply_xml_maps(&patch)
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        *self = Self::new(self.source.clone(), self.before.clone());
+    }
+
+    fn plan(self) -> Result<Patch> {
         validate_draft(
             self.catalog.as_ref(),
             &self.mapped_tables,
@@ -377,8 +391,7 @@ impl Edit {
             && self.before.mapped_tables() == self.mapped_tables
             && self.before.binding_groups_equal(&self.single_cell_bindings)
         {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(patch, false));
+            return Ok(Patch::new(self.before.clone(), self.before.clone()));
         }
 
         let mut source = self.before.source().clone();
@@ -422,8 +435,7 @@ impl Edit {
             self.single_cell_bindings,
             source,
         )?;
-        let patch = Patch::new(self.before, after);
-        Ok(Commit::new(patch, true))
+        Ok(Patch::new(self.before, after))
     }
 
     fn materialize_catalog(&self, source: &mut SourceState) -> Result<()> {
@@ -986,17 +998,19 @@ mod transaction_tests {
     fn absent_catalog_conformance_is_an_exact_signed_no_op() {
         let snapshot = Snapshot::empty_transaction_fixture(true);
         let before = snapshot.source().clone();
-        let mut transaction = snapshot.edit();
+        let mut transaction = Edit::new(
+            crate::Package::from(litchi_opc::OpcPackage::new()),
+            snapshot,
+        );
         assert!(
             !transaction
                 .set_conformance(XmlMapConformance::Strict)
                 .expect("absent catalog conformance is inert")
         );
-        let commit = transaction.commit().expect("commit no-op");
-        assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
-        assert_eq!(commit.patch().before().source(), &before);
-        assert_eq!(commit.patch().after().source(), &before);
+        let patch = transaction.plan().expect("plan no-op");
+        assert!(patch.is_noop());
+        assert_eq!(patch.before().source(), &before);
+        assert_eq!(patch.after().source(), &before);
     }
 
     #[test]
@@ -1123,6 +1137,7 @@ mod transaction_tests {
         )
         .expect("binding");
         let mut transaction = Edit {
+            source: crate::Package::from(litchi_opc::OpcPackage::new()),
             before,
             catalog: Some(fixture_catalog()),
             conformance: XmlMapConformance::Transitional,
@@ -1155,7 +1170,10 @@ mod transaction_tests {
     fn additive_binding_refuses_a_non_xml_table_without_mutating_the_draft() {
         let snapshot = Snapshot::non_xml_table_transaction_fixture();
         let source = snapshot.source().clone();
-        let mut transaction = snapshot.edit();
+        let mut transaction = Edit::new(
+            crate::Package::from(litchi_opc::OpcPackage::new()),
+            snapshot,
+        );
         let binding = ColumnBinding::new(
             1,
             7,

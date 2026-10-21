@@ -16,6 +16,8 @@ pub const MAX_MERGED_CELL_COLUMN: u32 = 16_383;
 /// Maximum number of `BrtMergeCell` records in one worksheet collection.
 pub const MAX_MERGED_CELL_RANGES: usize = 1_048_576;
 
+pub mod edit;
+
 /// Result type for merged-cell parsing and validation.
 pub type Result<T> = std::result::Result<T, Error>;
 

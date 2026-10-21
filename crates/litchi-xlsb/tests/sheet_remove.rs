@@ -19,6 +19,7 @@ use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI, Part as _, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
@@ -36,7 +37,6 @@ use litchi_xlsb::volatile_dependencies::{
     CONTENT_TYPE as VOLATILE_CONTENT_TYPE, CachedValue, CellReference, DEFAULT_PART_NAME,
     Dependencies, DependencyKind, MainTopic, Topic, VolatileType,
 };
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 const BINARY_INDEX_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex";
@@ -52,7 +52,7 @@ struct BundleEntry {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for (index, name) in names.iter().enumerate() {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} identity {index}"));
         builder.add_worksheet(sheet);
     }
@@ -71,12 +71,12 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart fixture");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data identity");
     builder.add_worksheet(data);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail identity");
     builder.add_worksheet(tail);
     builder.build().expect("chart-first fixture")
@@ -396,7 +396,7 @@ fn related_parts(package: &Package, root: &PackURI) -> BTreeSet<String> {
 fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .add_external_link(
@@ -480,7 +480,7 @@ fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
 fn package_with_named_ranges() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Scoped".to_owned(), Some(1)).with_formula(vec![
@@ -519,7 +519,10 @@ fn package_with_volatile_dependencies() -> Package {
     let mut edit = package.edit_volatile_dependencies().unwrap();
     edit.set_dependencies(dependencies).unwrap();
     let commit = edit.commit().unwrap();
-    package.apply_volatile_dependencies(&commit).unwrap()
+    package
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
 }
 
 fn volatile_ref_indices(package: &Package) -> Vec<u32> {
@@ -594,7 +597,7 @@ fn package_with_vba_project() -> Package {
 }
 
 fn package_with_shared_workbook() -> Package {
-    let mut opc = worksheets(&["A", "B", "C"]).into_opc();
+    let source = worksheets(&["A", "B", "C"]);
     let guid = Guid::from_bytes([7; 16]);
     let date = ShortDateTime {
         year: 2024,
@@ -640,14 +643,15 @@ fn package_with_shared_workbook() -> Package {
             b"opaque-log".to_vec(),
         )])],
     };
-    litchi_xlsb::shared_workbook::store(&mut opc, &catalog).unwrap();
-    Package::from_opc(opc).unwrap()
+    let mut edit = source.edit_shared_workbook().unwrap();
+    edit.replace(catalog).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
 fn package_with_connections() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_connections(Connections {
@@ -665,7 +669,7 @@ fn package_with_connections() -> Package {
 fn package_with_data_model() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).unwrap())
@@ -1225,10 +1229,18 @@ fn durable_tag10_is_sorted_and_replays_inverse_exactly() {
         3
     );
     let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
-    let replay = source.apply(&patch).unwrap();
+    let replay = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     assert_eq!(catalog_names(&replay), vec!["A", "C"]);
     assert_eq!(
-        replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        replay
+            .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         before
     );
 }
@@ -1398,6 +1410,7 @@ fn volatile_dependencies_shift_and_inverse_exactly() {
         commit
             .package()
             .apply(&commit.patch().inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -1588,8 +1601,8 @@ fn binary_hyperlink_locations_cannot_keep_removed_sheet_names() {
         ("O'Brien", "#'O''Brien'!A1"),
     ] {
         let mut builder = Builder::new();
-        builder.add_worksheet(MutableWorksheet::new(name));
-        let mut survivor = MutableWorksheet::new("Keep");
+        builder.add_worksheet(builder::Worksheet::new(name));
+        let mut survivor = builder::Worksheet::new("Keep");
         survivor.add_hyperlink(Hyperlink::new_internal(0, 0, 0, 0, location.to_owned()));
         builder.add_worksheet(survivor);
         let source = builder.build().unwrap();
@@ -1635,7 +1648,7 @@ fn opaque_pivot_cache_and_future_worksheet_carriers_are_guarded() {
 fn global_defined_name_cannot_lose_its_only_local_target() {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Target".to_owned(), None)
@@ -1658,8 +1671,8 @@ fn global_defined_name_cannot_lose_its_only_local_target() {
 fn live_formula_references_receive_typed_removal_refusal() {
     use litchi_xlsb::formula::ParsedFormula;
     let mut builder = Builder::new();
-    builder.add_worksheet(MutableWorksheet::new("A"));
-    let mut keep = MutableWorksheet::new("Keep");
+    builder.add_worksheet(builder::Worksheet::new("A"));
+    let mut keep = builder::Worksheet::new("Keep");
     keep.set_cell_formula_binary(
         0,
         0,
@@ -1672,7 +1685,7 @@ fn live_formula_references_receive_typed_removal_refusal() {
         0,
     );
     builder.add_worksheet(keep);
-    builder.add_worksheet(MutableWorksheet::new("C"));
+    builder.add_worksheet(builder::Worksheet::new("C"));
     let source = builder.build().unwrap();
     let before = source.to_bytes().unwrap();
     let mut edit = source.edit().unwrap();

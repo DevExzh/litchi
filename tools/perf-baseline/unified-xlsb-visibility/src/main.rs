@@ -83,18 +83,18 @@ fn target_name(index: usize) -> String {
 }
 
 fn corpus(target_count: usize) -> Result<Vec<u8>> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
     for index in 0..target_count {
-        let mut sheet = MutableWorksheet::new(target_name(index));
+        let mut sheet = builder::Worksheet::new(target_name(index));
         // Keep each generated worksheet physically non-empty. This makes the
         // corpus exercise the same worksheet payload closure at every N while
         // the operation itself remains workbook-tab metadata only.
         sheet.set_cell(0, 0, index as f64);
         writer.add_worksheet(sheet);
     }
-    let mut sentinel = MutableWorksheet::new(SENTINEL_NAME);
+    let mut sentinel = builder::Worksheet::new(SENTINEL_NAME);
     sentinel.set_cell(0, 0, -1.0);
     writer.add_worksheet(sentinel);
     let mut output = Cursor::new(Vec::new());
@@ -624,7 +624,7 @@ fn main() -> Result<()> {
         };
         let corpus_sha256 = sha256(&archive);
         let artifact = json!({
-            "generator": "litchi_xlsb::writer::{Builder, MutableWorksheet}; N target worksheets plus one visible sentinel; one numeric marker per tab",
+            "generator": "litchi_xlsb::builder::{self, Builder}; N target worksheets plus one visible sentinel; one numeric marker per tab",
             "target_count": target_count,
             "tab_count": target_count + 1,
             "bytes": archive.len(),

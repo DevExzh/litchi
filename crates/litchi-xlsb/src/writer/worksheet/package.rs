@@ -4,9 +4,9 @@ use crate::package::error::{Error, Result};
 use crate::raw::{Encoder, kind};
 use std::io::Write;
 
-use super::model::MutableWorksheet;
+use super::model::Worksheet;
 
-impl MutableWorksheet {
+impl Worksheet {
     /// Validate and fully encode the optional sparkline block without
     /// publishing any worksheet or relationship state.
     pub(crate) fn stage_sparkline_block(&self) -> Result<Option<Vec<u8>>> {
@@ -27,7 +27,7 @@ impl MutableWorksheet {
     pub(crate) fn write<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
     ) -> Result<()> {
         let sparkline_block = self.stage_sparkline_block()?;
         self.write_with_sparkline_block(writer, shared_strings, sparkline_block.as_deref())
@@ -37,7 +37,7 @@ impl MutableWorksheet {
     pub(crate) fn write_with_sparkline_block<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
         sparkline_block: Option<&[u8]>,
     ) -> Result<()> {
         // Write BrtBeginSheet

@@ -52,9 +52,9 @@ fn mixed_chart_tabs_with_sparkline_bytes() -> Vec<u8> {
 }
 
 fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
+    use xlsb::builder::{self, Builder};
     use xlsb::chart::{Anchor, Chart};
     use xlsb::sparkline::{Color as SparkColor, Colors, Group, Groups, Location, Sparkline};
-    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -65,9 +65,9 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
     if with_sparkline {
         let groups = Groups::new(vec![
@@ -85,7 +85,7 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(tail);
 
@@ -95,11 +95,11 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
 }
 
 fn all_worksheet_bytes() -> Vec<u8> {
-    use xlsb::writer::{Builder, MutableWorksheet};
+    use xlsb::builder::{self, Builder};
 
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "FIRST");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
 
     let mut writer = Builder::new();
@@ -112,8 +112,8 @@ fn all_worksheet_bytes() -> Vec<u8> {
 }
 
 fn chart_first_tabs_bytes() -> Vec<u8> {
+    use xlsb::builder::{self, Builder};
     use xlsb::chart::{Anchor, Chart};
-    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -124,12 +124,12 @@ fn chart_first_tabs_bytes() -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
 
     let mut writer = Builder::new();
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(data);
 
@@ -672,12 +672,12 @@ fn source_backed_facade_strictly_refuses_sparkline_materialization() {
             .value(),
         &CellValue::String("TAIL".to_string())
     );
-    let eager = xlsb::Package::from_bytes(&bytes)
-        .and_then(xlsb::Package::into_workbook)
+    let package = xlsb::Package::from_bytes(&bytes)
         .expect("explicit eager XLSB API should support sparkline-bearing sheets");
-    assert_eq!(eager_text(&eager), "DATA\nTAIL\n");
+    let eager = package.workbook().expect("eager projection");
+    assert_eq!(eager_text(eager), "DATA\nTAIL\n");
     assert_eq!(
-        WorkbookTrait::worksheet_by_name(&eager, "Tail")
+        WorkbookTrait::worksheet_by_name(eager, "Tail")
             .expect("eager tail worksheet")
             .cell_by_coordinate("A1")
             .expect("eager tail cell")

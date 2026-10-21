@@ -68,7 +68,7 @@ impl StylesWriter {
     /// # Examples
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::StylesWriter;
+    /// use litchi_xlsb::builder::StylesWriter;
     /// use litchi_xlsb::package::styles_table::Font;
     ///
     /// let mut styles = StylesWriter::new();

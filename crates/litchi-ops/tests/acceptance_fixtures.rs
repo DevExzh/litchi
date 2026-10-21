@@ -200,7 +200,7 @@ fn ppt_elements() -> Vec<u8> {
 /// A worksheet with a header row and a three-column table over it.
 fn xlsb_table() -> Vec<u8> {
     use litchi_xlsb::package::table::{Column, Range, Table, Type};
-    let mut sheet = litchi_xlsb::writer::MutableWorksheet::new("Sheet1");
+    let mut sheet = litchi_xlsb::builder::Worksheet::new("Sheet1");
     for (column, name) in ["Item", "Count", "Price"].into_iter().enumerate() {
         sheet.set_cell(0, column as u32, name);
     }

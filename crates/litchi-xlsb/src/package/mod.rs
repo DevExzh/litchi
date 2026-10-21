@@ -7,18 +7,17 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use litchi_core::{ExecutionContext, sheet::WorkbookTrait};
 use litchi_opc::{OpcPackage, PackageWriter};
 
 use crate::OpenOptions;
 use crate::Workbook;
+use crate::builder::{self, Builder};
 use crate::external_link::ExternalLinkLimits;
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::package::error::Result;
 use crate::workbook::DrawingLoadPolicy;
-use crate::writer::{Builder, MutableWorksheet};
 
 #[path = "../host/cell.rs"]
 pub(crate) mod cell;
@@ -99,7 +98,7 @@ pub(crate) mod walker;
 pub mod web_extension_bindings;
 
 pub use cell::{Cell, FormulaOpacityReason, FormulaResolutionStatus};
-pub use error::{Error as PackageError, Result as PackageResult};
+pub use error::{Error as PackageError, LimitKind, Result as PackageResult};
 pub use shared_strings::{
     PhoneticAlignment, PhoneticRun, PhoneticString, PhoneticType, SharedString, SharedStringRun,
 };
@@ -116,12 +115,24 @@ pub struct Package(
     ToleranceReport,
     DrawingLoadPolicy,
     Leniency,
-    // A validated projection is retained only by constructors that already
-    // paid to build it.  The physical package remains the owner snapshot;
-    // this cache lets an un-cloned consuming projection reuse that validation
-    // without reparsing the same admitted graph.
-    Option<Arc<Workbook>>,
+    // The validated read-only workbook projection of exactly this OPC graph.
+    // Constructors that already parsed it (every validating open and every
+    // reparsing commit) fill it; otherwise `workbook()` parses it once on
+    // first use. Clones share it.
+    Projection,
+    // The semantic budgets every family read and edit defaults to.
+    crate::SemanticLimits,
 );
+
+/// The lazily filled, shared workbook projection of a [`Package`].
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Projection(OnceLock<Arc<Workbook>>);
+
+impl Projection {
+    fn filled(workbook: Workbook) -> Self {
+        Self(OnceLock::from(Arc::new(workbook)))
+    }
+}
 
 impl Package {
     /// Start the primary detached workbook transaction.
@@ -138,9 +149,21 @@ impl Package {
         crate::cell_values::structure::Edit::new(self, options.get_transfer_limits())
     }
 
-    /// Apply an exact-source structural patch and return a new package.
-    pub fn apply(&self, patch: &crate::cell_values::structure::Patch) -> Result<Self> {
-        patch.apply_to_package(self)
+    /// Apply an exact-source structural patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch source, a changed patch of a
+    /// signed workbook, and the workbook validation errors of the result.
+    pub fn apply(
+        &self,
+        patch: &crate::cell_values::structure::Patch,
+    ) -> Result<crate::cell_values::structure::Commit> {
+        Ok(crate::cell_values::structure::Commit::published(
+            patch.apply_to_package(self)?,
+            patch.clone(),
+        ))
     }
 
     pub(crate) const fn drawing_load_policy(&self) -> DrawingLoadPolicy {
@@ -148,117 +171,38 @@ impl Package {
     }
 
     pub(crate) fn project_candidate(&self, candidate: OpcPackage) -> Result<Workbook> {
-        Workbook::reparse_candidate_with_policy(candidate, self.1, self.3, self.4)
+        let mut workbook =
+            Workbook::reparse_candidate_with_policy(candidate, self.1, self.3, self.4)?;
+        workbook.set_semantic_limits(self.6);
+        Ok(workbook)
+    }
+
+    /// The semantic budgets this package keeps; every family read uses them
+    /// and every family edit defaults to them.
+    #[must_use]
+    pub const fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.6
+    }
+
+    /// Return this package with other semantic budgets; the OPC graph and
+    /// the workbook projection are shared.
+    #[must_use]
+    pub fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut package = self.clone();
+        package.6 = limits;
+        if let Some(workbook) = package.5.0.get() {
+            if workbook.semantic_limits() != limits {
+                package.5 = Projection::default();
+            }
+        }
+        package
     }
 
     /// Create a deterministic workbook containing one visible worksheet.
     pub fn new() -> Result<Self> {
         let mut builder = Builder::new();
-        builder.add_worksheet(MutableWorksheet::new("Sheet1"));
+        builder.add_worksheet(builder::Worksheet::new("Sheet1"));
         builder.build()
-    }
-
-    /// Read workbook slicer caches as an immutable, source-bound snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the slicer owner or its dependency closure is invalid.
-    pub fn slicer_caches(&self) -> Result<crate::slicer::Snapshot> {
-        crate::slicer::transaction::read_caches(&self.0, &self.workbook_uri()?)
-    }
-
-    /// Read worksheet slicer views by checked zero-based worksheet position.
-    ///
-    /// `Ok(None)` means the worksheet selector did not resolve. An existing
-    /// worksheet always returns a snapshot, including when it has no view part.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when workbook resolution or the slicer owner is invalid.
-    pub fn slicer_views(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Snapshot>> {
-        let Some(worksheet_uri) = self.worksheet_uri(worksheet_index)? else {
-            return Ok(None);
-        };
-        crate::slicer::transaction::read_views(&self.0, &worksheet_uri).map(Some)
-    }
-
-    /// Read worksheet slicer views by exact worksheet name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when workbook resolution or the slicer owner is invalid.
-    pub fn slicer_views_by_name(
-        &self,
-        worksheet_name: &str,
-    ) -> Result<Option<crate::slicer::Snapshot>> {
-        let Some(worksheet_uri) = self.worksheet_uri_by_name(worksheet_name)? else {
-            return Ok(None);
-        };
-        crate::slicer::transaction::read_views(&self.0, &worksheet_uri).map(Some)
-    }
-
-    /// Apply a source-checked slicer patch and return a new package snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the patch is stale or its exact readback fails.
-    pub fn apply_slicer_patch(&self, patch: &crate::slicer::Patch) -> Result<Self> {
-        let mut candidate = self.0.clone();
-        crate::slicer::transaction::apply(&mut candidate, patch)?;
-        self.reparse_candidate(candidate)
-    }
-
-    /// Read workbook timeline caches as an immutable, source-bound snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the timeline owner or its dependency closure is invalid.
-    pub fn timeline_caches(&self) -> Result<crate::timeline::Snapshot> {
-        crate::timeline::transaction::read_caches(&self.0, &self.workbook_uri()?)
-    }
-
-    /// Read worksheet timeline views by checked zero-based worksheet position.
-    ///
-    /// `Ok(None)` means the worksheet selector did not resolve. An existing
-    /// worksheet always returns a snapshot, including when it has no view part.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when workbook resolution or the timeline owner is invalid.
-    pub fn timeline_views(
-        &self,
-        worksheet_index: usize,
-    ) -> Result<Option<crate::timeline::Snapshot>> {
-        let Some(worksheet_uri) = self.worksheet_uri(worksheet_index)? else {
-            return Ok(None);
-        };
-        crate::timeline::transaction::read_views(&self.0, &worksheet_uri).map(Some)
-    }
-
-    /// Read worksheet timeline views by exact worksheet name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when workbook resolution or the timeline owner is invalid.
-    pub fn timeline_views_by_name(
-        &self,
-        worksheet_name: &str,
-    ) -> Result<Option<crate::timeline::Snapshot>> {
-        let Some(worksheet_uri) = self.worksheet_uri_by_name(worksheet_name)? else {
-            return Ok(None);
-        };
-        crate::timeline::transaction::read_views(&self.0, &worksheet_uri).map(Some)
-    }
-
-    /// Apply a source-checked timeline patch and return a new package snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the patch is stale or its exact readback fails.
-    pub fn apply_timeline_patch(&self, patch: &crate::timeline::Patch) -> Result<Self> {
-        let mut candidate = self.0.clone();
-        crate::timeline::transaction::apply(&mut candidate, patch)?;
-        self.reparse_candidate(candidate)
     }
 
     /// Open and validate an XLSB package from a filesystem path.
@@ -339,80 +283,23 @@ impl Package {
     pub fn from_opc_with_options(package: OpcPackage, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
         let drawing_load_policy = options.drawing_load_policy();
-        let workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
             package.clone(),
             options.external_link_limits,
             drawing_load_policy,
         )?;
-        let tolerance = workbook.into_tolerance_report();
+        workbook.set_projection_leniency(options.leniency);
+        workbook.set_semantic_limits(options.semantic_limits);
+        let tolerance = workbook.tolerance_report().clone();
         Ok(Self(
             package,
             options.external_link_limits,
             tolerance,
             drawing_load_policy,
             options.leniency,
-            None,
+            Projection::filled(workbook),
+            options.semantic_limits,
         ))
-    }
-
-    /// Read the source-bound XLSB Custom Data catalog.
-    pub fn custom_data(&self) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load(&self.0)
-    }
-
-    /// Read Custom Data with an explicit finite policy.
-    pub fn custom_data_with_limits(
-        &self,
-        limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load_with_limits(&self.0, limits)
-    }
-
-    /// Read Custom Data with an explicit policy and owned execution context.
-    pub fn custom_data_with_limits_and_context(
-        &self,
-        limits: crate::custom_data::Limits,
-        context: ExecutionContext,
-    ) -> Result<crate::custom_data::Snapshot> {
-        crate::custom_data::Snapshot::load_with_limits_and_context(&self.0, limits, Some(context))
-    }
-
-    /// Start a detached source-bound Custom Data transaction.
-    pub fn edit_custom_data(&self) -> Result<crate::custom_data::Edit> {
-        crate::custom_data::Edit::from_package(self.0.clone())
-    }
-
-    /// Start a detached Custom Data transaction with an explicit finite policy.
-    pub fn edit_custom_data_with_limits(
-        &self,
-        limits: crate::custom_data::Limits,
-    ) -> Result<crate::custom_data::Edit> {
-        crate::custom_data::Edit::from_package_with_limits(self.0.clone(), limits)
-    }
-
-    /// Start a detached Custom Data transaction with an owned execution context.
-    pub fn edit_custom_data_with_limits_and_context(
-        &self,
-        limits: crate::custom_data::Limits,
-        context: ExecutionContext,
-    ) -> Result<crate::custom_data::Edit> {
-        crate::custom_data::Edit::from_package_with_limits_and_context(
-            self.0.clone(),
-            limits,
-            Some(context),
-        )
-    }
-
-    /// Apply a source-checked Custom Data patch and return a new package.
-    pub fn apply_custom_data_patch(&self, patch: &crate::custom_data::Patch) -> Result<Self> {
-        let mut candidate = self.0.clone();
-        patch.apply_to_opc(&mut candidate)?;
-        self.reparse_candidate(candidate)
-    }
-
-    /// Apply a source-checked Custom Data commit and return a new package.
-    pub fn apply_custom_data(&self, commit: &crate::custom_data::Commit) -> Result<Self> {
-        self.apply_custom_data_patch(commit.patch())
     }
 
     pub(crate) fn from_workbook(workbook: &Workbook) -> Self {
@@ -422,38 +309,19 @@ impl Package {
             workbook.tolerance_report().clone(),
             workbook.drawing_load_policy(),
             workbook.leniency(),
-            None,
+            Projection::default(),
+            workbook.semantic_limits(),
         )
     }
 
-    /// Adopt a validated workbook without serializing or reparsing its graph.
+    /// Adopt a validated workbook without serializing or reparsing its graph;
+    /// the workbook becomes the package's projection.
     pub(crate) fn from_validated_workbook(workbook: Workbook) -> Self {
         let limits = workbook.external_link_limits();
         let tolerance = workbook.tolerance_report().clone();
         let drawing_policy = workbook.drawing_load_policy();
         let leniency = workbook.leniency();
-        Self(
-            workbook.package,
-            limits,
-            tolerance,
-            drawing_policy,
-            leniency,
-            None,
-        )
-    }
-
-    /// Adopt a physically admitted workbook while retaining its validated
-    /// projection for one consuming `into_workbook` call.
-    ///
-    /// This narrow constructor is reserved for publication paths that have
-    /// already parsed and validated the candidate. Ordinary workbook-to-
-    /// package conversion intentionally discards the projection so a package
-    /// does not retain an unused duplicate semantic graph.
-    pub(crate) fn from_validated_workbook_with_projection(workbook: Workbook) -> Self {
-        let limits = workbook.external_link_limits();
-        let tolerance = workbook.tolerance_report().clone();
-        let drawing_policy = workbook.drawing_load_policy();
-        let leniency = workbook.leniency();
+        let semantic_limits = workbook.semantic_limits();
         let package = workbook.package.clone();
         Self(
             package,
@@ -461,19 +329,19 @@ impl Package {
             tolerance,
             drawing_policy,
             leniency,
-            Some(Arc::new(workbook)),
+            Projection::filled(workbook),
+            semantic_limits,
         )
     }
 
-    /// Revalidate a candidate under the owner's retained projection policies.
-    /// [`Self::reparse_candidate`] that keeps the validated projection, so a
-    /// following [`Self::into_workbook`] does not parse the candidate again.
+    /// Revalidate a candidate under the owner's retained projection policies,
+    /// keeping the validated projection so [`Self::workbook`] does not parse
+    /// the candidate again.
     pub(crate) fn reparse_candidate_retaining_projection(
         &self,
         candidate: OpcPackage,
     ) -> Result<Self> {
-        let workbook =
-            Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
+        let workbook = self.project_candidate(candidate.clone())?;
         let tolerance = workbook.tolerance_report().clone();
         Ok(Self(
             candidate,
@@ -481,41 +349,28 @@ impl Package {
             tolerance,
             self.3,
             self.4,
-            Some(Arc::new(workbook)),
-        ))
-    }
-
-    /// [`Self::reparse_candidate_retaining_projection`] for a candidate
-    /// derived from `workbook`'s graph, with the workbook's policies.
-    pub(crate) fn reparse_workbook_candidate(
-        workbook: &Workbook,
-        candidate: OpcPackage,
-    ) -> Result<Self> {
-        let limits = workbook.external_link_limits();
-        let drawing_policy = workbook.drawing_load_policy();
-        let leniency = workbook.leniency();
-        let reparsed = Workbook::reparse_candidate_with_policy(
-            candidate.clone(),
-            limits,
-            drawing_policy,
-            leniency,
-        )?;
-        let tolerance = reparsed.tolerance_report().clone();
-        Ok(Self(
-            candidate,
-            limits,
-            tolerance,
-            drawing_policy,
-            leniency,
-            Some(Arc::new(reparsed)),
+            Projection::filled(workbook),
+            self.6,
         ))
     }
 
     pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
-        let workbook =
-            Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
-        let tolerance = workbook.into_tolerance_report();
-        Ok(Self(candidate, self.1, tolerance, self.3, self.4, None))
+        self.reparse_candidate_retaining_projection(candidate)
+    }
+
+    /// Publish a candidate whose workbook projection the change cannot
+    /// affect (a signature, ribbon, task-pane, VBA or theme part change)
+    /// without validating it again. The projection is parsed on first use.
+    pub(crate) fn with_unparsed(&self, candidate: OpcPackage) -> Self {
+        Self(
+            candidate,
+            self.1,
+            self.2.clone(),
+            self.3,
+            self.4,
+            Projection::default(),
+            self.6,
+        )
     }
 
     /// The worksheet repair policy retained by this package.
@@ -553,36 +408,145 @@ impl Package {
         self.1
     }
 
-    /// Materialize a workbook handle from this package.
-    pub fn workbook(&self) -> Result<Workbook> {
+    /// The read-only workbook projection of this package.
+    ///
+    /// Every validating open and every commit already parsed it, so this
+    /// borrows that projection; a package adopted without validation
+    /// (`From<OpcPackage>`) parses it once on first use. Clones of a package
+    /// share it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the workbook validation errors of a package whose projection
+    /// was not parsed yet.
+    pub fn workbook(&self) -> Result<&Workbook> {
+        if let Some(workbook) = self.5.0.get() {
+            return Ok(workbook);
+        }
+        let workbook = self.materialize_workbook()?;
+        let workbook = self.5.0.get_or_init(|| Arc::new(workbook));
+        Ok(workbook)
+    }
+
+    /// The shared workbook projection, parsed on first use.
+    pub(crate) fn projection(&self) -> Result<Arc<Workbook>> {
+        self.workbook()?;
+        self.5.0.get().cloned().ok_or(PackageError::InvalidFormat(
+            "the XLSB workbook projection is missing".to_owned(),
+        ))
+    }
+
+    /// Whether this package carries package signatures.
+    #[must_use]
+    pub fn is_signed(&self) -> bool {
+        self.0.is_signed()
+    }
+
+    /// Verify package signatures with the safe strict policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns the signature parsing and verification errors.
+    #[cfg(feature = "sign")]
+    pub fn signatures(&self) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.0.signatures()
+    }
+
+    /// Verify package signatures with an explicit trust-neutral policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns the signature parsing and verification errors.
+    #[cfg(feature = "sign")]
+    pub fn signatures_with(
+        &self,
+        policy: &litchi_sign::Policy,
+    ) -> litchi_opc::sign::Result<Vec<litchi_opc::sign::Report>> {
+        self.0.signatures_with(policy)
+    }
+
+    /// Return a new package with one more signature, preserving every
+    /// existing valid signature; this package is unchanged. The new
+    /// signature part is reported by [`Self::signatures`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the signing errors.
+    #[cfg(feature = "sign")]
+    pub fn sign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut candidate = self.0.clone();
+        candidate.sign(signer)?;
+        Ok(self.with_unparsed(candidate))
+    }
+
+    /// [`Self::sign`] with explicit authoring resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the signing errors.
+    #[cfg(feature = "sign")]
+    pub fn sign_with(
+        &self,
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut candidate = self.0.clone();
+        candidate.sign_with(signer, limits)?;
+        Ok(self.with_unparsed(candidate))
+    }
+
+    /// Return a new package whose signatures are atomically replaced by one
+    /// signature; this package is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns the signing errors.
+    #[cfg(feature = "sign")]
+    pub fn resign(&self, signer: &litchi_sign::Signer) -> litchi_opc::sign::Result<Self> {
+        let mut candidate = self.0.clone();
+        candidate.resign(signer)?;
+        Ok(self.with_unparsed(candidate))
+    }
+
+    /// [`Self::resign`] with explicit authoring resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns the signing errors.
+    #[cfg(feature = "sign")]
+    pub fn resign_with(
+        &self,
+        signer: &litchi_sign::Signer,
+        limits: &litchi_sign::Limits,
+    ) -> litchi_opc::sign::Result<Self> {
+        let mut candidate = self.0.clone();
+        candidate.resign_with(signer, limits)?;
+        Ok(self.with_unparsed(candidate))
+    }
+
+    /// Return a new package without its package signatures; this package
+    /// keeps them.
+    ///
+    /// This is the explicit authorization ADR 0006 requires: an edit never
+    /// removes a signature itself, so a changed commit of a signed package
+    /// is refused with [`PackageError::Signed`] until this is called.
+    #[must_use]
+    pub fn unsign(&self) -> Self {
+        let mut candidate = self.0.clone();
+        candidate.unsign();
+        self.with_unparsed(candidate)
+    }
+
+    /// Parse a fresh, owned workbook from this package under its retained
+    /// policies (for crate paths that author into a donor workbook).
+    pub(crate) fn materialize_workbook(&self) -> Result<Workbook> {
         let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
             self.0.clone(),
             self.1,
             self.3,
         )?;
         workbook.set_projection_leniency(self.4);
-        Ok(workbook)
-    }
-
-    /// Consume this package and materialize its workbook handle.
-    ///
-    /// A uniquely held projection retained by cell publication is reused.
-    /// Packages without one, including shared projections, are parsed under
-    /// the retained source and format policies.
-    pub fn into_workbook(self) -> Result<Workbook> {
-        let Self(package, external_link_limits, _tolerance, drawing_load_policy, leniency, cached) =
-            self;
-        if let Some(cached) = cached {
-            if let Ok(workbook) = Arc::try_unwrap(cached) {
-                return Ok(workbook);
-            }
-        }
-        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
-            package,
-            external_link_limits,
-            drawing_load_policy,
-        )?;
-        workbook.set_projection_leniency(leniency);
+        workbook.set_semantic_limits(self.6);
         Ok(workbook)
     }
 
@@ -624,30 +588,6 @@ impl Package {
             path, &self.0, durability,
         )?)
     }
-
-    fn worksheet_uri(&self, index: usize) -> Result<Option<litchi_opc::PackURI>> {
-        let workbook = self.workbook()?;
-        if index >= workbook.worksheet_names().len() {
-            return Ok(None);
-        }
-        workbook.worksheet_uri(index).map(Some)
-    }
-
-    fn worksheet_uri_by_name(&self, name: &str) -> Result<Option<litchi_opc::PackURI>> {
-        let workbook = self.workbook()?;
-        let Some(index) = workbook
-            .worksheet_names()
-            .iter()
-            .position(|worksheet| worksheet == name)
-        else {
-            return Ok(None);
-        };
-        workbook.worksheet_uri(index).map(Some)
-    }
-
-    fn workbook_uri(&self) -> Result<litchi_opc::PackURI> {
-        Ok(self.0.main_document_part()?.partname().clone())
-    }
 }
 
 /// Copy borrowed input into the owned source archive after the input-size
@@ -688,7 +628,8 @@ impl From<OpcPackage> for Package {
             ToleranceReport::default(),
             DrawingLoadPolicy::Eager,
             Leniency::Strict,
-            None,
+            Projection::default(),
+            crate::SemanticLimits::new(),
         )
     }
 }
@@ -730,7 +671,7 @@ mod tests {
             package.opc_package().source_read_limits(),
             Some(source_limits)
         );
-        let reconstructed = package.into_workbook().expect("projection");
+        let reconstructed = package.materialize_workbook().expect("projection");
         assert_eq!(reconstructed.external_link_limits(), external_limits);
         assert_eq!(
             reconstructed.opc_package().source_read_limits(),
@@ -754,9 +695,12 @@ mod tests {
             package.workbook().expect("projection").leniency(),
             Leniency::TolerateCachedNumbers
         );
-        let published = package.without_signatures().expect("publication");
+        let published = package.unsign();
         assert_eq!(
-            published.into_workbook().expect("projection").leniency(),
+            published
+                .materialize_workbook()
+                .expect("projection")
+                .leniency(),
             Leniency::TolerateCachedNumbers
         );
         assert_eq!(

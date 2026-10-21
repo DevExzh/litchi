@@ -2,10 +2,29 @@ use super::model::{
     Catalog, Guid, Header, Info, RawRecord, RevisionHeaders, RevisionLog, ShortDateTime, User,
     UserNames,
 };
-use super::{apply, read, store};
+use super::package::store;
+use super::{Edit, Patch, Snapshot};
 use crate::raw::{Encoder, Kind, Records};
-use litchi_opc::constants::{content_type, relationship_type};
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
+
+fn read(package: &OpcPackage) -> super::Result<Snapshot> {
+    Snapshot::read(package)
+}
+
+fn start_edit(package: &OpcPackage) -> Edit {
+    crate::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_shared_workbook()
+        .unwrap()
+}
+
+fn apply(package: &mut OpcPackage, patch: &Patch) -> super::Result<Snapshot> {
+    let published = crate::Package::from_opc(package.clone())?
+        .apply_shared_workbook(patch)?
+        .into_package();
+    *package = published.into_opc();
+    Snapshot::read(package)
+}
 
 const FUTURE_KIND: u16 = 0x3fff;
 
@@ -14,8 +33,8 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
     let (mut package, _) = fixture();
     let before = owner_image(&package);
     let snapshot = read(&package).unwrap();
-    let commit = snapshot.edit().commit().unwrap();
-    assert!(commit.patch().is_empty());
+    let commit = start_edit(&package).commit().unwrap();
+    assert!(commit.patch().is_noop());
     let applied = apply(&mut package, commit.patch()).unwrap();
     assert_eq!(applied, snapshot);
     assert_eq!(owner_image(&package), before);
@@ -40,7 +59,7 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
             .iter()
             .any(|record| record.kind == FUTURE_KIND)
     );
-    let mut edit = snapshot.edit();
+    let mut edit = start_edit(&package);
     let mut info = snapshot.headers().unwrap().info.clone();
     info.revision_id = 7;
     edit.set_info(info).unwrap();
@@ -66,7 +85,7 @@ fn typed_metadata_edit_preserves_unknown_revision_header_records() {
 fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     let (mut package, _) = fixture();
     let snapshot = read(&package).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = start_edit(&package);
     let mut user = snapshot.users().unwrap().users[0].clone();
     user.name = "Alicia".to_string();
     edit.upsert_user(user).unwrap();
@@ -78,7 +97,7 @@ fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     assert!(apply(&mut package, commit.patch()).is_err());
     assert_eq!(owner_image(&package), before_stale_apply);
 
-    let mut invalid = applied.edit();
+    let mut invalid = start_edit(&package);
     let before = invalid.catalog().clone();
     let mut info = applied.headers().unwrap().info.clone();
     info.version = 0;
@@ -108,16 +127,7 @@ fn malformed_biff12_records_are_rejected_without_partial_metadata() {
 }
 
 fn fixture() -> (OpcPackage, PackURI) {
-    let mut package = OpcPackage::new();
-    let workbook = PackURI::new("/xl/workbook.bin").unwrap();
-    package.add_part(Box::new(BlobPart::new(
-        workbook,
-        content_type::XLSB_BIN.to_string(),
-        Vec::new(),
-    )));
-    package
-        .rels_mut()
-        .get_or_add(relationship_type::OFFICE_DOCUMENT, "xl/workbook.bin");
+    let mut package = crate::Package::new().unwrap().into_opc();
 
     let guid = Guid::from_bytes([1; 16]);
     let date = ShortDateTime {

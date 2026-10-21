@@ -24,10 +24,10 @@ const B2: &str = "/sheet[1]/B2";
 const SECOND_A1: &str = "/sheet[2]/A1";
 
 fn fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "seed");
     data.set_cell(0, 1, 2.5_f64);
     data.set_cell(0, 2, true);
@@ -35,7 +35,7 @@ fn fixture() -> Vec<u8> {
     data.set_cell(1, 1, 4_i32);
     writer.add_worksheet(data);
 
-    let mut archive = MutableWorksheet::new("Archive");
+    let mut archive = builder::Worksheet::new("Archive");
     archive.set_cell(0, 0, "untouched");
     archive.set_cell(0, 1, 9_i32);
     writer.add_worksheet(archive);
@@ -50,14 +50,14 @@ fn fixture() -> Vec<u8> {
 }
 
 fn named_fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
-    let mut data = MutableWorksheet::new("My Data");
+    let mut data = builder::Worksheet::new("My Data");
     data.set_cell(0, 0, "seed");
     data.set_cell(0, 1, "second");
     writer.add_worksheet(data);
-    writer.add_worksheet(MutableWorksheet::new("Archive"));
+    writer.add_worksheet(builder::Worksheet::new("Archive"));
 
     let mut output = Cursor::new(Vec::new());
     writer
@@ -69,8 +69,8 @@ fn named_fixture() -> Vec<u8> {
 }
 
 fn chart_first_fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -83,9 +83,9 @@ fn chart_first_fixture() -> Vec<u8> {
     .expect("chart fixture");
     let mut writer = Builder::new();
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart sheet");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "seed");
     writer.add_worksheet(data);
 

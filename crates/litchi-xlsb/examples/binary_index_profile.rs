@@ -23,7 +23,7 @@ use litchi_core::sheet::{
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_opc::{SourceCacheCounterDelta, SourceCacheDiagnostics};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::{SourceBackedWorkbook, Workbook};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::collections::BTreeSet;
@@ -580,7 +580,7 @@ fn generate_fixture(value: &str) -> Result<Vec<u8>> {
         return Err("synthetic fixture cell count must be in 1..=1_000_000".into());
     }
     let columns_per_row = 32_u32;
-    let mut worksheet = MutableWorksheet::new("Synthetic");
+    let mut worksheet = builder::Worksheet::new("Synthetic");
     for index in 0..cell_count {
         let row = u32::try_from(index / columns_per_row as usize)
             .map_err(|_| "synthetic fixture row exceeds XLSB bounds")?;

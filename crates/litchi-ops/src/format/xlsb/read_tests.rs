@@ -17,8 +17,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::chart::{Anchor, Chart};
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 use crate::File;
 use crate::error::{Code, Result};
@@ -93,12 +93,12 @@ fn save(mut writer: Builder) -> Vec<u8> {
 }
 
 fn sparse_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Sparse");
+    let mut sheet = builder::Worksheet::new("Sparse");
     sheet.set_cell(0, 0, "A1");
     sheet.set_cell(2, 2, "C3");
     sheet.set_cell(4, 4, 5.0);
 
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail");
 
     let mut writer = Builder::new();
@@ -108,9 +108,9 @@ fn sparse_workbook() -> Vec<u8> {
 }
 
 fn unicode_workbook() -> Vec<u8> {
-    let mut decomposed = MutableWorksheet::new("Cafe\u{301}");
+    let mut decomposed = builder::Worksheet::new("Cafe\u{301}");
     decomposed.set_cell(0, 0, "accent");
-    let mut other = MutableWorksheet::new("Other");
+    let mut other = builder::Worksheet::new("Other");
     other.set_cell(0, 0, "other");
 
     let mut writer = Builder::new();
@@ -122,9 +122,9 @@ fn unicode_workbook() -> Vec<u8> {
 fn unicode_ambiguous_workbook() -> Vec<u8> {
     // Excel's leaf name check lower-cases these two differently, while the
     // unified canonical key applies full Unicode case folding (`ß` -> `ss`).
-    let mut sharp_s = MutableWorksheet::new("Straße");
+    let mut sharp_s = builder::Worksheet::new("Straße");
     sharp_s.set_cell(0, 0, "sharp s");
-    let mut ascii = MutableWorksheet::new("STRASSE");
+    let mut ascii = builder::Worksheet::new("STRASSE");
     ascii.set_cell(0, 0, "ascii");
 
     let mut writer = Builder::new();
@@ -144,15 +144,15 @@ fn chart_workbook() -> Vec<u8> {
     )
     .expect("chart fixture");
 
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
 
     let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart tab");
     writer.add_worksheet(tail);
     save(writer)

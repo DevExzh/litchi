@@ -9,15 +9,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::data_validation::Validation;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test DV: Creating XLSB with data validation...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Validation");
+    let mut sheet = builder::Worksheet::new("Validation");
 
     // Create headers
     sheet.set_cell(0, 0, CellValue::String("Age (18-65)".to_string()));

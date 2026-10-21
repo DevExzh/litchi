@@ -401,7 +401,11 @@ fn remove_caches(package: &mut OpcPackage, workbook: &PackURI) -> Result<()> {
 }
 
 /// Replace workbook timeline caches and their BIFF12 references.
-pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cache]) -> Result<()> {
+pub(crate) fn store_caches(
+    package: &mut OpcPackage,
+    workbook: &PackURI,
+    caches: &[Cache],
+) -> Result<()> {
     validate_cache_set(caches)?;
     crate::signature_policy::ensure_unsigned(package)?;
     let _ = load_caches(package, workbook)?;
@@ -507,7 +511,11 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
 }
 
 /// Replace one worksheet's timeline view part and BIFF12 reference.
-pub fn store_views(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+pub(crate) fn store_views(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+) -> Result<()> {
     let mut candidate = package.clone();
     store_views_inner(&mut candidate, worksheet, views)?;
     *package = candidate;

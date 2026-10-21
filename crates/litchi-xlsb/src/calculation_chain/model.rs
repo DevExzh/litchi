@@ -148,7 +148,7 @@ impl ChainPart {
     /// before the next record is yielded.
     pub fn record_count(&self) -> Result<usize> {
         let raw_limits = RawLimits::new(self.bytes.len(), 0);
-        let mut records = Records::try_with_limits(self.bytes.as_slice(), raw_limits)?;
+        let mut records = Records::bounded(self.bytes.as_slice(), raw_limits)?;
         let mut count = 0usize;
         while records.next().transpose()?.is_some() {
             count = count.checked_add(1).ok_or(Error::CapacityOverflow {

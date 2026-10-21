@@ -60,10 +60,18 @@ fn a_name_is_added_to_a_workbook_without_an_externals_block() {
     let wire = patch.to_bytes(TransferLimits::DEFAULT).unwrap();
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
     assert_eq!(
-        source.apply(&decoded).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&decoded)
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         named.to_bytes().unwrap()
     );
-    let restored = named.apply(&patch.inverse()).unwrap();
+    let restored = named
+        .apply(&patch.inverse())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     assert_eq!(restored.to_bytes().unwrap(), patch.before());
     assert_eq!(patch.before(), source.to_bytes().unwrap());
     assert!(entries(&restored).is_empty());

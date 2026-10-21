@@ -14,7 +14,7 @@ use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, TargetMode};
 use crate::package::error::{Error, Result};
 
 use super::codec::{parse_comments, parse_persons, write_comments, write_persons};
-use super::semantic::{Comments, CommentsPart, Graph, People, PeoplePart};
+use super::semantic::{CommentsPart, Graph, PeoplePart};
 use super::validation::{validate_graph as validate_model_graph, validate_people};
 
 /// Content type of an XLSB threaded-comments XML part.
@@ -56,7 +56,7 @@ pub fn load_graph(package: &OpcPackage) -> Result<Graph> {
 }
 
 /// Replace the complete typed threaded-comments graph atomically.
-pub fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
+pub(crate) fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
     validate_package_graph(package)?;
     validate_model_graph(graph).map_err(map_model_error)?;
     let mut candidate = package.clone();
@@ -76,7 +76,8 @@ pub fn store_graph(package: &mut OpcPackage, graph: &Graph) -> Result<()> {
 }
 
 /// Remove every threaded-comments/person relationship and unreferenced part.
-pub fn remove_graph(package: &mut OpcPackage) -> Result<bool> {
+#[cfg(test)]
+pub(crate) fn remove_graph(package: &mut OpcPackage) -> Result<bool> {
     validate_package_graph(package)?;
     let mut candidate = package.clone();
     let changed = remove_graph_inner(&mut candidate)?;
@@ -111,50 +112,6 @@ pub fn load_people(package: &OpcPackage, workbook_part: &PackURI) -> Result<Opti
     }))
 }
 
-/// Store or replace the workbook persons part using a bounded canonical name.
-pub fn store_people(
-    package: &mut OpcPackage,
-    workbook_part: &PackURI,
-    people: &People,
-) -> Result<PeoplePart> {
-    validate_package_graph(package)?;
-    let mut candidate = package.clone();
-    let result = store_people_part(
-        &mut candidate,
-        workbook_part,
-        &PeoplePart {
-            relationship_id: String::new(),
-            part_name: String::new(),
-            persons: people.clone(),
-        },
-    )?;
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(result)
-}
-
-/// Remove the workbook persons relationship and unreferenced part.
-pub fn remove_people(package: &mut OpcPackage, workbook_part: &PackURI) -> Result<bool> {
-    validate_package_graph(package)?;
-    let Some((relationship_id, part_name)) = find_relationship(
-        package.get_part(workbook_part)?,
-        PERSONS_RELATIONSHIP_TYPE,
-        "persons",
-    )?
-    else {
-        return Ok(false);
-    };
-    let mut candidate = package.clone();
-    candidate
-        .get_part_mut(workbook_part)?
-        .rels_mut()
-        .remove(&relationship_id);
-    remove_if_unreferenced(&mut candidate, &part_name);
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(true)
-}
-
 /// Load the optional threaded-comments part owned by one XLSB worksheet.
 pub fn load_from_worksheet(
     package: &OpcPackage,
@@ -178,50 +135,6 @@ pub fn load_from_worksheet(
         part_name: part_name.to_string(),
         comments,
     }))
-}
-
-/// Store or replace one worksheet's threaded-comments part.
-pub fn store_on_worksheet(
-    package: &mut OpcPackage,
-    worksheet_part: &PackURI,
-    comments: &Comments,
-) -> Result<CommentsPart> {
-    validate_package_graph(package)?;
-    let mut candidate = package.clone();
-    let result = store_comments_part(
-        &mut candidate,
-        worksheet_part,
-        &CommentsPart {
-            worksheet_part_name: worksheet_part.to_string(),
-            relationship_id: String::new(),
-            part_name: String::new(),
-            comments: comments.clone(),
-        },
-    )?;
-    validate_package_graph(&candidate)?;
-    *package = candidate;
-    Ok(result)
-}
-
-/// Remove one worksheet's threaded-comments relationship and unreferenced part.
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI) -> Result<bool> {
-    validate_package_graph(package)?;
-    require_worksheet(package.get_part(worksheet_part)?)?;
-    let Some((relationship_id, part_name)) = find_relationship(
-        package.get_part(worksheet_part)?,
-        COMMENTS_RELATIONSHIP_TYPE,
-        "threaded comments",
-    )?
-    else {
-        return Ok(false);
-    };
-    crate::signature_policy::ensure_unsigned(package)?;
-    package
-        .get_part_mut(worksheet_part)?
-        .rels_mut()
-        .remove(&relationship_id);
-    remove_if_unreferenced(package, &part_name);
-    Ok(true)
 }
 
 fn store_people_part(

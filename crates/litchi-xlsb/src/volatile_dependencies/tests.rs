@@ -106,7 +106,8 @@ fn absent_owner_can_be_created_and_removed_reversibly() {
     );
     let commit = transaction.commit().expect("commit");
     let package = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish");
     assert_eq!(
         package
@@ -118,7 +119,8 @@ fn absent_owner_can_be_created_and_removed_reversibly() {
 
     let inverse = commit.patch().inverse();
     let restored = package
-        .apply_volatile_dependencies_patch(&inverse)
+        .apply_volatile_dependencies(&inverse)
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before_bytes);
     assert!(
@@ -146,9 +148,10 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     let before_bytes = package.to_bytes().expect("before bytes");
     let snapshot = package.volatile_dependencies().expect("snapshot");
     let commit = snapshot.edit().commit().expect("noop commit");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     let no_op = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("noop apply");
     assert_eq!(no_op.to_bytes().expect("noop bytes"), before_bytes);
 
@@ -165,7 +168,12 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     replacement.types[0].mains[0].first = "Replacement".to_string();
     changed.set_dependencies(replacement).expect("stage change");
     let changed = changed.commit().expect("changed commit");
-    assert!(stale.apply_volatile_dependencies(&changed).is_err());
+    assert!(
+        stale
+            .apply_volatile_dependencies(changed.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]

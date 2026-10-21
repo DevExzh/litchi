@@ -12,10 +12,10 @@ use std::io::Cursor;
 use litchi_core::sheet::CellValue;
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Limits, Reference, Scalar, StyleIndex, Value};
 use litchi_xlsb::formula::ParsedFormula;
 use litchi_xlsb::raw::{Encoder, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn a1() -> Reference {
     Reference::new(0, 0).expect("A1")
@@ -42,7 +42,7 @@ fn style_zero() -> StyleIndex {
 }
 
 fn package_with_scalars() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, 1.0_f64);
     sheet.set_cell(0, 1, true);
     sheet.set_cell(0, 2, "same");
@@ -59,7 +59,7 @@ fn package_with_scalars() -> Package {
 }
 
 fn package_with_grouped_formula() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet
         .set_shared_formula(0, 0, 0, 1, "1")
         .expect("formula fixture");
@@ -115,7 +115,7 @@ fn package_with_missing_group_follower() -> Package {
 }
 
 fn package_with_ordinary_formula() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let formula = ParsedFormula {
         rgce: vec![0x1E, 2, 0],
         rgcb: Vec::new(),
@@ -133,7 +133,7 @@ fn package_with_ordinary_formula() -> Package {
 }
 
 fn package_with_typed_formula_caches() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let formula = ParsedFormula {
         rgce: vec![0x1E, 1, 0],
         rgcb: Vec::new(),
@@ -475,6 +475,7 @@ fn removal_is_idempotent_and_inverse_restores_exact_package() {
         after
             .apply_cell_values(&patch.inverse())
             .expect("inverse")
+            .package()
             .to_bytes()
             .expect("restored"),
         before

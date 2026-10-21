@@ -3,13 +3,12 @@
 //! This owner implements `[MS-XLSB]` sections 2.4.228--2.4.230,
 //! 2.4.581--2.4.583, 2.4.806, 2.5.59--2.5.61, and 2.5.66. Formula bytes are
 //! retained and structurally validated but never compiled or evaluated.
-//! Source-bound worksheet snapshots remain package-neutral; [`Workbook`]
-//! APIs additionally prove name and `Xti` indexes against inert workbook
-//! metadata without following an external target.
-//!
-//! [`Workbook`]: crate::Workbook
+//! Source-bound worksheet snapshots remain package-neutral; the package
+//! family [`edit`] additionally proves name and `Xti` indexes against inert
+//! workbook metadata without following an external target.
 
 mod codec;
+pub mod edit;
 mod model;
 pub(crate) mod workbook;
 pub mod worksheet;
@@ -26,4 +25,4 @@ pub use model::{
 };
 
 pub(crate) use codec::{encode_block, parse_block};
-pub use worksheet::{Commit, Edit, Snapshot};
+pub use worksheet::Snapshot;

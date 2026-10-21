@@ -7,7 +7,7 @@
 
 use crate::chart::Chart;
 use crate::package::chartsheet::{
-    ChartSheet, Color, ColorType, PageSetup, Protection, State, View,
+    ChartSheet as ChartSheetMetadata, Color, ColorType, PageSetup, Protection, State, View,
 };
 use crate::package::error::{Error, Result};
 use crate::raw::Encoder;
@@ -28,18 +28,18 @@ const MAX_PAPER_SIZE: u32 = i32::MAX as u32 - 1;
 
 /// A chart sheet being authored in a new XLSB workbook.
 #[derive(Debug, Clone)]
-pub struct MutableChartSheet {
-    metadata: ChartSheet,
+pub struct ChartSheet {
+    metadata: ChartSheetMetadata,
     chart: Chart,
     printer_settings: Option<Vec<u8>>,
 }
 
-impl MutableChartSheet {
+impl ChartSheet {
     /// Create a visible chart sheet with one default workbook view.
     pub fn new(name: impl Into<String>, chart: Chart) -> Self {
         let name = name.into();
         Self {
-            metadata: ChartSheet {
+            metadata: ChartSheetMetadata {
                 name,
                 state: State::Visible,
                 code_name: String::new(),
@@ -68,7 +68,7 @@ impl MutableChartSheet {
     }
 
     /// Sheet-level metadata written to the binary chart-sheet stream.
-    pub fn metadata(&self) -> &ChartSheet {
+    pub fn metadata(&self) -> &ChartSheetMetadata {
         &self.metadata
     }
 
@@ -76,7 +76,7 @@ impl MutableChartSheet {
     ///
     /// Relationship identifiers are allocated by the writer. Setting a
     /// drawing or legacy-drawing identifier causes validation to fail.
-    pub fn metadata_mut(&mut self) -> &mut ChartSheet {
+    pub fn metadata_mut(&mut self) -> &mut ChartSheetMetadata {
         &mut self.metadata
     }
 
@@ -182,7 +182,7 @@ pub(crate) fn max_chart_sheets() -> usize {
 }
 
 pub(crate) fn write_chart_sheet(
-    sheet: &MutableChartSheet,
+    sheet: &ChartSheet,
     drawing_rel_id: &str,
     printer_rel_id: Option<&str>,
 ) -> Result<Vec<u8>> {
@@ -288,7 +288,7 @@ fn validate_page_setup(value: &PageSetup) -> Result<()> {
     Ok(())
 }
 
-fn write_properties<W: Write>(writer: &mut Encoder<W>, value: &ChartSheet) -> Result<()> {
+fn write_properties<W: Write>(writer: &mut Encoder<W>, value: &ChartSheetMetadata) -> Result<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&(u16::from(value.published)).to_le_bytes());
     let color_type = match value.tab_color.color_type {

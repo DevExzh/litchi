@@ -12,9 +12,9 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     Defect, SourceBackedWorkbook, ToleranceReport, Validation, ValueEncodingDefect, Workbook,
 };
@@ -25,7 +25,7 @@ const SST: &str = "/xl/sharedStrings.bin";
 /// A1 TRUE, B1 #DIV/0!, C1 a shared string, D1 a Boolean formula, and one
 /// classic whole-number validation on A2:A4.
 fn fixture() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Values");
+    let mut sheet = builder::Worksheet::new("Values");
     sheet.set_cell(0, 0, true);
     sheet.set_cell(0, 1, CellValue::Error("#DIV/0!".to_string()));
     sheet.set_cell(0, 2, "text\u{e9}");

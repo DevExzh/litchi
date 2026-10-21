@@ -63,7 +63,7 @@ pub struct SheetProtection {
 
 /// Mutable XLSB worksheet supporting CRUD operations
 #[derive(Debug, Clone)]
-pub struct MutableWorksheet {
+pub struct Worksheet {
     pub(crate) name: String,
     pub(crate) cells: BTreeMap<(u32, u32), CellData>,
     pub(crate) max_row: u32,
@@ -126,18 +126,18 @@ pub struct MutableWorksheet {
     pub(crate) table_rel_ids: Vec<String>,
 }
 
-impl MutableWorksheet {
+impl Worksheet {
     /// Create a new empty worksheet
     ///
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let sheet = MutableWorksheet::new("Sheet1");
+    /// let sheet = Worksheet::new("Sheet1");
     /// ```
     pub fn new<S: Into<String>>(name: S) -> Self {
-        MutableWorksheet {
+        Worksheet {
             name: name.into(),
             cells: BTreeMap::new(),
             max_row: 0,
@@ -189,9 +189,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
     /// sheet.set_cell(0, 1, 42.0);
     /// sheet.set_cell(1, 0, true);
@@ -477,9 +477,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Hello");
     /// sheet.delete_cell(0, 0);
     /// assert!(sheet.get_cell(0, 0).is_none());
@@ -675,10 +675,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::merged_cells::MergedCell;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.add_merged_cell(MergedCell::new(0, 1, 0, 1)); // Merge A1:B2
     /// ```
     pub fn add_merged_cell(&mut self, merged: MergedCell) {
@@ -690,10 +690,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::hyperlinks::Hyperlink;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string())
     ///     .with_tooltip("Visit website".to_string());
     /// sheet.add_hyperlink(link);
@@ -707,10 +707,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::comments::Record;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let comment = Record::new(0, 0, "John".to_string(), "Important note".to_string());
     /// sheet.add_comment(comment);
     /// ```
@@ -1169,10 +1169,10 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use litchi_xlsb::package::data_validation::Validation;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let mut dv = Validation::new(3, "A1:A10".to_string()); // list
     /// dv.formula1 = Some("Yes,No".to_string());
     /// sheet.add_data_validation(dv);
@@ -1201,12 +1201,12 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     /// use crate::conditional_formatting::{
     ///     Formatting, Rule, RuleType,
     /// };
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// let mut cf = Formatting::new(vec!["A1:A10".to_string()]);
     /// let rule = Rule::new(RuleType::CellIs, 1);
     /// cf.add_rule(rule);
@@ -1259,14 +1259,14 @@ impl MutableWorksheet {
     /// Formula tokens are structurally checked here and are proved against the
     /// finalized workbook name/XTI context before any worksheet is serialized.
     pub fn set_sparkline_groups(&mut self, groups: crate::sparkline::Groups) -> Result<&mut Self> {
-        self.set_sparkline_groups_with_limits(groups, crate::sparkline::Limits::DEFAULT)
+        self.set_sparkline_groups_bounded(groups, crate::sparkline::Limits::DEFAULT)
     }
 
     /// Replace the complete sparkline collection under an explicit policy.
     ///
     /// Validation is completed before either the collection or its policy is
     /// published, so every failure leaves the worksheet unchanged.
-    pub fn set_sparkline_groups_with_limits(
+    pub(crate) fn set_sparkline_groups_bounded(
         &mut self,
         groups: crate::sparkline::Groups,
         limits: crate::sparkline::Limits,
@@ -1305,9 +1305,9 @@ impl MutableWorksheet {
     /// # Example
     ///
     /// ```ignore
-    /// use litchi_xlsb::writer::MutableWorksheet;
+    /// use litchi_xlsb::builder::Worksheet;
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, "Row 0");
     /// sheet.set_cell(1, 0, "Row 1");
     /// sheet.set_cell(2, 0, "Row 2");

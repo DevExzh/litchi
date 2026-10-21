@@ -1,12 +1,33 @@
+use super::edit::{Edit, Patch};
 use super::package::{
     COMMENTS_CONTENT_TYPE, COMMENTS_RELATIONSHIP_TYPE, PERSONS_CONTENT_TYPE,
-    PERSONS_RELATIONSHIP_TYPE, WORKSHEET_CONTENT_TYPE,
+    PERSONS_RELATIONSHIP_TYPE,
 };
+use super::package::{remove_graph, store_graph};
 use super::{
-    Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person, RawXml, Thread,
-    apply, load_graph, parse_comments, parse_persons, read, remove_graph, store_graph,
-    validate_comments, validate_graph as validate_model_graph, write_comments, write_persons,
+    Comment, Comments, CommentsPart, Graph, Mention, People, PeoplePart, Person, RawXml, Snapshot,
+    Thread, load_graph, parse_comments, parse_persons, validate_comments,
+    validate_graph as validate_model_graph, write_comments, write_persons,
 };
+
+fn read(package: &OpcPackage) -> crate::package::PackageResult<Snapshot> {
+    Snapshot::read(package)
+}
+
+fn start_edit(package: &OpcPackage) -> Edit {
+    crate::Package::from_opc(package.clone())
+        .unwrap()
+        .edit_threaded_comments()
+        .unwrap()
+}
+
+fn apply(package: &mut OpcPackage, patch: &Patch) -> crate::package::PackageResult<Snapshot> {
+    let published = crate::Package::from_opc(package.clone())?
+        .apply_threaded_comments(patch)?
+        .into_package();
+    *package = published.into_opc();
+    Snapshot::read(package)
+}
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, TargetMode};
 
@@ -239,8 +260,8 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
     let snapshot = read(&package).unwrap();
     assert!(snapshot.source_parts().iter().any(|part| part.has_bytes()));
 
-    let commit = snapshot.edit().commit().unwrap();
-    assert!(commit.patch().is_empty());
+    let commit = start_edit(&package).commit().unwrap();
+    assert!(commit.patch().is_noop());
     let after = apply(&mut package, commit.patch()).unwrap();
 
     assert_eq!(after, snapshot);
@@ -252,14 +273,12 @@ fn changed_edit_validates_and_preserves_unknown_xml() {
     let (mut package, _workbook, worksheet) = fixture();
     store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
     let snapshot = read(&package).unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = start_edit(&package);
     let mut alice = snapshot.people().unwrap().persons[0].clone();
     alice.display_name = "Alicia".into();
     edit.upsert_person(alice).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.patch().is_empty());
-    assert!(!commit.snapshot().is_source_bound());
-    assert!(commit.snapshot().source_parts().is_empty());
+    assert!(!commit.patch().is_noop());
 
     let committed = apply(&mut package, commit.patch()).unwrap();
     assert_eq!(
@@ -286,12 +305,12 @@ fn invalid_edits_and_source_conflicts_are_atomic() {
     store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
     let snapshot = read(&package).unwrap();
 
-    let mut invalid = snapshot.edit();
+    let mut invalid = start_edit(&package);
     let before_graph = invalid.graph().clone();
     assert!(invalid.set_people(People::default()).is_err());
     assert_eq!(invalid.graph(), &before_graph);
 
-    let mut changed = snapshot.edit();
+    let mut changed = start_edit(&package);
     let mut alice = snapshot.people().unwrap().persons[0].clone();
     alice.display_name = "Other writer".into();
     changed.upsert_person(alice).unwrap();
@@ -310,8 +329,8 @@ fn invalid_edits_and_source_conflicts_are_atomic() {
 fn removing_threads_and_people_cleans_owner_parts_and_relationships() {
     let (mut package, workbook, worksheet) = fixture();
     store_graph(&mut package, &graph_fixture(&worksheet)).unwrap();
-    let snapshot = read(&package).unwrap();
-    let mut edit = snapshot.edit();
+    let _snapshot = read(&package).unwrap();
+    let mut edit = start_edit(&package);
     let removed = edit.remove_thread(worksheet.as_str(), ROOT).unwrap();
     assert!(removed.is_some());
     assert!(edit.remove_worksheet(worksheet.as_str()).unwrap());
@@ -393,22 +412,11 @@ fn owner_image(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
 }
 
 fn fixture() -> (OpcPackage, PackURI, PackURI) {
-    let mut package = OpcPackage::new();
+    let package = crate::Package::new().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
-    package.add_part(Box::new(BlobPart::new(
-        workbook.clone(),
-        ct::XLSB_BIN.into(),
-        Vec::new(),
-    )));
-    package.add_part(Box::new(BlobPart::new(
-        worksheet.clone(),
-        WORKSHEET_CONTENT_TYPE.into(),
-        Vec::new(),
-    )));
-    package
-        .rels_mut()
-        .get_or_add(rt::OFFICE_DOCUMENT, "xl/workbook.bin");
+    assert!(package.get_part(&workbook).is_ok());
+    assert!(package.get_part(&worksheet).is_ok());
     (package, workbook, worksheet)
 }
 

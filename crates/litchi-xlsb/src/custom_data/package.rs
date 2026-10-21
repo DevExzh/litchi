@@ -567,18 +567,9 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read a catalog with the default finite policy.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        Self::load_with_limits(package, Limits::default())
-    }
-
-    /// Read a catalog with an explicit finite policy.
-    pub fn load_with_limits(package: &OpcPackage, limits: Limits) -> Result<Self> {
-        Self::load_with_limits_and_context(package, limits, None)
-    }
-
-    /// Read a catalog under an owned execution context.
-    pub fn load_with_limits_and_context(
+    /// Read a catalog under a finite policy and an optional owned execution
+    /// context.
+    pub(crate) fn load_with_limits_and_context(
         package: &OpcPackage,
         limits: Limits,
         context: impl Into<Option<ExecutionContext>>,
@@ -642,10 +633,6 @@ impl Snapshot {
         self.limits
     }
 
-    pub(crate) fn execution_context(&self) -> Option<ExecutionContext> {
-        self.context.clone()
-    }
-
     /// Count effective ExtConn14 references to one UID.
     #[must_use]
     pub fn connection_references(&self, id: &str) -> usize {
@@ -686,10 +673,118 @@ impl Snapshot {
     }
 }
 
-/// A detached transaction over an immutable package snapshot.
+/// The configuration of a Custom Data edit.
+#[derive(Debug, Clone, Default)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+    context: Option<ExecutionContext>,
+}
+
+impl EditOptions {
+    /// Select the finite policy of the edit; the default is the package's
+    /// [`crate::SemanticLimits::custom_data_value`].
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Run the edit under the caller's execution context; cloned options
+    /// share its budget and cancellation token.
+    #[must_use]
+    pub fn execution_context(mut self, context: ExecutionContext) -> Self {
+        self.context = Some(context);
+        self
+    }
+
+    /// The configured finite policy, if any.
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
+    }
+
+    /// The configured execution context, if any.
+    #[must_use]
+    pub const fn execution_context_value(&self) -> Option<&ExecutionContext> {
+        self.context.as_ref()
+    }
+}
+
+impl crate::Package {
+    /// The source-bound Custom Data catalog, read under the package's
+    /// [`crate::SemanticLimits::custom_data_value`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the Custom Data graph, decoding and limit errors.
+    pub fn custom_data(&self) -> Result<Snapshot> {
+        Snapshot::load_with_limits_and_context(
+            self.opc_package(),
+            self.semantic_limits().custom_data_value(),
+            None,
+        )
+    }
+
+    /// Start a Custom Data edit under the package's limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the Custom Data graph, decoding and limit errors.
+    pub fn edit_custom_data(&self) -> Result<Edit> {
+        self.edit_custom_data_with_options(EditOptions::default())
+    }
+
+    /// Start a Custom Data edit with explicit options.
+    ///
+    /// # Errors
+    ///
+    /// Returns the Custom Data graph, decoding and limit errors, and the
+    /// execution-context refusals.
+    pub fn edit_custom_data_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits
+            .unwrap_or_else(|| self.semantic_limits().custom_data_value());
+        Edit::from_package_with_limits_and_context(self.clone(), limits, options.context)
+    }
+
+    /// Apply a source-checked Custom Data patch to a new package; this one is
+    /// unchanged. An exact no-op returns this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package's Custom Data
+    /// closure is not the patch's before state, [`Error::Signed`] for a
+    /// changed patch of a signed workbook, and the workbook validation errors
+    /// of the result.
+    pub fn apply_custom_data(&self, patch: &Patch) -> Result<Commit> {
+        if patch.is_noop() {
+            let mut candidate = self.opc_package().clone();
+            patch.apply_to_opc(&mut candidate)?;
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                Diagnostics::UNCHANGED,
+            ));
+        }
+        let mut candidate = self.opc_package().clone();
+        patch.apply_to_opc(&mut candidate)?;
+        let package = self.reparse_candidate_retaining_projection(candidate)?;
+        Ok(Commit::new(package, patch.clone(), Diagnostics::CHANGED))
+    }
+}
+
+/// What a committed Custom Data edit changed.
+pub use litchi_core::edit::Diagnostics;
+
+/// The result of a Custom Data edit's `commit`: the new package, the patch
+/// and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
+
+/// A staged Custom Data edit of one package. Dropping it discards it.
 pub struct Edit {
     before: Snapshot,
     draft: Vec<Storage>,
+    source: crate::Package,
     package: OpcPackage,
     limits: Limits,
     context: Option<ExecutionContext>,
@@ -708,25 +803,18 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
-    /// Start a detached transaction from a package clone.
-    pub(crate) fn from_package(package: OpcPackage) -> Result<Self> {
-        Self::from_package_with_limits_and_context(package, Limits::default(), None)
-    }
-
-    /// Start a detached transaction using explicit limits.
-    pub(crate) fn from_package_with_limits(package: OpcPackage, limits: Limits) -> Result<Self> {
-        Self::from_package_with_limits_and_context(package, limits, None)
-    }
-
-    /// Start a detached transaction under an owned execution context.
+    /// Start an edit of `source` under a finite policy and an optional owned
+    /// execution context.
     pub(crate) fn from_package_with_limits_and_context(
-        package: OpcPackage,
+        source: crate::Package,
         limits: Limits,
         context: Option<ExecutionContext>,
     ) -> Result<Self> {
+        let package = source.opc_package().clone();
         let before = Snapshot::load_with_limits_and_context(&package, limits, context.clone())?;
         Ok(Self {
             draft: clone_storages(&before.entries, "Custom Data transaction draft")?,
+            source,
             package,
             before,
             limits,
@@ -913,30 +1001,35 @@ impl Edit {
 
     /// Whether the staged semantic graph differs from the source.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub fn changed(&self) -> bool {
         !staged_entries_equal(&self.before.entries, &self.draft)
             || !self.connection_edits.is_empty()
     }
 
-    /// Alias for [`Self::is_changed`].
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    /// Discard every staged change.
+    pub fn reset(&mut self) -> Result<()> {
+        self.draft = clone_storages(&self.before.entries, "Custom Data transaction draft")?;
+        self.connection_edits.clear();
+        Ok(())
     }
 
-    /// Validate and publish this transaction atomically.
+    /// Validate the staged catalog, publish it to a new package and read it
+    /// back. An unchanged catalog returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook,
+    /// [`Error::PatchConflict`] for a changed source closure, the limit and
+    /// execution-context refusals, and the workbook validation errors of the
+    /// result.
     pub fn commit(self) -> Result<Commit> {
         check_context(self.context.as_ref())?;
-        if !self.is_changed() {
+        if !self.changed() {
             let patch = Patch {
                 before: self.before.clone(),
                 after: self.before.clone(),
             };
-            return Ok(Commit {
-                snapshot: self.before.clone(),
-                patch,
-                changed: false,
-            });
+            return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
         }
         if self.before.source.signed || self.before.source.signature_policy_required {
             return Err(Error::Signed);
@@ -973,13 +1066,12 @@ impl Edit {
         }
         let patch = Patch {
             before: self.before,
-            after: snapshot.clone(),
+            after: snapshot,
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        let package = self
+            .source
+            .reparse_candidate_retaining_projection(candidate)?;
+        Ok(Commit::new(package, patch, Diagnostics::CHANGED))
     }
 
     fn resolve<S: StorageSelectorInput>(&self, selector: S) -> Result<usize> {
@@ -1094,7 +1186,7 @@ impl Patch {
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -1117,7 +1209,7 @@ impl Patch {
         if !current.same_source(&self.before) {
             return Err(conflict("Custom Data source closure"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         if target.is_signed() || target.requires_signature_edit_policy() {
@@ -1163,44 +1255,6 @@ impl Patch {
             ));
         }
         Ok(())
-    }
-}
-
-/// Successful publication result.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether any semantic or connection bytes changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Resulting source-bound snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-impl Clone for Commit {
-    fn clone(&self) -> Self {
-        Self {
-            snapshot: self.snapshot.clone(),
-            patch: self.patch.clone(),
-            changed: self.changed,
-        }
     }
 }
 

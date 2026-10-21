@@ -13,7 +13,7 @@ pub mod package;
 mod parse;
 #[cfg(test)]
 mod tests;
-pub mod transaction;
+mod transaction;
 pub mod validation;
 pub(crate) mod write;
 
@@ -23,12 +23,12 @@ pub use model::{
     ReconnectionType, SourceType, UnknownRecord, WebProperties, WebTableItem,
 };
 pub use parse::parse_connections_part;
-pub use transaction::{Commit, Edit, Patch, Snapshot, apply, read};
+pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot};
 
 pub type Result<T> = crate::package::error::Result<T>;
 
-pub(crate) fn invalid(detail: impl Into<String>) -> crate::package::error::Error {
-    crate::package::error::Error::Unrecognized {
+pub(crate) fn invalid(detail: impl Into<String>) -> Error {
+    Error::Unrecognized {
         typ: "XLSB External Data Connections".to_string(),
         val: detail.into(),
     }

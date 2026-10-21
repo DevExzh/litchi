@@ -36,8 +36,8 @@ impl Patch {
         &self.after
     }
 
-    /// Whether this patch changes owner bytes or graph topology.
-    pub const fn is_empty(&self) -> bool {
+    /// Whether this patch changes no owner byte or graph topology.
+    pub const fn is_noop(&self) -> bool {
         !self.changed
     }
 
@@ -62,13 +62,11 @@ impl Patch {
                 "Volatile Dependencies patch source is stale".to_string(),
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         materialize_source(&mut candidate, &self.before, &self.after)?;
@@ -84,39 +82,9 @@ impl Patch {
     }
 }
 
-/// A detached transaction result containing a planned snapshot and patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owner bytes or topology.
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Volatile Dependencies edit's `commit`: the new package,
+/// the patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 pub(crate) fn materialize(
     package: &mut OpcPackage,

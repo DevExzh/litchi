@@ -11,11 +11,11 @@ use litchi_core::Position;
 use litchi_core::sheet::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, State};
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 const DIALOG_SHEET: (&str, &str) = (
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
@@ -41,14 +41,14 @@ fn every_kind_workbook() -> Vec<u8> {
     )
     .unwrap();
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Data"));
+    writer.add_worksheet(builder::Worksheet::new("Data"));
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     for name in ["Dialog", "Macro", "Intl"] {
-        writer.add_worksheet(MutableWorksheet::new(name));
+        writer.add_worksheet(builder::Worksheet::new(name));
     }
-    writer.add_worksheet(MutableWorksheet::new("Tail"));
+    writer.add_worksheet(builder::Worksheet::new("Tail"));
     let mut output = Cursor::new(Vec::new());
     writer
         .build()

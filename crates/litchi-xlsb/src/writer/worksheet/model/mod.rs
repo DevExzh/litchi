@@ -3,7 +3,7 @@
 mod semantic;
 mod wire;
 
-pub use semantic::{MutableWorksheet, SheetProtection};
+pub use semantic::{SheetProtection, Worksheet};
 pub use wire::CellData;
 
 #[allow(

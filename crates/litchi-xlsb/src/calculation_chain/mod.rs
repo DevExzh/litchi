@@ -17,6 +17,7 @@ mod workbook;
 #[cfg(test)]
 mod tests;
 
+pub use litchi_core::edit::Diagnostics;
 pub use model::{
     ChainPart, HARD_MAX_GRAPH_PARTS, HARD_MAX_PART_BYTES, HARD_MAX_RECORDS, HARD_MAX_RELATIONSHIPS,
     SemanticLimits,
@@ -24,7 +25,21 @@ pub use model::{
 pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Edit;
+pub use transaction::{Edit, EditOptions};
 
 /// Alias matching the concise limits naming used by other XLSB feature owners.
 pub use crate::package::error::{Error, Result};
+
+/// A bounded dimension of this family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of the Calculation Chain part.
+    PartBytes,
+    /// Records of the Calculation Chain part.
+    Records,
+    /// Relationships of the Calculation Chain closure.
+    Relationships,
+    /// Parts of the Calculation Chain closure.
+    GraphParts,
+}

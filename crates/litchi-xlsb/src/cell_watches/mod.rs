@@ -7,6 +7,7 @@
 //! by litchi.
 
 mod codec;
+mod edit;
 mod model;
 pub mod phonetic;
 mod validation;
@@ -16,9 +17,10 @@ pub mod worksheet;
 #[cfg(test)]
 mod tests;
 
+pub use edit::{Commit, Diagnostics, Edit, LimitKind, Patch};
 pub use model::{Reference, UnknownRecord, Watch, Watches};
 pub use phonetic::{Alignment, Info, Type};
-pub use worksheet::{Commit, Edit, Patch, Snapshot};
+pub use worksheet::Snapshot;
 
 pub use crate::package::error::{Error, Result};
 

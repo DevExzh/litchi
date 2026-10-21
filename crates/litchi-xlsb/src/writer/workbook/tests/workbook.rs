@@ -7,7 +7,7 @@
 
 use super::super::Builder;
 use crate::named_ranges::{Definition, area3d_formula};
-use crate::writer::MutableWorksheet;
+use crate::writer::Worksheet;
 use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use std::io::Cursor;
 
@@ -21,7 +21,7 @@ fn test_create_empty_workbook() {
 #[test]
 fn test_add_worksheet() {
     let mut workbook = Builder::new();
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     workbook.add_worksheet(sheet);
     assert_eq!(workbook.worksheet_count(), 1);
 }
@@ -36,14 +36,14 @@ fn test_workbook_writer_default() {
 #[test]
 fn test_get_worksheet_mut() {
     let mut workbook = Builder::new();
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     workbook.add_worksheet(sheet);
 
-    let sheet_ref = workbook.get_worksheet_mut(0);
+    let sheet_ref = workbook.worksheet_mut(0);
     assert!(sheet_ref.is_some());
     assert_eq!(sheet_ref.unwrap().name(), "Sheet1");
 
-    assert!(workbook.get_worksheet_mut(99).is_none());
+    assert!(workbook.worksheet_mut(99).is_none());
 }
 
 #[test]
@@ -65,9 +65,9 @@ fn test_styles_mut_accessor() {
 #[test]
 fn test_add_multiple_worksheets() {
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
-    workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
-    workbook.add_worksheet(MutableWorksheet::new("Sheet3"));
+    workbook.add_worksheet(Worksheet::new("Sheet1"));
+    workbook.add_worksheet(Worksheet::new("Sheet2"));
+    workbook.add_worksheet(Worksheet::new("Sheet3"));
 
     assert_eq!(workbook.worksheet_count(), 3);
 }
@@ -75,8 +75,8 @@ fn test_add_multiple_worksheets() {
 #[test]
 fn test_create_app_xml() {
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
-    workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
+    workbook.add_worksheet(Worksheet::new("Sheet1"));
+    workbook.add_worksheet(Worksheet::new("Sheet2"));
 
     assert_eq!(
         workbook.create_app_xml(),
@@ -126,12 +126,12 @@ fn test_add_named_range() {
 #[test]
 fn defined_name_survives_package_roundtrip() {
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Data Sheet"));
+    workbook.add_worksheet(Worksheet::new("Data Sheet"));
     workbook.add_named_range(
         Definition::new("SalesData".to_string(), None)
             .with_formula(area3d_formula(0, 1, 3, 1, 1).unwrap()),
     );
-    let mut summary = MutableWorksheet::new("Summary");
+    let mut summary = Worksheet::new("Summary");
     summary.set_cell(
         0,
         0,

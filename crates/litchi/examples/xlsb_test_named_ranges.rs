@@ -9,15 +9,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test NR: Creating XLSB with named ranges...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Create some data
     sheet.set_cell(0, 0, CellValue::String("Product".to_string()));

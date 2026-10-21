@@ -37,7 +37,6 @@ use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI};
 
 use super::{MAX_COLUMNS, MAX_ROWS, MAX_TEXT_UNITS, Record};
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
@@ -61,9 +60,9 @@ pub const MAX_COMMENTS: usize = 65_530;
 const COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
 
 /// A staged note edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -72,7 +71,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_comments(&self) -> Result<Edit<'_>> {
+    pub fn edit_comments(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -85,18 +84,8 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_comments(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a note edit of this workbook without first copying it into a
-    /// package.
-    pub fn edit_comments(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
@@ -211,7 +200,12 @@ fn check(row: u32, col: u32, author: &str, text: &str) -> Result<()> {
     Ok(())
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     fn part(&self, worksheet: &PackURI) -> Result<Option<(String, PackURI)>> {
         comments_part(self.staged.opc().get_part(worksheet)?.rels())
     }
@@ -594,7 +588,12 @@ mod tests {
         let vml = String::from_utf8(part(&after, "/xl/drawings/vmlDrawing1.vml").unwrap()).unwrap();
         assert_eq!(vml.matches("ObjectType=\"Note\"").count(), 2);
         assert_eq!(
-            package.apply_comments(&patch).unwrap().to_bytes().unwrap(),
+            package
+                .apply_comments(&patch)
+                .map(|commit| commit.into_package())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
             after.to_bytes().unwrap()
         );
         // The opened workbook reads the notes.

@@ -228,7 +228,7 @@ mod tests {
         .unwrap();
         let workbook = Package::from_bytes(&bytes)
             .unwrap()
-            .into_workbook()
+            .materialize_workbook()
             .unwrap();
         let eager = workbook.drawing_charts(0).unwrap();
         assert_eq!(eager.len(), 1);

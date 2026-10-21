@@ -21,7 +21,7 @@ use std::io::Cursor;
 
 #[test]
 fn test_set_and_get_cell() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Hello");
     sheet.set_cell(1, 1, 42.0);
 
@@ -36,13 +36,13 @@ fn writes_worksheet_web_extension_collection() {
         rgcb: Vec::new(),
     };
     let binding = Binding::new("sales-table", formula, |index| index == 0).unwrap();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet
         .set_web_extension_bindings(vec![binding.clone()])
         .unwrap();
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
     let records = Records::new(&buffer)
@@ -64,7 +64,7 @@ fn writes_worksheet_web_extension_collection() {
 
 #[test]
 fn test_set_cell_with_style() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell_with_style(0, 0, "Styled", 5);
 
     assert_eq!(
@@ -76,7 +76,7 @@ fn test_set_cell_with_style() {
 
 #[test]
 fn test_delete_cell() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Hello");
 
     assert!(sheet.delete_cell(0, 0).is_some());
@@ -85,7 +85,7 @@ fn test_delete_cell() {
 
 #[test]
 fn test_delete_row() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Row 0");
     sheet.set_cell(1, 0, "Row 1");
     sheet.set_cell(2, 0, "Row 2");
@@ -99,7 +99,7 @@ fn test_delete_row() {
 
 #[test]
 fn test_delete_column() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Col 0");
     sheet.set_cell(0, 1, "Col 1");
     sheet.set_cell(0, 2, "Col 2");
@@ -113,7 +113,7 @@ fn test_delete_column() {
 
 #[test]
 fn test_insert_row() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Row 0");
     sheet.set_cell(1, 0, "Row 1");
 
@@ -126,7 +126,7 @@ fn test_insert_row() {
 
 #[test]
 fn test_insert_column() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Col 0");
     sheet.set_cell(0, 1, "Col 1");
 
@@ -139,7 +139,7 @@ fn test_insert_column() {
 
 #[test]
 fn test_dimensions() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     assert!(sheet.dimensions().is_none());
 
     sheet.set_cell(5, 10, "Test");
@@ -148,7 +148,7 @@ fn test_dimensions() {
 
 #[test]
 fn test_cell_count() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     assert_eq!(sheet.cell_count(), 0);
 
     sheet.set_cell(0, 0, "A");
@@ -160,20 +160,20 @@ fn test_cell_count() {
 
 #[test]
 fn test_name() {
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     assert_eq!(sheet.name(), "Sheet1");
 }
 
 #[test]
 fn test_set_name() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_name("RenamedSheet");
     assert_eq!(sheet.name(), "RenamedSheet");
 }
 
 #[test]
 fn test_set_column_width() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_column_width(0, 15.5);
     sheet.set_column_width(2, 20.0);
 
@@ -183,7 +183,7 @@ fn test_set_column_width() {
 
 #[test]
 fn test_set_row_height() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_row_height(0, 25.0);
     sheet.set_row_height(3, 30.5);
 
@@ -193,7 +193,7 @@ fn test_set_row_height() {
 
 #[test]
 fn test_clear() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Test");
     sheet.add_merged_cell(MergedCell::new(0, 1, 0, 1));
 
@@ -206,7 +206,7 @@ fn test_clear() {
 
 #[test]
 fn test_add_merged_cell() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let merged = MergedCell::new(0, 1, 0, 1);
     sheet.add_merged_cell(merged);
 
@@ -217,7 +217,7 @@ fn test_add_merged_cell() {
 
 #[test]
 fn test_add_hyperlink() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string());
     sheet.add_hyperlink(link);
 
@@ -226,7 +226,7 @@ fn test_add_hyperlink() {
 
 #[test]
 fn test_hyperlinks_mut() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let link = Hyperlink::new(0, 0, 0, 0, "rId1".to_string());
     sheet.add_hyperlink(link);
 
@@ -236,7 +236,7 @@ fn test_hyperlinks_mut() {
 
 #[test]
 fn test_add_comment() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let comment = Record::new(0, 0, "Author".to_string(), "Comment text".to_string());
     sheet.add_comment(comment);
 
@@ -245,7 +245,7 @@ fn test_add_comment() {
 
 #[test]
 fn test_set_auto_filter() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_auto_filter(0, 10, 0, 5);
 
     assert!(sheet.auto_filter.is_some());
@@ -258,7 +258,7 @@ fn test_set_auto_filter() {
 
 #[test]
 fn test_add_data_validation() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let dv = Validation::new(3, "A1:A10".to_string());
     sheet.add_data_validation(dv);
 
@@ -268,7 +268,7 @@ fn test_add_data_validation() {
 
 #[test]
 fn test_add_conditional_formatting() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     let cf = Formatting::new(vec!["A1:A10".to_string()]);
     sheet.add_conditional_formatting(cf);
 
@@ -277,7 +277,7 @@ fn test_add_conditional_formatting() {
 
 #[test]
 fn test_cell_data_types() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
 
     // String
     sheet.set_cell(0, 0, "String");
@@ -307,10 +307,10 @@ fn test_cell_data_types() {
 
 #[test]
 fn test_worksheet_write_empty() {
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
 
     let result = sheet.write(&mut writer, &mut shared_strings);
     assert!(result.is_ok());
@@ -319,14 +319,14 @@ fn test_worksheet_write_empty() {
 
 #[test]
 fn test_worksheet_write_with_data() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Hello");
     sheet.set_cell(0, 1, 42.0);
     sheet.set_cell(1, 0, true);
 
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
 
     let result = sheet.write(&mut writer, &mut shared_strings);
     assert!(result.is_ok());
@@ -350,7 +350,7 @@ fn test_column_info_struct() {
 
 #[test]
 fn writes_best_fit_in_the_specified_column_flag() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.columns.insert(
         2,
         ColumnInfo {
@@ -361,7 +361,7 @@ fn writes_best_fit_in_the_specified_column_flag() {
     );
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
     let record = Records::new(buffer.as_slice())
@@ -414,7 +414,7 @@ fn test_cell_data_struct() {
 
 #[test]
 fn writes_ms_xlsb_brt_fmla_num_layout_without_downgrading_formula() {
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     let cell = CellData {
         value: CellValue::Formula {
             formula: "C13*2".to_string(),
@@ -428,7 +428,7 @@ fn writes_ms_xlsb_brt_fmla_num_layout_without_downgrading_formula() {
     };
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet
         .write_cell(&mut writer, 12, 1, &cell, &mut shared_strings)
         .unwrap();
@@ -448,7 +448,7 @@ fn writes_ms_xlsb_brt_fmla_num_layout_without_downgrading_formula() {
 
 #[test]
 fn unsupported_formula_is_an_error_instead_of_a_cached_constant() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(
         0,
         0,
@@ -461,14 +461,14 @@ fn unsupported_formula_is_an_error_instead_of_a_cached_constant() {
     );
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     let error = sheet.write(&mut writer, &mut shared_strings).unwrap_err();
     assert!(matches!(error, Error::UnsupportedFeature(_)));
 }
 
 #[test]
 fn formula_without_cached_result_is_marked_for_recalculation() {
-    let sheet = MutableWorksheet::new("Sheet1");
+    let sheet = Worksheet::new("Sheet1");
     let cell = CellData {
         value: CellValue::Formula {
             formula: "1+1".to_string(),
@@ -482,7 +482,7 @@ fn formula_without_cached_result_is_marked_for_recalculation() {
     };
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet
         .write_cell(&mut writer, 0, 0, &cell, &mut shared_strings)
         .unwrap();
@@ -495,14 +495,14 @@ fn formula_without_cached_result_is_marked_for_recalculation() {
 fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
     use crate::package::records::Stream;
 
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(2, 2, 10.0);
     sheet.set_cell(3, 2, 20.0);
     sheet.set_shared_formula(2, 2, 3, 2, "B3").unwrap();
 
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
     let mut iter = Stream::new(Cursor::new(buffer));
@@ -547,12 +547,12 @@ fn writes_unsupported_group_definition_losslessly() {
         always_calculate: true,
     };
     let expected = group.to_record_data().unwrap();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_formula_group_binary(group).unwrap();
 
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
     let mut iter = Stream::new(Cursor::new(buffer));
@@ -595,7 +595,7 @@ fn mutable_sparkline_set_clear_and_failures_are_atomic() {
     use crate::sparkline::{Formula, Group, Limits, Location, Sparkline, SparklineType};
 
     let original = authored_sparkline_groups(&[SparklineType::Line]);
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_sparkline_groups(original.clone()).unwrap();
     assert_eq!(sheet.sparkline_groups(), Some(&original));
 
@@ -603,7 +603,7 @@ fn mutable_sparkline_set_clear_and_failures_are_atomic() {
     let limits = Limits::DEFAULT.with_groups(1).unwrap();
     assert!(
         sheet
-            .set_sparkline_groups_with_limits(over_limit, limits)
+            .set_sparkline_groups_bounded(over_limit, limits)
             .is_err()
     );
     assert_eq!(sheet.sparkline_groups(), Some(&original));
@@ -638,12 +638,12 @@ fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
         SparklineType::Column,
         SparklineType::Stacked,
     ]);
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_sparkline_groups(groups.clone()).unwrap();
 
     let mut buffer = Vec::new();
     let mut writer = Encoder::new(&mut buffer);
-    let mut shared_strings = crate::writer::MutableSharedStringsWriter::new();
+    let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write(&mut writer, &mut shared_strings).unwrap();
 
     let kinds = Records::new(&buffer)
@@ -662,6 +662,7 @@ fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
     expected_tail.extend_from_slice(&[kind::END_SPARKLINE_GROUPS, kind::END_SHEET]);
     assert!(kinds.ends_with(&expected_tail));
 
-    let reparsed = crate::sparkline::worksheet::read(&buffer).unwrap();
+    let reparsed =
+        crate::sparkline::worksheet::read(&buffer, crate::sparkline::Limits::DEFAULT).unwrap();
     assert_eq!(reparsed.groups(), Some(&groups));
 }

@@ -94,11 +94,11 @@ fn insertion_position(tab_count: usize) -> usize {
 }
 
 fn corpus(tab_count: usize) -> Result<Vec<u8>> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
     for index in 0..tab_count {
-        let mut sheet = MutableWorksheet::new(sheet_name(index));
+        let mut sheet = builder::Worksheet::new(sheet_name(index));
         // Every worksheet owns one distinct marker.  Reordering must move the
         // complete worksheet identity, rather than merely changing names.
         sheet.set_cell(0, 0, sheet_marker(index));
@@ -334,7 +334,7 @@ fn catalog_snapshot(bytes: &[u8]) -> Result<CatalogSnapshot> {
         binary_index,
         active_catalog_position: workbook.active_catalog_position(),
         active_worksheet_index: workbook.active_worksheet_index(),
-        active_sheet_index: litchi_core::sheet::WorkbookTrait::active_sheet_index(&workbook),
+        active_sheet_index: litchi_core::sheet::WorkbookTrait::active_sheet_index(workbook),
     })
 }
 
@@ -700,7 +700,7 @@ fn main() -> Result<()> {
         };
         let corpus_sha256 = sha256(&archive);
         let artifact = json!({
-            "generator": "litchi_xlsb::writer::{Builder, MutableWorksheet}; N worksheets in catalog order; one distinct numeric marker per worksheet",
+            "generator": "litchi_xlsb::builder::{self, Builder}; N worksheets in catalog order; one distinct numeric marker per worksheet",
             "tab_count": tab_count,
             "insertion_position": insertion_position(tab_count),
             "inserted_name": INSERTED_NAME,

@@ -45,6 +45,7 @@ pub struct OpenOptions {
     pub(crate) skip_drawings: bool,
     pub(crate) cache_limits: Option<SourceCacheLimits>,
     pub(crate) execution_context: Option<ExecutionContext>,
+    pub(crate) semantic_limits: crate::SemanticLimits,
 }
 
 impl OpenOptions {
@@ -102,6 +103,56 @@ impl OpenOptions {
     pub fn execution_context(mut self, context: ExecutionContext) -> Self {
         self.execution_context = Some(context);
         self
+    }
+
+    /// Select the semantic budgets the opened package keeps for its family
+    /// reads and edits.
+    #[must_use]
+    pub const fn semantic_limits(mut self, limits: crate::SemanticLimits) -> Self {
+        self.semantic_limits = limits;
+        self
+    }
+
+    /// The physical limits of the clear OPC archive.
+    #[must_use]
+    pub const fn source_limits_value(&self) -> SourceLimits {
+        self.source_limits
+    }
+
+    /// The semantic limits of the external-link catalog.
+    #[must_use]
+    pub const fn external_link_limits_value(&self) -> ExternalLinkLimits {
+        self.external_link_limits
+    }
+
+    /// The opt-in repairs applied while the workbook is read.
+    #[must_use]
+    pub const fn leniency_value(&self) -> Leniency {
+        self.leniency
+    }
+
+    /// Whether eager routes decode drawings at open.
+    #[must_use]
+    pub const fn parse_drawings_value(&self) -> bool {
+        !self.skip_drawings
+    }
+
+    /// The payload-cache policy of positional-source ingress, if any.
+    #[must_use]
+    pub const fn cache_limits_value(&self) -> Option<SourceCacheLimits> {
+        self.cache_limits
+    }
+
+    /// The caller's execution context of positional-source ingress, if any.
+    #[must_use]
+    pub const fn execution_context_value(&self) -> Option<&ExecutionContext> {
+        self.execution_context.as_ref()
+    }
+
+    /// The semantic budgets the opened package keeps.
+    #[must_use]
+    pub const fn semantic_limits_value(&self) -> crate::SemanticLimits {
+        self.semantic_limits
     }
 
     pub(crate) const fn drawing_load_policy(&self) -> DrawingLoadPolicy {

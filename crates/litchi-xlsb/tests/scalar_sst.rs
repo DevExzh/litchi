@@ -10,9 +10,9 @@ use std::io::Cursor;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, Scalar, Value};
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 
@@ -25,11 +25,11 @@ fn b1() -> Reference {
 }
 
 fn generated_package() -> Package {
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "drop");
     first.set_cell(0, 1, "keep");
 
-    let mut second = MutableWorksheet::new("Second");
+    let mut second = builder::Worksheet::new("Second");
     second.set_cell(0, 0, "keep");
     second.set_cell(0, 1, "later");
 
@@ -46,11 +46,11 @@ fn generated_package() -> Package {
 }
 
 fn generated_unique_package() -> Package {
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "drop");
     first.set_cell(0, 1, "keep");
 
-    let mut second = MutableWorksheet::new("Second");
+    let mut second = builder::Worksheet::new("Second");
     second.set_cell(0, 0, "later");
 
     let mut writer = Builder::new();
@@ -202,6 +202,7 @@ fn scalar_patch_inverse_restores_the_exact_preclosure_package() {
     let changed = commit.package().clone();
     let restored = changed
         .apply_cell_values(&commit.patch().inverse())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("inverse patch");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 }

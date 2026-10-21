@@ -15,14 +15,14 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_xlsb::writer::{Builder, MutableWorksheet};
+//! use litchi_xlsb::builder::{Builder, Worksheet};
 //! use std::fs::File;
 //!
 //! // Create a new workbook
 //! let mut workbook = Builder::new();
 //!
 //! // Create a worksheet
-//! let mut sheet = MutableWorksheet::new("Sheet1");
+//! let mut sheet = Worksheet::new("Sheet1");
 //! sheet.set_cell(0, 0, "Hello");
 //! sheet.set_cell(0, 1, 42.0);
 //! sheet.set_cell(1, 0, true);
@@ -85,9 +85,9 @@ pub use crate::shapes::{
     EmuOffset, Geometry, GroupTransform, Insets, Paragraph, Preset, Properties, Run, TextSize,
     Underline, VerticalAnchor, Wrap,
 };
-pub use chartsheet::MutableChartSheet;
+pub use chartsheet::ChartSheet;
 pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ObjectSpec, ShapeSpec};
-pub use shared_strings::MutableSharedStringsWriter;
+pub(crate) use shared_strings::SharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
 pub use workbook::Builder;
-pub use worksheet::{CellData, MutableWorksheet, SheetProtection};
+pub use worksheet::{CellData, SheetProtection, Worksheet};

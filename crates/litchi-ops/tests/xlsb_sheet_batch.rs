@@ -27,7 +27,7 @@ fn fixture() -> Vec<u8> {
 }
 
 fn fixture_with_count(count: usize) -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
     let names = ["Data", "Archive", "Report", "Tail", "Spare", "Keep"];
@@ -35,7 +35,7 @@ fn fixture_with_count(count: usize) -> Vec<u8> {
         let name = names
             .get(index - 1)
             .map_or_else(|| format!("Tab{index}"), ToString::to_string);
-        let mut sheet = MutableWorksheet::new(name);
+        let mut sheet = builder::Worksheet::new(name);
         sheet.set_cell(0, 0, format!("seed-{index}"));
         writer.add_worksheet(sheet);
     }
@@ -50,8 +50,8 @@ fn fixture_with_count(count: usize) -> Vec<u8> {
 }
 
 fn worksheet_chart_worksheet_fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -63,11 +63,11 @@ fn worksheet_chart_worksheet_fixture() -> Vec<u8> {
     )
     .expect("chart fixture");
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Data"));
+    writer.add_worksheet(builder::Worksheet::new("Data"));
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart tab");
-    writer.add_worksheet(MutableWorksheet::new("Tail"));
+    writer.add_worksheet(builder::Worksheet::new("Tail"));
 
     let mut output = Cursor::new(Vec::new());
     writer

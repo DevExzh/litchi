@@ -465,12 +465,12 @@ impl Xlsb {
         let editor = self.editor()?;
         let commit = match &feature.data {
             Data::Comment(note) => {
-                let mut edit = editor.edit_comments();
+                let mut edit = editor.edit_comments().map_err(native)?;
                 edit.remove(sheet, note.row, note.col).map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
             Data::Hyperlink(_) => {
-                let mut edit = editor.edit_hyperlinks();
+                let mut edit = editor.edit_hyperlinks().map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
@@ -480,23 +480,23 @@ impl Xlsb {
                 } else {
                     ElementKind::Shape
                 };
-                let mut edit = editor.edit_drawings();
+                let mut edit = editor.edit_drawings().map_err(native)?;
                 edit.remove(sheet, kind, feature.index as usize)
                     .map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
             Data::Cf(_) => {
-                let mut edit = editor.edit_conditional_formats();
+                let mut edit = editor.edit_conditional_formats().map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
             Data::Validation(_) => {
-                let mut edit = editor.edit_data_validations();
+                let mut edit = editor.edit_data_validations().map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
             Data::Autofilter(_) => {
-                let mut edit = editor.edit_auto_filter();
+                let mut edit = editor.edit_auto_filter().map_err(native)?;
                 edit.set_auto_filter(sheet, None).map_err(native)?;
                 publish!(self, edit.commit().map_err(native)?)
             },
@@ -540,7 +540,7 @@ impl Xlsb {
             },
         };
         let editor = self.editor()?;
-        let mut edit = editor.edit_comments();
+        let mut edit = editor.edit_comments().map_err(native)?;
         let index = edit
             .add(
                 parent.sheet,
@@ -576,7 +576,7 @@ impl Xlsb {
             }
         }
         let editor = self.editor()?;
-        let mut edit = editor.edit_comments();
+        let mut edit = editor.edit_comments().map_err(native)?;
         if cell != (note.row, note.col) {
             if edit
                 .comments(sheet)
@@ -677,7 +677,7 @@ impl Xlsb {
         })?;
         let link = hyperlink(&reference, location, url, display, tooltip)?;
         let editor = self.editor()?;
-        let mut edit = editor.edit_hyperlinks();
+        let mut edit = editor.edit_hyperlinks().map_err(native)?;
         // As XLSX's `put_hyperlink`: a link on the same cells is replaced.
         let existing = edit
             .hyperlinks(parent.sheet)
@@ -727,7 +727,7 @@ impl Xlsb {
         }
         let replacement = hyperlink(&reference, location, url, display, tooltip)?;
         let editor = self.editor()?;
-        let mut edit = editor.edit_hyperlinks();
+        let mut edit = editor.edit_hyperlinks().map_err(native)?;
         edit.set(sheet, feature.index as usize, replacement)
             .map_err(authored)?;
         publish!(self, edit.commit().map_err(native)?)
@@ -1116,7 +1116,7 @@ impl Xlsb {
             flip_v,
         };
         let editor = self.editor()?;
-        let mut edit = editor.edit_drawings();
+        let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
         let commit = publish!(self, edit.commit().map_err(native)?)?;
         Ok((commit, feature_path(parent.sheet, "picture", Some(index))))
@@ -1268,7 +1268,7 @@ impl Xlsb {
         };
         let _: &Font = &spec.font;
         let editor = self.editor()?;
-        let mut edit = editor.edit_drawings();
+        let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
         let commit = publish!(self, edit.commit().map_err(native)?)?;
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
@@ -1348,7 +1348,7 @@ impl Xlsb {
             ElementKind::Shape
         };
         let editor = self.editor()?;
-        let mut edit = editor.edit_drawings();
+        let mut edit = editor.edit_drawings().map_err(native)?;
         edit.set(sheet, kind, feature.index as usize, &change)
             .map_err(authored)?;
         publish!(self, edit.commit().map_err(native)?)
@@ -2106,8 +2106,10 @@ impl Xlsb {
             None => cf_ranges("ref", parent.reference.as_deref().unwrap_or("A1:A10"))?,
         };
         let editor = self.editor()?;
-        let mut edit = editor.edit_conditional_formats();
+        let mut edit = editor.edit_conditional_formats().map_err(native)?;
         let worksheet_formats = editor
+            .workbook()
+            .map_err(native)?
             .sheet_features(parent.sheet, xlsb::sheet::FeatureSet::FORMATS)
             .map_err(native)?
             .formats;
@@ -2177,7 +2179,7 @@ impl Xlsb {
             }
         }
         let editor = self.editor()?;
-        let mut edit = editor.edit_conditional_formats();
+        let mut edit = editor.edit_conditional_formats().map_err(native)?;
         if !style_is_empty(&request.style) {
             let first = format
                 .rules
@@ -2386,7 +2388,7 @@ impl Xlsb {
         validation.show_input_message = true;
         apply_validation(&mut validation, props, Operation::Add)?;
         let editor = self.editor()?;
-        let mut edit = editor.edit_data_validations();
+        let mut edit = editor.edit_data_validations().map_err(native)?;
         let existing = edit.validations(parent.sheet).map_err(native)?;
         let added = rects(&validation.cell_ranges);
         if existing
@@ -2417,7 +2419,7 @@ impl Xlsb {
         let mut validation = (**current).clone();
         apply_validation(&mut validation, props, Operation::Set)?;
         let editor = self.editor()?;
-        let mut edit = editor.edit_data_validations();
+        let mut edit = editor.edit_data_validations().map_err(native)?;
         let existing = edit.validations(sheet).map_err(native)?;
         let changed = rects(&validation.cell_ranges);
         let clash = existing.iter().enumerate().any(|(index, other)| {
@@ -2465,7 +2467,7 @@ impl Xlsb {
         let range = range.ok_or_else(|| missing("range", "an auto-filter needs a range"))?;
         let filter = filter_range("range", &range)?;
         let editor = self.editor()?;
-        let mut edit = editor.edit_auto_filter();
+        let mut edit = editor.edit_auto_filter().map_err(native)?;
         edit.set_auto_filter(parent.sheet, Some(filter))
             .map_err(authored)?;
         let commit = publish!(self, edit.commit().map_err(native)?)?;
@@ -2474,7 +2476,7 @@ impl Xlsb {
 
     fn set_autofilter(&self, sheet: usize, props: &Props<'_>) -> Result<Commit> {
         let editor = self.editor()?;
-        let mut edit = editor.edit_auto_filter();
+        let mut edit = editor.edit_auto_filter().map_err(native)?;
         let mut filter = edit
             .auto_filter(sheet)
             .map_err(native)?
@@ -2536,7 +2538,7 @@ impl Xlsb {
         breaks: Vec<xlsb::page_breaks::Break>,
     ) -> Result<Commit> {
         let editor = self.editor()?;
-        let mut edit = editor.edit_page_breaks();
+        let mut edit = editor.edit_page_breaks().map_err(native)?;
         let mut all = edit.page_breaks(sheet).map_err(native)?;
         if kind == Kind::RowBreak {
             all.rows = breaks;

@@ -66,6 +66,8 @@ pub struct Workbook {
     pub(super) tolerance: crate::leniency::ToleranceReport,
     /// Opt-in repair policy applied to lazily parsed worksheet content.
     pub(super) leniency: crate::leniency::Leniency,
+    /// The semantic budgets of the family reads of this projection.
+    pub(super) semantic_limits: crate::SemanticLimits,
 }
 
 impl std::fmt::Debug for Workbook {
@@ -146,7 +148,8 @@ impl Workbook {
     ///
     /// ```
     /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
-    /// let workbook = litchi_xlsb::Package::new()?.into_workbook()?;
+    /// let bytes = litchi_xlsb::Package::new()?.to_bytes()?;
+    /// let workbook = litchi_xlsb::Workbook::new(std::io::Cursor::new(bytes))?;
     /// let package = workbook.into_package();
     /// assert_eq!(package.leniency(), litchi_xlsb::Leniency::Strict);
     /// assert!(package.drawings_parsed());
@@ -162,9 +165,14 @@ impl Workbook {
         self.leniency = leniency;
     }
 
-    /// Consume the workbook and keep only its open-time repair report.
-    pub(crate) fn into_tolerance_report(self) -> crate::leniency::ToleranceReport {
-        self.tolerance
+    pub(crate) fn set_semantic_limits(&mut self, limits: crate::SemanticLimits) {
+        self.semantic_limits = limits;
+    }
+
+    /// The semantic budgets of this projection's family reads.
+    #[must_use]
+    pub const fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.semantic_limits
     }
 
     /// Return the drawing projection boundary selected when this workbook was

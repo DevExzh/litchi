@@ -8,15 +8,51 @@
 
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::merged_cells::MergedCell;
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
+
+#[path = "support/projection.rs"]
+mod projection;
+
+use projection::OwnedWorkbook;
+
+/// Sequential merged-cell steps on an owned workbook projection: each step
+/// runs one `Package::edit_merged_cells` edit and adopts the published
+/// package; a refused step leaves the projection unchanged.
+trait MergeSteps {
+    fn merge_step<T>(
+        &mut self,
+        step: impl FnOnce(
+            &mut litchi_xlsb::merged_cells::edit::Edit,
+        ) -> litchi_xlsb::package::PackageResult<T>,
+    ) -> litchi_xlsb::package::PackageResult<T>;
+}
+
+impl MergeSteps for Workbook {
+    fn merge_step<T>(
+        &mut self,
+        step: impl FnOnce(
+            &mut litchi_xlsb::merged_cells::edit::Edit,
+        ) -> litchi_xlsb::package::PackageResult<T>,
+    ) -> litchi_xlsb::package::PackageResult<T> {
+        let mut edit = self.to_package().edit_merged_cells()?;
+        let value = step(&mut edit)?;
+        *self = edit.commit()?.into_package().owned_workbook()?;
+        Ok(value)
+    }
+}
+
+/// The complete-catalog position of a named tab.
+fn tab(workbook: &Workbook, name: &str) -> usize {
+    workbook.sheet(name).unwrap().unwrap().position().get()
+}
 
 fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
     let mut workbook = Builder::new();
     for (name, ranges) in sheets {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} preserved"));
         for range in *ranges {
             sheet.add_merged_cell(range.clone());
@@ -130,11 +166,14 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     let original_workbook = part_blob(&source, "/xl/workbook.bin");
 
     let mut workbook = Workbook::new(Cursor::new(&source)).unwrap();
+    let first = tab(&workbook, "First");
     workbook
-        .set_merged_cell_ranges_by_name(
-            "First",
-            &[MergedCell::new(5, 6, 2, 3), MergedCell::new(0, 1, 0, 1)],
-        )
+        .merge_step(|edit| {
+            edit.set_merged_cell_ranges(
+                first,
+                &[MergedCell::new(5, 6, 2, 3), MergedCell::new(0, 1, 0, 1)],
+            )
+        })
         .unwrap();
     assert_eq!(
         workbook.merged_cell_ranges(0).unwrap(),
@@ -180,25 +219,28 @@ fn replaces_adds_removes_and_clears_present_block_by_index_and_name() {
     let initial = [MergedCell::new(0, 1, 0, 1)];
     let source = workbook_bytes(&[("Data", &initial), ("Other", &[])]);
     let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
+    let data = tab(&workbook, "Data");
     workbook
-        .add_merged_cell_range_by_name("Data", MergedCell::new(3, 4, 3, 4))
+        .merge_step(|edit| edit.add_merged_cell_range(data, MergedCell::new(3, 4, 3, 4)))
         .unwrap();
     assert_eq!(workbook.merged_cell_ranges(0).unwrap().len(), 2);
     assert!(
         workbook
-            .remove_merged_cell_range(0, &MergedCell::new(0, 1, 0, 1))
+            .merge_step(|edit| edit.remove_merged_cell_range(0, &MergedCell::new(0, 1, 0, 1)))
             .unwrap()
     );
     assert!(
         !workbook
-            .remove_merged_cell_range_by_name("Data", &MergedCell::new(9, 10, 9, 10))
+            .merge_step(|edit| edit.remove_merged_cell_range(data, &MergedCell::new(9, 10, 9, 10)))
             .unwrap()
     );
     assert_eq!(
         workbook.merged_cell_ranges_by_name("Data").unwrap(),
         [MergedCell::new(3, 4, 3, 4)]
     );
-    workbook.clear_merged_cell_ranges_by_name("Data").unwrap();
+    workbook
+        .merge_step(|edit| edit.clear_merged_cell_ranges(data))
+        .unwrap();
     assert!(workbook.merged_cell_ranges(0).unwrap().is_empty());
     assert!(
         records(&part_blob(&save(&workbook), "/xl/worksheets/sheet1.bin"))
@@ -222,7 +264,11 @@ fn rejects_bounds_duplicates_and_overlaps_atomically() {
         vec![MergedCell::new(0, 4, 0, 4), MergedCell::new(3, 6, 4, 8)],
     ];
     for ranges in invalid_sets {
-        assert!(workbook.set_merged_cell_ranges(0, &ranges).is_err());
+        assert!(
+            workbook
+                .merge_step(|edit| edit.set_merged_cell_ranges(0, &ranges))
+                .is_err()
+        );
         assert!(workbook.merged_cell_ranges(0).unwrap().is_empty());
     }
     assert!(workbook.merged_cell_ranges(1).is_err());
@@ -270,7 +316,7 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
         assert!(workbook.merged_cell_ranges(0).is_err());
         assert!(
             workbook
-                .set_merged_cell_ranges(0, &[MergedCell::new(8, 9, 8, 9)])
+                .merge_step(|edit| edit.set_merged_cell_ranges(0, &[MergedCell::new(8, 9, 8, 9)]))
                 .is_err()
         );
         assert_eq!(
@@ -285,10 +331,12 @@ fn count_payload_and_record_order_are_strict_after_roundtrip() {
     let source = workbook_bytes(&[("Data", &[])]);
     let mut workbook = Workbook::new(Cursor::new(source)).unwrap();
     workbook
-        .set_merged_cell_ranges(
-            0,
-            &[MergedCell::new(8, 9, 2, 3), MergedCell::new(1, 2, 4, 5)],
-        )
+        .merge_step(|edit| {
+            edit.set_merged_cell_ranges(
+                0,
+                &[MergedCell::new(8, 9, 2, 3), MergedCell::new(1, 2, 4, 5)],
+            )
+        })
         .unwrap();
     let output = save(&workbook);
     let sheet = part_blob(&output, "/xl/worksheets/sheet1.bin");

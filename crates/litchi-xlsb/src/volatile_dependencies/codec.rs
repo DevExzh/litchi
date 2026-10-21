@@ -34,7 +34,7 @@ pub(crate) fn read(data: &[u8], limits: SemanticLimits, sheet_count: usize) -> R
         ));
     }
     let raw_limits = crate::raw::Limits::new(limits.max_part_bytes, limits.max_string_units);
-    let mut iterator = Records::try_with_limits(data, raw_limits)?;
+    let mut iterator = Records::bounded(data, raw_limits)?;
     let mut parser = Parser::new(limits);
     while let Some(record) = iterator.next() {
         let record = record?;

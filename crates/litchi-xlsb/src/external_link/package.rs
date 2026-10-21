@@ -21,14 +21,9 @@ use crate::raw::{Encoder, kind};
 
 const NULL_WIDE_STRING_LENGTH: u32 = u32::MAX;
 
-/// Write one canonical external-link stream without opaque records.
-pub fn write_external_link_stream(link: &Link, relationship_id: Option<&str>) -> Result<Vec<u8>> {
-    write_external_link_stream_with_limits(link, relationship_id, ExternalLinkLimits::DEFAULT)
-}
-
 /// Write one canonical external-link stream without opaque records under an
 /// explicit operation-scoped resource policy.
-pub fn write_external_link_stream_with_limits(
+pub fn write_external_link_stream(
     link: &Link,
     relationship_id: Option<&str>,
     limits: ExternalLinkLimits,

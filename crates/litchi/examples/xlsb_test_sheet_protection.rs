@@ -10,14 +10,14 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{Builder, MutableWorksheet, SheetProtection};
+use litchi::xlsb::builder::{self, Builder, SheetProtection};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with basic sheet protection enabled...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Protected");
+    let mut sheet = builder::Worksheet::new("Protected");
 
     sheet.set_cell(
         0,

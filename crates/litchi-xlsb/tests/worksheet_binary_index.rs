@@ -26,11 +26,15 @@ use litchi_core::{
 };
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsb::binary_index::Limits as BinaryIndexLimits;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Header, Kind, Limits as RawLimits, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Package, SourceBackedWorkbook, SourceLimits, Workbook};
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 const INDEX1: &str = "/xl/worksheets/binaryIndex1.bin";
@@ -49,6 +53,19 @@ fn fixture(relative: &str) -> Vec<u8> {
 
 fn source_workbook(relative: &str) -> SourceBackedWorkbook {
     SourceBackedWorkbook::from_reader(Cursor::new(fixture(relative))).expect("source workbook")
+}
+
+/// The first worksheet of a source owner opened under binary-index limits.
+fn limited_sheet(relative: &str, limits: BinaryIndexLimits) -> litchi_xlsb::SourceBackedWorksheet {
+    SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(fixture(relative)),
+        litchi_xlsb::OpenOptions::new()
+            .semantic_limits(litchi_xlsb::SemanticLimits::new().binary_index(limits)),
+    )
+    .expect("source workbook")
+    .worksheet_by_index(0)
+    .expect("worksheet selector")
+    .expect("first worksheet")
 }
 
 fn package_part(package_bytes: &[u8], path: &str) -> Vec<u8> {
@@ -82,7 +99,7 @@ fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cel
 fn publish(commit: litchi_xlsb::cell_values::Commit) -> Workbook {
     commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("published workbook")
 }
 
@@ -428,19 +445,14 @@ fn indexed_values_lookup_present_absent_and_formula_cache() {
 
 #[test]
 fn selected_shared_string_obeys_index_raw_string_limit() {
-    let workbook = source_workbook("test-data/ooxml/xlsb/sample.xlsb");
-    let sheet = workbook
-        .worksheet_by_index(0)
-        .expect("worksheet selector")
-        .expect("first worksheet");
     let high_limits = BinaryIndexLimits::new(
         RawLimits::new(RawLimits::DEFAULT.payload(), 5),
         1_000_000,
         32_768,
         1_000_000,
     );
-    let high = sheet
-        .indexed_values_with_limits(high_limits)
+    let high = limited_sheet("test-data/ooxml/xlsb/sample.xlsb", high_limits)
+        .indexed_values()
         .expect("high-limit indexed values")
         .expect("binary index relationship");
     assert_eq!(
@@ -454,8 +466,8 @@ fn selected_shared_string_obeys_index_raw_string_limit() {
         32_768,
         1_000_000,
     );
-    let low = sheet
-        .indexed_values_with_limits(low_limits)
+    let low = limited_sheet("test-data/ooxml/xlsb/sample.xlsb", low_limits)
+        .indexed_values()
         .expect("low-limit index binding")
         .expect("binary index relationship");
     assert!(low.cached_value(0, 0).is_err());
@@ -573,7 +585,7 @@ fn missing_index_relationship_returns_no_index_handle() {
 
 #[test]
 fn writer_emits_lookupable_offsets_for_sparse_cells() {
-    let mut sheet = MutableWorksheet::new("Indexed");
+    let mut sheet = builder::Worksheet::new("Indexed");
     sheet.set_cell(0, 0, 1.25_f64);
     sheet.set_cell(0, 1_024, 2.5_f64);
     sheet.set_cell(33, 2, 3.75_f64);
@@ -635,7 +647,7 @@ fn writer_emits_lookupable_offsets_for_sparse_cells() {
 #[test]
 fn writer_emits_an_empty_index_block_for_an_empty_sheet() {
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Empty"));
+    writer.add_worksheet(builder::Worksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
     writer
         .build()
@@ -699,7 +711,7 @@ fn index_accepts_optional_empty_blocks_and_two_end_markers() {
 #[test]
 fn index_accepts_an_empty_block_before_a_later_empty_block() {
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Empty"));
+    writer.add_worksheet(builder::Worksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
     writer
         .build()
@@ -1034,12 +1046,6 @@ fn source_bytes_limit_rejects_index_before_payload_reads() {
     let source = Arc::new(CountingSource::new(fixture(
         "test-data/ooxml/xlsb/sample.xlsb",
     )));
-    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).expect("source workbook");
-    let sheet = workbook
-        .worksheet_by_index(0)
-        .expect("worksheet selector")
-        .expect("worksheet");
-    let reads_before = source.reads();
     let limits = BinaryIndexLimits::new_with_source_bytes(
         RawLimits::DEFAULT,
         1,
@@ -1047,6 +1053,17 @@ fn source_bytes_limit_rejects_index_before_payload_reads() {
         32_768,
         1_000_000,
     );
-    assert!(sheet.indexed_values_with_limits(limits).is_err());
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .semantic_limits(litchi_xlsb::SemanticLimits::new().binary_index(limits)),
+    )
+    .expect("source workbook");
+    let sheet = workbook
+        .worksheet_by_index(0)
+        .expect("worksheet selector")
+        .expect("worksheet");
+    let reads_before = source.reads();
+    assert!(sheet.indexed_values().is_err());
     assert_eq!(source.reads(), reads_before);
 }

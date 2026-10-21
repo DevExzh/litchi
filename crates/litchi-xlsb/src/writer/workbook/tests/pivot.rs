@@ -8,7 +8,7 @@
 
 use super::super::Builder;
 use crate::raw::{Encoder, kind};
-use crate::writer::MutableWorksheet;
+use crate::writer::Worksheet;
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Cursor;
@@ -47,7 +47,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     .unwrap()
     .into_pivot_chart(view_name)
     .unwrap();
-    let mut sheet = MutableWorksheet::new("Pivot Host");
+    let mut sheet = Worksheet::new("Pivot Host");
     sheet.add_pivot_table_view(view).unwrap();
     sheet.add_chart(chart).unwrap();
 
@@ -112,7 +112,7 @@ fn pivot_chart_refuses_a_missing_view_binding() {
     .unwrap()
     .into_pivot_chart("MissingPivot")
     .unwrap();
-    let mut sheet = MutableWorksheet::new("Host");
+    let mut sheet = Worksheet::new("Host");
     sheet.add_chart(chart).unwrap();
     let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);

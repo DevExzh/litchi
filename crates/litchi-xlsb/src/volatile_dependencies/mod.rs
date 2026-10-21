@@ -19,6 +19,7 @@ mod tests;
 #[cfg(test)]
 mod codec_review_tests;
 
+pub use litchi_core::edit::Diagnostics;
 pub use model::{
     CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, HARD_MAX_ITEMS,
     HARD_MAX_PART_BYTES, HARD_MAX_RECORDS, HARD_MAX_RELATIONSHIPS, HARD_MAX_STRING_UNITS,
@@ -27,10 +28,22 @@ pub use model::{
 pub use package::{CONTENT_TYPE, DEFAULT_PART_NAME, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
 pub use snapshot::Snapshot;
-pub use transaction::Edit;
+pub use transaction::{Edit, EditOptions};
 
 /// Alias matching other XLSB feature owners.
 pub use crate::package::error::{Error, Result};
+
+/// A bounded dimension of this family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of the Volatile Dependencies part.
+    PartBytes,
+    /// Records of the Volatile Dependencies part.
+    Records,
+    /// Relationships of the Volatile Dependencies closure.
+    Relationships,
+}
 
 /// Validate graph ownership and the modeled stream before catalog remapping.
 pub(crate) fn reorder_owner(

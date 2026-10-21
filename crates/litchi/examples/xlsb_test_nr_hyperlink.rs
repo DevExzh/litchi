@@ -3,14 +3,14 @@
 #![allow(clippy::all)]
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Data
     sheet.set_cell(0, 0, CellValue::String("Product".to_string()));

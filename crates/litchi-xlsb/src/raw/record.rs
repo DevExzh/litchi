@@ -269,7 +269,7 @@ impl<'a> Records<'a> {
     }
 
     /// Construct an iterator after validating its raw limit profile.
-    pub fn try_with_limits(input: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn bounded(input: &'a [u8], limits: Limits) -> Result<Self> {
         match limits.validate() {
             Ok(limits) => Ok(Self::with_limits(input, limits)),
             Err(error) => Err(error),

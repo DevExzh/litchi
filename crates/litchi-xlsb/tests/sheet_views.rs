@@ -21,8 +21,8 @@ use litchi_sheet::view::{
 };
 use litchi_sheet::{Cell, Rect};
 use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::raw::{Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -34,9 +34,9 @@ fn fixture(relative: &str) -> PathBuf {
         .join(relative)
 }
 
-fn workbook_bytes(configure: impl FnOnce(&mut MutableWorksheet)) -> Vec<u8> {
+fn workbook_bytes(configure: impl FnOnce(&mut builder::Worksheet)) -> Vec<u8> {
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "views");
     configure(&mut sheet);
     workbook.add_worksheet(sheet);
@@ -283,7 +283,7 @@ fn explicit_sheet_view_round_trip() {
 
 #[test]
 fn freeze_panes_updates_canonical_view_without_losing_non_pane_state() {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let mut view = View::default();
     view.window = Window::new(9);
     view.color = Color::new(64).unwrap();

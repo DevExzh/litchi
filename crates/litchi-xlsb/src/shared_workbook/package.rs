@@ -141,7 +141,7 @@ pub fn load(package: &OpcPackage) -> Result<Catalog> {
 }
 
 /// Atomically replace the shared-workbook owner on a cloned OPC graph.
-pub fn store(package: &mut OpcPackage, catalog: &Catalog) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, catalog: &Catalog) -> Result<()> {
     let _ = load(package)?;
     let mut candidate = package.clone();
     store_inner(&mut candidate, catalog)?;

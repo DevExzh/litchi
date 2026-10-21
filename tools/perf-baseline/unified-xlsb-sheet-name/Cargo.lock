@@ -570,11 +570,16 @@ dependencies = [
 name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "caseless",
  "litchi-core",
+ "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "litchi-sheet-text",
  "litchi-xlsb",
+ "memchr",
+ "quick-xml",
  "serde",
  "serde_json",
  "unicode-normalization",
@@ -585,6 +590,15 @@ name = "litchi-sheet"
 version = "0.0.1"
 dependencies = [
  "litchi-core",
+ "thiserror",
+]
+
+[[package]]
+name = "litchi-sheet-text"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-sheet",
  "thiserror",
 ]
 

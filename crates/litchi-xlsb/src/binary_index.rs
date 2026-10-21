@@ -244,7 +244,7 @@ impl BinaryIndex {
         let mut previous_start = None;
         let mut previous_end = None;
 
-        for record_result in raw::Records::try_with_limits(source.as_slice(), limits.raw)? {
+        for record_result in raw::Records::bounded(source.as_slice(), limits.raw)? {
             let record = record_result?;
             record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                 resource: "binary-index record count",
@@ -469,7 +469,7 @@ impl WorksheetBinaryIndex {
         let mut current_row = row;
         let mut first = true;
         let mut record_count = 0usize;
-        for record_result in raw::Records::try_with_limits(tail, self.limits.raw)? {
+        for record_result in raw::Records::bounded(tail, self.limits.raw)? {
             let record = record_result?;
             record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                 resource: "binary-index lookup records",
@@ -890,7 +890,7 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     let mut previous_column = None;
     let mut cell_count = 0usize;
     let mut record_count = 0usize;
-    for record_result in raw::Records::try_with_limits(worksheet, limits.raw)? {
+    for record_result in raw::Records::bounded(worksheet, limits.raw)? {
         let record = record_result?;
         record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
             resource: "worksheet record count",
@@ -1362,7 +1362,7 @@ fn patch_offsets(source: &[u8], after: &WorksheetBinaryIndex, limits: Limits) ->
         .collect::<BTreeMap<_, _>>();
     let mut block_index = 0usize;
     let mut current_block = None;
-    for record_result in raw::Records::try_with_limits(source, limits.raw)? {
+    for record_result in raw::Records::bounded(source, limits.raw)? {
         let record = record_result?;
         match record.kind() {
             kind::INDEX_BLOCK => {

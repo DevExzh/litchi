@@ -120,6 +120,8 @@ struct SourceInner {
     tolerance: Mutex<ToleranceReport>,
     /// Opt-in repair policy applied to lazily read worksheet content.
     leniency: Leniency,
+    /// The semantic budgets of the family reads of this owner.
+    semantic_limits: crate::SemanticLimits,
 }
 
 /// What reading one worksheet stream needs ([`SourceBackedWorksheet`]).
@@ -270,9 +272,7 @@ impl SourceBackedIndexedWorksheet {
             let mut seen_sheet_data = false;
             let mut current_row = None;
             let mut record_count = 0usize;
-            for record_result in
-                Records::try_with_limits(self.worksheet.as_bytes(), self.limits.raw)?
-            {
+            for record_result in Records::bounded(self.worksheet.as_bytes(), self.limits.raw)? {
                 let record = record_result?;
                 record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "indexed worksheet record count",
@@ -490,6 +490,7 @@ impl SourceBackedWorkbook {
             SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?,
             options.external_link_limits,
             options.leniency,
+            options.semantic_limits,
         )
     }
 
@@ -522,18 +523,29 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::build(package, options.external_link_limits, options.leniency)
+        Self::build(
+            package,
+            options.external_link_limits,
+            options.leniency,
+            options.semantic_limits,
+        )
     }
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::build(package, ExternalLinkLimits::default(), Leniency::Strict)
+        Self::build(
+            package,
+            ExternalLinkLimits::default(),
+            Leniency::Strict,
+            crate::SemanticLimits::new(),
+        )
     }
 
     fn build(
         package: SourceBackedPackage,
         external_link_limits: ExternalLinkLimits,
         leniency: Leniency,
+        semantic_limits: crate::SemanticLimits,
     ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
@@ -813,8 +825,15 @@ impl SourceBackedWorkbook {
                 cached_value_cache: WorksheetCache::with_limits(CACHED_VALUE_CACHE_LIMITS),
                 tolerance: Mutex::new(tolerance),
                 leniency,
+                semantic_limits,
             }),
         })
+    }
+
+    /// The semantic budgets this owner keeps for its family reads.
+    #[must_use]
+    pub fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.inner.semantic_limits
     }
 
     /// A snapshot of every workbook-scope repair applied so far.
@@ -1280,18 +1299,12 @@ impl SourceBackedWorkbook {
     /// view. Image relationships remain inert; their payloads are not read.
     /// Source freshness and cancellation are checked around the operation.
     /// Retain the returned view for repeated color and font queries.
-    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
-        self.theme_with_limits(crate::theme::Limits::default())
-    }
-
-    /// Read the optional theme with explicit resource ceilings.
     ///
-    /// The selected part's declared size is checked before payload loading;
-    /// decoded XML and publication bounds remain enforced by the theme owner.
-    pub fn theme_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<Option<crate::theme::View>> {
+    /// The owner's [`crate::SemanticLimits::theme_value`] bound the read: the
+    /// selected part's declared size is checked before payload loading, and
+    /// decoded XML bounds remain enforced by the theme owner.
+    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
+        let limits = self.inner.semantic_limits.theme_value();
         let _ = preflight_package(&self.inner.package)?;
         let theme = crate::theme::read_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
@@ -1305,19 +1318,11 @@ impl SourceBackedWorkbook {
     /// payload views remain deferred; reading a payload is an explicit,
     /// fallible operation on the returned entry rather than part of this
     /// inventory call.
-    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
-        self.embedded_with_limits(&litchi_ooxml_common::embedded::Limits::default())
-    }
-
-    /// Inventory embedded relationships with explicit resource limits.
     ///
-    /// This is a catalog-only operation over the retained source-backed OPC
-    /// package. Payload bytes are not read or materialized; callers must use
-    /// the deferred fallible payload operation on each returned entry.
-    pub fn embedded_with_limits(
-        &self,
-        limits: &litchi_ooxml_common::embedded::Limits,
-    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+    /// The owner's [`crate::SemanticLimits::embedded_value`] bound the
+    /// inventory.
+    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        let limits = &self.inner.semantic_limits.embedded_value();
         let _ = preflight_package(&self.inner.package)?;
         let entries = litchi_ooxml_common::embedded::scan_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
@@ -1456,15 +1461,11 @@ impl SourceBackedWorksheet {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The owner's [`crate::SemanticLimits::binary_index_value`] bound the
+    /// worksheet and index validation.
     pub fn indexed_values(&self) -> Result<Option<SourceBackedIndexedWorksheet>> {
-        self.indexed_values_with_limits(crate::binary_index::Limits::DEFAULT)
-    }
-
-    /// Open indexed values with explicit worksheet and index validation limits.
-    pub fn indexed_values_with_limits(
-        &self,
-        limits: crate::binary_index::Limits,
-    ) -> Result<Option<SourceBackedIndexedWorksheet>> {
+        let limits = self.inner.semantic_limits.binary_index_value();
         let _ = preflight_package(&self.inner.package)?;
         let result = (|| {
             let limits = limits.validate()?;

@@ -213,21 +213,21 @@ fn legacy_limit_constructor_is_validated_before_wire_work() {
 fn checked_limit_constructors_reject_invalid_profiles() {
     let invalid = Limits::new(MAX_WIRE_PAYLOAD + 1, 0);
     assert!(matches!(
-        Cursor::try_with_limits(&[], "test", invalid),
+        Cursor::bounded(&[], "test", invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
         })
     ));
     assert!(matches!(
-        Records::try_with_limits(&[], invalid),
+        Records::bounded(&[], invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
         })
     ));
     assert!(matches!(
-        Encoder::try_with_limits(Vec::new(), invalid),
+        Encoder::bounded(Vec::new(), invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
@@ -240,7 +240,7 @@ fn oversized_wire_limits_are_rejected_before_writer_creation() {
     let too_large = MAX_WIRE_PAYLOAD + 1;
     let mut output = Vec::new();
     assert!(matches!(
-        Encoder::try_with_limits(&mut output, Limits::new(too_large, 1)),
+        Encoder::bounded(&mut output, Limits::new(too_large, 1)),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             value,

@@ -13,12 +13,12 @@ use std::io::Cursor;
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::package::connections::{
     CommandType, Connection, Connections, DbProperties, Properties, SourceType,
 };
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
     Workbook,
@@ -32,12 +32,6 @@ fn test_data(name: &str) -> Vec<u8> {
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap()
-}
-
-fn save(workbook: &Workbook) -> Vec<u8> {
-    let mut output = Cursor::new(Vec::new());
-    workbook.to_package().write_to(&mut output).unwrap();
-    output.into_inner()
 }
 
 /// The first part whose name contains `fragment`.
@@ -94,7 +88,7 @@ fn assert_single(
 
 /// A workbook with one structured table on its first sheet.
 fn table_workbook() -> Vec<u8> {
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "Region");
     data.set_cell(0, 1, "Amount");
     data.set_cell(1, 0, "North");
@@ -139,7 +133,7 @@ fn table_workbook() -> Vec<u8> {
 
 /// A workbook carrying one inert ODBC connection.
 fn connections_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "value");
     let mut writer = Builder::new();
     writer.add_worksheet(sheet);
@@ -149,24 +143,24 @@ fn connections_workbook() -> Vec<u8> {
         .expect("build package")
         .write_to(&mut output)
         .unwrap();
-    let mut workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
-    workbook
-        .set_connections(Connections {
-            connections: vec![Connection {
-                connection_id: 42,
-                source_type: SourceType::Odbc,
-                name: "Sales".to_string(),
-                properties: Properties::Database(DbProperties {
-                    command_type: CommandType::Sql,
-                    connection_string: "Driver={Generated};Server=example.invalid".to_string(),
-                    command: Some("SELECT 1".to_string()),
-                    server_command: None,
-                }),
-                ..Connection::default()
-            }],
-        })
-        .unwrap();
-    save(&workbook)
+    let package = Package::from_bytes(&output.into_inner()).unwrap();
+    let mut edit = package.edit_connections().unwrap();
+    edit.replace(Some(Connections {
+        connections: vec![Connection {
+            connection_id: 42,
+            source_type: SourceType::Odbc,
+            name: "Sales".to_string(),
+            properties: Properties::Database(DbProperties {
+                command_type: CommandType::Sql,
+                connection_string: "Driver={Generated};Server=example.invalid".to_string(),
+                command: Some("SELECT 1".to_string()),
+                server_command: None,
+            }),
+            ..Connection::default()
+        }],
+    }))
+    .unwrap();
+    edit.commit().unwrap().into_package().to_bytes().unwrap()
 }
 
 #[test]

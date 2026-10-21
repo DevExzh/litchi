@@ -258,7 +258,7 @@ impl<'f> Nav<'f> {
 pub(super) fn tab_count(file: &Xlsb) -> Result<usize> {
     match &file.0.owner {
         XlsbOwner::Source(workbook) => Ok(workbook.workbook().sheet_count()?),
-        XlsbOwner::Eager(workbook) => Ok(workbook.sheets().len()),
+        XlsbOwner::Eager(package) => Ok(super::projection(package)?.sheets().len()),
     }
 }
 

@@ -8,17 +8,17 @@ use crate::raw::{Records, kind};
 /// One defined name of a workbook: its scope and its formula as text.
 ///
 /// ```
-/// use litchi_xlsb::writer::{Builder, MutableWorksheet};
+/// use litchi_xlsb::builder::{self, Builder};
 /// use litchi_xlsb::named_ranges::{Definition, area3d_formula};
 ///
 /// let mut builder = Builder::new();
-/// builder.add_worksheet(MutableWorksheet::new("Data"));
+/// builder.add_worksheet(builder::Worksheet::new("Data"));
 /// builder.add_named_range(
 ///     Definition::new("Totals".to_owned(), None)
 ///         .with_formula(area3d_formula(0, 0, 4, 1, 1)?),
 /// );
-/// let workbook = builder.build()?.workbook()?;
-/// let names = workbook.defined_name_entries()?;
+/// let package = builder.build()?;
+/// let names = package.workbook()?.defined_name_entries()?;
 /// assert_eq!(names[0].name, "Totals");
 /// assert_eq!(names[0].formula.as_deref(), Some("Data!$B$1:$B$5"));
 /// # Ok::<(), Box<dyn std::error::Error>>(())

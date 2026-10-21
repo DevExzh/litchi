@@ -21,9 +21,9 @@
 //! let (package, patch) = commit.into_parts();
 //! let wire = patch.to_bytes(TransferLimits::DEFAULT)?;
 //! let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
-//! let applied = source.apply(&decoded)?;
+//! let applied = source.apply(&decoded)?.into_package();
 //! assert_eq!(package.to_bytes()?, applied.to_bytes()?);
-//! let restored = package.apply(&patch.inverse())?;
+//! let restored = package.apply(&patch.inverse())?.into_package();
 //! assert_eq!(restored.to_bytes()?, source.to_bytes()?);
 //! # Ok(())
 //! # }
@@ -456,11 +456,11 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::sheet::traits::WorkbookTrait;
-    /// use litchi_xlsb::{Builder, sheet::Selector, writer::MutableWorksheet};
+    /// use litchi_xlsb::{Builder, sheet::Selector, builder};
     ///
     /// let mut builder = Builder::new();
-    /// builder.add_worksheet(MutableWorksheet::new("First"));
-    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// builder.add_worksheet(builder::Worksheet::new("First"));
+    /// builder.add_worksheet(builder::Worksheet::new("Second"));
     /// let source = builder.build()?;
     /// let mut edit = source.edit()?;
     /// assert!(edit.reorder_sheets(&[
@@ -592,11 +592,11 @@ impl Edit {
     /// ```
     /// use litchi_core::sheet::traits::WorkbookTrait;
     /// use litchi_core::Position;
-    /// use litchi_xlsb::{Builder, sheet::State, writer::MutableWorksheet};
+    /// use litchi_xlsb::{Builder, sheet::State, builder};
     ///
     /// let mut builder = Builder::new();
-    /// builder.add_worksheet(MutableWorksheet::new("First"));
-    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// builder.add_worksheet(builder::Worksheet::new("First"));
+    /// builder.add_worksheet(builder::Worksheet::new("Second"));
     /// let source = builder.build()?;
     /// let mut edit = source.edit()?;
     /// edit.insert_sheet(Position::new(1), "Inserted".to_owned(), State::Visible)?;
@@ -630,7 +630,7 @@ impl Edit {
         }
         if self.operations.len() >= self.limits.changes() {
             return Err(Error::Limit {
-                kind: LimitKind::Changes,
+                kind: LimitKind::Changes.into(),
                 observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
@@ -683,7 +683,7 @@ impl Edit {
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
             return Err(Error::Limit {
-                kind: LimitKind::PatchBytes,
+                kind: LimitKind::PatchBytes.into(),
                 observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
@@ -722,11 +722,11 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::sheet::WorkbookTrait as _;
-    /// use litchi_xlsb::{Builder, writer::MutableWorksheet};
+    /// use litchi_xlsb::{Builder, builder};
     ///
     /// let mut builder = Builder::new();
-    /// builder.add_worksheet(MutableWorksheet::new("First"));
-    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// builder.add_worksheet(builder::Worksheet::new("First"));
+    /// builder.add_worksheet(builder::Worksheet::new("Second"));
     /// let source = builder.build()?;
     /// let mut edit = source.edit()?;
     /// assert_eq!(edit.remove_sheet(0_usize)?, Some(true));
@@ -803,7 +803,7 @@ impl Edit {
         let operation = Operation::RemoveSheets { positions };
         if existing_index.is_none() && self.operations.len() >= self.limits.changes() {
             return Err(Error::Limit {
-                kind: LimitKind::Changes,
+                kind: LimitKind::Changes.into(),
                 observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
@@ -838,7 +838,7 @@ impl Edit {
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
             return Err(Error::Limit {
-                kind: LimitKind::PatchBytes,
+                kind: LimitKind::PatchBytes.into(),
                 observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
@@ -890,17 +890,18 @@ impl Edit {
     /// very hidden because it has no physical sheet part.
     ///
     /// ```
-    /// use litchi_xlsb::{Builder, sheet::State, writer::MutableWorksheet};
+    /// use litchi_xlsb::{Builder, sheet::State, builder};
     /// let mut builder = Builder::new();
-    /// builder.add_worksheet(MutableWorksheet::new("Visible"));
-    /// builder.add_worksheet(MutableWorksheet::new("Archive"));
+    /// builder.add_worksheet(builder::Worksheet::new("Visible"));
+    /// builder.add_worksheet(builder::Worksheet::new("Archive"));
     /// let source = builder.build()?;
     /// let mut edit = source.edit()?;
     /// assert_eq!(edit.set_sheet_state("Archive", State::Hidden)?, Some(true));
     /// assert_eq!(edit.set_sheet_state("Missing", State::Hidden)?, None);
     /// let commit = edit.commit()?;
     /// assert!(commit.diagnostics().changed());
-    /// assert_eq!(commit.package().apply(&commit.patch().inverse())?.to_bytes()?, source.to_bytes()?);
+    /// let restored = commit.package().apply(&commit.patch().inverse())?.into_package();
+    /// assert_eq!(restored.to_bytes()?, source.to_bytes()?);
     /// # Ok::<(), litchi_xlsb::package::PackageError>(())
     /// ```
     pub fn set_sheet_state<'a>(
@@ -1297,7 +1298,7 @@ impl Edit {
                 "formula authoring requires a Formula*Cache value".to_string(),
             ));
         }
-        let mut donor = self.base.workbook()?;
+        let mut donor = self.base.materialize_workbook()?;
         let style_index = author_style(&mut donor, style)?;
         insert_candidate_cell(
             &mut donor,
@@ -1404,7 +1405,7 @@ impl Edit {
         style: &AuthoredStyle,
         shared: bool,
     ) -> Result<()> {
-        let mut donor = self.base.workbook()?;
+        let mut donor = self.base.materialize_workbook()?;
         let style_index = author_style(&mut donor, style)?;
         let font_id = donor
             .styles()
@@ -1482,7 +1483,7 @@ impl Edit {
         }
         if self.operations.len() >= self.limits.changes() {
             return Err(Error::Limit {
-                kind: LimitKind::Changes,
+                kind: LimitKind::Changes.into(),
                 observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
@@ -1544,6 +1545,17 @@ impl Diagnostics {
 }
 
 impl Commit {
+    pub(crate) fn published(package: crate::Package, patch: Patch) -> Self {
+        let diagnostics = Diagnostics {
+            changed: !patch.is_noop(),
+        };
+        Self {
+            package,
+            patch,
+            diagnostics,
+        }
+    }
+
     /// Validated package produced by this transaction.
     #[must_use]
     pub const fn package(&self) -> &crate::Package {
@@ -1637,12 +1649,11 @@ impl Patch {
         self.operations.len()
     }
 
-    /// Apply this patch atomically after checking the exact package source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for a stale workbook or failed complete readback.
-    pub fn apply(&self, workbook: &mut Workbook) -> Result<()> {
+    /// Apply this patch atomically to a workbook projection after checking
+    /// the exact package source (packages replay with
+    /// [`crate::Package::apply`]).
+    #[cfg(test)]
+    pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
         if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
             return Err(Error::UnsupportedFeature(
                 "workbook patch source is stale".to_string(),
@@ -1741,7 +1752,7 @@ impl Patch {
         validate_limits(limits)?;
         if self.operations.len() > limits.changes() {
             return Err(Error::Limit {
-                kind: LimitKind::Changes,
+                kind: LimitKind::Changes.into(),
                 observed: self.operations.len(),
                 maximum: limits.changes(),
             });
@@ -1765,7 +1776,7 @@ impl Patch {
             })?;
         if total > limits.bytes() {
             return Err(Error::Limit {
-                kind: LimitKind::PatchBytes,
+                kind: LimitKind::PatchBytes.into(),
                 observed: total,
                 maximum: limits.bytes(),
             });
@@ -1864,7 +1875,7 @@ impl Patch {
         validate_limits(limits)?;
         if data.len() > limits.bytes() {
             return Err(Error::Limit {
-                kind: LimitKind::PatchBytes,
+                kind: LimitKind::PatchBytes.into(),
                 observed: data.len(),
                 maximum: limits.bytes(),
             });
@@ -1880,7 +1891,7 @@ impl Patch {
         let operation_count = read_usize(data, 24)?;
         if operation_count > limits.changes() {
             return Err(Error::Limit {
-                kind: LimitKind::Changes,
+                kind: LimitKind::Changes.into(),
                 observed: operation_count,
                 maximum: limits.changes(),
             });
@@ -2121,7 +2132,7 @@ impl History {
         let bytes = patch.retained_bytes()?;
         if bytes > self.limits.history_bytes() {
             return Err(Error::Limit {
-                kind: LimitKind::HistoryBytes,
+                kind: LimitKind::HistoryBytes.into(),
                 observed: bytes,
                 maximum: self.limits.history_bytes(),
             });
@@ -2165,24 +2176,36 @@ impl History {
         Ok(())
     }
 
-    /// Apply one exact inverse at the current history tip.
-    pub fn undo(&mut self, workbook: &mut Workbook) -> Result<()> {
+    /// Apply one exact inverse at the current history tip to `package` and
+    /// return the new package; `package` is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when there is no undo entry, for a package that is
+    /// not the entry's after state, and for a failed readback.
+    pub fn undo(&mut self, package: &crate::Package) -> Result<Commit> {
         let index = self.cursor.checked_sub(1).ok_or_else(|| {
             Error::UnsupportedFeature("workbook history has no undo entry".to_string())
         })?;
-        self.entries[index].inverse().apply(workbook)?;
+        let commit = package.apply(&self.entries[index].inverse())?;
         self.cursor = index;
-        Ok(())
+        Ok(commit)
     }
 
-    /// Reapply one entry on the redo side.
-    pub fn redo(&mut self, workbook: &mut Workbook) -> Result<()> {
+    /// Reapply one entry on the redo side to `package` and return the new
+    /// package; `package` is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when there is no redo entry, for a package that is
+    /// not the entry's before state, and for a failed readback.
+    pub fn redo(&mut self, package: &crate::Package) -> Result<Commit> {
         let patch = self.entries.get(self.cursor).ok_or_else(|| {
             Error::UnsupportedFeature("workbook history has no redo entry".to_string())
         })?;
-        patch.apply(workbook)?;
+        let commit = package.apply(patch)?;
         self.cursor = self.cursor.saturating_add(1);
-        Ok(())
+        Ok(commit)
     }
 }
 
@@ -2489,7 +2512,7 @@ fn insert_candidate_cell(
         super::Limits::DEFAULT,
         leniency,
     )?
-    .edit();
+    .draft();
     if let Some(formula) = formula {
         edit.insert_formula(reference, style, value, formula)?;
     } else {
@@ -2853,7 +2876,7 @@ fn transfer_cell(
         super::Limits::DEFAULT,
         leniency,
     )?
-    .edit();
+    .draft();
     if let Some(formula) = source_cell.formula() {
         let formula =
             super::formula_transfer::remap(&source, target, source_sheet, target_sheet, formula)?;
@@ -2996,7 +3019,7 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
 }
 
 fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut worksheet = crate::writer::MutableWorksheet::new(name.to_owned());
+    let mut worksheet = crate::builder::Worksheet::new(name.to_owned());
     // `None` uses the legacy writer default, whose tab-selected flag is true.
     // An inserted tab must not become the active/selected tab implicitly.
     worksheet.set_view(litchi_sheet::view::View {
@@ -3006,7 +3029,7 @@ fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut source = Vec::new();
     worksheet.write_with_sparkline_block(
         &mut Encoder::new(&mut source),
-        &mut crate::writer::MutableSharedStringsWriter::new(),
+        &mut crate::writer::SharedStringsWriter::new(),
         None,
     )?;
     let index = crate::binary_index::encode_for_worksheet(

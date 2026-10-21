@@ -161,11 +161,19 @@ fn malformed_unselected_worksheet_does_not_block_theme_access() {
 #[test]
 fn theme_byte_limit_is_checked_before_payload_reads() {
     let source = Source::fixture();
-    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let open = |limits| {
+        SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            litchi_xlsb::OpenOptions::new()
+                .semantic_limits(litchi_xlsb::SemanticLimits::new().theme(limits)),
+        )
+        .unwrap()
+    };
+    let below = open(litchi_xlsb::theme::Limits::new(7_645, 100_000, 128));
+    let exact = open(litchi_xlsb::theme::Limits::new(7_646, 100_000, 128));
     let before = source.reads.load(Ordering::SeqCst);
-    let limits = litchi_xlsb::theme::Limits::new(7_645, 100_000, 128);
     assert!(matches!(
-        workbook.theme_with_limits(limits),
+        below.theme(),
         Err(PackageError::LimitExceeded {
             actual: 7_646,
             maximum: 7_645,
@@ -173,8 +181,7 @@ fn theme_byte_limit_is_checked_before_payload_reads() {
         })
     ));
     assert_eq!(source.reads.load(Ordering::SeqCst), before);
-    let exact = litchi_xlsb::theme::Limits::new(7_646, 100_000, 128);
-    assert!(workbook.theme_with_limits(exact).unwrap().is_some());
+    assert!(exact.theme().unwrap().is_some());
 }
 
 #[test]

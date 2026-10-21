@@ -710,9 +710,13 @@ impl Snapshot {
         })
     }
 
-    /// Start a detached edit against this exact source stream.
+    /// Start a detached byte-level draft against this exact source stream.
+    ///
+    /// Package edits go through [`crate::Package::edit_cell_values`]; a
+    /// draft edits the worksheet stream alone, and [`Draft::finish`] returns
+    /// its exact, composable [`Patch`].
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub fn draft(&self) -> Draft {
         let mut index = BTreeMap::new();
         for (entry_index, entry) in self.entries.iter().enumerate() {
             index
@@ -720,7 +724,7 @@ impl Snapshot {
                 .and_modify(|state| *state = CellIndex::Duplicate)
                 .or_insert(CellIndex::Unique(entry_index));
         }
-        Edit {
+        Draft {
             source: Arc::clone(&self.source),
             entries: self.entries.clone(),
             metadata: None,
@@ -817,9 +821,9 @@ struct SourceMetadata {
     formula_group_metadata_invalid: bool,
 }
 
-/// Detached structural edits of worksheet cell records.
+/// Detached, byte-level structural edits of worksheet cell records.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     source: Arc<[u8]>,
     entries: Vec<Entry>,
     metadata: Option<SourceMetadata>,
@@ -830,7 +834,7 @@ pub struct Edit {
     leniency: Leniency,
 }
 
-impl Edit {
+impl Draft {
     /// Resource policy retained by this detached edit.
     pub(crate) const fn limits(&self) -> Limits {
         self.limits
@@ -1294,7 +1298,7 @@ impl Edit {
         }
         if self.inserted.len() >= self.limits.cells {
             return Err(Error::Limit {
-                kind: LimitKind::Cells,
+                kind: LimitKind::Cells.into(),
                 observed: self.inserted.len().saturating_add(1),
                 maximum: self.limits.cells,
             });
@@ -1318,7 +1322,17 @@ impl Edit {
     ///
     /// Returns an error if a replacement range cannot be represented or the
     /// generated source stream fails bounded structural readback.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the draft and return the planned worksheet snapshot and its
+    /// exact, reversible stream patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns the cell validation and limit errors of the draft.
+    pub fn finish(self) -> Result<(Snapshot, Patch)> {
+        Ok(self.commit()?.into_parts())
+    }
+
+    pub(crate) fn commit(self) -> Result<Commit> {
         let maximum = self.limits.cells.saturating_mul(2);
         self.commit_with_change_limit(maximum)
     }
@@ -1333,7 +1347,7 @@ impl Edit {
                 })?;
         if final_cells > self.limits.cells {
             return Err(Error::Limit {
-                kind: LimitKind::Cells,
+                kind: LimitKind::Cells.into(),
                 observed: final_cells,
                 maximum: self.limits.cells,
             });
@@ -1366,51 +1380,29 @@ impl Edit {
     }
 }
 
-/// Publication diagnostics for a worksheet-stream commit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the commit changes the worksheet stream.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
-
-/// Successful immutable cell-value commit.
+/// Successful immutable cell-value draft commit.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
 }
 
 impl Commit {
-    /// What the commit changed.
-    #[must_use]
-    pub fn diagnostics(&self) -> Diagnostics {
-        Diagnostics {
-            changed: !self.patch.is_noop(),
-        }
-    }
-
     /// Planned immutable worksheet snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Split this result into the planned snapshot and patch.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
@@ -1892,7 +1884,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
     limits.validate()?;
     if source.len() > limits.source_bytes {
         return Err(Error::Limit {
-            kind: LimitKind::SourceBytes,
+            kind: LimitKind::SourceBytes.into(),
             observed: source.len(),
             maximum: limits.source_bytes,
         });
@@ -1952,7 +1944,7 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
             cell_kind if in_sheet_data && frt_depth == 0 && is_supported_cell(cell_kind) => {
                 if entries.len() >= limits.cells {
                     return Err(Error::Limit {
-                        kind: LimitKind::Cells,
+                        kind: LimitKind::Cells.into(),
                         observed: entries.len().saturating_add(1),
                         maximum: limits.cells,
                     });
@@ -2054,7 +2046,7 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                 let reference = Reference::new(row, binary::read_u32_le_at(record.payload(), 0)?)?;
                 if source_cells.insert(reference) && source_cells.len() > limits.cells {
                     return Err(Error::Limit {
-                        kind: LimitKind::Cells,
+                        kind: LimitKind::Cells.into(),
                         observed: source_cells.len(),
                         maximum: limits.cells,
                     });
@@ -2094,7 +2086,7 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                         }
                         if formula_groups.len() >= limits.cells {
                             return Err(Error::Limit {
-                                kind: LimitKind::Cells,
+                                kind: LimitKind::Cells.into(),
                                 observed: formula_groups.len().saturating_add(1),
                                 maximum: limits.cells,
                             });
@@ -2536,7 +2528,7 @@ fn xnum_error(context: &'static str) -> Error {
     clippy::too_many_lines,
     reason = "one record-order state machine keeps structural BIFF12 rewriting and unknown-record copying auditable"
 )]
-fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
+fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
     let final_columns = final_row_columns(edit)?;
     let existing_rows = source_rows(&edit.source, edit.limits)?;
     let source_has_cells = source_contains_cells(&edit.source, edit.limits)?;
@@ -2721,7 +2713,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn final_row_columns(edit: &Edit) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
+fn final_row_columns(edit: &Draft) -> Result<BTreeMap<u32, BTreeSet<u32>>> {
     let mut rows = BTreeMap::<u32, BTreeSet<u32>>::new();
     let mut current_row = None;
     let mut in_sheet_data = false;
@@ -3117,7 +3109,7 @@ fn semantic_changes(
         if before != destination {
             if changes.len() == maximum {
                 return Err(Error::Limit {
-                    kind: LimitKind::Changes,
+                    kind: LimitKind::Changes.into(),
                     observed: changes.len().saturating_add(1),
                     maximum,
                 });
@@ -3240,7 +3232,7 @@ fn merge_patch_changes(left: &Patch, right: &Patch) -> Result<MergeOutcome> {
         });
     }
     let base = read_shared(Arc::clone(&left.before), left.limits, Leniency::Strict)?;
-    let mut edit = base.edit();
+    let mut edit = base.draft();
     for (reference, destination) in destinations {
         match destination {
             Some(cell) => put_stored_cell(&mut edit, cell)?,
@@ -3254,7 +3246,7 @@ fn merge_patch_changes(left: &Patch, right: &Patch) -> Result<MergeOutcome> {
     })
 }
 
-fn put_stored_cell(edit: &mut Edit, cell: StoredCell) -> Result<()> {
+fn put_stored_cell(edit: &mut Draft, cell: StoredCell) -> Result<()> {
     validate_value_with_limits(&cell.value, edit.limits)?;
     if cell.value.is_formula_cache() != cell.formula.is_some() {
         return Err(Error::InvalidFormula(
@@ -3484,7 +3476,7 @@ mod tests {
         let formula_error_ref = Reference::new(3, 10).expect("formula error reference");
         let formula_string_ref = Reference::new(3, 11).expect("formula string reference");
         let rich_string_ref = Reference::new(3, 12).expect("rich string reference");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         edit.set_number(real_ref, 9.25).expect("set real");
         edit.set_boolean(bool_ref, true).expect("set bool");
         edit.set_inline_string(string_ref, "CD".to_string())
@@ -3652,7 +3644,7 @@ mod tests {
             .expect("formula")
             .formula
             .clone();
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         edit.set_formula_string_cache(number, "eleven".to_string())
             .expect("number to string");
         edit.set_formula_number_cache(string, 2.5)
@@ -3694,7 +3686,7 @@ mod tests {
         let snapshot = read(&stream()).expect("snapshot");
         let string_ref = Reference::new(3, 4).expect("string reference");
         let rk_ref = Reference::new(3, 5).expect("rk reference");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         assert!(edit.set_boolean(string_ref, true).is_err());
         edit.set_inline_string(string_ref, "a much longer string".to_string())
             .expect("length-changing string");
@@ -3723,7 +3715,7 @@ mod tests {
         let inserted_same_row = Reference::new(3, 13).expect("same row");
         let inserted_new_row = Reference::new(8, 1).expect("new row");
         let formula_ref = Reference::new(3, 6).expect("formula");
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.draft();
         edit.remove(removed).expect("remove");
         edit.insert(
             inserted_same_row,
@@ -3776,14 +3768,14 @@ mod tests {
         let left_ref = Reference::new(3, 2).expect("left");
         let right_ref = Reference::new(3, 3).expect("right");
 
-        let mut left_edit = base.edit();
+        let mut left_edit = base.draft();
         left_edit.set_number(left_ref, 10.0).expect("left edit");
         let left = left_edit.commit().expect("left commit").patch().clone();
         let encoded = left.to_bytes(TransferLimits::DEFAULT).expect("serialize");
         let decoded = Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("decode");
         assert_eq!(decoded.apply(&before).expect("apply"), left.after());
 
-        let mut right_edit = base.edit();
+        let mut right_edit = base.draft();
         right_edit.set_boolean(right_ref, true).expect("right edit");
         let right = right_edit.commit().expect("right commit").patch().clone();
         let merged = left.compose_disjoint(&right).expect("disjoint merge");
@@ -3806,7 +3798,7 @@ mod tests {
             &Value::Boolean(true)
         );
 
-        let mut conflict_edit = base.edit();
+        let mut conflict_edit = base.draft();
         conflict_edit.set_number(left_ref, 11.0).expect("conflict");
         let conflict = conflict_edit.commit().expect("commit").patch().clone();
         let outcome = left.merge_three_way(&conflict).expect("merge outcome");

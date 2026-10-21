@@ -18,10 +18,10 @@ use litchi_core::Position;
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, PackURI, Part as _, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::State;
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 const BINARY_INDEX_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex";
@@ -37,7 +37,7 @@ struct BundleEntry {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for name in names {
-        builder.add_worksheet(MutableWorksheet::new(*name));
+        builder.add_worksheet(builder::Worksheet::new(*name));
     }
     builder.build().expect("worksheet package")
 }
@@ -54,9 +54,9 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    builder.add_worksheet(MutableWorksheet::new("Data"));
+    builder.add_worksheet(builder::Worksheet::new("Data"));
     builder.build().expect("chart-first package")
 }
 

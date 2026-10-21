@@ -37,7 +37,11 @@ pub(crate) fn author_part(link: &Link, one_based_index: usize) -> Result<BlobPar
         Kind::Dde => None,
         Kind::Ole => Some(part.relate_to_ext(link.source(), relationship_type::OLE_OBJECT)),
     };
-    let bytes = crate::external_link::write_external_link_stream(link, relationship_id.as_deref())?;
+    let bytes = crate::external_link::write_external_link_stream(
+        link,
+        relationship_id.as_deref(),
+        crate::external_link::ExternalLinkLimits::DEFAULT,
+    )?;
     if bytes.len() > MAX_PART_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_PART_BYTES,

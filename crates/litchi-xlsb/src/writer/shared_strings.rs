@@ -13,16 +13,16 @@ use std::collections::HashMap;
 use std::io::Write;
 
 /// Shared strings table writer
-pub struct MutableSharedStringsWriter {
+pub(crate) struct SharedStringsWriter {
     strings: Vec<String>,
     string_map: HashMap<String, u32>,
     total_count: u64,
 }
 
-impl MutableSharedStringsWriter {
+impl SharedStringsWriter {
     /// Create a new shared strings writer
-    pub fn new() -> Self {
-        MutableSharedStringsWriter {
+    pub(crate) fn new() -> Self {
+        SharedStringsWriter {
             strings: Vec::new(),
             string_map: HashMap::new(),
             total_count: 0,
@@ -32,7 +32,7 @@ impl MutableSharedStringsWriter {
     /// Add a string to the shared strings table
     ///
     /// Returns the index of the string (existing or newly added)
-    pub fn add_string(&mut self, s: String) -> u32 {
+    pub(crate) fn add_string(&mut self, s: String) -> u32 {
         self.total_count = self.total_count.saturating_add(1);
         if let Some(&index) = self.string_map.get(&s) {
             index
@@ -45,18 +45,20 @@ impl MutableSharedStringsWriter {
     }
 
     /// Get the count of unique strings
-    pub fn len(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
         self.strings.len()
     }
 
-    /// Check if the table is empty
-    pub fn is_empty(&self) -> bool {
-        self.strings.is_empty()
+    /// Total number of string-cell occurrences added, including duplicates.
+    #[cfg(test)]
+    pub(crate) fn total_count(&self) -> u64 {
+        self.total_count
     }
 
-    /// Total number of string-cell occurrences added, including duplicates.
-    pub fn total_count(&self) -> u64 {
-        self.total_count
+    /// Check if the table is empty
+    pub(crate) fn is_empty(&self) -> bool {
+        self.strings.is_empty()
     }
 
     /// Write shared strings table to binary format
@@ -104,7 +106,7 @@ impl MutableSharedStringsWriter {
     }
 }
 
-impl Default for MutableSharedStringsWriter {
+impl Default for SharedStringsWriter {
     fn default() -> Self {
         Self::new()
     }
@@ -116,21 +118,21 @@ mod tests {
 
     #[test]
     fn test_shared_strings_writer_new() {
-        let writer = MutableSharedStringsWriter::new();
+        let writer = SharedStringsWriter::new();
         assert!(writer.is_empty());
         assert_eq!(writer.len(), 0);
     }
 
     #[test]
     fn test_shared_strings_writer_default() {
-        let writer: MutableSharedStringsWriter = Default::default();
+        let writer: SharedStringsWriter = Default::default();
         assert!(writer.is_empty());
         assert_eq!(writer.len(), 0);
     }
 
     #[test]
     fn test_add_string() {
-        let mut writer = MutableSharedStringsWriter::new();
+        let mut writer = SharedStringsWriter::new();
         let idx1 = writer.add_string("Hello".to_string());
         let idx2 = writer.add_string("World".to_string());
 
@@ -142,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_add_duplicate_string() {
-        let mut writer = MutableSharedStringsWriter::new();
+        let mut writer = SharedStringsWriter::new();
         let idx1 = writer.add_string("Test".to_string());
         let idx2 = writer.add_string("Test".to_string());
         let idx3 = writer.add_string("Other".to_string());
@@ -156,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_add_multiple_strings() {
-        let mut writer = MutableSharedStringsWriter::new();
+        let mut writer = SharedStringsWriter::new();
         let strings = ["A", "B", "C", "D", "E"];
 
         for (i, s) in strings.iter().enumerate() {
@@ -169,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_add_empty_string() {
-        let mut writer = MutableSharedStringsWriter::new();
+        let mut writer = SharedStringsWriter::new();
         let idx = writer.add_string("".to_string());
 
         assert_eq!(idx, 0);
@@ -178,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_add_unicode_string() {
-        let mut writer = MutableSharedStringsWriter::new();
+        let mut writer = SharedStringsWriter::new();
         let idx = writer.add_string("Hello 世界 🌍".to_string());
 
         assert_eq!(idx, 0);
@@ -187,7 +189,7 @@ mod tests {
 
     #[test]
     fn writes_total_and_unique_counts() {
-        let mut table = MutableSharedStringsWriter::new();
+        let mut table = SharedStringsWriter::new();
         table.add_string("same".to_string());
         table.add_string("same".to_string());
         table.add_string("other".to_string());

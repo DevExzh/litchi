@@ -165,8 +165,10 @@ fn sequential_edits_compose_and_an_undo_restores_the_source_values() {
     let eager_twice = eager
         .apply_metadata(&first_patch)
         .unwrap()
+        .into_package()
         .apply_metadata(&second_patch)
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(eager_twice.metadata().unwrap(), metadata);
 
     // Undoing both edits restores the source values over the source parts.

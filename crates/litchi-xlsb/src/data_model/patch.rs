@@ -32,7 +32,7 @@ impl Patch {
     }
 
     /// Whether publication changes no workbook or model-part source bytes.
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -58,15 +58,13 @@ impl Patch {
     }
 
     /// Apply this patch directly to an OPC package after an exact source check.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         let current = self.check_source(package)?;
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         self.materialize(&mut candidate)?;
@@ -81,7 +79,7 @@ impl Patch {
     }
 
     pub(crate) fn materialize(&self, package: &mut OpcPackage) -> Result<()> {
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         materialize_models(package, &self.before, self.after.model())?;
@@ -218,39 +216,9 @@ fn restore_source_tokens(
     Ok(())
 }
 
-/// Detached result containing a planned snapshot and reversible patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owned bytes or topology.
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its planned snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Data Model edit's `commit`: the new package, the patch
+/// and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())

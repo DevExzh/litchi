@@ -15,9 +15,12 @@ use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use crate::package::error::{Error, Result};
 
-/// A bounded draft detached from an immutable Data Model snapshot.
+crate::part_edit::limits_options!(super::SemanticLimits, "Data Model");
+
+/// A staged Data Model edit of one package. Dropping it discards it.
 #[derive(Clone, Debug)]
 pub struct Edit {
+    source: crate::Package,
     before: Snapshot,
     definition: Option<Definition>,
     payload: Option<Arc<Vec<u8>>>,
@@ -38,11 +41,12 @@ enum PayloadEditKind {
 }
 
 impl Edit {
-    pub(crate) fn new(before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
         let definition = before.definition().cloned();
         let payload = before.part().map(|part| Arc::clone(&part.bytes));
         let identity_baseline = definition.clone();
         Self {
+            source,
             before,
             definition,
             payload,
@@ -377,7 +381,19 @@ impl Edit {
         self.replace_model(None)
     }
 
-    /// Commit the detached draft into a reversible source-checked patch.
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        *self = Self::new(self.source.clone(), self.before.clone());
+    }
+
+    /// Validate the staged Data Model, publish it to a new package and read
+    /// it back. An unchanged model returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook, the
+    /// closure, identity and payload refusals, and the workbook validation
+    /// errors of the result.
     pub fn commit(self) -> Result<Commit> {
         let after_model = match (&self.definition, &self.payload) {
             (None, None) => None,
@@ -419,7 +435,11 @@ impl Edit {
         };
         if unchanged {
             let before = self.before;
-            return Ok(Commit::new(Patch::new(before.clone(), before), false));
+            return Ok(Commit::new(
+                self.source,
+                Patch::new(before.clone(), before),
+                litchi_core::edit::Diagnostics::UNCHANGED,
+            ));
         }
         let after_definition = after_model.as_ref().map(|model| &model.definition);
         if let Some(after_definition) = after_definition {
@@ -452,9 +472,7 @@ impl Edit {
         if self.before.package().is_signed()
             || self.before.package().requires_signature_edit_policy()
         {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = self.before.package().as_ref().clone();
         super::patch::materialize_models(&mut candidate, &self.before, after_model.as_ref())?;
@@ -469,7 +487,12 @@ impl Edit {
                 "changed Data Model transaction produced no source change",
             ));
         }
-        Ok(Commit::new(Patch::new(self.before, after), true))
+        let package = self.source.reparse_candidate(candidate)?;
+        Ok(Commit::new(
+            package,
+            Patch::new(self.before, after),
+            litchi_core::edit::Diagnostics::CHANGED,
+        ))
     }
 
     fn validate_connection_closure(&self, definition: &Definition) -> Result<()> {

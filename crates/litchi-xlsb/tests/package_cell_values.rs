@@ -12,10 +12,10 @@
 use std::io::Cursor;
 
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, TransferLimits, Value};
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::raw::{Encoder, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 use litchi_xlsb::{Package, SourceLimits};
 
 fn a1() -> Reference {
@@ -62,9 +62,9 @@ fn chart_sheet_package() -> Package {
     .expect("chart fixture");
     let mut writer = Builder::new();
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart sheet");
-    writer.add_worksheet(MutableWorksheet::new("Data"));
+    writer.add_worksheet(builder::Worksheet::new("Data"));
     let mut output = Cursor::new(Vec::new());
     writer
         .build()
@@ -77,8 +77,8 @@ fn chart_sheet_package() -> Package {
 #[test]
 fn package_cell_name_selection_rejects_ambiguous_names() {
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("DATA"));
-    writer.add_worksheet(MutableWorksheet::new("Else"));
+    writer.add_worksheet(builder::Worksheet::new("DATA"));
+    writer.add_worksheet(builder::Worksheet::new("Else"));
     let mut output = Cursor::new(Vec::new());
     writer
         .build()
@@ -134,6 +134,7 @@ fn package_cell_commit_is_immutable_and_exposes_the_commit_triad() {
 
     let applied = source
         .apply_cell_values(commit.patch())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("replay against the exact source");
     assert_eq!(applied.to_bytes().expect("replayed bytes"), candidate_bytes);
 
@@ -148,10 +149,12 @@ fn package_cell_patch_inverse_replays_to_the_original_image() {
     let commit = changed_commit(&source);
     let changed = source
         .apply_cell_values(commit.patch())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("forward package patch");
 
     let restored = changed
         .apply_cell_values(&commit.patch().inverse())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("inverse package patch");
     assert_eq!(restored.to_bytes().expect("restored bytes"), original);
 }
@@ -162,10 +165,14 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
     let changed = changed_commit(&source);
     let changed_package = source
         .apply_cell_values(changed.patch())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("changed package");
 
     assert!(
-        changed_package.apply_cell_values(changed.patch()).is_err(),
+        changed_package
+            .apply_cell_values(changed.patch())
+            .map(litchi_xlsb::cell_values::Commit::into_package)
+            .is_err(),
         "a changed patch must reject its already-published destination"
     );
 
@@ -178,7 +185,10 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
     assert!(!noop.diagnostics().changed());
     assert!(noop.patch().is_noop());
     assert!(
-        changed_package.apply_cell_values(noop.patch()).is_err(),
+        changed_package
+            .apply_cell_values(noop.patch())
+            .map(litchi_xlsb::cell_values::Commit::into_package)
+            .is_err(),
         "even a no-op patch is source-checked against its exact package image"
     );
 }
@@ -256,7 +266,10 @@ fn package_cell_commit_and_replay_honor_finite_retained_input_limits() {
     )
     .expect("reopen source at its exact input budget");
     assert!(
-        bounded_source.apply_cell_values(commit.patch()).is_err(),
+        bounded_source
+            .apply_cell_values(commit.patch())
+            .map(litchi_xlsb::cell_values::Commit::into_package)
+            .is_err(),
         "destination retained input limits must reject a patch that grows the package"
     );
 
@@ -314,13 +327,14 @@ fn raw_worksheet_transaction_stays_under_an_explicit_namespace() {
     let source = Package::new().expect("source package");
     let workbook = source.workbook().expect("workbook projection");
     let snapshot = workbook.cell_values(0).expect("worksheet snapshot");
-    let mut edit: litchi_xlsb::cell_values::worksheet::Edit = snapshot.edit();
-    edit.insert(a1(), style_zero(), Value::Number(7.0))
+    let mut draft: litchi_xlsb::cell_values::worksheet::Draft = snapshot.draft();
+    draft
+        .insert(a1(), style_zero(), Value::Number(7.0))
         .expect("raw worksheet insert");
-    let commit: litchi_xlsb::cell_values::worksheet::Commit =
-        edit.commit().expect("raw worksheet commit");
-    assert!(!commit.patch().is_noop());
-    assert_eq!(commit.patch().before(), snapshot.source_bytes());
+    let (_, patch): (_, litchi_xlsb::cell_values::worksheet::Patch) =
+        draft.finish().expect("raw worksheet draft");
+    assert!(!patch.is_noop());
+    assert_eq!(patch.before(), snapshot.source_bytes());
 }
 
 #[test]
@@ -349,7 +363,9 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
     assert!(matches!(
         edit.commit(),
         Err(Error::Limit {
-            kind: litchi_xlsb::cell_values::LimitKind::PatchBytes,
+            kind: litchi_xlsb::package::LimitKind::CellValues(
+                litchi_xlsb::cell_values::LimitKind::PatchBytes
+            ),
             ..
         })
     ));
@@ -375,7 +391,9 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
     assert!(matches!(
         edit.commit(),
         Err(Error::Limit {
-            kind: litchi_xlsb::cell_values::LimitKind::PatchBytes,
+            kind: litchi_xlsb::package::LimitKind::CellValues(
+                litchi_xlsb::cell_values::LimitKind::PatchBytes
+            ),
             ..
         })
     ));
@@ -410,7 +428,9 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
     assert!(matches!(
         edit.commit(),
         Err(Error::Limit {
-            kind: litchi_xlsb::cell_values::LimitKind::Changes,
+            kind: litchi_xlsb::package::LimitKind::CellValues(
+                litchi_xlsb::cell_values::LimitKind::Changes
+            ),
             ..
         })
     ));

@@ -7,19 +7,29 @@ use super::patch::{Commit, Patch};
 use super::snapshot::Snapshot;
 use crate::package::error::{Error, Result};
 
-/// A bounded draft detached from an immutable Volatile Dependencies snapshot.
+crate::part_edit::limits_options!(super::SemanticLimits, "Volatile Dependencies");
+
+/// A staged Volatile Dependencies edit of one package. Dropping it discards
+/// it.
 #[derive(Clone, Debug)]
 pub struct Edit {
+    source: crate::Package,
     before: Snapshot,
     dependencies: Option<Arc<Dependencies>>,
 }
 
 impl Edit {
-    pub(crate) fn new(before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
         Self {
+            source,
             dependencies: before.dependencies_arc(),
             before,
         }
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.dependencies = self.before.dependencies_arc();
     }
 
     /// Immutable source snapshot used by stale-source checks.
@@ -62,7 +72,11 @@ impl Edit {
         let changed = self.dependencies.as_deref() != self.before.dependencies();
         if !changed {
             let before = self.before;
-            return Ok(Commit::new(Patch::new(before.clone(), before), false));
+            return Ok(Commit::new(
+                self.source,
+                Patch::new(before.clone(), before),
+                litchi_core::edit::Diagnostics::UNCHANGED,
+            ));
         }
         if self.dependencies.is_some() && !self.before.can_edit() {
             return Err(unsupported_unknown_records());
@@ -70,9 +84,7 @@ impl Edit {
         if self.before.package().is_signed()
             || self.before.package().requires_signature_edit_policy()
         {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = self.before.package().as_ref().clone();
         let after_dependencies = self.dependencies.clone();
@@ -89,7 +101,8 @@ impl Edit {
                 "changed Volatile Dependencies transaction produced no source change".to_string(),
             ));
         }
-        Ok(Commit::new(Patch::new(self.before, after), true))
+        self.source
+            .apply_volatile_dependencies(&Patch::new(self.before, after))
     }
 }
 

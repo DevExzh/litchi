@@ -16,9 +16,9 @@ use litchi_core::sheet::CellValue;
 use std::collections::BTreeMap;
 use std::io::Write;
 
-use super::model::{CellData, MutableWorksheet};
+use super::model::{CellData, Worksheet};
 
-impl MutableWorksheet {
+impl Worksheet {
     /// Write worksheet properties (BrtWsProp) - REQUIRED by Excel
     ///
     /// [MS-XLSB] 2.4.864 + spec example 3.7.21: 23 bytes total
@@ -159,7 +159,7 @@ impl MutableWorksheet {
     pub(super) fn write_cells<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
     ) -> Result<()> {
         let formula_groups = self.formula_groups_for_write()?;
         if formula_groups.is_empty() {
@@ -188,7 +188,7 @@ impl MutableWorksheet {
     pub(super) fn write_cells_from<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
         cells: &BTreeMap<(u32, u32), CellData>,
         formula_groups: &[Group],
     ) -> Result<()> {
@@ -431,7 +431,7 @@ impl MutableWorksheet {
         _row: u32,
         col: u32,
         cell_data: &CellData,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
     ) -> Result<()> {
         match &cell_data.value {
             CellValue::Empty => self.write_blank_cell(writer, col, cell_data.style)?,
@@ -594,7 +594,7 @@ impl MutableWorksheet {
         col: u32,
         value: &str,
         style: u32,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
     ) -> Result<()> {
         // Add string to shared strings table and get index
         let string_index = shared_strings.add_string(value.to_string());

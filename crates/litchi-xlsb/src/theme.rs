@@ -27,7 +27,7 @@ use litchi_opc::{
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use crate::package::error::{Error, Result};
+use crate::package::error::Result;
 
 /// Transitional DrawingML Theme relationship type.
 pub const RELATIONSHIP_TYPE: &str = relationship_type::THEME;
@@ -144,19 +144,8 @@ impl Snapshot {
     /// Return the absolute Theme part name for diagnostics and package-owned
     /// integrations.  Ordinary edits do not require this identifier.
     #[must_use]
-    #[allow(dead_code, reason = "used by Workbook publication integration")]
-    pub(crate) fn part_name(&self) -> &str {
+    pub fn part_name(&self) -> &str {
         &self.graph.theme_name
-    }
-
-    /// Start a detached source-checked edit.
-    #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
-            before: self.clone(),
-            staged: self.theme.as_ref().clone(),
-            staged_family: self.family.clone(),
-        }
     }
 
     fn same_source(&self, other: &Self) -> bool {
@@ -173,8 +162,8 @@ impl Snapshot {
 ///
 /// The view owns the parsed typed model and the source payload handle.  It
 /// does not detach a managed allocation into an unreserved `Arc`; callers who
-/// need an edit use [`Self::edit`], which intentionally creates a detached
-/// snapshot.
+/// need an edit open an owned [`crate::Package`] and use
+/// [`crate::Package::edit_theme`].
 #[derive(Clone, Debug)]
 pub struct View {
     theme: Arc<Theme>,
@@ -221,273 +210,6 @@ impl View {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
-    }
-
-    /// Start a detached edit over the captured source.
-    ///
-    /// The detached transaction copies only this bounded Theme XML part;
-    /// the source-backed view itself continues to retain its managed payload
-    /// reservation.
-    pub fn edit(&self) -> Result<Edit> {
-        let source_xml = copy_bytes(self.source.as_bytes(), "Theme transaction source")?;
-        Ok(Edit {
-            before: Snapshot {
-                theme: Arc::clone(&self.theme),
-                family: self.family.clone(),
-                source_xml: Arc::new(source_xml),
-                graph: self.graph.clone(),
-                limits: self.limits,
-            },
-            staged: self.theme.as_ref().clone(),
-            staged_family: self.family.clone(),
-        })
-    }
-}
-
-/// A detached, source-checked Theme draft.
-#[derive(Clone, Debug)]
-pub struct Edit {
-    before: Snapshot,
-    staged: Theme,
-    staged_family: Option<Family>,
-}
-
-impl Edit {
-    /// Snapshot used for stale-source checks.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Borrow the currently staged typed color/font metadata.
-    #[must_use]
-    pub fn theme(&self) -> &Theme {
-        &self.staged
-    }
-
-    /// Borrow the currently staged applied-theme family metadata.
-    #[must_use]
-    pub fn family(&self) -> Option<&Family> {
-        self.staged_family.as_ref()
-    }
-
-    /// Replace the typed color/font metadata after bounded validation.
-    pub fn replace(&mut self, theme: Theme) -> Result<bool> {
-        if self.staged == theme {
-            return Ok(false);
-        }
-        validate_model(&theme, self.before.limits)?;
-        self.staged = theme;
-        Ok(true)
-    }
-
-    /// Change the Theme display name.
-    pub fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.name = name.into();
-        self.replace(candidate)
-    }
-
-    /// Replace the complete twelve-slot color palette.
-    pub fn set_palette(&mut self, colors: Palette) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.colors = colors;
-        self.replace(candidate)
-    }
-
-    /// Replace the complete major/minor font set.
-    pub fn set_fonts(&mut self, fonts: FontSet) -> Result<bool> {
-        let mut candidate = self.staged.clone();
-        candidate.fonts = fonts;
-        self.replace(candidate)
-    }
-
-    /// Set or replace the applied-theme family metadata.
-    pub fn set_family(&mut self, family: Family) -> Result<bool> {
-        let family = preserve_family_source(self.before.family.as_ref(), family)?;
-        if self.staged_family.as_ref() == Some(&family) {
-            return Ok(false);
-        }
-        self.staged_family = Some(family);
-        Ok(true)
-    }
-
-    /// Remove the applied-theme family metadata while retaining the Theme.
-    pub fn remove_family(&mut self) -> Result<bool> {
-        if self.staged_family.is_none() {
-            return Ok(false);
-        }
-        self.staged_family = None;
-        Ok(true)
-    }
-
-    /// Commit the detached draft into an exact, reversible XML patch.
-    pub fn commit(self) -> Result<Commit> {
-        if self.staged == *self.before.theme && self.staged_family == self.before.family {
-            let before = self.before;
-            return Ok(Commit::new(Patch::new(before.clone(), before), false));
-        }
-        validate_model(&self.staged, self.before.limits)?;
-        let source = rewrite_source_with_family(
-            self.before.source_xml(),
-            self.before.theme(),
-            &self.staged,
-            self.before.family.as_ref(),
-            self.staged_family.as_ref(),
-            self.before.limits,
-        )?;
-        let (parsed, parsed_family) = parse_theme_content(&source, self.before.limits)?;
-        if parsed != self.staged {
-            return Err(invalid(
-                "Theme transaction read-back did not match the staged typed model",
-            ));
-        }
-        if parsed_family.as_ref() != self.staged_family.as_ref() {
-            return Err(invalid(
-                "Theme transaction read-back did not match the staged family metadata",
-            ));
-        }
-        let after = Snapshot {
-            theme: Arc::new(parsed),
-            family: parsed_family,
-            source_xml: Arc::new(source),
-            graph: self.before.graph.clone(),
-            limits: self.before.limits,
-        };
-        Ok(Commit::new(Patch::new(self.before, after), true))
-    }
-}
-
-/// A detached Theme transaction result.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the Theme XML bytes change.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its planned snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
-
-/// A source-checked, reversible Theme-part replacement.
-#[derive(Clone, Debug)]
-pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
-    changed: bool,
-}
-
-impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        let changed = !before.same_source(&after);
-        Self {
-            before,
-            after,
-            changed,
-        }
-    }
-
-    /// Source state required before publication.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Exact state produced by publication.
-    #[must_use]
-    pub fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
-    /// Whether applying this patch changes no Theme bytes or graph metadata.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.changed
-    }
-
-    /// Return an exact inverse patch.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
-        Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
-            changed: self.changed,
-        }
-    }
-
-    /// Apply atomically after checking the complete Theme source closure.
-    #[allow(dead_code, reason = "called by Workbook publication integration")]
-    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = read(package, self.before.limits)?;
-        let Some(current) = current else {
-            return Err(invalid("Theme patch source is missing its Theme part"));
-        };
-        if !current.same_source(&self.before) {
-            return Err(invalid("Theme patch source is stale"));
-        }
-        if self.is_empty() {
-            return Ok(current);
-        }
-        if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
-        }
-        let mut candidate = package.clone();
-        let part_name = PackURI::new(self.after.part_name().to_owned())
-            .map_err(|error| Error::InvalidUri(error.to_string()))?;
-        {
-            let part = candidate.get_part(&part_name)?;
-            if part.content_type() != CONTENT_TYPE {
-                return Err(Error::InvalidContentType {
-                    expected: CONTENT_TYPE.to_owned(),
-                    got: part.content_type().to_owned(),
-                });
-            }
-        }
-        candidate.unsign();
-        replace_source_xml_part(
-            &mut candidate,
-            &part_name,
-            self.before.source_xml(),
-            self.after.source_xml(),
-        )?;
-        let resulting = read(&candidate, self.before.limits)?
-            .ok_or_else(|| invalid("Theme patch read-back lost the Theme part"))?;
-        if !resulting.same_state(&self.after) {
-            return Err(invalid(
-                "Theme patch read-back changed the planned Theme state",
-            ));
-        }
-        *package = candidate;
-        Ok(resulting)
     }
 }
 
@@ -1316,15 +1038,6 @@ fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Ra
     Ok(None)
 }
 
-fn copy_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(bytes.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
-    output.extend_from_slice(bytes);
-    Ok(output)
-}
-
 /// Replace one Theme payload while retaining OPC source provenance for the
 /// resulting XML. Native Theme parts commonly carry an XML declaration and
 /// line endings, which are valid source bytes but fail the compact authored
@@ -1439,10 +1152,10 @@ fn preserve_family_source(existing: Option<&Family>, incoming: Family) -> Result
     Ok(value)
 }
 
+mod edit;
 mod lifecycle;
 
-pub(crate) use lifecycle::read_owner;
-pub use lifecycle::{OwnerCommit, OwnerPatch, OwnerSnapshot, OwnerTransaction};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 
 #[cfg(test)]
 mod splice_tests;
@@ -1478,71 +1191,38 @@ mod tests {
         let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
         let parsed = parse_theme(&xml, Limits::DEFAULT).expect("read");
         assert_eq!(parsed, value);
-        let snapshot = Snapshot {
-            theme: Arc::new(parsed.clone()),
-            family: None,
-            source_xml: Arc::new(xml.clone()),
-            graph: GraphState {
-                workbook_name: "/xl/workbook.bin".to_string(),
-                theme_name: "/xl/theme/theme1.xml".to_string(),
-                workbook_relationship: RelationshipState {
-                    id: "rId1".to_string(),
-                    reltype: RELATIONSHIP_TYPE.to_string(),
-                    target_ref: "theme/theme1.xml".to_string(),
-                    target_mode: TargetMode::Internal,
-                    target_name: Some("/xl/theme/theme1.xml".to_string()),
-                },
-                theme_relationships: Vec::new(),
-            },
-            limits: Limits::DEFAULT,
-        };
-        let commit = snapshot.edit().commit().expect("commit");
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().source_xml(), xml.as_slice());
+        let rewritten =
+            rewrite_source_with_family(&xml, &parsed, &parsed, None, None, Limits::DEFAULT)
+                .expect("no-op rewrite");
+        assert_eq!(rewritten, xml);
     }
 
     #[test]
     fn palette_edit_preserves_root_and_font_source() {
         let value = theme();
         let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
-        let snapshot = Snapshot {
-            theme: Arc::new(value.clone()),
-            family: None,
-            source_xml: Arc::new(xml.clone()),
-            graph: GraphState {
-                workbook_name: "/xl/workbook.bin".to_string(),
-                theme_name: "/xl/theme/theme1.xml".to_string(),
-                workbook_relationship: RelationshipState {
-                    id: "rId1".to_string(),
-                    reltype: RELATIONSHIP_TYPE.to_string(),
-                    target_ref: "theme/theme1.xml".to_string(),
-                    target_mode: TargetMode::Internal,
-                    target_name: Some("/xl/theme/theme1.xml".to_string()),
-                },
-                theme_relationships: Vec::new(),
-            },
-            limits: Limits::DEFAULT,
-        };
-        let mut replacement = palette();
-        replacement = replacement.with(Slot::Accent1, Color::rgb("FF0000").expect("color"));
-        let mut edit = snapshot.edit();
-        assert!(edit.set_palette(replacement).expect("set palette"));
-        let commit = edit.commit().expect("commit");
-        assert!(commit.changed());
+        let mut replacement = value.clone();
+        replacement.colors = palette().with(Slot::Accent1, Color::rgb("FF0000").expect("color"));
+        let edited =
+            rewrite_source_with_family(&xml, &value, &replacement, None, None, Limits::DEFAULT)
+                .expect("palette rewrite");
         assert!(
-            commit
-                .snapshot()
-                .source_xml()
+            edited
                 .windows(b"Aptos".len())
                 .any(|window| window == b"Aptos")
         );
+        let (parsed, family) = parse_theme_content(&edited, Limits::DEFAULT).expect("read back");
+        assert!(family.is_none());
         assert_eq!(
-            commit.snapshot().theme().colors.color(Slot::Accent1),
+            parsed.colors.color(Slot::Accent1),
             Some(&Color::Rgb("FF0000".to_string()))
         );
+        let restored =
+            rewrite_source_with_family(&edited, &parsed, &value, None, None, Limits::DEFAULT)
+                .expect("inverse rewrite");
         assert_eq!(
-            commit.patch().inverse().after().source_xml(),
-            xml.as_slice()
+            parse_theme(&restored, Limits::DEFAULT).expect("restored theme"),
+            value
         );
     }
 }

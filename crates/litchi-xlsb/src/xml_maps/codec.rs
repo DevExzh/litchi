@@ -339,7 +339,7 @@ fn parse_table_bindings_impl(
             format!("expected LTXML, found {table_type}"),
         ));
     }
-    let value = MappedTable::new_with_limits(table_id, bindings, limits)?;
+    let value = MappedTable::bounded(table_id, bindings, limits)?;
     Ok((value, slots))
 }
 
@@ -392,7 +392,7 @@ fn parse_column_binding_with_flags(
     let map_id = cursor.read_u32()?;
     let flags = cursor.read_u32()?;
     let data_type = XmlDataType::new(cursor.read_u32()?)?;
-    let xpath = XPath::new_with_limits(cursor.read_wide_string()?, limits)?;
+    let xpath = XPath::bounded(cursor.read_wide_string()?, limits)?;
     cursor.finish()?;
     let binding = ColumnBinding::new(
         column_id,

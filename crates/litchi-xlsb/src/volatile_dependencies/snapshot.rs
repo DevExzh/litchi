@@ -72,11 +72,14 @@ impl Snapshot {
         self.rewrite_safe
     }
 
-    /// Start a detached source-bound transaction. Missing owners can be
-    /// created through `replace` on the returned transaction.
-    #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
+    /// Start an edit of the package this snapshot was read from (the unit
+    /// tests' route; packages start one with `edit_volatile_dependencies`).
+    #[cfg(test)]
+    pub(crate) fn edit(&self) -> super::Edit {
+        super::Edit::new(
+            crate::Package::from(self.package().as_ref().clone()),
+            self.clone(),
+        )
     }
 
     /// Exact finite limits retained by this snapshot.
@@ -124,7 +127,7 @@ fn workbook_sheet_count(workbook: &dyn Part, limits: SemanticLimits) -> Result<u
         });
     }
     let raw_limits = crate::raw::Limits::new(limits.max_part_bytes, limits.max_string_units);
-    let mut records = crate::raw::Records::try_with_limits(data, raw_limits)?;
+    let mut records = crate::raw::Records::bounded(data, raw_limits)?;
     let mut record_count = 0usize;
     let mut sheet_count = 0usize;
     let mut collection_seen = false;

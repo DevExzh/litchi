@@ -8,10 +8,8 @@
 
 use super::worksheet::{self, Commit, Snapshot};
 use super::{Formula, FormulaKind, Groups, Limits};
-use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, SupportingLink};
-use crate::workbook::DrawingLoadPolicy;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
@@ -24,61 +22,7 @@ pub(crate) fn read_with_limits(
 ) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
-    worksheet::read_with_limits(part.blob(), limits).map_err(map_error)
-}
-
-/// The outcome of one validated sparkline publication.
-///
-/// Returning the parsed workbook lets a typed workbook owner publish the
-/// derived state that already validated the candidate bytes.
-pub(crate) enum Applied {
-    /// The patch reproduced the stored worksheet bytes exactly.
-    Unchanged(Snapshot),
-    /// The changed candidate passed complete workbook validation.
-    Published {
-        /// Snapshot read from the validated worksheet bytes.
-        snapshot: Snapshot,
-        /// Workbook parse that validated the candidate package.
-        workbook: Box<crate::Workbook>,
-    },
-}
-
-/// Apply a sparkline commit and retain the complete workbook parse used for
-/// candidate validation, parsed under the caller's drawing policy.
-pub(crate) fn apply_retaining_parse(
-    package: &OpcPackage,
-    worksheet: &PackURI,
-    commit: Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-    leniency: crate::Leniency,
-) -> Result<Applied> {
-    let part = package.get_part(worksheet)?;
-    require_worksheet(part)?;
-    let current = part.blob();
-    let (_, limits, patch) = commit.into_publication();
-    let (changed, updated) = patch.apply_owned(current).map_err(map_error)?;
-    if !changed {
-        return Ok(Applied::Unchanged(
-            worksheet::read_owned(updated, limits).map_err(map_error)?,
-        ));
-    }
-
-    crate::signature_policy::ensure_unsigned(package)?;
-    let snapshot = worksheet::read_with_limits(&updated, limits).map_err(map_error)?;
-    let mut candidate = package.clone();
-    crate::worksheet_index::maintain(&mut candidate, worksheet, current, &updated)?;
-    candidate.get_part_mut(worksheet)?.set_blob(updated);
-    let workbook = crate::Workbook::reparse_candidate_with_policy(
-        candidate,
-        external_link_limits,
-        drawing_load_policy,
-        leniency,
-    )?;
-    Ok(Applied::Published {
-        snapshot,
-        workbook: Box::new(workbook),
-    })
+    worksheet::read(part.blob(), limits).map_err(map_error)
 }
 
 /// Prove every structurally valid formula against its workbook-owned name and

@@ -32,7 +32,6 @@
 use std::ops::Range;
 
 use super::{RecordKind, Validation};
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
@@ -52,9 +51,9 @@ pub enum LimitKind {
 pub const MAX_VALIDATIONS: usize = 65_534;
 
 /// A staged data-validation edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -63,7 +62,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_data_validations(&self) -> Result<Edit<'_>> {
+    pub fn edit_data_validations(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -77,18 +76,8 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_data_validations(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a data-validation edit of this workbook without first copying
-    /// it into a package.
-    pub fn edit_data_validations(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_data_validations(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
@@ -148,7 +137,12 @@ fn collection(bytes: &[u8], layout: &SheetLayout) -> Result<Option<Collection>> 
     }))
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     /// The staged classic validations of the worksheet at complete-catalog
     /// position `sheet`, in stream order.
     ///
@@ -341,6 +335,7 @@ mod tests {
         assert_eq!(
             package
                 .apply_data_validations(&patch)
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

@@ -238,7 +238,9 @@ impl SheetHandle {
         }
         Ok(match self {
             Self::Eager { file, .. } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => workbook.drawing_charts(self.position().get())?,
+                XlsbOwner::Eager(package) => {
+                    super::projection(package)?.drawing_charts(self.position().get())?
+                },
                 XlsbOwner::Source(_) => return Err(lost_owner()),
             },
             Self::Source { sheet, .. } => sheet.drawing_charts()?,

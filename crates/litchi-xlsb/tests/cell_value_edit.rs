@@ -21,6 +21,10 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
+
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
@@ -40,7 +44,7 @@ fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cel
 fn publish(commit: litchi_xlsb::cell_values::Commit) -> Workbook {
     commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("published workbook")
 }
 
@@ -92,12 +96,12 @@ fn real_fixture_cell_value_commit_is_source_checked_and_length_stable() {
     // The package patch owns the whole OPC graph.  Keep the worksheet codec
     // assertions on its explicit raw transaction so this regression still
     // proves the BrtCellReal replacement is length-stable and source-checked.
-    let mut raw_edit = before.edit();
+    let mut raw_edit = before.draft();
     raw_edit
         .set_number(reference, replacement)
         .expect("raw set number");
-    let raw_commit = raw_edit.commit().expect("raw commit");
-    let raw_after = raw_commit.patch().after();
+    let (_, raw_patch) = raw_edit.finish().expect("raw commit");
+    let raw_after = raw_patch.after();
     assert_eq!(before.source_bytes().len(), raw_after.len());
     assert!(
         before
@@ -109,8 +113,8 @@ fn real_fixture_cell_value_commit_is_source_checked_and_length_stable() {
             <= 8,
         "only the selected f64 field may change"
     );
-    assert!(raw_commit.patch().apply(before.source_bytes()).is_ok());
-    assert!(raw_commit.patch().apply(raw_after).is_err());
+    assert!(raw_patch.apply(before.source_bytes()).is_ok());
+    assert!(raw_patch.apply(raw_after).is_err());
 
     let (_, mut edit) = package_edit(&workbook, sheet);
     edit.set_number(reference, replacement).expect("set number");
@@ -174,15 +178,12 @@ fn real_fixture_non_real_scalar_or_formula_cache_round_trips() {
         .expect("a real fixture contains an editable non-BrtCellReal value");
 
     let before = workbook.cell_values(sheet).expect("before snapshot");
-    let mut raw_edit = before.edit();
+    let mut raw_edit = before.draft();
     raw_edit
         .set_value(reference, replacement.clone())
         .expect("raw set typed value");
-    let raw_commit = raw_edit.commit().expect("raw commit");
-    assert_eq!(
-        raw_commit.patch().before().len(),
-        raw_commit.patch().after().len()
-    );
+    let (_, raw_patch) = raw_edit.finish().expect("raw commit");
+    assert_eq!(raw_patch.before().len(), raw_patch.after().len());
 
     let (_, mut edit) = package_edit(&workbook, sheet);
     edit.set_value(reference, replacement.clone())
@@ -246,15 +247,12 @@ fn real_fixture_style_index_edit_is_contextually_validated() {
     .expect("a real fixture contains at least two cell styles and one stored cell");
 
     let before = workbook.cell_values(sheet).expect("snapshot");
-    let mut raw_edit = before.edit();
+    let mut raw_edit = before.draft();
     raw_edit
         .set_style(reference, replacement)
         .expect("raw set style");
-    let raw_commit = raw_edit.commit().expect("raw style commit");
-    assert_eq!(
-        before.source_bytes().len(),
-        raw_commit.patch().after().len()
-    );
+    let (_, raw_patch) = raw_edit.finish().expect("raw style commit");
+    assert_eq!(before.source_bytes().len(), raw_patch.after().len());
     let (_, mut edit) = package_edit(&workbook, sheet);
     edit.set_style(reference, replacement).expect("set style");
     let commit = edit.commit().expect("commit");

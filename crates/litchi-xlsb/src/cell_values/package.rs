@@ -129,7 +129,7 @@ impl Diagnostics {
 pub struct Edit {
     base: Package,
     worksheet: PackURI,
-    raw: super::worksheet::Edit,
+    raw: super::worksheet::Draft,
     transfer_limits: TransferLimits,
     shared_strings: Option<Vec<SharedString>>,
     calculation_chain_present: bool,
@@ -222,7 +222,7 @@ impl Edit {
         Self {
             base,
             worksheet,
-            raw: snapshot.edit(),
+            raw: snapshot.draft(),
             transfer_limits,
             shared_strings: None,
             calculation_chain_present,
@@ -267,9 +267,9 @@ impl Edit {
     /// ```
     /// use litchi_xlsb::Package;
     /// use litchi_xlsb::cell_values::{Reference, Scalar};
-    /// use litchi_xlsb::writer::{MutableWorksheet, Builder};
+    /// use litchi_xlsb::builder::{self, Builder};
     ///
-    /// let mut sheet = MutableWorksheet::new("Sheet1");
+    /// let mut sheet = builder::Worksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, 1.0_f64);
     /// let mut writer = Builder::new();
     /// writer.add_worksheet(sheet);
@@ -706,7 +706,7 @@ impl Edit {
         )?;
 
         let (package, after) = match applied {
-            Applied::Unchanged(_) => (self.base.clone(), Arc::clone(&before)),
+            Applied::Unchanged => (self.base.clone(), Arc::clone(&before)),
             Applied::Published { workbook, .. } => {
                 let workbook = if shared_string_delta(raw_commit.patch().changes()) != 0 {
                     super::scalar_sst::reconcile_with_limits(
@@ -736,7 +736,7 @@ impl Edit {
         };
         if patch.retained_bytes() > self.transfer_limits.bytes() {
             return Err(Error::Limit {
-                kind: crate::cell_values::LimitKind::PatchBytes,
+                kind: crate::cell_values::LimitKind::PatchBytes.into(),
                 observed: patch.retained_bytes(),
                 maximum: self.transfer_limits.bytes(),
             });
@@ -843,7 +843,7 @@ impl Patch {
     }
 
     /// Apply this patch to an exact package source.
-    pub fn apply(&self, package: &Package) -> Result<Package> {
+    pub(crate) fn apply(&self, package: &Package) -> Result<Package> {
         validate_limits(self.transfer_limits)?;
         let source = serialize_package(package, self.transfer_limits.bytes())?;
         if source.as_slice() != self.before.as_ref() {
@@ -974,9 +974,19 @@ impl Package {
         )))
     }
 
-    /// Apply an exact-source cell-values patch and return the new package.
-    pub fn apply_cell_values(&self, patch: &Patch) -> Result<Self> {
-        patch.apply(self)
+    /// Apply an exact-source cell-values patch to a new package; this one is
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch source, a changed patch of a
+    /// signed workbook, and the workbook validation errors of the result.
+    pub fn apply_cell_values(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit {
+            package: patch.apply(self)?,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::new(!patch.is_noop()),
+        })
     }
 }
 
@@ -1053,15 +1063,12 @@ fn publish_validated_workbook(
     let after = serialize_opc_package(&workbook.package, image_budget)?;
     let admitted = OpcPackage::from_bytes_with_limits(&after, base.opc_package().read_limits())?;
     workbook.package = admitted;
-    Ok((
-        Package::from_validated_workbook_with_projection(workbook),
-        after,
-    ))
+    Ok((Package::from_validated_workbook(workbook), after))
 }
 
 fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<usize> {
     limits.bytes().checked_sub(before_len).ok_or(Error::Limit {
-        kind: crate::cell_values::LimitKind::PatchBytes,
+        kind: crate::cell_values::LimitKind::PatchBytes.into(),
         observed: before_len.saturating_add(1),
         maximum: limits.bytes(),
     })
@@ -1076,7 +1083,7 @@ fn serialize_opc_package(package: &OpcPackage, maximum: usize) -> Result<Vec<u8>
     let result = PackageWriter::write_to(&mut writer, package);
     if writer.exceeded {
         return Err(Error::Limit {
-            kind: super::LimitKind::PatchBytes,
+            kind: super::LimitKind::PatchBytes.into(),
             observed: writer.written.max(maximum.saturating_add(1)),
             maximum,
         });
@@ -1136,7 +1143,7 @@ fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> R
     validate_limits(limits)?;
     if patch.changes().len() > limits.changes() {
         return Err(Error::Limit {
-            kind: crate::cell_values::LimitKind::Changes,
+            kind: crate::cell_values::LimitKind::Changes.into(),
             observed: patch.changes().len(),
             maximum: limits.changes(),
         });
@@ -1150,7 +1157,7 @@ fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> R
         })?;
     if bytes > limits.bytes() {
         return Err(Error::Limit {
-            kind: crate::cell_values::LimitKind::PatchBytes,
+            kind: crate::cell_values::LimitKind::PatchBytes.into(),
             observed: bytes,
             maximum: limits.bytes(),
         });

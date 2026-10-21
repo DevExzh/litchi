@@ -168,15 +168,17 @@ fn removal_and_inverse_restore_case_equivalent_physical_source() {
     let mut transaction = before.edit();
     assert!(transaction.remove().expect("remove"));
     let commit = transaction.commit().expect("commit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     assert!(!removed.calculation_chain().expect("removed").is_present());
 
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let after = restored.calculation_chain().expect("restored");
     assert_eq!(after, before);
@@ -189,10 +191,11 @@ fn exact_noop_does_not_publish_a_changed_patch() {
     let package = package_with_chain(opaque_records());
     let before = package.calculation_chain().expect("before");
     let commit = before.edit().commit().expect("no-op");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     let after = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("no-op publication");
     assert_eq!(after.calculation_chain().expect("after"), before);
 }
@@ -212,10 +215,12 @@ fn empty_owner_relationships_are_captured_and_restored() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let restored_snapshot = restored.calculation_chain().expect("restored");
     assert_eq!(restored_snapshot, before);
@@ -306,8 +311,8 @@ fn workbook_bytes_changed_with_owner_and_relationships_unchanged_is_stale() {
         .to_vec();
     let payload_offset = {
         let raw_limits = crate::raw::Limits::new(bytes.len(), 0);
-        let mut records = crate::raw::Records::try_with_limits(&bytes, raw_limits)
-            .expect("workbook record stream");
+        let mut records =
+            crate::raw::Records::bounded(&bytes, raw_limits).expect("workbook record stream");
         let record = loop {
             let record = records
                 .next()
@@ -327,7 +332,12 @@ fn workbook_bytes_changed_with_owner_and_relationships_unchanged_is_stale() {
         .expect("workbook")
         .set_blob(bytes);
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -363,7 +373,9 @@ fn public_package_facade_preflights_oversized_stale_metadata_before_clone() {
     let maximum = litchi_opc::SourceLimits::default().max_xml_attribute_bytes();
     let stale = package_with_unrelated_root_relationship("x".repeat(maximum - "Id".len() + 1));
     assert!(matches!(
-        stale.apply_calculation_chain(&commit),
+        stale
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package),
         Err(Error::Opc(litchi_opc::OpcError::Limit {
             kind: litchi_opc::SourceLimitKind::XmlAttributeBytes,
             ..
@@ -388,10 +400,7 @@ fn checked_publication_keeps_signature_policy_after_source_preflight() {
         .patch()
         .apply_checked(&mut signed_candidate, current)
         .expect_err("changed signed candidate must require an explicit policy");
-    assert!(matches!(
-        error,
-        Error::Opc(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    ));
+    assert!(matches!(error, Error::Signed));
 }
 
 #[test]
@@ -486,17 +495,17 @@ fn signed_source_allows_exact_noop_but_refuses_changed_publication() {
     let signed = signed_package(package.clone());
     let before = signed.calculation_chain().expect("signed before");
     let noop = before.edit().commit().expect("signed no-op");
-    assert!(!noop.changed());
-    assert!(signed.apply_calculation_chain(&noop).is_ok());
+    assert!(!noop.diagnostics().changed());
+    assert!(
+        signed
+            .apply_calculation_chain(noop.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_ok()
+    );
 
     let mut transaction = before.edit();
     transaction.remove().expect("signed remove");
-    assert!(matches!(
-        transaction.commit(),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(transaction.commit(), Err(Error::Signed)));
 }
 
 #[test]
@@ -514,7 +523,12 @@ fn owner_bytes_changed_with_workbook_bytes_unchanged_is_stale() {
         .expect("chain")
         .set_blob(vec![0x99, 0x88]);
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -533,7 +547,12 @@ fn relationship_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale(
         true,
     );
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -544,7 +563,8 @@ fn inverse_refuses_a_foreign_edge_to_the_removed_physical_target() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
 
     let mut changed = removed.into_opc();
@@ -563,7 +583,8 @@ fn inverse_refuses_a_foreign_edge_to_the_removed_physical_target() {
     let changed = Package::from_opc(changed).expect("changed package");
     assert!(
         changed
-            .apply_calculation_chain_patch(&commit.patch().inverse())
+            .apply_calculation_chain(&commit.patch().inverse())
+            .map(litchi_core::edit::Commit::into_package)
             .is_err()
     );
 }
@@ -594,7 +615,12 @@ fn content_types_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale
         .try_replace_content_types(current.bytes(), &replacement)
         .expect("replace content types");
     let changed = Package::from_opc(changed).expect("changed package");
-    assert!(changed.apply_calculation_chain(&commit).is_err());
+    assert!(
+        changed
+            .apply_calculation_chain(commit.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
@@ -612,7 +638,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        large_package.calculation_chain_with_limits(small_bytes),
+        large_package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(small_bytes))
+            .calculation_chain(),
         Err(Error::LimitExceeded {
             resource: "Calculation Chain part bytes",
             ..
@@ -624,7 +652,8 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         ..SemanticLimits::DEFAULT
     };
     let snapshot = package
-        .calculation_chain_with_limits(small_records)
+        .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(small_records))
+        .calculation_chain()
         .expect("record quota does not reject opaque admission");
     let before_diagnostic = snapshot.part().expect("part").bytes().to_vec();
     assert!(matches!(
@@ -641,7 +670,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        package.calculation_chain_with_limits(no_relationships),
+        package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_relationships))
+            .calculation_chain(),
         Err(Error::LimitExceeded {
             resource: "Calculation Chain relationships",
             ..
@@ -653,7 +684,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
-        package.calculation_chain_with_limits(no_parts),
+        package
+            .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_parts))
+            .calculation_chain(),
         Err(Error::LimitExceeded {
             resource: "Calculation Chain graph parts",
             ..
@@ -729,11 +762,13 @@ fn malformed_or_non_biff_opaque_payload_removes_and_restores_exactly() {
     transaction.remove().expect("remove");
     let commit = transaction.commit().expect("commit");
     let removed = package
-        .apply_calculation_chain(&commit)
+        .apply_calculation_chain(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("remove publication");
     assert!(!removed.calculation_chain().expect("removed").is_present());
     let restored = removed
-        .apply_calculation_chain_patch(&commit.patch().inverse())
+        .apply_calculation_chain(&commit.patch().inverse())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse publication");
     let after = restored.calculation_chain().expect("restored");
     assert_eq!(after.part().expect("part").bytes(), bytes.as_slice());

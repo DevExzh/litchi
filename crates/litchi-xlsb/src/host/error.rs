@@ -162,10 +162,13 @@ pub enum Error {
     },
     /// Workbook is password protected
     PasswordProtected,
-    /// A caller-selected cell-values transaction bound was exceeded.
+    /// A well-formed request this route refuses (record 0351 §2.4),
+    /// classified by its [`litchi_core::edit::RefusalKind`].
+    Refused(litchi_core::edit::Refusal),
+    /// A configured budget was exceeded.
     Limit {
         /// The bounded dimension.
-        kind: crate::cell_values::LimitKind,
+        kind: LimitKind,
         /// The observed (or first refused) amount.
         observed: usize,
         /// The configured maximum.
@@ -176,6 +179,70 @@ pub enum Error {
         /// The refused policy.
         policy: crate::OpenPolicy,
     },
+    /// A configured limit is not valid.
+    InvalidLimit {
+        /// The configured dimension.
+        kind: LimitKind,
+        /// The configured value.
+        value: usize,
+        /// The largest value the dimension admits.
+        maximum: usize,
+    },
+}
+
+/// A bounded dimension of an XLSB package operation.
+///
+/// Each variant wraps the typed `LimitKind` of the family that owns the
+/// bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Cell-value and primary workbook transactions
+    /// ([`crate::cell_values::LimitKind`]).
+    CellValues(crate::cell_values::LimitKind),
+    /// Raw OPC edits ([`crate::opc::LimitKind`]).
+    Opc(crate::opc::LimitKind),
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CellValues(kind) => fmt::Display::fmt(kind, f),
+            Self::Opc(crate::opc::LimitKind::Parts) => f.write_str("changed package parts"),
+        }
+    }
+}
+
+impl From<crate::cell_values::LimitKind> for LimitKind {
+    fn from(kind: crate::cell_values::LimitKind) -> Self {
+        Self::CellValues(kind)
+    }
+}
+
+impl From<crate::opc::LimitKind> for LimitKind {
+    fn from(kind: crate::opc::LimitKind) -> Self {
+        Self::Opc(kind)
+    }
+}
+
+impl Error {
+    /// A typed budget refusal.
+    pub(crate) fn limit(kind: impl Into<LimitKind>, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind: kind.into(),
+            observed,
+            maximum,
+        }
+    }
+
+    /// A content-free refusal of a well-formed request.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
 }
 
 impl fmt::Display for Error {
@@ -290,6 +357,15 @@ impl fmt::Display for Error {
             Error::UnsupportedOpenPolicy { policy } => {
                 write!(f, "this XLSB open route does not support {policy}")
             },
+            Error::Refused(refusal) => fmt::Display::fmt(refusal, f),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLSB {kind} limit {value}: the maximum is {maximum}"
+            ),
         }
     }
 }
@@ -336,6 +412,8 @@ impl std::error::Error for Error {
             | Error::Unrecognized { .. }
             | Error::PasswordProtected
             | Error::Limit { .. }
+            | Error::InvalidLimit { .. }
+            | Error::Refused(_)
             | Error::UnsupportedOpenPolicy { .. } => None,
             Error::PatchConflict { .. } | Error::Signed | Error::CustomDataReferenced { .. } => {
                 None
@@ -560,8 +638,10 @@ impl From<Error> for litchi_core::sheet::Error {
                 RefusalKind::UnsupportedContent,
                 "the XLSB workbook uses an unsupported feature",
             ),
+            Error::Refused(refusal) => Self::Refused(refusal),
             Error::LimitExceeded { .. }
             | Error::Limit { .. }
+            | Error::InvalidLimit { .. }
             | Error::ExternalLinkLimitExceeded { .. }
             | Error::Allocation { .. }
             | Error::CapacityOverflow { .. } => refused(

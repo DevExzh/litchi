@@ -10,15 +10,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::hyperlinks::Hyperlink;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test H: Creating XLSB with one hyperlink...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Hyperlinks");
+    let mut sheet = builder::Worksheet::new("Hyperlinks");
 
     // Visible cell text
     sheet.set_cell(0, 0, CellValue::String("Details".to_string()));

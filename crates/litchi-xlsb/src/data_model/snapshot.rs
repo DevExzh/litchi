@@ -31,13 +31,8 @@ impl PartialEq for Snapshot {
 impl Eq for Snapshot {}
 
 impl Snapshot {
-    /// Read a Data Model snapshot with conservative finite limits.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, SemanticLimits::DEFAULT)
-    }
-
     /// Read a Data Model snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         let limits = limits.validate()?;
         super::package::preflight_metadata(package, limits)?;
         crate::package::connections::package::preflight(
@@ -150,12 +145,6 @@ impl Snapshot {
     #[must_use]
     pub fn is_present(&self) -> bool {
         self.model.is_some()
-    }
-
-    /// Begin a detached, source-bound Data Model transaction.
-    #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
     }
 
     /// Exact finite limits used to inspect and edit this snapshot.

@@ -37,7 +37,7 @@ mod package;
 pub(crate) mod resources;
 mod scalar_sst;
 pub mod structure;
-pub mod workbook;
+pub(crate) mod workbook;
 pub mod worksheet;
 
 pub use drawing_transfer::DrawingTransferRefusal;

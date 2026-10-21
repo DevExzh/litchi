@@ -24,6 +24,10 @@ use litchi_xlsb::raw::{Encoder, Header, Limits as RawLimits, Records, kind};
 use litchi_xlsb::sheet::{Kind, State};
 use litchi_xlsb::{Leniency, SourceBackedWorkbook, SourceLimits, Workbook};
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
+
 fn fixture() -> Vec<u8> {
     std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -1001,7 +1005,7 @@ fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
     edit.insert(inserted, StyleIndex::new(0).unwrap(), Value::Number(1.0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    workbook = commit.into_package().into_workbook().unwrap();
+    workbook = commit.into_package().owned_workbook().unwrap();
 
     assert!(
         old_grid

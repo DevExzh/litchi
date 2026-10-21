@@ -32,7 +32,7 @@ impl<W: Write> Encoder<W> {
     }
 
     /// Construct a writer after validating its raw limit profile.
-    pub fn try_with_limits(writer: W, limits: Limits) -> Result<Self> {
+    pub fn bounded(writer: W, limits: Limits) -> Result<Self> {
         match limits.validate() {
             Ok(limits) => Ok(Self::with_limits(writer, limits)),
             Err(error) => Err(error),

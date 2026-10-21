@@ -17,6 +17,7 @@ use litchi_core::sheet::{Cell as _, Worksheet as _};
 use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
@@ -24,7 +25,6 @@ use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, Selector};
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 fn chart_first_package() -> Package {
     let chart = Chart::bar_chart_with_cache(
@@ -38,12 +38,12 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data identity");
     builder.add_worksheet(data);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail identity");
     builder.add_worksheet(tail);
     builder.build().expect("chart-first package")
@@ -52,7 +52,7 @@ fn chart_first_package() -> Package {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for (index, name) in names.iter().enumerate() {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} identity {index}"));
         builder.add_worksheet(sheet);
     }
@@ -173,7 +173,7 @@ fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
 fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .add_external_link(
@@ -379,7 +379,10 @@ fn durable_tag8_replay_and_inverse_preserve_the_complete_catalog() {
         .expect("durable patch");
     assert_eq!(wire[operation_offset(&wire)], 8, "reorder operation tag");
     let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode tag8");
-    let replay = source.apply(&patch).expect("replay tag8");
+    let replay = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("replay tag8");
     assert_eq!(
         catalog(&replay),
         vec![
@@ -391,6 +394,7 @@ fn durable_tag8_replay_and_inverse_preserve_the_complete_catalog() {
     assert_eq!(
         replay
             .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .expect("inverse")
             .to_bytes()
             .expect("inverse bytes"),
@@ -506,7 +510,7 @@ fn book_view_first_and_active_indices_follow_the_physical_tab() {
 fn defined_name_scope_remaps_but_global_scope_stays_global() {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Scoped".to_owned(), Some(1)).with_formula(vec![

@@ -101,7 +101,7 @@ pub(super) fn reconcile_with_limits(
         let source = package.get_part(worksheet_uri)?.blob();
         if source.len() > worksheet_limits.source_bytes() {
             return Err(Error::Limit {
-                kind: crate::cell_values::LimitKind::SourceBytes,
+                kind: crate::cell_values::LimitKind::SourceBytes.into(),
                 observed: source.len(),
                 maximum: worksheet_limits.source_bytes(),
             });
@@ -123,7 +123,7 @@ pub(super) fn reconcile_with_limits(
         )?;
         if rewritten.len() > worksheet_limits.source_bytes() {
             return Err(Error::Limit {
-                kind: crate::cell_values::LimitKind::SourceBytes,
+                kind: crate::cell_values::LimitKind::SourceBytes.into(),
                 observed: rewritten.len(),
                 maximum: worksheet_limits.source_bytes(),
             });

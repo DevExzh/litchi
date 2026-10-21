@@ -28,8 +28,10 @@
 //! # Editing
 //!
 //! XLSB has no source-backed edit API. At the first edit the write kernel
-//! (M2) asks for the eager [`xlsb::Workbook`], which a source-backed handle
-//! materializes from the package indexed at open (L-XLSB-1).
+//! (M2) asks for the eager [`xlsb::Package`], which a source-backed handle
+//! materializes from the package indexed at open (L-XLSB-1). Every edit
+//! family of the package commits a new package, which the handle adopts
+//! together with its already parsed read-only [`xlsb::Workbook`] projection.
 
 use std::ops::Deref;
 use std::path::Path;
@@ -124,31 +126,44 @@ struct XlsbState {
 enum XlsbOwner {
     /// Deferred catalog over the retained positional source.
     Source(SourceWorkbook),
-    /// The owning workbook.
-    Eager(Box<xlsb::Workbook>),
+    /// The owning package. Every constructor admits a package whose
+    /// read-only projection is already parsed ([`eager_package`]), so
+    /// [`projection`] borrows it without parsing.
+    Eager(Box<xlsb::Package>),
 }
 
-/// The eager workbook the write kernel (M2) materializes before handing the
-/// owning [`xlsb::Package`] to a cell-value transaction.
+/// The owning package the write kernel (M2) hands to an edit family.
 pub(crate) enum XlsbEditor<'a> {
     /// The handle's own eager owner.
-    Eager(&'a xlsb::Workbook),
+    Eager(&'a xlsb::Package),
     /// Materialized from the source-backed catalog (L-XLSB-1). After
     /// [`Signed::unsign`](crate::Signed::unsign), either owner yields an
     /// owning copy whose signature the leaf removed explicitly
-    /// ([`xlsb::Workbook::unsign`], record 0013).
-    Materialized(Box<xlsb::Workbook>),
+    /// ([`xlsb::Package::unsign`], record 0013).
+    Materialized(Box<xlsb::Package>),
 }
 
 impl Deref for XlsbEditor<'_> {
-    type Target = xlsb::Workbook;
+    type Target = xlsb::Package;
 
-    fn deref(&self) -> &xlsb::Workbook {
+    fn deref(&self) -> &xlsb::Package {
         match self {
-            Self::Eager(workbook) => workbook,
-            Self::Materialized(workbook) => workbook,
+            Self::Eager(package) => package,
+            Self::Materialized(package) => package,
         }
     }
+}
+
+/// Admit a package as an eager owner: parse its read-only projection now,
+/// once, so every later read borrows it.
+fn eager_package(package: xlsb::Package) -> Result<XlsbOwner> {
+    package.workbook()?;
+    Ok(XlsbOwner::Eager(Box::new(package)))
+}
+
+/// The read-only projection of an eager owner's package.
+pub(crate) fn projection(package: &xlsb::Package) -> Result<&xlsb::Workbook> {
+    package.workbook().map_err(Into::into)
 }
 
 const _: () = {
@@ -194,13 +209,13 @@ impl Xlsb {
         let options = OpenOptions::new()
             .retain_source(self.0.retain_source)
             .ooxml_limits(self.0.ooxml_limits);
-        let workbook = package.into_workbook()?;
+        let owner = eager_package(package)?;
         let signature = match self.signature() {
             Signature::RemovalAuthorized => Signature::Unsigned,
             signature => signature,
         };
         Ok(Self::with_owner(
-            XlsbOwner::Eager(Box::new(workbook)),
+            owner,
             self.0.metadata.clone(),
             self.0.metadata_repairs.clone(),
             &options,
@@ -398,19 +413,13 @@ impl Xlsb {
                 .map_err(metadata_error)?
                 .unwrap_or_default();
         let metadata = super::metadata::with_app_props(metadata, &package);
-        let workbook = xlsb::Package::from_opc(package)?.into_workbook()?;
-        Ok(Self::with_owner(
-            XlsbOwner::Eager(Box::new(workbook)),
-            metadata,
-            metadata_repairs,
-            options,
-        ))
+        let owner = eager_package(xlsb::Package::from_opc(package)?)?;
+        Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
     }
 
     /// Adopt a newly created native package without serializing and reopening
     /// its binary workbook. The native creator has already validated the
-    /// package; `into_workbook` acquires its eager semantic projection at the
-    /// unified boundary.
+    /// package and parsed its read-only projection.
     pub(crate) fn from_package(package: xlsb::Package, options: &OpenOptions) -> Result<Self> {
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata = litchi_ooxml_common::properties::read_with_report(
@@ -420,13 +429,8 @@ impl Xlsb {
         .map_err(metadata_error)?
         .unwrap_or_default();
         let metadata = super::metadata::with_app_props(metadata, package.opc_package());
-        let workbook = package.into_workbook()?;
-        Ok(Self::with_owner(
-            XlsbOwner::Eager(Box::new(workbook)),
-            metadata,
-            metadata_repairs,
-            options,
-        ))
+        let owner = eager_package(package)?;
+        Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
     }
 
     fn source_owner(
@@ -434,7 +438,7 @@ impl Xlsb {
         options: &OpenOptions,
     ) -> Result<XlsbOwner> {
         Ok(if options.source_mode == SourceMode::Eager {
-            XlsbOwner::Eager(Box::new(workbook.to_workbook()?))
+            eager_package(workbook.to_workbook()?.into_package())?
         } else {
             XlsbOwner::Source(SourceWorkbook::new(workbook)?)
         })
@@ -518,9 +522,10 @@ impl Xlsb {
     pub fn text(&self) -> Result<String> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => Ok(workbook.workbook().text()?),
-            XlsbOwner::Eager(workbook) => {
+            XlsbOwner::Eager(package) => {
+                let workbook = projection(package)?;
                 let mut out = String::new();
-                for index in 0..WorkbookTrait::worksheet_count(workbook.as_ref()) {
+                for index in 0..WorkbookTrait::worksheet_count(workbook) {
                     let worksheet = workbook.worksheet(index)?;
                     for row in litchi_core::sheet::Worksheet::rows(&worksheet) {
                         cell_text::append_row(&mut out, &row?);
@@ -565,10 +570,11 @@ impl Xlsb {
                 workbook.ensure_current()?;
                 Ok(report)
             },
-            XlsbOwner::Eager(workbook) => {
+            XlsbOwner::Eager(package) => {
+                let workbook = projection(package)?;
                 let mut report = workbook.tolerance_report().clone();
                 report.append_properties(&self.0.metadata_repairs);
-                for index in 0..WorkbookTrait::worksheet_count(workbook.as_ref()) {
+                for index in 0..WorkbookTrait::worksheet_count(workbook) {
                     report.append(workbook.worksheet(index)?.tolerance_report());
                 }
                 Ok(report)
@@ -609,35 +615,31 @@ impl Xlsb {
         }
         if self.0.signature() == Signature::RemovalAuthorized {
             return self
-                .unsigned_workbook()
-                .map(|workbook| XlsbEditor::Materialized(Box::new(workbook)));
+                .unsigned_package()
+                .map(|package| XlsbEditor::Materialized(Box::new(package)));
         }
         match &self.0.owner {
             XlsbOwner::Source(workbook) => Ok(XlsbEditor::Materialized(Box::new(
-                workbook.workbook().to_workbook()?,
+                workbook.workbook().to_workbook()?.into_package(),
             ))),
-            XlsbOwner::Eager(workbook) => Ok(XlsbEditor::Eager(workbook)),
+            XlsbOwner::Eager(package) => Ok(XlsbEditor::Eager(package)),
         }
     }
 
-    /// An owning copy of the workbook whose signature the leaf removed
-    /// explicitly ([`xlsb::Workbook::unsign`]).
-    fn unsigned_workbook(&self) -> Result<xlsb::Workbook> {
-        let mut workbook = match &self.0.owner {
+    /// An owning copy of the package whose signature the leaf removed
+    /// explicitly ([`xlsb::Package::unsign`]).
+    fn unsigned_package(&self) -> Result<xlsb::Package> {
+        Ok(match &self.0.owner {
             XlsbOwner::Source(workbook) => {
                 let bytes = signature::exact_source(workbook.workbook().source_backed_package())?;
                 xlsb::Package::from_bytes_with_options(
                     &bytes,
                     litchi_xlsb::OpenOptions::new().source_limits(self.0.ooxml_limits),
                 )?
-                .into_workbook()?
+                .unsign()
             },
-            XlsbOwner::Eager(workbook) => {
-                xlsb::Workbook::from_opc_package(workbook.opc_package().clone())?
-            },
-        };
-        workbook.unsign();
-        Ok(workbook)
+            XlsbOwner::Eager(package) => package.unsign(),
+        })
     }
 }
 
@@ -656,9 +658,9 @@ impl std::fmt::Debug for Xlsb {
         let mut debug = formatter.debug_struct("Xlsb");
         match &self.0.owner {
             XlsbOwner::Source(workbook) => debug.field("source", workbook),
-            XlsbOwner::Eager(workbook) => debug.field(
+            XlsbOwner::Eager(package) => debug.field(
                 "worksheet_count",
-                &WorkbookTrait::worksheet_count(workbook.as_ref()),
+                &projection(package).map_or(0, WorkbookTrait::worksheet_count),
             ),
         };
         debug.finish_non_exhaustive()
@@ -673,14 +675,16 @@ impl WorkbookTrait for Xlsb {
     fn active_sheet_index(&self) -> usize {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.active_worksheet_ordinal().unwrap_or(0),
-            XlsbOwner::Eager(workbook) => workbook.active_sheet_index(),
+            XlsbOwner::Eager(package) => {
+                projection(package).map_or(0, WorkbookTrait::active_sheet_index)
+            },
         }
     }
 
     fn active_worksheet(&self) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.active_worksheet().map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook
+            XlsbOwner::Eager(package) => projection(package)?
                 .active_worksheet()
                 .map(Sheet::xlsb_eager)
                 .map_err(Into::into),
@@ -690,14 +694,16 @@ impl WorkbookTrait for Xlsb {
     fn is_1904_date_system(&self) -> bool {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.date1904(),
-            XlsbOwner::Eager(workbook) => workbook.is_1904_date_system(),
+            XlsbOwner::Eager(package) => {
+                projection(package).is_ok_and(WorkbookTrait::is_1904_date_system)
+            },
         }
     }
 
     fn worksheet_by_index(&self, index: usize) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.worksheet(index).map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook
+            XlsbOwner::Eager(package) => projection(package)?
                 .worksheet_by_index(index)
                 .map(Sheet::xlsb_eager)
                 .map_err(Into::into),
@@ -707,7 +713,7 @@ impl WorkbookTrait for Xlsb {
     fn worksheet_by_name(&self, name: &str) -> Result<Sheet<'_>> {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.worksheet_named(name).map(Sheet::xlsb_source),
-            XlsbOwner::Eager(workbook) => workbook
+            XlsbOwner::Eager(package) => projection(package)?
                 .worksheet_by_name(name)
                 .map(Sheet::xlsb_eager)
                 .map_err(Into::into),
@@ -717,14 +723,18 @@ impl WorkbookTrait for Xlsb {
     fn worksheet_count(&self) -> usize {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.names().len(),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_count(),
+            XlsbOwner::Eager(package) => {
+                projection(package).map_or(0, WorkbookTrait::worksheet_count)
+            },
         }
     }
 
     fn worksheet_names(&self) -> &[String] {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => workbook.names(),
-            XlsbOwner::Eager(workbook) => workbook.worksheet_names(),
+            XlsbOwner::Eager(package) => {
+                projection(package).map_or(&[], WorkbookTrait::worksheet_names)
+            },
         }
     }
 
@@ -733,7 +743,10 @@ impl WorkbookTrait for Xlsb {
             XlsbOwner::Source(workbook) => {
                 WorksheetsInner::XlsbSource(SourceWorksheets { workbook, index: 0 })
             },
-            XlsbOwner::Eager(workbook) => WorksheetsInner::XlsbEager(workbook.worksheets()),
+            XlsbOwner::Eager(package) => match projection(package) {
+                Ok(workbook) => WorksheetsInner::XlsbEager(workbook.worksheets()),
+                Err(error) => WorksheetsInner::Refused(Some(error)),
+            },
         })
     }
 }
