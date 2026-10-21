@@ -412,6 +412,7 @@ impl Refusal {
 
 /// Error returned by the opened-presentation slide-order owner.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The package could not be opened, validated, or republished.
     Package(PackageError),
@@ -721,6 +722,45 @@ impl Snapshot {
         let mut package = Reader::from_reader_with_options(Cursor::new(bytes.as_slice()), options)?;
         let has_signature = package.contains_signature_component()?;
         let presentation = package.presentation_with_options(options)?;
+        drop(package);
+        let artifact = Arc::from(bytes.into_boxed_slice());
+        Self::from_admitted(artifact, presentation, has_signature, options)
+    }
+
+    /// Capture a native snapshot from an already admitted canonical package.
+    ///
+    /// The package has already validated and retained its CFB index and
+    /// presentation projection. Reusing that projection avoids opening the
+    /// same source container a second time when a package-level edit starts;
+    /// the exact bytes and the source freshness fence remain explicit.
+    pub(crate) fn from_package_with_options(
+        package: &crate::Package,
+        bytes: Arc<[u8]>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        let presentation = package.presentation()?;
+        let has_signature = package
+            .exact()
+            .signed(|| package.contains_signature_component())?;
+        Self::from_admitted(bytes, presentation, has_signature, options)
+    }
+
+    fn from_admitted(
+        artifact: Arc<[u8]>,
+        presentation: crate::presentation::Presentation,
+        has_signature: bool,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        presentation.check_source()?;
+        let limits = options.source_limits_value();
+        if artifact.len() > limits.max_package_bytes {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: artifact.len(),
+                maximum: limits.max_package_bytes,
+            }
+            .into());
+        }
         let directory = presentation.slide_directory();
         // Resolve the live document through the already parsed presentation.
         // The embedded append-only editor intentionally walks UserEdit chains
@@ -777,10 +817,9 @@ impl Snapshot {
             .iter()
             .any(|defect| matches!(defect.defect, crate::leniency::Defect::UserEditChain(_)))
             || presentation.tolerance_report().unrecorded() != 0;
-        drop(presentation);
-        drop(package);
+        presentation.check_source()?;
         Ok(Self {
-            artifact: Artifact::new(Arc::from(bytes.into_boxed_slice())),
+            artifact: Artifact::new(artifact),
             document,
             document_persist_id,
             limits,
@@ -8288,7 +8327,10 @@ fn take_length_prefixed<'a>(bytes: &'a [u8], offset: &mut usize, limit: usize) -
 )]
 mod tests {
     use super::*;
+    use litchi_cfb::OleError;
     use litchi_cfb::{OleFile, OleWriter};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     fn fixture(name: &str) -> Vec<u8> {
         std::fs::read(
@@ -8324,6 +8366,110 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn package_backed_snapshot_matches_a_fresh_parse() {
+        let bytes = authored_fixture();
+        let limits = SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .max_events(10_000)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .source_limits(limits)
+            .leniency(crate::leniency::Leniency::TolerateUserEditChainDefects);
+        let package = crate::Package::from_bytes_with_options(&bytes, options).unwrap();
+        let artifact = Arc::from(package.to_encrypted_bytes().unwrap().into_boxed_slice());
+        let admitted =
+            Snapshot::from_package_with_options(&package, Arc::clone(&artifact), options).unwrap();
+        let reparsed = Snapshot::from_bytes_with_options(bytes, options).unwrap();
+
+        assert_eq!(admitted.bytes(), reparsed.bytes());
+        assert_eq!(admitted.document, reparsed.document);
+        assert_eq!(admitted.document_persist_id, reparsed.document_persist_id);
+        assert_eq!(admitted.chain_repaired, reparsed.chain_repaired);
+        assert_eq!(admitted.has_review_history, reparsed.has_review_history);
+        assert_eq!(admitted.has_signature, reparsed.has_signature);
+        assert!(Arc::ptr_eq(admitted.artifact.shared(), &artifact));
+        assert_eq!(admitted.limits(), limits);
+        assert_eq!(
+            admitted.leniency(),
+            crate::leniency::Leniency::TolerateUserEditChainDefects
+        );
+    }
+
+    struct VersionedSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn change(&self) {
+            self.revision.fetch_add(1, Ordering::AcqRel);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x5050,
+                self.revision.load(Ordering::Acquire),
+            ))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+            let input = self.bytes.get(offset..).unwrap_or_default();
+            let count = input.len().min(output.len());
+            output[..count].copy_from_slice(&input[..count]);
+            Ok(count)
+        }
+    }
+
+    #[test]
+    fn package_backed_snapshot_rechecks_a_changed_positional_source() {
+        let bytes = authored_fixture();
+        let limits = SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .max_events(10_000)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .source_limits(limits)
+            .leniency(crate::leniency::Leniency::TolerateUserEditChainDefects);
+        let source = Arc::new(VersionedSource::new(bytes));
+        let package = crate::Package::from_read_at_with_options(source.clone(), options).unwrap();
+        let artifact = Arc::from(package.to_encrypted_bytes().unwrap().into_boxed_slice());
+
+        // Populate the package's signed-component memo before changing the
+        // source. The freshness fence must still reject a later projection;
+        // a cached signature result cannot make a positional source current.
+        Snapshot::from_package_with_options(&package, Arc::clone(&artifact), options).unwrap();
+        source.change();
+
+        assert!(matches!(
+            Snapshot::from_package_with_options(&package, artifact, options),
+            Err(Error::Package(PackageError::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
     }
 
     fn signed_fixture(bytes: &[u8]) -> Vec<u8> {
