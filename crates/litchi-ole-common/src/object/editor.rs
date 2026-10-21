@@ -856,11 +856,11 @@ impl Edit {
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_presentation_path(key, index)?;
-        let source = self
+        let bytes = self
             .package
             .stream_shared(&stream_path)
-            .ok_or(OleError::StreamNotFound)
-            .and_then(|bytes| presentation::Snapshot::parse_shared(bytes, limits))?;
+            .ok_or(OleError::StreamNotFound)?;
+        let source = presentation::Snapshot::parse_shared(bytes, limits)?;
         let mut transaction = source.edit();
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
@@ -904,11 +904,11 @@ impl Edit {
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_native_path(key)?;
-        let source = self
+        let bytes = self
             .package
             .stream_shared(&stream_path)
-            .ok_or(OleError::StreamNotFound)
-            .and_then(|bytes| native::Snapshot::parse_shared(bytes, limits))?;
+            .ok_or(OleError::StreamNotFound)?;
+        let source = native::Snapshot::parse_shared(bytes, limits)?;
         let mut transaction = source.edit();
         edit(&mut transaction)?;
         let commit = transaction.commit()?;

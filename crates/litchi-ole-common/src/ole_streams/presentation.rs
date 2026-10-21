@@ -18,7 +18,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses a source presentation stream under explicit limits.
-    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid(
@@ -29,7 +29,7 @@ impl Snapshot {
     }
 
     /// Parses a source presentation stream without copying its allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         let stream = OlePresentationStream::parse_shared(bytes, limits)?;
         let revision = StreamRevision::from(Revision::of(stream.bytes()));
@@ -41,7 +41,7 @@ impl Snapshot {
     }
 
     /// Captures an already parsed stream as a source snapshot.
-    pub fn from_stream(stream: OlePresentationStream, limits: Limits) -> Result<Self, OleError> {
+    pub fn from_stream(stream: OlePresentationStream, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         stream.validate(limits)?;
         if stream.bytes().len() > limits.max_bytes {
@@ -147,9 +147,9 @@ impl Edit {
 
     /// Applies one callback to a cloned candidate and validates it before
     /// publication.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut OlePresentationStream) -> Result<(), OleError>,
+        F: FnOnce(&mut OlePresentationStream) -> Result<(), Error>,
     {
         let mut candidate = self.candidate.clone();
         edit(&mut candidate)?;
@@ -159,24 +159,25 @@ impl Edit {
     }
 
     /// Stages an opaque data replacement.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, Error> {
         let limits = self.source.limits;
         self.update(|stream| stream.set_data(value, limits))
     }
 
     /// Stages a primary clipboard-format replacement.
-    pub fn set_clipboard_format(&mut self, value: ClipboardFormat) -> Result<&mut Self, OleError> {
-        self.update(|stream| stream.set_clipboard_format(value))
+    pub fn set_clipboard_format(&mut self, value: ClipboardFormat) -> Result<&mut Self, Error> {
+        let limits = self.source.limits;
+        self.update(|stream| stream.set_clipboard_format(value, limits))
     }
 
     /// Stages a target-device replacement.
-    pub fn set_target_device(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
+    pub fn set_target_device(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, Error> {
         let limits = self.source.limits;
         self.update(|stream| stream.set_target_device(value, limits))
     }
 
     /// Stages an aspect-hint replacement.
-    pub fn set_aspect(&mut self, value: u32) -> Result<&mut Self, OleError> {
+    pub fn set_aspect(&mut self, value: u32) -> Result<&mut Self, Error> {
         self.update(|stream| {
             stream.set_aspect(value);
             Ok(())
@@ -184,7 +185,7 @@ impl Edit {
     }
 
     /// Stages an Lindex-hint replacement.
-    pub fn set_lindex(&mut self, value: u32) -> Result<&mut Self, OleError> {
+    pub fn set_lindex(&mut self, value: u32) -> Result<&mut Self, Error> {
         self.update(|stream| {
             stream.set_lindex(value);
             Ok(())
@@ -192,7 +193,7 @@ impl Edit {
     }
 
     /// Stages an Advf-hint replacement.
-    pub fn set_advf(&mut self, value: u32) -> Result<&mut Self, OleError> {
+    pub fn set_advf(&mut self, value: u32) -> Result<&mut Self, Error> {
         self.update(|stream| {
             stream.set_advf(value);
             Ok(())
@@ -200,7 +201,7 @@ impl Edit {
     }
 
     /// Stages a width replacement.
-    pub fn set_width(&mut self, value: i32) -> Result<&mut Self, OleError> {
+    pub fn set_width(&mut self, value: i32) -> Result<&mut Self, Error> {
         self.update(|stream| {
             stream.set_width(value);
             Ok(())
@@ -208,7 +209,7 @@ impl Edit {
     }
 
     /// Stages a height replacement.
-    pub fn set_height(&mut self, value: i32) -> Result<&mut Self, OleError> {
+    pub fn set_height(&mut self, value: i32) -> Result<&mut Self, Error> {
         self.update(|stream| {
             stream.set_height(value);
             Ok(())
@@ -216,9 +217,9 @@ impl Edit {
     }
 
     /// Stages a TOC entry edit.
-    pub fn update_toc_entry<F>(&mut self, index: usize, edit: F) -> Result<&mut Self, OleError>
+    pub fn update_toc_entry<F>(&mut self, index: usize, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut TocEntry) -> Result<(), OleError>,
+        F: FnOnce(&mut TocEntry) -> Result<(), Error>,
     {
         let limits = self.source.limits;
         self.update(|stream| stream.update_toc_entry(index, limits, edit))
@@ -229,13 +230,13 @@ impl Edit {
         &mut self,
         index: usize,
         entry: TocEntry,
-    ) -> Result<&mut Self, OleError> {
+    ) -> Result<&mut Self, Error> {
         let limits = self.source.limits;
         self.update(|stream| stream.insert_toc_entry(index, entry, limits))
     }
 
     /// Stages removal of a TOC entry.
-    pub fn remove_toc_entry(&mut self, index: usize) -> Result<TocEntry, OleError> {
+    pub fn remove_toc_entry(&mut self, index: usize) -> Result<TocEntry, Error> {
         let limits = self.source.limits;
         let mut removed = None;
         self.update(|stream| {
@@ -246,14 +247,14 @@ impl Edit {
     }
 
     /// Validates and publishes this transaction.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = self.source.patch_to(&snapshot);
         let diagnostics = Diagnostics::new(!patch.is_noop());
         Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
+    fn materialize(&self) -> Result<Snapshot, Error> {
         self.candidate.validate(self.source.limits)?;
         if !self.has_changes() {
             return Ok(self.source.clone());
@@ -335,11 +336,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(invalid(
-                "OLEDS presentation patch source does not match its base",
-            ));
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }

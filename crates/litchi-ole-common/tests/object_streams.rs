@@ -8,6 +8,7 @@
 )]
 
 use litchi_cfb::OleWriter;
+use litchi_ole_common::{Error, LimitKind};
 use litchi_ole_common::object::{Edit, Limits, Target, Targets};
 use litchi_ole_common::ole_streams::{
     CF_DIB, ClipboardFormat, Limits as StreamLimits, OleNativeStream, OlePresentationStream,
@@ -24,14 +25,18 @@ fn write_cfb(build: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
 }
 
 fn presentation(data: &[u8]) -> Vec<u8> {
-    OlePresentationStream::new(ClipboardFormat::Standard(CF_DIB), data.to_vec())
+    OlePresentationStream::new(
+        ClipboardFormat::Standard(CF_DIB),
+        data.to_vec(),
+        StreamLimits::default(),
+    )
         .expect("presentation should construct")
         .to_bytes(StreamLimits::default())
         .expect("presentation should serialize")
 }
 
 fn native(data: &[u8]) -> Vec<u8> {
-    OleNativeStream::new(data.to_vec())
+    OleNativeStream::new(data.to_vec(), StreamLimits::default())
         .expect("native stream should construct")
         .to_bytes(StreamLimits::default())
         .expect("native stream should serialize")
@@ -406,15 +411,36 @@ fn absent_typed_streams_still_validate_explicit_limits() {
     let presentation_error = object
         .presentation(7, invalid)
         .expect_err("absent presentation should still validate limits");
-    assert!(format!("{presentation_error:?}").contains("limits must be non-zero"));
+    assert!(matches!(
+        presentation_error,
+        Error::InvalidLimit {
+            kind: LimitKind::StreamBytes,
+            value: 0,
+            ..
+        }
+    ));
     let native_error = object
         .native(invalid)
         .expect_err("absent native stream should still validate limits");
-    assert!(format!("{native_error:?}").contains("limits must be non-zero"));
+    assert!(matches!(
+        native_error,
+        Error::InvalidLimit {
+            kind: LimitKind::StreamBytes,
+            value: 0,
+            ..
+        }
+    ));
     let list_error = object
         .presentations(invalid)
         .expect_err("empty presentation listing should still validate limits");
-    assert!(format!("{list_error:?}").contains("limits must be non-zero"));
+    assert!(matches!(
+        list_error,
+        Error::InvalidLimit {
+            kind: LimitKind::StreamBytes,
+            value: 0,
+            ..
+        }
+    ));
     assert!(
         editor
             .update_native("object", invalid, |_transaction| Ok(()))

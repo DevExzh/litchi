@@ -293,11 +293,15 @@ fn ole2_test_object(marker: u8) -> Vec<u8> {
     let presentation = OlePresentationStream::new(
         ClipboardFormat::Standard(CF_DIB),
         [marker, marker.wrapping_add(1)],
+        OleStreamLimits::default(),
     )
     .unwrap()
     .to_bytes(litchi_ole_common::ole_streams::Limits::default())
     .unwrap();
-    let native = OleNativeStream::new([marker.wrapping_add(2), marker.wrapping_add(3)])
+    let native = OleNativeStream::new(
+        [marker.wrapping_add(2), marker.wrapping_add(3)],
+        OleStreamLimits::default(),
+    )
         .unwrap()
         .to_bytes(litchi_ole_common::ole_streams::Limits::default())
         .unwrap();
@@ -532,12 +536,15 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
     let ole = crate::writer::ole_metadata::generate_ole_stream();
     let obj_info = [0x00, 0x00, 0x03, 0x00, 0x00, 0x00];
     let unknown = [0xFA, 0xCE, 0xD0, 0x0C];
-    let presentation =
-        OlePresentationStream::new(ClipboardFormat::Standard(CF_DIB), [0x10, 0x20, 0x30])
-            .unwrap()
-            .to_bytes(litchi_ole_common::ole_streams::Limits::default())
-            .unwrap();
-    let native = OleNativeStream::new([0x40, 0x50, 0x60])
+    let presentation = OlePresentationStream::new(
+        ClipboardFormat::Standard(CF_DIB),
+        [0x10, 0x20, 0x30],
+        OleStreamLimits::default(),
+    )
+    .unwrap()
+    .to_bytes(OleStreamLimits::default())
+    .unwrap();
+    let native = OleNativeStream::new([0x40, 0x50, 0x60], OleStreamLimits::default())
         .unwrap()
         .to_bytes(litchi_ole_common::ole_streams::Limits::default())
         .unwrap();

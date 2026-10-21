@@ -14,6 +14,7 @@
 //! is bounded, encoded, and reparsed.  Unknown reserved fields and trailing
 //! producer bytes are copied through a changed presentation edit.
 
+use crate::Error;
 use litchi_cfb::OleError;
 use std::fmt;
 use std::ops::Range;
@@ -72,9 +73,27 @@ impl Default for Limits {
 }
 
 impl Limits {
-    pub(crate) fn validate(self) -> Result<Self, OleError> {
-        if self.max_bytes == 0 || self.max_data_bytes == 0 || self.max_toc_entries == 0 {
-            return Err(invalid("OLEDS stream limits must be non-zero"));
+    pub(crate) fn validate(self) -> Result<Self, Error> {
+        if self.max_bytes == 0 {
+            return Err(Error::InvalidLimit {
+                kind: crate::LimitKind::StreamBytes,
+                value: 0,
+                maximum: usize::MAX as u64,
+            });
+        }
+        if self.max_data_bytes == 0 {
+            return Err(Error::InvalidLimit {
+                kind: crate::LimitKind::StreamBytes,
+                value: 0,
+                maximum: usize::MAX as u64,
+            });
+        }
+        if self.max_toc_entries == 0 {
+            return Err(Error::InvalidLimit {
+                kind: crate::LimitKind::DirectoryEntries,
+                value: 0,
+                maximum: usize::MAX as u64,
+            });
         }
         Ok(self)
     }
@@ -98,9 +117,17 @@ pub enum ClipboardFormat {
 impl ClipboardFormat {
     /// Creates a registered-format value from its raw, NUL-terminated ANSI
     /// bytes.
-    pub fn registered(bytes: impl Into<Vec<u8>>) -> Result<Self, OleError> {
+    pub fn registered(bytes: impl Into<Vec<u8>>, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         let bytes = bytes.into();
-        validate_registered_bytes_bounded(&bytes, DEFAULT_MAX_BYTES)?;
+        validate_registered_bytes(&bytes)?;
+        if bytes.len() > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
+            ));
+        }
         Ok(Self::Registered(bytes.into()))
     }
 
@@ -128,7 +155,7 @@ impl ClipboardFormat {
         matches!(self, Self::Standard(CF_METAFILEPICT))
     }
 
-    fn encoded_len(&self) -> Result<usize, OleError> {
+    fn encoded_len(&self) -> Result<usize, Error> {
         match self {
             Self::None => Ok(4),
             Self::Standard(_) => Ok(8),
@@ -141,7 +168,7 @@ impl ClipboardFormat {
         }
     }
 
-    fn encode_with_marker(&self, marker: u32, output: &mut Vec<u8>) -> Result<(), OleError> {
+    fn encode_with_marker(&self, marker: u32, output: &mut Vec<u8>) -> Result<(), Error> {
         match self {
             Self::None => {
                 if marker != 0 {
@@ -181,7 +208,7 @@ fn default_format_marker(format: &ClipboardFormat) -> u32 {
     }
 }
 
-fn validate_format_marker(format: &ClipboardFormat, marker: u32) -> Result<(), OleError> {
+fn validate_format_marker(format: &ClipboardFormat, marker: u32) -> Result<(), Error> {
     match format {
         ClipboardFormat::None if marker == 0 => Ok(()),
         ClipboardFormat::Standard(_) if matches!(marker, u32::MAX | 0xffff_fffe) => Ok(()),
@@ -196,7 +223,7 @@ fn validate_format_marker(format: &ClipboardFormat, marker: u32) -> Result<(), O
     }
 }
 
-fn validate_primary_format(format: &ClipboardFormat) -> Result<(), OleError> {
+fn validate_primary_format(format: &ClipboardFormat) -> Result<(), Error> {
     if let ClipboardFormat::Registered(bytes) = format {
         validate_registered_bytes_bounded(bytes, MAX_PRIMARY_REGISTERED_FORMAT_CHARS)?;
     }
@@ -212,10 +239,15 @@ impl TargetDevice {
     ///
     /// An empty value represents an absent target device.  Non-empty values
     /// must retain at least the fixed DVTARGETDEVICE header.
-    pub fn from_bytes(bytes: impl Into<Vec<u8>>) -> Result<Self, OleError> {
+    pub fn from_bytes(bytes: impl Into<Vec<u8>>, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         let bytes = bytes.into();
-        if bytes.len() > DEFAULT_MAX_BYTES {
-            return Err(invalid("target device exceeds the default stream limit"));
+        if bytes.len() > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
+            ));
         }
         validate_target_device(&bytes, "target device")?;
         Ok(Self(bytes.into()))
@@ -290,24 +322,24 @@ impl<'a> Reader<'a> {
         self.offset
     }
 
-    fn u32(&mut self, field: &str) -> Result<u32, OleError> {
+    fn u32(&mut self, field: &str) -> Result<u32, Error> {
         let bytes = self.take(4, field)?;
         Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    fn i32(&mut self, field: &str) -> Result<i32, OleError> {
+    fn i32(&mut self, field: &str) -> Result<i32, Error> {
         let bytes = self.take(4, field)?;
         Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
     }
 
-    fn array<const N: usize>(&mut self, field: &str) -> Result<[u8; N], OleError> {
+    fn array<const N: usize>(&mut self, field: &str) -> Result<[u8; N], Error> {
         let bytes = self.take(N, field)?;
         let mut result = [0; N];
         result.copy_from_slice(bytes);
         Ok(result)
     }
 
-    fn take(&mut self, count: usize, field: &str) -> Result<&'a [u8], OleError> {
+    fn take(&mut self, count: usize, field: &str) -> Result<&'a [u8], Error> {
         let end = self
             .offset
             .checked_add(count)
@@ -326,7 +358,7 @@ impl<'a> Reader<'a> {
         field: &str,
         includes_header: bool,
         required: bool,
-    ) -> Result<Option<Range<usize>>, OleError> {
+    ) -> Result<Option<Range<usize>>, Error> {
         let size = usize::try_from(encoded_size)
             .map_err(|_| invalid(format!("{field} size exceeds this platform")))?;
         let payload = if includes_header {
@@ -357,11 +389,19 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn invalid(message: impl Into<String>) -> OleError {
-    OleError::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Cfb(OleError::InvalidFormat(message.into()))
 }
 
-fn validate_registered_bytes(bytes: &[u8]) -> Result<(), OleError> {
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind,
+        observed: observed as u64,
+        maximum: maximum as u64,
+    }
+}
+
+fn validate_registered_bytes(bytes: &[u8]) -> Result<(), Error> {
     if bytes.is_empty() || bytes.last() != Some(&0) {
         return Err(invalid(
             "registered clipboard format must be NUL terminated",
@@ -375,7 +415,7 @@ fn validate_registered_bytes(bytes: &[u8]) -> Result<(), OleError> {
     Ok(())
 }
 
-fn validate_registered_bytes_bounded(bytes: &[u8], max_chars: usize) -> Result<(), OleError> {
+fn validate_registered_bytes_bounded(bytes: &[u8], max_chars: usize) -> Result<(), Error> {
     validate_registered_bytes(bytes)?;
     if bytes.len() > max_chars {
         return Err(invalid(
@@ -389,7 +429,7 @@ fn parse_clipboard_format(
     reader: &mut Reader<'_>,
     required: bool,
     max_registered_chars: usize,
-) -> Result<(ClipboardFormat, u32), OleError> {
+) -> Result<(ClipboardFormat, u32), Error> {
     let marker = reader.u32("clipboard format marker")?;
     match marker {
         0 if !required => Ok((ClipboardFormat::None, marker)),
@@ -413,14 +453,14 @@ fn parse_clipboard_format(
     }
 }
 
-fn checked_len_add(total: &mut usize, value: usize, field: &str) -> Result<(), OleError> {
+fn checked_len_add(total: &mut usize, value: usize, field: &str) -> Result<(), Error> {
     *total = total
         .checked_add(value)
         .ok_or_else(|| invalid(format!("{field} serialized size overflows")))?;
     Ok(())
 }
 
-fn ensure_u32(value: usize, field: &str) -> Result<u32, OleError> {
+fn ensure_u32(value: usize, field: &str) -> Result<u32, Error> {
     u32::try_from(value).map_err(|_| invalid(format!("{field} exceeds u32")))
 }
 
@@ -428,10 +468,10 @@ fn reserve_output(
     output: &mut Vec<u8>,
     size: usize,
     resource: &'static str,
-) -> Result<(), OleError> {
+) -> Result<(), Error> {
     output
         .try_reserve_exact(size)
-        .map_err(|source| OleError::Allocation { resource, source })
+        .map_err(|source| Error::Cfb(OleError::Allocation { resource, source }))
 }
 
 /// A source-backed byte field with an optional copy-on-write replacement.
@@ -499,7 +539,7 @@ impl BytesField {
     }
 }
 
-fn validate_target_device(bytes: &[u8], field: &str) -> Result<(), OleError> {
+fn validate_target_device(bytes: &[u8], field: &str) -> Result<(), Error> {
     if bytes.is_empty() {
         return Ok(());
     }
@@ -600,22 +640,32 @@ impl TocEntry {
     }
 
     /// Parses one TOCENTRY from a complete byte slice.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        if bytes.len() > DEFAULT_MAX_BYTES {
-            return Err(invalid("TOCENTRY exceeds the default stream limit"));
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
+        if bytes.len() > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
+            ));
         }
-        let snapshot = Self::parse_shared(Arc::<[u8]>::from(bytes))?;
+        let snapshot = Self::parse_shared(Arc::<[u8]>::from(bytes), limits)?;
         Ok(snapshot)
     }
 
     /// Parses one TOCENTRY while sharing the supplied source allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self, OleError> {
-        if bytes.len() > DEFAULT_MAX_BYTES {
-            return Err(invalid("TOCENTRY exceeds the default stream limit"));
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
+        if bytes.len() > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
+            ));
         }
         let mut reader = Reader::new(&bytes);
         let (format, format_marker) =
-            parse_clipboard_format(&mut reader, false, DEFAULT_MAX_BYTES)?;
+            parse_clipboard_format(&mut reader, false, limits.max_bytes)?;
         let target_size = reader.u32("TOCENTRY target-device size")?;
         let target = reader.sized_range(target_size, "TOCENTRY target device", false, false)?;
         if let Some(range) = target.as_ref() {
@@ -647,8 +697,9 @@ impl TocEntry {
         })
     }
 
-    /// Creates a TOCENTRY from typed fields using the OLEDS wire defaults.
-    pub fn new(format: ClipboardFormat) -> Result<Self, OleError> {
+    /// Creates a TOCENTRY from typed fields under explicit stream limits.
+    pub fn new(format: ClipboardFormat, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         let format_marker = default_format_marker(&format);
         let entry = Self {
             wire: BytesField::empty(),
@@ -663,8 +714,8 @@ impl TocEntry {
             reserved2: 0,
             dirty: true,
         };
-        let bytes = entry.to_bytes(Limits::default())?;
-        Self::parse_shared(bytes.into())
+        let bytes = entry.to_bytes(limits)?;
+        Self::parse_shared(bytes.into(), limits)
     }
 
     /// Exact source bytes, when the entry is unedited.
@@ -686,8 +737,20 @@ impl TocEntry {
     }
 
     /// Replaces the clipboard format.
-    pub fn set_clipboard_format(&mut self, value: ClipboardFormat) -> Result<(), OleError> {
+    pub fn set_clipboard_format(
+        &mut self,
+        value: ClipboardFormat,
+        limits: Limits,
+    ) -> Result<(), Error> {
+        let limits = limits.validate()?;
         value.encoded_len()?;
+        if value.encoded_len()? > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                value.encoded_len()?,
+                limits.max_bytes,
+            ));
+        }
         if self.format != value {
             self.format_marker = match (&value, self.format_marker) {
                 (ClipboardFormat::Standard(_), marker @ (u32::MAX | 0xffff_fffe)) => marker,
@@ -710,12 +773,14 @@ impl TocEntry {
         &mut self,
         value: impl Into<Vec<u8>>,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         let limits = limits.validate()?;
         let value = value.into();
         if value.len() > limits.max_bytes {
-            return Err(invalid(
-                "TOCENTRY target device exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                value.len(),
+                limits.max_bytes,
             ));
         }
         validate_target_device(&value, "TOCENTRY target device")?;
@@ -801,7 +866,7 @@ impl TocEntry {
         }
     }
 
-    fn encoded_len(&self) -> Result<usize, OleError> {
+    fn encoded_len(&self) -> Result<usize, Error> {
         let mut length = self.format.encoded_len()?;
         checked_len_add(&mut length, 4, "TOCENTRY target-device size")?;
         checked_len_add(
@@ -813,28 +878,40 @@ impl TocEntry {
         Ok(length)
     }
 
-    fn validate(&self, limits: Limits) -> Result<(), OleError> {
+    fn validate(&self, limits: Limits) -> Result<(), Error> {
         self.format.encoded_len()?;
         validate_format_marker(&self.format, self.format_marker)?;
         if self.target_device.len() > limits.max_bytes {
-            return Err(invalid("TOCENTRY target device exceeds the stream limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                self.target_device.len(),
+                limits.max_bytes,
+            ));
         }
         if !self.target_device.is_empty() && self.target_device.len() < 4 {
             return Err(invalid("TOCENTRY target device is truncated"));
         }
         if self.encoded_len()? > limits.max_bytes {
-            return Err(invalid("TOCENTRY exceeds the configured stream limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                self.encoded_len()?,
+                limits.max_bytes,
+            ));
         }
         Ok(())
     }
 
     /// Serializes this entry under explicit resource limits.
-    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, Error> {
         let limits = limits.validate()?;
         self.validate(limits)?;
         if !self.dirty {
             if self.wire.len() > limits.max_bytes {
-                return Err(invalid("TOCENTRY exceeds the configured stream limit"));
+                return Err(limit(
+                    crate::LimitKind::StreamBytes,
+                    self.wire.len(),
+                    limits.max_bytes,
+                ));
             }
             return Ok(self.wire.bytes().to_vec());
         }
@@ -846,7 +923,7 @@ impl TocEntry {
         Ok(output)
     }
 
-    fn encode_into(&self, output: &mut Vec<u8>, limits: Limits) -> Result<(), OleError> {
+    fn encode_into(&self, output: &mut Vec<u8>, limits: Limits) -> Result<(), Error> {
         self.validate(limits)?;
         self.format.encode_with_marker(self.format_marker, output)?;
         output.extend_from_slice(
@@ -911,11 +988,13 @@ impl OlePresentationStream {
     }
 
     /// Parses one complete OlePresentationStream under explicit limits.
-    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid(
-                "OlePresentationStream exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
             ));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
@@ -923,11 +1002,13 @@ impl OlePresentationStream {
 
     /// Parses one complete OlePresentationStream without copying an existing
     /// source allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid(
-                "OlePresentationStream exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
             ));
         }
         let mut reader = Reader::new(&bytes);
@@ -956,8 +1037,10 @@ impl OlePresentationStream {
         let data_len = usize::try_from(data_size)
             .map_err(|_| invalid("OlePresentationStream data size exceeds this platform"))?;
         if data_len > limits.max_data_bytes {
-            return Err(invalid(
-                "OlePresentationStream data exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                data_len,
+                limits.max_data_bytes,
             ));
         }
         let data_start = reader.position();
@@ -984,8 +1067,10 @@ impl OlePresentationStream {
                     invalid("OlePresentationStream TOC count exceeds this platform")
                 })?;
                 if count_usize > limits.max_toc_entries {
-                    return Err(invalid(
-                        "OlePresentationStream TOC count exceeds the configured limit",
+                    return Err(limit(
+                        crate::LimitKind::DirectoryEntries,
+                        count_usize,
+                        limits.max_toc_entries,
                     ));
                 }
                 if count_usize > reader.remaining() / MIN_TOC_ENTRY_BYTES {
@@ -998,13 +1083,15 @@ impl OlePresentationStream {
                         resource: "OLEDS TOC entries",
                         source,
                     })?;
-                for index in 0..count_usize {
+                for _ in 0..count_usize {
                     let start = reader.position();
                     let entry = parse_toc_entry_from_reader(&mut reader, &bytes, limits.max_bytes)?;
                     if entry.encoded_len()? > limits.max_bytes {
-                        return Err(invalid(format!(
-                            "OLEDS TOC entry {index} exceeds the configured limit"
-                        )));
+                        return Err(limit(
+                            crate::LimitKind::StreamBytes,
+                            entry.encoded_len()?,
+                            limits.max_bytes,
+                        ));
                     }
                     toc_entries.push(entry);
                     if reader.position() <= start {
@@ -1047,7 +1134,12 @@ impl OlePresentationStream {
     }
 
     /// Creates a minimal presentation stream with opaque presentation data.
-    pub fn new(format: ClipboardFormat, data: impl Into<Vec<u8>>) -> Result<Self, OleError> {
+    pub fn new(
+        format: ClipboardFormat,
+        data: impl Into<Vec<u8>>,
+        limits: Limits,
+    ) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         let data = data.into();
         validate_primary_format(&format)?;
         if matches!(
@@ -1056,8 +1148,12 @@ impl OlePresentationStream {
         ) {
             return Err(invalid("primary OlePresentationStream format is not valid"));
         }
-        if data.len() > Limits::default().max_data_bytes {
-            return Err(invalid("presentation data exceeds the default limit"));
+        if data.len() > limits.max_data_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                data.len(),
+                limits.max_data_bytes,
+            ));
         }
         let format_marker = default_format_marker(&format);
         let mut stream = Self {
@@ -1082,8 +1178,8 @@ impl OlePresentationStream {
         if stream.format.is_metafile_pict() {
             stream.reserved2 = Some([0; 18]);
         }
-        let bytes = stream.to_bytes(Limits::default())?;
-        Self::parse_shared(bytes.into(), Limits::default())
+        let bytes = stream.to_bytes(limits)?;
+        Self::parse_shared(bytes.into(), limits)
     }
 
     /// Exact source bytes, when this value has not been edited.
@@ -1105,7 +1201,12 @@ impl OlePresentationStream {
     }
 
     /// Replaces the primary clipboard format.
-    pub fn set_clipboard_format(&mut self, value: ClipboardFormat) -> Result<(), OleError> {
+    pub fn set_clipboard_format(
+        &mut self,
+        value: ClipboardFormat,
+        limits: Limits,
+    ) -> Result<(), Error> {
+        let limits = limits.validate()?;
         validate_primary_format(&value)?;
         if matches!(
             value,
@@ -1114,6 +1215,13 @@ impl OlePresentationStream {
             return Err(invalid("primary OlePresentationStream format is not valid"));
         }
         value.encoded_len()?;
+        if value.encoded_len()? > limits.max_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                value.encoded_len()?,
+                limits.max_bytes,
+            ));
+        }
         if self.format != value {
             self.format_marker = match (&value, self.format_marker) {
                 (ClipboardFormat::Standard(_), marker @ (u32::MAX | 0xffff_fffe)) => marker,
@@ -1142,12 +1250,14 @@ impl OlePresentationStream {
         &mut self,
         value: impl Into<Vec<u8>>,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         let limits = limits.validate()?;
         let value = value.into();
         if value.len() > limits.max_bytes {
-            return Err(invalid(
-                "presentation target device exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                value.len(),
+                limits.max_bytes,
             ));
         }
         validate_target_device(&value, "OlePresentationStream target device")?;
@@ -1248,11 +1358,15 @@ impl OlePresentationStream {
     }
 
     /// Replaces opaque presentation data under explicit limits.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), Error> {
         let limits = limits.validate()?;
         let data = value.into();
         if data.len() > limits.max_data_bytes {
-            return Err(invalid("presentation data exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                data.len(),
+                limits.max_data_bytes,
+            ));
         }
         if self.data.replace(data) {
             self.dirty = true;
@@ -1296,9 +1410,9 @@ impl OlePresentationStream {
         index: usize,
         limits: Limits,
         edit: F,
-    ) -> Result<(), OleError>
+    ) -> Result<(), Error>
     where
-        F: FnOnce(&mut TocEntry) -> Result<(), OleError>,
+        F: FnOnce(&mut TocEntry) -> Result<(), Error>,
     {
         let limits = limits.validate()?;
         let mut candidate =
@@ -1330,7 +1444,7 @@ impl OlePresentationStream {
         index: usize,
         entry: TocEntry,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         let limits = limits.validate()?;
         if index > self.toc_entries.len() {
             return Err(invalid(
@@ -1355,7 +1469,7 @@ impl OlePresentationStream {
     ///
     /// Removing the final entry leaves an explicit `NANI` table with a zero
     /// count, which keeps the operation's table grammar unambiguous.
-    pub fn remove_toc_entry(&mut self, index: usize, limits: Limits) -> Result<TocEntry, OleError> {
+    pub fn remove_toc_entry(&mut self, index: usize, limits: Limits) -> Result<TocEntry, Error> {
         let limits = limits.validate()?;
         if index >= self.toc_entries.len() {
             return Err(invalid(
@@ -1381,7 +1495,7 @@ impl OlePresentationStream {
         self.unknown_tail.bytes()
     }
 
-    fn encoded_len(&self, limits: Limits) -> Result<usize, OleError> {
+    fn encoded_len(&self, limits: Limits) -> Result<usize, Error> {
         let mut length = self.format.encoded_len()?;
         let target_size = self
             .target_device
@@ -1392,7 +1506,11 @@ impl OlePresentationStream {
         checked_len_add(&mut length, target_size - 4, "presentation target device")?;
         checked_len_add(&mut length, 28, "presentation fixed fields")?;
         if self.data.len() > limits.max_data_bytes {
-            return Err(invalid("presentation data exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                self.data.len(),
+                limits.max_data_bytes,
+            ));
         }
         checked_len_add(&mut length, self.data.len(), "presentation data")?;
         if self.format.is_metafile_pict() {
@@ -1430,14 +1548,16 @@ impl OlePresentationStream {
             )?;
         }
         if length > limits.max_bytes {
-            return Err(invalid(
-                "OlePresentationStream exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                length,
+                limits.max_bytes,
             ));
         }
         Ok(length)
     }
 
-    fn toc_count_for_encoding(&self, limits: Limits) -> Result<u32, OleError> {
+    fn toc_count_for_encoding(&self, limits: Limits) -> Result<u32, Error> {
         let Some(signature) = self.toc_signature else {
             if self.toc_count.is_some() || !self.toc_entries.is_empty() {
                 return Err(invalid("presentation TOC entries have no signature"));
@@ -1449,8 +1569,10 @@ impl OlePresentationStream {
             .ok_or_else(|| invalid("presentation TOC signature has no count"))?;
         if signature == TOC_SIGNATURE {
             if self.toc_entries.len() > limits.max_toc_entries {
-                return Err(invalid(
-                    "presentation TOC count exceeds the configured limit",
+                return Err(limit(
+                    crate::LimitKind::DirectoryEntries,
+                    self.toc_entries.len(),
+                    limits.max_toc_entries,
                 ));
             }
             let actual = ensure_u32(self.toc_entries.len(), "presentation TOC count")?;
@@ -1467,13 +1589,15 @@ impl OlePresentationStream {
         }
     }
 
-    fn validate(&self, limits: Limits) -> Result<(), OleError> {
+    fn validate(&self, limits: Limits) -> Result<(), Error> {
         validate_primary_format(&self.format)?;
         self.format.encoded_len()?;
         validate_format_marker(&self.format, self.format_marker)?;
         if self.target_device.len() > limits.max_bytes {
-            return Err(invalid(
-                "presentation target device exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                self.target_device.len(),
+                limits.max_bytes,
             ));
         }
         if !self.target_device.is_empty() && self.target_device.len() < 4 {
@@ -1484,13 +1608,15 @@ impl OlePresentationStream {
     }
 
     /// Serializes this stream under explicit resource limits.
-    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, Error> {
         let limits = limits.validate()?;
         self.validate(limits)?;
         if !self.dirty {
             if self.wire.len() > limits.max_bytes {
-                return Err(invalid(
-                    "OlePresentationStream exceeds the configured limit",
+                return Err(limit(
+                    crate::LimitKind::StreamBytes,
+                    self.wire.len(),
+                    limits.max_bytes,
                 ));
             }
             return Ok(self.wire.to_vec());
@@ -1547,7 +1673,7 @@ fn parse_toc_entry_from_reader(
     reader: &mut Reader<'_>,
     source: &Arc<[u8]>,
     max_registered_chars: usize,
-) -> Result<TocEntry, OleError> {
+) -> Result<TocEntry, Error> {
     let start = reader.position();
     let (format, format_marker) = parse_clipboard_format(reader, false, max_registered_chars)?;
     let target_size = reader.u32("TOCENTRY target-device size")?;
@@ -1593,27 +1719,40 @@ impl OleNativeStream {
     }
 
     /// Parses a native stream under explicit limits.
-    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid("OleNativeStream exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
+            ));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
     }
 
     /// Parses a native stream without copying an existing source allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes || bytes.len() < 4 {
-            return Err(invalid(
-                "OleNativeStream is truncated or exceeds the configured limit",
-            ));
+            if bytes.len() > limits.max_bytes {
+                return Err(limit(
+                    crate::LimitKind::StreamBytes,
+                    bytes.len(),
+                    limits.max_bytes,
+                ));
+            }
+            return Err(invalid("OleNativeStream is truncated"));
         }
         let mut reader = Reader::new(&bytes);
         let size = usize::try_from(reader.u32("OleNativeStream native-data size")?)
             .map_err(|_| invalid("OleNativeStream native-data size exceeds this platform"))?;
         if size > limits.max_data_bytes {
-            return Err(invalid("OleNativeStream data exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                size,
+                limits.max_data_bytes,
+            ));
         }
         let data_start = reader.position();
         reader.take(size, "OleNativeStream native data")?;
@@ -1632,10 +1771,15 @@ impl OleNativeStream {
     }
 
     /// Creates a native stream from opaque bytes.
-    pub fn new(data: impl Into<Vec<u8>>) -> Result<Self, OleError> {
+    pub fn new(data: impl Into<Vec<u8>>, limits: Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
         let data = data.into();
-        if data.len() > Limits::default().max_data_bytes {
-            return Err(invalid("native data exceeds the default limit"));
+        if data.len() > limits.max_data_bytes {
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                data.len(),
+                limits.max_data_bytes,
+            ));
         }
         let mut output = Vec::new();
         reserve_output(&mut output, 4 + data.len(), "OLEDS native stream")?;
@@ -1662,11 +1806,15 @@ impl OleNativeStream {
     }
 
     /// Replaces opaque native data under explicit limits.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>, limits: Limits) -> Result<(), Error> {
         let limits = limits.validate()?;
         let value = value.into();
         if value.len() > limits.max_data_bytes {
-            return Err(invalid("native data exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                value.len(),
+                limits.max_data_bytes,
+            ));
         }
         if self.data.replace(value) {
             self.dirty = true;
@@ -1674,26 +1822,38 @@ impl OleNativeStream {
         Ok(())
     }
 
-    fn encoded_len(&self, limits: Limits) -> Result<usize, OleError> {
+    fn encoded_len(&self, limits: Limits) -> Result<usize, Error> {
         if self.data.len() > limits.max_data_bytes {
-            return Err(invalid("native data exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                self.data.len(),
+                limits.max_data_bytes,
+            ));
         }
         let length = 4usize
             .checked_add(self.data.len())
             .ok_or_else(|| invalid("native stream serialized size overflows"))?;
         if length > limits.max_bytes {
-            return Err(invalid("OleNativeStream exceeds the configured limit"));
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                length,
+                limits.max_bytes,
+            ));
         }
         Ok(length)
     }
 
     /// Serializes this stream under explicit resource limits.
-    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, OleError> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>, Error> {
         let limits = limits.validate()?;
         self.encoded_len(limits)?;
         if !self.dirty {
             if self.wire.len() > limits.max_bytes {
-                return Err(invalid("OleNativeStream exceeds the configured limit"));
+                return Err(limit(
+                    crate::LimitKind::StreamBytes,
+                    self.wire.len(),
+                    limits.max_bytes,
+                ));
             }
             return Ok(self.wire.to_vec());
         }
@@ -1720,7 +1880,7 @@ pub fn parse_named_presentation(
     name: &str,
     bytes: Arc<[u8]>,
     limits: Limits,
-) -> Result<presentation::Snapshot, OleError> {
+) -> Result<presentation::Snapshot, Error> {
     presentation_index(name)?;
     presentation::Snapshot::parse_shared(bytes, limits)
 }
@@ -1730,7 +1890,7 @@ pub fn parse_named_native(
     name: &str,
     bytes: Arc<[u8]>,
     limits: Limits,
-) -> Result<native::Snapshot, OleError> {
+) -> Result<native::Snapshot, Error> {
     if name != NATIVE_STREAM_NAME {
         return Err(invalid("stream name is not \\x01Ole10Native"));
     }
@@ -1738,7 +1898,7 @@ pub fn parse_named_native(
 }
 
 /// Returns the numeric presentation index from a valid `\x02OlePres###` name.
-pub fn presentation_index(name: &str) -> Result<usize, OleError> {
+pub fn presentation_index(name: &str) -> Result<usize, Error> {
     let suffix = name
         .strip_prefix(PRESENTATION_STREAM_PREFIX)
         .ok_or_else(|| invalid("stream name is not an OLEDS presentation stream"))?;
@@ -1757,7 +1917,7 @@ pub fn presentation_index(name: &str) -> Result<usize, OleError> {
 }
 
 /// Builds a canonical OLEDS presentation stream name for an index.
-pub fn presentation_name(index: usize) -> Result<String, OleError> {
+pub fn presentation_name(index: usize) -> Result<String, Error> {
     if index > MAX_PRESENTATION_INDEX {
         return Err(invalid("OLEDS presentation stream index exceeds 999"));
     }

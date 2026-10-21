@@ -16,7 +16,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parses a native stream with explicit limits.
-    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, OleError> {
+    pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
             return Err(invalid("OleNativeStream exceeds the configured limit"));
@@ -25,7 +25,7 @@ impl Snapshot {
     }
 
     /// Parses a native stream without copying the source allocation.
-    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, OleError> {
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         let stream = OleNativeStream::parse_shared(bytes, limits)?;
         let revision = StreamRevision::from(Revision::of(stream.bytes()));
@@ -82,7 +82,7 @@ impl Snapshot {
     }
 
     /// Captures an already parsed native stream as a source snapshot.
-    pub fn from_stream(stream: OleNativeStream, limits: Limits) -> Result<Self, OleError> {
+    pub fn from_stream(stream: OleNativeStream, limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         stream.encoded_len(limits)?;
         if stream.bytes().len() > limits.max_bytes {
@@ -137,9 +137,9 @@ impl Edit {
 
     /// Applies a custom edit to a cloned candidate and validates it before
     /// publishing it into this transaction.
-    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, OleError>
+    pub fn update<F>(&mut self, edit: F) -> Result<&mut Self, Error>
     where
-        F: FnOnce(&mut OleNativeStream) -> Result<(), OleError>,
+        F: FnOnce(&mut OleNativeStream) -> Result<(), Error>,
     {
         let mut candidate = self.candidate.clone();
         edit(&mut candidate)?;
@@ -149,20 +149,20 @@ impl Edit {
     }
 
     /// Stages an opaque native-data replacement.
-    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, OleError> {
+    pub fn set_data(&mut self, value: impl Into<Vec<u8>>) -> Result<&mut Self, Error> {
         let limits = self.source.limits;
         self.update(|stream| stream.set_data(value, limits))
     }
 
     /// Validates and publishes this transaction.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let snapshot = self.materialize()?;
         let patch = Patch::new(self.source, snapshot.clone());
         let diagnostics = Diagnostics::new(!patch.is_noop());
         Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn materialize(&self) -> Result<Snapshot, OleError> {
+    fn materialize(&self) -> Result<Snapshot, Error> {
         self.candidate.encoded_len(self.source.limits)?;
         if !self.has_changes() {
             return Ok(self.source.clone());
@@ -244,9 +244,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(invalid("OLEDS native patch source does not match its base"));
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
