@@ -130,17 +130,39 @@ fewer calls and unchanged retained-live and peak bytes. These are separate
 from the removed 152-byte per-publication state allocation.
 
 The source trace identifies the residual as the owner migration's
-pre-mutation copy-on-write path. `cell_values::commit` opens an
+failure-atomic candidate path. `cell_values::commit` opens an
 `ObjectPackage`, calls `package.edit()`, and mutates the editor while the
-source `package` remains alive. The current object owner stores the captured
-targets, package, and objects behind Arc boxes; the first mutation therefore
-detaches the editor state and captured package. The pre-wave editor was unique
-at this point and mutated its captured package directly. This accounts for
-the one small owner/captured-package allocation on each XLS publication; it
-does not indicate a lost output or replay allocation. A narrow follow-up is to
-drop the temporary owner immediately after creating the editor, before the
-first mutation, in every matching XLS consumer. That repair is not included in
-the protected `a84650cd70` binaries and must be measured as a new candidate.
+source `package` remains alive. The current object owner keeps the captured
+state behind an `Arc`; each mutator first clones the editor, then
+`Arc::make_mut` detaches `PackageState` and the captured package before the
+candidate is rendered, reopened, recaptured, and discovered. Publication then
+installs new `Arc` boxes for the parsed package and object catalog and retains
+the already validated render behind `pending_render`. The pending render shares
+the published byte allocation; it does not introduce a second rendered byte
+buffer. The pre-wave editor cloned its inline candidate fields directly and
+published through the rendered hand-off, so the allocation shape differs even
+where the payloads remain shared.
+
+The paired counters are consistent with that transient shape: cells are 1,589
+to 1,587 calls and +437 requested bytes (+0.0185%), while 128-step XLS history
+is 387,769 to 387,383 calls and +67,246 requested bytes (+0.0152%), or about
+525 bytes per publication. Live bytes and peak bytes are unchanged, so this is
+not retained history growth. The earlier suggestion to drop the temporary
+`package` owner in XLS consumers is invalid: `put_stream_shared` clones the
+editor to preserve failure atomicity, and the original editor and candidate
+continue sharing their state and captured package until validation succeeds.
+Dropping that outer owner cannot remove the candidate COW on the measured
+route and is not a proposed repair.
+
+A sound follow-up must keep the original editor untouched through every
+fallible step. One narrowly scoped design is to detach a local captured-package
+candidate, apply the mutation, render/reopen/recapture/discover it, and only
+then swap the editor state. That can reduce allocations on rejected mutations,
+but the successful path still needs one published state and package/catalog
+replacement. Removing the measured successful-path overhead requires a larger
+split between immutable owner metadata and mutable candidate state; it must be
+implemented across every mutator and remeasured before acceptance. No such
+repair is included in the protected `a84650cd70` binaries.
 
 Native qualification still must cover the owner clone and all eleven OLE
 selectors with the frozen runner, exact output/replay checks, host-overlap
