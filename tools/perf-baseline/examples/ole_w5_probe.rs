@@ -87,6 +87,13 @@ mod w5_counting_allocator {
     }
 
     #[inline]
+    fn record_realloc_to_zero(old_bytes: usize) {
+        TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
+        LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
+        LIVE_BYTES.fetch_sub(old_bytes, Ordering::Relaxed);
+    }
+
+    #[inline]
     fn record_dealloc(bytes: usize) {
         LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
         LIVE_BYTES.fetch_sub(bytes, Ordering::Relaxed);
@@ -126,6 +133,10 @@ mod w5_counting_allocator {
             let new_pointer = unsafe { System.realloc(pointer, layout, new_size) };
             if !new_pointer.is_null() {
                 record_realloc(layout.size(), new_size);
+            } else if new_size == 0 {
+                // System::realloc follows the usual realloc(ptr, 0) rule and
+                // releases the old allocation when it returns null.
+                record_realloc_to_zero(layout.size());
             }
             new_pointer
         }
