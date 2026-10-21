@@ -4089,6 +4089,46 @@ mod tests {
     }
 
     #[test]
+    fn preservation_index_spills_records_larger_than_stack_workspace() {
+        for extra_len in [4 * 1024 + 32, 65_530] {
+            let extra = vec![0x5a; extra_len];
+            let data = stored_archive_with_metadata("payload.bin", &extra);
+            let metadata_bytes = central_metadata_bytes(&data);
+            assert!(metadata_bytes > 4 * 1024);
+            if extra_len > 65_000 {
+                assert!(metadata_bytes > 64 * 1024);
+            }
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            let mut limits = ArchiveLimits::UNBOUNDED;
+            limits.max_metadata_bytes = metadata_bytes;
+            let index = PreservationIndex::new_with_limits(&archive, &mut scratch, limits)
+                .expect("large central metadata should spill under its exact limit");
+            let output = index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap();
+            assert_eq!(output, data);
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            limits.max_metadata_bytes = metadata_bytes - 1;
+            let error = match PreservationIndex::new_with_limits(&archive, &mut scratch, limits) {
+                Ok(_) => panic!("metadata one byte over the finite limit must refuse"),
+                Err(error) => error,
+            };
+            assert!(matches!(
+                error.kind(),
+                ErrorKind::LimitExceeded {
+                    resource: LimitResource::MetadataBytes,
+                    actual,
+                    maximum,
+                } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+            ));
+        }
+    }
+
+    #[test]
     fn bounded_preservation_includes_eocd_comment_in_metadata_and_unbounded_is_exact() {
         let data = with_file_comment(
             with_comment(

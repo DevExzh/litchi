@@ -1797,9 +1797,11 @@ impl<R> ZipArchive<R> {
     /// once and hands the buffer over. `prefilled` is zero when it did not,
     /// and the iterator then reads exactly as it does today.
     ///
-    /// The spill threshold is pinned at [`RECOMMENDED_BUFFER_SIZE`] rather
-    /// than tracking the buffer, so sizing the buffer to the declared
-    /// directory cannot move which typed error an oversized record reaches.
+    /// The spill threshold follows a small caller-provided buffer, while
+    /// retaining the historical 64 KiB boundary for larger buffers. The index
+    /// publication path deliberately supplies a small stack workspace, so a
+    /// record larger than that workspace must use the bounded per-record spill
+    /// buffer instead of trying to refill a buffer that can never hold it.
     pub(crate) fn entries_for_index<'archive, 'buf>(
         &'archive self,
         buffer: &'buf mut [u8],
@@ -1807,7 +1809,7 @@ impl<R> ZipArchive<R> {
         prefilled: usize,
     ) -> ZipEntries<'archive, 'buf, R> {
         let prefilled = prefilled.min(buffer.len());
-        let spill_threshold = buffer.len().max(RECOMMENDED_BUFFER_SIZE);
+        let spill_threshold = buffer.len().min(RECOMMENDED_BUFFER_SIZE);
         ZipEntries {
             buffer,
             metadata_buffer: Vec::new(),

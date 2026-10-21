@@ -73,6 +73,11 @@ pub use read_session::PartReadSession;
 mod shared_clone_tests;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+// Central-directory records that exceed this caller-owned workspace spill into
+// the ZIP reader's bounded per-record buffer.  Keeping the hot-path workspace
+// on the stack avoids retaining a 64 KiB heap allocation for every publication;
+// the archive metadata limit still bounds the spill path.
+const PRESERVATION_INDEX_STACK_BYTES: usize = 4 * 1024;
 
 #[cfg(test)]
 #[path = "source_xml_hint_tests.rs"]
@@ -13633,14 +13638,7 @@ impl SourceBackedPackage {
         self.disable_read_ahead_for_publication()?;
         let _monitored = self.source.monitor_publication();
         self.source.ensure_current()?;
-        let mut scratch = Vec::new();
-        scratch
-            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC preservation index",
-                source,
-            })?;
-        scratch.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let mut scratch = [0_u8; PRESERVATION_INDEX_STACK_BYTES];
         let index = match self
             .archive
             .preservation_index_with_limits(&mut scratch, self.limits.zip_limits())

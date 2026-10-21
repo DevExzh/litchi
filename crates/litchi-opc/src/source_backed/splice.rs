@@ -676,14 +676,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         let _monitored = self.package.source.monitor_publication();
         self.package.check_topology_progress()?;
 
-        let mut scratch = Vec::new();
-        scratch
-            .try_reserve_exact(soapberry_zip::RECOMMENDED_BUFFER_SIZE)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC decoded splice preservation index",
-                source,
-            })?;
-        scratch.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
+        let mut scratch = [0_u8; super::PRESERVATION_INDEX_STACK_BYTES];
         let index = self
             .package
             .archive
