@@ -10,8 +10,8 @@ pub(in crate::web) struct OperationBudget {
 
 impl OperationBudget {
     pub(in crate::web) fn charge_xml(&mut self, bytes: usize, limits: &Limits) -> Result<()> {
-        self.xml_bytes = self.xml_bytes.checked_add(bytes).ok_or(Error::WebLimit {
-            kind: LimitKind::AggregateXmlBytes,
+        self.xml_bytes = self.xml_bytes.checked_add(bytes).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::AggregateXmlBytes),
             maximum: limits.total_xml_bytes,
             observed: usize::MAX,
         })?;
@@ -26,14 +26,11 @@ impl OperationBudget {
     }
 
     pub(in crate::web) fn charge_strings(&mut self, bytes: usize, limits: &Limits) -> Result<()> {
-        self.string_bytes = self
-            .string_bytes
-            .checked_add(bytes)
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::RetainedStringBytes,
-                maximum: limits.total_string_bytes,
-                observed: usize::MAX,
-            })?;
+        self.string_bytes = self.string_bytes.checked_add(bytes).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
+            maximum: limits.total_string_bytes,
+            observed: usize::MAX,
+        })?;
         if self.string_bytes > limits.total_string_bytes {
             return limit(
                 LimitKind::RetainedStringBytes,
@@ -55,8 +52,8 @@ impl OperationBudget {
         copies: usize,
         limits: &Limits,
     ) -> Result<()> {
-        let retained = bytes.checked_mul(copies).ok_or(Error::WebLimit {
-            kind: LimitKind::IndexedPackageMetadataBytes,
+        let retained = bytes.checked_mul(copies).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::IndexedPackageMetadataBytes),
             maximum: limits.total_string_bytes,
             observed: usize::MAX,
         })?;

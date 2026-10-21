@@ -778,7 +778,9 @@ fn map_xldm_rename_error(context: &str, error: Xldm140RenameError) -> Error {
                 return invalid(message);
             };
             Error::LimitExceeded {
-                resource: error.limit_resource().unwrap_or("Data Model payload bytes"),
+                resource: error
+                    .limit_kind()
+                    .map_or("Data Model payload bytes", litchi_xldm::LimitKind::as_str),
                 actual,
                 maximum,
             }
@@ -807,13 +809,13 @@ fn map_xldm_olap_proof_error(context: &str, error: litchi_xldm::OlapProofError) 
         litchi_xldm::OlapProofError::UnsupportedProfile => {
             Error::UnsupportedFeature(format!("{context}: XLDM OLAP profile is unsupported"))
         },
-        litchi_xldm::OlapProofError::LimitExceeded {
-            resource,
-            actual,
+        litchi_xldm::OlapProofError::Limit {
+            kind,
+            observed,
             maximum,
         } => Error::LimitExceeded {
-            resource,
-            actual,
+            resource: kind.as_str(),
+            actual: observed,
             maximum,
         },
         litchi_xldm::OlapProofError::Invalid { path, detail }

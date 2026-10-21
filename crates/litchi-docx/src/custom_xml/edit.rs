@@ -31,7 +31,7 @@ use litchi_ooxml_common::custom_xml::Item;
 graph_family!("Custom XML", own_limits);
 
 /// The typed budgets of the Custom XML family: its limit errors are
-/// [`litchi_ooxml_common::Error::CustomXmlLimit`] carried by
+/// [`litchi_ooxml_common::Error::Limit`] carried by
 /// [`crate::Error::Common`] (record 0360).
 pub use litchi_ooxml_common::custom_xml::LimitKind;
 graph_edit!("Custom XML", edit_custom_xml, apply_custom_xml);

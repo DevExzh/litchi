@@ -3,7 +3,7 @@
 /// A Ribbon (customUI) family budget that was exceeded.
 ///
 /// Every limit error of the [`crate::ribbon`] module is
-/// [`crate::Error::RibbonLimit`] with one of these kinds; its display is the
+/// [`crate::Error::Limit`] with one of these kinds; its display is the
 /// resource's human-readable name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]

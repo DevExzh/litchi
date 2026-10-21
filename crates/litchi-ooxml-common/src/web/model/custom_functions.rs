@@ -232,8 +232,8 @@ pub(in crate::web) fn validate_custom_functions(
         validate_xml_string("background runtimeId", &background.runtime_id)?;
         string_bytes = string_bytes
             .checked_add(background.runtime_id.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::DecodedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                 maximum: limits.string_bytes,
                 observed: usize::MAX,
             })?;
@@ -248,8 +248,8 @@ pub(in crate::web) fn validate_custom_functions(
         }
         for id in &list.ids {
             validate_xml_string("custom function ID", id)?;
-            string_bytes = string_bytes.checked_add(id.len()).ok_or(Error::WebLimit {
-                kind: LimitKind::DecodedStringBytes,
+            string_bytes = string_bytes.checked_add(id.len()).ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                 maximum: limits.string_bytes,
                 observed: usize::MAX,
             })?;
@@ -587,8 +587,8 @@ fn append_custom_text(
         let next_len = active_id
             .len()
             .checked_add(text.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionIdBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionIdBytes),
                 maximum: limits.string_bytes,
                 observed: usize::MAX,
             })?;
@@ -601,8 +601,8 @@ fn append_custom_text(
         }
         let total = (*string_bytes)
             .checked_add(text.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::DecodedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                 maximum: limits.string_bytes,
                 observed: usize::MAX,
             })?;
@@ -714,14 +714,13 @@ fn parse_background(
                     return invalid("duplicate backgroundAppData runtimeId attribute".into());
                 }
                 let value = value.into_owned();
-                *string_bytes =
-                    (*string_bytes)
-                        .checked_add(value.len())
-                        .ok_or(Error::WebLimit {
-                            kind: LimitKind::DecodedStringBytes,
-                            maximum: limits.string_bytes,
-                            observed: usize::MAX,
-                        })?;
+                *string_bytes = (*string_bytes)
+                    .checked_add(value.len())
+                    .ok_or(Error::Limit {
+                        kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
+                        maximum: limits.string_bytes,
+                        observed: usize::MAX,
+                    })?;
                 runtime_id = Some(value);
             },
             _ => return invalid("backgroundAppData has an unexpected attribute".into()),
@@ -754,8 +753,8 @@ fn is_xml_space(character: char) -> bool {
 }
 
 fn preflight_attribute_bytes(raw: &[u8], string_bytes: usize, limits: &Limits) -> Result<()> {
-    let next = string_bytes.checked_add(raw.len()).ok_or(Error::WebLimit {
-        kind: LimitKind::DecodedStringBytes,
+    let next = string_bytes.checked_add(raw.len()).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
         maximum: limits.string_bytes,
         observed: usize::MAX,
     })?;
@@ -766,8 +765,8 @@ fn preflight_attribute_bytes(raw: &[u8], string_bytes: usize, limits: &Limits) -
 }
 
 fn preflight_text_bytes(raw: &[u8], string_bytes: usize, limits: &Limits) -> Result<()> {
-    let next = string_bytes.checked_add(raw.len()).ok_or(Error::WebLimit {
-        kind: LimitKind::DecodedStringBytes,
+    let next = string_bytes.checked_add(raw.len()).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
         maximum: limits.string_bytes,
         observed: usize::MAX,
     })?;
@@ -1022,8 +1021,8 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 local_name,
                 qname,
             } => {
-                nodes = nodes.checked_add(1).ok_or(Error::WebLimit {
-                    kind: LimitKind::CustomFunctionXmlNodes,
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlNodes),
                     maximum: limits.nodes,
                     observed: usize::MAX,
                 })?;
@@ -1163,8 +1162,8 @@ fn scan_xml_layout(xml: &[u8], limits: &Limits) -> Result<XmlLayout> {
                 local_name,
                 qname,
             } => {
-                nodes = nodes.checked_add(1).ok_or(Error::WebLimit {
-                    kind: LimitKind::CustomFunctionXmlNodes,
+                nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlNodes),
                     maximum: limits.nodes,
                     observed: usize::MAX,
                 })?;
@@ -1854,8 +1853,8 @@ fn render_extension(value: CustomFunctions, limits: &Limits) -> Result<String> {
         .and_then(|length| length.checked_add("\">".len()))
         .and_then(|length| length.checked_add(payload.len()))
         .and_then(|length| length.checked_add("</a:ext>".len()))
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::CustomFunctionXmlBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
             maximum: limits.xml_bytes,
             observed: usize::MAX,
         })?;
@@ -1930,8 +1929,8 @@ fn render_ids(prefix: &str, ids: &[String], limits: &Limits) -> Result<String> {
             .checked_add("<we:customFunctionIds>".len())
             .and_then(|length| length.checked_add(escaped_xml_bytes(id).ok()?))
             .and_then(|length| length.checked_add("</we:customFunctionIds>".len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
                 maximum: limits.xml_bytes,
                 observed: usize::MAX,
             })?;
@@ -1969,8 +1968,8 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
                     3
                 })
             })
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;
@@ -1985,8 +1984,8 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
             .and_then(|value| value.checked_add("\" runtimeId=\"".len()))
             .and_then(|value| value.checked_add(escaped_xml_bytes(&background.runtime_id).ok()?))
             .and_then(|value| value.checked_add(3))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;
@@ -2010,8 +2009,8 @@ fn custom_functions_rendered_len(value: &CustomFunctions) -> Result<usize> {
                         .and_then(|ids| value.checked_add(ids))
                 }
             })
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;
@@ -2028,8 +2027,8 @@ fn escaped_xml_bytes(value: &str) -> Result<usize> {
             '\t' | '\n' | '\r' => 5,
             _ => character.len_utf8(),
         };
-        length.checked_add(escaped).ok_or(Error::WebLimit {
-            kind: LimitKind::CustomFunctionXmlBytes,
+        length.checked_add(escaped).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
             maximum: usize::MAX,
             observed: usize::MAX,
         })
@@ -2088,8 +2087,8 @@ fn apply_edits(xml: &[u8], mut edits: Vec<Edit>, maximum: usize) -> Result<Strin
         output_len = output_len
             .checked_sub(edit.end - edit.start)
             .and_then(|value| value.checked_add(edit.replacement.len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::CustomFunctionXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::CustomFunctionXmlBytes),
                 maximum,
                 observed: usize::MAX,
             })?;

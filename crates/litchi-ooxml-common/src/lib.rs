@@ -70,6 +70,6 @@ pub mod private {
     };
 }
 
-pub use error::{Error, Result};
+pub use error::{Error, LimitKind, Result};
 
 pub use xml::XmlError;

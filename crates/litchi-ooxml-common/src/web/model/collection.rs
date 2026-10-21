@@ -147,8 +147,8 @@ impl Panes {
     }
 
     pub(in crate::web) fn next_relationship_id(&self) -> Result<String> {
-        let attempts = self.panes.len().checked_add(1).ok_or(Error::WebLimit {
-            kind: LimitKind::PaneRelationshipIds,
+        let attempts = self.panes.len().checked_add(1).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::PaneRelationshipIds),
             maximum: usize::MAX,
             observed: usize::MAX,
         })?;

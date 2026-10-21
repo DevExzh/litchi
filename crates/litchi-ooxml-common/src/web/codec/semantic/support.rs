@@ -58,8 +58,8 @@ pub(in crate::web) fn invalid<T>(message: String) -> Result<T> {
 }
 
 pub(in crate::web) fn limit<T>(kind: LimitKind, max: usize, actual: usize) -> Result<T> {
-    Err(Error::WebLimit {
-        kind,
+    Err(Error::Limit {
+        kind: crate::LimitKind::Web(kind),
         maximum: max,
         observed: actual,
     })

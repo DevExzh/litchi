@@ -73,8 +73,8 @@ impl Patch {
         let affected_parts = planned
             .len()
             .checked_add(deletions.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::PatchParts,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::PatchParts),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;
@@ -918,8 +918,8 @@ impl LexicalChange {
             .len()
             .checked_add(destination_parts.len())
             .and_then(|count| count.checked_add(parts.len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::PatchLexicalScope,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalScope),
                 maximum: limits.package_parts,
                 observed: usize::MAX,
             })?;
@@ -953,8 +953,8 @@ impl LexicalChange {
                 scope_names
                     .len()
                     .checked_add(if root.is_some() { 1 } else { 0 })
-                    .ok_or(Error::WebLimit {
-                        kind: LimitKind::PatchRelationshipTokens,
+                    .ok_or(Error::Limit {
+                        kind: crate::LimitKind::Web(LimitKind::PatchRelationshipTokens),
                         maximum: limits.package_relationships,
                         observed: usize::MAX,
                     })?,
@@ -973,8 +973,8 @@ impl LexicalChange {
         let mut total_xml_bytes = before_content_types.bytes().len();
         total_xml_bytes = total_xml_bytes
             .checked_add(content_types_after.bytes().len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::PatchLexicalXml,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
                 maximum: limits.total_xml_bytes,
                 observed: usize::MAX,
             })?;
@@ -1361,8 +1361,8 @@ fn check_lexical_bytes(bytes: usize, limits: &Limits, kind: LimitKind) -> Result
 }
 
 fn charge_lexical_bytes(total: &mut usize, bytes: usize, limits: &Limits) -> Result<()> {
-    *total = total.checked_add(bytes).ok_or(Error::WebLimit {
-        kind: LimitKind::PatchLexicalXml,
+    *total = total.checked_add(bytes).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
         maximum: limits.total_xml_bytes,
         observed: usize::MAX,
     })?;
@@ -1493,8 +1493,8 @@ pub(in crate::web) fn charge_patch_relationship(
     relationships: &mut usize,
     limits: &Limits,
 ) -> Result<()> {
-    *relationships = relationships.checked_add(1).ok_or(Error::WebLimit {
-        kind: LimitKind::PackageRelationships,
+    *relationships = relationships.checked_add(1).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
         maximum: limits.package_relationships,
         observed: usize::MAX,
     })?;

@@ -946,8 +946,8 @@ pub(super) fn require_at_most(kind: LimitKind, actual: usize, max: usize) -> Res
 }
 
 pub(super) fn limit(kind: LimitKind, max: usize, actual: usize) -> Error {
-    Error::CustomXmlLimit {
-        kind,
+    Error::Limit {
+        kind: crate::LimitKind::CustomXml(kind),
         maximum: max,
         observed: actual,
     }

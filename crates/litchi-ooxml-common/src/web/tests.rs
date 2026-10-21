@@ -1743,7 +1743,10 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
     };
     assert!(matches!(
         load(&authored, &no_parts),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     let no_relationships = Limits {
         package_relationships: 0,
@@ -1751,7 +1754,10 @@ fn package_graph_limits_bound_index_allocation_relationships_and_deletion() {
     };
     assert!(matches!(
         load(&authored, &no_relationships),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     let no_deletions = Limits {
         part_deletions: 0,
@@ -1806,7 +1812,10 @@ fn part_name_allocation_probes_are_operation_wide() {
 
     assert!(matches!(
         put(&mut package, panes, Conformance::Transitional, &limits,),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(package.part_count(), 1);
     assert_eq!(package.get_part(&occupied_name).unwrap().blob(), &[7]);
@@ -1835,7 +1844,10 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
             Conformance::Transitional,
             &xml_tight,
         ),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(rejected.part_count(), 0);
 
@@ -1850,7 +1862,10 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
             Conformance::Transitional,
             &strings_tight,
         ),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(rejected.part_count(), 0);
 
@@ -1864,11 +1879,17 @@ fn aggregate_xml_and_retained_string_budgets_bound_put_and_load() {
     .unwrap();
     assert!(matches!(
         load(&stored, &xml_tight),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert!(matches!(
         load(&stored, &strings_tight),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
 }
 
@@ -1897,7 +1918,10 @@ fn inherited_namespace_expansion_is_charged_before_fragment_retention() {
 
     assert!(matches!(
         parse_add_in_with(xml.as_bytes(), &limits),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(parse_add_in(xml.as_bytes()).unwrap().bindings().len(), 32);
 }
@@ -1915,7 +1939,13 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
         total_string_bytes: 32 * 1024,
         ..Limits::standard()
     };
-    assert!(matches!(load(&stored, &tight), Err(Error::WebLimit { .. })));
+    assert!(matches!(
+        load(&stored, &tight),
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
+    ));
 
     let add_in = AddIn::new(
         "add-in-1",
@@ -1930,7 +1960,10 @@ fn package_and_authored_relationship_metadata_share_the_string_budget() {
     let mut package = OpcPackage::new();
     assert!(matches!(
         put(&mut package, panes, Conformance::Transitional, &tight,),
-        Err(Error::WebLimit { .. })
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(_),
+            ..
+        })
     ));
     assert_eq!(package.part_count(), 0);
 }

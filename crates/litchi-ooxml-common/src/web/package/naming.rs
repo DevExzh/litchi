@@ -146,8 +146,8 @@ pub(in crate::web) fn next_package_relationship_id(
     package: &OpcPackage,
     limits: &Limits,
 ) -> Result<String> {
-    let attempts = package.rels().len().checked_add(1).ok_or(Error::WebLimit {
-        kind: LimitKind::RelationshipIds,
+    let attempts = package.rels().len().checked_add(1).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::RelationshipIds),
         maximum: limits.part_allocations,
         observed: usize::MAX,
     })?;

@@ -235,28 +235,28 @@ fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
     let mut names = Vec::with_capacity(package.part_count().min(MAX_PART_NAMES));
     let mut bytes = 0usize;
     for part in package.iter_parts() {
-        let count = names.len().checked_add(1).ok_or(Error::RibbonLimit {
-            kind: LimitKind::PartNameAllocationScan,
+        let count = names.len().checked_add(1).ok_or(Error::Limit {
+            kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationScan),
             maximum: MAX_PART_NAMES,
             observed: usize::MAX,
         })?;
         if count > MAX_PART_NAMES {
-            return Err(Error::RibbonLimit {
-                kind: LimitKind::PartNameAllocationScan,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationScan),
                 maximum: MAX_PART_NAMES,
                 observed: count,
             });
         }
         bytes = bytes
             .checked_add(part.partname().as_str().len())
-            .ok_or(Error::RibbonLimit {
-                kind: LimitKind::PartNameAllocationBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationBytes),
                 maximum: MAX_PART_NAME_BYTES,
                 observed: usize::MAX,
             })?;
         if bytes > MAX_PART_NAME_BYTES {
-            return Err(Error::RibbonLimit {
-                kind: LimitKind::PartNameAllocationBytes,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationBytes),
                 maximum: MAX_PART_NAME_BYTES,
                 observed: bytes,
             });
@@ -388,14 +388,14 @@ fn removable_images(
             };
             match source_index {
                 Some(source_index) => {
-                    edges = edges.checked_add(1).ok_or(Error::RibbonLimit {
-                        kind: LimitKind::ImageGarbageCollectionEdges,
+                    edges = edges.checked_add(1).ok_or(Error::Limit {
+                        kind: crate::LimitKind::Ribbon(LimitKind::ImageGarbageCollectionEdges),
                         maximum: MAX_IMAGE_GC_EDGES,
                         observed: usize::MAX,
                     })?;
                     if edges > MAX_IMAGE_GC_EDGES {
-                        return Err(Error::RibbonLimit {
-                            kind: LimitKind::ImageGarbageCollectionEdges,
+                        return Err(Error::Limit {
+                            kind: crate::LimitKind::Ribbon(LimitKind::ImageGarbageCollectionEdges),
                             maximum: MAX_IMAGE_GC_EDGES,
                             observed: edges,
                         });
@@ -435,14 +435,14 @@ fn removable_images(
 }
 
 fn bump_graph_links(scanned: &mut usize) -> Result<()> {
-    *scanned = scanned.checked_add(1).ok_or(Error::RibbonLimit {
-        kind: LimitKind::PackageGraphRelationships,
+    *scanned = scanned.checked_add(1).ok_or(Error::Limit {
+        kind: crate::LimitKind::Ribbon(LimitKind::PackageGraphRelationships),
         maximum: MAX_GRAPH_LINKS,
         observed: usize::MAX,
     })?;
     if *scanned > MAX_GRAPH_LINKS {
-        return Err(Error::RibbonLimit {
-            kind: LimitKind::PackageGraphRelationships,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Ribbon(LimitKind::PackageGraphRelationships),
             maximum: MAX_GRAPH_LINKS,
             observed: *scanned,
         });

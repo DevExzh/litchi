@@ -18,8 +18,8 @@ use crate::xml::attributes::BytesStartExt as _;
 
 pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Result<Version> {
     if xml.len() > limits.xml_bytes {
-        return Err(Error::RibbonLimit {
-            kind: LimitKind::XmlBytes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Ribbon(LimitKind::XmlBytes),
             maximum: limits.xml_bytes,
             observed: xml.len(),
         });
@@ -77,14 +77,14 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
                     version = Some(root_version);
                     root_seen = true;
                 }
-                depth = depth.checked_add(1).ok_or(Error::RibbonLimit {
-                    kind: LimitKind::XmlDepth,
+                depth = depth.checked_add(1).ok_or(Error::Limit {
+                    kind: crate::LimitKind::Ribbon(LimitKind::XmlDepth),
                     maximum: limits.depth,
                     observed: usize::MAX,
                 })?;
                 if depth > limits.depth {
-                    return Err(Error::RibbonLimit {
-                        kind: LimitKind::XmlDepth,
+                    return Err(Error::Limit {
+                        kind: crate::LimitKind::Ribbon(LimitKind::XmlDepth),
                         maximum: limits.depth,
                         observed: depth,
                     });
@@ -93,14 +93,14 @@ pub(super) fn validate_xml(xml: &[u8], family: Family, limits: &Limits) -> Resul
             Event::Empty(element) => {
                 count_node(&mut nodes, limits)?;
                 validate_qname(element.name().as_ref(), "element")?;
-                let child_depth = depth.checked_add(1).ok_or(Error::RibbonLimit {
-                    kind: LimitKind::XmlDepth,
+                let child_depth = depth.checked_add(1).ok_or(Error::Limit {
+                    kind: crate::LimitKind::Ribbon(LimitKind::XmlDepth),
                     maximum: limits.depth,
                     observed: usize::MAX,
                 })?;
                 if child_depth > limits.depth {
-                    return Err(Error::RibbonLimit {
-                        kind: LimitKind::XmlDepth,
+                    return Err(Error::Limit {
+                        kind: crate::LimitKind::Ribbon(LimitKind::XmlDepth),
                         maximum: limits.depth,
                         observed: child_depth,
                     });
@@ -471,14 +471,14 @@ fn validate_root(
 }
 
 fn count_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
-    *nodes = nodes.checked_add(1).ok_or(Error::RibbonLimit {
-        kind: LimitKind::XmlNodes,
+    *nodes = nodes.checked_add(1).ok_or(Error::Limit {
+        kind: crate::LimitKind::Ribbon(LimitKind::XmlNodes),
         maximum: limits.nodes,
         observed: usize::MAX,
     })?;
     if *nodes > limits.nodes {
-        return Err(Error::RibbonLimit {
-            kind: LimitKind::XmlNodes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Ribbon(LimitKind::XmlNodes),
             maximum: limits.nodes,
             observed: *nodes,
         });
@@ -501,14 +501,14 @@ pub(super) fn validate_images(
                 relationship.reltype()
             )));
         }
-        *count = count.checked_add(1).ok_or(Error::RibbonLimit {
-            kind: LimitKind::ImageRelationships,
+        *count = count.checked_add(1).ok_or(Error::Limit {
+            kind: crate::LimitKind::Ribbon(LimitKind::ImageRelationships),
             maximum: limits.images,
             observed: usize::MAX,
         })?;
         if *count > limits.images {
-            return Err(Error::RibbonLimit {
-                kind: LimitKind::ImageRelationships,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Ribbon(LimitKind::ImageRelationships),
                 maximum: limits.images,
                 observed: *count,
             });

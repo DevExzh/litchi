@@ -20,15 +20,15 @@ pub(in crate::web) fn effective_namespaces(
     let mut namespaces = Vec::new();
     namespaces
         .try_reserve(scope.binding_count)
-        .map_err(|_error| Error::WebLimit {
-            kind: LimitKind::RetainedNamespaceEntries,
+        .map_err(|_error| Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceEntries),
             maximum: scope.binding_count,
             observed: scope.binding_count,
         })?;
     let mut seen = HashSet::new();
     seen.try_reserve(scope.binding_count)
-        .map_err(|_error| Error::WebLimit {
-            kind: LimitKind::RetainedNamespaceEntries,
+        .map_err(|_error| Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceEntries),
             maximum: scope.binding_count,
             observed: scope.binding_count,
         })?;
@@ -60,8 +60,8 @@ pub(in crate::web) fn retained_namespace_bytes(
                 .len()
                 .checked_add(prefix.len())
                 .and_then(|value| value.checked_add("=\"".len()))
-                .ok_or(Error::WebLimit {
-                    kind: LimitKind::RetainedNamespaceBytes,
+                .ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
                     maximum: usize::MAX,
                     observed: usize::MAX,
                 })?
@@ -71,8 +71,8 @@ pub(in crate::web) fn retained_namespace_bytes(
             .checked_add(head)
             .and_then(|total| total.checked_add(value))
             .and_then(|total| total.checked_add(1))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::RetainedNamespaceBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;
@@ -90,8 +90,8 @@ pub(in crate::web) fn escaped_attr_bytes(value: &str) -> Result<usize> {
             '\'' => "&apos;".len(),
             _ => character.len_utf8(),
         };
-        total.checked_add(bytes).ok_or(Error::WebLimit {
-            kind: LimitKind::RetainedNamespaceBytes,
+        total.checked_add(bytes).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedNamespaceBytes),
             maximum: usize::MAX,
             observed: usize::MAX,
         })
@@ -269,8 +269,8 @@ impl XmlDocument {
             .collect::<Vec<_>>();
         namespaces.sort_unstable_by(|left, right| left.0.cmp(right.0));
         let extra = retained_namespace_bytes(&namespaces, &fragment.declared_prefixes)?;
-        let capacity = raw.len().checked_add(extra).ok_or(Error::WebLimit {
-            kind: LimitKind::RetainedFragmentBytes,
+        let capacity = raw.len().checked_add(extra).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedFragmentBytes),
             maximum: usize::MAX,
             observed: usize::MAX,
         })?;
@@ -278,12 +278,11 @@ impl XmlDocument {
             return limit(LimitKind::RetainedFragmentBytes, limits.xml_bytes, capacity);
         }
         let mut out = String::new();
-        out.try_reserve(capacity)
-            .map_err(|_error| Error::WebLimit {
-                kind: LimitKind::RetainedFragmentBytes,
-                maximum: capacity,
-                observed: capacity,
-            })?;
+        out.try_reserve(capacity).map_err(|_error| Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedFragmentBytes),
+            maximum: capacity,
+            observed: capacity,
+        })?;
         out.push_str(&raw[..insert_at]);
         for (prefix, namespace) in namespaces {
             if prefix == "xml" || fragment.declared_prefixes.contains(prefix) {
@@ -578,8 +577,8 @@ pub(in crate::web) fn push_element(
         state.string_bytes = state
             .string_bytes
             .checked_add(name.len().saturating_add(value.len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::DecodedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                 maximum: limits.string_bytes,
                 observed: usize::MAX,
             })?;
@@ -621,8 +620,8 @@ pub(in crate::web) fn push_element(
     let binding_count = parent_namespaces
         .binding_count
         .checked_add(new_bindings)
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::XmlNamespaceBindings,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::XmlNamespaceBindings),
             maximum: 4096,
             observed: usize::MAX,
         })?;
@@ -653,8 +652,8 @@ pub(in crate::web) fn push_element(
     state.string_bytes = state
         .string_bytes
         .checked_add(namespace.len().saturating_add(local_name.len()))
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::DecodedStringBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
             maximum: limits.string_bytes,
             observed: usize::MAX,
         })?;
@@ -696,8 +695,8 @@ pub(in crate::web) fn push_element(
         let retained_bytes = declared_prefixes.iter().try_fold(
             retained_namespace_bytes(&inherited, &declared_prefixes)?,
             |total, prefix| {
-                total.checked_add(prefix.len()).ok_or(Error::WebLimit {
-                    kind: LimitKind::DecodedStringBytes,
+                total.checked_add(prefix.len()).ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                     maximum: limits.string_bytes,
                     observed: usize::MAX,
                 })
@@ -707,8 +706,8 @@ pub(in crate::web) fn push_element(
             state
                 .string_bytes
                 .checked_add(retained_bytes)
-                .ok_or(Error::WebLimit {
-                    kind: LimitKind::DecodedStringBytes,
+                .ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DecodedStringBytes),
                     maximum: limits.string_bytes,
                     observed: usize::MAX,
                 })?;

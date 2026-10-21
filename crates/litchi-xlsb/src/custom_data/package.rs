@@ -77,13 +77,13 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 fn map_common_error(error: litchi_ooxml_common::Error) -> Error {
     match error {
         litchi_ooxml_common::Error::Limit {
-            resource,
-            max,
-            actual,
+            kind,
+            observed,
+            maximum,
         } => Error::LimitExceeded {
-            resource,
-            actual,
-            maximum: max,
+            resource: kind.as_str(),
+            actual: observed,
+            maximum,
         },
         litchi_ooxml_common::Error::Allocation { resource, source } => {
             Error::Allocation { resource, source }

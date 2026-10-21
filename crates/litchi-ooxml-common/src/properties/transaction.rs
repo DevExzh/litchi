@@ -111,19 +111,20 @@ impl From<crate::Error> for Error {
             crate::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy) => Self::Signed,
             crate::Error::Invalid(message) => Self::Invalid(message),
             crate::Error::Limit {
-                resource,
-                max,
-                actual,
+                kind: resource,
+                maximum: max,
+                observed: actual,
             } => {
-                let kind = if resource.contains("text") {
+                let name = resource.as_str();
+                let kind = if name.contains("text") {
                     Some(LimitKind::TextBytes)
-                } else if resource.contains("events") {
+                } else if name.contains("events") {
                     Some(LimitKind::XmlEvents)
-                } else if resource.contains("XML bytes") {
+                } else if name.contains("XML bytes") {
                     Some(LimitKind::XmlBytes)
-                } else if resource.contains("custom") {
+                } else if name.contains("custom") {
                     Some(LimitKind::CustomProperties)
-                } else if resource.contains("names") || resource.contains("identifiers") {
+                } else if name.contains("names") || name.contains("identifiers") {
                     Some(LimitKind::Names)
                 } else {
                     None
@@ -135,9 +136,9 @@ impl From<crate::Error> for Error {
                         maximum: max,
                     },
                     None => Self::Package(crate::Error::Limit {
-                        resource,
-                        max,
-                        actual,
+                        kind: resource,
+                        maximum: max,
+                        observed: actual,
                     }),
                 }
             },
@@ -478,7 +479,11 @@ fn family_state<P: PackageMetadata>(
     relationship_id: Option<String>,
     bytes: &impl Fn(&PackURI) -> Result<Arc<Vec<u8>>>,
 ) -> Result<FamilyState> {
-    let new_part = free_part_name(package, family.stem(), "document-property part names");
+    let new_part = free_part_name(
+        package,
+        family.stem(),
+        crate::LimitKind::DocumentPropertyPartNames,
+    );
     let present = match (part, relationship_id) {
         (Some(part), Some(relationship_id)) => {
             let relationship = package

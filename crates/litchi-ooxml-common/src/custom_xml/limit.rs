@@ -3,7 +3,7 @@
 /// A Custom XML budget that a read, an edit or a patch exceeded.
 ///
 /// Every limit error of this module is
-/// [`crate::Error::CustomXmlLimit`] with one of these kinds; its display
+/// [`crate::Error::Limit`] with one of these kinds; its display
 /// is the resource's human-readable name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]

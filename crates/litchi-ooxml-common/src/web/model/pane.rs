@@ -522,8 +522,8 @@ impl Pane {
             .snapshot_resources
             .len()
             .checked_add(2)
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::SnapshotRelationshipIds,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::SnapshotRelationshipIds),
                 maximum: usize::MAX,
                 observed: usize::MAX,
             })?;

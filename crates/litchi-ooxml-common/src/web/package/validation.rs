@@ -137,8 +137,8 @@ pub(in crate::web) fn validate_plan_counts(
         .parts
         .len()
         .checked_add(new_parts)
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::PackageParts,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::PackageParts),
             maximum: limits.package_parts,
             observed: usize::MAX,
         })?;
@@ -156,15 +156,15 @@ pub(in crate::web) fn validate_plan_counts(
         relationships =
             relationships
                 .checked_add(part.relationships.len())
-                .ok_or(Error::WebLimit {
-                    kind: LimitKind::PackageRelationships,
+                .ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
                     maximum: limits.package_relationships,
                     observed: usize::MAX,
                 })?;
     }
     if existing_graph.is_none() {
-        relationships = relationships.checked_add(1).ok_or(Error::WebLimit {
-            kind: LimitKind::PackageRelationships,
+        relationships = relationships.checked_add(1).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
             maximum: limits.package_relationships,
             observed: usize::MAX,
         })?;

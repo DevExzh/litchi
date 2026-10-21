@@ -146,8 +146,8 @@ pub(in crate::web) fn validate_panes(task_panes: &Panes, limits: &Limits) -> Res
                     total_snapshot_bytes =
                         total_snapshot_bytes
                             .checked_add(data.len())
-                            .ok_or(Error::WebLimit {
-                                kind: LimitKind::AggregateSnapshotBytes,
+                            .ok_or(Error::Limit {
+                                kind: crate::LimitKind::Web(LimitKind::AggregateSnapshotBytes),
                                 maximum: limits.total_image_bytes,
                                 observed: usize::MAX,
                             })?;
@@ -175,8 +175,8 @@ pub(in crate::web) fn charge_authored_metadata(
         .len()
         .checked_add(1)
         .and_then(|count| count.checked_mul(128))
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::AuthoredPackageMetadataBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
             maximum: limits.total_string_bytes,
             observed: usize::MAX,
         })?;
@@ -186,8 +186,8 @@ pub(in crate::web) fn charge_authored_metadata(
             .relationship_id
             .len()
             .checked_add(ADD_IN_RELATIONSHIP.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::AuthoredPackageMetadataBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?;
@@ -203,8 +203,8 @@ pub(in crate::web) fn charge_authored_metadata(
             }
             .and_then(|bytes| bytes.checked_add(resource.relationship_id.len()))
             .and_then(|bytes| bytes.checked_add(IMAGE_RELATIONSHIP_TYPE.len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::AuthoredPackageMetadataBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?;
@@ -219,8 +219,8 @@ pub(in crate::web) fn add_xml_budget(
     bytes: usize,
     limits: &Limits,
 ) -> Result<()> {
-    *total = total.checked_add(bytes).ok_or(Error::WebLimit {
-        kind: LimitKind::AuthoredXmlBytes,
+    *total = total.checked_add(bytes).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::AuthoredXmlBytes),
         maximum: limits.xml_bytes,
         observed: usize::MAX,
     })?;
@@ -235,8 +235,8 @@ pub(in crate::web) fn add_escaped_xml_budget(
     value: &str,
     limits: &Limits,
 ) -> Result<()> {
-    let bytes = value.len().checked_mul(6).ok_or(Error::WebLimit {
-        kind: LimitKind::AuthoredXmlBytes,
+    let bytes = value.len().checked_mul(6).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::AuthoredXmlBytes),
         maximum: limits.xml_bytes,
         observed: usize::MAX,
     })?;

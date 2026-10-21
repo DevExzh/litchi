@@ -7,8 +7,8 @@ use super::model::{Item, MAX_ITEMS};
 
 pub(super) fn items(values: &[Item]) -> Result<()> {
     if values.len() > MAX_ITEMS {
-        return Err(Error::CustomXmlLimit {
-            kind: super::LimitKind::Items,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(super::LimitKind::Items),
             maximum: MAX_ITEMS,
             observed: values.len(),
         });

@@ -48,44 +48,11 @@ pub enum Error {
     #[error("{0}")]
     SpreadsheetXmlMaps(String),
 
-    /// A bounded resource exceeds the service's declared ceiling.
-    #[error("OOXML {resource} exceeds limit {max} (actual {actual})")]
+    /// A bounded resource exceeds its ceiling (record 0351 §2.4).
+    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
     Limit {
-        /// Resource whose bounded representation was exceeded.
-        resource: &'static str,
-        /// Maximum accepted value.
-        max: usize,
-        /// Observed value, or `usize::MAX` when arithmetic overflowed.
-        actual: usize,
-    },
-
-    /// A Custom XML budget is exhausted (record 0360).
-    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
-    CustomXmlLimit {
-        /// The exceeded budget.
-        kind: crate::custom_xml::LimitKind,
-        /// Observed value, or `usize::MAX` when arithmetic overflowed.
-        observed: usize,
-        /// Maximum accepted value.
-        maximum: usize,
-    },
-
-    /// A Web Extensions (task-pane) budget is exhausted (record 0360).
-    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
-    WebLimit {
-        /// The exceeded budget.
-        kind: crate::web::LimitKind,
-        /// Observed value, or `usize::MAX` when arithmetic overflowed.
-        observed: usize,
-        /// Maximum accepted value.
-        maximum: usize,
-    },
-
-    /// A Ribbon (customUI) budget is exhausted (record 0360).
-    #[error("OOXML {kind} exceeds limit {maximum} (actual {observed})")]
-    RibbonLimit {
-        /// The exceeded budget.
-        kind: crate::ribbon::LimitKind,
+        /// The exceeded bound.
+        kind: LimitKind,
         /// Observed value, or `usize::MAX` when arithmetic overflowed.
         observed: usize,
         /// Maximum accepted value.
@@ -138,11 +105,186 @@ impl From<litchi_core::metadata::keywords::Error> for Error {
     fn from(error: litchi_core::metadata::keywords::Error) -> Self {
         match error {
             litchi_core::metadata::keywords::Error::Limit { observed, maximum } => Self::Limit {
-                resource: "core property text bytes",
-                max: maximum,
-                actual: observed,
+                kind: LimitKind::CorePropertyTextBytes,
+                maximum,
+                observed,
             },
             other => Self::Invalid(other.to_string()),
         }
+    }
+}
+
+/// A bounded dimension of a shared OOXML service, as reported by
+/// [`Error::Limit`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// A Custom XML budget ([`crate::custom_xml::LimitKind`]).
+    CustomXml(crate::custom_xml::LimitKind),
+    /// A Web Extensions (task-pane) budget ([`crate::web::LimitKind`]).
+    Web(crate::web::LimitKind),
+    /// A Ribbon (customUI) budget ([`crate::ribbon::LimitKind`]).
+    Ribbon(crate::ribbon::LimitKind),
+    /// Core keyword items.
+    CoreKeywordItems,
+    /// Core-properties part-name candidates.
+    CorePropertiesPartNameCandidates,
+    /// Core-properties XML bytes.
+    CorePropertiesXmlBytes,
+    /// Core-properties XML events.
+    CorePropertiesXmlEvents,
+    /// Core property text bytes.
+    CorePropertyTextBytes,
+    /// Custom Data storage id UTF-16 units.
+    CustomDataStorageIdUtf16Units,
+    /// Custom Data UID UTF-16 units.
+    CustomDataUidUtf16Units,
+    /// Custom Data XML namespace bytes.
+    CustomDataXmlNamespaceBytes,
+    /// Custom Data XML namespace prefix.
+    CustomDataXmlNamespacePrefix,
+    /// Custom Data XML namespace URI.
+    CustomDataXmlNamespaceUri,
+    /// Custom properties.
+    CustomProperties,
+    /// Custom-properties XML attribute bytes.
+    CustomPropertiesXmlAttributeBytes,
+    /// Custom-properties XML attributes.
+    CustomPropertiesXmlAttributes,
+    /// Custom-properties XML bytes.
+    CustomPropertiesXmlBytes,
+    /// Custom-properties XML depth.
+    CustomPropertiesXmlDepth,
+    /// Custom-properties XML nodes.
+    CustomPropertiesXmlNodes,
+    /// Custom-property name bytes.
+    CustomPropertyNameBytes,
+    /// Custom-property name characters.
+    CustomPropertyNameCharacters,
+    /// Custom-property text bytes.
+    CustomPropertyTextBytes,
+    /// Document-property part names.
+    DocumentPropertyPartNames,
+    /// Embedded payload relationships.
+    EmbeddedPayloadRelationships,
+    /// Embedded relationships.
+    EmbeddedRelationships,
+    /// Escaped XML attribute length.
+    EscapedXmlAttributeLength,
+    /// Extended-properties part names.
+    ExtendedPropertiesPartNames,
+    /// Extended-properties XML bytes.
+    ExtendedPropertiesXmlBytes,
+    /// Extended-properties XML depth.
+    ExtendedPropertiesXmlDepth,
+    /// Extended-properties XML events.
+    ExtendedPropertiesXmlEvents,
+    /// Extended-property text bytes.
+    ExtendedPropertyTextBytes,
+    /// Extension URI.
+    ExtensionUri,
+    /// Extension XML bytes.
+    ExtensionXmlBytes,
+    /// Package relationship identifiers.
+    PackageRelationshipIdentifiers,
+    /// Properties XML bytes.
+    PropertiesXmlBytes,
+    /// Properties XML output.
+    PropertiesXmlOutput,
+    /// Serialized properties XML bytes.
+    SerializedPropertiesXmlBytes,
+    /// Source-backed embedded scan progress.
+    SourceBackedEmbeddedScanProgress,
+    /// Storage id bytes.
+    StorageIdBytes,
+    /// XML attribute count.
+    XmlAttributeCount,
+    /// XML depth.
+    XmlDepth,
+    /// XML event count.
+    XmlEventCount,
+    /// XML namespace binding count.
+    XmlNamespaceBindingCount,
+    /// XML node count.
+    XmlNodeCount,
+    /// XML string bytes.
+    XmlStringBytes,
+}
+
+impl LimitKind {
+    /// A short structural description of the dimension.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::CustomXml(kind) => kind.as_str(),
+            Self::Web(kind) => kind.as_str(),
+            Self::Ribbon(kind) => kind.as_str(),
+            Self::CoreKeywordItems => "core keyword items",
+            Self::CorePropertiesPartNameCandidates => "core-properties part-name candidates",
+            Self::CorePropertiesXmlBytes => "core-properties XML bytes",
+            Self::CorePropertiesXmlEvents => "core-properties XML events",
+            Self::CorePropertyTextBytes => "core property text bytes",
+            Self::CustomDataStorageIdUtf16Units => "Custom Data storage id UTF-16 units",
+            Self::CustomDataUidUtf16Units => "Custom Data UID UTF-16 units",
+            Self::CustomDataXmlNamespaceBytes => "Custom Data XML namespace bytes",
+            Self::CustomDataXmlNamespacePrefix => "Custom Data XML namespace prefix",
+            Self::CustomDataXmlNamespaceUri => "Custom Data XML namespace URI",
+            Self::CustomProperties => "custom properties",
+            Self::CustomPropertiesXmlAttributeBytes => "custom-properties XML attribute bytes",
+            Self::CustomPropertiesXmlAttributes => "custom-properties XML attributes",
+            Self::CustomPropertiesXmlBytes => "custom-properties XML bytes",
+            Self::CustomPropertiesXmlDepth => "custom-properties XML depth",
+            Self::CustomPropertiesXmlNodes => "custom-properties XML nodes",
+            Self::CustomPropertyNameBytes => "custom-property name bytes",
+            Self::CustomPropertyNameCharacters => "custom-property name characters",
+            Self::CustomPropertyTextBytes => "custom-property text bytes",
+            Self::DocumentPropertyPartNames => "document-property part names",
+            Self::EmbeddedPayloadRelationships => "embedded payload relationships",
+            Self::EmbeddedRelationships => "embedded relationships",
+            Self::EscapedXmlAttributeLength => "escaped XML attribute length",
+            Self::ExtendedPropertiesPartNames => "extended-properties part names",
+            Self::ExtendedPropertiesXmlBytes => "extended-properties XML bytes",
+            Self::ExtendedPropertiesXmlDepth => "extended-properties XML depth",
+            Self::ExtendedPropertiesXmlEvents => "extended-properties XML events",
+            Self::ExtendedPropertyTextBytes => "extended-property text bytes",
+            Self::ExtensionUri => "extension URI",
+            Self::ExtensionXmlBytes => "extension XML bytes",
+            Self::PackageRelationshipIdentifiers => "package relationship identifiers",
+            Self::PropertiesXmlBytes => "properties XML bytes",
+            Self::PropertiesXmlOutput => "properties XML output",
+            Self::SerializedPropertiesXmlBytes => "serialized properties XML bytes",
+            Self::SourceBackedEmbeddedScanProgress => "source-backed embedded scan progress",
+            Self::StorageIdBytes => "storage id bytes",
+            Self::XmlAttributeCount => "XML attribute count",
+            Self::XmlDepth => "XML depth",
+            Self::XmlEventCount => "XML event count",
+            Self::XmlNamespaceBindingCount => "XML namespace binding count",
+            Self::XmlNodeCount => "XML node count",
+            Self::XmlStringBytes => "XML string bytes",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl From<crate::custom_xml::LimitKind> for LimitKind {
+    fn from(kind: crate::custom_xml::LimitKind) -> Self {
+        Self::CustomXml(kind)
+    }
+}
+
+impl From<crate::web::LimitKind> for LimitKind {
+    fn from(kind: crate::web::LimitKind) -> Self {
+        Self::Web(kind)
+    }
+}
+
+impl From<crate::ribbon::LimitKind> for LimitKind {
+    fn from(kind: crate::ribbon::LimitKind) -> Self {
+        Self::Ribbon(kind)
     }
 }

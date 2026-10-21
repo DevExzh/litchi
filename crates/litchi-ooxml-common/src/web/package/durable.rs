@@ -771,14 +771,14 @@ impl IntentDecodeBudget {
             .semantic
             .xml_bytes
             .checked_add(bytes)
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::AggregateXmlBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::AggregateXmlBytes),
                 maximum: limits.total_xml_bytes,
                 observed: usize::MAX,
             })?;
         if total > limits.total_xml_bytes {
-            return Err(Error::WebLimit {
-                kind: LimitKind::AggregateXmlBytes,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::AggregateXmlBytes),
                 maximum: limits.total_xml_bytes,
                 observed: total,
             });
@@ -787,14 +787,14 @@ impl IntentDecodeBudget {
     }
 
     fn preflight_image(&self, bytes: usize, limits: &Limits) -> Result<()> {
-        let total = self.image_bytes.checked_add(bytes).ok_or(Error::WebLimit {
-            kind: LimitKind::AggregateImageBytes,
+        let total = self.image_bytes.checked_add(bytes).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::AggregateImageBytes),
             maximum: limits.total_image_bytes,
             observed: usize::MAX,
         })?;
         if total > limits.total_image_bytes {
-            return Err(Error::WebLimit {
-                kind: LimitKind::AggregateImageBytes,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::AggregateImageBytes),
                 maximum: limits.total_image_bytes,
                 observed: total,
             });
@@ -858,8 +858,8 @@ impl<'a> Decoder<'a> {
             Error::Invalid("Web Extensions durable integer exceeds this platform".into())
         })?;
         if value > maximum {
-            return Err(Error::WebLimit {
-                kind: field,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(field),
                 maximum,
                 observed: value,
             });
@@ -912,14 +912,14 @@ impl<'a> Decoder<'a> {
         resource: LimitKind,
     ) -> Result<Vec<u8>> {
         let source = self.bytes_slice(field, maximum)?;
-        let next = total.checked_add(source.len()).ok_or(Error::WebLimit {
-            kind: resource,
+        let next = total.checked_add(source.len()).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(resource),
             maximum: total_maximum,
             observed: usize::MAX,
         })?;
         if next > total_maximum {
-            return Err(Error::WebLimit {
-                kind: resource,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(resource),
                 maximum: total_maximum,
                 observed: next,
             });
@@ -940,8 +940,8 @@ impl<'a> Decoder<'a> {
             self.string_total = budget.string_bytes;
         }
         if budget.string_bytes > limits.total_string_bytes {
-            return Err(Error::WebLimit {
-                kind: LimitKind::RetainedStringBytes,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
                 maximum: limits.total_string_bytes,
                 observed: budget.string_bytes,
             });
@@ -959,14 +959,14 @@ impl<'a> Decoder<'a> {
         let next = self
             .string_total
             .checked_add(text.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::DurableDecodedStrings,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DurableDecodedStrings),
                 maximum: self.string_maximum,
                 observed: usize::MAX,
             })?;
         if next > self.string_maximum {
-            return Err(Error::WebLimit {
-                kind: LimitKind::DurableDecodedStrings,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DurableDecodedStrings),
                 maximum: self.string_maximum,
                 observed: next,
             });
@@ -1032,22 +1032,22 @@ fn parser_limits_for_budget(
     let remaining = limits
         .total_string_bytes
         .checked_sub(budget.string_bytes)
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::RetainedStringBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
             maximum: limits.total_string_bytes,
             observed: budget.string_bytes,
         })?;
     let next = budget
         .string_bytes
         .checked_add(source_len)
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::RetainedStringBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
             maximum: limits.total_string_bytes,
             observed: usize::MAX,
         })?;
     if next > limits.total_string_bytes {
-        return Err(Error::WebLimit {
-            kind: LimitKind::RetainedStringBytes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
             maximum: limits.total_string_bytes,
             observed: next,
         });
@@ -1090,8 +1090,8 @@ fn intent_image_shared(
         folded_name
             .len()
             .checked_add(content_type.len())
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::RetainedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?;
@@ -1110,8 +1110,8 @@ fn intent_image_shared(
     budget.image_bytes = budget
         .image_bytes
         .checked_add(source.len())
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::AggregateImageBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::AggregateImageBytes),
             maximum: limits.total_image_bytes,
             observed: usize::MAX,
         })?;
@@ -1129,8 +1129,8 @@ fn intent_image_shared(
 fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
     let maximum = MAX_INTENT_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableIntentBytes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableIntentBytes),
             maximum,
             observed: bytes.len(),
         });
@@ -1164,8 +1164,8 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
             }
             let retained = addition_count
                 .checked_mul(size_of::<Pane>())
-                .ok_or_else(|| Error::WebLimit {
-                    kind: LimitKind::DurableAuthoredPanes,
+                .ok_or_else(|| Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DurableAuthoredPanes),
                     maximum: limits.total_xml_bytes.max(limits.total_image_bytes),
                     observed: usize::MAX,
                 })?;
@@ -1174,8 +1174,8 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes);
             if retained > staging_maximum {
-                return Err(Error::WebLimit {
-                    kind: LimitKind::DurableAuthoredPanes,
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DurableAuthoredPanes),
                     maximum: staging_maximum,
                     observed: retained,
                 });
@@ -1192,8 +1192,8 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
             }
             let operation_count = decoder.u64(LimitKind::DurableOperationCount, limits.items)?;
             if operation_count > MAX_INTENT_OPERATIONS {
-                return Err(Error::WebLimit {
-                    kind: LimitKind::DurableOperations,
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DurableOperations),
                     maximum: MAX_INTENT_OPERATIONS,
                     observed: operation_count,
                 });
@@ -1204,8 +1204,8 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
             }
             let retained = operation_count
                 .checked_mul(size_of::<(OwnerSelector, custom_function::Operation)>())
-                .ok_or_else(|| Error::WebLimit {
-                    kind: LimitKind::DurableOperations,
+                .ok_or_else(|| Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DurableOperations),
                     maximum: limits.total_string_bytes.max(limits.total_xml_bytes),
                     observed: usize::MAX,
                 })?;
@@ -1214,8 +1214,8 @@ fn decode_intent(bytes: &[u8], limits: &Limits) -> Result<WebIntent> {
                 .max(limits.total_image_bytes)
                 .max(limits.total_string_bytes);
             if retained > staging_maximum {
-                return Err(Error::WebLimit {
-                    kind: LimitKind::DurableOperations,
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::DurableOperations),
                     maximum: staging_maximum,
                     observed: retained,
                 });
@@ -1277,8 +1277,8 @@ fn decode_panes(
     }
     let retained = count
         .checked_mul(size_of::<Pane>())
-        .ok_or_else(|| Error::WebLimit {
-            kind: LimitKind::DurablePanes,
+        .ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurablePanes),
             maximum: limits.total_xml_bytes.max(limits.total_image_bytes),
             observed: usize::MAX,
         })?;
@@ -1287,8 +1287,8 @@ fn decode_panes(
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if retained > staging_maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurablePanes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurablePanes),
             maximum: staging_maximum,
             observed: retained,
         });
@@ -1346,8 +1346,8 @@ fn decode_pane(
     }
     let retained = resource_count
         .checked_mul(size_of::<SnapshotResource>())
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::DurableSnapshotResources,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableSnapshotResources),
             maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
@@ -1356,8 +1356,8 @@ fn decode_pane(
         })?;
     let ledger_retained = resource_count
         .checked_mul(size_of::<DecodedImage>())
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::DurableImageLedger,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableImageLedger),
             maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
@@ -1366,8 +1366,8 @@ fn decode_pane(
         })?;
     let index_retained = resource_count
         .checked_mul(size_of::<(Vec<u8>, usize)>())
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::DurableImageIndex,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableImageIndex),
             maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
@@ -1377,8 +1377,8 @@ fn decode_pane(
     let staging = retained
         .checked_add(ledger_retained)
         .and_then(|value| value.checked_add(index_retained))
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::DurableSnapshotStaging,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableSnapshotStaging),
             maximum: limits
                 .total_xml_bytes
                 .max(limits.total_image_bytes)
@@ -1390,8 +1390,8 @@ fn decode_pane(
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if staging > staging_maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableSnapshotStaging,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableSnapshotStaging),
             maximum: staging_maximum,
             observed: staging,
         });
@@ -1566,20 +1566,18 @@ fn decode_list(decoder: &mut Decoder<'_>, limits: &Limits) -> Result<Option<Cust
     if count > decoder.remaining() / size_of::<u64>() {
         return invalid("truncated Web Extensions custom-function IDs".into());
     }
-    let retained = count
-        .checked_mul(size_of::<String>())
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::PackageCustomFunctionIds,
-            maximum: limits.total_string_bytes,
-            observed: usize::MAX,
-        })?;
+    let retained = count.checked_mul(size_of::<String>()).ok_or(Error::Limit {
+        kind: crate::LimitKind::Web(LimitKind::PackageCustomFunctionIds),
+        maximum: limits.total_string_bytes,
+        observed: usize::MAX,
+    })?;
     let staging_maximum = limits
         .total_xml_bytes
         .max(limits.total_image_bytes)
         .max(limits.total_string_bytes);
     if retained > staging_maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::PackageCustomFunctionIds,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::PackageCustomFunctionIds),
             maximum: staging_maximum,
             observed: retained,
         });
@@ -1725,8 +1723,8 @@ fn apply_operation(
 
 fn make_function_list(ids: Vec<String>, limits: &Limits) -> Result<CustomFunctionList> {
     if ids.len() > limits.items {
-        return Err(Error::WebLimit {
-            kind: LimitKind::CustomFunctionListIds,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::CustomFunctionListIds),
             maximum: limits.items,
             observed: ids.len(),
         });
@@ -2097,8 +2095,8 @@ fn encode_member(
 fn decode_restore<'a>(bytes: &'a [u8], limits: &Limits) -> Result<(&'a [u8], &'a [u8])> {
     let maximum = MAX_CLOSURE_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableRestoreBytes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableRestoreBytes),
             maximum,
             observed: bytes.len(),
         });
@@ -2115,8 +2113,8 @@ fn decode_restore<'a>(bytes: &'a [u8], limits: &Limits) -> Result<(&'a [u8], &'a
 fn decode_closure(bytes: &[u8], limits: &Limits) -> Result<Vec<ClosureRecord>> {
     let maximum = MAX_CLOSURE_BYTES;
     if bytes.len() > maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableClosureBytes,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableClosureBytes),
             maximum,
             observed: bytes.len(),
         });
@@ -2139,8 +2137,8 @@ fn decode_closure(bytes: &[u8], limits: &Limits) -> Result<Vec<ClosureRecord>> {
             Error::Invalid("Web Extensions durable closure allocation overflow".into())
         })?;
     if retained > maximum {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableClosureRecords,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableClosureRecords),
             maximum,
             observed: retained,
         });
@@ -2616,8 +2614,8 @@ fn exact_proof_package(
         }
     }
     if names.len() > limits.package_parts {
-        return Err(Error::WebLimit {
-            kind: LimitKind::DurableProofParts,
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::DurableProofParts),
             maximum: limits.package_parts,
             observed: names.len(),
         });
@@ -2634,14 +2632,14 @@ fn exact_proof_package(
             .and_then(|value| value.checked_add(part.relationships.1.len()))
             .and_then(|value| value.checked_add(name.len()))
             .and_then(|value| value.checked_add(PROOF_ENTRY_OVERHEAD))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::DurableProofBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DurableProofBytes),
                 maximum,
                 observed: usize::MAX,
             })?;
         if total > maximum {
-            return Err(Error::WebLimit {
-                kind: LimitKind::DurableProofBytes,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::DurableProofBytes),
                 maximum,
                 observed: total,
             });

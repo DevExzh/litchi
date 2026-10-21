@@ -63,16 +63,16 @@ impl Limits {
     pub const fn validate(self) -> Result<Self> {
         if self.relationships > Self::MAX_RELATIONSHIPS {
             return Err(Error::Limit {
-                resource: "embedded relationships",
-                max: Self::MAX_RELATIONSHIPS,
-                actual: self.relationships,
+                kind: crate::LimitKind::EmbeddedRelationships,
+                maximum: Self::MAX_RELATIONSHIPS,
+                observed: self.relationships,
             });
         }
         if self.payload_relationships > Self::MAX_PAYLOAD_RELATIONSHIPS {
             return Err(Error::Limit {
-                resource: "embedded payload relationships",
-                max: Self::MAX_PAYLOAD_RELATIONSHIPS,
-                actual: self.payload_relationships,
+                kind: crate::LimitKind::EmbeddedPayloadRelationships,
+                maximum: Self::MAX_PAYLOAD_RELATIONSHIPS,
+                observed: self.payload_relationships,
             });
         }
         Ok(self)

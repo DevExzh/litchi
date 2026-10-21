@@ -73,8 +73,8 @@ impl PackageGraphIndex {
                 .as_str()
                 .len()
                 .checked_add(part.content_type().len())
-                .ok_or(Error::WebLimit {
-                    kind: LimitKind::IndexedPackageMetadataBytes,
+                .ok_or(Error::Limit {
+                    kind: crate::LimitKind::Web(LimitKind::IndexedPackageMetadataBytes),
                     maximum: limits.total_string_bytes,
                     observed: usize::MAX,
                 })?;
@@ -127,14 +127,14 @@ impl PackageGraphIndex {
             .len()
             .checked_add(relationship.reltype().len())
             .and_then(|bytes| bytes.checked_add(relationship.target_ref().len()))
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::IndexedPackageMetadataBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::IndexedPackageMetadataBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?;
         budget.charge_metadata(metadata_bytes, 3, limits)?;
-        self.relationships = self.relationships.checked_add(1).ok_or(Error::WebLimit {
-            kind: LimitKind::PackageRelationships,
+        self.relationships = self.relationships.checked_add(1).ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
             maximum: limits.package_relationships,
             observed: usize::MAX,
         })?;

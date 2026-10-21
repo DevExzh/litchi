@@ -12,31 +12,32 @@ pub use litchi_ooxml_common::custom_data::codec::Limits as XmlLimits;
     reason = "the shared error is non-exhaustive; host limits and allocations are mapped explicitly"
 )]
 fn map_common_error(error: litchi_ooxml_common::Error) -> Error {
+    use litchi_ooxml_common::LimitKind as CommonLimit;
     match error {
         litchi_ooxml_common::Error::Limit {
-            resource,
-            max,
-            actual,
+            kind,
+            observed,
+            maximum,
         } => Error::ResourceLimit(litchi_core::ResourceLimit {
             // Keep byte and scalar-size limits as byte admission failures.
             // Only structural cardinalities are object charges: a namespace
             // byte ceiling or an escaped attribute length is still a byte
             // ceiling, even though its diagnostic label contains
             // `namespace` or `attribute`.
-            resource: match resource {
-                "XML depth" => litchi_core::Resource::Depth,
-                "XML node count"
-                | "XML event count"
-                | "XML attribute count"
-                | "XML namespace binding count" => litchi_core::Resource::Objects,
-                "serialized properties XML bytes" | "properties XML output" => {
+            resource: match kind {
+                CommonLimit::XmlDepth => litchi_core::Resource::Depth,
+                CommonLimit::XmlNodeCount
+                | CommonLimit::XmlEventCount
+                | CommonLimit::XmlAttributeCount
+                | CommonLimit::XmlNamespaceBindingCount => litchi_core::Resource::Objects,
+                CommonLimit::SerializedPropertiesXmlBytes | CommonLimit::PropertiesXmlOutput => {
                     litchi_core::Resource::OutputBytes
                 },
                 _ => litchi_core::Resource::InputBytes,
             },
-            observed: actual as u64,
-            limit: max as u64,
-            scope: Arc::<str>::from(format!("XLSX Custom Data {resource}")),
+            observed: observed as u64,
+            limit: maximum as u64,
+            scope: Arc::<str>::from(format!("XLSX Custom Data {kind}")),
         }),
         litchi_ooxml_common::Error::Allocation { resource, source } => {
             Error::Allocation { resource, source }

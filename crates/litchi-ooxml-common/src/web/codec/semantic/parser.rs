@@ -40,8 +40,8 @@ pub(in crate::web) fn parse_add_in_with_budget(
             .xml
             .len()
             .checked_add(document.string_bytes)
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::RetainedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?,
@@ -208,8 +208,8 @@ pub(in crate::web) fn parse_panes_with_budget(
             .xml
             .len()
             .checked_add(document.string_bytes)
-            .ok_or(Error::WebLimit {
-                kind: LimitKind::RetainedStringBytes,
+            .ok_or(Error::Limit {
+                kind: crate::LimitKind::Web(LimitKind::RetainedStringBytes),
                 maximum: limits.total_string_bytes,
                 observed: usize::MAX,
             })?,

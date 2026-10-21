@@ -147,9 +147,9 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     output.extend_from_slice(&xml[cursor..]);
     if output.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "extended-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: output.len(),
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: output.len(),
         });
     }
     if decode(&output)? != *target {
@@ -189,9 +189,9 @@ pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
     }
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "extended-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: xml.len(),
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: xml.len(),
         });
     }
     Ok(xml)
@@ -233,9 +233,9 @@ fn lexical(field: Field, value: Value<'_>) -> Result<String> {
         Value::Text(text) => {
             if text.len() > MAX_TEXT_BYTES {
                 return Err(Error::Limit {
-                    resource: "extended-property text bytes",
-                    max: MAX_TEXT_BYTES,
-                    actual: text.len(),
+                    kind: crate::LimitKind::ExtendedPropertyTextBytes,
+                    maximum: MAX_TEXT_BYTES,
+                    observed: text.len(),
                 });
             }
             if let Some(character) = text.chars().find(|character| !is_xml_char(*character)) {
@@ -290,9 +290,9 @@ enum Scanned {
 fn scan(xml: &[u8]) -> Result<Layout> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "extended-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: xml.len(),
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: xml.len(),
         });
     }
     if crate::mce::mentions_namespace(xml) {
@@ -318,9 +318,9 @@ fn scan(xml: &[u8]) -> Result<Layout> {
         events += 1;
         if events > MAX_EVENTS {
             return Err(Error::Limit {
-                resource: "extended-properties XML events",
-                max: MAX_EVENTS,
-                actual: events,
+                kind: crate::LimitKind::ExtendedPropertiesXmlEvents,
+                maximum: MAX_EVENTS,
+                observed: events,
             });
         }
         let start = offset(origin, reader.buffer_position())?;
@@ -444,9 +444,9 @@ fn scan(xml: &[u8]) -> Result<Layout> {
                     depth += 1;
                     if depth > MAX_DEPTH {
                         return Err(Error::Limit {
-                            resource: "extended-properties XML depth",
-                            max: MAX_DEPTH,
-                            actual: depth,
+                            kind: crate::LimitKind::ExtendedPropertiesXmlDepth,
+                            maximum: MAX_DEPTH,
+                            observed: depth,
                         });
                     }
                 }
@@ -509,9 +509,9 @@ fn scan(xml: &[u8]) -> Result<Layout> {
 fn push_text(value: &mut String, text: &str) -> Result<()> {
     if value.len().saturating_add(text.len()) > MAX_TEXT_BYTES {
         return Err(Error::Limit {
-            resource: "extended-property text bytes",
-            max: MAX_TEXT_BYTES,
-            actual: value.len().saturating_add(text.len()),
+            kind: crate::LimitKind::ExtendedPropertyTextBytes,
+            maximum: MAX_TEXT_BYTES,
+            observed: value.len().saturating_add(text.len()),
         });
     }
     value.push_str(text);

@@ -197,8 +197,8 @@ fn enforces_guid_depth_size_and_content_type_caps() {
     let error = validate_payload(too_deep.as_bytes()).unwrap_err();
     assert!(matches!(
         error,
-        Error::CustomXmlLimit {
-            kind: LimitKind::Depth,
+        Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::Depth),
             ..
         }
     ));

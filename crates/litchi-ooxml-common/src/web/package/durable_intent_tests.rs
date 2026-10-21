@@ -126,8 +126,8 @@ fn custom_add_in_spans(bytes: &[u8]) -> Vec<Range<usize>> {
 
 fn assert_limit<T>(result: Result<T>, resource: &str, maximum: usize, actual: usize) {
     match result {
-        Err(Error::WebLimit {
-            kind: actual_resource,
+        Err(Error::Limit {
+            kind: crate::LimitKind::Web(actual_resource),
             maximum: actual_maximum,
             observed: actual_value,
         }) => {

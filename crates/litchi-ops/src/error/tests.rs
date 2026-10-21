@@ -435,18 +435,18 @@ fn row_malformed_input_is_corrupt_file() {
 fn shared_ooxml_family_limits_are_limit_exceeded() {
     let shared = || {
         [
-            litchi_ooxml_common::Error::CustomXmlLimit {
-                kind: litchi_ooxml_common::custom_xml::LimitKind::Items,
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::CustomXml(litchi_ooxml_common::custom_xml::LimitKind::Items),
                 observed: 11,
                 maximum: 10,
             },
-            litchi_ooxml_common::Error::WebLimit {
-                kind: litchi_ooxml_common::web::LimitKind::Panes,
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::Web(litchi_ooxml_common::web::LimitKind::Panes),
                 observed: 11,
                 maximum: 10,
             },
-            litchi_ooxml_common::Error::RibbonLimit {
-                kind: litchi_ooxml_common::ribbon::LimitKind::XmlBytes,
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::Ribbon(litchi_ooxml_common::ribbon::LimitKind::XmlBytes),
                 observed: 11,
                 maximum: 10,
             },

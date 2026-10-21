@@ -1155,9 +1155,7 @@ impl Classify for litchi_core::Error {
 fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
     matches!(
         error,
-        litchi_ooxml_common::Error::CustomXmlLimit { .. }
-            | litchi_ooxml_common::Error::WebLimit { .. }
-            | litchi_ooxml_common::Error::RibbonLimit { .. }
+        litchi_ooxml_common::Error::Limit { .. }
     )
 }
 

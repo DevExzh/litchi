@@ -910,7 +910,7 @@ fn source_uid_shrink_has_an_independent_output_ceiling() {
     assert!(matches!(
         rewrite_id(&source, "x", &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));
@@ -934,7 +934,7 @@ fn extension_output_preflight_covers_shrink_and_empty_root_expansion() {
     assert!(matches!(
         rewrite_extension_list(&source, None, &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));
@@ -954,7 +954,7 @@ fn extension_output_preflight_covers_shrink_and_empty_root_expansion() {
     assert!(matches!(
         rewrite_extension_list(&source, Some(&extension), &limits, expected.len() - 1),
         Err(litchi_ooxml_common::Error::Limit {
-            resource: "properties XML output",
+            kind: litchi_ooxml_common::LimitKind::PropertiesXmlOutput,
             ..
         })
     ));

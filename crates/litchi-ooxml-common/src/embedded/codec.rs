@@ -48,7 +48,7 @@ pub fn scan<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Vec<Entry<'a
                 &mut relationship_count,
                 1,
                 limits.relationships,
-                "embedded relationships",
+                crate::LimitKind::EmbeddedRelationships,
             )?;
             if !is_allowed_source(kind, source.content_type()) {
                 return Err(Error::Relationship(format!(
@@ -186,7 +186,7 @@ pub fn scan_source<'a>(
                 &mut relationship_count,
                 1,
                 limits.relationships,
-                "embedded relationships",
+                crate::LimitKind::EmbeddedRelationships,
             )?;
             if !is_allowed_source(kind, source.content_type()) {
                 return Err(Error::Relationship(format!(
@@ -311,7 +311,12 @@ fn is_allowed_source(kind: Kind, source_content_type: &str) -> bool {
 
 fn validate_payload_relationships(payload: &dyn Part, count: &mut usize, max: usize) -> Result<()> {
     for relationship in payload.rels().iter() {
-        charge(count, 1, max, "embedded payload relationships")?;
+        charge(
+            count,
+            1,
+            max,
+            crate::LimitKind::EmbeddedPayloadRelationships,
+        )?;
         if !matches!(
             relationship.reltype(),
             relationship_type::HYPERLINK | relationship_type::STRICT_HYPERLINK
@@ -333,7 +338,12 @@ fn validate_payload_relationships_source(
     max: usize,
 ) -> Result<()> {
     for relationship in payload.rels().iter() {
-        charge(count, 1, max, "embedded payload relationships")?;
+        charge(
+            count,
+            1,
+            max,
+            crate::LimitKind::EmbeddedPayloadRelationships,
+        )?;
         if !matches!(
             relationship.reltype(),
             relationship_type::HYPERLINK | relationship_type::STRICT_HYPERLINK
@@ -358,9 +368,9 @@ fn check_source_state(package: &SourceBackedPackage) -> Result<()> {
 fn check_source_progress(package: &SourceBackedPackage, progress: &mut usize) -> Result<()> {
     package.check_execution()?;
     *progress = progress.checked_add(1).ok_or(Error::Limit {
-        resource: "source-backed embedded scan progress",
-        max: usize::MAX,
-        actual: usize::MAX,
+        kind: crate::LimitKind::SourceBackedEmbeddedScanProgress,
+        maximum: usize::MAX,
+        observed: usize::MAX,
     })?;
     if *progress % 256 == 0 {
         package.source_version()?;
@@ -405,17 +415,17 @@ fn canonical_part_name(partname: &litchi_opc::PackURI) -> Result<Vec<u8>> {
     Ok(canonical)
 }
 
-fn charge(total: &mut usize, amount: usize, max: usize, resource: &'static str) -> Result<()> {
+fn charge(total: &mut usize, amount: usize, max: usize, resource: crate::LimitKind) -> Result<()> {
     let actual = total.checked_add(amount).ok_or(Error::Limit {
-        resource,
-        max,
-        actual: usize::MAX,
+        kind: resource,
+        maximum: max,
+        observed: usize::MAX,
     })?;
     if actual > max {
         return Err(Error::Limit {
-            resource,
-            max,
-            actual,
+            kind: resource,
+            maximum: max,
+            observed: actual,
         });
     }
     *total = actual;

@@ -33,7 +33,7 @@ use crate::web_extensions::{self as web, Conformance, Limits, Panes};
 graph_family!("task-pane", own_limits);
 
 /// The typed budgets of the task-pane family: its limit errors are
-/// [`litchi_ooxml_common::Error::WebLimit`] carried by
+/// [`litchi_ooxml_common::Error::Limit`] carried by
 /// [`crate::Error::Common`] (record 0360).
 pub use litchi_ooxml_common::web::LimitKind;
 

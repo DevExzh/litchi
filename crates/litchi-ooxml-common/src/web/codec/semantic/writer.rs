@@ -151,8 +151,8 @@ pub(in crate::web) fn splice_add_in_extension_list_with(
         .len()
         .checked_sub(fragment.end - fragment.start)
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(Error::WebLimit {
-            kind: LimitKind::XmlBytes,
+        .ok_or(Error::Limit {
+            kind: crate::LimitKind::Web(LimitKind::XmlBytes),
             maximum: limits.xml_bytes,
             observed: usize::MAX,
         })?;

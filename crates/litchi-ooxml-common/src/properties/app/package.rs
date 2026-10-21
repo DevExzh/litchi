@@ -209,7 +209,11 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
         settle_unsigned_change(package)?;
         return Ok(true);
     }
-    let part = free_part_name(&*package, "/docProps/app", "extended-properties part names")?;
+    let part = free_part_name(
+        &*package,
+        "/docProps/app",
+        crate::LimitKind::ExtendedPropertiesPartNames,
+    )?;
     let xml = codec::encode_new(&props)?;
     let mut relationships = package.rels().clone();
     let id = next_relationship_id(&relationships)?;
@@ -270,8 +274,8 @@ pub(crate) fn next_relationship_id(relationships: &Relationships) -> Result<Stri
         }
     }
     Err(Error::Limit {
-        resource: "package relationship identifiers",
-        max: u32::MAX as usize,
-        actual: usize::MAX,
+        kind: crate::LimitKind::PackageRelationshipIdentifiers,
+        maximum: u32::MAX as usize,
+        observed: usize::MAX,
     })
 }
