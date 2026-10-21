@@ -844,7 +844,7 @@ mod tests {
             max_records: 1,
             ..crate::Limits::default()
         };
-        let record = crate::Record::parse(&bytes, 0, origin).unwrap().0;
+        let record = Record::parse(&bytes, 0, origin).unwrap().0;
         let container = Container::try_new(record).unwrap();
         assert!(matches!(
             super::container(&container, None, Limits::default()),
