@@ -16,7 +16,10 @@ pub(super) const MAX_STORE_ENTRIES: u16 = 0x0FFF;
 pub struct Limits {
     /// Largest accepted BLIP body.
     pub max_blip_bytes: u32,
-    /// Largest accepted BLIP-store entry count.
+    /// Largest accepted BLIP-store entry count, and the maximum number of
+    /// blocks visited by [`Delay::iter`]. Direct offset lookup through
+    /// [`Delay::at`] parses one block without enumerating preceding blocks;
+    /// it uses `max_blip_bytes`, rather than this traversal count.
     pub max_store_entries: u16,
 }
 

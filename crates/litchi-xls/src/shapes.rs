@@ -181,7 +181,8 @@ impl WorkbookDrawing {
             let end = offset
                 .checked_add(size)
                 .ok_or_else(|| invalid_data("XLS OfficeArt drawing extent overflow"))?;
-            let shapes = shape::parse(&self.officeart[offset..end]).map_err(invalid_data)?;
+            let shapes = shape::parse(&self.officeart[offset..end], Default::default())
+                .map_err(invalid_data)?;
             for shape in &shapes {
                 result.push(Shape::from_odraw(shape, &mut self.texts)?);
             }
@@ -615,7 +616,7 @@ mod tests {
         write::container(&mut bytes, 0, write::Container::Sp, &children).unwrap();
         let (record, consumed) = Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
-        let parsed = DrawShape::try_from(record).unwrap();
+        let parsed = DrawShape::from_record(record, Default::default()).unwrap();
         let projected = Shape::from_odraw(&parsed, &mut VecDeque::new()).unwrap();
         assert_eq!(projected.sheet_anchor, Some(expected));
     }

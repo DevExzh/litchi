@@ -643,7 +643,7 @@ mod tests {
         .unwrap();
         let mut bytes = Vec::new();
         blip.write(&mut bytes).unwrap();
-        let Blip::Wmf(parsed) = Blip::parse(&bytes).unwrap() else {
+        let Blip::Wmf(parsed) = Blip::parse(&bytes, Default::default()).unwrap() else {
             panic!("expected WMF")
         };
         assert_eq!(parsed.header().compression, Compression::None);
@@ -660,7 +660,7 @@ mod tests {
             .two_uids();
         let mut bytes = Vec::new();
         blip.write(&mut bytes).unwrap();
-        let Blip::Jpeg(parsed) = Blip::parse(&bytes).unwrap() else {
+        let Blip::Jpeg(parsed) = Blip::parse(&bytes, Default::default()).unwrap() else {
             panic!("expected JPEG")
         };
         assert_eq!(parsed.jpeg_flavor(), Some(JpegFlavor::Alternate));
@@ -681,14 +681,17 @@ mod tests {
         builder.write_store(&mut store_bytes).unwrap();
         builder.write_delay(&mut delay_bytes).unwrap();
 
-        let store = Store::parse(&store_bytes).unwrap();
+        let store = Store::parse(&store_bytes, Default::default()).unwrap();
         assert!(matches!(
             store.resolve(embedded, Context::new()).unwrap(),
             Some(Blip::Png(_))
         ));
         assert!(matches!(
             store
-                .resolve(delayed, Context::new().with_delay(Delay::new(&delay_bytes)))
+                .resolve(
+                    delayed,
+                    Context::new().with_delay(Delay::new(&delay_bytes, Default::default()))
+                )
                 .unwrap(),
             Some(Blip::Png(_))
         ));

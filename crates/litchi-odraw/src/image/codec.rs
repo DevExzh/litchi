@@ -14,38 +14,18 @@ enum Family {
 
 /// Parses exactly one BLIP record.
 impl<'data> Blip<'data> {
-    /// Parses exactly one complete BLIP record.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `data` cannot be decoded as exactly one BLIP record
-    /// under the default limits.
-    pub fn parse(data: &'data [u8]) -> Result<Self> {
-        Self::parse_with(data, Limits::default())
-    }
-
     /// Parses exactly one complete BLIP record under explicit limits.
     ///
     /// # Errors
     ///
     /// Returns an error if `data` cannot be decoded as exactly one BLIP record,
     /// or if the record exceeds `limits` or fails BLIP validation.
-    pub fn parse_with(data: &'data [u8], limits: Limits) -> Result<Self> {
+    pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
         let (record, consumed) = Record::parse(data, 0)?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
         }
-        Self::from_record_with(record, limits)
-    }
-
-    /// Parses a previously checked `OfficeArt` record.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `record` is not a valid BLIP record under the
-    /// default limits.
-    pub fn from_record(record: Record<'data>) -> Result<Self> {
-        Self::from_record_with(record, Limits::default())
+        Self::from_record(record, limits)
     }
 
     /// Parses a previously checked `OfficeArt` record under explicit limits.
@@ -54,7 +34,7 @@ impl<'data> Blip<'data> {
     ///
     /// Returns an error if `record` exceeds `limits`, is not a BLIP record, or
     /// fails BLIP validation.
-    pub fn from_record_with(record: Record<'data>, limits: Limits) -> Result<Self> {
+    pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
                 limit: ImageLimit::BlipBytes,
@@ -199,23 +179,13 @@ impl<'data> Blip<'data> {
 }
 
 impl<'data> Entry<'data> {
-    /// Parses an FBSE record.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `record` is not a valid FBSE record under the
-    /// default limits.
-    pub fn parse(record: Record<'data>) -> Result<Self> {
-        Self::parse_with(record, Limits::default())
-    }
-
     /// Parses an FBSE record under explicit image limits.
     ///
     /// # Errors
     ///
     /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
     /// fails FBSE validation.
-    pub fn parse_with(record: Record<'data>, limits: Limits) -> Result<Self> {
+    pub fn parse(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.kind() != RecordKind::Bse {
             return Err(Error::NotImageRecord {
                 raw_kind: record.raw_kind(),
@@ -342,28 +312,18 @@ impl<'data> Entry<'data> {
 }
 
 impl<'data> Store<'data> {
-    /// Parses exactly one `BStore` container.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `data` cannot be decoded as exactly one `BStore`
-    /// container under the default limits.
-    pub fn parse(data: &'data [u8]) -> Result<Self> {
-        Self::parse_with(data, Limits::default())
-    }
-
     /// Parses exactly one `BStore` container under explicit limits.
     ///
     /// # Errors
     ///
     /// Returns an error if `data` cannot be decoded as exactly one `BStore`
     /// container under `limits`.
-    pub fn parse_with(data: &'data [u8], limits: Limits) -> Result<Self> {
+    pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
         let (record, consumed) = Record::parse(data, 0)?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
         }
-        Self::from_record_with(record, limits)
+        Self::from_record(record, limits)
     }
 
     /// Returns the number declared by the container header.
@@ -435,21 +395,9 @@ impl<'data> Store<'data> {
 }
 
 impl<'data> Delay<'data> {
-    /// Borrows a delay-store byte sequence.
-    #[must_use]
-    pub const fn new(data: &'data [u8]) -> Self {
-        Self::with_limits(
-            data,
-            Limits {
-                max_blip_bytes: 256 * 1024 * 1024,
-                max_store_entries: super::model::MAX_STORE_ENTRIES,
-            },
-        )
-    }
-
     /// Borrows a delay store under explicit image limits.
     #[must_use]
-    pub const fn with_limits(data: &'data [u8], limits: Limits) -> Self {
+    pub const fn new(data: &'data [u8], limits: Limits) -> Self {
         Self { data, limits }
     }
 
@@ -465,6 +413,9 @@ impl<'data> Delay<'data> {
     }
 
     /// Parses the file block beginning at an exact delay offset.
+    ///
+    /// This direct lookup applies the BLIP byte ceiling. It does not traverse
+    /// the delay sequence, so the iteration count ceiling does not apply.
     ///
     /// # Errors
     ///
@@ -493,14 +444,6 @@ impl<'data> Delay<'data> {
     }
 }
 
-impl<'data> TryFrom<Record<'data>> for Blip<'data> {
-    type Error = Error;
-
-    fn try_from(record: Record<'data>) -> Result<Self> {
-        Self::from_record(record)
-    }
-}
-
 impl<'data> IntoIterator for &Store<'data> {
     type Item = Result<Block<'data>>;
     type IntoIter = super::model::Blocks<'data>;
@@ -515,7 +458,7 @@ impl<'data> Iterator for Embedded<'data> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.records.next().map(|record| {
-            record.and_then(|blip_record| Blip::from_record_with(blip_record, self.limits))
+            record.and_then(|blip_record| Blip::from_record(blip_record, self.limits))
         })
     }
 }
@@ -639,9 +582,9 @@ pub(super) fn uid_at(data: &[u8], offset: usize) -> Result<Uid> {
 
 pub(super) fn block(record: Record<'_>, limits: Limits) -> Result<Block<'_>> {
     if record.kind() == RecordKind::Bse {
-        Entry::parse_with(record, limits).map(Block::Entry)
+        Entry::parse(record, limits).map(Block::Entry)
     } else if record.kind().is_blip() {
-        Blip::from_record_with(record, limits).map(Block::Blip)
+        Blip::from_record(record, limits).map(Block::Blip)
     } else {
         Err(Error::MalformedImage {
             reason: "BLIP store contains a non-image file block",

@@ -587,7 +587,7 @@ mod tests {
         let bytes = build_chart_sp_container(&frame, 1027).unwrap();
         let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
         assert_eq!(consumed, bytes.len());
-        let shape = litchi_odraw::shape::Shape::try_from(record).unwrap();
+        let shape = litchi_odraw::shape::Shape::from_record(record, Default::default()).unwrap();
         assert_eq!(shape.external_object_id().unwrap(), Some(42));
     }
 

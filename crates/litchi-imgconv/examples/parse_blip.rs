@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
 
-    let blip = Blip::parse(&blip_bytes)?;
+    let blip = Blip::parse(&blip_bytes, Default::default())?;
     println!("kind: {:?}, data bytes: {}", blip.kind(), blip.data().len());
     let png = to_png(&blip, Options::default())?;
     std::fs::write(&output, png)?;

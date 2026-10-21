@@ -59,10 +59,10 @@ impl<'data> Parser<'data> {
     ///
     /// Returns an error from `Parser::root` if the stream is malformed, or from
     /// `Container::find_recursive` if a descendant record is malformed or the
-    /// default traversal limits are exceeded.
-    pub fn shapes(&self) -> Result<Vec<Record<'data>>> {
+    /// caller traversal limits are exceeded.
+    pub fn shapes(&self, limits: crate::Limits) -> Result<Vec<Record<'data>>> {
         match self.root()? {
-            Some(root) => root.find_recursive(RecordKind::SpContainer),
+            Some(root) => root.find_recursive(RecordKind::SpContainer, limits),
             None => Ok(Vec::new()),
         }
     }
@@ -73,10 +73,10 @@ impl<'data> Parser<'data> {
     ///
     /// Returns an error from `Parser::root` if the stream is malformed, or from
     /// `Container::find_recursive` if a descendant record is malformed or the
-    /// default traversal limits are exceeded.
-    pub fn textboxes(&self) -> Result<Vec<Record<'data>>> {
+    /// caller traversal limits are exceeded.
+    pub fn textboxes(&self, limits: crate::Limits) -> Result<Vec<Record<'data>>> {
         match self.root()? {
-            Some(root) => root.find_recursive(RecordKind::ClientTextbox),
+            Some(root) => root.find_recursive(RecordKind::ClientTextbox, limits),
             None => Ok(Vec::new()),
         }
     }

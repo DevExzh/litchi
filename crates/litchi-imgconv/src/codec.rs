@@ -1348,21 +1348,21 @@ mod tests {
         zlib.write_all(b"metafile").unwrap();
         let encoded = zlib.finish().unwrap();
         let bytes = meta(&encoded, 8);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         assert_eq!(
             decode_data(&blip, &Limits::default()).unwrap(),
             b"metafile".as_slice()
         );
 
         let wrong = meta(&encoded, 9);
-        let wrong = Blip::parse(&wrong).unwrap();
+        let wrong = Blip::parse(&wrong, Default::default()).unwrap();
         assert!(decode_data(&wrong, &Limits::default()).is_err());
 
         let mut raw = DeflateEncoder::new(Vec::new(), Level::default());
         raw.write_all(b"metafile").unwrap();
         let raw = raw.finish().unwrap();
         let raw = meta(&raw, 8);
-        let raw = Blip::parse(&raw).unwrap();
+        let raw = Blip::parse(&raw, Default::default()).unwrap();
         assert!(decode_data(&raw, &Limits::default()).is_err());
     }
 
@@ -1372,7 +1372,7 @@ mod tests {
         zlib.write_all(&[0; 1024]).unwrap();
         let encoded = zlib.finish().unwrap();
         let bytes = meta(&encoded, 1024);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         let limits = Limits {
             max_uncompressed_bytes: 32,
             ..Limits::default()
@@ -1390,7 +1390,7 @@ mod tests {
         body.push(0xFF);
         body.extend_from_slice(&png);
         let bytes = record(0x6E0, 0xF01E, &body);
-        let blip = Blip::parse(&bytes).unwrap();
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
         let limits = Limits {
             max_pixels: 15,
             ..Limits::default()

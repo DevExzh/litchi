@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::{Bounds, Flags, Kind, Native, parse, parse_with};
+use super::{Bounds, Flags, Kind, Native, Shape, parse};
 use crate::write::{self, Atom, Container as OutContainer, ShapeBuilder};
 use crate::{Error, Limit, Limits, Record, RecordKind};
 
@@ -98,9 +98,44 @@ fn drawing() -> Vec<u8> {
 }
 
 #[test]
+fn from_record_obeys_the_same_limits_as_parse() {
+    let bytes = shape(Native::RECTANGLE, 2, false);
+    let (record, _) = Record::parse(&bytes, 0).expect("valid record");
+    let parsed = Shape::from_record(record.clone(), Limits::default()).expect("valid shape");
+    assert_eq!(parsed.id(), 2);
+    assert_eq!(parsed.kind(), Kind::Rectangle);
+    assert!(matches!(
+        Shape::from_record(
+            record.clone(),
+            Limits {
+                max_depth: 64,
+                max_records: 1
+            }
+        ),
+        Err(Error::LimitExceeded {
+            limit: Limit::Records,
+            maximum: 1
+        })
+    ));
+    assert!(matches!(
+        Shape::from_record(
+            record,
+            Limits {
+                max_depth: 65,
+                max_records: 1_000
+            }
+        ),
+        Err(Error::InvalidLimit {
+            limit: Limit::Depth,
+            maximum: 64
+        })
+    ));
+}
+
+#[test]
 fn hides_root_patriarch_and_preserves_nested_group() {
     let bytes = drawing();
-    let shapes = parse(&bytes).expect("parse drawing");
+    let shapes = parse(&bytes, Default::default()).expect("parse drawing");
 
     assert_eq!(shapes.len(), 2);
     assert_eq!(shapes[0].kind(), Kind::Rectangle);
@@ -133,7 +168,7 @@ fn rejects_a_missing_anchor_for_a_user_shape() {
     write::container(&mut bytes, 0, OutContainer::Sp, &body).expect("write shape container");
 
     assert!(matches!(
-        parse(&bytes),
+        parse(&bytes, Default::default()),
         Err(Error::MalformedShape {
             reason: "shape HAVE_ANCHOR flag disagrees with its anchor records",
         })
@@ -142,7 +177,7 @@ fn rejects_a_missing_anchor_for_a_user_shape() {
 
 #[test]
 fn traversal_limits_are_enforced() {
-    let error = parse_with(
+    let error = parse(
         &drawing(),
         Limits {
             max_depth: 0,
@@ -165,13 +200,16 @@ fn rejects_trailing_root_bytes() {
     let mut bytes = drawing();
     bytes.push(0);
 
-    assert!(matches!(parse(&bytes), Err(Error::TrailingData { .. })));
+    assert!(matches!(
+        parse(&bytes, Default::default()),
+        Err(Error::TrailingData { .. })
+    ));
 }
 
 #[test]
 fn rejects_an_unsafe_recursive_depth_limit() {
     assert!(matches!(
-        parse_with(
+        parse(
             &drawing(),
             Limits {
                 max_depth: 65,
@@ -188,7 +226,7 @@ fn rejects_an_unsafe_recursive_depth_limit() {
 #[test]
 fn metadata_records_consume_the_record_budget() {
     assert!(matches!(
-        parse_with(
+        parse(
             &drawing(),
             Limits {
                 max_depth: 64,
@@ -218,7 +256,7 @@ fn rejects_a_group_coordinate_atom_with_the_wrong_length() {
 #[test]
 fn typed_group_bounds_do_not_drop_future_records() {
     let bytes = drawing();
-    let shapes = parse(&bytes).expect("parse drawing");
+    let shapes = parse(&bytes, Default::default()).expect("parse drawing");
     let group = &shapes[1];
     let extension = group
         .meta()

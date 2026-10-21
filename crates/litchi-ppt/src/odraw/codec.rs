@@ -194,7 +194,10 @@ pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
         visit_host_record(&mut visited)?;
         let (record, consumed) = Record::parse(data, offset)?;
         let end = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
-        shapes.extend(litchi_odraw::shape::parse(&data[offset..end])?);
+        shapes.extend(litchi_odraw::shape::parse(
+            &data[offset..end],
+            Default::default(),
+        )?);
         roots.push(record);
         offset = end;
     }

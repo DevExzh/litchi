@@ -1,0 +1,38 @@
+[
+  {
+    "path": "crates/litchi-odraw/src/image/codec.rs",
+    "type": "impl<'data> Blip<'data>",
+    "method": "pub fn parse(",
+    "normalized_body_sha256": "429e49b2df088b989efb5f32f67be0fc9141eba3ccd297a85b7ae44e19f61f03"
+  },
+  {
+    "path": "crates/litchi-odraw/src/image/codec.rs",
+    "type": "impl<'data> Blip<'data>",
+    "method": "pub fn from_record(",
+    "normalized_body_sha256": "74447586e6b7e48ff90580d0394ecc53001c6d199e12fe5081611864a1a97a2b"
+  },
+  {
+    "path": "crates/litchi-odraw/src/image/codec.rs",
+    "type": "impl<'data> Entry<'data>",
+    "method": "pub fn parse(",
+    "normalized_body_sha256": "db91a16b502789ac02d0a3133f5132e84ea3563fa4afd96240fe060f0d1671a2"
+  },
+  {
+    "path": "crates/litchi-odraw/src/image/codec.rs",
+    "type": "impl<'data> Store<'data>",
+    "method": "pub fn parse(",
+    "normalized_body_sha256": "429e49b2df088b989efb5f32f67be0fc9141eba3ccd297a85b7ae44e19f61f03"
+  },
+  {
+    "path": "crates/litchi-odraw/src/image/codec.rs",
+    "type": "impl<'data> Delay<'data>",
+    "method": "pub const fn new(",
+    "normalized_body_sha256": "be37716ce5d3117f639f60d19b3d336a99d93d3ecd92126274af5d4146e6e7af"
+  },
+  {
+    "path": "crates/litchi-odraw/src/image/validation.rs",
+    "type": "impl<'data> Store<'data>",
+    "method": "pub fn from_record(",
+    "normalized_body_sha256": "8c3fbb011be86848e016183f59971804c634671b210e4655a460efe1f40dab58"
+  }
+]

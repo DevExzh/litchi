@@ -1180,7 +1180,7 @@ fn repairs_duplicate_or_undefined_powerpoint12_placeholder_atoms() {
         record_bytes(0, 0, 0x0420, &[6]),
     ] {
         let drawing = create_round_trip_placeholder_escher_drawing(202, &malformed);
-        let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
+        let shapes = litchi_odraw::shape::parse(&drawing, Default::default()).unwrap();
         assert!(shapes[0].powerpoint12_shape_metadata().is_err());
     }
 }
@@ -1230,7 +1230,7 @@ fn accepts_every_powerpoint12_placeholder_identity() {
     ] {
         let atom = record_bytes(0, 0, 0x0420, &[id]);
         let drawing = create_round_trip_placeholder_escher_drawing(202, &atom);
-        let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
+        let shapes = litchi_odraw::shape::parse(&drawing, Default::default()).unwrap();
         assert_eq!(
             shapes[0]
                 .powerpoint12_shape_metadata()
@@ -1246,7 +1246,7 @@ fn accepts_every_powerpoint12_placeholder_identity() {
     ] {
         let atom = record_bytes(0, 0, 0x0bdd, &[id]);
         let drawing = create_round_trip_placeholder_escher_drawing(1, &atom);
-        let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
+        let shapes = litchi_odraw::shape::parse(&drawing, Default::default()).unwrap();
         assert_eq!(
             shapes[0]
                 .powerpoint12_shape_metadata()
@@ -1324,7 +1324,7 @@ fn rejects_malformed_or_duplicate_powerpoint12_shape_round_trip_atoms() {
         duplicate_checksums,
     ] {
         let drawing = create_round_trip_placeholder_escher_drawing(1, &malformed);
-        let shapes = litchi_odraw::shape::parse(&drawing).unwrap();
+        let shapes = litchi_odraw::shape::parse(&drawing, Default::default()).unwrap();
         assert!(shapes[0].powerpoint12_shape_metadata().is_err());
     }
 }

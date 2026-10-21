@@ -6775,7 +6775,7 @@ fn picture_remaps(
             })
             .map(|(candidate_id, _candidate)| *candidate_id);
         let staged = pictures.iter().find_map(|picture| {
-            let blip = litchi_odraw::image::Blip::parse(&picture.blip).ok()?;
+            let blip = litchi_odraw::image::Blip::parse(&picture.blip, Default::default()).ok()?;
             (blip.kind() == source.kind && blip.data() == source.data).then_some(picture.target_id)
         });
         let target_id = if let Some(target_id) = existing.or(staged) {
@@ -6802,7 +6802,8 @@ fn picture_remaps(
 }
 
 fn build_picture_fbse(blip_bytes: &[u8], delay_offset: u32) -> Result<Vec<u8>> {
-    let blip = litchi_odraw::image::Blip::parse(blip_bytes).map_err(PackageError::from)?;
+    let blip = litchi_odraw::image::Blip::parse(blip_bytes, Default::default())
+        .map_err(PackageError::from)?;
     let kind = blip.kind();
     let uid = blip
         .uids()
@@ -7061,8 +7062,8 @@ fn validate_transferred_pictures(
     }
     let inventory = picture_inventory(snapshot)?;
     for (target_id, expected_blip) in pictures {
-        let expected =
-            litchi_odraw::image::Blip::parse(expected_blip).map_err(PackageError::from)?;
+        let expected = litchi_odraw::image::Blip::parse(expected_blip, Default::default())
+            .map_err(PackageError::from)?;
         let actual = inventory.resources.get(target_id).ok_or_else(|| {
             PackageError::Corrupted(format!(
                 "published PPT is missing transferred BLIP {target_id}"

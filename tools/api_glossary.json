@@ -18610,6 +18610,44 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "odraw",
+      "package": "litchi-odraw",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "parse_with",
+          "scope": "litchi_odraw",
+          "replacement": "use parse(data, limits)"
+        },
+        {
+          "name": "from_record_with",
+          "scope": "litchi_odraw",
+          "replacement": "use from_record(record, limits)"
+        },
+        {
+          "name": "find_recursive_with",
+          "scope": "litchi_odraw",
+          "replacement": "use find_recursive(kind, limits)"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_odraw",
+          "replacement": "use new(data, limits)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_odraw::image::Blip",
+        "litchi_odraw::image::Entry",
+        "litchi_odraw::image::Store",
+        "litchi_odraw::image::Delay",
+        "litchi_odraw::shape::Shape",
+        "litchi_odraw::Parser",
+        "litchi_odraw::Container"
+      ]
     }
   ]
 }

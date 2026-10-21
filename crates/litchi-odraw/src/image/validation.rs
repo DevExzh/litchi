@@ -8,15 +8,12 @@ impl<'data> Entry<'data> {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedImage` when the FBSE instance is not a valid
-    /// `MSOBLIPTYPE` value, no embedded BLIP matches the instance, or a
-    /// nonempty entry has neither an embedded nor a delayed BLIP.
+    /// Returns `Error::MalformedImage` when no embedded BLIP matches the
+    /// admitted instance, or a nonempty entry has neither an embedded nor
+    /// a delayed BLIP.
     pub fn storage(&self) -> Result<Storage<'data>> {
         if !self.embedded.is_empty() {
-            let instance =
-                u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
-                    reason: "FBSE instance is not an MSOBLIPTYPE value",
-                })?;
+            let instance = self.admitted_instance();
             for blip in self.embedded() {
                 let embedded_blip = blip?;
                 if matches_instance(&embedded_blip, instance) {
@@ -45,13 +42,17 @@ impl<'data> Entry<'data> {
     /// Returns an error from [`Entry::storage`] when the entry is malformed,
     /// `Error::MissingDelayStore` when a delayed BLIP lacks a delay store, or
     /// `Error::MalformedImage` when the delay offset does not point to a BLIP
-    /// or the resolved BLIP fails cross-record validation.
+    /// or the resolved BLIP fails cross-record validation. A delayed BLIP must
+    /// satisfy both the entry's and the context's BLIP byte limits; otherwise this
+    /// returns `Error::ImageLimitExceeded`.
     pub fn resolve(&self, context: Context<'data>) -> Result<Option<Blip<'data>>> {
         match self.storage()? {
             Storage::Embedded(blip) => Ok(Some(blip)),
             Storage::Empty => Ok(None),
             Storage::Delay(offset) => {
-                let delay = context.delay.ok_or(Error::MissingDelayStore)?;
+                let mut delay = context.delay.ok_or(Error::MissingDelayStore)?;
+                delay.limits.max_blip_bytes =
+                    delay.limits.max_blip_bytes.min(self.limits.max_blip_bytes);
                 match delay.at(offset)? {
                     Block::Blip(blip) => {
                         self.validate_selected(&blip, true)?;
@@ -66,10 +67,7 @@ impl<'data> Entry<'data> {
     }
 
     pub(super) fn validate_selected(&self, blip: &Blip<'_>, delayed: bool) -> Result<()> {
-        let instance =
-            u8::try_from(self.record.instance()).map_err(|_err| Error::MalformedImage {
-                reason: "FBSE instance is not an MSOBLIPTYPE value",
-            })?;
+        let instance = self.admitted_instance();
         if !matches_instance(blip, instance) {
             return Err(Error::MalformedImage {
                 reason: "resolved BLIP kind does not match the FBSE instance",
@@ -104,19 +102,17 @@ impl<'data> Entry<'data> {
         }
         Ok(())
     }
+
+    fn admitted_instance(&self) -> u8 {
+        // Entry::parse is the sole constructor and checks that the instance
+        // fits in a byte before publishing the immutable entry. Reuse that
+        // admission fact when selecting or resolving a BLIP.
+        debug_assert!(u8::try_from(self.record.instance()).is_ok());
+        self.record.instance().to_le_bytes()[0]
+    }
 }
 
 impl<'data> Store<'data> {
-    /// Validates a previously parsed `BStore` record.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error from [`Store::from_record_with`] under the default
-    /// limits.
-    pub fn from_record(record: Record<'data>) -> Result<Self> {
-        Self::from_record_with(record, Limits::default())
-    }
-
     /// Validates a previously parsed `BStore` record under explicit limits.
     ///
     /// # Errors
@@ -125,7 +121,7 @@ impl<'data> Store<'data> {
     /// `BStore` container, contains an invalid child, or its file-block count
     /// does not match `recInstance`, and `Error::ImageLimitExceeded` when the
     /// entry count exceeds `limits.max_store_entries`.
-    pub fn from_record_with(record: Record<'data>, limits: Limits) -> Result<Self> {
+    pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.kind() != RecordKind::BStoreContainer
             || record.version() != 0x0F
             || !record.is_container()
@@ -174,7 +170,7 @@ pub(super) fn validate_embedded(entry: &Entry<'_>, instance: u8) -> Result<()> {
 
     let mut selected = false;
     for record in crate::Children::new(entry.embedded) {
-        let blip = record.and_then(|child| Blip::from_record_with(child, entry.limits))?;
+        let blip = record.and_then(|child| Blip::from_record(child, entry.limits))?;
         if matches_instance(&blip, instance) {
             entry.validate_selected(&blip, false)?;
             selected = true;
