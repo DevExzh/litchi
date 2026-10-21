@@ -156,5 +156,8 @@ It reached four of five clone blocks and then stopped at
 `/tmp/peculiar-runtime-.../peculiar_shell` children. The failing host snapshot
 has SHA-256
 `c320c25b630c60ca54b70013617216cf553c995d1572c380b29a0b735ae9c6a3`.
-This is a discarded overlap attempt, not native evidence; a fresh quiet grant
-and fresh output directory are required after those processes drain.
+The run as a whole is not acceptance-complete, but its four completed clone
+blocks are qualified observations and remain usable alongside a fresh run
+with the same binaries and protocol. The interrupted fifth block is excluded
+from timing evidence. A fresh quiet grant and fresh output directory are
+required after those processes drain.
