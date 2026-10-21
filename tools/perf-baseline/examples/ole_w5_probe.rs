@@ -87,13 +87,6 @@ mod w5_counting_allocator {
     }
 
     #[inline]
-    fn record_realloc_to_zero(old_bytes: usize) {
-        TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
-        LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
-        LIVE_BYTES.fetch_sub(old_bytes, Ordering::Relaxed);
-    }
-
-    #[inline]
     fn record_dealloc(bytes: usize) {
         LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
         LIVE_BYTES.fetch_sub(bytes, Ordering::Relaxed);
@@ -133,10 +126,6 @@ mod w5_counting_allocator {
             let new_pointer = unsafe { System.realloc(pointer, layout, new_size) };
             if !new_pointer.is_null() {
                 record_realloc(layout.size(), new_size);
-            } else if new_size == 0 {
-                // System::realloc follows the usual realloc(ptr, 0) rule and
-                // releases the old allocation when it returns null.
-                record_realloc_to_zero(layout.size());
             }
             new_pointer
         }
@@ -153,21 +142,37 @@ mod w5_counting_allocator {
         }
     }
 
+    pub fn begin_operation() -> Snapshot {
+        let live_calls = LIVE_CALLS.load(Ordering::Relaxed);
+        let live_bytes = LIVE_BYTES.load(Ordering::Relaxed);
+        PEAK_CALLS.store(live_calls, Ordering::Relaxed);
+        PEAK_BYTES.store(live_bytes, Ordering::Relaxed);
+        snapshot()
+    }
+
     pub fn print_header() {
         println!(
-            "w5_alloc,route,iteration,delta_calls,delta_bytes,live_calls,live_bytes,peak_calls,peak_bytes,base_live_calls,base_live_bytes,base_peak_calls,base_peak_bytes"
+            "w5_alloc,phase,route,iteration,delta_calls,delta_bytes,live_calls,live_bytes,peak_calls,peak_bytes,peak_delta_calls,peak_delta_bytes,base_live_calls,base_live_bytes,base_peak_calls,base_peak_bytes"
         );
     }
 
-    pub fn print_delta(route: &str, iteration: usize, before: Snapshot, after: Snapshot) {
+    pub fn print_delta(
+        phase: &str,
+        route: &str,
+        iteration: usize,
+        before: Snapshot,
+        after: Snapshot,
+    ) {
         println!(
-            "w5_alloc,{route},{iteration},{},{},{},{},{},{},{},{},{},{}",
+            "w5_alloc,{phase},{route},{iteration},{},{},{},{},{},{},{},{},{},{},{},{}",
             after.total_calls.saturating_sub(before.total_calls),
             after.total_bytes.saturating_sub(before.total_bytes),
             after.live_calls,
             after.live_bytes,
             after.peak_calls,
             after.peak_bytes,
+            after.peak_calls.saturating_sub(before.live_calls),
+            after.peak_bytes.saturating_sub(before.live_bytes),
             before.live_calls,
             before.live_bytes,
             before.peak_calls,
@@ -263,7 +268,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     for iteration in 0..warmup.checked_add(samples).ok_or("sample count overflow")? {
         let started = Instant::now();
         #[cfg(feature = "w5-counting-allocator")]
-        let allocation_before = w5_counting_allocator::snapshot();
+        let allocation_before = w5_counting_allocator::begin_operation();
         let output_bytes = match route_name {
             "open" => {
                 let editor = owner_open_editor(&corpus)?;
@@ -309,6 +314,16 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 }
                 #[cfg(feature = "w5-counting-allocator")]
                 black_box(&last_properties);
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        "full",
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 output_bytes
             },
             "edit" => {
@@ -329,6 +344,16 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 if final_section != corpus.user_section {
                     return Err("property edit output differs from preflight".into());
                 }
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        "full",
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 output_bytes
             },
             "doc_tracked_revision" => {
@@ -346,6 +371,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
                     w5_counting_allocator::print_delta(
+                        "full",
                         route_name,
                         iteration - warmup,
                         allocation_before,
@@ -388,6 +414,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
                     w5_counting_allocator::print_delta(
+                        "full",
                         route_name,
                         iteration - warmup,
                         allocation_before,
@@ -415,6 +442,16 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 }
                 let elapsed = started.elapsed().as_nanos();
                 let commit = last_commit.ok_or("XLS cell stage batch was empty")?;
+                #[cfg(feature = "w5-counting-allocator")]
+                if iteration >= warmup {
+                    w5_counting_allocator::print_delta(
+                        "stage",
+                        route_name,
+                        iteration - warmup,
+                        allocation_before,
+                        w5_counting_allocator::snapshot(),
+                    );
+                }
                 let output = commit.package().to_bytes()?;
                 if output != *expected {
                     return Err("XLS cell stage output differs from preflight".into());
@@ -423,6 +460,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
                     w5_counting_allocator::print_delta(
+                        "full",
                         route_name,
                         iteration - warmup,
                         allocation_before,
@@ -453,6 +491,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
                     w5_counting_allocator::print_delta(
+                        "full",
                         route_name,
                         iteration - warmup,
                         allocation_before,
@@ -482,6 +521,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
                     w5_counting_allocator::print_delta(
+                        "full",
                         route_name,
                         iteration - warmup,
                         allocation_before,
@@ -500,8 +540,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
         };
         let elapsed = started.elapsed().as_nanos();
         #[cfg(feature = "w5-counting-allocator")]
-        if iteration >= warmup {
+        if iteration >= warmup && !matches!(route_name, "read" | "edit") {
             w5_counting_allocator::print_delta(
+                "full",
                 route_name,
                 iteration - warmup,
                 allocation_before,
