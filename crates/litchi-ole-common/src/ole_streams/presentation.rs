@@ -21,8 +21,10 @@ impl Snapshot {
     pub fn parse(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
         let limits = limits.validate()?;
         if bytes.len() > limits.max_bytes {
-            return Err(invalid(
-                "OlePresentationStream exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                bytes.len(),
+                limits.max_bytes,
             ));
         }
         Self::parse_shared(Arc::<[u8]>::from(bytes), limits)
@@ -45,8 +47,10 @@ impl Snapshot {
         let limits = limits.validate()?;
         stream.validate(limits)?;
         if stream.bytes().len() > limits.max_bytes {
-            return Err(invalid(
-                "OlePresentationStream exceeds the configured limit",
+            return Err(limit(
+                crate::LimitKind::StreamBytes,
+                stream.bytes().len(),
+                limits.max_bytes,
             ));
         }
         if stream.dirty {

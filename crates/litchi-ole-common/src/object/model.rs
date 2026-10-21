@@ -16,7 +16,7 @@ const MAX_PRESENTATION_STREAMS: usize = 999;
 
 /// Applies codec-owned limit validation even when the requested stream is absent.
 pub(crate) fn validate_ole_stream_limits(limits: ole_streams::Limits) -> Result<(), Error> {
-    limits.validate().map(|_| ()).map_err(Error::from)
+    limits.validate().map(|_| ())
 }
 
 /// Resource ceilings applied before CFB bytes are retained or rewritten.
@@ -239,9 +239,7 @@ impl Stream {
         if !name.starts_with(ole_streams::PRESENTATION_STREAM_PREFIX) {
             return Ok(None);
         }
-        ole_streams::parse_named_presentation(name, Arc::clone(&self.data), limits)
-            .map(Some)
-            .map_err(Error::from)
+        ole_streams::parse_named_presentation(name, Arc::clone(&self.data), limits).map(Some)
     }
 
     /// Parses this stream as OLEDS native data under explicit stream limits.
@@ -258,7 +256,6 @@ impl Stream {
             limits,
         )
         .map(Some)
-        .map_err(Error::from)
     }
 
     pub(crate) fn replace_data(&mut self, data: Arc<[u8]>) {
