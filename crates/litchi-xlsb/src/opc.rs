@@ -303,6 +303,18 @@ mod tests {
                 .as_slice(),
             replacement.as_slice()
         );
+        let reopened_source = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+        let reopened_replayed = patch
+            .0
+            .apply_graph(reopened_source.opc_package())
+            .expect("reopened forward source replay");
+        assert_eq!(
+            reopened_replayed
+                .content_types_source_bytes()
+                .expect("reopened replayed raw source allocation")
+                .as_slice(),
+            replacement.as_slice()
+        );
         let restored = patch
             .0
             .inverse()
@@ -313,6 +325,23 @@ mod tests {
             .expect("restored source allocation");
         assert_eq!(
             restored_bytes.as_slice(),
+            source
+                .opc_package()
+                .content_types_source_bytes()
+                .expect("original source allocation")
+                .as_slice()
+        );
+        let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        let reopened_restored = patch
+            .0
+            .inverse()
+            .apply_graph(reopened_after.opc_package())
+            .expect("reopened inverse source replay");
+        assert_eq!(
+            reopened_restored
+                .content_types_source_bytes()
+                .expect("reopened restored source allocation")
+                .as_slice(),
             source
                 .opc_package()
                 .content_types_source_bytes()
@@ -343,6 +372,24 @@ mod tests {
         let (after, patch) = edit.commit().unwrap().into_parts();
         let replayed = source.apply_opc(&patch).unwrap().into_package();
         assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+        let reopened_source = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+        let reopened_replayed = reopened_source
+            .apply_opc(&patch)
+            .expect("reopened mixed forward replay")
+            .into_package();
+        assert_eq!(
+            reopened_replayed.to_bytes().unwrap(),
+            after.to_bytes().unwrap()
+        );
+        let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        let reopened_restored = reopened_after
+            .apply_opc(&patch.inverse())
+            .expect("reopened mixed inverse replay")
+            .into_package();
+        assert_eq!(
+            reopened_restored.to_bytes().unwrap(),
+            source.to_bytes().unwrap()
+        );
 
         let mut divergent = source.edit_opc().unwrap();
         divergent
