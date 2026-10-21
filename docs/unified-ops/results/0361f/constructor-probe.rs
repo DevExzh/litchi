@@ -224,8 +224,8 @@ fn run(route: &str, iterations: usize) -> Metrics {
     let mut message_infos = make_metadata_messages();
     let mut messages = make_messages();
     let rejected_limits = limits()
-        .with_header_fields(1)
-        .expect("the one-field rejection profile is valid");
+        .with_header_bytes(1)
+        .expect("the one-byte rejection profile is valid");
     #[cfg(feature = "allocations")]
     let before = allocation::start();
     let started = Instant::now();
@@ -360,13 +360,13 @@ fn validate_outputs(directory: &std::path::Path) {
     let rejected = ArchiveObject::new(
         OBJECT_ID,
         make_messages(),
-        limits().with_header_fields(1).unwrap(),
+        limits().with_header_bytes(1).unwrap(),
     )
     .unwrap_err();
     assert!(matches!(
         rejected,
         litchi_iwa_core::Error::Limit {
-            kind: litchi_iwa_core::LimitKind::HeaderFields,
+            kind: litchi_iwa_core::LimitKind::HeaderBytes,
             ..
         }
     ));

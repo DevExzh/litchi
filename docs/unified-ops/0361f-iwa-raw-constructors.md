@@ -112,10 +112,17 @@ python3 docs/unified-ops/results/0361f/constructor-abba.py \
 ```
 
 The nine routes are `FieldPath::new`, `FieldInfo::new`, `MessageInfo::new`,
-`ArchiveInfo::new`, `ArchiveObject::new`, tight-header object refusal, archive
+`ArchiveInfo::new`, `ArchiveObject::new`, tight-header-byte object refusal, archive
 parse, validate and encode. The tight-header route measures preflight; the
 unit test remains the correctness authority for rejection before metadata
 buffers are reserved.
 
 This slice does not close the remaining shared raw-constructor audit or the
 integrated W4/W4b/W8 gate. Those rows remain required engineering work.
+
+The first coordinator build (`matched-v1`) stopped during base validation:
+the prepared tight-header-field refusal assumed enforcement absent in the
+base constructor. It produced no qualified timings. The raw traceback,
+protected binary and original probe are retained. The corrected comparison
+uses a one-byte header ceiling, enforced by both endpoints; candidate-only
+header-field rejection remains covered by its correctness tests.
