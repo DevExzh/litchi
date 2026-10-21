@@ -3,6 +3,7 @@
 - Date: 2026-10-21.
 - Base: `61515148e1`.
 - Parent source checkpoint: `08f586ca42`.
+- Candidate source: `58b53ef522`.
 - Status: source repair and focused validation complete; native timing and the
   post-policy matched release/allocator rebuild remain pending coordinator
   scheduling.
@@ -31,7 +32,8 @@ existing writer and image-record routes.
 
 The final policy correction intersects a retained record's raw framing and
 traversal limits with every narrower caller policy.  This applies to recursive
-container searches, child views, image stores, BLIPs, and `File` views.  A
+container searches, container image scans, child views, image stores, BLIPs,
+and `File` views.  A
 `File` rebinds its borrowed BLIP to that intersection before it can be
 detached, so `into_owned().blip()` cannot regain a wider caller policy.  Tests
 cover both permissive-origin/strict-caller and strict-origin/permissive-caller
