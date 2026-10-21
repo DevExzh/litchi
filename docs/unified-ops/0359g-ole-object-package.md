@@ -2,9 +2,9 @@
 
 - Date: 2026-10-21.
 - Base: `45a5f9e9d1` plus the 0359f raw-bounds commits.
-- Status: implementation and consumer migration are in progress on
-  `uo2/w5-ole`; validation and coordinated performance measurement remain
-  pending.
+- Status: implementation and consumer migration are complete on `uo2/w5-ole`;
+  the corrected candidate still requires a fresh coordinated performance
+  measurement before acceptance.
 
 The shared object owner now follows the common package contract. `Package` is
 an immutable read owner; `Package::open(bytes)` uses the finite default policy
@@ -17,12 +17,31 @@ triad. Dropping an edit discards its staged state.
 
 The owner retains admitted source bytes and captured stream allocations in
 `Arc` values. Read projections and output methods use immutable receivers;
-`write_to(&self, ...)` streams an unchanged source directly, while changed
-output is rendered only at publication. `source_shared()` exposes the retained
-source allocation to deferred format owners, and `OpenOptions`/`EditOptions`
-provide the policy getters with the required `_value` names. DOC, XLS, PPT
-tests, and the OLE performance harness were migrated to package ingress and
-edit/commit publication in the same slice.
+`write_to(&self, ...)` streams an unchanged source directly. Changed
+candidates are validated internally while staging and are published only by
+`commit()`; no staged-output method exposes those bytes. `source_shared()`
+exposes the retained source allocation to deferred format owners, and
+`OpenOptions`/`EditOptions` provide the policy getters with the required
+`_value` names. DOC, XLS, PPT tests, and the OLE performance harness were
+migrated to package ingress and edit/commit publication in the same slice.
+
+## Publication handoff correction
+
+The first owner migration exposed `put_stream_shared_with_rendered` and
+`put_streams_shared_with_rendered` as staged-output bypasses. The correction
+removes both public methods and migrates the DOC tracked-revision path plus
+the XLS visibility, comments, cells, user-names, and worksheet-feature paths
+to `Edit::commit().package()`/`Commit::into_package()`. A common `Edit` now
+retains the already validated candidate render internally and reuses it when
+`commit()` publishes the package, so these consumers do not serialize the
+same candidate a second time. A changed sector-layout policy bypasses that
+retained render and performs its required validation under the selected
+policy. Failed clone-first mutations leave the prior retained render intact.
+
+The exact `Patch` debug regression asserts structural lengths and the no-op
+flag rather than merely checking that authored payload strings are absent.
+The common error is non-exhaustive; CFB diagnostics remain structural and the
+broader redaction audit remains the single deferred memo item.
 
 The migration removes the former public object-editor open constructors and
 staged-snapshot publication path. The raw OLE directory, OLEDS, link, and
@@ -74,3 +93,9 @@ The four paths are expected to be kept distinct per route. Set `A` to the
 appropriate baseline binary and `B` to the candidate binary; do not mix the
 `g` and `h` baselines within a route. No native performance result is claimed
 until this paired run is completed under quiescent host conditions.
+
+The binaries and one-sample preflight listed above predate the publication
+handoff correction and are diagnostic only. A corrected before/after pair must
+be rebuilt from the exact post-correction source before any performance claim;
+the route set must additionally cover ordinary `put_stream` + `commit` and the
+former XLS/DOC rendered-handoff consumers through their new commit paths.

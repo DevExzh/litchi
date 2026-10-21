@@ -32,9 +32,7 @@ use litchi_cfb::{
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
 use litchi_core::{Position, ReadAt, SourceVersion};
-use litchi_ole_common::object::{
-    Edit as PackageEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
-};
+use litchi_ole_common::object::{Limits, OpenOptions, Package as ObjectPackage, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::fmt;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
@@ -89,29 +87,19 @@ impl Snapshot {
             OpenOptions::new()
                 .targets(Targets::default())
                 .limits(Limits::default()),
-        )?
-        .edit()?;
-        Self::from_package_editor(package)
+        )?;
+        Self::open_package(package)
     }
 
-    fn from_package_editor(package: PackageEditor) -> Result<Self> {
-        Self::open_package(package, None)
-    }
-
-    /// Opens a captured package. `rendered` is the artifact an edit's package
-    /// publication already rendered and validated for this exact editor
-    /// state; without it the editor is finished here.
-    fn open_package(package: PackageEditor, rendered: Option<Vec<u8>>) -> Result<Self> {
+    /// Opens a captured, already-published package.
+    fn open_package(package: ObjectPackage) -> Result<Self> {
         let workbook_path = select_workbook_path(&package)?;
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let sheets = parse_directory(&workbook_stream)?;
         require_visible_worksheet(&sheets)?;
-        let bytes = match rendered {
-            Some(rendered) => rendered,
-            None => crate::scoped::object_editor_bytes(&package)?,
-        };
+        let bytes = package.source_shared();
         // The complete reader's validation-only mode: every record is
         // validated as `Reader::new` validates it; no cell is decoded, and
         // no cell is read here.
@@ -120,7 +108,7 @@ impl Snapshot {
         require_public_readback(&workbook, &sheets)?;
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(bytes),
+                bytes: Arc::from(bytes.as_slice()),
                 workbook_path,
                 workbook_stream,
                 sheets,
@@ -445,25 +433,15 @@ impl Edit {
             }
             *field = encode_visibility(change.after);
         }
-        let mut package = ObjectPackage::open_with_options(
+        let package = ObjectPackage::open_with_options(
             self.source.inner.bytes.to_vec(),
             OpenOptions::new()
                 .targets(Targets::default())
                 .limits(Limits::default()),
-        )?
-        .edit()?;
-        // Publish the rendering the package publication already validated
-        // instead of rendering the same editor state a second time.
-        let rendered = package.put_stream_shared_with_rendered(
-            &self.source.inner.workbook_path,
-            Arc::from(workbook),
         )?;
-        debug_assert_eq!(
-            crate::scoped::object_editor_bytes(&package).ok().as_deref(),
-            Some(rendered.as_slice()),
-            "a fresh render of the committed editor reproduces its validated rendering"
-        );
-        let snapshot = Snapshot::open_package(package, Some(rendered))?;
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
+        let snapshot = Snapshot::open_package(editor.commit()?.into_package())?;
         for change in &self.changes {
             if snapshot
                 .inner
@@ -1057,7 +1035,7 @@ impl fmt::Debug for Patch {
     }
 }
 
-fn select_workbook_path(package: &PackageEditor) -> Result<Vec<String>> {
+fn select_workbook_path(package: &ObjectPackage) -> Result<Vec<String>> {
     let workbook = vec!["Workbook".to_string()];
     let book = vec!["Book".to_string()];
     match (

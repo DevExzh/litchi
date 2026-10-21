@@ -151,9 +151,9 @@ mod tests {
             b"private-after-payload".to_vec(),
         );
         let debug = format!("{patch:?}");
-        assert!(debug.contains("before_len"));
-        assert!(debug.contains("after_len"));
-        assert!(!debug.contains("private-before-payload"));
-        assert!(!debug.contains("private-after-payload"));
+        assert_eq!(
+            debug,
+            "Patch { before_len: 22, after_len: 21, is_noop: false }"
+        );
     }
 }

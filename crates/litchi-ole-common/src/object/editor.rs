@@ -102,6 +102,11 @@ pub struct Edit {
     package: Arc<CapturedPackage>,
     objects: Arc<Objects>,
     changed: bool,
+    /// The rendered candidate already validated by the last mutating
+    /// operation.  Keeping this publication behind an `Arc` lets the outer
+    /// owner hand the same bytes to its source-backed reader when it commits,
+    /// without rendering the candidate a second time.
+    pending_render: Option<Arc<Vec<u8>>>,
     layout: SectorLayoutPolicy,
     validated_layout: SectorLayoutPolicy,
 }
@@ -113,10 +118,10 @@ impl fmt::Debug for Edit {
             .field("target_count", &self.targets.len())
             .field("object_count", &self.objects.len())
             .field("changed", &self.changed)
-            .field("catalog_is_shared", &Arc::ptr_eq(
-                &self.base_package,
-                &self.package,
-            ))
+            .field(
+                "catalog_is_shared",
+                &Arc::ptr_eq(&self.base_package, &self.package),
+            )
             .finish()
     }
 }
@@ -248,6 +253,7 @@ impl Edit {
             package,
             objects: Arc::new(objects),
             changed: false,
+            pending_render: None,
             layout: SectorLayoutPolicy::default(),
             validated_layout: SectorLayoutPolicy::default(),
         }
@@ -299,6 +305,7 @@ impl Edit {
             package: snapshot.package(),
             objects: snapshot.objects_clone(),
             changed: snapshot.changed(),
+            pending_render: None,
             layout: snapshot.layout(),
             validated_layout: snapshot.validated_layout(),
         }
@@ -514,38 +521,6 @@ impl Edit {
         Ok(())
     }
 
-    /// Replaces an existing stream and returns the exact candidate rendering
-    /// that was validated while committing it.
-    ///
-    /// This is a narrow hand-off for format owners whose next validation stage
-    /// consumes the rendered package bytes.  It does not cache a rendering on
-    /// the editor, so ordinary `put_stream_shared` callers and no-op editors
-    /// retain their existing behavior and allocation profile.  The returned
-    /// bytes have already passed the same package check, CFB reopen, stream
-    /// recapture, and target discovery performed by a normal stream edit.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same bounded stream, CFB, and package-validation errors as
-    /// [`Self::put_stream_shared`].
-    pub fn put_stream_shared_with_rendered(
-        &mut self,
-        path: &[String],
-        data: Arc<[u8]>,
-    ) -> Result<Vec<u8>, Error> {
-        if self
-            .stream(path)
-            .is_some_and(|current| current == data.as_ref())
-        {
-            return self.clone().finish();
-        }
-        let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
-        let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
-        *self = candidate;
-        Ok(rendered)
-    }
-
     /// Replaces existing streams in one failure-atomic CFB publication.
     ///
     /// Replacements are applied in iterator order to one isolated candidate.
@@ -562,35 +537,6 @@ impl Edit {
         &mut self,
         replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
     ) -> Result<(), Error> {
-        self.put_streams_shared_with_rendered(replacements)
-            .map(|_| ())
-    }
-
-    /// Replaces existing streams in one failure-atomic CFB publication and
-    /// returns the validated candidate rendering when the batch changes it.
-    ///
-    /// Replacements are applied in iterator order to one isolated candidate.
-    /// Repeated paths therefore retain the last supplied value. The candidate
-    /// is rendered, reopened, and published only once after every replacement
-    /// has passed the configured stream and package bounds. An empty or
-    /// all-no-op batch returns `Ok(None)` without cloning or rendering. A
-    /// repeated path that changes to one value and then changes back to its
-    /// original value is still an effective two-step batch and is rendered.
-    ///
-    /// The returned bytes are the exact rendering validated while publishing
-    /// the candidate. They are handed to the caller and are not retained by
-    /// this editor.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the batch exceeds the package stream-count bound,
-    /// a stream is missing or oversized, or the final rendered package fails
-    /// validation. Failure leaves this editor unchanged and returns no
-    /// rendered bytes.
-    pub fn put_streams_shared_with_rendered<'a>(
-        &mut self,
-        replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
-    ) -> Result<Option<Vec<u8>>, Error> {
         let mut candidate = None;
         for (index, (path, data)) in replacements.into_iter().enumerate() {
             if index >= self.limits.max_streams {
@@ -611,12 +557,9 @@ impl Edit {
             Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
         }
         if let Some(candidate) = candidate {
-            let (candidate, rendered) = candidate.commit_candidate_with_rendered()?;
-            *self = candidate;
-            Ok(Some(rendered))
-        } else {
-            Ok(None)
+            *self = candidate.commit_candidate()?;
         }
+        Ok(())
     }
 
     /// Adds an opaque package stream below an existing CFB storage.
@@ -975,7 +918,13 @@ impl Edit {
     pub fn commit(self) -> Result<Commit, Error> {
         let before = Arc::clone(&self.original);
         let after = if self.changed {
-            Arc::new(self.finish()?)
+            if self.layout == self.validated_layout
+                && let Some(rendered) = self.pending_render.clone()
+            {
+                rendered
+            } else {
+                Arc::new(self.finish()?)
+            }
         } else {
             Arc::clone(&self.original)
         };
@@ -985,12 +934,7 @@ impl Edit {
         Ok(Commit::new(package, patch, diagnostics))
     }
 
-    fn commit_candidate(self) -> Result<Self, Error> {
-        self.commit_candidate_with_rendered()
-            .map(|(candidate, _rendered)| candidate)
-    }
-
-    fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), Error> {
+    fn commit_candidate(mut self) -> Result<Self, Error> {
         self.package.check(self.limits)?;
         let rendered = if self.layout == SectorLayoutPolicy::Reuse {
             self.package
@@ -1023,7 +967,8 @@ impl Edit {
         )?);
         self.changed = true;
         self.validated_layout = self.layout;
-        Ok((self, rendered))
+        self.pending_render = Some(Arc::new(rendered));
+        Ok(self)
     }
 }
 

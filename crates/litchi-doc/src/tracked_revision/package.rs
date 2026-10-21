@@ -3469,13 +3469,16 @@ impl RevisionEditor {
                     .map_err(PackageError::from)?;
             }
         }
-        let rendered = self
-            .package
-            .put_streams_shared_with_rendered(replacements)
+        self.package
+            .put_streams_shared(replacements)
             .map_err(PackageError::from)?;
-        self.retained_render.0 = rendered.filter(|bytes| {
-            self.retained_render_limit != 0 && bytes.capacity() <= self.retained_render_limit
-        });
+        if self.retained_render_limit != 0 {
+            let rendered =
+                crate::package::object_edit_bytes(&self.package).map_err(PackageError::from)?;
+            if rendered.capacity() <= self.retained_render_limit {
+                self.retained_render.0 = Some(rendered);
+            }
+        }
         self.changed = true;
         Ok(())
     }

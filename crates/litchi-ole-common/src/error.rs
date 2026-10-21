@@ -50,6 +50,7 @@ pub enum LimitKind {
 
 /// Shared OLE errors preserve low-level CFB failures and identify typed budgets.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// A low-level CFB or raw metadata failure.
     Cfb(OleError),

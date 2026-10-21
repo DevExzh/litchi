@@ -53,10 +53,10 @@ impl fmt::Debug for Package {
             .field("target_count", &self.state.targets.len())
             .field("object_count", &self.state.objects.len())
             .field("changed", &self.state.changed)
-            .field("source_is_current", &Arc::ptr_eq(
-                &self.state.original,
-                &self.state.current,
-            ))
+            .field(
+                "source_is_current",
+                &Arc::ptr_eq(&self.state.original, &self.state.current),
+            )
             .finish()
     }
 }
@@ -220,6 +220,18 @@ impl Package {
     #[must_use]
     pub fn source_shared(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.state.original)
+    }
+
+    /// Object-capture bounds retained by this immutable package.
+    #[must_use]
+    pub fn limits_value(&self) -> super::model::Limits {
+        self.state.limits
+    }
+
+    /// Physical CFB bounds retained by this immutable package.
+    #[must_use]
+    pub fn cfb_limits_value(&self) -> OleFileLimits {
+        self.state.cfb_limits
     }
 
     /// Parses one selected object's OLEDS `\x01Ole` metadata, when present.
