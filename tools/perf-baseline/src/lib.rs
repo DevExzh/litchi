@@ -52747,21 +52747,22 @@ fn publish_xlsx_defined_names_edit<W: Write>(
     source_backed: bool,
 ) -> Result<usize, Box<dyn Error>> {
     if source_backed {
-        let editor = litchi_xlsx::defined_names::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit();
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_defined_names()?;
         if !edit.replace(xlsx_defined_names_target())? {
             return Err("XLSX source-backed defined-name edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed()
-            || commit.patch().is_empty()
+        if !commit.diagnostics().changed()
+            || commit.patch().is_noop()
             || commit.patch().inverse().after() != commit.patch().before()
         {
             return Err("XLSX source-backed defined-name edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published != *commit.snapshot() {
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published != *commit.patch().after() {
             return Err("XLSX source-backed defined-name edit published another snapshot".into());
         }
         Ok(materializations)
@@ -52934,21 +52935,22 @@ fn publish_xlsx_calculation_metadata_edit<W: Write>(
     let properties =
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(91));
     if source_backed {
-        let editor = litchi_xlsx::calculation_properties::SourceBackedEditor::from_read_at(source)?;
-        let mut edit = editor.edit();
+        let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
+        let mut edit = editor.edit_calculation_metadata()?;
         if !edit.set_properties(properties) {
             return Err("XLSX source-backed calculation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
-        if !commit.changed()
-            || commit.patch().is_empty()
+        if !commit.diagnostics().changed()
+            || commit.patch().is_noop()
             || commit.patch().inverse().after() != commit.patch().before()
         {
             return Err("XLSX source-backed calculation edit produced an invalid patch".into());
         }
         let materializations = usize::try_from(editor.cache_diagnostics().successful_loads)?;
-        let published = editor.publish_commit_to_stream(writer, &commit)?;
-        if published != *commit.snapshot() {
+        commit.package().write_to(writer)?;
+        let published = commit.patch().after().clone();
+        if published != *commit.patch().after() {
             return Err("XLSX source-backed calculation edit published another snapshot".into());
         }
         Ok(materializations)

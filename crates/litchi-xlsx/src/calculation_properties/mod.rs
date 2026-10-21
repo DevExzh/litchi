@@ -17,7 +17,7 @@ mod patch;
 )]
 mod rewriter;
 mod snapshot;
-mod source;
+pub mod source;
 
 #[cfg(test)]
 mod tests;
@@ -27,9 +27,10 @@ pub use features::{Feature, Features};
 pub use limits::{LimitKind, Limits};
 pub use model::{Builder, Mode, Properties, ReferenceMode, Specified};
 pub use package::load;
-pub use patch::{Commit, Patch};
+#[cfg(test)]
+pub(crate) use patch::Commit;
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};
 
 #[allow(
     unused_imports,

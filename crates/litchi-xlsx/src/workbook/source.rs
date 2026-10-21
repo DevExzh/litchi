@@ -482,7 +482,10 @@ impl SourceBackedWorkbook {
     /// the same workbook part; reading them performs no I/O.
     #[must_use]
     pub fn defined_names(&self) -> &[raw::DefinedName] {
-        &self.current().defined_names
+        match self.pending_catalog() {
+            Some(catalog) => &catalog.defined_names,
+            None => &self.current().defined_names,
+        }
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.
@@ -623,7 +626,17 @@ impl SourceBackedWorkbook {
     /// see [`Self::sheet_names`] for committed workbooks.
     #[must_use]
     pub fn active_sheet_position(&self) -> Option<usize> {
-        self.current().active_sheet
+        match self.pending_catalog() {
+            Some(catalog) => catalog.active_sheet,
+            None => self.current().active_sheet,
+        }
+    }
+
+    fn pending_catalog(&self) -> Option<&deferred::Catalog> {
+        self.pending
+            .as_ref()
+            .filter(|pending| pending.materialized().is_none())
+            .and_then(|pending| pending.catalog())
     }
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
@@ -4384,10 +4397,9 @@ mod package_handoff_tests {
             .expect("the sole owner recovers its package");
         // Same lineage token: the very package opened above, not a re-index.
         assert!(package.source_lineage() == lineage);
-        let editor =
-            crate::tab_state::SourceBackedEditor::from_source_backed_package(package).unwrap();
-        editor
-            .snapshot()
-            .expect("a per-feature editor adopts the recovered package");
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        workbook
+            .edit_tab_state()
+            .expect("a source-backed family edit adopts the recovered package");
     }
 }

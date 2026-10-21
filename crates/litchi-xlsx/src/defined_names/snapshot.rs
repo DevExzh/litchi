@@ -146,17 +146,6 @@ impl Snapshot {
     pub(super) fn same_source(&self, other: &Self) -> bool {
         self.source == other.source
     }
-
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        workbook.partname() == &self.source.part_name
-            && workbook.content_type() == self.source.content_type.as_ref()
-            && workbook.blob() == self.source.bytes.as_bytes()
-            && current_owner_relationship(package.rels())
-                .is_some_and(|owner| self.source.owner_relationship.matches(owner))
-    }
 }
 
 impl PartialEq for Snapshot {
@@ -197,13 +186,6 @@ impl SourceRelationship {
             )?,
             mode: relationship.target_mode(),
         })
-    }
-
-    fn matches(&self, relationship: &Relationship) -> bool {
-        relationship.r_id() == self.id.as_ref()
-            && relationship.reltype() == self.relationship_type.as_ref()
-            && relationship.target_ref() == self.target.as_ref()
-            && relationship.target_mode() == self.mode
     }
 }
 

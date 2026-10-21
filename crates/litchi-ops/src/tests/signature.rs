@@ -566,16 +566,13 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "xlsx")]
         FileFormat::Xlsx => {
-            // Every source-backed XLSX editor publishes through the same OPC
-            // overlay; the workbook-level defined-names editor reaches it on
+            // Every source-backed XLSX family publishes through the same OPC
+            // overlay; the workbook-level defined-names family reaches it on
             // any workbook.
-            let editor =
-                litchi_xlsx::defined_names::SourceBackedEditor::from_read_at(source()).unwrap();
-            let commit = editor.edit().commit().unwrap();
+            let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source()).unwrap();
+            let commit = workbook.edit_defined_names().unwrap().commit().unwrap();
             let mut output = Vec::new();
-            editor
-                .publish_commit_to_stream(&mut output, &commit)
-                .unwrap();
+            commit.package().write_to(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
             // The eager semantic transaction returns a signed workbook

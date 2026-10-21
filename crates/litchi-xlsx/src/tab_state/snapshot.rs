@@ -257,10 +257,6 @@ impl Snapshot {
         self.source == other.source
     }
 
-    pub(super) fn same_semantics(&self, other: &Self) -> bool {
-        self.tabs == other.tabs && self.active == other.active
-    }
-
     pub(super) fn belongs_to(&self, origin: &Arc<()>) -> bool {
         self.origin
             .as_ref()
@@ -302,27 +298,6 @@ impl Snapshot {
             }
         }
         Ok(true)
-    }
-
-    pub(super) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let positions = self
-            .source
-            .touched
-            .iter()
-            .map(|part| part.position)
-            .collect::<Vec<_>>();
-        Self::load_owned_with_touched(package, &positions)
-            .is_ok_and(|current| current.source == self.source)
-    }
-
-    pub(super) fn load_owned_target(package: &OpcPackage, target: &Self) -> Result<Self> {
-        let positions = target
-            .source
-            .touched
-            .iter()
-            .map(|part| part.position)
-            .collect::<Vec<_>>();
-        Self::load_owned_with_touched(package, &positions)
     }
 }
 

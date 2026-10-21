@@ -26,12 +26,26 @@ pub(crate) type Publish = dyn Fn(&SourceBackedPackage, &mut dyn Write) -> Result
 pub(crate) struct Deferred {
     publish: Box<Publish>,
     materialized: OnceLock<SourceBackedWorkbook>,
+    /// The committed workbook catalog of a workbook-level change, which the
+    /// infallible catalog accessors read without materializing the output.
+    catalog: Option<Catalog>,
+}
+
+/// The catalog fields a workbook-level family can change.
+pub(crate) struct Catalog {
+    pub(crate) defined_names: Box<[crate::raw::DefinedName]>,
+    pub(crate) active_sheet: Option<usize>,
 }
 
 impl Deferred {
     /// The reopened output, once a read has materialized it.
     pub(super) fn materialized(&self) -> Option<&SourceBackedWorkbook> {
         self.materialized.get()
+    }
+
+    /// The committed catalog of a workbook-level change.
+    pub(super) const fn catalog(&self) -> Option<&Catalog> {
+        self.catalog.as_ref()
     }
 }
 
@@ -43,6 +57,7 @@ impl SourceBackedWorkbook {
     /// before any output exists, as the stream writer would refuse it.
     pub(crate) fn deferred(
         &self,
+        catalog_xml: Option<&[u8]>,
         publish: impl Fn(&SourceBackedPackage, &mut dyn Write) -> Result<()> + Send + Sync + 'static,
     ) -> Result<Self> {
         let base = self.view()?;
@@ -56,11 +71,22 @@ impl SourceBackedWorkbook {
             }
             .into());
         }
+        let catalog = match catalog_xml {
+            None => None,
+            Some(xml) => {
+                let parsed = crate::raw::parse_catalog(xml)?;
+                Some(Catalog {
+                    active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
+                    defined_names: parsed.defined_names.into_boxed_slice(),
+                })
+            },
+        };
         Ok(Self {
             inner: Arc::clone(&base.inner),
             pending: Some(Arc::new(Deferred {
                 publish: Box::new(publish),
                 materialized: OnceLock::new(),
+                catalog,
             })),
         })
     }
@@ -150,6 +176,13 @@ impl SourceBackedWorkbook {
 }
 
 impl SourceBackedWorkbook {
+    /// The semantic budgets this workbook was opened with
+    /// ([`crate::OpenOptions::semantic_limits`]).
+    #[must_use]
+    pub fn semantic_limits(&self) -> &crate::SemanticLimits {
+        &self.inner.options.semantic_limits
+    }
+
     /// The indexed package every source-backed edit reads: the reopened
     /// output of a committed workbook.
     pub(crate) fn edit_package(&self) -> Result<&SourceBackedPackage> {
@@ -173,6 +206,19 @@ pub(crate) trait Change: Clone + Send + Sync + 'static {
     /// Check `package` again and write the after artifact: the selected
     /// parts replaced, every other member raw-copied.
     fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()>;
+    /// The after workbook XML of a workbook-level change, whose catalog the
+    /// committed workbook's infallible accessors read.
+    fn catalog_xml(&self) -> Option<&[u8]> {
+        None
+    }
+}
+
+/// What a committed change reports.
+pub(crate) trait Report {
+    /// The family's diagnostics.
+    type Diagnostics;
+    /// The diagnostics of committing (or replaying) the change.
+    fn diagnostics(&self) -> Self::Diagnostics;
 }
 
 /// The committed workbook of `change` over `workbook`: `workbook` itself
@@ -184,8 +230,11 @@ pub(crate) fn publish<C: Change>(
     if change.is_noop() {
         return Ok(workbook.clone());
     }
+    let catalog = change.catalog_xml().map(<[u8]>::to_vec);
     let change = change.clone();
-    workbook.deferred(move |package, writer| change.write(package, writer))
+    workbook.deferred(catalog.as_deref(), move |package, writer| {
+        change.write(package, writer)
+    })
 }
 
 /// Replay `change` onto `workbook`: refuse a workbook without the before
@@ -221,8 +270,25 @@ macro_rules! source_family {
     };
     // A family module that declares (or re-exports) its own `LimitKind`.
     ($what:literal, $change:ty, own_limits) => {
-        pub use crate::Error;
         pub use litchi_core::edit::Diagnostics;
+
+        impl crate::workbook::source::deferred::Report for $change {
+            type Diagnostics = Diagnostics;
+
+            fn diagnostics(&self) -> Diagnostics {
+                Diagnostics::new(!crate::workbook::source::deferred::Change::is_noop(self))
+            }
+        }
+
+        crate::workbook::source::deferred::source_family!(@core $what, $change, Diagnostics);
+    };
+    // A family that declares its own `LimitKind` and a `Diagnostics` type
+    // with a `changed()` accessor, reported by its change's `Report` impl.
+    ($what:literal, $change:ty, own_limits, own_diagnostics) => {
+        crate::workbook::source::deferred::source_family!(@core $what, $change, Diagnostics);
+    };
+    (@core $what:literal, $change:ty, $diag:ty) => {
+        pub use crate::Error;
 
         #[doc = concat!(
                     "A replayable ", $what, " change of a source-backed workbook: the exact ",
@@ -251,7 +317,7 @@ macro_rules! source_family {
                     "A committed ", $what, " change: the new source-backed workbook, its ",
                     "patch and diagnostics."
                 )]
-        pub type Commit = litchi_core::edit::Commit<crate::SourceBackedWorkbook, Patch>;
+        pub type Commit = litchi_core::edit::Commit<crate::SourceBackedWorkbook, Patch, $diag>;
 
         #[allow(dead_code, reason = "not every family commits from a staged edit")]
         fn commit_change(
@@ -259,12 +325,8 @@ macro_rules! source_family {
             change: $change,
         ) -> crate::Result<Commit> {
             let next = crate::workbook::source::deferred::publish(workbook, &change)?;
-            let changed = !crate::workbook::source::deferred::Change::is_noop(&change);
-            Ok(Commit::new(
-                next,
-                Patch(change),
-                litchi_core::edit::Diagnostics::new(changed),
-            ))
+            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&change);
+            Ok(Commit::new(next, Patch(change), diagnostics))
         }
 
         fn apply_change(
@@ -272,11 +334,8 @@ macro_rules! source_family {
             patch: &Patch,
         ) -> crate::Result<Commit> {
             let next = crate::workbook::source::deferred::replay(workbook, &patch.0)?;
-            Ok(Commit::new(
-                next,
-                patch.clone(),
-                litchi_core::edit::Diagnostics::new(!patch.is_noop()),
-            ))
+            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&patch.0);
+            Ok(Commit::new(next, patch.clone(), diagnostics))
         }
     };
 }
