@@ -8,7 +8,7 @@ use crate::charts::background_fill::{
 };
 use crate::shapes::{RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique};
 
-impl Editor {
+impl Draft {
     /// Read the effective color, gradient, or image background of one sheet chart.
     pub fn sheet_chart_background_fill(
         &self,
@@ -51,7 +51,7 @@ impl Editor {
 }
 
 fn sheet_chart_background_fill(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<ShapeFill> {
@@ -65,7 +65,7 @@ fn sheet_chart_background_fill(
 }
 
 fn set_sheet_chart_background_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     fill: &ShapeFill,
@@ -82,7 +82,7 @@ fn set_sheet_chart_background_fill(
         "Numbers",
         fill,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if &verified.sheet_chart_background_fill(sheet_id, drawable_object_id)? != fill {
         return Err(Error::InvalidFormat(
             "Numbers chart background fill update failed validation".to_owned(),
@@ -93,7 +93,7 @@ fn set_sheet_chart_background_fill(
 }
 
 fn set_sheet_chart_background_image_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     preferred_filename: &str,
@@ -119,7 +119,7 @@ fn set_sheet_chart_background_image_fill(
         fill_size,
         tint,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_background_fill(sheet_id, drawable_object_id)?
         != ShapeFill::Image(image.clone())
     {

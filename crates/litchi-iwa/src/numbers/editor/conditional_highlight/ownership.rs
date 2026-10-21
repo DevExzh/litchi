@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use super::*;
 
 pub(super) fn ensure_children_are_private(
-    package: &IWorkPackage,
+    package: &HostPackage,
     owner_identifier: u64,
     children: &[u64],
 ) -> Result<()> {
@@ -40,7 +40,7 @@ pub(super) fn ensure_children_are_private(
 }
 
 pub(super) fn remove_owned_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifiers: &[u64],
 ) -> Result<()> {

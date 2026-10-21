@@ -14,7 +14,7 @@ use litchi_iwa_protos::pages_footnote_codec;
 use litchi_iwa_protos::pages_footnote_marker_codec;
 
 #[cfg(test)]
-use super::Editor;
+use super::Draft;
 use super::{
     DOCUMENT_OBJECT_ID, STORAGE_MESSAGE_TYPES, find_object_archive, package_references_object,
 };
@@ -30,7 +30,7 @@ use crate::protobuf::tswp;
 use crate::wire::repeated_length_delimited_payloads;
 #[cfg(test)]
 use crate::wire::{patch_length_delimited_field, rewrite_repeated_length_delimited_fields};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_pages::footnote::body::{Footnote, Position};
 
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
@@ -59,7 +59,7 @@ struct FootnoteTableEntry {
 }
 
 pub(super) fn body_footnote_graphs(
-    package: &IWorkPackage,
+    package: &HostPackage,
     body_storage_id: u64,
 ) -> Result<Vec<BodyFootnoteGraph>> {
     let mut wire_budget = FootnoteGraphBudget::default();
@@ -108,7 +108,7 @@ pub(super) fn body_footnote_graphs(
 
 /// Reclaim footnote graphs whose anchors were removed by an ordinary body edit.
 pub(super) fn cleanup_removed_body_footnotes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     body_storage_id: u64,
     before: &[BodyFootnoteGraph],
 ) -> Result<()> {
@@ -158,7 +158,7 @@ pub(super) fn cleanup_removed_body_footnotes(
         identifiers.extend(remove_unreferenced_footnote_graph(&mut staged, graph)?);
     }
     release_package_identifier_suffix(&mut staged, &identifiers)?;
-    IWorkPackage::from_bytes(&staged.to_bytes()?)?;
+    HostPackage::from_bytes(&staged.to_bytes()?)?;
     *package = staged;
     Ok(())
 }
@@ -584,7 +584,7 @@ fn no_footnote_descent(_visit: litchi_iwa_common::wire::WireVisit<'_, '_>) -> Re
 }
 
 fn decode_footnote_graph(
-    package: &IWorkPackage,
+    package: &HostPackage,
     position: u32,
     reference_id: u64,
     wire_budget: &mut FootnoteGraphBudget,
@@ -782,7 +782,7 @@ fn reserve_footnote_entries<T>(
 }
 
 fn validate_footnote_marker(
-    package: &IWorkPackage,
+    package: &HostPackage,
     marker_id: u64,
     wire_budget: &mut FootnoteGraphBudget,
 ) -> Result<()> {
@@ -1049,7 +1049,7 @@ fn validate_footnote_table_entries<F: AsRef<str>>(
 }
 
 fn remove_unreferenced_footnote_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &BodyFootnoteGraph,
 ) -> Result<[u64; 3]> {
     let reference_id = graph.reference_id;
@@ -1075,7 +1075,7 @@ fn remove_unreferenced_footnote_graph(
 }
 
 fn remove_unreferenced_footnote_object(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     identifier: u64,
     message_types: &[u32],
     label: &str,
@@ -1102,7 +1102,7 @@ fn remove_unreferenced_footnote_object(
 }
 
 fn with_storage_projection<T, F>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     label: &str,
     wire_budget: &mut FootnoteGraphBudget,
@@ -1287,7 +1287,7 @@ mod tests {
     use litchi_pages::Package as PagesPackage;
     use litchi_pages::footnote::body::{Footnote, Selector};
 
-    fn focused_body_footnotes(editor: &Editor) -> Result<Vec<Footnote>> {
+    fn focused_body_footnotes(editor: &Draft) -> Result<Vec<Footnote>> {
         let package = PagesPackage::from_bytes(&editor.to_bytes()?)
             .map_err(|error| Error::InvalidFormat(format!("Pages footnote package: {error}")))?;
         package
@@ -1296,7 +1296,7 @@ mod tests {
     }
 
     fn insert_body_footnote_via_pages(
-        editor: &mut Editor,
+        editor: &mut Draft,
         position: Position,
         text: &str,
     ) -> Result<Footnote> {
@@ -1320,12 +1320,12 @@ mod tests {
         commit.package().write_to(&mut bytes).map_err(|error| {
             Error::InvalidFormat(format!("Pages footnote package write failed: {error}"))
         })?;
-        *editor = Editor::from_bytes(&bytes)?;
+        *editor = Draft::from_bytes(&bytes)?;
         Ok(inserted)
     }
 
     fn rewrite_body_footnote_text_via_pages(
-        editor: &mut Editor,
+        editor: &mut Draft,
         selector: Selector,
         text: &str,
     ) -> Result<Footnote> {
@@ -1343,7 +1343,7 @@ mod tests {
         commit.package().write_to(&mut bytes).map_err(|error| {
             Error::InvalidFormat(format!("Pages footnote package write failed: {error}"))
         })?;
-        let reopened = Editor::from_bytes(&bytes)?;
+        let reopened = Draft::from_bytes(&bytes)?;
         let updated_footnotes = commit
             .package()
             .body_footnotes()
@@ -1389,7 +1389,7 @@ mod tests {
 
     #[test]
     fn ordinary_body_replacement_refuses_unattributed_footnote_graph_cleanup() {
-        let mut editor = Editor::create_with_text("AB").unwrap();
+        let mut editor = Draft::create_with_text("AB").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(1).unwrap(),
@@ -1416,7 +1416,7 @@ mod tests {
 
     #[test]
     fn required_footnote_reference_payload_cannot_be_removed_by_host_mutation() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn footnote_marker_unknown_fields_survive_an_atomic_text_rewrite() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1490,7 +1490,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut edited = Editor::from_package(package).unwrap();
+        let mut edited = Draft::from_package(package).unwrap();
         assert_eq!(
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
@@ -1504,7 +1504,7 @@ mod tests {
 
     #[test]
     fn malformed_footnote_marker_rewrite_is_failure_atomic() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1532,7 +1532,7 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
             rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")
@@ -1543,7 +1543,7 @@ mod tests {
 
     #[test]
     fn footnote_reference_unknown_fields_survive_an_atomic_text_rewrite() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1573,7 +1573,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut edited = Editor::from_package(package).unwrap();
+        let mut edited = Draft::from_package(package).unwrap();
         assert_eq!(
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
@@ -1587,7 +1587,7 @@ mod tests {
 
     #[test]
     fn malformed_footnote_reference_rewrite_is_failure_atomic() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1616,7 +1616,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
             rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")
@@ -1627,7 +1627,7 @@ mod tests {
 
     #[test]
     fn footnote_body_attachment_unknown_fields_survive_an_atomic_text_rewrite() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1682,7 +1682,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut edited = Editor::from_package(package).unwrap();
+        let mut edited = Draft::from_package(package).unwrap();
         assert_eq!(
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
@@ -1709,7 +1709,7 @@ mod tests {
 
     #[test]
     fn malformed_footnote_body_attachment_rewrite_is_failure_atomic() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         insert_body_footnote_via_pages(
             &mut editor,
             Position::from_utf16_index(4).unwrap(),
@@ -1763,7 +1763,7 @@ mod tests {
             })
             .unwrap();
 
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
             rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")

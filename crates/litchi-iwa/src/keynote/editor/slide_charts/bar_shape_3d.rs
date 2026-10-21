@@ -7,7 +7,7 @@ use crate::charts::bar_shape_3d::{
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
 };
 
-impl Editor {
+impl Draft {
     /// Read the rectangular/cylindrical geometry of one 3D bar or column chart.
     pub fn slide_chart_3d_bar_shape(
         &self,
@@ -50,7 +50,7 @@ impl Editor {
             "Keynote",
             shape,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.slide_chart_3d_bar_shape(slide_index, drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Keynote chart 3D bar-shape update failed validation".to_owned(),
@@ -97,7 +97,7 @@ mod tests {
         let duplicate = editor
             .duplicate_slide_chart(0, chart_selector(&editor, &chart))
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_chart_3d_bar_shape(0, chart.drawable_object_id)

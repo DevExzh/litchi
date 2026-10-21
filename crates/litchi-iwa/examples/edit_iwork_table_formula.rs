@@ -48,12 +48,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|extension| extension.to_str())
     {
         Some("numbers") => {
-            let mut editor = numbers::Editor::open(input)?;
+            let mut editor = numbers::Draft::open(input)?;
             editor.set_formula(table_id, row, column, expression)?;
             editor.save(output)?;
         },
         Some("pages") => {
-            let mut editor = pages::Editor::open(input)?;
+            let mut editor = pages::Draft::open(input)?;
             editor.set_table_formula(
                 table_id,
                 row,
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(|value| value.parse::<usize>())
                 .transpose()?
                 .unwrap_or(0);
-            let mut editor = keynote::Editor::open(input)?;
+            let mut editor = keynote::Draft::open(input)?;
             editor.set_slide_table_formula(
                 slide_index,
                 table_id,

@@ -825,7 +825,9 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
 
     assert!(matches!(
         package.edit_slide_body("Existing Empty"),
-        Err(SlideTextError::TextStorageNotFound { role: Kind::Body })
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::TextStorageNotFound { role: Kind::Body }
+        ))
     ));
     Ok(())
 }
@@ -913,7 +915,10 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
     let mismatch_package = Package::from_bytes(&mismatch)?;
     assert!(matches!(
         mismatch_package.edit_slide_title("Agenda"),
-        Err(SlideTextError::DependentContent | SlideTextError::InvalidSource)
+        Err(
+            SlideTextError::Refused(litchi_keynote::slide::text::Refusal::DependentContent)
+                | SlideTextError::InvalidSource
+        )
     ));
     assert_eq!(mismatch_package.exact_bytes(), mismatch);
 
@@ -1001,7 +1006,9 @@ fn unrelated_placeholder_cannot_alias_selected_storage_by_modern_or_legacy_edge(
         edit.set("must not publish across an unrelated owner")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideTextError::DependentContent)
+            Err(SlideTextError::Refused(
+                litchi_keynote::slide::text::Refusal::DependentContent
+            ))
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1091,41 +1098,47 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
 
     assert!(matches!(
         package.edit_slide_title("Missing"),
-        Err(SlideTextError::SlideNameNotFound)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_slide_text(SlideSelector::index(2), Kind::Title),
-        Err(SlideTextError::SlidePositionNotFound { position }) if position == Position::new(2)
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SlidePositionNotFound { position })) if position == Position::new(2)
     ));
 
     let mut split_start = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         split_start.replace(TextSpan::from_utf16_indexes(8, 9)?, "x"),
-        Err(SlideTextError::SurrogateBoundary { position })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(8)
     ));
     let mut split_end = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         split_end.delete(TextSpan::from_utf16_indexes(7, 8)?),
-        Err(SlideTextError::SurrogateBoundary { position })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(8)
     ));
     let mut out_of_bounds = package.edit_slide_body("Agenda")?;
     assert!(matches!(
         out_of_bounds.delete(TextSpan::from_utf16_indexes(0, 100)?),
-        Err(SlideTextError::SpanOutOfBounds { length, .. })
+        Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SpanOutOfBounds { length, .. }))
             if length == TextPosition::from_utf16_code_units(9)
     ));
     let mut marker = package.edit_slide_title("Agenda")?;
     assert!(matches!(
         marker.insert(TextPosition::ZERO, "bad\u{fffc}marker"),
-        Err(SlideTextError::ObjectMarkerReplacement)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::ObjectMarkerReplacement
+        ))
     ));
     let mut one_operation = package.edit_slide_body("Agenda")?;
     one_operation.insert(TextPosition::ZERO, "first")?;
     assert!(matches!(
         one_operation.insert(TextPosition::ZERO, "second"),
-        Err(SlideTextError::OperationAlreadyStaged)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::OperationAlreadyStaged
+        ))
     ));
     assert_eq!(package.exact_bytes(), bytes);
     assert_eq!(package.exact_bytes(), source_snapshot);
@@ -1403,11 +1416,15 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
 
     assert!(matches!(
         package.slide_title("Agenda"),
-        Err(SlideTextError::AmbiguousSelector)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::AmbiguousSelector
+        ))
     ));
     assert!(matches!(
         package.edit_slide_body("Agenda"),
-        Err(SlideTextError::AmbiguousSelector)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::AmbiguousSelector
+        ))
     ));
     assert_eq!(
         package.slide_title(SlideSelector::index(0))?,
@@ -1462,7 +1479,9 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
             let package = Package::from_bytes(&contradictory)?;
             assert!(matches!(
                 package.edit_slide_text("Agenda", role),
-                Err(SlideTextError::DependentContent)
+                Err(SlideTextError::Refused(
+                    litchi_keynote::slide::text::Refusal::DependentContent
+                ))
             ));
             assert_eq!(package.exact_bytes(), contradictory);
         }
@@ -1520,7 +1539,9 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
     edit.set("duplicate metadata must not publish")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), duplicate_field_path);
     Ok(())
@@ -1556,7 +1577,9 @@ fn selected_storage_merge_and_diff_metadata_refuse_changed_commits() -> TestResu
         edit.set("merge metadata must remain opaque")?;
         assert!(matches!(
             edit.commit(),
-            Err(SlideTextError::DependentContent)
+            Err(SlideTextError::Refused(
+                litchi_keynote::slide::text::Refusal::DependentContent
+            ))
         ));
         assert_eq!(package.exact_bytes(), adversarial);
     }
@@ -1721,7 +1744,9 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
     edit.set("must not rewrite aliased storage")?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(package.exact_bytes(), alias);
     Ok(())
@@ -1816,7 +1841,9 @@ fn ownership_metadata_and_dependent_text_are_proven_before_publish() -> TestResu
     intersects.delete(TextSpan::from_utf16_indexes(7, 9)?)?;
     assert!(matches!(
         intersects.commit(),
-        Err(SlideTextError::DependentContent)
+        Err(SlideTextError::Refused(
+            litchi_keynote::slide::text::Refusal::DependentContent
+        ))
     ));
     let mut unrelated = package.edit_slide_title("Agenda")?;
     unrelated.replace(TextSpan::from_utf16_indexes(0, 1)?, "X")?;
@@ -1839,10 +1866,12 @@ fn errors_and_transaction_debug_are_content_free() -> TestResult<()> {
     assert!(!edit_debug.contains("Agenda"));
 
     let errors = [
-        SlideTextError::SlideNameNotFound,
-        SlideTextError::TextStorageNotFound { role: Kind::Title },
+        SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SlideNameNotFound),
+        SlideTextError::Refused(litchi_keynote::slide::text::Refusal::TextStorageNotFound {
+            role: Kind::Title,
+        }),
         SlideTextError::PatchConflict,
-        SlideTextError::LimitExceeded {
+        SlideTextError::Limit {
             kind: SlideTextLimitKind::OutputBytes,
             observed: 11,
             maximum: 10,
@@ -1890,7 +1919,7 @@ fn selected_text_limit_is_inclusive_and_one_over_is_typed() -> TestResult<()> {
         Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(one_under))?;
     assert!(matches!(
         limited_package.slide_title(SlideSelector::index(0)),
-        Err(SlideTextError::LimitExceeded {
+        Err(SlideTextError::Limit {
             kind: SlideTextLimitKind::TextBytes,
             observed,
             maximum,
@@ -1922,7 +1951,7 @@ fn candidate_text_limit_is_checked_when_staging_with_exact_amounts() -> TestResu
 
     assert!(matches!(
         error,
-        SlideTextError::LimitExceeded {
+        SlideTextError::Limit {
             kind: SlideTextLimitKind::TextBytes,
             observed,
             maximum,
@@ -1959,7 +1988,7 @@ fn changed_slide_text_respects_the_retained_output_limit() -> TestResult<()> {
     edit.insert(TextPosition::ZERO, &expanded)?;
     assert!(matches!(
         edit.commit(),
-        Err(SlideTextError::LimitExceeded {
+        Err(SlideTextError::Limit {
             kind: SlideTextLimitKind::OutputBytes,
             ..
         })

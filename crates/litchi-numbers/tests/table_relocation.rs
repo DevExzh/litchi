@@ -17,7 +17,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
 use litchi_numbers::{
     Package, SheetSelector, TableSelector,
-    table::relocation::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
+    table::relocation::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
 };
 use prost::Message as _;
 
@@ -826,13 +826,15 @@ fn a_destination_name_collision_is_refused_typed() -> TestResult {
     assert!(
         matches!(
             error,
-            Error::DuplicateTableName {
-                path: Path::Table {
-                    source_sheet: 0,
-                    table: 1,
-                    destination_sheet: 1
+            Error::Refused(
+                litchi_numbers::table::relocation::Refusal::DuplicateTableName {
+                    path: Path::Table {
+                        source_sheet: 0,
+                        table: 1,
+                        destination_sheet: 1
+                    }
                 }
-            }
+            )
         ),
         "{error:?}"
     );

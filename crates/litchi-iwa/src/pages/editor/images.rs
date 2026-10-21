@@ -48,7 +48,7 @@ pub struct RemovedPagesImage {
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl Editor {
+impl Draft {
     /// List images anchored to the document body in text-flow order.
     pub fn body_images(&self) -> Result<Vec<ImageInfo>> {
         body_image_infos(self)
@@ -81,7 +81,7 @@ impl Editor {
         let ids = ImageObjectIds::allocate(graph_first_identifier)?;
         let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
+        let mut media = crate::media::Draft::from_package(self.package().clone())?;
         let asset = media.insert_unreferenced(preferred_filename, data)?;
         if asset.media_type != MediaType::Image {
             return Err(Error::ParseError(format!(
@@ -109,7 +109,7 @@ impl Editor {
             Ok(())
         })?;
 
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -404,7 +404,7 @@ impl Editor {
             new_attachment_id,
             BODY_DRAWABLE_DUPLICATE_OFFSET,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -503,16 +503,15 @@ impl Editor {
     }
 
     /// Remove a body-anchored image, its private graph, and unshared assets.
-    #[allow(deprecated)]
     pub fn remove_body_image(
         &mut self,
         drawable_object_id: DrawableId,
     ) -> Result<RemovedPagesImage> {
         let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(drawable_object_id)?;
-        let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
+        let mut text_editor = crate::text::Draft::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
@@ -548,7 +547,7 @@ impl Editor {
         remove_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &source.uuid_object_ids)?;
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
-        let mut media = IWorkMediaEditor::from_package(staged)?;
+        let mut media = crate::media::Draft::from_package(staged)?;
         let mut removed_data_identifiers = Vec::new();
         let data_identifiers = source
             .data_references
@@ -592,7 +591,7 @@ impl Editor {
 }
 
 fn set_body_image_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: DrawableId,
     text: &str,
     kind: DrawableCaptionKind,
@@ -602,7 +601,7 @@ fn set_body_image_caption(
     let slot = image_caption_slot(editor, raw_drawable_object_id, kind)?;
     let before = image_title_caption(editor, raw_drawable_object_id)?;
     let staged = if let Some(storage_id) = slot.storage_id {
-        let mut text_editor = IWorkTextEditor::from_package(editor.package().clone());
+        let mut text_editor = crate::text::Draft::from_package(editor.package().clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
@@ -632,7 +631,7 @@ fn set_body_image_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.body_image_title_caption(drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -654,7 +653,7 @@ fn set_body_image_caption(
 }
 
 fn remove_body_image_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: DrawableId,
     kind: DrawableCaptionKind,
 ) -> Result<bool> {
@@ -677,7 +676,7 @@ fn remove_body_image_caption(
     )?;
     add_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     let actual = verified.body_image_title_caption(drawable_object_id)?;
     let expected = match kind {
         DrawableCaptionKind::Caption => crate::DrawableTitleCaption {
@@ -733,7 +732,7 @@ mod tests {
         DrawableId::from_raw(999).unwrap()
     }
 
-    fn focused_image_adjustments(editor: &Editor) -> ImageAdjustments {
+    fn focused_image_adjustments(editor: &Draft) -> ImageAdjustments {
         let bytes = editor.to_bytes().unwrap();
         litchi_pages::Package::from_bytes(&bytes)
             .unwrap()
@@ -741,7 +740,7 @@ mod tests {
             .unwrap()
     }
 
-    fn set_focused_image_adjustments(editor: &mut Editor, adjustments: ImageAdjustments) {
+    fn set_focused_image_adjustments(editor: &mut Draft, adjustments: ImageAdjustments) {
         let bytes = editor.to_bytes().unwrap();
         let package = litchi_pages::Package::from_bytes(&bytes).unwrap();
         let commit = package
@@ -753,40 +752,38 @@ mod tests {
             .unwrap();
         let mut changed = Vec::new();
         commit.package().write_to(&mut changed).unwrap();
-        *editor = Editor::from_bytes(&changed).unwrap();
+        *editor = Draft::from_bytes(&changed).unwrap();
     }
 
     #[test]
     fn image_selectors_use_drawable_object_id() {
-        let _: fn(&Editor, DrawableId) -> Result<DrawableGeometry> = Editor::body_image_geometry;
-        let _: fn(&mut Editor, DrawableId) -> Result<DrawableGeometry> =
-            Editor::restore_body_image_original_size;
-        let _: fn(&mut Editor, DrawableId, DrawableFlipAxis) -> Result<DrawableGeometry> =
-            Editor::flip_body_image;
-        let _: fn(&mut Editor, DrawableId, DrawableGeometry) -> Result<()> =
-            Editor::set_body_image_geometry;
-        let _: fn(&Editor, DrawableId) -> Result<DrawableProperties> =
-            Editor::body_image_properties;
-        let _: fn(&mut Editor, DrawableId, DrawableProperties) -> Result<()> =
-            Editor::set_body_image_properties;
-        let _: fn(&Editor, DrawableId) -> Result<crate::DrawableTitleCaption> =
-            Editor::body_image_title_caption;
-        let _: fn(&mut Editor, DrawableId, &str) -> Result<()> = Editor::set_body_image_title;
-        let _: fn(&mut Editor, DrawableId) -> Result<bool> = Editor::remove_body_image_title;
-        let _: fn(&mut Editor, DrawableId, &str) -> Result<()> = Editor::set_body_image_caption;
-        let _: fn(&mut Editor, DrawableId) -> Result<bool> = Editor::remove_body_image_caption;
-        let _: fn(&mut Editor, DrawableId, usize) -> Result<ImageInfo> =
-            Editor::duplicate_body_image;
-        let _: fn(&mut Editor, DrawableId, &[u8]) -> Result<Vec<u8>> =
-            Editor::replace_body_image_data;
-        let _: fn(&mut Editor, DrawableId) -> Result<RemovedPagesImage> = Editor::remove_body_image;
+        let _: fn(&Draft, DrawableId) -> Result<DrawableGeometry> = Draft::body_image_geometry;
+        let _: fn(&mut Draft, DrawableId) -> Result<DrawableGeometry> =
+            Draft::restore_body_image_original_size;
+        let _: fn(&mut Draft, DrawableId, DrawableFlipAxis) -> Result<DrawableGeometry> =
+            Draft::flip_body_image;
+        let _: fn(&mut Draft, DrawableId, DrawableGeometry) -> Result<()> =
+            Draft::set_body_image_geometry;
+        let _: fn(&Draft, DrawableId) -> Result<DrawableProperties> = Draft::body_image_properties;
+        let _: fn(&mut Draft, DrawableId, DrawableProperties) -> Result<()> =
+            Draft::set_body_image_properties;
+        let _: fn(&Draft, DrawableId) -> Result<crate::DrawableTitleCaption> =
+            Draft::body_image_title_caption;
+        let _: fn(&mut Draft, DrawableId, &str) -> Result<()> = Draft::set_body_image_title;
+        let _: fn(&mut Draft, DrawableId) -> Result<bool> = Draft::remove_body_image_title;
+        let _: fn(&mut Draft, DrawableId, &str) -> Result<()> = Draft::set_body_image_caption;
+        let _: fn(&mut Draft, DrawableId) -> Result<bool> = Draft::remove_body_image_caption;
+        let _: fn(&mut Draft, DrawableId, usize) -> Result<ImageInfo> = Draft::duplicate_body_image;
+        let _: fn(&mut Draft, DrawableId, &[u8]) -> Result<Vec<u8>> =
+            Draft::replace_body_image_data;
+        let _: fn(&mut Draft, DrawableId) -> Result<RemovedPagesImage> = Draft::remove_body_image;
     }
 
     #[test]
     fn scratch_document_supports_image_crud_without_a_source_package() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Draft::create_with_text("Quarterly report").unwrap();
 
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -808,7 +805,7 @@ mod tests {
             original
         );
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.body_images().unwrap(),
             std::slice::from_ref(&created)
@@ -930,13 +927,13 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "Quarterly report");
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_document_supports_native_image_title_caption_crud() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = Editor::create_with_text("Image labels").unwrap();
+        let mut editor = Draft::create_with_text("Image labels").unwrap();
         let image = editor
             .add_body_image(
                 "Image labels".encode_utf16().count(),
@@ -979,7 +976,7 @@ mod tests {
         editor
             .set_body_image_caption(image_id, "Recreated caption")
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.body_image_title_caption(image_id).unwrap(),
             crate::DrawableTitleCaption {
@@ -993,7 +990,7 @@ mod tests {
     fn scratch_document_supports_native_image_duplication() {
         let original = fixture("test-data/images/png/lena.png");
         let replacement = fixture("crates/soapberry-zip/assets/gophercolor16x16.png");
-        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Draft::create_with_text("Quarterly report").unwrap();
         let source = editor
             .add_body_image(
                 "Quarterly report".encode_utf16().count(),
@@ -1114,7 +1111,7 @@ mod tests {
             editor.extract_media(source.image_data_identifier).unwrap(),
             replacement
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_images().unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1137,13 +1134,13 @@ mod tests {
         );
         assert!(editor.body_images().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_image_creation_and_geometry_are_transactional() {
         let original = fixture("test-data/images/png/lena.png");
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         let missing_id = missing_selector();

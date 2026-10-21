@@ -40,7 +40,7 @@ impl Expression {
     /// and the construction errors of the individual expression builders.
     pub fn parse(text: &str) -> Result<Self, Error> {
         if text.len() > MAX_TEXT_BYTES {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: super::LimitKind::OwnedBytes,
                 observed: text.len(),
                 maximum: MAX_TEXT_BYTES,
@@ -100,7 +100,7 @@ impl Parser<'_> {
     fn enter(&mut self) -> Result<(), Error> {
         self.depth += 1;
         if self.depth > MAX_PARSE_DEPTH {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: super::LimitKind::Depth,
                 observed: self.depth,
                 maximum: MAX_PARSE_DEPTH,
@@ -531,16 +531,13 @@ mod tests {
         ));
         assert!(matches!(
             Expression::parse("VLOOKUP(A1)"),
-            Err(Error::UnsupportedFunction | Error::LimitExceeded { .. })
+            Err(Error::UnsupportedFunction | Error::Limit { .. })
         ));
         assert!(matches!(
             Expression::parse("IF(A1)"),
             Err(Error::InvalidArity)
         ));
         let deep = "(".repeat(200) + "1" + &")".repeat(200);
-        assert!(matches!(
-            Expression::parse(&deep),
-            Err(Error::LimitExceeded { .. })
-        ));
+        assert!(matches!(Expression::parse(&deep), Err(Error::Limit { .. })));
     }
 }

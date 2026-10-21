@@ -136,31 +136,35 @@ fn usize_to_u64(value: usize) -> u64 {
 pub(super) fn map_chart_title_error(error: super::slide_chart_title::Error) -> AxisSupportError {
     use super::slide_chart_title::{Error as ChartTitleError, LimitKind as ChartTitleLimitKind};
     match error {
-        ChartTitleError::UnsupportedSource => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
             AxisSupportError::Selector(AxisSupportSelectorError::UnsupportedSource)
         },
-        ChartTitleError::AmbiguousSelector => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
             AxisSupportError::Selector(AxisSupportSelectorError::AmbiguousSelector)
         },
-        ChartTitleError::EmptySlideName => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptySlideName) => {
             AxisSupportError::Selector(AxisSupportSelectorError::EmptySlideName)
         },
-        ChartTitleError::SlideNameNotFound => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
             AxisSupportError::Selector(AxisSupportSelectorError::SlideNameNotFound)
         },
-        ChartTitleError::SlidePositionNotFound { position } => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::SlidePositionNotFound {
+            position,
+        }) => {
             AxisSupportError::Selector(AxisSupportSelectorError::SlidePositionNotFound { position })
         },
-        ChartTitleError::ChartNameNotFound => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
             AxisSupportError::Selector(AxisSupportSelectorError::ChartNameNotFound)
         },
-        ChartTitleError::ChartPositionNotFound { position } => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::ChartPositionNotFound {
+            position,
+        }) => {
             AxisSupportError::Selector(AxisSupportSelectorError::ChartPositionNotFound { position })
         },
-        ChartTitleError::EmptyChartName => {
+        ChartTitleError::Refused(crate::chart::title::Refusal::EmptyChartName) => {
             AxisSupportError::Selector(AxisSupportSelectorError::EmptyChartName)
         },
-        ChartTitleError::LimitExceeded {
+        ChartTitleError::Limit {
             kind,
             observed,
             maximum,

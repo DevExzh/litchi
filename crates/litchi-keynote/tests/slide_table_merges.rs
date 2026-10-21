@@ -40,7 +40,9 @@ fn merge_read_reports_invalid_table_selector_without_exposing_native_ids()
 
     assert!(matches!(
         error,
-        SlideTableMergesError::TablePositionNotFound { .. }
+        SlideTableMergesError::Refused(
+            litchi_keynote::slide::table::merge::transaction::Refusal::TablePositionNotFound { .. }
+        )
     ));
     Ok(())
 }
@@ -60,7 +62,7 @@ fn selection_and_merge_decode_share_the_cumulative_reference_budget()
 
     assert!(matches!(
         error,
-        SlideTableMergesError::LimitExceeded {
+        SlideTableMergesError::Limit {
             kind: SlideTableMergesLimitKind::References,
             ..
         }

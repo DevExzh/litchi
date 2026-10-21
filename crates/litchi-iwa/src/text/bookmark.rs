@@ -8,7 +8,7 @@ use crate::package_metadata::{
     release_package_identifier_suffix, remove_component_external_references_to_object,
     remove_component_object_uuids, set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::bookmark_object::{
     new_bookmark_object, patch_bookmark_settings, validate_bookmark_object,
@@ -27,7 +27,7 @@ use litchi_iwa_text::position::{TextPosition, TextRange};
 
 const BOOKMARK_TABLE: RangedObjectTable = RangedObjectTable::Bookmark;
 
-pub(crate) fn text_bookmarks(package: &IWorkPackage, storage_id: u64) -> Result<Vec<TextBookmark>> {
+pub(crate) fn text_bookmarks(package: &HostPackage, storage_id: u64) -> Result<Vec<TextBookmark>> {
     let located = locate_storage_with_archive(package, storage_id, BOOKMARK_TABLE)?;
     let location = &located.location;
     let boundaries = decoded_boundaries(storage_id, location, BOOKMARK_TABLE)?;
@@ -35,7 +35,7 @@ pub(crate) fn text_bookmarks(package: &IWorkPackage, storage_id: u64) -> Result<
 }
 
 pub(crate) fn add_text_bookmark(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     settings: &TextBookmarkSettings,
@@ -93,7 +93,7 @@ pub(crate) fn add_text_bookmark(
 }
 
 pub(crate) fn update_text_bookmark(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextBookmarkId,
     range: TextRange,
@@ -152,7 +152,7 @@ pub(crate) fn update_text_bookmark(
 }
 
 pub(crate) fn remove_text_bookmark(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextBookmarkId,
 ) -> Result<TextBookmark> {
@@ -214,7 +214,7 @@ pub(crate) fn remove_text_bookmark(
 }
 
 pub(crate) fn remove_unreferenced_bookmark_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {
@@ -270,7 +270,7 @@ pub(crate) fn remove_unreferenced_bookmark_objects(
 }
 
 fn bookmark_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     id: TextBookmarkId,
 ) -> Result<TextBookmark> {
@@ -332,8 +332,8 @@ fn collect_bookmarks(
     Ok(bookmarks)
 }
 
-fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
-    IWorkPackage::from_bytes(&package.to_bytes()?)
+fn roundtrip(package: &HostPackage) -> Result<HostPackage> {
+    HostPackage::from_bytes(&package.to_bytes()?)
 }
 
 #[cfg(test)]

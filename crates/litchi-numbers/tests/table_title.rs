@@ -80,11 +80,15 @@ fn native_read_noop_apply_and_selectors_are_exact() -> TestResult<()> {
 
     assert!(matches!(
         package.table_title_settings("missing", 0usize),
-        Err(Error::SheetNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::title::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_title_settings(0usize, "missing"),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_numbers::table::title::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }

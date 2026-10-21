@@ -68,7 +68,7 @@ struct SlideShapeGraph {
     uuid_object_ids: Vec<u64>,
 }
 
-impl Editor {
+impl Draft {
     /// List ordinary non-text-box shapes owned directly by one slide.
     pub fn slide_shapes(&self, slide_index: usize) -> Result<Vec<SlideShapeInfo>> {
         shape_infos(self, slide_index)
@@ -938,14 +938,13 @@ impl Editor {
     }
 
     /// Remove an ordinary shape and its private text-bearing object graph.
-    #[allow(deprecated)]
     pub fn remove_slide_shape(
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
     ) -> Result<RemovedKeynoteSlideShape> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
@@ -1006,7 +1005,7 @@ fn new_shape_geometry(position: DrawablePoint, size: DrawableSize) -> Result<Dra
     .validate()
 }
 
-fn shape_infos(editor: &Editor, slide_index: usize) -> Result<Vec<SlideShapeInfo>> {
+fn shape_infos(editor: &Draft, slide_index: usize) -> Result<Vec<SlideShapeInfo>> {
     let slides = editor.slides()?;
     let slide = slides.get(slide_index).ok_or_else(|| {
         Error::ParseError(format!(
@@ -1050,7 +1049,7 @@ fn shape_infos(editor: &Editor, slide_index: usize) -> Result<Vec<SlideShapeInfo
 }
 
 fn shape_graph(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<SlideShapeGraph> {
@@ -1133,7 +1132,7 @@ fn shape_graph(
 
 #[allow(deprecated)]
 fn shape_info(
-    editor: &Editor,
+    editor: &Draft,
     graph: &ObjectGraph,
     slide_index: usize,
     drawable_object_id: u64,
@@ -1355,7 +1354,7 @@ mod tests {
             .set_slide_shape_properties(0, created.drawable_object_id, properties.clone())
             .unwrap();
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let shape = &reopened.slide_shapes(0).unwrap()[0];
         assert_eq!(shape.storage.storage.text(), "Made from typed objects");
         assert_eq!(shape.geometry, geometry);
@@ -1435,7 +1434,7 @@ mod tests {
                 .text(),
             "Source shape"
         );
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shapes(0)
@@ -1474,7 +1473,7 @@ mod tests {
             LineSegment::new(LINE_START, LINE_END).unwrap()
         ));
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(line_segments_match(
             reopened
                 .slide_line_segment(0, created.drawable_object_id)
@@ -1555,7 +1554,7 @@ mod tests {
                 LineStyle::new(stroke).with_endpoints(endpoints),
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_stroke(0, created.drawable_object_id)
@@ -1621,7 +1620,7 @@ mod tests {
         editor
             .set_slide_shape_fill(0, created.drawable_object_id, &fill)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_fill(0, created.drawable_object_id)
@@ -1676,7 +1675,7 @@ mod tests {
             bytes
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_fill(0, created.drawable_object_id)
@@ -1718,7 +1717,7 @@ mod tests {
             .set_slide_shape_effects(0, created.drawable_object_id, effects)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_effects(0, created.drawable_object_id)
@@ -1765,7 +1764,7 @@ mod tests {
             .set_slide_shape_shadow(0, created.drawable_object_id, shadow)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_shadow(0, created.drawable_object_id)
@@ -1807,7 +1806,7 @@ mod tests {
             .set_slide_shape_text_layout(0, created.drawable_object_id, layout)
             .unwrap();
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_text_layout(0, created.drawable_object_id)
@@ -1855,7 +1854,7 @@ mod tests {
             ))
         );
 
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let replacement = Endpoints::new(Endpoint::SimpleArrow, Endpoint::OpenCircle);
         reopened
             .set_slide_line_endpoints(0, created.drawable_object_id, replacement)
@@ -1893,7 +1892,7 @@ mod tests {
         assert_eq!(created.kind, ShapePathKind::RoundedRectangle);
         assert_eq!(created.preset, Some(Preset::ROUNDED_RECTANGLE));
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .slide_shape_preset(0, created.drawable_object_id)

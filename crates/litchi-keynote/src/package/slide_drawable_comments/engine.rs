@@ -696,7 +696,9 @@ pub(super) fn execute(
     budget: &mut Budget,
 ) -> Result<EngineOutput, Error> {
     if !source_has_exact_catalog(source) {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::comment::transaction::Refusal::UnsupportedSource,
+        ));
     }
 
     // The graph adapter performs the complete wrapper-route, rooted-closure,
@@ -2812,7 +2814,11 @@ fn serialize_candidate(
 ) -> Result<Vec<u8>, Error> {
     let source_catalog = match &source.state.source {
         PhysicalSource::Package(source) => source,
-        PhysicalSource::Semantic(_) => return Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => {
+            return Err(Error::Refused(
+                crate::slide::comment::transaction::Refusal::UnsupportedSource,
+            ));
+        },
     };
     let archive_limits = source
         .limits()

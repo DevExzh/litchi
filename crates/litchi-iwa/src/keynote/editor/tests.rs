@@ -37,7 +37,7 @@ fn asset_id(raw: u64) -> MediaAssetId {
 }
 
 fn focused_placeholder_visibility(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     kind: FocusedPlaceholderKind,
 ) -> Option<FocusedPlaceholderState> {
@@ -47,15 +47,15 @@ fn focused_placeholder_visibility(
         .unwrap()
 }
 
-fn reopen_focused_package(editor: &mut Editor, package: &FocusedKeynotePackage) {
+fn reopen_focused_package(editor: &mut Draft, package: &FocusedKeynotePackage) {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes).unwrap();
-    *editor = Editor::from_bytes(&bytes).unwrap();
+    *editor = Draft::from_bytes(&bytes).unwrap();
 }
 
 #[test]
 fn reads_placeholder_text_without_mutating_navigator_names() {
-    let editor = Editor::from_package(test_package()).unwrap();
+    let editor = Draft::from_package(test_package()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 2);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
@@ -145,7 +145,7 @@ fn typed_build_mutators_preserve_transactional_invariants() {
 
 #[test]
 fn slide_build_crud_is_transactional_and_updates_native_caches() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     assert!(editor.slide_builds(0).unwrap().is_empty());
 
     let settings = BuildSettings::appear_in();
@@ -211,7 +211,7 @@ fn slide_rotate_action_crud_maps_native_parameters_and_is_transactional() {
         BuildAttributesAcceleration, BuildAttributesRotationDirection,
     };
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut settings = BuildSettings::rotate_action(810.0, RotationDirection::Clockwise);
     settings.duration = 2.5;
     settings.rotation.as_mut().unwrap().acceleration = BuildAcceleration::EaseIn;
@@ -296,7 +296,7 @@ fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
         .with_custom_timing_curve(curve.clone())
         .unwrap();
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     assert_eq!(created.settings, settings);
 
@@ -353,7 +353,7 @@ fn slide_custom_timing_curve_actions_create_update_and_clear_natively() {
 
 #[test]
 fn slide_custom_timing_curve_rejects_invalid_pairing_and_shape_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let settings = BuildSettings::rotate_action(90.0, RotationDirection::Counterclockwise);
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let before = editor.to_bytes().unwrap();
@@ -407,7 +407,7 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
             MotionPathPoint::new(0.85, 0.9),
         ))
         .unwrap();
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings).unwrap();
     let mut package = editor.into_package();
     let suffixes = [
@@ -474,7 +474,7 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     settings.timing_curve.as_mut().unwrap().path.subpaths[0].nodes[0]
         .out_control_point
@@ -503,7 +503,7 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
 
 #[test]
 fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let settings = BuildSettings::rotate_action(90.0, RotationDirection::Counterclockwise);
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let mut package = editor.into_package();
@@ -525,13 +525,13 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
         })
         .unwrap();
     assert!(
-        Editor::from_package(package)
+        Draft::from_package(package)
             .unwrap()
             .slide_builds(0)
             .is_err()
     );
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
     let mut package = editor.into_package();
     package
@@ -557,7 +557,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
             Ok(())
         })
         .unwrap();
-    let mut malformed = Editor::from_package(package).unwrap();
+    let mut malformed = Draft::from_package(package).unwrap();
     assert!(malformed.slide_builds(0).is_err());
     let before = malformed.to_bytes().unwrap();
     assert!(
@@ -572,7 +572,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
 fn slide_scale_and_opacity_action_crud_maps_native_parameters_and_is_transactional() {
     use kn::build_attributes_archive::BuildAttributesAcceleration;
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut scale = BuildSettings::scale_action(0.280_904_227_638_190_7);
     scale.duration = 1.75;
     scale.scale.as_mut().unwrap().acceleration = BuildAcceleration::EaseOut;
@@ -657,7 +657,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
         (BuildSettings::scale_action(1.5), 11),
         (BuildSettings::opacity_action(50.0), 12),
     ] {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -678,13 +678,13 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
             })
             .unwrap();
         assert!(
-            Editor::from_package(package)
+            Draft::from_package(package)
                 .unwrap()
                 .slide_builds(0)
                 .is_err()
         );
 
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings).unwrap();
         let mut package = editor.into_package();
         package
@@ -713,7 +713,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
             })
             .unwrap();
         assert!(
-            Editor::from_package(package)
+            Draft::from_package(package)
                 .unwrap()
                 .slide_builds(0)
                 .is_err()
@@ -725,7 +725,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
 fn slide_emphasis_action_crud_maps_native_parameters_and_cleans_conversions() {
     use kn::build_attributes_archive::ActionBuildAttributesJiggleIntensity;
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let settings = [
         BuildSettings::blink_action(7, true),
         BuildSettings::bounce_action(5, false),
@@ -857,7 +857,7 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
         BuildSettings::rotate_action(90.0, RotationDirection::Clockwise),
     ];
     for (mutation, settings) in cases.into_iter().enumerate() {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
         package
@@ -904,7 +904,7 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -919,7 +919,7 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
 
 #[test]
 fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut build_in = BuildSettings::keyboard_in(KeyboardDirection::Forward, false);
     build_in.duration = 2.25;
     let created_in = editor.add_slide_build(0, 5, build_in.clone()).unwrap();
@@ -1013,7 +1013,7 @@ fn slide_keyboard_build_crud_maps_native_parameters_and_cleans_conversions() {
 #[test]
 fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
     for mutation in 0..5 {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let settings = BuildSettings::keyboard_in(KeyboardDirection::Forward, true);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
@@ -1058,7 +1058,7 @@ fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1077,7 +1077,7 @@ fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
         BuildAttributesDeliveryOption, BuildAttributesTextDelivery,
     };
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let build_in = BuildSettings::dissolve_in();
     let created = editor.add_slide_build(0, 5, build_in.clone()).unwrap();
     assert_eq!(created.settings, build_in);
@@ -1133,7 +1133,7 @@ fn slide_dissolve_build_crud_uses_native_text_delivery_defaults() {
 
 #[test]
 fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let settings = [
         BuildSettings::shimmer_in(),
         BuildSettings::shimmer_out(),
@@ -1298,7 +1298,7 @@ fn slide_object_build_crud_maps_native_effects_directions_and_defaults() {
 
 #[test]
 fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let settings = BuildSettings::trace_in(HorizontalBuildDirection::LeftToRight);
     let created = editor.add_slide_build(0, 5, settings).unwrap();
     let mut package = editor.into_package();
@@ -1321,7 +1321,7 @@ fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() 
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let read = editor.slide_builds(0).unwrap().remove(0).settings;
     assert_eq!(read.direction, None);
     assert_eq!(
@@ -1338,7 +1338,7 @@ fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() 
 #[test]
 fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
     for mutation in 0..6 {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let settings = BuildSettings::trace_in(HorizontalBuildDirection::RightToLeft);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
@@ -1390,7 +1390,7 @@ fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1405,7 +1405,7 @@ fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
 
 #[test]
 fn slide_raw_custom_build_parameter_crud_is_lossless_and_transactional() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut settings = BuildSettings::appear_in();
     settings.effect = "com.example.future-build".to_owned();
     settings.direction = Some(42);
@@ -1469,7 +1469,7 @@ fn slide_raw_custom_build_parameter_crud_is_lossless_and_transactional() {
 #[test]
 fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
     for mutation in 0..7 {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let mut settings = BuildSettings::appear_in();
         settings.effect = "com.example.future-build".to_owned();
         settings.custom_parameters = BuildCustomParameters {
@@ -1510,7 +1510,7 @@ fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err(), "mutation {mutation}");
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1527,7 +1527,7 @@ fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
 fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
     use kn::build_attributes_archive::BuildAttributesAcceleration;
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut settings = BuildSettings::move_action(488.492, -258.172);
     settings.duration = 2.25;
     let move_action = settings.move_action.as_mut().unwrap();
@@ -1607,7 +1607,7 @@ fn slide_move_action_crud_maps_editable_bezier_path_and_is_transactional() {
 
 #[test]
 fn slide_move_updates_preserve_deep_unknown_path_wire() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor
         .add_slide_build(0, 5, BuildSettings::move_action(400.0, -200.0))
         .unwrap();
@@ -1670,7 +1670,7 @@ fn slide_move_updates_preserve_deep_unknown_path_wire() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     let path = &mut settings.move_action.as_mut().unwrap().path;
     path.subpaths[0].nodes[1].point.x = 420.0;
@@ -1701,7 +1701,7 @@ fn slide_move_updates_preserve_deep_unknown_path_wire() {
 #[test]
 fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
     for mutation in 0..3 {
-        let mut editor = Editor::from_package(test_package()).unwrap();
+        let mut editor = Draft::from_package(test_package()).unwrap();
         let settings = BuildSettings::move_action(300.0, 100.0);
         let created = editor.add_slide_build(0, 5, settings.clone()).unwrap();
         let mut package = editor.into_package();
@@ -1737,7 +1737,7 @@ fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
                 Ok(())
             })
             .unwrap();
-        let mut malformed = Editor::from_package(package).unwrap();
+        let mut malformed = Draft::from_package(package).unwrap();
         assert!(malformed.slide_builds(0).is_err());
         let before = malformed.to_bytes().unwrap();
         assert!(
@@ -1751,7 +1751,7 @@ fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
 
 #[test]
 fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor
         .add_slide_build(
             0,
@@ -1779,7 +1779,7 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let mut settings = editor.slide_builds(0).unwrap()[0].settings.clone();
     assert_eq!(settings.effect, "apple:action-future");
     assert!(settings.rotation.is_none());
@@ -1807,7 +1807,7 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
 
 #[test]
 fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let mut first_settings = BuildSettings::appear_in();
     first_settings.start = BuildStart::AfterTransition;
     first_settings.delay = 0.25;
@@ -1861,7 +1861,7 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     assert_eq!(second_click.chunks[0].automatic, Some(false));
     assert_eq!(second_click.chunks[0].referent, Some(true));
 
-    let mut empty = Editor::from_package(test_package()).unwrap();
+    let mut empty = Draft::from_package(test_package()).unwrap();
     let mut invalid_first = BuildSettings::appear_in();
     invalid_first.start = BuildStart::AfterPrevious;
     assert!(empty.add_slide_build(0, 5, invalid_first).is_err());
@@ -1874,7 +1874,7 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
 
 #[test]
 fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let build = editor
         .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
@@ -1897,13 +1897,13 @@ fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics
         })
         .unwrap();
 
-    let malformed = Editor::from_package(package).unwrap();
+    let malformed = Draft::from_package(package).unwrap();
     assert!(malformed.slide_builds(0).is_err());
 }
 
 #[test]
 fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor
         .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
@@ -1939,7 +1939,7 @@ fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let mut settings = BuildSettings::appear_in();
     settings.effect = "apple:unmapped-test-effect".to_owned();
     settings.duration = 2.5;
@@ -1985,7 +1985,7 @@ fn build_crud_tracks_only_native_uuid_objects_and_releases_highwater() {
             },
         )
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let build = editor
         .add_slide_build(0, 5, BuildSettings::appear_in())
         .unwrap();
@@ -2015,7 +2015,7 @@ fn build_crud_tracks_only_native_uuid_objects_and_releases_highwater() {
 
 #[test]
 fn slide_owned_text_storage_crud_covers_placeholders_and_text_boxes() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let text = editor.slide_text_storages(0).unwrap();
     assert_eq!(
         text.iter().map(|item| item.role).collect::<Vec<_>>(),
@@ -2072,7 +2072,7 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
             Ok(object.replace_message(0, message).map(|_| ())?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Slide-4.iwa")
@@ -2114,7 +2114,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.slide_text_storages(0).is_err());
     assert!(editor.set_slide_text_storage(0, 17, "rejected").is_err());
@@ -2144,7 +2144,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
             ))?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.slide_text_storages(0).is_err());
     assert!(editor.set_slide_text_storage(0, 17, "rejected").is_err());
@@ -2153,7 +2153,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
 
 #[test]
 fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     let created = editor.duplicate_slide_text_box(0, 17, "Clone 🚀").unwrap();
@@ -2219,7 +2219,7 @@ fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
 
 #[test]
 fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_geometry(0, 17).unwrap();
     assert_eq!(
         original,
@@ -2274,7 +2274,7 @@ fn ordinary_text_box_geometry_updates_are_guarded_and_byte_exact() {
 
 #[test]
 fn ordinary_text_box_properties_updates_are_guarded_and_byte_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let original = editor.slide_text_box_properties(0, 17).unwrap();
     assert_eq!(original, DrawableProperties::default());
     let baseline = editor.to_bytes().unwrap();
@@ -2349,7 +2349,7 @@ fn text_box_duplicate_delete_tracks_package_highwater_and_slide_uuids() {
         )
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor
         .duplicate_slide_text_box(0, 17, "Metadata clone")
@@ -2403,7 +2403,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor
         .duplicate_slide_text_box(0, 17, "Unknown clone")
@@ -2442,7 +2442,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(archive.insert_object(owner)?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide_text_box(0, 17, "rejected").is_err());
     assert!(editor.remove_slide_text_box(0, 17).is_err());
@@ -2465,7 +2465,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             Ok(())
         })
         .unwrap();
-    assert!(Editor::from_package(package).is_err());
+    assert!(Draft::from_package(package).is_err());
 }
 
 #[test]
@@ -2532,7 +2532,7 @@ fn transition_custom_parameters_reader_rejects_malformed_wire() {
                 Ok(())
             })
             .unwrap();
-        let rejected = match Editor::from_package(package) {
+        let rejected = match Draft::from_package(package) {
             Ok(malformed) => malformed.slides().is_err(),
             Err(_) => true,
         };
@@ -2624,7 +2624,7 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
                 Ok(())
             })
             .unwrap();
-        let rejected = match Editor::from_package(package) {
+        let rejected = match Draft::from_package(package) {
             Ok(malformed) => malformed.slides().is_err(),
             Err(_) => true,
         };
@@ -2634,7 +2634,7 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
 
 #[test]
 fn reads_current_slide_layout_from_theme_relationship() {
-    let editor = Editor::from_package(test_package_with_current_layout()).unwrap();
+    let editor = Draft::from_package(test_package_with_current_layout()).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(
         slides[0].layout,
@@ -2656,7 +2656,7 @@ fn slide_layout_ids_reject_null_and_round_trip_nonzero_values() {
 
 #[test]
 fn updates_slide_layout_transactionally_without_replacing_user_content() {
-    let mut editor = Editor::from_package(test_package_with_two_layouts()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_two_layouts()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let title_only = layouts
         .iter()
@@ -2764,7 +2764,7 @@ fn updates_slide_layout_transactionally_without_replacing_user_content() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_image_graphs() {
-    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_image_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let photo = layouts
         .iter()
@@ -2817,7 +2817,7 @@ fn slide_layout_update_materializes_and_removes_image_graphs() {
 
 #[test]
 fn creates_slide_with_materialized_layout_image_graph() {
-    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_image_layout()).unwrap();
     let photo = editor
         .slide_layouts()
         .unwrap()
@@ -2842,7 +2842,7 @@ fn creates_slide_with_materialized_layout_image_graph() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_live_video_graphs() {
-    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_live_video_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let live_video = layouts
         .iter()
@@ -2897,7 +2897,7 @@ fn slide_layout_update_materializes_and_removes_live_video_graphs() {
 
 #[test]
 fn creates_slide_with_materialized_layout_live_video_graph() {
-    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_live_video_layout()).unwrap();
     let live_video = editor
         .slide_layouts()
         .unwrap()
@@ -2924,7 +2924,7 @@ fn creates_slide_with_materialized_layout_live_video_graph() {
 
 #[test]
 fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
-    let mut editor = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut editor = Draft::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let movie_layout = layouts
         .iter()
@@ -2976,7 +2976,7 @@ fn slide_layout_update_materializes_and_removes_file_movie_placeholders() {
 
 #[test]
 fn creates_slide_with_materialized_file_movie_placeholder_graph() {
-    let mut editor = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut editor = Draft::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let movie_layout = editor
         .slide_layouts()
         .unwrap()
@@ -3012,7 +3012,7 @@ struct MovieIdentityOracle {
 }
 
 fn focused_movie_summaries(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
 ) -> Vec<litchi_keynote::slide::media::MovieInfo> {
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
@@ -3026,8 +3026,7 @@ fn focused_movie_summaries(
         .to_vec()
 }
 
-#[allow(deprecated)]
-fn generated_movie_identities(editor: &Editor, slide_index: usize) -> Vec<MovieIdentityOracle> {
+fn generated_movie_identities(editor: &Draft, slide_index: usize) -> Vec<MovieIdentityOracle> {
     let slide_id = editor
         .slides()
         .unwrap()
@@ -3098,7 +3097,7 @@ fn generated_movie_identities(editor: &Editor, slide_index: usize) -> Vec<MovieI
 
 #[test]
 fn static_layout_movies_remain_template_only_for_update_and_creation() {
-    let mut editor = Editor::from_package(test_package_with_file_movie_layout(0)).unwrap();
+    let mut editor = Draft::from_package(test_package_with_file_movie_layout(0)).unwrap();
     let movie_layout = editor
         .slide_layouts()
         .unwrap()
@@ -3138,7 +3137,7 @@ fn static_layout_movies_remain_template_only_for_update_and_creation() {
 
 #[test]
 fn hand_built_slide_movie_admission_rejection_is_transactional() {
-    let editor = Editor::from_package(test_package_with_slide_movie()).unwrap();
+    let editor = Draft::from_package(test_package_with_slide_movie()).unwrap();
     let identities = generated_movie_identities(&editor, 0);
     assert_eq!(identities.len(), 1);
     let identity = identities[0];
@@ -3172,12 +3171,16 @@ fn hand_built_slide_movie_admission_rejection_is_transactional() {
     );
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -3188,7 +3191,8 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let mut editor = keynote::Builder::new().build().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let commit = package
-        .add_slide_movie(
+        .edit_slide_movie_creation()
+        .add(
             SlideSelector::index(0),
             "movie.mov",
             TEST_MOVIE_VIDEO,
@@ -3209,6 +3213,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
             })
             .unwrap(),
         )
+        .and_then(|edit| edit.commit())
         .unwrap();
     reopen_focused_package(&mut editor, commit.package());
     let created = generated_movie_identities(&editor, 0)
@@ -3264,7 +3269,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let baseline = editor.to_bytes().unwrap();
     let package = FocusedKeynotePackage::from_bytes(&baseline).unwrap();
     let duplicate_commit = package
-        .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())
         .unwrap();
     let inverse = duplicate_commit.patch().inverse();
     let restored = duplicate_commit
@@ -3355,7 +3362,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let removed_duplicate = package
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(1))
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(1))
+        .and_then(|edit| edit.commit())
         .unwrap();
     assert_eq!(removed_duplicate.diagnostics().removed_data(), 0);
     reopen_focused_package(&mut editor, removed_duplicate.package());
@@ -3369,7 +3378,9 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let package = FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let removed_original = package
-        .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .edit_slide_media_lifecycle()
+        .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())
         .unwrap();
     assert_eq!(removed_original.patch().kind(), MovieKind::File);
     assert_eq!(removed_original.patch().movie_position().get(), 0);
@@ -3385,7 +3396,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
 #[test]
 fn slide_movie_mutations_reject_wrong_targets_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_slide_movie()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_slide_movie()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         FocusedKeynotePackage::from_bytes(&before)
@@ -3402,12 +3413,16 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(9))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
@@ -3418,7 +3433,7 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     assert!(editor.replace_media(asset_id(2), TEST_MOVIE_VIDEO).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let mut placeholder = Editor::from_package(test_package_with_file_movie_layout(1)).unwrap();
+    let mut placeholder = Draft::from_package(test_package_with_file_movie_layout(1)).unwrap();
     let layout = placeholder
         .slide_layouts()
         .unwrap()
@@ -3446,12 +3461,16 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
     let package = FocusedKeynotePackage::from_bytes(&before).unwrap();
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(placeholder.to_bytes().unwrap(), before);
@@ -3459,7 +3478,7 @@ fn slide_movie_mutations_reject_wrong_targets_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_live_video_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_live_video_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let live_video = layouts
         .iter()
@@ -3496,7 +3515,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_layout(0, bullets).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3504,7 +3523,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_image_layout()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_image_layout()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     let photo = layouts
         .iter()
@@ -3541,7 +3560,7 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
             Ok(())
         })
         .unwrap();
-    editor = Editor::from_package(package).unwrap();
+    editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_slide_layout(0, bullets).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3549,7 +3568,7 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
 
 #[test]
 fn slide_layout_update_rejects_invalid_inputs_without_mutation() {
-    let mut editor = Editor::from_package(test_package_with_two_layouts()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_two_layouts()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -3583,7 +3602,7 @@ fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_slide_layout(0, SlideLayoutId::new(37).unwrap())
         .unwrap();
@@ -3622,7 +3641,7 @@ fn slide_layout_update_rejects_ambiguous_wire_fields_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -3650,7 +3669,7 @@ fn current_slide_layout_rejects_missing_theme_mapping() {
             Ok(())
         })
         .unwrap();
-    assert!(Editor::from_package(package).is_err());
+    assert!(Draft::from_package(package).is_err());
 }
 
 #[test]
@@ -3679,12 +3698,12 @@ fn current_slide_layout_rejects_multiple_theme_mappings() {
             Ok(())
         })
         .unwrap();
-    assert!(Editor::from_package(package).is_err());
+    assert!(Draft::from_package(package).is_err());
 }
 
 #[test]
 fn creates_empty_slide_from_typed_theme_layout_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_theme()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_theme()).unwrap();
     let layouts = editor.slide_layouts().unwrap();
     assert_eq!(
         layouts,
@@ -3759,9 +3778,9 @@ fn duplicate_slide_tree_references_fail_transactionally() {
     // boundary. Keep the malformed package only to exercise the operation's
     // transactional failure path after admission has been bypassed in this
     // focused fixture.
-    assert!(Editor::from_package(package.clone()).is_err());
-    let mut editor = Editor {
-        text: IWorkTextEditor::from_package(package),
+    assert!(Draft::from_package(package.clone()).is_err());
+    let mut editor = Draft {
+        text: crate::text::Draft::from_package(package),
     };
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide(0).is_err());
@@ -3789,7 +3808,7 @@ fn duplicates_slide_graph_with_independent_objects() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let source_component = editor
         .package()
         .entry("Index/Slide-4.iwa")
@@ -3843,7 +3862,7 @@ fn duplicates_slide_graph_with_independent_objects() {
     let notes = notes.commit().unwrap();
     let mut bytes = Vec::new();
     notes.package().write_to(&mut bytes).unwrap();
-    let mut editor = Editor::from_bytes(&bytes).unwrap();
+    let mut editor = Draft::from_bytes(&bytes).unwrap();
     let slides = editor.slides().unwrap();
     assert_eq!(slides.len(), 3);
     assert_eq!(slides[0].title.as_deref(), Some("Old title"));
@@ -3938,7 +3957,7 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let source = editor.package().archive("Index/Slide-4.iwa").unwrap();
     let created = editor.duplicate_slide(0).unwrap();
     let cloned = editor
@@ -4029,7 +4048,7 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide(0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -4070,7 +4089,7 @@ fn append_unknown_fixed32(data: &mut Vec<u8>, field_number: u32, value: u32) {
 }
 
 #[allow(deprecated)]
-fn test_package_with_text_box() -> IWorkPackage {
+fn test_package_with_text_box() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Slide-4.iwa", |archive| {
@@ -4136,7 +4155,7 @@ fn test_package_with_text_box() -> IWorkPackage {
     package
 }
 
-fn test_package_with_unknown_slide_tree() -> IWorkPackage {
+fn test_package_with_unknown_slide_tree() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -4198,7 +4217,7 @@ fn object<T: Message>(identifier: u64, type_: u32, value: T) -> ArchiveObject {
     .unwrap()
 }
 
-fn test_package() -> IWorkPackage {
+fn test_package() -> HostPackage {
     let document = kn::DocumentArchive {
         show: reference(2),
         ..Default::default()
@@ -4267,7 +4286,7 @@ fn test_package() -> IWorkPackage {
         },
         ..Default::default()
     };
-    let mut package = IWorkPackage::new();
+    let mut package = HostPackage::new();
     package
         .replace_archive(
             "Index/Document.iwa",
@@ -4355,7 +4374,7 @@ fn test_package() -> IWorkPackage {
     package
 }
 
-fn test_package_with_slide_background() -> IWorkPackage {
+fn test_package_with_slide_background() -> HostPackage {
     let mut package = test_package();
     for archive_name in ["Index/Slide-4.iwa", "Index/Slide-10.iwa"] {
         package
@@ -4449,7 +4468,7 @@ fn test_package_with_slide_background() -> IWorkPackage {
     package
 }
 
-fn test_package_with_theme() -> IWorkPackage {
+fn test_package_with_theme() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -4548,7 +4567,7 @@ fn test_package_with_theme() -> IWorkPackage {
     package
 }
 
-fn test_package_with_current_layout() -> IWorkPackage {
+fn test_package_with_current_layout() -> HostPackage {
     let mut package = test_package_with_theme();
     package
         .update_archive("Index/Slide-4.iwa", |archive| {
@@ -4571,7 +4590,7 @@ fn test_package_with_current_layout() -> IWorkPackage {
     package
 }
 
-fn test_package_with_two_layouts() -> IWorkPackage {
+fn test_package_with_two_layouts() -> HostPackage {
     let mut package = test_package_with_current_layout();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -4691,7 +4710,7 @@ fn test_package_with_two_layouts() -> IWorkPackage {
     package
 }
 
-fn test_package_with_image_layout() -> IWorkPackage {
+fn test_package_with_image_layout() -> HostPackage {
     let mut package = test_package_with_two_layouts();
     package
         .update_archive("Index/TemplateSlide-38.iwa", |archive| {
@@ -4773,7 +4792,7 @@ fn test_package_with_image_layout() -> IWorkPackage {
     package
 }
 
-fn test_package_with_live_video_layout() -> IWorkPackage {
+fn test_package_with_live_video_layout() -> HostPackage {
     let mut package = test_package_with_two_layouts();
     package
         .update_archive("Index/TemplateSlide-38.iwa", |archive| {
@@ -4846,7 +4865,7 @@ fn test_package_with_live_video_layout() -> IWorkPackage {
     package
 }
 
-fn test_package_with_file_movie_layout(flags: u32) -> IWorkPackage {
+fn test_package_with_file_movie_layout(flags: u32) -> HostPackage {
     let mut package = test_package_with_two_layouts();
     package
         .update_archive("Index/TemplateSlide-38.iwa", |archive| {
@@ -4921,7 +4940,7 @@ fn test_package_with_file_movie_layout(flags: u32) -> IWorkPackage {
 }
 
 #[allow(deprecated)]
-fn test_package_with_slide_movie() -> IWorkPackage {
+fn test_package_with_slide_movie() -> HostPackage {
     let mut package = test_package_with_two_layouts();
     package
         .replace_archive(
@@ -4950,7 +4969,7 @@ fn test_package_with_slide_movie() -> IWorkPackage {
             },
         )
         .unwrap();
-    let mut media = IWorkMediaEditor::from_package(package).unwrap();
+    let mut media = crate::media::Draft::from_package(package).unwrap();
     let video = media
         .insert_unreferenced("movie.mov", TEST_MOVIE_VIDEO)
         .unwrap();

@@ -173,28 +173,28 @@ fn duration_seconds(duration: Duration) -> Result<f32> {
 /// Exact-source transactions for one movie caption.
 pub mod caption {
     pub use crate::package::slide_movie_caption::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one movie's geometry.
 pub mod geometry {
     pub use crate::package::slide_movie_geometry::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one file-backed movie's playback settings.
 pub mod playback {
     pub use crate::package::slide_movie_playback::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
 /// Exact-source transactions for one movie title.
 pub mod title {
     pub use crate::package::slide_movie_title::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

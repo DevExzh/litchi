@@ -88,20 +88,20 @@ impl TransactionBudget {
 
     fn charge(&mut self, kind: LimitKind, amount: usize) -> Result<(), Error> {
         let index = Self::index(kind);
-        let amount = u64::try_from(amount).map_err(|_| Error::LimitExceeded {
+        let amount = u64::try_from(amount).map_err(|_| Error::Limit {
             kind,
             observed: u64::MAX,
             maximum: self.maximum[index],
         })?;
         let observed = self.observed[index]
             .checked_add(amount)
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind,
                 observed: u64::MAX,
                 maximum: self.maximum[index],
             })?;
         if observed > self.maximum[index] {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed,
                 maximum: self.maximum[index],
@@ -124,13 +124,13 @@ impl TransactionBudget {
 
     fn observe(&mut self, kind: LimitKind, amount: usize) -> Result<(), Error> {
         let index = Self::index(kind);
-        let amount = u64::try_from(amount).map_err(|_| Error::LimitExceeded {
+        let amount = u64::try_from(amount).map_err(|_| Error::Limit {
             kind,
             observed: u64::MAX,
             maximum: self.maximum[index],
         })?;
         if amount > self.maximum[index] {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: amount,
                 maximum: self.maximum[index],
@@ -367,24 +367,14 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("the Pages header/footer selector did not match a logical slot")]
-    NotFound,
-    #[error("the Pages header/footer selector is ambiguous")]
-    AmbiguousSelector,
-    #[error("this Pages source does not support exact header/footer text editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     #[error("the rooted Pages header/footer graph is invalid")]
     InvalidSource,
-    #[error("the selected Pages header/footer graph has an unsupported dependency")]
-    UnsupportedDependency,
-    #[error("Pages header/footer text contains an invalid UTF-16 range")]
-    PositionOutOfBounds,
-    #[error("Pages header/footer text exceeds its semantic byte budget")]
-    TextTooLarge,
-    #[error("Pages header/footer text contains a native structural marker")]
-    StructuralMarker,
     #[error("Pages header/footer {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         kind: LimitKind,
         observed: u64,
         maximum: u64,
@@ -395,6 +385,50 @@ pub enum Error {
     Verification,
     #[error("the Pages header/footer patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    #[error("the Pages header/footer selector did not match a logical slot")]
+    NotFound,
+    #[error("the Pages header/footer selector is ambiguous")]
+    AmbiguousSelector,
+    #[error("this Pages source does not support exact header/footer text editing")]
+    UnsupportedSource,
+    #[error("the selected Pages header/footer graph has an unsupported dependency")]
+    UnsupportedDependency,
+    #[error("Pages header/footer text contains an invalid UTF-16 range")]
+    PositionOutOfBounds,
+    #[error("Pages header/footer text exceeds its semantic byte budget")]
+    TextTooLarge,
+    #[error("Pages header/footer text contains a native structural marker")]
+    StructuralMarker,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::NotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousSelector { .. }
+            | Self::PositionOutOfBounds { .. }
+            | Self::TextTooLarge { .. } => RefusalKind::InvalidValue,
+            Self::UnsupportedSource { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::StructuralMarker { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// Mutable selector-first header/footer text edit.
@@ -434,7 +468,7 @@ impl Edit<'_> {
         let start = utf16_boundary(&self.after, range.start)?;
         let end = utf16_boundary(&self.after, range.end)?;
         if start > end {
-            return Err(Error::PositionOutOfBounds);
+            return Err(Error::Refused(Refusal::PositionOutOfBounds));
         }
         self.after.replace_range(start..end, replacement);
         validate_authored(&self.after)?;
@@ -612,6 +646,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     #[must_use]
@@ -1208,7 +1248,7 @@ fn discover_slots_with_budget(
                         litchi_iwa_text_wire::validate_storage_with_limits(payload, residual)
                             .map_err(map_text_error)?;
                     if validation.storage_kind() != 1 {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     budget.charge_text_validation(payload.len(), validation)?;
                     budget.charge_text_allocation(validation)?;
@@ -1328,7 +1368,7 @@ fn select_record<'a>(
                 && record.resolved.public.kind() == selector.kind()
                 && record.resolved.public.slot() == selector.slot()
         })
-        .ok_or(Error::NotFound)
+        .ok_or(Error::Refused(Refusal::NotFound))
 }
 
 fn resolve_section_index(
@@ -1340,7 +1380,7 @@ fn resolve_section_index(
         SectionSelector::Position(position) => {
             let index = position.get();
             if source.sections().get(index).is_none() {
-                return Err(Error::NotFound);
+                return Err(Error::Refused(Refusal::NotFound));
             }
             Ok(index)
         },
@@ -1355,11 +1395,11 @@ fn resolve_section_index(
                 )?;
                 if section.name() == Some(name) {
                     if found.replace(index).is_some() {
-                        return Err(Error::AmbiguousSelector);
+                        return Err(Error::Refused(Refusal::AmbiguousSelector));
                     }
                 }
             }
-            found.ok_or(Error::NotFound)
+            found.ok_or(Error::Refused(Refusal::NotFound))
         },
     }
 }
@@ -1496,10 +1536,10 @@ fn validate_declared_reference(
                     .filter(|identifier| **identifier == target)
                     .count();
                 if occurrences != 0 && field.path.as_slice() != [expected_root_field] {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if field.data_references.contains(&target) {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 field_matches = field_matches.saturating_add(occurrences);
             }
@@ -1538,7 +1578,7 @@ fn reject_unattributed_storage_owners(
                             && record.resolved.storage_id == *target
                     });
                     if allowed && !expected {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 for target in &message_info.data_references {
@@ -1547,7 +1587,7 @@ fn reject_unattributed_storage_owners(
                         .iter()
                         .any(|record| record.resolved.storage_id == *target)
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                 }
                 for field in &message_info.field_infos {
@@ -1561,7 +1601,7 @@ fn reject_unattributed_storage_owners(
                                 && record.resolved.storage_id == *target
                         });
                         if allowed && !expected {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                     for target in &field.data_references {
@@ -1570,7 +1610,7 @@ fn reject_unattributed_storage_owners(
                             .iter()
                             .any(|record| record.resolved.storage_id == *target)
                         {
-                            return Err(Error::UnsupportedDependency);
+                            return Err(Error::Refused(Refusal::UnsupportedDependency));
                         }
                     }
                 }
@@ -1616,7 +1656,7 @@ fn reject_metadata_storage_owners(
     .map_err(map_metadata_error)?;
     budget.charge_metadata_report(inspection.report())?;
     if visitor.unsupported {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     Ok(())
 }
@@ -1762,7 +1802,7 @@ fn precharge_candidate_catalog(
             0 => member_bytes,
             8 => super::table_lock::deflate_compressed_bound(member_bytes)
                 .ok_or(Error::InvalidSource)?,
-            _ => return Err(Error::UnsupportedSource),
+            _ => return Err(Error::Refused(Refusal::UnsupportedSource)),
         };
         let old_compressed = usize::try_from(entry.metadata().compressed_size())
             .map_err(|_| Error::InvalidSource)?;
@@ -1888,7 +1928,7 @@ fn rewrite_storage_component(
     let validation = litchi_iwa_text_wire::validate_storage_with_limits(&message.data, limits)
         .map_err(map_text_error)?;
     if validation.storage_kind() != 1 {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     budget.charge_text_validation(message.data.len(), validation)?;
     budget.charge_text_allocation(validation)?;
@@ -1966,7 +2006,7 @@ fn rewrite_storage_component(
         || rewritten.object_reference_occurrences_before()
             != rewritten.object_reference_occurrences_after()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let message_type = message.type_;
     let rewritten = rewritten.into_bytes();
@@ -2049,7 +2089,7 @@ fn rewrite_metadata_tokens(
         .source
         .components()
         .get("Index/Metadata.iwa")
-        .ok_or(Error::UnsupportedDependency)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let mut location = None;
     for (object_index, object) in component.archive().objects.iter().enumerate() {
         for (message_index, message) in object.messages.iter().enumerate() {
@@ -2084,9 +2124,12 @@ fn rewrite_metadata_tokens(
     .map_err(map_metadata_error)?;
     budget.charge_metadata_report(inspection.report())?;
     if visitor.ambiguous {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    let matching = visitor.found.as_ref().ok_or(Error::UnsupportedDependency)?;
+    let matching = visitor
+        .found
+        .as_ref()
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let rewrite_options = metadata_options(source, payload.len(), budget)?;
     let selector = package_metadata_codec::ComponentSelector::new(matching.0, matching.1.as_str());
     let batch = package_metadata_codec::SaveTokenBatch::new(std::slice::from_ref(&selector));
@@ -2285,7 +2328,7 @@ fn residual_limit(
 ) -> Result<usize, Error> {
     let maximum = budget.remaining(kind);
     if maximum < required {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind,
             observed: required as u64,
             maximum: maximum as u64,
@@ -2403,19 +2446,19 @@ fn verify_member_bytes(
 
 fn validate_authored(value: &str) -> Result<(), Error> {
     if value.contains('\u{000e}') || value.contains('\u{fffc}') {
-        return Err(Error::StructuralMarker);
+        return Err(Error::Refused(Refusal::StructuralMarker));
     }
     let bytes = value.len();
     let units = value.encode_utf16().count();
     if units > u32::MAX as usize {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextUnits,
             observed: units as u64,
             maximum: u64::from(u32::MAX),
         });
     }
     if bytes > crate::DEFAULT_MAX_TEXT_BYTES {
-        return Err(Error::TextTooLarge);
+        return Err(Error::Refused(Refusal::TextTooLarge));
     }
     Ok(())
 }
@@ -2428,12 +2471,12 @@ fn utf16_boundary(value: &str, index: usize) -> Result<usize, Error> {
         }
         units = units
             .checked_add(character.len_utf16())
-            .ok_or(Error::PositionOutOfBounds)?;
+            .ok_or(Error::Refused(Refusal::PositionOutOfBounds))?;
     }
     if units == index {
         Ok(value.len())
     } else {
-        Err(Error::PositionOutOfBounds)
+        Err(Error::Refused(Refusal::PositionOutOfBounds))
     }
 }
 
@@ -2453,12 +2496,12 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::Entries,
             observed: observed as u64,
             maximum: limit as u64,
@@ -2475,7 +2518,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -2503,7 +2546,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2534,7 +2577,7 @@ fn map_text_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 "input bytes" | "input" => LimitKind::InputBytes,
                 "output bytes" | "output" => LimitKind::OutputBytes,
@@ -2584,7 +2627,7 @@ fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
@@ -2597,7 +2640,7 @@ fn map_metadata_error(error: package_metadata_codec::RewriteError) -> Error {
         Some(package_metadata_codec::InvalidReason::ExistingReferenceCollision)
         | Some(package_metadata_codec::InvalidReason::CrossComponentRemoval)
         | Some(package_metadata_codec::InvalidReason::VersionedRemoval) => {
-            Error::UnsupportedDependency
+            Error::Refused(Refusal::UnsupportedDependency)
         },
         _ => Error::InvalidSource,
     }
@@ -2626,7 +2669,7 @@ fn map_template_error(error: pages_header_footer_codec::DecodeError) -> Error {
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2662,7 +2705,7 @@ fn map_section_error(error: pages_section_codec::DecodeError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,

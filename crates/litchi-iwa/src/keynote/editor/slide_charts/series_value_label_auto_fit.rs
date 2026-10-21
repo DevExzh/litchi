@@ -8,7 +8,7 @@ use crate::charts::series_value_label_auto_fit::{
 };
 use crate::charts::{ChartSeriesValueLabelAutoFit, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label Auto-Fit setting in native series order.
     pub fn slide_chart_series_value_label_auto_fits(
         &self,
@@ -65,7 +65,7 @@ impl Editor {
 }
 
 fn slide_chart_series_value_label_auto_fits(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesValueLabelAutoFit>> {
@@ -87,7 +87,7 @@ fn slide_chart_series_value_label_auto_fits(
 }
 
 fn set_slide_chart_series_value_label_auto_fits(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     values: &[ChartSeriesValueLabelAutoFit],
@@ -125,7 +125,7 @@ fn set_slide_chart_series_value_label_auto_fits(
         "Keynote",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_value_label_auto_fits(slide_index, drawable_object_id)?
         != expected
     {

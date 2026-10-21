@@ -341,13 +341,15 @@ fn selector_and_malformed_background_fields_fail_closed_without_mutation() -> Te
     )?)?;
     assert!(matches!(
         same.edit_section_background(SectionSelector::name("Missing")),
-        Err(Error::NameNotFound)
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::NameNotFound
+        ))
     ));
     assert!(
-        matches!(same.edit_section_background(SectionSelector::index(2)), Err(Error::PositionNotFound { position }) if position == Position::new(2))
+        matches!(same.edit_section_background(SectionSelector::index(2)), Err(Error::Refused(litchi_pages::section::background::Refusal::PositionNotFound { position })) if position == Position::new(2))
     );
     assert!(
-        matches!(same.edit_section_background(SectionSelector::name("Same")), Err(Error::AmbiguousSelector { first, duplicate }) if first == Position::new(0) && duplicate == Position::new(1))
+        matches!(same.edit_section_background(SectionSelector::name("Same")), Err(Error::Refused(litchi_pages::section::background::Refusal::AmbiguousSelector { first, duplicate })) if first == Position::new(0) && duplicate == Position::new(1))
     );
 
     let canonical = section_message("Alpha", None, 7_777)?;
@@ -536,7 +538,9 @@ fn color_projection_is_strict_but_preserves_supported_display_p3() -> TestResult
                 edit.clear();
                 assert!(matches!(
                     edit.commit(),
-                    Err(Error::UnsupportedSource { .. })
+                    Err(Error::Refused(
+                        litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+                    ))
                 ));
             },
             Err(Error::InvalidSource { .. }) => {},
@@ -647,7 +651,9 @@ fn clear_and_changed_legacy_sources_obey_exact_source_rules() -> TestResult<()> 
     changed.clear();
     assert!(matches!(
         changed.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     Ok(())
 }
@@ -700,7 +706,9 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
     clear.clear();
     assert!(matches!(
         clear.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
     let mut replace = unsupported.edit_section_background(SectionSelector::index(0))?;
@@ -710,7 +718,9 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
     })?;
     assert!(matches!(
         replace.commit(),
-        Err(Error::UnsupportedSource { .. })
+        Err(Error::Refused(
+            litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&unsupported)?, unsupported_bytes);
 
@@ -748,7 +758,10 @@ fn unsupported_or_reference_owned_backgrounds_refuse_changed_edits_atomically() 
         })?;
         assert!(matches!(
             edit.commit(),
-            Err(Error::InvalidSource { .. } | Error::UnsupportedSource { .. })
+            Err(Error::InvalidSource { .. }
+                | Error::Refused(
+                    litchi_pages::section::background::Refusal::UnsupportedSource { .. }
+                ))
         ));
         assert_eq!(exact_bytes(&source)?, bytes);
     }
@@ -802,7 +815,7 @@ fn output_limits_are_atomic() -> TestResult<()> {
     })?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             ..
         })

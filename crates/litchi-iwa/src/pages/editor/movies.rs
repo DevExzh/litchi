@@ -51,7 +51,7 @@ pub struct RemovedPagesMovie {
     pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
-impl Editor {
+impl Draft {
     /// List ordinary file-backed movies anchored to the body in text-flow order.
     pub fn body_movies(&self) -> Result<Vec<MovieInfo>> {
         body_movie_infos(self)
@@ -87,7 +87,7 @@ impl Editor {
         let ids = MovieObjectIds::allocate(graph_first_identifier)?;
         let archive_name = find_object_archive(self.package(), self.body_storage_id.get())?;
 
-        let mut media = IWorkMediaEditor::from_package(self.package().clone())?;
+        let mut media = crate::media::Draft::from_package(self.package().clone())?;
         let movie_asset = media.insert_unreferenced(preferred_movie_filename, movie_data)?;
         if movie_asset.media_type != MediaType::Video {
             return Err(Error::ParseError(format!(
@@ -124,7 +124,7 @@ impl Editor {
             Ok(())
         })?;
 
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -413,7 +413,7 @@ impl Editor {
             new_attachment_id,
             BODY_DRAWABLE_DUPLICATE_OFFSET,
         )?;
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -526,14 +526,13 @@ impl Editor {
     }
 
     /// Remove a body movie, its attachment/private graph, and unshared assets.
-    #[allow(deprecated)]
     pub fn remove_body_movie(&mut self, drawable_object_id: u64) -> Result<RemovedPagesMovie> {
         let source = body_movie_graph(self, drawable_object_id)?;
-        let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
+        let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
             drawable_object_id,
         )?)?;
-        let mut text_editor = IWorkTextEditor::from_package(comments.into_package());
+        let mut text_editor = crate::text::Draft::from_package(comments.into_package());
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
@@ -569,7 +568,7 @@ impl Editor {
         remove_component_object_uuids(&mut staged, DOCUMENT_OBJECT_ID, &source.uuid_object_ids)?;
         release_package_identifier_suffix(&mut staged, &source.object_ids)?;
 
-        let mut media = IWorkMediaEditor::from_package(staged)?;
+        let mut media = crate::media::Draft::from_package(staged)?;
         let mut removed_data_identifiers = Vec::new();
         let data_identifiers = source
             .data_references
@@ -649,12 +648,8 @@ mod tests {
     }
 
     #[test]
-    #[expect(
-        deprecated,
-        reason = "exercises the legacy raw-ID Pages drawable-comment API; retained for migration-host compatibility"
-    )]
     fn scratch_document_supports_movie_crud_without_a_source_package() {
-        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Draft::create_with_text("Quarterly report").unwrap();
         let anchor = "Quarterly report".encode_utf16().count();
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
@@ -680,7 +675,7 @@ mod tests {
             POSTER
         );
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let roundtripped = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             roundtripped.body_movies().unwrap(),
             std::slice::from_ref(&created)
@@ -806,12 +801,12 @@ mod tests {
         assert_eq!(editor.body_text().unwrap(), "Quarterly report");
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn scratch_document_supports_native_movie_title_caption_crud() {
-        let mut editor = Editor::create_with_text("Movie labels").unwrap();
+        let mut editor = Draft::create_with_text("Movie labels").unwrap();
         let movie = editor
             .add_body_movie(
                 "Movie labels".encode_utf16().count(),
@@ -882,7 +877,7 @@ mod tests {
             crate::DrawableTitleCaption::default()
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_movie_title_caption(duplicate.drawable_object_id)
@@ -904,7 +899,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_native_movie_duplication() {
-        let mut editor = Editor::create_with_text("Quarterly report").unwrap();
+        let mut editor = Draft::create_with_text("Quarterly report").unwrap();
         let source = editor
             .add_body_movie(
                 "Quarterly report".encode_utf16().count(),
@@ -1008,7 +1003,7 @@ mod tests {
             REPLACEMENT_POSTER
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.body_movies().unwrap().len(), 2);
         assert_eq!(
             reopened
@@ -1036,12 +1031,12 @@ mod tests {
         );
         assert!(editor.body_movies().unwrap().is_empty());
         assert!(editor.media_assets().unwrap().is_empty());
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 
     #[test]
     fn invalid_movie_creation_and_cross_type_edits_are_transactional() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
         assert!(editor.duplicate_body_movie(999, 0).is_err());
         assert_eq!(editor.to_bytes().unwrap(), baseline);
@@ -1119,7 +1114,7 @@ mod tests {
 
     #[test]
     fn removing_an_earlier_movie_shifts_and_preserves_later_attachments() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         let first = editor
             .add_body_movie(4, "first.mov", MOVIE, "first.png", POSTER, options())
             .unwrap();
@@ -1150,6 +1145,6 @@ mod tests {
                 .unwrap(),
             REPLACEMENT_POSTER
         );
-        Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     }
 }

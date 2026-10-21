@@ -58,7 +58,7 @@ impl TransactionBudget {
     fn map_decode_error(&self, error: keynote_slide_number_codec::DecodeError) -> Error {
         match error.resource_limit() {
             Some(keynote_slide_number_codec::DecodeLimit::Bytes { observed, maximum }) => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireBytes,
                     observed: observed as u64,
                     maximum: maximum as u64,
@@ -67,7 +67,7 @@ impl TransactionBudget {
             Some(keynote_slide_number_codec::DecodeLimit::Fields {
                 observed,
                 maximum: _,
-            }) => Error::LimitExceeded {
+            }) => Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: self.fields.saturating_add(observed) as u64,
                 maximum: self.maximum_fields as u64,
@@ -75,13 +75,13 @@ impl TransactionBudget {
             Some(keynote_slide_number_codec::DecodeLimit::Work {
                 observed,
                 maximum: _,
-            }) => Error::LimitExceeded {
+            }) => Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: self.work.saturating_add(observed) as u64,
                 maximum: self.maximum_work as u64,
             },
             Some(keynote_slide_number_codec::DecodeLimit::Nesting { observed, maximum }) => {
-                Error::LimitExceeded {
+                Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: u64::from(observed),
                     maximum: u64::from(maximum),
@@ -395,7 +395,9 @@ pub(super) fn validate_storage(
         || storage.archive_info.message_infos.len() != 1
         || storage.messages[0].type_ != STORAGE_MESSAGE_TYPE
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     validate_merge_metadata(storage, &storage.archive_info.message_infos[0])?;
     let payload = storage.messages[0].data.as_slice();
@@ -409,7 +411,9 @@ pub(super) fn validate_storage(
     if !matches!(storage_projection.kind(), None | Some(3))
         || storage_projection.in_document() != Some(true)
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     reject_groups(payload, limits)?;
     let dependency_scan_work = payload.len().checked_mul(6).ok_or(Error::InvalidSource)?;
@@ -459,7 +463,9 @@ pub(super) fn validate_storage(
             return Err(Error::InvalidSource);
         }
         if field.number() == 1 && entry.replace(field).is_some() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(
+                crate::slide::placeholder::Refusal::UnsupportedSource,
+            ));
         }
     }
     let attachment_entry_field = entry.ok_or(Error::InvalidSource)?;
@@ -510,7 +516,9 @@ pub(super) fn validate_storage(
         || attachment.archive_info.message_infos.len() != 1
         || attachment.messages[0].type_ != ATTACHMENT_MESSAGE_TYPE
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     validate_merge_metadata(attachment, &attachment.archive_info.message_infos[0])?;
     charge_reference_metadata_scan(attachment, 0, budget)?;
@@ -540,7 +548,9 @@ pub(super) fn validate_storage(
             .string_equivalent()
             .is_some_and(|value| !value.is_empty())
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::slide::placeholder::Refusal::UnsupportedSource,
+        ));
     }
     let attachment_scan_work = attachment_payload
         .len()

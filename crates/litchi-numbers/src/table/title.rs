@@ -22,5 +22,7 @@
 //! shape-style prerequisites. These checks preserve the source's native
 //! structure without exposing it as an editable public detail.
 
-pub use crate::package::table_title::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path};
+pub use crate::package::table_title::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
+};
 pub use litchi_iwa_common::table::title::Settings;

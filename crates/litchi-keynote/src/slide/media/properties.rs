@@ -105,7 +105,7 @@ impl MediaProperties {
 
 // Exact-source transaction vocabulary of this family (ADR 0034 W1).
 pub use crate::package::slide_media_properties::{
-    Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };
 
 #[cfg(test)]

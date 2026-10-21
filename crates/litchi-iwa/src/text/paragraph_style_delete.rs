@@ -9,7 +9,7 @@ use crate::package_metadata::{
 };
 use crate::protobuf::{tsp, tss};
 use crate::wire::{repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields};
-use crate::{Error, IWorkPackage, IWorkThemeArchive, Result};
+use crate::{Error, HostPackage, IWorkThemeArchive, Result};
 
 use super::paragraph_alignment::native;
 use super::paragraph_style_catalog::{ThemeLocation, locate_themes};
@@ -21,7 +21,7 @@ const STYLESHEET_STYLES_FIELD: u32 = 1;
 const STYLESHEET_IDENTIFIER_MAP_FIELD: u32 = 2;
 
 pub(super) fn delete_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     first_style_id: u64,
     target: ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
@@ -82,7 +82,7 @@ pub(super) fn delete_named_paragraph_style(
 }
 
 fn ensure_no_live_references(
-    package: &IWorkPackage,
+    package: &HostPackage,
     target: u64,
     stylesheet_id: u64,
     themes: &[ThemeLocation],
@@ -122,7 +122,7 @@ fn ensure_no_live_references(
 }
 
 fn remove_theme_preset(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &ThemeLocation,
     stylesheet_id: u64,
     target: u64,
@@ -226,7 +226,7 @@ fn ensure_only_paragraph_preset_reference(
 }
 
 fn remove_stylesheet_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     stylesheet_id: u64,
     target: u64,

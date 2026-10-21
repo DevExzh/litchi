@@ -694,7 +694,7 @@ fn output_limit_rejects_growth_before_publication() -> TestResult {
         .set(points(32.0)?)
         .commit()
         .expect_err("output growth must be rejected at the physical ceiling");
-    assert!(matches!(error, Error::LimitExceeded { .. }));
+    assert!(matches!(error, Error::Limit { .. }));
     assert_eq!(bounded.exact_bytes(), before);
     Ok(())
 }
@@ -733,7 +733,7 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
         let result = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(1))
             .and_then(|edit| edit.set(requested).commit());
-        assert!(matches!(result, Err(Error::LimitExceeded { .. })));
+        assert!(matches!(result, Err(Error::Limit { .. })));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -756,8 +756,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         assert!(matches!(
             result,
             Err(Error::InvalidSource)
-                | Err(Error::UnsupportedSource)
-                | Err(Error::LimitExceeded { .. })
+                | Err(Error::Refused(
+                    litchi_pages::table::dimension::transaction::Refusal::UnsupportedSource
+                ))
+                | Err(Error::Limit { .. })
         ));
         assert_eq!(package.exact_bytes(), before);
     }
@@ -770,7 +772,10 @@ fn lock_alias_missing_and_malformed_buckets_fail_atomically() -> TestResult {
         .set(requested)
         .commit()
         .expect_err("locked table dimension must refuse");
-    assert!(matches!(error, Error::TableLocked));
+    assert!(matches!(
+        error,
+        Error::Refused(litchi_pages::table::dimension::transaction::Refusal::TableLocked)
+    ));
     Ok(())
 }
 
@@ -799,10 +804,7 @@ fn limits_and_public_values_are_typed_and_redacted() -> TestResult {
             .set_points(Points::new(31.0)?)
             .commit()
             .expect_err("tight header limits must reject before publication");
-        assert!(matches!(
-            error,
-            Error::LimitExceeded { .. } | Error::InvalidSource
-        ));
+        assert!(matches!(error, Error::Limit { .. } | Error::InvalidSource));
     }
     let package = Package::from_bytes(&source)?;
     let edit = package.edit_body_table_dimension_size(0usize, Dimension::Row(0))?;

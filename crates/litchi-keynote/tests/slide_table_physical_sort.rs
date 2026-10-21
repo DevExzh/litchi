@@ -1919,11 +1919,13 @@ fn duplicate_sort_keys_are_stable_and_selected_ranges_are_body_relative() -> Tes
     let package = Package::from_bytes(&selected)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::ScopeMismatch {
-            configured: Scope::SelectedRows,
-            requested: Scope::EntireTable,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::ScopeMismatch {
+                configured: Scope::SelectedRows,
+                requested: Scope::EntireTable,
+                ..
+            }
+        ))
     ));
     let commit = package.execute_slide_table_sort_order_to_rows(
         SlideSelector::name("Tables"),
@@ -1993,7 +1995,7 @@ fn cross_tile_row_moves_are_rejected_before_publication() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())
@@ -2077,25 +2079,29 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
     let package = Package::from_bytes(&entire_source)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(usize::MAX, 0usize),
-        Err(Error::SlidePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlidePositionNotFound { .. }))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name(""), 0usize),
-        Err(Error::EmptySlideName)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::EmptySlideName
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(SlideSelector::name("missing"), 0usize),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, usize::MAX),
-        Err(Error::TablePositionNotFound { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::TablePositionNotFound { .. }))
     ));
     let selected_source = source(Scope::SelectedRows)?;
     let selected = Package::from_bytes(&selected_source)?;
     assert!(matches!(
         selected.execute_slide_table_sort_order_to_rows(0usize, 0usize, RowRange::new(4, 6)?),
-        Err(Error::RowRangeOutOfBounds { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::RowRangeOutOfBounds { .. }))
     ));
     let absent = Package::from_bytes(&source_package(Scope::EntireTable, false, false)?)?;
     let absent = rewrite_document(&package_bytes(&absent)?, |archive| {
@@ -2117,13 +2123,17 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
     let absent = Package::from_bytes(&absent)?;
     assert!(matches!(
         absent.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::SortOrderMissing { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::SortOrderMissing { .. }
+        ))
     ));
     let locked = Package::from_bytes(&rewrite_table_info(&entire_source, true)?)?;
     let before = package_bytes(&locked)?;
     assert!(matches!(
         locked.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::TableLocked { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::TableLocked { .. }
+        ))
     ));
     assert_source_unchanged(&locked, &before)?;
     Ok(())
@@ -2226,10 +2236,12 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let formula_before = package_bytes(&formula_package)?;
     assert!(matches!(
         formula_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedFeature {
-            feature: UnsupportedFeature::Formula,
-            ..
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedFeature {
+                feature: UnsupportedFeature::Formula,
+                ..
+            }
+        ))
     ));
     assert_source_unchanged(&formula_package, &formula_before)?;
 
@@ -2238,10 +2250,10 @@ fn formula_registry_and_imported_data_are_rejected_atomically() -> TestResult {
     let imported_before = package_bytes(&imported_package)?;
     assert!(matches!(
         imported_package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedDependency {
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedDependency {
             feature: UnsupportedFeature::RowAffineDependency,
             ..
-        })
+        }))
     ));
     assert_source_unchanged(&imported_package, &imported_before)?;
     Ok(())
@@ -2327,7 +2339,7 @@ fn string_entry_sidecars_are_rejected_atomically() -> TestResult {
     let before = package_bytes(&package)?;
     assert!(matches!(
         package.execute_slide_table_sort_order(0usize, 0usize),
-        Err(Error::UnsupportedTopology { .. })
+        Err(Error::Refused(litchi_keynote::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { .. }))
     ));
     assert_source_unchanged(&package, &before)?;
     Ok(())

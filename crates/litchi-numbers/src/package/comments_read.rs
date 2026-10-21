@@ -61,16 +61,14 @@ fn copy_text(
     retained: &mut usize,
     path: Path,
 ) -> Result<Box<str>, Error> {
-    let next = retained
-        .checked_add(value.len())
-        .ok_or(Error::LimitExceeded {
-            kind: LimitKind::TextBytes,
-            observed: usize::MAX,
-            maximum,
-            path,
-        })?;
+    let next = retained.checked_add(value.len()).ok_or(Error::Limit {
+        kind: LimitKind::TextBytes,
+        observed: usize::MAX,
+        maximum,
+        path,
+    })?;
     if next > maximum {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextBytes,
             observed: next,
             maximum,
@@ -94,55 +92,45 @@ fn map_error(error: annotation_author_codec::DecodeError, path: Path) -> Error {
         return Error::InvalidSource { path };
     };
     match limit {
-        annotation_author_codec::DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        annotation_author_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed,
             maximum,
             path,
         },
         annotation_author_codec::DecodeLimit::OutputBytes { observed, maximum }
-        | annotation_author_codec::DecodeLimit::Retained { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::OutputBytes,
-                observed,
-                maximum,
-                path,
-            }
+        | annotation_author_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed,
+            maximum,
+            path,
         },
-        annotation_author_codec::DecodeLimit::Fields { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireFields,
-                observed,
-                maximum,
-                path,
-            }
+        annotation_author_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireFields,
+            observed,
+            maximum,
+            path,
         },
         annotation_author_codec::DecodeLimit::Work { observed, maximum }
-        | annotation_author_codec::DecodeLimit::Scratch { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed,
-                maximum,
-                path,
-            }
+        | annotation_author_codec::DecodeLimit::Scratch { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+            path,
         },
-        annotation_author_codec::DecodeLimit::Nesting { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: usize::try_from(observed).unwrap_or(usize::MAX),
-                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
-                path,
-            }
+        annotation_author_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
         },
-        annotation_author_codec::DecodeLimit::References { observed, maximum } => {
-            Error::LimitExceeded {
-                kind: LimitKind::References,
-                observed,
-                maximum,
-                path,
-            }
+        annotation_author_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
+            kind: LimitKind::References,
+            observed,
+            maximum,
+            path,
         },
-        annotation_author_codec::DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        annotation_author_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed,
             maximum,

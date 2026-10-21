@@ -2,7 +2,6 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-use litchi_iwa::IWorkMediaEditor;
 use litchi_iwa::keynote;
 use litchi_iwa::media::MediaAssetId;
 use litchi_iwa::numbers;
@@ -17,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(2);
     };
 
-    let editor = IWorkMediaEditor::open(input)?;
+    let editor = litchi_iwa::media::Draft::open(input)?;
     for asset in editor.assets() {
         println!(
             "id={} type={} path={} actual={:?} declared={:?} component_records={} component_refs={} message_refs={} metadata={}",
@@ -41,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .file_name()
                 .and_then(|name| name.to_str())
                 .ok_or("media path has no UTF-8 basename")?;
-            let mut media = IWorkMediaEditor::open(input)?;
+            let mut media = litchi_iwa::media::Draft::open(input)?;
             let inserted = media.insert_unreferenced(preferred_filename, &data)?;
             media.save(output)?;
             println!(
@@ -56,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         if arguments[2] == "remove" {
             let data_identifier = MediaAssetId::try_from(arguments[3].parse::<u64>()?)?;
-            let mut media = IWorkMediaEditor::open(input)?;
+            let mut media = litchi_iwa::media::Draft::open(input)?;
             let removed = media.remove_unreferenced(data_identifier)?;
             media.save(output)?;
             println!(
@@ -75,19 +74,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|extension| extension.to_str())
         {
             Some("key") => {
-                let mut app = keynote::Editor::open(input)?;
+                let mut app = keynote::Draft::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("numbers") => {
-                let mut app = numbers::Editor::open(input)?;
+                let mut app = numbers::Draft::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("pages") => {
-                let mut app = pages::Editor::open(input)?;
+                let mut app = pages::Draft::open(input)?;
                 let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous

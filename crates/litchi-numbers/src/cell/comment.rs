@@ -7,12 +7,12 @@
 
 pub use crate::package::comments::{
     Comment, CommentAuthor, CommentReply, CommentReplyIndex, CommentTimestamp, Commit, Diagnostics,
-    Edit, Error, LimitKind, Patch, Path,
+    Edit, Error, LimitKind, Patch, Path, Refusal,
 };
 
 /// Selector-first exact-source transactions for direct comment replies.
 pub mod transaction {
     pub use crate::package::comments::comments_reply::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

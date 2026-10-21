@@ -114,24 +114,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// The rooted Pages body has no table matching the selector.
-    #[error("the Pages body has no table matching the requested selector")]
-    TableNotFound,
-    /// More than one body table has the requested exact name.
-    #[error("the Pages body has more than one table with the requested name")]
-    AmbiguousTableName,
-    /// A selector could not be resolved uniquely.
-    #[error("the Pages body-table selector is ambiguous")]
-    AmbiguousSelector,
-    /// The package source cannot publish a preservation-safe changed edit.
-    #[error("the Pages package source does not support exact body-table lock editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted semantic selection did not resolve to one supported native payload.
     #[error("the selected Pages body table has no unambiguous editable lock payload")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Pages body-table lock {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested resource amount.
@@ -151,6 +143,46 @@ pub enum Error {
     /// The supplied patch was not created from this exact package artifact.
     #[error("the Pages body-table lock patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The rooted Pages body has no table matching the selector.
+    #[error("the Pages body has no table matching the requested selector")]
+    TableNotFound,
+    /// More than one body table has the requested exact name.
+    #[error("the Pages body has more than one table with the requested name")]
+    AmbiguousTableName,
+    /// A selector could not be resolved uniquely.
+    #[error("the Pages body-table selector is ambiguous")]
+    AmbiguousSelector,
+    /// The package source cannot publish a preservation-safe changed edit.
+    #[error("the Pages package source does not support exact body-table lock editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::AmbiguousTableName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A mutable semantic body-table lock state staged against one immutable
@@ -219,7 +251,7 @@ impl Edit<'_> {
             });
         }
         if !source.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let package = rewrite_lock_state(
@@ -371,6 +403,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the exact-source reversible patch.
@@ -538,7 +576,7 @@ impl Package {
                 targets
                     .into_iter()
                     .nth(position.get())
-                    .ok_or(Error::TableNotFound)
+                    .ok_or(Error::Refused(Refusal::TableNotFound))
             },
             BodyTableSelector::Name(name) => {
                 let mut first = None;
@@ -549,11 +587,11 @@ impl Package {
                         continue;
                     }
                     if first.replace(target).is_some() {
-                        return Err(Error::AmbiguousTableName);
+                        return Err(Error::Refused(Refusal::AmbiguousTableName));
                     }
                 }
                 let Some(first) = first else {
-                    return Err(Error::TableNotFound);
+                    return Err(Error::Refused(Refusal::TableNotFound));
                 };
                 Ok(first)
             },
@@ -680,7 +718,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         return if allow_empty {
             Ok(Vec::new())
         } else {
-            Err(Error::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     };
     if !message_declares_reference(
@@ -757,7 +795,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         return if allow_empty {
             Ok(Vec::new())
         } else {
-            Err(Error::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     };
     let table_view = budget.parse(table_field.payload(), 1)?;
@@ -766,7 +804,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         .filter(|field| field.number() == TABLE_ENTRY_FIELD)
         .count();
     if entry_count > MAX_BODY_TABLES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(entry_count),
             maximum: usize_as_u64(MAX_BODY_TABLES),
@@ -973,7 +1011,7 @@ fn native_body_table_targets_from_components_with_budget_mode(
         return if allow_empty {
             Ok(targets)
         } else {
-            Err(Error::TableNotFound)
+            Err(Error::Refused(Refusal::TableNotFound))
         };
     }
     Ok(targets)
@@ -1112,7 +1150,7 @@ fn map_body_storage_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Err
             resource,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match resource {
                 "message bytes" => LimitKind::WireBytes,
                 "fields" => LimitKind::WireFields,
@@ -1228,7 +1266,7 @@ fn map_table_model_codec_error(error: table_model_discovery_codec::DecodeError) 
         ),
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed,
         maximum,
@@ -1552,7 +1590,7 @@ fn rewrite_lock_state(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = physical_limits
         .effective_archive_limits()
@@ -1594,7 +1632,7 @@ fn rewrite_lock_state(
     let original_message_length = message.data.len();
     let patched_bound =
         table_info_rewrite_bound(original_message_length, target.explicit_locked.is_some()).ok_or(
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: u64::MAX,
                 maximum: physical_limits.max_input_bytes(),
@@ -1604,38 +1642,37 @@ fn rewrite_lock_state(
         .checked_sub(original_message_length)
         .and_then(|value| value.checked_add(patched_bound))
         .and_then(|value| value.checked_add(16))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_input_bytes(),
         })?;
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_entry_bytes(),
         })?;
-    let compressed_bound =
-        snappy_compressed_bound(rewritten_bound).ok_or(Error::LimitExceeded {
-            kind: LimitKind::OutputBytes,
-            observed: u64::MAX,
-            maximum: physical_limits.max_input_bytes(),
-        })?;
+    let compressed_bound = snappy_compressed_bound(rewritten_bound).ok_or(Error::Limit {
+        kind: LimitKind::OutputBytes,
+        observed: u64::MAX,
+        maximum: physical_limits.max_input_bytes(),
+    })?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => deflate_compressed_bound(compressed_bound).ok_or(Error::LimitExceeded {
+        8 => deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_input_bytes(),
         })?,
-        _ => return Err(Error::UnsupportedSource),
+        _ => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     let package_output_bound = source_catalog
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
         .and_then(|value| value.checked_add(replacement_compressed_bound))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: physical_limits.max_input_bytes(),
@@ -2268,7 +2305,7 @@ pub(crate) fn preflight_body_table_component<'a>(
         .find(|entry| entry.name() == component.name())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget.charge_payload_work(entry.data().len())?;
     let stream_length = parsed_archive_source_length(component.archive())?;
@@ -2531,7 +2568,7 @@ impl WireBudget {
                 .and_then(|value| value.checked_add(entry.metadata().central().name().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().extra().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().comment().len()))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::PackageBytes,
                     observed: u64::MAX,
                     maximum: self.physical_limits.max_input_bytes(),
@@ -2610,7 +2647,7 @@ impl WireBudget {
         )?;
         self.charge_wire_work(work_bytes)?;
         if usize::try_from(max_depth).unwrap_or(usize::MAX) > self.limits.max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(max_depth),
                 maximum: usize_as_u64(self.limits.max_nesting()),
@@ -2625,14 +2662,14 @@ impl WireBudget {
         maximum: u64,
         kind: LimitKind,
     ) -> Result<(), Error> {
-        let observed = counter.checked_add(amount).ok_or(Error::LimitExceeded {
+        let observed = counter.checked_add(amount).ok_or(Error::Limit {
             kind,
             observed: u64::MAX,
             maximum,
         })?;
         let observed_u64 = usize_as_u64(observed);
         if observed_u64 > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed_u64,
                 maximum,
@@ -2643,16 +2680,13 @@ impl WireBudget {
     }
 
     fn charge_wire_work(&mut self, amount: usize) -> Result<(), Error> {
-        let work = self
-            .total_work
-            .checked_add(amount)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: u64::MAX,
-                maximum: usize_as_u64(self.limits.max_rewrite_work()),
-            })?;
+        let work = self.total_work.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.limits.max_rewrite_work()),
+        })?;
         if work > self.limits.max_rewrite_work() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_as_u64(work),
                 maximum: usize_as_u64(self.limits.max_rewrite_work()),
@@ -2663,16 +2697,13 @@ impl WireBudget {
     }
 
     pub(crate) fn charge_payload_work(&mut self, amount: usize) -> Result<(), Error> {
-        let work = self
-            .payload_work
-            .checked_add(amount)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: u64::MAX,
-                maximum: usize_as_u64(self.maximum_payload_work),
-            })?;
+        let work = self.payload_work.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.maximum_payload_work),
+        })?;
         if work > self.maximum_payload_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: usize_as_u64(work),
                 maximum: usize_as_u64(self.maximum_payload_work),
@@ -2724,7 +2755,7 @@ impl WireBudget {
         let observed = usize_as_u64(amount);
         let maximum = self.physical_limits.max_entry_bytes();
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed,
                 maximum,
@@ -2850,7 +2881,7 @@ impl WireBudget {
         for entry in package.iter() {
             let entry_bytes =
                 usize::try_from(entry.metadata().uncompressed_size()).map_err(|_| {
-                    Error::LimitExceeded {
+                    Error::Limit {
                         kind: LimitKind::EntryBytes,
                         observed: u64::MAX,
                         maximum: self.physical_limits.max_entry_bytes(),
@@ -2871,7 +2902,7 @@ impl WireBudget {
                 .and_then(|value| value.checked_add(entry.metadata().central().name().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().extra().len()))
                 .and_then(|value| value.checked_add(entry.metadata().central().comment().len()))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::PackageBytes,
                     observed: u64::MAX,
                     maximum: self.physical_limits.max_input_bytes(),
@@ -2897,7 +2928,7 @@ impl WireBudget {
         for component in components.iter() {
             let archive_bytes = parsed_archive_source_length(component.archive())?;
             if archive_bytes > self.physical_limits.max_iwa_stream_bytes() {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::PayloadBytes,
                     observed: usize_as_u64(archive_bytes),
                     maximum: usize_as_u64(self.physical_limits.max_iwa_stream_bytes()),
@@ -2923,7 +2954,7 @@ impl WireBudget {
             message_count =
                 message_count
                     .checked_add(object.messages.len())
-                    .ok_or(Error::LimitExceeded {
+                    .ok_or(Error::Limit {
                         kind: LimitKind::PayloadMessages,
                         observed: u64::MAX,
                         maximum: u64::MAX,
@@ -2934,7 +2965,7 @@ impl WireBudget {
                     .and_then(|value| value.checked_add(info.field_infos.len()))
                     .and_then(|value| value.checked_add(info.object_references.len()))
                     .and_then(|value| value.checked_add(info.data_references.len()))
-                    .ok_or(Error::LimitExceeded {
+                    .ok_or(Error::Limit {
                         kind: LimitKind::PayloadItems,
                         observed: u64::MAX,
                         maximum: u64::MAX,
@@ -2947,7 +2978,7 @@ impl WireBudget {
             .checked_add(archive.objects.len())
             .and_then(|value| value.checked_add(message_count))
             .and_then(|value| value.checked_add(item_count))
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: u64::MAX,
                 maximum: usize_as_u64(self.maximum_payload_work),
@@ -2961,7 +2992,7 @@ impl WireBudget {
         } else {
             (usize::BITS - (length - 1).leading_zeros()) as usize
         };
-        let amount = length.checked_mul(levels).ok_or(Error::LimitExceeded {
+        let amount = length.checked_mul(levels).ok_or(Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::MAX,
             maximum: usize_as_u64(self.maximum_payload_work),
@@ -2975,7 +3006,7 @@ impl WireBudget {
         depth: usize,
     ) -> Result<WireView<'a>, Error> {
         if depth > self.limits.max_nesting() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: usize_as_u64(depth),
                 maximum: usize_as_u64(self.limits.max_nesting()),
@@ -2984,13 +3015,13 @@ impl WireBudget {
         let bytes = self
             .total_bytes
             .checked_add(source.len())
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: u64::MAX,
                 maximum: usize_as_u64(self.limits.max_input_bytes()),
             })?;
         if bytes > self.limits.max_input_bytes() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_as_u64(bytes),
                 maximum: usize_as_u64(self.limits.max_input_bytes()),
@@ -3000,26 +3031,23 @@ impl WireBudget {
         let fields = self
             .total_fields
             .checked_add(view.len())
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: u64::MAX,
                 maximum: usize_as_u64(self.limits.max_fields()),
             })?;
         if fields > self.limits.max_fields() {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireFields,
                 observed: usize_as_u64(fields),
                 maximum: usize_as_u64(self.limits.max_fields()),
             });
         }
-        let work = source
-            .len()
-            .checked_add(view.len())
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::WireWork,
-                observed: u64::MAX,
-                maximum: usize_as_u64(self.limits.max_rewrite_work()),
-            })?;
+        let work = source.len().checked_add(view.len()).ok_or(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: u64::MAX,
+            maximum: usize_as_u64(self.limits.max_rewrite_work()),
+        })?;
         self.charge_wire_work(work)?;
         self.total_bytes = bytes;
         self.total_fields = fields;
@@ -3031,31 +3059,31 @@ pub(crate) fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
         PackageError::Allocation { amount } => Error::Allocation { amount },
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
         },
         PackageError::Semantic(error) => match error {
             crate::Error::TooManySections { actual, limit }
-            | crate::Error::TooManyBodyStorages { actual, limit } => Error::LimitExceeded {
+            | crate::Error::TooManyBodyStorages { actual, limit } => Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(actual),
                 maximum: usize_as_u64(limit),
             },
-            crate::Error::TextTooLarge { observed, limit } => Error::LimitExceeded {
+            crate::Error::TextTooLarge { observed, limit } => Error::Limit {
                 kind: LimitKind::PayloadBytes,
                 observed: usize_as_u64(observed),
                 maximum: usize_as_u64(limit),
             },
             crate::Error::InvalidSectionIndex { .. } => Error::InvalidSource,
         },
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(limit),
@@ -3077,7 +3105,7 @@ pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3095,7 +3123,7 @@ pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
         | litchi_iwa_archive::Error::InvalidLimits(_)
@@ -3112,7 +3140,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -3153,7 +3181,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3386,7 +3414,7 @@ mod tests {
                 .expect("first bounded table-info decode");
             assert!(matches!(
                 decode_table_info(&payload, &mut budget, body_identifier),
-                Err(Error::LimitExceeded { kind: observed, .. }) if observed == kind
+                Err(Error::Limit { kind: observed, .. }) if observed == kind
             ));
         }
     }
@@ -3413,7 +3441,7 @@ mod tests {
         charge(&mut budget, maximum).expect("maximum is accepted");
         assert!(matches!(
             charge(&mut budget, 1),
-            Err(Error::LimitExceeded { kind: observed, .. }) if observed == kind
+            Err(Error::Limit { kind: observed, .. }) if observed == kind
         ));
     }
 
@@ -3467,7 +3495,7 @@ mod tests {
             .expect("a second member at the maximum is accepted");
         assert!(matches!(
             budget.charge_entry_bytes(9),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
                 observed: 9,
                 maximum: 8,
@@ -3616,7 +3644,7 @@ mod tests {
                 false,
                 &mut message_budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })
@@ -3631,7 +3659,7 @@ mod tests {
                 &[TABLE_BODY_FIELD],
                 &mut prefix_budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })
@@ -3655,7 +3683,7 @@ mod tests {
                 true,
                 &mut field_budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })
@@ -3670,7 +3698,7 @@ mod tests {
                 &[TABLE_BODY_FIELD],
                 &mut field_prefix_budget,
             ),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })
@@ -3688,7 +3716,7 @@ mod tests {
         budget.maximum_payload_references = 0;
         assert!(matches!(
             message_declares_reference_prefix(&message, 100, &[TABLE_BODY_FIELD], &mut budget,),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })
@@ -3711,7 +3739,7 @@ mod tests {
         budget.maximum_payload_references = 0;
         assert!(matches!(
             validate_body_table_ownership(&message, &[], &mut budget),
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::PayloadReferences,
                 ..
             })

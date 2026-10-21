@@ -8,7 +8,7 @@ use crate::charts::category_labels::{
     set_chart_category_label_layout as set_native_category_label_layout,
 };
 
-impl Editor {
+impl Draft {
     /// Read the complete category-label menu state for one sheet chart.
     pub fn sheet_chart_category_label_layout(
         &self,
@@ -30,7 +30,7 @@ impl Editor {
 }
 
 fn sheet_chart_category_label_layout(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Layout> {
@@ -44,7 +44,7 @@ fn sheet_chart_category_label_layout(
 }
 
 fn set_sheet_chart_category_label_layout(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     layout: Layout,
@@ -58,7 +58,7 @@ fn set_sheet_chart_category_label_layout(
         "Numbers",
         layout,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_category_label_layout(sheet_id, drawable_object_id)? != layout {
         return Err(Error::InvalidFormat(
             "Numbers chart category-label layout update failed validation".to_owned(),
@@ -117,7 +117,7 @@ mod tests {
         editor
             .set_sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id, customized)
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_category_label_layout(sheet_id, chart.drawable_object_id)

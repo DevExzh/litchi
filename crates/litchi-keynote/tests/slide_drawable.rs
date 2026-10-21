@@ -72,11 +72,15 @@ fn inventory_reads_kinds_text_geometry_and_z_order() -> TestResult {
     }
     assert!(matches!(
         package.slide_drawable_list(SlideSelector::index(9)),
-        Err(Error::SlidePositionNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_drawable_list(SlideSelector::name("")),
-        Err(Error::EmptySlideName)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::EmptySlideName
+        ))
     ));
     let runs =
         package.slide_drawable_text_runs(SlideSelector::index(0), DrawableSelector::index(0))?;
@@ -185,7 +189,9 @@ fn move_to_reorders_the_z_order_only() -> TestResult {
             DrawableSelector::index(0),
             Position::new(3)
         ),
-        Err(Error::ZPositionOutOfRange { count: 3, .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::ZPositionOutOfRange { count: 3, .. }
+        ))
     ));
     Ok(())
 }
@@ -281,17 +287,23 @@ fn add_image_creates_data_and_reads_back() -> TestResult {
     let mut edit = package.edit_slide_drawables();
     assert!(matches!(
         edit.add_image(slide, b"not an image", "x.png", frame),
-        Err(Error::Unsupported {
-            reason: Unsupported::ImageFormat
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::ImageFormat
+            }
+        ))
     ));
     assert!(matches!(
         edit.add_image(slide, &PNG, ".png", frame),
-        Err(Error::InvalidImage)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidImage
+        ))
     ));
     assert!(matches!(
         edit.add_image(slide, &PNG, "a/b.png", frame),
-        Err(Error::InvalidImage)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidImage
+        ))
     ));
     Ok(())
 }
@@ -392,15 +404,19 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
     let mut edit = package.edit_slide_drawables();
     assert!(matches!(
         edit.remove(slide, DrawableSelector::index(1)),
-        Err(Error::Unsupported {
-            reason: Unsupported::Kind {
-                kind: Kind::TitlePlaceholder
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::Kind {
+                    kind: Kind::TitlePlaceholder
+                }
             }
-        })
+        ))
     ));
     assert!(matches!(
         edit.remove(slide, DrawableSelector::index(7)),
-        Err(Error::DrawablePositionNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::DrawablePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         edit.set_geometry(
@@ -408,7 +424,9 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             DrawableSelector::index(0),
             Geometry::new(0.0, 0.0, 0.0, 10.0)
         ),
-        Err(Error::InvalidGeometry)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidGeometry
+        ))
     ));
     assert!(matches!(
         edit.set_geometry(
@@ -416,7 +434,9 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             DrawableSelector::index(0),
             Geometry::new(f32::NAN, 0.0, 1.0, 10.0)
         ),
-        Err(Error::InvalidGeometry)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidGeometry
+        ))
     ));
     assert!(matches!(
         edit.add_shape(
@@ -425,7 +445,9 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             Geometry::new(0.0, 0.0, 100.0, 100.0),
             ""
         ),
-        Err(Error::InvalidGeometry)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidGeometry
+        ))
     ));
     assert!(matches!(
         edit.set_text_style(
@@ -434,11 +456,13 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             TextSpan::new(0, 4),
             Style::new()
         ),
-        Err(Error::Unsupported {
-            reason: Unsupported::TextStyling
-        } | Error::Unsupported {
-            reason: Unsupported::Kind { .. }
-        })
+        Err(
+            Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::TextStyling
+            }) | Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::Kind { .. }
+            })
+        )
     ));
     assert!(matches!(
         edit.set_text_style(
@@ -447,12 +471,16 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             TextSpan::new(4, 40),
             Style::new()
         ),
-        Err(Error::InvalidSpan)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::InvalidSpan
+        ))
     ));
     edit.remove(slide, DrawableSelector::index(0))?;
     assert!(matches!(
         edit.remove(slide, DrawableSelector::index(0)),
-        Err(Error::DrawableRemoved)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::DrawableRemoved
+        ))
     ));
     assert!(matches!(
         edit.set_geometry(
@@ -460,7 +488,9 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             DrawableSelector::index(0),
             Geometry::new(0.0, 0.0, 1.0, 1.0)
         ),
-        Err(Error::DrawableRemoved)
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::DrawableRemoved
+        ))
     ));
     // The refusals left the staged removal intact.
     assert_eq!(edit.commit()?.diagnostics().removed_drawables(), 1);
@@ -485,7 +515,13 @@ fn corpus_inventories_read_or_refuse_and_identity_geometry_is_a_no_op() -> TestR
         let slides = package.slides()?.len();
         for slide in 0..slides {
             match package.slide_drawable_list(SlideSelector::index(slide)) {
-                Ok(_) | Err(Error::Unsupported { .. } | Error::LimitExceeded { .. }) => {},
+                Ok(_)
+                | Err(
+                    Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                        ..
+                    })
+                    | Error::Limit { .. },
+                ) => {},
                 Err(error) => panic!("{}: slide {slide}: {error}", path.display()),
             }
         }
@@ -508,7 +544,9 @@ fn corpus_inventories_read_or_refuse_and_identity_geometry_is_a_no_op() -> TestR
                     assert_eq!(list(commit.package(), 0)?.len() + 1, drawables.len());
                     removed += 1;
                 },
-                Err(Error::Unsupported { .. }) => refused += 1,
+                Err(Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                    ..
+                })) => refused += 1,
                 Err(error) => panic!("{}: {error}", path.display()),
             }
         }
@@ -523,7 +561,9 @@ fn corpus_inventories_read_or_refuse_and_identity_geometry_is_a_no_op() -> TestR
                 assert_eq!(list(commit.package(), 0)?.len(), drawables.len() + 1);
                 added += 1;
             },
-            Err(Error::Unsupported { .. }) => {},
+            Err(Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                ..
+            })) => {},
             Err(error) => panic!("{}: {error}", path.display()),
         }
         let Some(shape) = drawables.iter().find(|drawable| {
@@ -608,21 +648,27 @@ fn set_text_refuses_placeholders_images_and_inline_markers() -> TestResult {
     let mut edit = package.edit_slide_drawables();
     assert!(matches!(
         edit.set_text(slide, DrawableSelector::index(1), "Title"),
-        Err(Error::Unsupported {
-            reason: Unsupported::Kind {
-                kind: Kind::TitlePlaceholder
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::Kind {
+                    kind: Kind::TitlePlaceholder
+                }
             }
-        })
+        ))
     ));
     assert!(matches!(
         edit.set_text(slide, DrawableSelector::index(0), "object \u{fffc} marker"),
-        Err(Error::Unsupported {
-            reason: Unsupported::InlineObjects
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::InlineObjects
+            }
+        ))
     ));
     assert!(matches!(
         edit.set_text(slide, DrawableSelector::index(7), "x"),
-        Err(Error::DrawablePositionNotFound { .. })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::DrawablePositionNotFound { .. }
+        ))
     ));
     // A new image has no text storage.
     let mut edit = package.edit_slide_drawables();
@@ -637,9 +683,11 @@ fn set_text_refuses_placeholders_images_and_inline_markers() -> TestResult {
     let mut edit = with_image.edit_slide_drawables();
     assert!(matches!(
         edit.set_text(slide, DrawableSelector::index(image), "x"),
-        Err(Error::Unsupported {
-            reason: Unsupported::Kind { kind: Kind::Image }
-        })
+        Err(Error::Refused(
+            litchi_keynote::slide::drawable::Refusal::Unsupported {
+                reason: Unsupported::Kind { kind: Kind::Image }
+            }
+        ))
     ));
     Ok(())
 }
@@ -807,7 +855,11 @@ fn corpus_text_boxes_take_character_styles() -> TestResult {
                 assert_eq!(bytes(restored.package())?, before, "{}", path.display());
                 styled += 1;
             },
-            Err(error @ Error::Unsupported { .. }) => refused.push((path, error)),
+            Err(
+                error @ Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
+                    ..
+                }),
+            ) => refused.push((path, error)),
             Err(error) => panic!("{}: {error:?}", path.display()),
         }
     }
@@ -863,9 +915,9 @@ fn slide_table_cells_take_values() -> TestResult {
             let commit = match edit.commit() {
                 Ok(commit) => commit,
                 Err(
-                    error @ Error::Unsupported {
+                    error @ Error::Refused(litchi_keynote::slide::drawable::Refusal::Unsupported {
                         reason: Unsupported::TableFormulas | Unsupported::TableStorage,
-                    },
+                    }),
                 ) => {
                     eprintln!("{name}: refused {error:?}");
                     break;
@@ -939,9 +991,11 @@ fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
         )?;
         assert!(matches!(
             edit.commit(),
-            Err(Error::Unsupported {
-                reason: Unsupported::TableFormulas
-            })
+            Err(Error::Refused(
+                litchi_keynote::slide::drawable::Refusal::Unsupported {
+                    reason: Unsupported::TableFormulas
+                }
+            ))
         ));
     }
     Ok(())
@@ -1006,7 +1060,11 @@ fn corpus_placeholders_take_character_styles() -> TestResult {
                         assert_eq!(bytes(restored.package())?, source, "{}", path.display());
                         styled += 1;
                     },
-                    Err(error @ Error::Unsupported { .. }) => refused.push((path.clone(), error)),
+                    Err(
+                        error @ Error::Refused(
+                            litchi_keynote::slide::drawable::Refusal::Unsupported { .. },
+                        ),
+                    ) => refused.push((path.clone(), error)),
                     Err(error) => panic!("{}: {error:?}", path.display()),
                 }
             }

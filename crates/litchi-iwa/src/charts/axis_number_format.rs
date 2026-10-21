@@ -17,7 +17,7 @@ use crate::charts::number_format::{
 use crate::charts::{Axis, NumberFormat};
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const AXIS_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields {
     legacy: 2,
@@ -28,7 +28,7 @@ const FORMAT_CONTEXT: &str = "chart axis-label";
 
 /// Read the decimal-number format for one native chart axis.
 pub(crate) fn chart_axis_number_format(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -46,7 +46,7 @@ pub(crate) fn chart_axis_number_format(
 
 /// Set or reset the decimal-number format for one native chart axis.
 pub(crate) fn set_chart_axis_number_format(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

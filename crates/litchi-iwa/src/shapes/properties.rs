@@ -7,7 +7,7 @@ use crate::protobuf::{tsd, tswp};
 use crate::wire::{
     patch_length_delimited_field, patch_varint_field, transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_ARCHIVE_SUPER_FIELD: u32 = 1;
@@ -33,7 +33,7 @@ pub struct DrawableProperties {
 }
 
 pub(crate) fn shape_properties(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<DrawableProperties> {
@@ -56,7 +56,7 @@ pub(crate) fn shape_properties(
 }
 
 pub(crate) fn set_shape_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     replacement: &DrawableProperties,

@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut header_bytes = Vec::new();
     header_commit.package().write_to(&mut header_bytes)?;
-    editor = litchi_iwa::pages::Editor::from_bytes(&header_bytes)?;
+    editor = litchi_iwa::pages::Draft::from_bytes(&header_bytes)?;
     editor.set_table_cells(
         table_id,
         [
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .commit()?;
     let mut sort_bytes = Vec::new();
     sort_commit.package().write_to(&mut sort_bytes)?;
-    editor = litchi_iwa::pages::Editor::from_bytes(&sort_bytes)?;
+    editor = litchi_iwa::pages::Draft::from_bytes(&sort_bytes)?;
     if !editor.apply_table_sort_order(table_id)? {
         return Err("expected the source table to be reordered".into());
     }

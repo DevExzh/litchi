@@ -557,8 +557,9 @@ fn assert_movie_caption_edit_rejected(source: &[u8]) -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::InvalidSource)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        )) | Err(SlideMovieCaptionError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -850,9 +851,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         changed_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_package)?, no_metadata_source);
 
@@ -873,9 +877,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         create_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_create)?, no_metadata_create_source);
 
@@ -899,9 +906,12 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         .commit();
     assert!(matches!(
         clear_without_metadata,
-        Err(SlideMovieCaptionError::UnsupportedSource)
-            | Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedSource
+        )) | Err(SlideMovieCaptionError::InvalidSource)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&no_metadata_clear)?, no_metadata_clear_source);
     Ok(())
@@ -1203,8 +1213,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::InvalidSource)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        )) | Err(SlideMovieCaptionError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, aliased);
 
@@ -1225,7 +1236,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, malformed_standin);
 
@@ -1238,7 +1251,9 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, duplicate_metadata);
 
@@ -1251,8 +1266,10 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert!(matches!(
         result,
         Err(SlideMovieCaptionError::InvalidSource)
-            | Err(SlideMovieCaptionError::UnsupportedDependency)
-            | Err(SlideMovieCaptionError::LimitExceeded { .. })
+            | Err(SlideMovieCaptionError::Refused(
+                litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+            ))
+            | Err(SlideMovieCaptionError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, overflow);
 
@@ -1374,11 +1391,15 @@ fn selector_errors_are_typed_and_source_stays_unchanged() -> TestResult<()> {
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_movie_caption(SlideSelector::index(9), MovieSelector::index(0)),
-        Err(SlideMovieCaptionError::SlidePositionNotFound { .. })
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_movie_caption(SlideSelector::index(0), MovieSelector::index(9)),
-        Err(SlideMovieCaptionError::MoviePositionNotFound { .. })
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
@@ -1438,7 +1459,9 @@ fn shared_caption_storage_is_rejected_without_mutation() -> TestResult<()> {
     let package = Package::from_bytes(&hostile)?;
     assert!(matches!(
         package.slide_movie_caption(0usize, 0usize),
-        Err(SlideMovieCaptionError::UnsupportedDependency)
+        Err(SlideMovieCaptionError::Refused(
+            litchi_keynote::slide::movie::caption::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, hostile);
     Ok(())

@@ -1291,10 +1291,13 @@ fn duplicate_file_movie_is_source_bound_and_shares_materialized_assets() -> Test
     let before = exact_bytes(&package)?;
     assert_eq!(movie_count(&package)?, 3);
 
-    let commit = package.duplicate_slide_media(
-        SlideSelector::name("Media replacement"),
-        MovieSelector::index(0),
-    )?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .duplicate(
+            SlideSelector::name("Media replacement"),
+            MovieSelector::index(0),
+        )
+        .and_then(|edit| edit.commit())?;
     let candidate = commit.package();
     assert_eq!(movie_count(candidate)?, 4);
     assert_eq!(
@@ -1324,7 +1327,10 @@ fn duplicate_audio_is_source_bound_and_keeps_audio_bytes_shared() -> TestResult 
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
 
-    let commit = package.duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = commit.package();
     assert_eq!(movie_count(candidate)?, 4);
     assert_eq!(
@@ -1347,7 +1353,10 @@ fn removing_shared_movie_reclaims_data_only_at_the_final_owner() -> TestResult {
     let source = lifecycle_source()?;
     let package = Package::from_bytes(&source)?;
 
-    let first = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let first = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let after_first = exact_bytes(first.package())?;
     assert_eq!(movie_count(first.package())?, 2);
     assert_member_unchanged(&source, &after_first, "Data/movie.mov")?;
@@ -1362,7 +1371,9 @@ fn removing_shared_movie_reclaims_data_only_at_the_final_owner() -> TestResult {
 
     let second = first
         .package()
-        .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let after_second = exact_bytes(second.package())?;
     assert_eq!(movie_count(second.package())?, 1);
     assert_no_member(&after_second, "Data/movie.mov")?;
@@ -1386,7 +1397,10 @@ fn removing_shared_audio_reclaims_audio_data_at_the_final_owner() -> TestResult 
     let source = lifecycle_source()?;
     let package = Package::from_bytes(&source)?;
 
-    let first = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))?;
+    let first = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let after_first = exact_bytes(first.package())?;
     assert_eq!(movie_count(first.package())?, 2);
     assert_no_member(&after_first, "Data/audio.m4a")?;
@@ -1404,7 +1418,10 @@ fn removing_shared_audio_reclaims_audio_data_at_the_final_owner() -> TestResult 
 fn lifecycle_patch_rejects_a_foreign_exact_source_atomically() -> TestResult {
     let source = lifecycle_source()?;
     let package = Package::from_bytes(&source)?;
-    let commit = package.duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
 
     let foreign_source =
         with_data_metadata_map(&fixture::synthetic_package_with_shared_image_poster_owner()?)?;
@@ -1422,12 +1439,16 @@ fn lifecycle_selectors_fail_atomically_for_missing_slide_or_media() -> TestResul
 
     assert!(
         package
-            .duplicate_slide_media(SlideSelector::index(9), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate(SlideSelector::index(9), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(9))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(9))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1451,12 +1472,16 @@ fn duplicate_movie_reference_is_refused_without_mutating_source() -> TestResult 
     let package = Package::from_bytes(&hostile)?;
     assert!(
         package
-            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, hostile);
@@ -1468,7 +1493,10 @@ fn remove_reclaims_repeated_owner_counts_without_premature_shared_data_gc() -> T
     let source = with_repeated_content_owner(&lifecycle_source()?, 2)?;
     let package = Package::from_bytes(&source)?;
     let before = exact_bytes(&package)?;
-    let commit = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
 
     assert_eq!(movie_count(commit.package())?, 2);
@@ -1516,7 +1544,9 @@ fn removal_refuses_surviving_reference_to_selected_private_child_atomically() ->
     let before = exact_bytes(&package)?;
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1536,7 +1566,9 @@ fn removal_refuses_slide_header_missing_selected_aggregate_atomically() -> TestR
     let before = exact_bytes(&package)?;
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1552,7 +1584,9 @@ fn removal_refuses_duplicate_selected_slide_header_aggregate_atomically() -> Tes
     let before = exact_bytes(&package)?;
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1570,7 +1604,9 @@ fn removal_refuses_partial_or_wrong_kind_slide_field_info_atomically() -> TestRe
     let before = exact_bytes(&package)?;
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1582,13 +1618,18 @@ fn final_shared_poster_owner_prevents_poster_gc_without_blocking_movie_remove() 
     let source =
         with_data_metadata_map(&fixture::synthetic_package_with_shared_image_poster_owner()?)?;
     let package = Package::from_bytes(&source)?;
-    let first = package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let first = package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let before_final = exact_bytes(first.package())?;
     assert_member_unchanged(&source, &before_final, "Data/poster.png")?;
 
     let final_movie = first
         .package()
-        .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let after_final = exact_bytes(final_movie.package())?;
     assert_no_member(&after_final, "Data/movie.mov")?;
     assert_member_unchanged(&source, &after_final, "Data/poster.png")?;
@@ -1612,8 +1653,10 @@ fn native_focused_movie_duplicate_clones_graph_and_preserves_source() -> TestRes
         ]
     );
 
-    let commit =
-        source_package.duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_native_inventory(commit.package(), 5, 2, 3)?;
     assert_native_media_zip_unchanged(&source, &candidate)?;
@@ -1662,8 +1705,10 @@ fn native_focused_movie_duplicate_clones_graph_and_preserves_source() -> TestRes
 fn native_focused_movie_removal_reclaims_only_final_owner() -> TestResult {
     let source_package = Package::from_bytes(NATIVE_SOURCE)?;
     let source = exact_bytes(&source_package)?;
-    let first =
-        source_package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))?;
+    let first = source_package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let first_bytes = exact_bytes(first.package())?;
     assert_native_inventory(first.package(), 3, 2, 1)?;
     assert_eq!(
@@ -1705,7 +1750,9 @@ fn native_focused_movie_removal_reclaims_only_final_owner() -> TestResult {
 
     let second = first
         .package()
-        .remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(second.package())?;
     assert_native_inventory(second.package(), 2, 2, 0)?;
     assert_eq!(
@@ -1755,8 +1802,10 @@ fn native_focused_audio_duplicate_clones_private_graph_and_shared_data() -> Test
     let source_package = Package::from_bytes(NATIVE_SOURCE)?;
     let source = exact_bytes(&source_package)?;
     let source_media = native_media_ids(&source)?;
-    let commit =
-        source_package.duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let commit = source_package
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert_native_inventory(commit.package(), 5, 3, 2)?;
     assert_native_media_zip_unchanged(&source, &candidate)?;
@@ -1806,8 +1855,10 @@ fn native_focused_audio_duplicate_clones_private_graph_and_shared_data() -> Test
 fn native_focused_audio_removal_reclaims_audio_at_final_owner() -> TestResult {
     let source_package = Package::from_bytes(NATIVE_SOURCE)?;
     let source = exact_bytes(&source_package)?;
-    let first =
-        source_package.remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+    let first = source_package
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let first_bytes = exact_bytes(first.package())?;
     assert_native_inventory(first.package(), 3, 1, 2)?;
     assert_eq!(
@@ -1836,7 +1887,9 @@ fn native_focused_audio_removal_reclaims_audio_at_final_owner() -> TestResult {
 
     let second = first
         .package()
-        .remove_slide_media(SlideSelector::index(0), MovieSelector::index(0))?;
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(0))
+        .and_then(|edit| edit.commit())?;
     let final_bytes = exact_bytes(second.package())?;
     assert_native_inventory(second.package(), 2, 0, 2)?;
     assert_eq!(
@@ -1890,12 +1943,16 @@ fn duplicate_build_chunk_uuid_fields_refuse_lifecycle_atomically() -> TestResult
 
     assert!(
         package
-            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(2))
+            .edit_slide_media_lifecycle()
+            .duplicate(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
         package
-            .remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))
+            .edit_slide_media_lifecycle()
+            .remove(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -1928,11 +1985,13 @@ fn explicit_tiny_media_byte_ceiling_rejects_lifecycle_reads_atomically() -> Test
         Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(tight))?;
     let before = exact_bytes(&package)?;
     let error = package
-        .remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))
+        .edit_slide_media_lifecycle()
+        .remove(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())
         .err()
         .ok_or_else(|| io::Error::other("tiny media-byte ceiling must reject lifecycle reads"))?;
     match error {
-        SlideMediaLifecycleError::LimitExceeded {
+        SlideMediaLifecycleError::Limit {
             kind: SlideMediaLifecycleLimitKind::MediaBytes,
             observed,
             maximum,
@@ -2061,8 +2120,10 @@ fn lifecycle_preserves_selector_order_with_unsupported_media_siblings() -> TestR
         let source =
             fixture::with_movie_payload(&original, fixture::MOVIES[0], opaque_sibling.clone())?;
         let package = Package::from_bytes(&source)?;
-        let duplicate =
-            package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(1))?;
+        let duplicate = package
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(1))
+            .and_then(|edit| edit.commit())?;
         assert_eq!(duplicate.diagnostics().source_media_count(), 3);
         assert_eq!(duplicate.diagnostics().target_media_count(), 4);
         assert_eq!(movie_count(duplicate.package())?, 4);
@@ -2077,8 +2138,10 @@ fn lifecycle_preserves_selector_order_with_unsupported_media_siblings() -> TestR
             .package()
             .apply_slide_media_lifecycle(&duplicate.patch().inverse())?;
         assert_eq!(exact_bytes(restored.package())?, source);
-        let removed =
-            package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(1))?;
+        let removed = package
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(1))
+            .and_then(|edit| edit.commit())?;
         assert_eq!(removed.diagnostics().source_media_count(), 3);
         assert_eq!(removed.diagnostics().target_media_count(), 2);
         assert_eq!(movie_count(removed.package())?, 2);
@@ -2103,25 +2166,35 @@ fn typed_lifecycle_kind_mismatch_precedes_metadata_rewrite() -> TestResult {
     let package = Package::from_bytes(&source)?;
     for error in [
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit())
             .unwrap_err(),
         package
-            .remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .edit_slide_media_lifecycle()
+            .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit())
             .unwrap_err(),
         package
-            .duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .unwrap_err(),
         package
-            .remove_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .remove_audio(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .unwrap_err(),
     ] {
         assert!(
-            matches!(error, SlideMediaLifecycleError::KindMismatch { expected, actual } if expected != actual)
+            matches!(error, SlideMediaLifecycleError::Refused(litchi_keynote::slide::media::lifecycle::Refusal::KindMismatch { expected, actual }) if expected != actual)
         );
     }
     assert!(
         package
-            .duplicate_slide_media(SlideSelector::index(0), MovieSelector::index(2))
+            .edit_slide_media_lifecycle()
+            .duplicate(SlideSelector::index(0), MovieSelector::index(2))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, source);
@@ -2147,9 +2220,15 @@ fn lifecycle_invalidates_materialized_node_cache_and_restores_exact_source() -> 
     let package = Package::from_bytes(&source)?;
     for duplicate in [true, false] {
         let commit = if duplicate {
-            package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?
+            package
+                .edit_slide_media_lifecycle()
+                .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+                .and_then(|edit| edit.commit())?
         } else {
-            package.remove_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?
+            package
+                .edit_slide_media_lifecycle()
+                .remove_movie(SlideSelector::index(0), MovieSelector::index(2))
+                .and_then(|edit| edit.commit())?
         };
         let candidate = exact_bytes(commit.package())?;
         let (_, archive) = native_component_containing_object(&candidate, NATIVE_SLIDE_NODE)?;
@@ -2190,7 +2269,10 @@ fn lifecycle_invalidates_materialized_node_cache_and_restores_exact_source() -> 
 fn lifecycle_keeps_already_invalidated_native_node_component_exact() -> TestResult {
     let (node_member, _) = native_component_containing_object(NATIVE_SOURCE, NATIVE_SLIDE_NODE)?;
     let package = Package::from_bytes(NATIVE_SOURCE)?;
-    let commit = package.duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(2))?;
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .duplicate_movie(SlideSelector::index(0), MovieSelector::index(2))
+        .and_then(|edit| edit.commit())?;
     assert_member_unchanged(NATIVE_SOURCE, &exact_bytes(commit.package())?, &node_member)?;
     Ok(())
 }
@@ -2242,9 +2324,43 @@ fn duplicate_refuses_unproven_transitive_movie_header_reference() -> TestResult 
     let package = Package::from_bytes(&source)?;
     assert!(
         package
-            .duplicate_slide_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .edit_slide_media_lifecycle()
+            .duplicate_movie(SlideSelector::index(0), MovieSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn the_edit_stages_exactly_one_lifecycle_operation() -> TestResult {
+    let package = Package::from_bytes(NATIVE_SOURCE)?;
+    assert!(matches!(
+        package.edit_slide_media_lifecycle().commit(),
+        Err(SlideMediaLifecycleError::Refused(
+            litchi_keynote::slide::media::lifecycle::Refusal::NoStagedOperation
+        ))
+    ));
+    assert!(matches!(
+        package
+            .edit_slide_media_lifecycle()
+            .duplicate(SlideSelector::index(0), MovieSelector::index(0))?
+            .remove(SlideSelector::index(0), MovieSelector::index(0)),
+        Err(SlideMediaLifecycleError::Refused(
+            litchi_keynote::slide::media::lifecycle::Refusal::OperationAlreadyStaged
+        ))
+    ));
+    let commit = package
+        .edit_slide_media_lifecycle()
+        .duplicate(SlideSelector::index(0), MovieSelector::index(0))?
+        .commit()?;
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_media_lifecycle(&patch.inverse())?;
+    let mut bytes = Vec::new();
+    restored.package().write_to(&mut bytes)?;
+    assert_eq!(bytes, NATIVE_SOURCE);
     Ok(())
 }

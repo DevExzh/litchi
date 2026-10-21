@@ -4,11 +4,11 @@ use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use crate::text::{ParagraphList, preset_style_object};
-use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
+use crate::{HostPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 use plist::Value;
 use prost::Message;
 
-use super::editor::Editor;
+use super::editor::Draft;
 use super::formula_owner::{empty_table_formula_owner, uuid_as_cfuuid};
 use super::table_uid_map::COLUMN_ROW_UID_MAP_MESSAGE_TYPE;
 
@@ -268,16 +268,16 @@ impl Builder {
     }
 
     /// Build a mutable editor for the generated spreadsheet.
-    pub fn build(self) -> Result<Editor> {
-        Editor::from_package(self.build_package()?)
+    pub fn build(self) -> Result<Draft> {
+        Draft::from_package(self.build_package()?)
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<HostPackage> {
         self.validate()?;
         let identity = IWorkDocumentIdentity::generate();
         let table_uuid = fresh_tsp_uuid();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package.replace_archive(
             DOCUMENT_ARCHIVE_ENTRY,
             &document_archive(&self, &table_uuid)?,
@@ -335,7 +335,7 @@ impl Builder {
     }
 }
 
-impl Editor {
+impl Draft {
     pub fn builder() -> Builder {
         Builder::new()
     }
@@ -1093,7 +1093,7 @@ fn metadata_archive(identity: &IWorkDocumentIdentity) -> Result<Archive> {
     })
 }
 
-fn add_plists(package: &mut IWorkPackage, identity: &IWorkDocumentIdentity) -> Result<()> {
+fn add_plists(package: &mut HostPackage, identity: &IWorkDocumentIdentity) -> Result<()> {
     let mut properties = plist::Dictionary::new();
     for key in ["documentUUID", "stableDocumentUUID", "shareUUID"] {
         properties.insert(
@@ -1347,8 +1347,8 @@ mod tests {
         baseline_bytes: &[u8],
         after_bytes: &[u8],
     ) {
-        let baseline = IWorkPackage::from_bytes(baseline_bytes).unwrap();
-        let mut after = IWorkPackage::from_bytes(after_bytes).unwrap();
+        let baseline = HostPackage::from_bytes(baseline_bytes).unwrap();
+        let mut after = HostPackage::from_bytes(after_bytes).unwrap();
         let baseline_names = baseline
             .iwa_entry_names()
             .map(ToOwned::to_owned)
@@ -1389,7 +1389,7 @@ mod tests {
         assert_eq!(after_registry, baseline_registry);
         assert!(!after_registry.contains(&after_watermark));
 
-        let metadata = |package: &IWorkPackage| {
+        let metadata = |package: &HostPackage| {
             let archive = package.archive(PACKAGE_METADATA_ARCHIVE_ENTRY).unwrap();
             let message = archive
                 .objects
@@ -1513,7 +1513,7 @@ mod tests {
         assert_eq!((table.rows, table.columns), (12, 4));
 
         let bytes = editor.to_bytes().unwrap();
-        let reopened = Editor::from_bytes(&bytes).unwrap();
+        let reopened = Draft::from_bytes(&bytes).unwrap();
         assert_eq!(reopened.sheets().unwrap()[0].name, "Inventory");
         assert_eq!(reopened.tables().unwrap()[0].name, "Stock");
     }
@@ -1536,7 +1536,7 @@ mod tests {
 
     #[test]
     fn scratch_and_bootstrapped_tables_use_identity_preserving_uid_maps() {
-        fn uid_map_message_type(editor: &Editor, model_id: u64) -> u32 {
+        fn uid_map_message_type(editor: &Draft, model_id: u64) -> u32 {
             let package = editor.package();
             let model = package
                 .iwa_entry_names()
@@ -1632,7 +1632,7 @@ mod tests {
 
     #[test]
     fn generated_table_supports_cell_crud() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         crate::numbers::editor::set_cell_fixture(
             &mut editor,
@@ -1678,7 +1678,7 @@ mod tests {
 
     #[test]
     fn generated_table_supports_formula_crud() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let table_id = editor.tables().unwrap()[0].object_id;
         crate::numbers::editor::set_cell_fixture(
             &mut editor,
@@ -1726,7 +1726,7 @@ mod tests {
 
     #[test]
     fn generated_added_table_supports_formula_crud() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let table = editor
             .add_empty_table(
@@ -1793,7 +1793,7 @@ mod tests {
 
     #[test]
     fn generated_added_table_removes_its_formula_owner() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let table = editor
             .add_empty_table(
@@ -1873,7 +1873,7 @@ mod tests {
 
     #[test]
     fn generated_table_removal_rejects_incoming_formula_references() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let sheet_id = editor.sheets().unwrap()[0].object_id;
         let source_table_id = editor.tables().unwrap()[0].object_id;
         let target = editor
@@ -1918,7 +1918,7 @@ mod tests {
 
     #[test]
     fn generated_spreadsheet_supports_sheet_and_table_lifecycle() {
-        let mut editor = Editor::create().unwrap();
+        let mut editor = Draft::create().unwrap();
         let sheet = editor.add_empty_sheet("Archive").unwrap();
         let table = editor
             .add_empty_table(
@@ -1949,7 +1949,7 @@ mod tests {
             sheet
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.sheets().unwrap().len(), 1);
         assert_eq!(reopened.tables().unwrap().len(), 1);
     }

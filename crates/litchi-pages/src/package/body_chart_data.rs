@@ -80,23 +80,13 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted body chart matched the source-order selector.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartNotFound { position: Position },
-    /// The source does not retain a supported exact native artifact.
-    #[error("this Pages source does not support body-chart data reads")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted graph or selected chart-data payload was malformed.
     #[error("the selected Pages body-chart data source is invalid")]
     InvalidSource,
-    /// The requested edit changes row or column labels, which this first
-    /// source-preserving numeric transaction does not own.
-    #[error("Pages body-chart data edits must preserve row and column labels")]
-    LabelsChanged,
-    /// The requested edit changes the grid dimensions, which this first
-    /// source-preserving numeric transaction does not own.
-    #[error("Pages body-chart data edits must preserve chart dimensions")]
-    ShapeChanged,
     /// Reopening the candidate did not reproduce the requested numeric grid.
     #[error("the edited Pages body-chart data failed semantic verification")]
     Verification,
@@ -106,7 +96,7 @@ pub enum Error {
     PatchConflict,
     /// A finite read resource ceiling was exceeded.
     #[error("Pages body-chart data {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -117,6 +107,47 @@ pub enum Error {
     /// A bounded semantic allocation failed.
     #[error("could not allocate {amount} units for Pages body-chart data")]
     Allocation { amount: usize },
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted body chart matched the source-order selector.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartNotFound { position: Position },
+    /// The source does not retain a supported exact native artifact.
+    #[error("this Pages source does not support body-chart data reads")]
+    UnsupportedSource,
+    /// The requested edit changes row or column labels, which this first
+    /// source-preserving numeric transaction does not own.
+    #[error("Pages body-chart data edits must preserve row and column labels")]
+    LabelsChanged,
+    /// The requested edit changes the grid dimensions, which this first
+    /// source-preserving numeric transaction does not own.
+    #[error("Pages body-chart data edits must preserve chart dimensions")]
+    ShapeChanged,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ChartNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. }
+            | Self::LabelsChanged { .. }
+            | Self::ShapeChanged { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic body-chart data value staged against an immutable
@@ -330,6 +361,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the exact-source reversible patch.
@@ -604,7 +641,7 @@ fn commit_data_edit(mut edit: Edit<'_>) -> Result<Commit, Error> {
         .map_err(map_arrangement_error)?;
     validate_data_change(before.as_ref(), &after_data)?;
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     // `after_data` was supplied by the caller. Its children are already
     // admitted above; only the Arc control block is allocated by this API.
@@ -732,10 +769,10 @@ fn validate_data_change(before: &ChartData, after: &ChartData) -> Result<(), Err
             .zip(after.values())
             .any(|(before, after)| before.len() != after.len())
     {
-        return Err(Error::ShapeChanged);
+        return Err(Error::Refused(Refusal::ShapeChanged));
     }
     if before.row_names() != after.row_names() || before.column_names() != after.column_names() {
-        return Err(Error::LabelsChanged);
+        return Err(Error::Refused(Refusal::LabelsChanged));
     }
     Ok(())
 }
@@ -882,7 +919,7 @@ fn data_options(budget: &ArrangementBudget, source: &[u8]) -> Result<DecodeOptio
     let source_bytes = source.len().max(1).min(limits.max_input_bytes());
     let fields = limits.max_fields().max(1);
     let work = limits.max_rewrite_work().max(1);
-    let max_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::LimitExceeded {
+    let max_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::Limit {
         kind: LimitKind::WireNesting,
         observed: limits.max_nesting() as u64,
         maximum: u32::MAX as u64,
@@ -942,28 +979,28 @@ fn charge_data_report(
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
     if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > limits.max_nesting() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(report.max_depth()),
             maximum: limits.max_nesting() as u64,
         });
     }
     if report.cell_count() > MAX_DATA_CELLS {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CellCount,
             observed: report.cell_count() as u64,
             maximum: MAX_DATA_CELLS as u64,
         });
     }
     if report.label_count() > MAX_DATA_LABEL_COUNT {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::LabelCount,
             observed: report.label_count() as u64,
             maximum: MAX_DATA_LABEL_COUNT as u64,
         });
     }
     if report.text_bytes() > MAX_DATA_TEXT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextBytes,
             observed: report.text_bytes() as u64,
             maximum: MAX_DATA_TEXT_BYTES as u64,
@@ -998,7 +1035,7 @@ fn own_labels(
 ) -> Result<Vec<String>, Error> {
     let count = labels.len();
     if count > MAX_DATA_LABEL_COUNT {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::LabelCount,
             observed: count as u64,
             maximum: MAX_DATA_LABEL_COUNT as u64,
@@ -1006,7 +1043,7 @@ fn own_labels(
     }
     let (text_bytes, string_allocations, seen) = labels.iter().try_fold(
         (0usize, 0usize, 0usize),
-        |(text_bytes, string_allocations, seen), label| {
+        |(text_bytes, string_allocations, seen), label| -> Result<_, Error> {
             let text_bytes = text_bytes
                 .checked_add(label.len())
                 .ok_or(Error::InvalidSource)?;
@@ -1021,7 +1058,7 @@ fn own_labels(
         return Err(Error::InvalidSource);
     }
     if text_bytes > MAX_DATA_TEXT_BYTES {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::TextBytes,
             observed: text_bytes as u64,
             maximum: MAX_DATA_TEXT_BYTES as u64,
@@ -1073,7 +1110,7 @@ fn own_values(
     let row_count = rows.len();
     let cells = row_count.checked_mul(columns).ok_or(Error::InvalidSource)?;
     if cells > MAX_DATA_CELLS {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::CellCount,
             observed: cells as u64,
             maximum: MAX_DATA_CELLS as u64,
@@ -1125,19 +1162,23 @@ fn own_values(
 
 fn map_arrangement_error(error: BodyChartArrangementError) -> Error {
     match error {
-        BodyChartArrangementError::ChartNotFound { position }
-        | BodyChartArrangementError::ChartPositionNotFound { position } => {
-            Error::ChartNotFound { position }
-        },
-        BodyChartArrangementError::UnsupportedSource => Error::UnsupportedSource,
+        BodyChartArrangementError::Refused(crate::chart::arrangement::Refusal::ChartNotFound {
+            position,
+        })
+        | BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::ChartPositionNotFound { position },
+        ) => Error::Refused(Refusal::ChartNotFound { position }),
+        BodyChartArrangementError::Refused(
+            crate::chart::arrangement::Refusal::UnsupportedSource,
+        ) => Error::Refused(Refusal::UnsupportedSource),
         BodyChartArrangementError::InvalidSource => Error::InvalidSource,
         BodyChartArrangementError::Verification => Error::Verification,
         BodyChartArrangementError::PatchConflict => Error::PatchConflict,
-        BodyChartArrangementError::LimitExceeded {
+        BodyChartArrangementError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_arrangement_limit(kind),
             observed,
             maximum,
@@ -1176,37 +1217,37 @@ fn map_data_codec_error(error: chart_data_codec::DecodeError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        DecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        DecodeLimit::Cells { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Cells { observed, maximum } => Error::Limit {
             kind: LimitKind::CellCount,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Labels { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Labels { observed, maximum } => Error::Limit {
             kind: LimitKind::LabelCount,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        DecodeLimit::Text { observed, maximum } => Error::LimitExceeded {
+        DecodeLimit::Text { observed, maximum } => Error::Limit {
             kind: LimitKind::TextBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1223,38 +1264,38 @@ fn map_data_rewrite_error(error: chart_data_codec::RewriteError) -> Error {
         return Error::InvalidSource;
     };
     match limit {
-        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Bytes { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Fields { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Fields { observed, maximum } => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Work { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Work { observed, maximum } => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Output { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Output { observed, maximum } => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Nesting { observed, maximum } => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => Error::LimitExceeded {
+        chart_data_codec::RewriteLimit::Allocations { observed, maximum } => Error::Limit {
             kind: LimitKind::WireAllocations,
             observed: observed as u64,
             maximum: maximum as u64,
         },
         chart_data_codec::RewriteLimit::Retained { observed, maximum }
-        | chart_data_codec::RewriteLimit::Scratch { observed, maximum } => Error::LimitExceeded {
+        | chart_data_codec::RewriteLimit::Scratch { observed, maximum } => Error::Limit {
             kind: LimitKind::WireRetainedBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1319,7 +1360,7 @@ mod tests {
             chart_data_codec::decode_modern_with_report(source, &options).expect("chart data");
 
         let mut exhausted = ArrangementBudget::new(&package).expect("fresh arrangement budget");
-        let BodyChartArrangementError::LimitExceeded { maximum, .. } =
+        let BodyChartArrangementError::Limit { maximum, .. } =
             exhausted.work(usize::MAX).expect_err("finite work ceiling")
         else {
             panic!("expected a work limit");
@@ -1330,7 +1371,7 @@ mod tests {
         let result = charge_materialization_work(&mut exhausted, snapshot, report);
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 ..
             })
@@ -1362,7 +1403,7 @@ mod tests {
         let result = own_values(snapshot.rows(), snapshot.column_count(), &mut budget);
         assert!(matches!(
             result,
-            Err(Error::LimitExceeded {
+            Err(Error::Limit {
                 kind: LimitKind::WireRetainedBytes,
                 ..
             })
@@ -1510,7 +1551,7 @@ mod tests {
                 .expect("body chart edit")
                 .set(labels_changed)
                 .commit(),
-            Err(Error::LabelsChanged)
+            Err(Error::Refused(Refusal::LabelsChanged))
         ));
 
         let dimensions_changed = ChartData::new(
@@ -1529,7 +1570,7 @@ mod tests {
                 .expect("body chart edit")
                 .set(dimensions_changed)
                 .commit(),
-            Err(Error::ShapeChanged)
+            Err(Error::Refused(Refusal::ShapeChanged))
         ));
     }
 

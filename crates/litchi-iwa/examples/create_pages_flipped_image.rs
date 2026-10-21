@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let image = fs::read(&image_path)?;
     let body = "This mirrored image was created entirely by litchi-iwa.";
 
-    let mut editor = pages::Editor::create_with_text(body)?;
+    let mut editor = pages::Draft::create_with_text(body)?;
     let created = editor.add_body_image(
         body.encode_utf16().count(),
         preferred_filename,

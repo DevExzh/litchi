@@ -62,7 +62,9 @@ pub mod image;
 /// Exact-source transactions for the document properties (title, author,
 /// keywords, description).
 pub mod metadata {
-    pub use crate::package::metadata_edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+    pub use crate::package::metadata_edit::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 mod limits;
 pub mod movie;

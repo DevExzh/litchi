@@ -10,7 +10,7 @@ use crate::charts::series_fill::{
 };
 use crate::shapes::{RgbaColor, ShapeFill, ShapeImageFill, ShapeImageFillTechnique};
 
-impl Editor {
+impl Draft {
     /// Read effective fills in native series order.
     pub fn slide_chart_series_fills(
         &self,
@@ -99,7 +99,7 @@ impl Editor {
 }
 
 fn slide_chart_series_fills(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<ShapeFill>> {
@@ -122,7 +122,7 @@ fn slide_chart_series_fills(
 }
 
 fn set_slide_chart_series_fills(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     fills: &[ShapeFill],
@@ -148,7 +148,7 @@ fn set_slide_chart_series_fills(
         series_count,
         fills,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_fills(slide_index, drawable_object_id)? != fills {
         return Err(Error::InvalidFormat(
             "Keynote chart series fill update failed validation".to_owned(),
@@ -159,7 +159,7 @@ fn set_slide_chart_series_fills(
 }
 
 fn reset_slide_chart_series_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     series: Index,
@@ -182,7 +182,7 @@ fn reset_slide_chart_series_fill(
         series_count,
         series.zero_based(),
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_fill(slide_index, drawable_object_id, series)? != inherited {
         return Err(Error::InvalidFormat(
             "Keynote chart series fill reset failed validation".to_owned(),
@@ -194,7 +194,7 @@ fn reset_slide_chart_series_fill(
 
 #[allow(clippy::too_many_arguments)]
 fn set_slide_chart_series_image_fill(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     series: Index,
@@ -231,7 +231,7 @@ fn set_slide_chart_series_image_fill(
         fill_size,
         tint,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_fill(slide_index, drawable_object_id, series)?
         != ShapeFill::Image(image.clone())
     {

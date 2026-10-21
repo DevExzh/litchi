@@ -617,7 +617,9 @@ fn semantic_sheet_and_table_selectors_distinguish_absent_false_and_true() -> Tes
     );
     assert!(matches!(
         dense.table_lock(SheetSelector::index(0), TableSelector::index(35)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     Ok(())
 }
@@ -628,19 +630,27 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.table_lock("Missing sheet", ABSENT_TABLE_NAME),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(2), TableSelector::index(0)),
-        Err(TableLockError::SheetNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::SheetNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(FIRST_SHEET_NAME, "Missing table"),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package.table_lock(SheetSelector::index(0), TableSelector::index(3)),
-        Err(TableLockError::TableNotFound)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::TableNotFound
+        ))
     ));
 
     let duplicate_name = rewrite_component(&bytes, TABLES_MEMBER, |archive| {
@@ -1136,7 +1146,9 @@ fn legacy_nested_index_reads_and_noops_but_refuses_changed_publication() -> Test
     changed.lock();
     assert!(matches!(
         changed.commit(),
-        Err(TableLockError::UnsupportedSource)
+        Err(TableLockError::Refused(
+            litchi_numbers::table::lock::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(package.exact_bytes(), legacy);
     Ok(())
@@ -1174,7 +1186,7 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     edit.lock();
     match edit.commit() {
-        Err(TableLockError::LimitExceeded {
+        Err(TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             ..
         }) => {},
@@ -1245,10 +1257,10 @@ fn debug_and_error_text_are_redacted_from_authored_and_physical_names() -> TestR
         assert!(!patch_debug.contains(redacted));
     }
     for error in [
-        TableLockError::SheetNotFound,
-        TableLockError::TableNotFound,
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::SheetNotFound),
+        TableLockError::Refused(litchi_numbers::table::lock::Refusal::TableNotFound),
         TableLockError::PatchConflict,
-        TableLockError::LimitExceeded {
+        TableLockError::Limit {
             kind: TableLockLimitKind::OutputBytes,
             observed: 11,
             maximum: 10,

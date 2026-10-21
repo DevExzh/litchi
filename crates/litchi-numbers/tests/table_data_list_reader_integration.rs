@@ -1238,9 +1238,9 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
         .expect_err("a cell without a root comment must be rejected");
     assert_eq!(
         error,
-        TableCellCommentError::CommentNotFound {
+        TableCellCommentError::Refused(litchi_numbers::cell::comment::Refusal::CommentNotFound {
             path: expected_path,
-        }
+        })
     );
     let error = package
         .table_cell_comment_replies_a1(
@@ -1251,9 +1251,9 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
         .expect_err("A1 lookup without a root comment must be rejected");
     assert_eq!(
         error,
-        TableCellCommentError::CommentNotFound {
+        TableCellCommentError::Refused(litchi_numbers::cell::comment::Refusal::CommentNotFound {
             path: expected_path,
-        }
+        })
     );
     assert!(matches!(
         package.table_cell_comment_replies_a1(
@@ -1261,7 +1261,9 @@ fn package_cell_comment_replies_accept_empty_threads_and_report_missing_roots() 
             "Mixed table-data-list table",
             "not-an-address",
         ),
-        Err(TableCellCommentError::InvalidAddress)
+        Err(TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::InvalidAddress
+        ))
     ));
     assert_eq!(
         empty_bytes, empty_original,
@@ -1550,14 +1552,16 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         .expect_err("segment-backed text replacement must be refused");
     assert!(matches!(
         segmented_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
+        TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 4,
+                    column: 0,
+                },
+            }
+        )
     ));
     assert_eq!(
         segmented_bytes, segmented_original_bytes,
@@ -1572,14 +1576,16 @@ fn package_cell_comment_edit_clear_and_inverse_are_selector_first() -> TestResul
         .expect_err("segmented changed clear must be refused");
     assert!(matches!(
         segmented_clear_error,
-        TableCellCommentError::UnsupportedDependency {
-            path: TableCellCommentPath::Cell {
-                sheet: 0,
-                table: 0,
-                row: 4,
-                column: 0,
-            },
-        }
+        TableCellCommentError::Refused(
+            litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                path: TableCellCommentPath::Cell {
+                    sheet: 0,
+                    table: 0,
+                    row: 4,
+                    column: 0,
+                },
+            }
+        )
     ));
     assert_eq!(
         segmented_bytes, segmented_original_bytes,
@@ -1700,14 +1706,16 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         ),
         (
             extra_storage_message,
-            TableCellCommentError::UnsupportedDependency {
-                path: TableCellCommentPath::Cell {
-                    sheet: 0,
-                    table: 0,
-                    row: 1,
-                    column: 1,
+            TableCellCommentError::Refused(
+                litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                    path: TableCellCommentPath::Cell {
+                        sheet: 0,
+                        table: 0,
+                        row: 1,
+                        column: 1,
+                    },
                 },
-            },
+            ),
         ),
         (
             opaque_table_candidate,

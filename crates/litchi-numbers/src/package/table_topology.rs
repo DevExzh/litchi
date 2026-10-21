@@ -172,6 +172,42 @@ impl fmt::Display for Unsupported {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted table-topology source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} table-topology items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested state.
+    #[error("table-topology candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("table-topology patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The sheet selector did not resolve one sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -215,35 +251,35 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support table topology changes")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted table-topology source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} table-topology items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested state.
-    #[error("table-topology candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("table-topology patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::LastAxis { .. } => RefusalKind::UnsupportedTarget,
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } => RefusalKind::NotFound,
+            Self::PositionOutOfRange { .. } => RefusalKind::InvalidValue,
+            Self::SectionFull { .. }
+            | Self::Unsupported { .. }
+            | Self::CellClear { .. }
+            | Self::UnsupportedDependency { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::NoStagedOperation { .. } => RefusalKind::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 const fn refuse(reason: Unsupported) -> Error {
-    Error::Unsupported { reason }
+    Error::Refused(Refusal::Unsupported { reason })
 }
 
 /// A storage-phase fault: an unowned layout is a typed storage refusal.
@@ -307,20 +343,22 @@ fn checked(index: usize, length: u32, inclusive: bool) -> Result<u32, Error> {
         index < usize_of(length)
     };
     if !fits {
-        return Err(Error::PositionOutOfRange {
+        return Err(Error::Refused(Refusal::PositionOutOfRange {
             index,
             length: usize_of(length),
-        });
+        }));
     }
-    u32::try_from(index).map_err(|_error| Error::PositionOutOfRange {
-        index,
-        length: usize_of(length),
+    u32::try_from(index).map_err(|_error| {
+        Error::Refused(Refusal::PositionOutOfRange {
+            index,
+            length: usize_of(length),
+        })
     })
 }
 
 fn grow(count: u32) -> Result<u32, Error> {
     if count >= MAX_SECTION {
-        return Err(Error::SectionFull);
+        return Err(Error::Refused(Refusal::SectionFull));
     }
     Ok(count + 1)
 }
@@ -355,7 +393,10 @@ fn resolve(operation: Operation, geometry: Geometry) -> Result<Step, Error> {
             (true, AxisEdit::Insert(physical))
         },
         Operation::RemoveRow(deletion) => {
-            after.rows = geometry.rows.checked_sub(1).ok_or(Error::LastAxis)?;
+            after.rows = geometry
+                .rows
+                .checked_sub(1)
+                .ok_or(Error::Refused(Refusal::LastAxis))?;
             let physical = match deletion {
                 RowDeletion::Header { index } => {
                     let index = checked(index, geometry.header_rows, false)?;
@@ -372,7 +413,7 @@ fn resolve(operation: Operation, geometry: Geometry) -> Result<Step, Error> {
                 },
             };
             if after.rows == 0 || after.header_rows + after.footer_rows > after.rows {
-                return Err(Error::LastAxis);
+                return Err(Error::Refused(Refusal::LastAxis));
             }
             (true, AxisEdit::Remove(physical))
         },
@@ -393,7 +434,10 @@ fn resolve(operation: Operation, geometry: Geometry) -> Result<Step, Error> {
             (false, AxisEdit::Insert(physical))
         },
         Operation::RemoveColumn(deletion) => {
-            after.columns = geometry.columns.checked_sub(1).ok_or(Error::LastAxis)?;
+            after.columns = geometry
+                .columns
+                .checked_sub(1)
+                .ok_or(Error::Refused(Refusal::LastAxis))?;
             let physical = match deletion {
                 ColumnDeletion::Header { index } => {
                     let index = checked(index, geometry.header_columns, false)?;
@@ -405,7 +449,7 @@ fn resolve(operation: Operation, geometry: Geometry) -> Result<Step, Error> {
                 },
             };
             if after.columns == 0 || after.header_columns > after.columns {
-                return Err(Error::LastAxis);
+                return Err(Error::Refused(Refusal::LastAxis));
             }
             (false, AxisEdit::Remove(physical))
         },
@@ -456,7 +500,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionOutOfRange`], [`Error::SectionFull`].
+    /// [`Refusal::PositionOutOfRange`], [`Refusal::SectionFull`].
     pub fn insert_row(self, insertion: RowInsertion) -> Result<Self, Error> {
         self.stage(Operation::InsertRow(insertion))
     }
@@ -465,7 +509,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionOutOfRange`], [`Error::SectionFull`].
+    /// [`Refusal::PositionOutOfRange`], [`Refusal::SectionFull`].
     pub fn insert_column(self, insertion: ColumnInsertion) -> Result<Self, Error> {
         self.stage(Operation::InsertColumn(insertion))
     }
@@ -475,7 +519,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionOutOfRange`], [`Error::LastAxis`].
+    /// [`Refusal::PositionOutOfRange`], [`Refusal::LastAxis`].
     pub fn remove_row(self, deletion: RowDeletion) -> Result<Self, Error> {
         self.stage(Operation::RemoveRow(deletion))
     }
@@ -485,7 +529,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::PositionOutOfRange`], [`Error::LastAxis`].
+    /// [`Refusal::PositionOutOfRange`], [`Refusal::LastAxis`].
     pub fn remove_column(self, deletion: ColumnDeletion) -> Result<Self, Error> {
         self.stage(Operation::RemoveColumn(deletion))
     }
@@ -494,14 +538,14 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit;
-    /// [`Error::Unsupported`] for table content this transaction does not
-    /// rewrite; [`Error::CellClear`] when a removed cell cannot be cleared;
+    /// [`Refusal::NoStagedOperation`] for an empty edit;
+    /// [`Refusal::Unsupported`] for table content this transaction does not
+    /// rewrite; [`Refusal::CellClear`] when a removed cell cannot be cleared;
     /// source, resource and verification errors. Failure never publishes a
     /// partial package.
     pub fn commit(self) -> Result<Commit, Error> {
         if self.operations.is_empty() {
-            return Err(Error::NoStagedOperation);
+            return Err(Error::Refused(Refusal::NoStagedOperation));
         }
         let mut current: Option<Package> = None;
         let mut touched = 0_usize;
@@ -513,7 +557,7 @@ impl Edit<'_> {
             previews = previews.saturating_add(published.deleted_previews);
             current = Some(published.package);
         }
-        let package = current.ok_or(Error::NoStagedOperation)?;
+        let package = current.ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         Commit::new(
             self.source,
             Published {
@@ -538,7 +582,9 @@ pub(super) fn locate(working: &Working<'_>, sheet: usize, table: usize) -> Resul
         &document.messages[document_index].data,
         &[DOCUMENT_SHEETS_FIELD],
     )?;
-    let sheet = *sheets.get(sheet).ok_or(Error::SheetNotFound)?;
+    let sheet = *sheets
+        .get(sheet)
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let sheet_object = working.object(sheet)?;
     let (sheet_index, sheet_path) = structure::sheet_message(sheet_object)?;
     let mut tables = Vec::new();
@@ -547,7 +593,9 @@ pub(super) fn locate(working: &Working<'_>, sheet: usize, table: usize) -> Resul
             tables.push(drawable);
         }
     }
-    let info = *tables.get(table).ok_or(Error::TableNotFound)?;
+    let info = *tables
+        .get(table)
+        .ok_or(Error::Refused(Refusal::TableNotFound))?;
     let info_object = working.object(info)?;
     let info_index = structure::table_info_message(info_object)?;
     let model =
@@ -821,7 +869,7 @@ fn clear_axis(
     table: usize,
     cells: &[At],
 ) -> Result<Package, Error> {
-    let cell_error = |error| Error::CellClear { error };
+    let cell_error = |error| Error::Refused(Refusal::CellClear { error });
     let mut edit = source
         .edit_table_cells(SheetSelector::index(sheet), TableSelector::index(table))
         .map_err(cell_error)?;
@@ -1395,11 +1443,11 @@ fn run(
         match clear_axis(commented, sheet, table, &cells) {
             Ok(package) => (Some(package), false),
             Err(
-                error @ Error::CellClear {
+                error @ Error::Refused(Refusal::CellClear {
                     error: crate::table::cells::Error::Allocation { .. },
-                },
+                }),
             ) => return Err(error),
-            Err(Error::CellClear { .. }) => (None, true),
+            Err(Error::Refused(Refusal::CellClear { .. })) => (None, true),
             Err(other) => return Err(other),
         }
     };
@@ -1491,12 +1539,12 @@ pub(super) fn table_position(
         .workbook_ref()
         .sheets()
         .get(sheet)
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     match selector {
         TableSelector::Position(position) => {
             let position = position.get();
             if position >= sheet.table_count() {
-                return Err(Error::TableNotFound);
+                return Err(Error::Refused(Refusal::TableNotFound));
             }
             Ok(position)
         },
@@ -1505,7 +1553,9 @@ pub(super) fn table_position(
                 .tables()
                 .enumerate()
                 .filter(|(_, table)| table.name() == name);
-            let (position, _) = matches.next().ok_or(Error::TableNotFound)?;
+            let (position, _) = matches
+                .next()
+                .ok_or(Error::Refused(Refusal::TableNotFound))?;
             if matches.next().is_some() {
                 return Err(Error::InvalidSource);
             }
@@ -1539,7 +1589,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::SheetNotFound`], [`Error::TableNotFound`]; source errors
+    /// [`Refusal::SheetNotFound`], [`Refusal::TableNotFound`]; source errors
     /// for a semantic-only or malformed source.
     pub fn edit_table_topology<'sheet, 'table>(
         &self,
@@ -1550,7 +1600,7 @@ impl Package {
             .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?
             .index();
         let table = table_position(self, sheet, table.into())?;
         let geometry = read_geometry(self, sheet, table)?;

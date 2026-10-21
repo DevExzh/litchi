@@ -7,7 +7,7 @@ use crate::charts::rounded_corners::{
     set_chart_rounded_corners as set_native_chart_rounded_corners,
 };
 
-impl Editor {
+impl Draft {
     /// Read the rounded-corner settings for one native Keynote slide chart.
     pub fn slide_chart_rounded_corners(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn slide_chart_rounded_corners(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<ChartRoundedCorners> {
@@ -43,7 +43,7 @@ fn slide_chart_rounded_corners(
 }
 
 fn set_slide_chart_rounded_corners(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     rounded_corners: ChartRoundedCorners,
@@ -60,7 +60,7 @@ fn set_slide_chart_rounded_corners(
         "Keynote",
         rounded_corners,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_rounded_corners(slide_index, drawable_object_id)? != rounded_corners {
         return Err(Error::InvalidFormat(
             "Keynote chart rounded-corner update failed validation".to_owned(),

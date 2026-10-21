@@ -942,11 +942,11 @@ fn lock_state_limits_fail_before_publication_and_keep_source_exact() -> TestResu
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_lock_state(0usize, 0usize),
-        Err(SlideTableLockStateError::LimitExceeded { .. })
+        Err(SlideTableLockStateError::Limit { .. })
     ));
     assert!(matches!(
         package.edit_slide_table_lock_state(0usize, 0usize),
-        Err(SlideTableLockStateError::LimitExceeded { .. })
+        Err(SlideTableLockStateError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())

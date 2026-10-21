@@ -7,7 +7,7 @@ use crate::charts::bar_shape_3d::{
     set_chart_3d_bar_shape as set_native_chart_3d_bar_shape,
 };
 
-impl Editor {
+impl Draft {
     /// Read the rectangular/cylindrical geometry of one 3D bar or column chart.
     pub fn body_chart_3d_bar_shape(&self, drawable_object_id: u64) -> Result<BarShape> {
         let graph = body_chart_graph(self, drawable_object_id)?;
@@ -45,7 +45,7 @@ impl Editor {
             "Pages",
             shape,
         )?;
-        let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+        let verified = Draft::from_bytes(&staged.to_bytes()?)?;
         if verified.body_chart_3d_bar_shape(drawable_object_id)? != shape {
             return Err(Error::InvalidFormat(
                 "Pages chart 3D bar-shape update failed validation".to_owned(),
@@ -98,7 +98,7 @@ mod tests {
         let duplicate = editor
             .duplicate_body_chart(chart.drawable_object_id, 1)
             .unwrap();
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body_chart_3d_bar_shape(chart.drawable_object_id)

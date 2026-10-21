@@ -22,7 +22,7 @@ fn formula_cached_value_to_cell_value(cached_value: FormulaCachedValue) -> CellV
 }
 
 pub(super) fn set_attached_table_formula(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -132,7 +132,7 @@ pub(super) fn set_attached_table_formula(
         &compiled.external_precedents,
     )?;
 
-    let verified = IWorkPackage::from_bytes(&package.to_bytes()?)?;
+    let verified = HostPackage::from_bytes(&package.to_bytes()?)?;
     verify_formula_link(&verified, table_id, row, column, formula_id, &formula)?;
     verify_formula_dependency(
         &verified,

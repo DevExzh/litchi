@@ -13,7 +13,7 @@ const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
 pub(super) fn rules_at_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &CellLocation,
     column: usize,
 ) -> Result<Option<Vec<Rule>>> {
@@ -46,7 +46,7 @@ pub(super) fn rules_at_location(
 }
 
 fn decode_style_set(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     style_set_id: u64,
 ) -> Result<tst::ConditionalStyleSetArchive> {
@@ -68,7 +68,7 @@ fn decode_style_set(
 }
 
 fn decode_rules(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     set: &tst::ConditionalStyleSetArchive,
 ) -> Result<Vec<Rule>> {
@@ -92,7 +92,7 @@ fn decode_rules(
 }
 
 fn decode_rule(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     rule: &tst::conditional_style_set_archive::ConditionalStyleRule,
     prepivot: Option<&tst::conditional_style_set_archive::ConditionalStyleRulePrePivot>,
@@ -439,7 +439,7 @@ fn decode_date_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result
 }
 
 fn decode_cell_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<Option<RgbaColor>> {
@@ -474,7 +474,7 @@ fn decode_cell_style(
 }
 
 fn decode_text_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
 ) -> Result<(Option<RgbaColor>, bool)> {
@@ -512,7 +512,7 @@ fn decode_text_style(
 }
 
 fn with_object<T>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     kind: &str,

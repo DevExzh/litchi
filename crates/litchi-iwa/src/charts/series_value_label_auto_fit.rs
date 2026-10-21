@@ -12,7 +12,7 @@ use crate::charts::series_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const SHOW_LABELS_IN_FRONT_FIELD: u32 = 100;
 
@@ -39,7 +39,7 @@ impl ChartSeriesValueLabelAutoFit {
 
 /// Read Auto-Fit settings in native series order.
 pub(crate) fn chart_series_value_label_auto_fits(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -60,7 +60,7 @@ pub(crate) fn chart_series_value_label_auto_fits(
 
 /// Set Auto-Fit settings in native series order.
 pub(crate) fn set_chart_series_value_label_auto_fits(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -103,7 +103,7 @@ pub(crate) fn set_chart_series_value_label_auto_fits(
 }
 
 fn effective_slots(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

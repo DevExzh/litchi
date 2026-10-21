@@ -8,7 +8,7 @@ use crate::charts::axis_style::{
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl Editor {
+impl Draft {
     /// Read whether Pages shows the line for one native body-chart axis.
     pub fn body_chart_axis_line_visible(
         &self,
@@ -30,7 +30,7 @@ impl Editor {
 }
 
 fn body_chart_axis_line_visible(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<Visibility> {
@@ -45,7 +45,7 @@ fn body_chart_axis_line_visible(
 }
 
 fn set_body_chart_axis_line_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     axis: Axis,
     visible: Visibility,
@@ -60,7 +60,7 @@ fn set_body_chart_axis_line_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_line_visible(drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart axis-line update failed validation".to_owned(),

@@ -99,6 +99,41 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted physical graph or selected payload is not unambiguous.
+    #[error("the Pages drawable-order source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error(
+        "Pages body drawable order {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        /// Resource category that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested resource amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded transaction allocation failed.
+    #[error("could not allocate {amount} units for the Pages drawable-order transaction")]
+    Allocation { amount: usize },
+    /// Complete candidate reopening did not reproduce the requested order.
+    #[error("the edited Pages body drawable order failed semantic verification")]
+    Verification,
+    /// The supplied patch does not belong to this exact package artifact.
+    #[error("the Pages body drawable-order patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The rooted Pages document has no drawable-order payload.
     #[error("the Pages document has no readable body drawable order")]
     MissingOrder,
@@ -122,30 +157,27 @@ pub enum Error {
     /// physical edit.
     #[error("this Pages source does not support physical drawable-order edits")]
     UnsupportedSource,
-    /// The rooted physical graph or selected payload is not unambiguous.
-    #[error("the Pages drawable-order source cannot be edited safely")]
-    InvalidSource,
-    /// A finite transaction resource ceiling was exceeded.
-    #[error(
-        "Pages body drawable order {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        /// Resource category that exceeded its ceiling.
-        kind: LimitKind,
-        /// Observed or requested resource amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded transaction allocation failed.
-    #[error("could not allocate {amount} units for the Pages drawable-order transaction")]
-    Allocation { amount: usize },
-    /// Complete candidate reopening did not reproduce the requested order.
-    #[error("the edited Pages body drawable order failed semantic verification")]
-    Verification,
-    /// The supplied patch does not belong to this exact package artifact.
-    #[error("the Pages body drawable-order patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::MissingOrder { .. }
+            | Self::HandleSourceMismatch { .. }
+            | Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::AmbiguousOrder { .. } | Self::InvalidOrder { .. } => RefusalKind::InvalidValue,
+            Self::PositionNotFound { .. } | Self::HandleNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -403,6 +435,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -525,7 +563,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !edit.source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
 
     let candidate = rewrite_order(edit.source, location, &current, &after)?;
@@ -592,7 +630,7 @@ fn read_order(package: &Package) -> Result<(OrderLocation, Vec<NonZeroU64>), Err
         match field.number() {
             ROOT_DRAWABLES_Z_ORDER_FIELD => {
                 if zorder_identifier.is_some() || field.wire_type() != 2 {
-                    return Err(Error::AmbiguousOrder);
+                    return Err(Error::Refused(Refusal::AmbiguousOrder));
                 }
                 zorder_identifier = Some(strict_reference(field.payload(), package)?);
             },
@@ -608,7 +646,7 @@ fn read_order(package: &Package) -> Result<(OrderLocation, Vec<NonZeroU64>), Err
             _ => {},
         }
     }
-    let zorder_identifier = zorder_identifier.ok_or(Error::MissingOrder)?;
+    let zorder_identifier = zorder_identifier.ok_or(Error::Refused(Refusal::MissingOrder))?;
     let (zorder_component_index, zorder_object_index) = locations
         .get(&zorder_identifier.get())
         .copied()
@@ -699,7 +737,7 @@ fn handles_to_identities(
     let mut identities = allocate_vec(handles.len())?;
     for handle in handles {
         if !source_matches(&handle.source, source) {
-            return Err(Error::HandleSourceMismatch);
+            return Err(Error::Refused(Refusal::HandleSourceMismatch));
         }
         identities.push(handle.identity);
     }
@@ -732,7 +770,7 @@ fn resolve_staged_selector(
         BodyDrawableSelector::Position(position) => handles
             .get(position.get())
             .map(|_| position.get())
-            .ok_or(Error::PositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::PositionNotFound { position })),
         BodyDrawableSelector::Handle(handle) => handles
             .iter()
             .position(|candidate| candidate == &handle)
@@ -741,9 +779,9 @@ fn resolve_staged_selector(
                     .first()
                     .is_some_and(|candidate| !source_matches(&candidate.source, &handle.source))
                 {
-                    Error::HandleSourceMismatch
+                    Error::Refused(Refusal::HandleSourceMismatch)
                 } else {
-                    Error::HandleNotFound
+                    Error::Refused(Refusal::HandleNotFound)
                 }
             }),
     }
@@ -777,7 +815,7 @@ fn validate_exact_permutation(
     requested: &[NonZeroU64],
 ) -> Result<(), Error> {
     if current.len() != requested.len() {
-        return Err(Error::InvalidOrder);
+        return Err(Error::Refused(Refusal::InvalidOrder));
     }
     // An empty order is a valid Pages state.  It is also the only valid
     // empty permutation, so return before constructing validation scratch.
@@ -794,7 +832,7 @@ fn validate_exact_permutation(
         .iter()
         .any(|identifier| !current_set.insert(*identifier))
     {
-        return Err(Error::InvalidOrder);
+        return Err(Error::Refused(Refusal::InvalidOrder));
     }
     let mut requested_set = HashSet::new();
     requested_set
@@ -807,7 +845,7 @@ fn validate_exact_permutation(
         .any(|identifier| !requested_set.insert(*identifier))
         || requested_set != current_set
     {
-        return Err(Error::InvalidOrder);
+        return Err(Error::Refused(Refusal::InvalidOrder));
     }
     Ok(())
 }
@@ -830,7 +868,7 @@ fn rewrite_order(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = catalog
         .limits()
@@ -1141,9 +1179,11 @@ fn unique_message_index(object: &ArchiveObject, message_type: u32) -> Result<usi
         .enumerate()
         .filter(|(_, message)| message.type_ == message_type)
         .map(|(index, _)| index);
-    let index = indexes.next().ok_or(Error::MissingOrder)?;
+    let index = indexes
+        .next()
+        .ok_or(Error::Refused(Refusal::MissingOrder))?;
     if indexes.next().is_some() {
-        return Err(Error::AmbiguousOrder);
+        return Err(Error::Refused(Refusal::AmbiguousOrder));
     }
     Ok(index)
 }
@@ -1331,32 +1371,32 @@ fn map_codec_error(error: DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     match error.resource_limit() {
-        Some(WireResourceLimit::InputBytes { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::InputBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(WireResourceLimit::OutputBytes { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::OutputBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Fields { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireFields,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(WireResourceLimit::WorkBytes { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::WorkBytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        Some(WireResourceLimit::References { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::References { observed, maximum }) => Error::Limit {
             kind: LimitKind::References,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1371,12 +1411,12 @@ fn map_package_error(error: super::PackageError) -> Error {
         super::PackageError::Archive(error) => map_archive_error(error),
         super::PackageError::Detection(_) => Error::InvalidSource,
         super::PackageError::Allocation { amount } => Error::Allocation { amount },
-        super::PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        super::PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        super::PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        super::PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,
@@ -1399,7 +1439,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1417,7 +1457,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
         | litchi_iwa_archive::Error::InvalidLimits(_)
@@ -1434,7 +1474,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1518,11 +1558,11 @@ mod tests {
         let current = [NonZeroU64::new(1).unwrap(), NonZeroU64::new(2).unwrap()];
         assert_eq!(
             validate_exact_permutation(&current, &[current[0], current[0]]),
-            Err(Error::InvalidOrder)
+            Err(Error::Refused(Refusal::InvalidOrder))
         );
         assert_eq!(
             validate_exact_permutation(&current, &[current[0], NonZeroU64::new(3).unwrap()]),
-            Err(Error::InvalidOrder)
+            Err(Error::Refused(Refusal::InvalidOrder))
         );
     }
 
@@ -1531,7 +1571,7 @@ mod tests {
         assert_eq!(validate_exact_permutation(&[], &[]), Ok(()));
         assert_eq!(
             validate_exact_permutation(&[], &[NonZeroU64::new(1).unwrap()]),
-            Err(Error::InvalidOrder)
+            Err(Error::Refused(Refusal::InvalidOrder))
         );
     }
 

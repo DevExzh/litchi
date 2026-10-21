@@ -18,7 +18,7 @@ use crate::charts::axis::{
 };
 use crate::protobuf::tsch;
 use crate::wire::patch_length_delimited_field;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartaxisdefaultusermax` in `TSCH.Generated.ChartAxisNonStyleArchive`.
 const VALUE_AXIS_MAXIMUM_FIELD: u32 = 17;
@@ -27,7 +27,7 @@ const VALUE_AXIS_MINIMUM_FIELD: u32 = 18;
 
 /// Read the manual bounds of one native chart's primary value axis.
 pub(crate) fn chart_value_axis_bounds(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -44,7 +44,7 @@ pub(crate) fn chart_value_axis_bounds(
 
 /// Set the manual bounds of one native chart's primary value axis.
 pub(crate) fn set_chart_value_axis_bounds(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

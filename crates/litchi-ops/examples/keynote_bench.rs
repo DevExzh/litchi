@@ -31,7 +31,7 @@
 //!   `table_cell` (the first cell of `table-discovery.key`; leaf
 //!   `set_table_cell`; unified `set` of `text`) and `media_remove` (the
 //!   first clip of `media-lifecycle-audio-remove-native.key`; leaf
-//!   `remove_slide_media`; unified `File::remove`). Their outputs are
+//!   `edit_slide_media_lifecycle().remove(..)`; unified `File::remove`). Their outputs are
 //!   compared byte for byte before timing.
 //! - record 0329: `table_add`, a 3 x 3 table on the table slide of
 //!   `table-discovery.key` (leaf `edit_slide_drawables` + `add_table`;
@@ -358,10 +358,12 @@ fn main() {
     {
         let leaf = leaf_bytes(
             media_package()
-                .remove_slide_media(
+                .edit_slide_media_lifecycle()
+                .remove(
                     SlideSelector::index(media_slide),
                     litchi_keynote::MovieSelector::index(0),
                 )
+                .and_then(|edit| edit.commit())
                 .unwrap()
                 .package(),
         );
@@ -754,10 +756,12 @@ fn main() {
                 leg(n, media_package, |package| {
                     drop(black_box(
                         package
-                            .remove_slide_media(
+                            .edit_slide_media_lifecycle()
+                            .remove(
                                 SlideSelector::index(media_slide),
                                 litchi_keynote::MovieSelector::index(0),
                             )
+                            .and_then(|edit| edit.commit())
                             .unwrap(),
                     ));
                 })

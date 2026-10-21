@@ -566,7 +566,7 @@ fn source_name_rename_budget_failure_is_typed_and_atomic() -> TestResult {
         .expect_err("the exact input ceiling must reject output growth");
     assert!(matches!(
         error,
-        BodyTableNameError::LimitExceeded {
+        BodyTableNameError::Limit {
             kind: BodyTableNameLimitKind::OutputBytes,
             ..
         }

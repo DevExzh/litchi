@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let mut editor = pages::Editor::open(input)?;
+    let mut editor = pages::Draft::open(input)?;
     let anchor = editor.body_text()?.encode_utf16().count();
     let created = editor.add_text_box(
         anchor,

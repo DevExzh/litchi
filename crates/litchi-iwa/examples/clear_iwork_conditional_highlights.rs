@@ -35,12 +35,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn clear_numbers(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = numbers::Editor::open(source)?;
+    let mut editor = numbers::Draft::open(source)?;
     let table_id = editor.tables()?.remove(0).id();
     editor.clear_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?;
     editor.save(output)?;
     assert!(
-        numbers::Editor::open(output)?
+        numbers::Draft::open(output)?
             .cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?
             .is_none()
     );
@@ -48,12 +48,12 @@ fn clear_numbers(source: &Path, output: &Path) -> Result<(), Box<dyn std::error:
 }
 
 fn clear_pages(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = pages::Editor::open(source)?;
+    let mut editor = pages::Draft::open(source)?;
     let table_id = editor.tables()?.remove(0).model_object_id;
     editor.clear_table_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?;
     editor.save(output)?;
     assert!(
-        pages::Editor::open(output)?
+        pages::Draft::open(output)?
             .table_cell_conditional_highlighting(table_id, HIGHLIGHT_ROW, HIGHLIGHT_COLUMN)?
             .is_none()
     );
@@ -61,7 +61,7 @@ fn clear_pages(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::E
 }
 
 fn clear_keynote(source: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut editor = keynote::Editor::open(source)?;
+    let mut editor = keynote::Draft::open(source)?;
     let table_id = editor.slide_tables(0)?.remove(0).model_object_id;
     editor.clear_slide_table_cell_conditional_highlighting(
         0,
@@ -71,7 +71,7 @@ fn clear_keynote(source: &Path, output: &Path) -> Result<(), Box<dyn std::error:
     )?;
     editor.save(output)?;
     assert!(
-        keynote::Editor::open(output)?
+        keynote::Draft::open(output)?
             .slide_table_cell_conditional_highlighting(
                 0,
                 table_id,

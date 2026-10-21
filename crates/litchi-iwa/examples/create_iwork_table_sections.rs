@@ -69,9 +69,9 @@ fn create_numbers(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_focused_table_headers(
-    editor: numbers::Editor,
+    editor: numbers::Draft,
     settings: HeaderSettings,
-) -> Result<numbers::Editor, Box<dyn std::error::Error>> {
+) -> Result<numbers::Draft, Box<dyn std::error::Error>> {
     let package = Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_table_headers(SheetSelector::index(0), TableSelector::index(0))?
@@ -79,7 +79,7 @@ fn set_focused_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(numbers::Editor::from_bytes(&bytes)?)
+    Ok(numbers::Draft::from_bytes(&bytes)?)
 }
 
 fn create_pages(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -146,7 +146,7 @@ fn create_keynote(insertions: &Path, deletions: &Path) -> Result<(), Box<dyn std
 }
 
 fn set_pages_table_headers(
-    editor: &mut litchi_iwa::pages::Editor,
+    editor: &mut litchi_iwa::pages::Draft,
     settings: PagesHeaderSettings,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let package = PagesPackage::from_bytes(&editor.to_bytes()?)?;
@@ -156,14 +156,14 @@ fn set_pages_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = litchi_iwa::pages::Editor::from_bytes(&bytes)?;
+    *editor = litchi_iwa::pages::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
 fn set_focused_keynote_table_headers(
-    editor: keynote::Editor,
+    editor: keynote::Draft,
     settings: KeynoteHeaderSettings,
-) -> Result<keynote::Editor, Box<dyn std::error::Error>> {
+) -> Result<keynote::Draft, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
         .edit_slide_table_headers(
@@ -174,7 +174,7 @@ fn set_focused_keynote_table_headers(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    Ok(keynote::Editor::from_bytes(&bytes)?)
+    Ok(keynote::Draft::from_bytes(&bytes)?)
 }
 
 fn section_values() -> Vec<TableCellUpdate> {
@@ -193,7 +193,7 @@ fn section_values() -> Vec<TableCellUpdate> {
 }
 
 fn set_numbers_cells(
-    editor: &mut numbers::Editor,
+    editor: &mut numbers::Draft,
     updates: impl IntoIterator<Item = litchi_numbers::cell::Update>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let changes = updates
@@ -210,7 +210,7 @@ fn set_numbers_cells(
         .commit()?;
     let mut bytes = Vec::new();
     commit.package().write_to(&mut bytes)?;
-    *editor = numbers::Editor::from_bytes(&bytes)?;
+    *editor = numbers::Draft::from_bytes(&bytes)?;
     Ok(())
 }
 

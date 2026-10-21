@@ -66,7 +66,7 @@ impl Document {
         // ingress. Media is optional, so a source without a usable Data tree
         // remains a valid document.
         let (media_limits, package_limits) = media_profiles(limits)?;
-        let media_manager = MediaManager::new_with_limits_and_package_limits(
+        let media_manager = MediaManager::open_with_limits_and_package_limits(
             path_ref,
             media_limits,
             package_limits,
@@ -418,7 +418,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = crate::IWorkPackage::new();
+        let mut package = crate::HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",
@@ -443,7 +443,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let mut package = crate::IWorkPackage::new();
+        let mut package = crate::HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",

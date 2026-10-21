@@ -169,7 +169,7 @@ fn immutable_external_style_accepts_exact_bytes_and_enforces_comparison_budget()
             Some(style_identifier),
             &mut one_under,
         ),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: LimitKind::WireWork,
             ..
         })

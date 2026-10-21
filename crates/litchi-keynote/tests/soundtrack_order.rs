@@ -380,7 +380,12 @@ fn fixture_order_transaction_is_exact_and_reversible() -> TestResult {
     let source = fixture()?;
     let package = Package::from_bytes(&source)?;
     let edit = package.edit_soundtrack_order();
-    assert!(matches!(edit.commit(), Err(Error::NoStagedOperation)));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(
+            litchi_keynote::soundtrack::order::Refusal::NoStagedOperation
+        ))
+    ));
 
     let mut edit = package.edit_soundtrack_order();
     edit.move_item(Position::new(0), Position::new(0))?;
@@ -426,7 +431,7 @@ fn changed_order_rejects_a_tight_output_limit_atomically() -> TestResult {
     edit.move_item(Position::new(0), Position::new(1))?;
     assert!(matches!(
         edit.commit(),
-        Err(Error::LimitExceeded {
+        Err(Error::Limit {
             kind: litchi_keynote::soundtrack::order::LimitKind::OutputBytes,
             ..
         })
@@ -608,7 +613,7 @@ fn soundtrack_order_reference_budget_is_aggregate() -> TestResult {
     let mut edit = package.edit_soundtrack_order();
     assert!(matches!(
         edit.move_item(Position::new(0), Position::new(0)),
-        Err(Error::LimitExceeded { .. })
+        Err(Error::Limit { .. })
     ));
     assert_eq!(bytes(&package)?, source);
     Ok(())

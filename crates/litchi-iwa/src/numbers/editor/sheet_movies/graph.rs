@@ -26,7 +26,7 @@ const STANDIN_CAPTION_MESSAGE_VERSION: [u32; 3] = [10, 1, 0];
 /// archive ceilings. The focused Numbers owner applies the profile to its
 /// borrowed Buffa projection and source-preserving rewrite.
 pub(in crate::numbers::editor) fn movie_playback_wire_limits(
-    package: &IWorkPackage,
+    package: &HostPackage,
 ) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
@@ -60,7 +60,7 @@ pub(in crate::numbers::editor) fn movie_playback_wire_limits(
 /// bounded Buffa projection. The generated MovieArchive remains the owner of
 /// the drawable graph; this seam borrows only the playback payload bytes.
 pub(in crate::numbers::editor) fn movie_playback_settings_from_payload(
-    package: &IWorkPackage,
+    package: &HostPackage,
     payload: &[u8],
 ) -> Result<MediaPlaybackSettings> {
     let limits = movie_playback_wire_limits(package)?;
@@ -75,7 +75,7 @@ pub(in crate::numbers::editor) fn movie_playback_settings_from_payload(
 /// receives a private clone, so malformed payloads, strict codec failures, and
 /// candidate validation errors leave the caller's package unchanged.
 pub(in crate::numbers::editor) fn replace_movie_playback_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     context: &str,
@@ -237,7 +237,7 @@ pub(super) fn movie_creation_values(options: SheetMovieOptions) -> Result<(Drawa
 }
 
 pub(in crate::numbers::editor) fn movie_creation_context(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
 ) -> Result<MovieCreationContext> {
     let (archive_name, _, _) = numbers_sheet(editor.package(), sheet_id)?;
@@ -276,7 +276,7 @@ pub(in crate::numbers::editor) fn movie_creation_context(
     })
 }
 
-fn movie_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
+fn movie_style_id(package: &HostPackage, theme_id: u64) -> Result<u64> {
     let locations = object_locations(package)?;
     let archive_name = locations.get(&theme_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Numbers theme object {theme_id} is missing"))
@@ -304,7 +304,7 @@ fn movie_style_id(package: &IWorkPackage, theme_id: u64) -> Result<u64> {
 }
 
 pub(super) fn movie_caption_theme(
-    package: &IWorkPackage,
+    package: &HostPackage,
     theme_id: u64,
     stylesheet_id: u64,
 ) -> Result<CaptionThemeStyle> {
@@ -353,7 +353,7 @@ pub(super) fn movie_caption_theme(
     })
 }
 
-pub(super) fn movie_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetMovieInfo>> {
+pub(super) fn movie_infos(editor: &Draft, sheet_id: u64) -> Result<Vec<SheetMovieInfo>> {
     let (_, _, sheet) = numbers_sheet(editor.package(), sheet_id)?;
     let locations = object_locations(editor.package())?;
     let mut movies = Vec::new();
@@ -399,7 +399,7 @@ pub(super) fn movie_infos(editor: &Editor, sheet_id: u64) -> Result<Vec<SheetMov
 }
 
 pub(super) fn movie_graph(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<SheetMovieGraph> {
@@ -551,7 +551,7 @@ pub(super) fn movie_graph(
     })
 }
 
-fn movie_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<SheetMovieInfo> {
+fn movie_info(package: &HostPackage, sheet_id: u64, identifier: u64) -> Result<SheetMovieInfo> {
     let locations = object_locations(package)?;
     let archive_name = locations
         .get(&identifier)
@@ -616,7 +616,6 @@ fn movie_info(package: &IWorkPackage, sheet_id: u64, identifier: u64) -> Result<
     })
 }
 
-#[allow(deprecated)]
 pub(super) fn movie_objects(
     ids: MovieObjectIds,
     sheet_id: u64,
@@ -719,7 +718,7 @@ pub(super) fn movie_objects(
 }
 
 pub(in crate::numbers::editor) fn set_movie_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     geometry: DrawableGeometry,
@@ -758,7 +757,7 @@ pub(in crate::numbers::editor) fn set_movie_geometry(
 }
 
 pub(in crate::numbers::editor) fn set_movie_properties(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     properties: &DrawableProperties,

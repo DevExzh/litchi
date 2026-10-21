@@ -172,14 +172,17 @@ fn oversized_preferred_movie_uses_short_collision_suffix_and_inverse() -> TestRe
     let (source_movie, source_poster) = source_assets(&source)?;
     let movie = fresh_movie(&source_movie);
     let poster = fresh_poster(&source_poster)?;
-    let first = source.add_slide_movie(
-        SlideSelector::index(0),
-        "first-fresh.mov",
-        &movie,
-        "first-fresh.png",
-        &poster,
-        options()?,
-    )?;
+    let first = source
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            "first-fresh.mov",
+            &movie,
+            "first-fresh.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(first.patch().created_data(), 2);
     let content_identifier = data_identifier(first.package(), &movie)?;
     let collision_name = format!("Data/litchi-{content_identifier}.mov");
@@ -188,14 +191,17 @@ fn oversized_preferred_movie_uses_short_collision_suffix_and_inverse() -> TestRe
 
     let long_filename = format!("{}.mov", "m".repeat(4_092));
     assert_eq!(long_filename.len(), 4_096);
-    let second = source_with_orphan.add_slide_movie(
-        SlideSelector::index(0),
-        &long_filename,
-        &movie,
-        "suffix-poster.png",
-        &poster,
-        options()?,
-    )?;
+    let second = source_with_orphan
+        .edit_slide_movie_creation()
+        .add(
+            SlideSelector::index(0),
+            &long_filename,
+            &movie,
+            "suffix-poster.png",
+            &poster,
+            options()?,
+        )
+        .and_then(|edit| edit.commit())?;
     assert_eq!(second.patch().created_data(), 2);
 
     let short_suffix_name = format!("Data/litchi-{content_identifier}-1.mov");

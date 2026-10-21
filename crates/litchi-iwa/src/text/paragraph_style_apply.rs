@@ -2,7 +2,7 @@
 
 use crate::package_metadata::release_package_identifier_suffix;
 use crate::shapes::remove_style_variation;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::paragraph_alignment::{native, storage};
 use super::style_registry::{
@@ -38,7 +38,7 @@ impl AppliedParagraphStyle {
 }
 
 pub(super) fn applied_named_paragraph_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<AppliedParagraphStyle> {
     let storage = storage::locate(package, storage_id)?;
@@ -46,7 +46,7 @@ pub(super) fn applied_named_paragraph_style(
 }
 
 pub(super) fn apply_named_paragraph_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     target: ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
@@ -99,7 +99,7 @@ pub(super) fn apply_named_paragraph_style(
 }
 
 fn resolve_applied_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
 ) -> Result<AppliedParagraphStyle> {
     let selectable = native::named_paragraph_styles(package, first_style_id)?;
@@ -132,7 +132,7 @@ fn resolve_applied_style(
 }
 
 fn selectable_style(
-    package: &IWorkPackage,
+    package: &HostPackage,
     first_style_id: u64,
     target: ParagraphStyleId,
 ) -> Result<NamedParagraphStyle> {
@@ -148,7 +148,7 @@ fn selectable_style(
 }
 
 fn remove_exclusive_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     owner_archive_name: &str,
     style_id: u64,
     base_style_id: ParagraphStyleId,

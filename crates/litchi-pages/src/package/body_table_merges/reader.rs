@@ -11,6 +11,7 @@ use super::{
     Error, map_lock_error, map_merge_error, map_package_error, model_message_from_components,
     read_limits, select_reader_target,
 };
+use crate::OpenOptions;
 use crate::selector::BodyTableSelector;
 use crate::table::merge::Region;
 
@@ -80,19 +81,20 @@ impl MergeReader {
     /// Returns a typed error when the path cannot be read, physical ingress
     /// exceeds its limits, or the source is not a valid Pages package.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
-        Self::open_with_limits(path, Limits::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a Pages package for lazy merged-cell queries under explicit
-    /// physical limits.
+    /// Open a Pages package for lazy merged-cell queries under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`],
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`],
     /// plus bounded filesystem ingress failures.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: Limits) -> Result<Self, Error> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, Error> {
+        let limits = archive_limits(options)?;
         let bytes = super::super::read_path(path.as_ref(), limits).map_err(map_package_error)?;
-        Self::from_shared_bytes_with_limits(bytes, limits)
+        Self::from_shared_bytes_with_archive_limits(bytes, limits)
     }
 
     /// Parse a Pages package for lazy merged-cell queries with default limits.
@@ -106,17 +108,18 @@ impl MergeReader {
     /// Returns a typed error when physical ingress, Pages root qualification,
     /// or the component object inventory is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
-    /// Parse a Pages package for lazy merged-cell queries under explicit
-    /// physical limits.
+    /// Parse a Pages package for lazy merged-cell queries under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
     /// Returns a typed error when physical ingress, Pages root qualification,
     /// or the component object inventory is malformed.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self, Error> {
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
+        let limits = archive_limits(options)?;
         let source = SourceCatalog::from_bytes_with_limits(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
@@ -131,18 +134,28 @@ impl MergeReader {
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`].
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`].
     pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, Error> {
-        Self::from_shared_bytes_with_limits(bytes, Limits::default())
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::default())
     }
 
-    /// Parse an already-owned immutable Pages package under explicit physical
-    /// limits.
+    /// Parse an already-owned immutable Pages package under the physical
+    /// source limits of `options`.
     ///
     /// # Errors
     ///
-    /// Returns the same typed failures as [`Self::from_bytes_with_limits`].
-    pub fn from_shared_bytes_with_limits(bytes: Arc<[u8]>, limits: Limits) -> Result<Self, Error> {
+    /// Returns the same typed failures as [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes_with_options(
+        bytes: Arc<[u8]>,
+        options: OpenOptions,
+    ) -> Result<Self, Error> {
+        Self::from_shared_bytes_with_archive_limits(bytes, archive_limits(options)?)
+    }
+
+    fn from_shared_bytes_with_archive_limits(
+        bytes: Arc<[u8]>,
+        limits: Limits,
+    ) -> Result<Self, Error> {
         let source = SourceCatalog::from_shared_bytes_with_limits(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
@@ -239,4 +252,9 @@ impl MergeReader {
         }
         Ok(read.regions)
     }
+}
+
+/// The archive profile `options` selects for physical merge-reader ingress.
+fn archive_limits(options: OpenOptions) -> Result<Limits, Error> {
+    options.archive().map_err(map_package_error)
 }

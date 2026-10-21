@@ -8,7 +8,7 @@ use crate::wire::{
     patch_fixed32_field, patch_length_delimited_field, patch_varint_field,
     transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 pub use litchi_iwa_common::shape::geometry::{
     FlipAxis as DrawableFlipAxis, Point as DrawablePoint, Size as DrawableSize,
 };
@@ -145,7 +145,7 @@ fn native_vertical_flip_angle(angle: Option<f32>) -> f32 {
 }
 
 pub(crate) fn shape_geometry(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<DrawableGeometry> {
@@ -168,7 +168,7 @@ pub(crate) fn shape_geometry(
 }
 
 pub(crate) fn set_shape_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     replacement: DrawableGeometry,

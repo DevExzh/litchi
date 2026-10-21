@@ -66,7 +66,7 @@ fn selector_refuses_an_unmatched_body_chart() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
     assert!(matches!(
         package.body_chart_data(BodyChartSelector::index(1)),
-        Err(BodyChartDataError::ChartNotFound { position })
+        Err(BodyChartDataError::Refused(litchi_pages::chart::data::Refusal::ChartNotFound { position }))
             if position == Position::new(1)
     ));
     Ok(())

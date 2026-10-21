@@ -13,7 +13,7 @@ use litchi_numbers::cell::data_format::custom::{
 };
 
 const NATIVE_CUSTOM_TEXT_VALUE_TOKEN: char = '\u{e421}';
-use crate::{Error, IWorkPackage, Result, wire};
+use crate::{Error, HostPackage, Result, wire};
 
 const CUSTOM_FORMAT_LIST_MESSAGE_TYPE: u32 = 222;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
@@ -36,7 +36,7 @@ struct RegistryLocation {
 }
 
 pub(super) fn acquire_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     format: &Custom,
 ) -> Result<tsk::FormatStructArchive> {
     let location = locate_registry(package)?;
@@ -83,7 +83,7 @@ pub(super) fn acquire_reference(
 }
 
 pub(super) fn resolve_reference(
-    package: &IWorkPackage,
+    package: &HostPackage,
     reference: &tsk::FormatStructArchive,
 ) -> Result<Custom> {
     let uuid = reference_uuid(reference)?.ok_or_else(|| {
@@ -111,7 +111,7 @@ pub(super) fn resolve_reference(
 }
 
 pub(super) fn release_reference_if_unused(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     reference: &tsk::FormatStructArchive,
 ) -> Result<()> {
     let Some(uuid) = reference_uuid(reference)? else {
@@ -526,7 +526,7 @@ fn reference_archive(format_type: u32, uuid: tsp::Uuid) -> tsk::FormatStructArch
     }
 }
 
-fn locate_registry(package: &IWorkPackage) -> Result<RegistryLocation> {
+fn locate_registry(package: &HostPackage) -> Result<RegistryLocation> {
     let mut result = None;
     for archive_name in package.iwa_entry_names() {
         let archive = package.archive(archive_name)?;
@@ -560,7 +560,7 @@ fn locate_registry(package: &IWorkPackage) -> Result<RegistryLocation> {
 }
 
 #[cfg(test)]
-pub(super) fn registry_entry_count(package: &IWorkPackage) -> Result<usize> {
+pub(super) fn registry_entry_count(package: &HostPackage) -> Result<usize> {
     let location = locate_registry(package)?;
     validate_registry(&location)?;
     Ok(location.list.uuids.len())
@@ -602,7 +602,7 @@ fn validate_registry(location: &RegistryLocation) -> Result<()> {
 }
 
 fn replace_registry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &RegistryLocation,
     data: Vec<u8>,
 ) -> Result<()> {
@@ -629,7 +629,7 @@ fn replace_registry(
     })
 }
 
-fn package_references_uuid(package: &IWorkPackage, uuid: &tsp::Uuid) -> Result<bool> {
+fn package_references_uuid(package: &HostPackage, uuid: &tsp::Uuid) -> Result<bool> {
     for archive_name in package.iwa_entry_names() {
         for object in package.archive(archive_name)?.objects {
             for message in object.messages {

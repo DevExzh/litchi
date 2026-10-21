@@ -50,7 +50,7 @@ const SECONDS_PER_DAY: f64 = 86_400.0;
 const CONDITIONAL_STYLE_RULE_COUNT_FIELD: u32 = 1;
 
 pub(super) fn info_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -60,7 +60,7 @@ pub(super) fn info_in_package(
 }
 
 pub(super) fn attached_info_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -70,7 +70,7 @@ pub(super) fn attached_info_in_package(
 }
 
 pub(super) fn rules_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -80,7 +80,7 @@ pub(super) fn rules_in_package(
 }
 
 pub(super) fn attached_rules_in_package(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -90,7 +90,7 @@ pub(super) fn attached_rules_in_package(
 }
 
 fn info_at_location(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: CellLocation,
     table_id: u64,
     row: usize,
@@ -214,7 +214,7 @@ fn strict_conditional_style_rule_count(source: &[u8]) -> Result<u32> {
 }
 
 pub(super) fn clear_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -224,7 +224,7 @@ pub(super) fn clear_in_package(
 }
 
 pub(super) fn clear_attached_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -234,7 +234,7 @@ pub(super) fn clear_attached_in_package(
 }
 
 pub(super) fn set_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -251,7 +251,7 @@ pub(super) fn set_in_package(
 }
 
 pub(super) fn set_attached_in_package(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     row: usize,
     column: usize,
@@ -282,7 +282,7 @@ fn validate_rules(rules: &[Rule]) -> Result<()> {
 }
 
 fn set_at_location(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -370,7 +370,7 @@ fn set_at_location(
 }
 
 fn ensure_conditional_style_table(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     list_id: u64,
 ) -> Result<(String, String, tsp::Uuid)> {
@@ -471,7 +471,7 @@ fn ensure_conditional_style_table(
 }
 
 fn append_conditional_style_entry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     list_id: u64,
     style_set_id: u64,
@@ -586,7 +586,7 @@ fn is_volatile_date_condition(condition: &Condition) -> bool {
 }
 
 fn resolve_entry(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &CellLocation,
     list_identifier: u32,
 ) -> Result<(ResolvedTableDataList, LocatedTableDataListEntry)> {
@@ -622,7 +622,7 @@ fn resolve_entry(
 }
 
 fn update_cell(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &CellLocation,
     row: usize,
     column: usize,
@@ -651,7 +651,7 @@ fn update_cell(
 }
 
 fn applied_rule_for_cell(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &CellLocation,
     column: usize,
     rules: &[Rule],

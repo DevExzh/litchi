@@ -139,7 +139,7 @@
 //! drawables, text and notes); a fresh slide materializes a theme layout
 //! ([`Package::slide_layouts`]) with empty title, body and notes. Slides
 //! whose content lives in other components (tables, charts, comments) are
-//! refused with a typed [`slide::creation::Error::UnsupportedContent`].
+//! refused with a typed [`slide::creation::Refusal::UnsupportedContent`].
 //!
 //! ```no_run
 //! use litchi_keynote::{Package, Position, SlideSelector};
@@ -170,7 +170,7 @@
 //! [`slide::drawable::Edit::add_image`] operations and commits them as one
 //! verified package; selectors resolve against the base snapshot. Removing
 //! tables, charts, groups, movies and placeholders, and character-style
-//! writes, are typed [`slide::drawable::Error::Unsupported`] refusals;
+//! writes, are typed [`slide::drawable::Refusal::Unsupported`] refusals;
 //! [`Package::slide_drawable_text_runs`] reads character runs.
 //!
 //! ```no_run
@@ -538,7 +538,7 @@ pub use selector::{
 };
 pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
 pub use slide::image::ImageSelector;
-pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
+pub use slide::media::{MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
 pub use slide::table::merge::Region;

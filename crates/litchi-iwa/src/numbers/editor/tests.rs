@@ -24,28 +24,28 @@ use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
 fn install_focused_compat_bytes(
-    editor: &mut Editor,
+    editor: &mut Draft,
     bytes: Vec<u8>,
     source_built: bool,
 ) -> crate::Result<()> {
     if !source_built {
-        *editor = Editor::from_bytes(&bytes)?;
+        *editor = Draft::from_bytes(&bytes)?;
         return Ok(());
     }
-    let parsed = IWorkPackage::from_bytes(&bytes)?;
-    let mut package = IWorkPackage::new();
+    let parsed = HostPackage::from_bytes(&bytes)?;
+    let mut package = HostPackage::new();
     for name in parsed.entry_names() {
         let data = parsed.entry(name).ok_or_else(|| {
             Error::InvalidFormat("focused compatibility member disappeared".to_owned())
         })?;
         package.insert_entry(name.to_owned(), data.to_vec())?;
     }
-    *editor = Editor::from_package(package)?;
+    *editor = Draft::from_package(package)?;
     Ok(())
 }
 
 fn focused_sort_order(
-    editor: &Editor,
+    editor: &Draft,
     table: TableSelector<'_>,
 ) -> crate::Result<Option<FocusedSortOrder>> {
     let source_built = !editor.package().source_is_exact();
@@ -77,7 +77,7 @@ fn focused_sort_order(
 }
 
 fn set_focused_sort_order(
-    editor: &mut Editor,
+    editor: &mut Draft,
     table: TableSelector<'_>,
     order: FocusedSortOrder,
 ) -> crate::Result<()> {
@@ -138,11 +138,11 @@ fn set_focused_sort_order(
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    *editor = Editor::from_bytes(&bytes)?;
+    *editor = Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
-fn clear_focused_sort_order(editor: &mut Editor, table: TableSelector<'_>) -> crate::Result<()> {
+fn clear_focused_sort_order(editor: &mut Draft, table: TableSelector<'_>) -> crate::Result<()> {
     let source_built = !editor.package().source_is_exact();
     let bytes = editor.to_bytes()?;
     let package = match FocusedNumbersPackage::from_bytes(&bytes) {
@@ -196,11 +196,11 @@ fn clear_focused_sort_order(editor: &mut Editor, table: TableSelector<'_>) -> cr
         .package()
         .write_to(&mut bytes)
         .map_err(|error| Error::Io(error.into_io_error()))?;
-    *editor = Editor::from_bytes(&bytes)?;
+    *editor = Draft::from_bytes(&bytes)?;
     Ok(())
 }
 
-fn append_test_sort_order_payload(editor: &mut Editor, payload: &[u8]) {
+fn append_test_sort_order_payload(editor: &mut Draft, payload: &[u8]) {
     editor
         .package
         .update_archive("Index/Document.iwa", |archive| {
@@ -222,7 +222,7 @@ fn append_test_sort_order_payload(editor: &mut Editor, payload: &[u8]) {
         .unwrap();
 }
 
-fn test_sort_order_payload(editor: &Editor) -> Vec<u8> {
+fn test_sort_order_payload(editor: &Draft) -> Vec<u8> {
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     crate::wire::repeated_length_delimited_payloads(
         archive.object(10).unwrap().messages[0].data.as_slice(),
@@ -234,7 +234,7 @@ fn test_sort_order_payload(editor: &Editor) -> Vec<u8> {
     .to_vec()
 }
 
-fn set_test_table_locked(editor: &mut Editor) {
+fn set_test_table_locked(editor: &mut Draft) {
     editor
         .package
         .update_archive("Index/Document.iwa", |archive| {
@@ -260,7 +260,7 @@ fn cell_number(value: f64) -> CellValue {
     CellValue::number(value).expect("finite test number")
 }
 
-fn focused_test_cell_value(editor: &Editor, row: usize, column: usize) -> Option<CellValue> {
+fn focused_test_cell_value(editor: &Draft, row: usize, column: usize) -> Option<CellValue> {
     let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     focused
         .table_cell(
@@ -281,7 +281,7 @@ enum FocusedCommentReadPath {
 }
 
 fn focused_cell_comment_from_path(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -311,7 +311,7 @@ fn focused_cell_comment_from_path(
 }
 
 fn focused_cell_comment(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -320,7 +320,7 @@ fn focused_cell_comment(
 }
 
 fn focused_compatibility_cell_comment(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -335,7 +335,7 @@ fn focused_compatibility_cell_comment(
 }
 
 fn focused_cell_comment_replies_from_path(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -365,7 +365,7 @@ fn focused_cell_comment_replies_from_path(
 }
 
 fn focused_compatibility_cell_comment_replies(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -390,7 +390,7 @@ fn cached_scalar_number(value: f64) -> crate::numbers::bnc::CachedScalar {
     )
 }
 
-fn replace_test_table_model_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+fn replace_test_table_model_messages(package: &mut HostPackage, messages: Vec<RawMessage>) {
     package
         .update_archive("Index/Document.iwa", |archive| {
             let slot = archive
@@ -404,7 +404,7 @@ fn replace_test_table_model_messages(package: &mut IWorkPackage, messages: Vec<R
         .unwrap();
 }
 
-fn replace_test_table_info_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+fn replace_test_table_info_messages(package: &mut HostPackage, messages: Vec<RawMessage>) {
     package
         .update_archive("Index/Document.iwa", |archive| {
             let slot = archive
@@ -418,14 +418,14 @@ fn replace_test_table_info_messages(package: &mut IWorkPackage, messages: Vec<Ra
         .unwrap();
 }
 
-fn test_table_model(package: &IWorkPackage) -> TableModelArchive {
+fn test_table_model(package: &HostPackage) -> TableModelArchive {
     let archive = package.archive("Index/Document.iwa").unwrap();
     let object = archive.object(10).unwrap();
     TableModelArchive::decode(object.messages[0].data.as_slice()).unwrap()
 }
 
 pub(crate) fn set_test_table_header_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     settings: HeaderSettings,
 ) -> crate::Result<()> {
@@ -433,7 +433,7 @@ pub(crate) fn set_test_table_header_settings(
 }
 
 pub(crate) fn test_table_header_settings(
-    package: &IWorkPackage,
+    package: &HostPackage,
     table_id: u64,
 ) -> crate::Result<HeaderSettings> {
     let descriptor = attached_table_descriptor(package, table_id)?;
@@ -718,7 +718,7 @@ fn table_model_discovery_rejects_duplicate_canonical_models_transactionally() {
 
 #[test]
 fn source_built_table_catalog_uses_compatibility_appearance_projection() {
-    let editor = Editor::from_package(test_package()).unwrap();
+    let editor = Draft::from_package(test_package()).unwrap();
     assert!(!editor.package().source_is_exact());
 
     let tables = editor
@@ -731,7 +731,7 @@ fn source_built_table_catalog_uses_compatibility_appearance_projection() {
 #[test]
 fn exact_table_catalog_appearance_refusal_is_terminal_and_atomic() {
     let source = test_package().to_bytes().unwrap();
-    let editor = Editor::from_bytes(&source).unwrap();
+    let editor = Draft::from_bytes(&source).unwrap();
     assert!(editor.package().source_is_exact());
     let before = editor.to_bytes().unwrap();
 
@@ -748,7 +748,7 @@ fn exact_table_catalog_appearance_refusal_is_terminal_and_atomic() {
 
 #[test]
 fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let text_boxes = editor.sheet_text_boxes(2).unwrap();
     assert_eq!(text_boxes.len(), 1);
@@ -815,9 +815,8 @@ fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
 }
 
 #[test]
-#[allow(deprecated)]
 fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(
         editor
@@ -862,7 +861,7 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
         .unwrap();
     assert_eq!(editor.to_bytes().unwrap(), bytes);
 
-    let mut reparsed = Editor::from_bytes(&bytes).unwrap();
+    let mut reparsed = Draft::from_bytes(&bytes).unwrap();
     assert_eq!(
         reparsed
             .sheet_drawable_comment(2, 50)
@@ -878,7 +877,6 @@ fn sheet_owned_drawable_comment_crud_is_guarded_and_byte_exact() {
 }
 
 #[test]
-#[allow(deprecated)]
 fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
     let mut duplicate_owner = test_package_with_text_box();
     duplicate_owner
@@ -899,7 +897,7 @@ fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(duplicate_owner).unwrap();
+    let mut editor = Draft::from_package(duplicate_owner).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.sheet_drawables(2).is_err());
     assert!(
@@ -943,7 +941,7 @@ fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(cross_sheet).unwrap();
+    let mut editor = Draft::from_package(cross_sheet).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.sheet_drawables(2).is_err());
     assert!(editor.clear_sheet_drawable_comment(60, 50).is_err());
@@ -952,7 +950,7 @@ fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
 
 #[test]
 fn ordinary_text_box_duplicate_delete_is_independent_and_exact() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let source_geometry = editor.sheet_text_box_geometry(2, 50).unwrap();
     let created = editor
@@ -996,7 +994,7 @@ fn populated_sheet_duplicate_is_ordered_and_independent() {
     const SOURCE_CELL_ROW: usize = 0;
     const SOURCE_CELL_COLUMN: usize = 1;
 
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     let created = editor
         .duplicate_sheet(test_sheet_selector(&editor, SOURCE_SHEET_ID))
         .unwrap();
@@ -1124,7 +1122,7 @@ fn unsupported_sheet_drawable_duplicate_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -1172,7 +1170,7 @@ fn cross_table_dependency_sheet_duplicate_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -1203,7 +1201,7 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(duplicate_owner).unwrap();
+    let mut editor = Draft::from_package(duplicate_owner).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_sheet_text_box_text(2, 50, "rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1224,7 +1222,7 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
             Ok(archive.insert_object(owner)?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(externally_referenced).unwrap();
+    let mut editor = Draft::from_package(externally_referenced).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.remove_sheet_text_box(2, 50).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1232,7 +1230,7 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
 
 #[test]
 fn text_box_duplicate_tracks_document_component_uuids_and_highwater() {
-    let mut editor = Editor::from_package(test_package_with_text_box_metadata()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box_metadata()).unwrap();
     let baseline = editor.to_bytes().unwrap();
     let created = editor
         .duplicate_sheet_text_box(2, 50, "Metadata clone")
@@ -1814,7 +1812,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
         .cloned()
         .ok_or_else(|| Error::InvalidFormat("row-header bucket location is missing".to_owned()))?;
 
-    let bucket_message = |package: &IWorkPackage| -> crate::Result<Vec<u8>> {
+    let bucket_message = |package: &HostPackage| -> crate::Result<Vec<u8>> {
         let archive = package.archive(&archive_name)?;
         let object = archive.object(bucket_id).ok_or_else(|| {
             Error::InvalidFormat("row-header bucket object is missing".to_owned())
@@ -1934,7 +1932,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
     assert_eq!(changed_root.number(), 99);
     assert_eq!(changed_root.raw(&changed_bucket)?, root_unknown.as_slice());
 
-    let reopened = Editor::from_bytes(&changed_bytes)?;
+    let reopened = Draft::from_bytes(&changed_bytes)?;
     assert_eq!(
         header_size_bits(
             &crate::wire::repeated_length_delimited_payloads(
@@ -1998,7 +1996,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
     );
     assert_eq!(duplicate.to_bytes()?, before_duplicate);
 
-    let replace_bucket = |package: &mut IWorkPackage,
+    let replace_bucket = |package: &mut HostPackage,
                           replacement: Vec<u8>,
                           alternate_role: Option<u32>|
      -> crate::Result<()> {
@@ -2030,7 +2028,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
         })
     };
     let assert_dimension_rejected_atomically =
-        |hostile: IWorkPackage, hostile_dimension: Dimension| -> crate::Result<()> {
+        |hostile: HostPackage, hostile_dimension: Dimension| -> crate::Result<()> {
             let before = hostile.to_bytes()?;
             let mut changed = hostile.clone();
             assert!(
@@ -2046,8 +2044,8 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
             Ok(())
         };
     let assert_rejected_atomically =
-        |hostile: IWorkPackage| assert_dimension_rejected_atomically(hostile, dimension);
-    let rewrite_model = |package: &mut IWorkPackage,
+        |hostile: HostPackage| assert_dimension_rejected_atomically(hostile, dimension);
+    let rewrite_model = |package: &mut HostPackage,
                          mutate: &dyn Fn(&mut TableModelArchive)|
      -> crate::Result<()> {
         let archive_name = object_locations(package)?
@@ -2521,7 +2519,7 @@ fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(7.5)).unwrap();
     let archive = editor.package().archive("Index/Document.iwa").unwrap();
     let tile = Tile::decode(archive.object(30).unwrap().messages[0].data.as_slice()).unwrap();
@@ -2556,7 +2554,7 @@ fn segmented_formula_entries_are_reused_and_released() {
             FormulaExpression::Number(2.0),
         ],
     );
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     editor.set_formula(10, 0, 0, expression.clone()).unwrap();
     let mut package = editor.into_package();
     move_table_data_list_entries_to_segment(&mut package, 21, 61);
@@ -2566,7 +2564,7 @@ fn segmented_formula_entries_are_reused_and_released() {
         document.sheets()[0].tables().next().unwrap().get_cell(0, 0),
         Some(&CellValue::Formula("=SUM(1,2)".to_owned()))
     );
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor.set_formula(10, 1, 0, expression).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 0, cell_number(7.0)).unwrap();
 
@@ -2598,7 +2596,7 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
             Some(&CellValue::Error("Syntax Error".to_owned()))
         );
 
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
         crate::numbers::editor::set_cell_fixture(&mut editor, 10, 0, 1, cell_number(4.5)).unwrap();
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
         let errors =
@@ -2629,7 +2627,7 @@ fn formula_error_cells_release_root_and_segmented_list_entries() {
 
 #[test]
 fn cell_comment_crud_preserves_value_and_comment_metadata() {
-    let mut editor = Editor::from_package(test_package_with_comments(false)).unwrap();
+    let mut editor = Draft::from_package(test_package_with_comments(false)).unwrap();
     let original = focused_compatibility_cell_comment(&editor, 10, 0, 1)
         .unwrap()
         .unwrap();
@@ -2646,7 +2644,7 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
         [StorageId::new(70).unwrap()]
     );
     assert_eq!(original_witness.comment.storage_uuid.unwrap().lower(), 61);
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let reader_comment = focused_compatibility_cell_comment(&reopened, 10, 0, 1)
         .unwrap()
         .unwrap();
@@ -2703,7 +2701,7 @@ fn cell_comment_crud_preserves_value_and_comment_metadata() {
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(0, 1), Some(&CellValue::Empty));
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         focused_compatibility_cell_comment(&reopened, 10, 0, 1)
             .unwrap()
@@ -2717,7 +2715,7 @@ fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
         env!("CARGO_MANIFEST_DIR"),
         "/../litchi-numbers/tests/fixtures/comment-edit-root.numbers"
     ));
-    let original = Editor::from_bytes(source).unwrap();
+    let original = Draft::from_bytes(source).unwrap();
     let table_id = original.tables().unwrap()[0].native_id();
     let original_comment = cell_comment_in_package(original.package(), table_id, 1, 1)
         .unwrap()
@@ -2751,7 +2749,7 @@ fn supported_cell_comment_replacement_delegates_to_focused_package_owner() {
     for preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(editor.package().entry(preview).is_none());
     }
-    Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
 }
 
 #[test]
@@ -2762,7 +2760,7 @@ fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
             .insert_entry(preview, preview.as_bytes().to_vec())
             .unwrap();
     }
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
 
     editor
         .set_cell_comment(10, 0, 1, "Legacy reply replacement")
@@ -2788,7 +2786,7 @@ fn unsupported_comment_graph_keeps_legacy_fallback_and_previews() {
 
 #[test]
 fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
-    let mut editor = Editor::from_package(test_package_with_comments(false)).unwrap();
+    let mut editor = Draft::from_package(test_package_with_comments(false)).unwrap();
     let original_root = cell_comment_in_package(editor.package(), 10, 0, 1)
         .unwrap()
         .unwrap();
@@ -2878,7 +2876,7 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
     assert!(editor.remove_cell_comment_reply(10, 0, 1, 999_999).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let reparsed = Editor::from_bytes(&before).unwrap();
+    let reparsed = Draft::from_bytes(&before).unwrap();
     assert_eq!(
         focused_compatibility_cell_comment_replies(&reparsed, 10, 0, 1).unwrap()[0].text(),
         "Reply"
@@ -2889,7 +2887,7 @@ fn cell_comment_reply_crud_is_copy_on_write_and_transactional() {
 fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
     let mut package = test_package_with_comments(true);
     move_table_data_list_entries_to_segment(&mut package, 60, 62);
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let original_storage = cell_comment_in_package(editor.package(), 10, 0, 1)
         .unwrap()
         .unwrap()
@@ -2946,7 +2944,7 @@ fn shared_segmented_comments_use_copy_on_write_and_cleanup() {
 fn comment_updates_and_copy_on_write_preserve_unknown_storage_fields() {
     let mut package = test_package_with_comments(false);
     let unknown = add_unknown_comment_storage_field(&mut package, 61);
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_cell_comment(10, 0, 1, "Wire-safe update")
         .unwrap();
@@ -2959,7 +2957,7 @@ fn comment_updates_and_copy_on_write_preserve_unknown_storage_fields() {
 
     let mut package = test_package_with_comments(true);
     add_unknown_comment_storage_field(&mut package, 61);
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor.set_cell_comment(10, 0, 1, "Wire-safe copy").unwrap();
     let cloned = cell_comment_in_package(editor.package(), 10, 0, 1)
         .unwrap()
@@ -2987,7 +2985,7 @@ fn comment_updates_and_copy_on_write_preserve_unknown_storage_fields() {
 
 #[test]
 fn creates_comment_table_and_comment_only_cell_when_missing() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     editor
         .set_cell_comment(10, 1, 2, "Created comment")
         .unwrap();
@@ -3008,7 +3006,7 @@ fn creates_comment_table_and_comment_only_cell_when_missing() {
     let document = compatibility_document_from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let table = &document.sheets()[0].tables().next().unwrap();
     assert_eq!(table.get_cell(1, 2), Some(&CellValue::Empty));
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_compatibility_cell_comment(&reopened, 10, 1, 2)
             .unwrap()
@@ -3060,7 +3058,7 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
             )?)?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_cell_comment(10, 1, 2, "Generated local author")
         .unwrap();
@@ -3105,7 +3103,7 @@ fn malformed_comment_storage_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_cell_comment(10, 0, 1, "Rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3128,7 +3126,7 @@ fn noncanonical_comment_storage_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_cell_comment(10, 0, 1, "Rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -3201,7 +3199,7 @@ fn public_reader_applies_tile_row_origins() {
 
 #[test]
 fn formula_writes_intern_validate_and_release_references() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let expression = FormulaExpression::function(
         "SUM",
@@ -3275,7 +3273,7 @@ fn formula_writes_intern_validate_and_release_references() {
 
 #[test]
 fn overwrites_formula_with_tiled_only_app_dependency_storage() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     editor
         .set_formula(
@@ -3335,7 +3333,7 @@ fn overwrites_formula_with_tiled_only_app_dependency_storage() {
 
 #[test]
 fn local_reference_formulas_write_exact_calculation_engine_edges() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     let table_id = editor.tables().unwrap()[0].object_id;
     let expression = FormulaExpression::function(
         "SUM",
@@ -3401,7 +3399,7 @@ fn local_reference_formulas_write_exact_calculation_engine_edges() {
 
 #[test]
 fn cell_write_refreshes_aggregate_range_formula_cache() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -3430,7 +3428,7 @@ fn cell_write_refreshes_aggregate_range_formula_cache() {
 
 #[test]
 fn cell_write_refreshes_typed_boolean_formula_cache() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(1.0)).unwrap();
     editor
         .set_formula_with_cached_value(
@@ -3456,7 +3454,7 @@ fn cell_write_refreshes_typed_boolean_formula_cache() {
 
 #[test]
 fn cell_write_refreshes_all_supported_numeric_aggregates() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(4.0)).unwrap();
     for (row, function, cached) in [
@@ -3494,7 +3492,7 @@ fn cell_write_refreshes_all_supported_numeric_aggregates() {
 
 #[test]
 fn cell_write_refreshes_cross_table_formula_cache() {
-    let mut editor = Editor::from_package(test_package_with_cross_table_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_cross_table_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 11, 0, 1, cell_number(2.0)).unwrap();
     editor
         .set_formula_with_cached_value(
@@ -3515,7 +3513,7 @@ fn cell_write_refreshes_cross_table_formula_cache() {
 }
 
 fn cached_formula_scalar(
-    editor: &Editor,
+    editor: &Draft,
     table_id: u64,
     row: usize,
     column: usize,
@@ -3557,7 +3555,7 @@ fn formula_dependency_tiles_use_app_dimensions_and_global_record_coordinates() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
 
     editor
         .set_formula(
@@ -3600,7 +3598,7 @@ fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
     package
         .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_formula(
             10,
@@ -3673,7 +3671,7 @@ fn cross_table_formula_cells_write_owner_uid_ast_and_external_edges() {
 
 #[test]
 fn cross_table_formula_ranges_expand_external_edges_in_row_major_order() {
-    let mut editor = Editor::from_package(test_package_with_cross_table_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_cross_table_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -3735,7 +3733,7 @@ fn cross_table_formula_ranges_expand_external_edges_in_row_major_order() {
 
 #[test]
 fn whole_row_formula_ranges_round_trip_with_complete_external_edges() {
-    let mut editor = Editor::from_package(test_package_with_cross_table_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_cross_table_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -3825,7 +3823,7 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
 
     let mut locked_bytes = Vec::new();
     locked.package().write_to(&mut locked_bytes).unwrap();
-    let mut editor = Editor::from_bytes(&locked_bytes).unwrap();
+    let mut editor = Draft::from_bytes(&locked_bytes).unwrap();
     let duplicate = editor
         .duplicate_table(test_table_selector(&editor, table.object_id))
         .unwrap();
@@ -3847,7 +3845,7 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
         .package()
         .write_to(&mut unlocked_duplicate_bytes)
         .unwrap();
-    let mut editor = Editor::from_bytes(&unlocked_duplicate_bytes).unwrap();
+    let mut editor = Draft::from_bytes(&unlocked_duplicate_bytes).unwrap();
     let focused = FocusedNumbersPackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused
@@ -3880,7 +3878,7 @@ fn focused_table_lock_edits_round_trip_through_legacy_host_creation() {
 fn focused_cell_edit_round_trips_through_legacy_host_reader() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let editor = Editor::open(fixture).unwrap();
+    let editor = Draft::open(fixture).unwrap();
     let source_bytes = editor.to_bytes().unwrap();
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
     let position = litchi_numbers::table::At::new(1, 2);
@@ -3894,7 +3892,7 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
         .unwrap();
     let mut edited_bytes = Vec::new();
     commit.package().write_to(&mut edited_bytes).unwrap();
-    let _legacy_reader = Editor::from_bytes(&edited_bytes).unwrap();
+    let _legacy_reader = Draft::from_bytes(&edited_bytes).unwrap();
     assert_ne!(edited_bytes, source_bytes);
 
     let focused = FocusedNumbersPackage::from_bytes(&edited_bytes).unwrap();
@@ -3920,7 +3918,7 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
 fn focused_number_format_edit_round_trips_through_legacy_host_writer() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut editor = Editor::open(fixture).unwrap();
+    let mut editor = Draft::open(fixture).unwrap();
     let table_id = editor.tables().unwrap().remove(0).id();
     let source_bytes = editor.to_bytes().unwrap();
     let source = FocusedNumbersPackage::from_bytes(&source_bytes).unwrap();
@@ -3984,7 +3982,7 @@ fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
 
     // Recreate the previous host route: release the focused control owner,
     // then let the compatibility scalar writer publish Number metadata.
-    let expected = Editor::from_bytes(&source_bytes).unwrap();
+    let expected = Draft::from_bytes(&source_bytes).unwrap();
     let mut expected = expected;
     expected
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
@@ -3997,9 +3995,9 @@ fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
         &DataFormat::Number(number),
     )
     .unwrap();
-    let expected = Editor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let expected = Draft::from_bytes(&expected.to_bytes().unwrap()).unwrap();
 
-    let mut actual = Editor::from_bytes(&source_bytes).unwrap();
+    let mut actual = Draft::from_bytes(&source_bytes).unwrap();
     actual
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
         .unwrap();
@@ -4027,7 +4025,7 @@ fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
         ThousandsSeparator::Shown,
         CurrencyStyle::Standard,
     );
-    let expected_currency = Editor::from_bytes(&source_bytes).unwrap();
+    let expected_currency = Draft::from_bytes(&source_bytes).unwrap();
     let mut expected_currency = expected_currency;
     expected_currency
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
@@ -4040,8 +4038,8 @@ fn exact_control_to_number_preserves_boolean_against_compatibility_writer() {
         &DataFormat::Currency(currency),
     )
     .unwrap();
-    let expected_currency = Editor::from_bytes(&expected_currency.to_bytes().unwrap()).unwrap();
-    let mut actual_currency = Editor::from_bytes(&source_bytes).unwrap();
+    let expected_currency = Draft::from_bytes(&expected_currency.to_bytes().unwrap()).unwrap();
+    let mut actual_currency = Draft::from_bytes(&source_bytes).unwrap();
     actual_currency
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Currency(currency))
         .unwrap();
@@ -4089,7 +4087,7 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
     // A Checkbox cell with Boolean storage remains on the compatibility route
     // when Scientific is requested. Compare the complete package with the
     // previous two-owner route: focused clear, then the generic writer.
-    let mut expected = Editor::from_bytes(&checkbox_bytes).unwrap();
+    let mut expected = Draft::from_bytes(&checkbox_bytes).unwrap();
     expected
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
         .unwrap();
@@ -4101,9 +4099,9 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         &DataFormat::Scientific(scientific),
     )
     .unwrap();
-    let expected = Editor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let expected = Draft::from_bytes(&expected.to_bytes().unwrap()).unwrap();
 
-    let mut actual = Editor::from_bytes(&checkbox_bytes).unwrap();
+    let mut actual = Draft::from_bytes(&checkbox_bytes).unwrap();
     actual
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Scientific(scientific))
         .unwrap();
@@ -4125,12 +4123,12 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         NegativeStyle::MinusSign,
         ThousandsSeparator::Shown,
     );
-    let mut number_source = Editor::from_bytes(&checkbox_bytes).unwrap();
+    let mut number_source = Draft::from_bytes(&checkbox_bytes).unwrap();
     number_source
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
         .unwrap();
     let number_bytes = number_source.to_bytes().unwrap();
-    let mut expected = Editor::from_bytes(&number_bytes).unwrap();
+    let mut expected = Draft::from_bytes(&number_bytes).unwrap();
     super::cell_data_format::set_cell_data_format(
         &mut expected.package,
         table_id,
@@ -4139,8 +4137,8 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         &DataFormat::Scientific(scientific),
     )
     .unwrap();
-    let expected = Editor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
-    let mut actual = Editor::from_bytes(&number_bytes).unwrap();
+    let expected = Draft::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let mut actual = Draft::from_bytes(&number_bytes).unwrap();
     actual
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Scientific(scientific))
         .unwrap();
@@ -4171,13 +4169,13 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         .set_table_cell_data_format(text_table_id, 1, 1, DataFormat::Number(number))
         .unwrap();
     let text_bytes = text_source.to_bytes().unwrap();
-    let text_exact = Editor::from_bytes(&text_bytes).unwrap();
+    let text_exact = Draft::from_bytes(&text_bytes).unwrap();
     assert_eq!(
         focused_test_cell_value(&text_exact, 1, 1),
         Some(CellValue::Text("Selected".to_owned()))
     );
 
-    let mut expected = Editor::from_bytes(&text_bytes).unwrap();
+    let mut expected = Draft::from_bytes(&text_bytes).unwrap();
     super::cell_data_format::set_cell_data_format(
         &mut expected.package,
         text_table_id,
@@ -4186,8 +4184,8 @@ fn nonnumeric_controls_to_scientific_keep_compatibility_writer() {
         &DataFormat::Scientific(scientific),
     )
     .unwrap();
-    let expected = Editor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
-    let mut actual = Editor::from_bytes(&text_bytes).unwrap();
+    let expected = Draft::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+    let mut actual = Draft::from_bytes(&text_bytes).unwrap();
     actual
         .set_table_cell_data_format(text_table_id, 1, 1, DataFormat::Scientific(scientific))
         .unwrap();
@@ -4242,7 +4240,7 @@ fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
             )
             .unwrap();
         let source_bytes = source.to_bytes().unwrap();
-        let source_editor = Editor::from_bytes(&source_bytes).unwrap();
+        let source_editor = Draft::from_bytes(&source_bytes).unwrap();
         let before_value = focused_test_cell_value(&source_editor, 1, 1);
         let before_cache = cached_formula_scalar(&source_editor, table_id, 1, 1);
         assert!(matches!(before_value.as_ref(), Some(CellValue::Formula(_))));
@@ -4261,7 +4259,7 @@ fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
             DataFormat::Currency(currency),
             DataFormat::Scientific(scientific),
         ] {
-            let mut expected = Editor::from_bytes(&source_bytes).unwrap();
+            let mut expected = Draft::from_bytes(&source_bytes).unwrap();
             super::cell_data_format::set_cell_data_format(
                 &mut expected.package,
                 table_id,
@@ -4270,9 +4268,9 @@ fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
                 &target,
             )
             .unwrap();
-            let expected = Editor::from_bytes(&expected.to_bytes().unwrap()).unwrap();
+            let expected = Draft::from_bytes(&expected.to_bytes().unwrap()).unwrap();
 
-            let mut actual = Editor::from_bytes(&source_bytes).unwrap();
+            let mut actual = Draft::from_bytes(&source_bytes).unwrap();
             actual
                 .set_table_cell_data_format(table_id, 1, 1, target.clone())
                 .unwrap();
@@ -4294,7 +4292,7 @@ fn nonnumeric_formula_caches_keep_compatibility_numeric_routes() {
 fn exact_number_to_currency_matches_focused_stages_and_preserves_value() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut editor = Editor::open(fixture).unwrap();
+    let mut editor = Draft::open(fixture).unwrap();
     let table_id = editor.tables().unwrap().remove(0).id();
     let number = Number::new(
         DecimalPlaces::fixed(2).unwrap(),
@@ -4359,7 +4357,7 @@ fn exact_number_to_currency_matches_focused_stages_and_preserves_value() {
 fn exact_numeric_cross_family_transitions_preserve_typed_value() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut editor = Editor::open(fixture).unwrap();
+    let mut editor = Draft::open(fixture).unwrap();
     let table_id = editor.tables().unwrap().remove(0).id();
     let number = Number::new(
         DecimalPlaces::fixed(2).unwrap(),
@@ -4439,7 +4437,7 @@ fn exact_formula_numeric_transitions_preserve_formula_and_cached_value() {
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
         .unwrap();
     let source_bytes = editor.to_bytes().unwrap();
-    let mut exact = Editor::from_bytes(&source_bytes).unwrap();
+    let mut exact = Draft::from_bytes(&source_bytes).unwrap();
     let before_formula = focused_test_cell_value(&exact, 1, 1);
     let before_cache = cached_formula_scalar(&exact, table_id, 1, 1);
     assert!(matches!(
@@ -4480,7 +4478,7 @@ fn exact_formula_numeric_transitions_preserve_formula_and_cached_value() {
 fn exact_focused_data_format_noop_preserves_source_bytes() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut editor = Editor::open(fixture).unwrap();
+    let mut editor = Draft::open(fixture).unwrap();
     let table_id = editor.tables().unwrap().remove(0).id();
     let number = Number::new(
         DecimalPlaces::fixed(2).unwrap(),
@@ -4519,7 +4517,7 @@ fn exact_focused_data_format_noop_preserves_source_bytes() {
 fn exact_number_numeral_system_conversions_keep_compatibility_writer() {
     let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut number_editor = Editor::open(fixture).unwrap();
+    let mut number_editor = Draft::open(fixture).unwrap();
     let table_id = number_editor.tables().unwrap().remove(0).id();
     let number = Number::new(
         DecimalPlaces::fixed(2).unwrap(),
@@ -4536,7 +4534,7 @@ fn exact_number_numeral_system_conversions_keep_compatibility_writer() {
         .set_table_cell_data_format(table_id, 2, 1, DataFormat::Number(number))
         .unwrap();
     let number_bytes = number_editor.to_bytes().unwrap();
-    let mut expected_numeral = Editor::from_bytes(&number_bytes).unwrap();
+    let mut expected_numeral = Draft::from_bytes(&number_bytes).unwrap();
     super::cell_data_format::set_cell_data_format(
         &mut expected_numeral.package,
         table_id,
@@ -4547,7 +4545,7 @@ fn exact_number_numeral_system_conversions_keep_compatibility_writer() {
     .unwrap();
     let expected_numeral_bytes = expected_numeral.to_bytes().unwrap();
 
-    let mut numeral_editor = Editor::from_bytes(&number_bytes).unwrap();
+    let mut numeral_editor = Draft::from_bytes(&number_bytes).unwrap();
     numeral_editor
         .set_table_cell_data_format(table_id, 2, 1, DataFormat::NumeralSystem(numeral_system))
         .unwrap();
@@ -4593,7 +4591,7 @@ fn exact_control_numeral_system_conversions_keep_compatibility_writer() {
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
         .unwrap();
     let control_bytes = editor.to_bytes().unwrap();
-    let mut exact = Editor::from_bytes(&control_bytes).unwrap();
+    let mut exact = Draft::from_bytes(&control_bytes).unwrap();
     let numeral_system = NumeralSystem::new(
         Base::HEXADECIMAL,
         Places::Fixed(FixedPlaces::EIGHT),
@@ -4607,7 +4605,7 @@ fn exact_control_numeral_system_conversions_keep_compatibility_writer() {
         exact.table_cell_data_format(table_id, 1, 1).unwrap(),
         DataFormat::NumeralSystem(numeral_system)
     );
-    let mut reopened = Editor::from_bytes(&exact.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&exact.to_bytes().unwrap()).unwrap();
     reopened
         .set_table_cell_data_format(table_id, 1, 1, DataFormat::Checkbox(Checkbox))
         .unwrap();
@@ -4661,7 +4659,7 @@ fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
 
 #[test]
 fn duplicates_populated_table_with_independent_storage() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor
         .duplicate_table(test_table_selector(&editor, 10))
         .unwrap();
@@ -4718,7 +4716,7 @@ fn duplicates_formula_table_with_independent_dependency_owner() {
     package
         .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let expression = FormulaExpression::function(
         "SUM",
         [
@@ -4858,7 +4856,7 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
     const RANGE_TILE_ID: u64 = 10_001;
     const RANGE_TILE_MESSAGE_TYPE: u32 = 4_010;
 
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -5004,7 +5002,7 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let created = editor
         .duplicate_table(test_table_selector(&editor, 10))
         .unwrap();
@@ -5175,7 +5173,7 @@ fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     assert!(
@@ -5222,7 +5220,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Document.iwa")
@@ -5249,7 +5247,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
 
 #[test]
 fn grows_and_truncates_blank_table_edges_with_uid_maps() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     editor
         .resize_table(test_table_selector(&editor, 10), 6, 6)
         .unwrap();
@@ -5295,7 +5293,7 @@ fn grows_and_truncates_blank_table_edges_with_uid_maps() {
 
 #[test]
 fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let side = BorderSide::Bottom;
     assert_eq!(editor.table_cell_borders(10, 1, 2).unwrap().get(side), None);
 
@@ -5342,7 +5340,7 @@ fn table_cell_border_crud_allocates_sparse_layers_and_round_trips() {
         None
     );
 
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.table_cell_borders(10, 1, 2).unwrap().get(side),
         None
@@ -5380,7 +5378,7 @@ fn table_cell_fill_crud_round_trips_and_reuses_private_style() {
     );
     assert_eq!(editor.table_cell_fill(table_id, 1, 1).unwrap(), blue);
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(reopened.reset_table_cell_fill(table_id, 1, 1).unwrap());
     assert_eq!(reopened.table_cell_fill(table_id, 1, 1).unwrap(), original);
     assert!(!reopened.reset_table_cell_fill(table_id, 1, 1).unwrap());
@@ -5421,7 +5419,7 @@ fn table_cell_layout_composes_with_fill_and_resets_independently() {
         styled_object_count
     );
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.table_cell_layout(table_id, 1, 1).unwrap(), layout);
     assert_eq!(reopened.table_cell_fill(table_id, 1, 1).unwrap(), fill);
     assert!(reopened.reset_table_cell_layout(table_id, 1, 1).unwrap());
@@ -5456,7 +5454,7 @@ fn table_cell_layout_rejects_invalid_coordinates_transactionally() {
 
 #[test]
 fn table_cell_border_rejects_invalid_coordinates_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();
     let stroke = crate::shapes::Stroke::new(
         crate::shapes::RgbaColor::black(),
@@ -5513,7 +5511,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_table_cell_border(
             10,
@@ -5559,7 +5557,7 @@ fn table_row_insertion_preserves_explicit_stroke_layers_on_original_cells() {
     add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Top, 1, &[(1, 1)]);
     add_test_stroke_layer(&mut package, 51, TestStrokeLayerSide::Left, 1, &[(1, 3)]);
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
         .unwrap();
@@ -5620,7 +5618,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(2))
         .unwrap();
@@ -5665,7 +5663,7 @@ fn table_row_deletion_removes_or_compacts_explicit_stroke_layers_and_metadata_re
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(1))
         .unwrap();
@@ -5697,7 +5695,7 @@ fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
     add_test_stroke_layer(&mut package, 50, TestStrokeLayerSide::Left, 1, &[(1, 1)]);
     add_test_stroke_layer(&mut package, 51, TestStrokeLayerSide::Top, 1, &[(1, 3)]);
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
@@ -5715,7 +5713,7 @@ fn table_column_insertion_preserves_explicit_stroke_layers_on_original_cells() {
 
 #[test]
 fn inserts_blank_table_row_and_shifts_cells_uids_headers_and_formulas() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -5839,7 +5837,7 @@ fn appends_blank_table_row_without_allocating_storage() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(4))
         .unwrap();
@@ -5884,7 +5882,7 @@ fn row_insert_rejects_missing_destination_tile_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 3, 0, cell_number(9.0)).unwrap();
     let before = editor.to_bytes().unwrap();
 
@@ -5898,7 +5896,7 @@ fn row_insert_rejects_missing_destination_tile_transactionally() {
 
 #[test]
 fn row_insert_rejects_out_of_bounds_index_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -5910,7 +5908,7 @@ fn row_insert_rejects_out_of_bounds_index_transactionally() {
 
 #[test]
 fn row_insert_rewrites_relative_formula_ast_losslessly() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -5937,7 +5935,7 @@ fn row_insert_rewrites_relative_formula_ast_losslessly() {
 
 #[test]
 fn column_insert_rewrites_absolute_formula_ast_losslessly() {
-    let mut editor = Editor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_column_headers_and_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -5964,7 +5962,7 @@ fn column_insert_rewrites_absolute_formula_ast_losslessly() {
 
 #[test]
 fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -6008,7 +6006,7 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     editor
@@ -6027,7 +6025,7 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
 
 #[test]
 fn row_insert_rewrites_segmented_formula_ast_losslessly() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -6038,7 +6036,7 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
         .unwrap();
     let mut package = editor.into_package();
     move_table_data_list_entries_to_segment(&mut package, 21, 61);
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     editor
@@ -6057,7 +6055,7 @@ fn row_insert_rewrites_segmented_formula_ast_losslessly() {
 
 #[test]
 fn row_insert_copy_on_writes_shared_formula_ast_and_remerges_on_delete() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -6107,7 +6105,7 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .set_formula(
             10,
@@ -6159,7 +6157,7 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     editor
@@ -6208,7 +6206,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -6418,7 +6416,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
     package
         .insert_entry(VERSIONED_ENGINE_ENTRY, engine)
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(4.0)).unwrap();
     assert_eq!(
         cached_formula_scalar(&editor, 10, 3, 1),
@@ -6483,7 +6481,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
 
 #[test]
 fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_cross_table_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_cross_table_engine()).unwrap();
     editor
         .set_formula(
             11,
@@ -6504,7 +6502,7 @@ fn row_insert_rejects_incoming_cross_table_formula_transactionally() {
 
 #[test]
 fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -6580,7 +6578,7 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_row(test_table_selector(&editor, 10), RowInsertion::body(1))
         .unwrap();
@@ -6630,7 +6628,7 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 
 #[test]
 fn inserts_blank_table_column_and_shifts_cells_uids_headers_and_formulas() {
-    let mut editor = Editor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_column_headers_and_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -6754,7 +6752,7 @@ fn appends_blank_table_column_and_grows_dependency_ranges() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
 
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(4))
@@ -6782,7 +6780,7 @@ fn appends_blank_table_column_and_grows_dependency_ranges() {
 
 #[test]
 fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -6791,7 +6789,7 @@ fn column_insert_rejects_out_of_bounds_and_incoming_formulas_transactionally() {
     );
     assert_eq!(editor.to_bytes().unwrap(), before);
 
-    let mut editor = Editor::from_package(test_package_with_cross_table_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_cross_table_engine()).unwrap();
     editor
         .set_formula(
             11,
@@ -6828,7 +6826,7 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     assert!(
@@ -6841,7 +6839,7 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
 
 #[test]
 fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
-    let mut editor = Editor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_column_headers_and_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -6917,7 +6915,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
         })
         .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     editor
         .insert_table_column(test_table_selector(&editor, 10), ColumnInsertion::body(1))
         .unwrap();
@@ -6961,7 +6959,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
 
 #[test]
 fn row_insert_then_delete_restores_exact_package_bytes() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -6992,7 +6990,7 @@ fn row_insert_then_delete_restores_exact_package_bytes() {
 
 #[test]
 fn column_insert_then_delete_restores_exact_package_bytes() {
-    let mut editor = Editor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_column_headers_and_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -7035,7 +7033,7 @@ fn section_relative_header_insertions_shift_formulas_and_restore_exactly() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -7092,7 +7090,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 1, 1, cell_number(2.0)).unwrap();
     crate::numbers::editor::set_cell_fixture(&mut editor, 10, 2, 1, cell_number(3.0)).unwrap();
     editor
@@ -7147,7 +7145,7 @@ fn footer_insertions_do_not_expand_body_formula_ranges() {
 
 #[test]
 fn section_insertions_create_first_fixed_regions_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let baseline = editor.to_bytes().unwrap();
 
     editor
@@ -7208,7 +7206,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -7291,7 +7289,7 @@ fn section_relative_deletions_target_fixed_regions_transactionally() {
 
 #[test]
 fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
-    let mut editor = Editor::from_package(test_package_with_column_headers_and_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_column_headers_and_engine()).unwrap();
     crate::numbers::editor::set_cell_fixture(
         &mut editor,
         10,
@@ -7339,7 +7337,7 @@ fn removes_populated_table_axes_with_reference_cleanup_and_formula_shifts() {
 #[test]
 fn table_axis_delete_releases_comment_graphs() {
     for remove_row in [true, false] {
-        let mut editor = Editor::from_package(test_package_with_comments(false)).unwrap();
+        let mut editor = Draft::from_package(test_package_with_comments(false)).unwrap();
         if remove_row {
             editor
                 .remove_table_row(test_table_selector(&editor, 10), RowDeletion::body(0))
@@ -7356,7 +7354,7 @@ fn table_axis_delete_releases_comment_graphs() {
         let list =
             TableDataList::decode(archive.object(60).unwrap().messages[0].data.as_slice()).unwrap();
         assert!(list.entries.is_empty());
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert!(
             focused_compatibility_cell_comment(&reopened, 10, 0, 1)
                 .unwrap()
@@ -7367,7 +7365,7 @@ fn table_axis_delete_releases_comment_graphs() {
 
 #[test]
 fn table_axis_delete_rejects_live_formula_references_transactionally() {
-    let mut editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     editor
         .set_formula(
             10,
@@ -7451,7 +7449,7 @@ fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(
         focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
@@ -7483,7 +7481,7 @@ fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible
     assert_eq!(order.rules()[0].column().get(), 2);
     assert_eq!(order.rules()[0].direction(), TableSortDirection::Descending);
     let changed = editor.to_bytes().unwrap();
-    let reparsed = Editor::from_bytes(&changed).unwrap();
+    let reparsed = Draft::from_bytes(&changed).unwrap();
     assert!(focused_sort_order(&reparsed, TableSelector::index(0)).is_err());
     let exact_before = reparsed.to_bytes().unwrap();
     let mut exact_edit = reparsed.clone();
@@ -7619,7 +7617,7 @@ fn focused_package_sort_order_rejects_duplicate_wire_fields_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(focused_sort_order(&editor, TableSelector::index(0)).is_err());
     assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), order).is_err());
@@ -7665,7 +7663,7 @@ fn focused_package_sort_order_rejects_malformed_nested_wire_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(focused_sort_order(&editor, TableSelector::index(0)).is_err());
     assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), order).is_err());
@@ -7675,7 +7673,7 @@ fn focused_package_sort_order_rejects_malformed_nested_wire_transactionally() {
 
 #[test]
 fn focused_compat_sort_order_resolves_table_name_for_crud() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let selector = TableSelector::name("Table 1");
     let baseline = editor.to_bytes().unwrap();
     assert_eq!(focused_sort_order(&editor, selector).unwrap(), None);
@@ -7707,7 +7705,7 @@ fn focused_compat_sort_order_resolves_table_name_for_crud() {
 
 #[test]
 fn focused_compat_sort_order_rejects_duplicate_table_names_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     editor
         .package
         .update_archive("Index/Document.iwa", |archive| {
@@ -7761,7 +7759,7 @@ fn focused_compat_sort_order_preserves_balanced_unknown_groups_on_set_and_clear(
     append_balanced_unknown_group(&mut unknown_group, 91);
     sort.extend_from_slice(&unknown_group);
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     append_test_sort_order_payload(&mut editor, &sort);
     assert_eq!(
         focused_sort_order(&editor, TableSelector::name("Table 1"))
@@ -7804,7 +7802,7 @@ fn focused_compat_sort_order_preserves_balanced_unknown_groups_on_set_and_clear(
 
 #[test]
 fn focused_compat_sort_order_rejects_stale_ownership_metadata_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     editor
         .package
         .update_archive("Index/Document.iwa", |archive| {
@@ -7843,7 +7841,7 @@ fn focused_compat_sort_order_locked_idempotence_and_changed_refusal_are_exact() 
     )])
     .unwrap();
     let selector = TableSelector::name("Table 1");
-    let mut locked = Editor::from_package(test_package()).unwrap();
+    let mut locked = Draft::from_package(test_package()).unwrap();
     set_focused_sort_order(&mut locked, selector, initial.clone()).unwrap();
     set_test_table_locked(&mut locked);
     let locked_bytes = locked.to_bytes().unwrap();
@@ -7866,7 +7864,7 @@ fn focused_compat_sort_order_locked_idempotence_and_changed_refusal_are_exact() 
     assert!(clear_focused_sort_order(&mut locked, selector).is_err());
     assert_eq!(locked.to_bytes().unwrap(), before_changed);
 
-    let mut empty_locked = Editor::from_package(test_package()).unwrap();
+    let mut empty_locked = Draft::from_package(test_package()).unwrap();
     set_test_table_locked(&mut empty_locked);
     let empty_locked_bytes = empty_locked.to_bytes().unwrap();
     clear_focused_sort_order(&mut empty_locked, selector).unwrap();
@@ -7914,7 +7912,7 @@ fn source_created_sparse_boundary_supports_formula_and_comment_crud() {
     );
 
     let bytes = editor.to_bytes().unwrap();
-    let mut reopened = Editor::from_bytes(&bytes).unwrap();
+    let mut reopened = Draft::from_bytes(&bytes).unwrap();
     assert_eq!(
         focused_compatibility_cell_comment(&reopened, table_id, 256, 1)
             .unwrap()
@@ -7976,7 +7974,7 @@ fn source_created_large_table_allocates_header_buckets_only_when_needed() {
         vec![(0, 0), (65_536, 1)]
     );
     assert_eq!(descriptor.model.base_data_store.next_row_strip_id, 257);
-    assert!(Editor::from_bytes(&editor.to_bytes().unwrap()).is_ok());
+    assert!(Draft::from_bytes(&editor.to_bytes().unwrap()).is_ok());
 }
 
 #[test]
@@ -7994,7 +7992,7 @@ fn source_created_table_supports_focused_sort_order_configuration_crud() {
     )])
     .unwrap();
     set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
-    let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reparsed = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
         Some(order)
@@ -8025,7 +8023,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         table_id,
@@ -8063,7 +8061,7 @@ fn selected_row_sort_roundtrips_scope_and_moves_only_the_explicit_body_range() {
     .unwrap();
     assert_eq!(order.scope(), TableSortScope::SelectedRows);
     set_focused_sort_order(&mut editor, TableSelector::index(0), order.clone()).unwrap();
-    let reparsed = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reparsed = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
         Some(order.clone())
@@ -8169,7 +8167,7 @@ fn table_sort_order_executes_stable_body_sort_and_remaps_row_uids() {
         ],
     )
     .unwrap();
-    let read_uid_map = |editor: &Editor| {
+    let read_uid_map = |editor: &Draft| {
         let locations = object_locations(editor.package()).unwrap();
         let model_archive = editor
             .package()
@@ -8358,7 +8356,7 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
     const STRING_LIST_ID: u64 = 20;
     const STRING_SEGMENT_ID: u64 = 60;
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         TABLE_ID,
@@ -8382,7 +8380,7 @@ fn table_sort_resolves_plain_text_keys_from_segmented_string_storage() {
     .unwrap();
     let mut package = editor.into_package();
     move_table_data_list_entries_to_segment(&mut package, STRING_LIST_ID, STRING_SEGMENT_ID);
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
 
     assert!(
         editor
@@ -8418,7 +8416,7 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
     const TABLE_ID: u64 = 10;
     const STRING_LIST_ID: u64 = 20;
 
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         TABLE_ID,
@@ -8457,7 +8455,7 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
 
     let error = editor
@@ -8811,7 +8809,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         table_id,
@@ -8917,7 +8915,7 @@ fn source_created_table_executes_sort_order_without_moving_headers_or_footers() 
     assert_eq!(moved_replies[0].storage_id, original_reply.storage_id);
     assert_eq!(moved_replies[0].comment, original_reply.comment);
     assert_eq!(moved_replies_semantic[0], original_reply_semantic);
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         focused_sort_order(&reopened, TableSelector::index(0)).unwrap(),
         Some(order)
@@ -8966,7 +8964,7 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         table_id,
@@ -9024,7 +9022,7 @@ fn table_sort_keeps_user_hidden_axes_at_their_physical_positions() {
         table.get_cell(3, 0),
         Some(&CellValue::Text("South".to_owned()))
     );
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .table_hidden_axes(test_table_selector(&reopened, table_id))
@@ -9079,7 +9077,7 @@ fn table_sort_moves_rows_across_tile_boundaries() {
             )?)?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         10,
@@ -9173,7 +9171,7 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
         },
     )
     .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut editor,
         10,
@@ -9247,7 +9245,7 @@ fn table_sort_distinguishes_empty_and_populated_conditional_style_storage() {
         let mut package = test_package();
         add_test_app_native_topology_allocations(&mut package);
         add_test_conditional_style_storage(&mut package, has_entries);
-        let mut editor = Editor::from_package(package).unwrap();
+        let mut editor = Draft::from_package(package).unwrap();
         crate::numbers::editor::apply_numbers_fixture(
             &mut editor,
             10,
@@ -9314,7 +9312,7 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
     )
     .unwrap();
 
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let original_value = compatibility_document_from_bytes(&editor.to_bytes().unwrap())
         .unwrap()
         .sheets()[0]
@@ -9357,7 +9355,7 @@ fn cell_conditional_highlighting_is_detected_and_deleted_without_changing_value(
 
 #[test]
 fn table_sort_execution_rejects_unsupported_state_transactionally() {
-    let mut no_order = Editor::from_package(test_package()).unwrap();
+    let mut no_order = Draft::from_package(test_package()).unwrap();
     let before = no_order.to_bytes().unwrap();
     assert!(
         no_order
@@ -9368,7 +9366,7 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
 
     let mut spill_package = test_package_with_calculation_engine();
     add_test_spill_dependency(&mut spill_package);
-    let mut spill_editor = Editor::from_package(spill_package).unwrap();
+    let mut spill_editor = Draft::from_package(spill_package).unwrap();
     crate::numbers::editor::apply_numbers_fixture(
         &mut spill_editor,
         10,
@@ -9398,7 +9396,7 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
     );
     assert_eq!(spill_editor.to_bytes().unwrap(), before);
 
-    let mut formula_editor = Editor::from_package(test_package_with_calculation_engine()).unwrap();
+    let mut formula_editor = Draft::from_package(test_package_with_calculation_engine()).unwrap();
     formula_editor
         .set_formula(10, 0, 1, FormulaExpression::Number(3.0))
         .unwrap();
@@ -9433,7 +9431,7 @@ fn table_sort_execution_rejects_unsupported_state_transactionally() {
 
 #[test]
 fn removes_table_from_owning_sheet_transactionally() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let removed = editor
         .remove_table(test_table_selector(&editor, 10))
         .unwrap();
@@ -9454,7 +9452,7 @@ fn removes_table_from_owning_sheet_transactionally() {
 
 #[test]
 fn removes_sheets_transactionally() {
-    let mut editor = Editor::from_package(two_sheet_package()).unwrap();
+    let mut editor = Draft::from_package(two_sheet_package()).unwrap();
     assert_eq!(
         editor
             .sheets()
@@ -9511,7 +9509,7 @@ fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
                 .map(|_| ())?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Document.iwa")
@@ -9536,7 +9534,7 @@ fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
 
 #[test]
 fn creates_empty_sheet_with_unique_object_id() {
-    let mut editor = Editor::from_package(test_package()).unwrap();
+    let mut editor = Draft::from_package(test_package()).unwrap();
     let created = editor.add_empty_sheet("Created 東京").unwrap();
     assert_eq!(created.name, "Created 東京");
     assert_eq!(created.index, 1);
@@ -9549,7 +9547,7 @@ fn creates_empty_sheet_with_unique_object_id() {
 
 #[test]
 fn detached_table_models_are_not_exposed_or_writable() {
-    let mut editor = Editor::from_package(two_sheet_package()).unwrap();
+    let mut editor = Draft::from_package(two_sheet_package()).unwrap();
     editor
         .remove_sheet(test_sheet_selector(&editor, 2))
         .unwrap();
@@ -9589,11 +9587,11 @@ fn creates_independent_empty_table_on_an_existing_sheet() {
             Ok(())
         })
         .unwrap();
-    let mut editor = Editor::from_package(package.clone()).unwrap();
+    let mut editor = Draft::from_package(package.clone()).unwrap();
     let created = editor
         .add_empty_table(test_sheet_selector(&editor, 50), "Created Table", 3, 2)
         .unwrap();
-    let mut repeated = Editor::from_package(package).unwrap();
+    let mut repeated = Draft::from_package(package).unwrap();
     repeated
         .add_empty_table(test_sheet_selector(&repeated, 50), "Created Table", 3, 2)
         .unwrap();
@@ -9696,7 +9694,7 @@ fn recreates_first_table_after_removing_the_last_scratch_table() {
     )
     .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
     let table = document.sheets()[0].tables().next().unwrap();
     assert_eq!(
@@ -9806,7 +9804,7 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
                 .map(|_| ())?)
         })
         .unwrap();
-    let mut editor = Editor::from_package(package).unwrap();
+    let mut editor = Draft::from_package(package).unwrap();
     let baseline = editor
         .package()
         .archive("Index/Document.iwa")
@@ -9874,7 +9872,7 @@ fn package_with_string_segments(
         crate::protobuf::tsp::Range,
         Vec<tst::table_data_list::ListEntry>,
     )>,
-) -> IWorkPackage {
+) -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -9916,7 +9914,7 @@ fn package_with_string_segments(
 }
 
 fn move_table_data_list_entries_to_segment(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table_id: u64,
     segment_id: u64,
 ) {
@@ -9978,7 +9976,7 @@ fn move_table_data_list_entries_to_segment(
         .unwrap();
 }
 
-fn test_package_with_formula_error() -> IWorkPackage {
+fn test_package_with_formula_error() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -10043,7 +10041,7 @@ fn test_package_with_formula_error() -> IWorkPackage {
     package
 }
 
-fn test_package_with_comments(shared: bool) -> IWorkPackage {
+fn test_package_with_comments(shared: bool) -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -10157,7 +10155,7 @@ fn test_package_with_comments(shared: bool) -> IWorkPackage {
     package
 }
 
-fn add_unknown_comment_storage_field(package: &mut IWorkPackage, storage_id: u64) -> Vec<u8> {
+fn add_unknown_comment_storage_field(package: &mut HostPackage, storage_id: u64) -> Vec<u8> {
     let mut unknown = litchi_iwa_common::varint::encode_varint(99 << 3);
     unknown.extend(litchi_iwa_common::varint::encode_varint(999));
     package
@@ -10187,7 +10185,7 @@ fn append_balanced_unknown_group(data: &mut Vec<u8>, field_number: u32) {
 }
 
 #[allow(deprecated)]
-fn test_package_with_text_box() -> IWorkPackage {
+fn test_package_with_text_box() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -10285,7 +10283,7 @@ fn test_package_with_text_box() -> IWorkPackage {
     package
 }
 
-fn replace_test_text_storage_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+fn replace_test_text_storage_messages(package: &mut HostPackage, messages: Vec<RawMessage>) {
     package
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(53).ok_or_else(|| {
@@ -10442,7 +10440,7 @@ fn numbers_text_storage_projection_skips_2022_paragraph_style_collision() {
 
 #[test]
 fn numbers_sheet_text_boxes_read_back_wire_projection_after_mutation() {
-    let mut editor = Editor::from_package(test_package_with_text_box()).unwrap();
+    let mut editor = Draft::from_package(test_package_with_text_box()).unwrap();
     editor
         .replace_sheet_text_box_text(2, 50, 0..6, "Edited 🚀")
         .unwrap();
@@ -10481,7 +10479,7 @@ fn numbers_object_catalog_rejects_later_duplicate_ids_and_malformed_archives() {
             .contains("appears in both Numbers archives")
     );
     assert!(
-        Editor::from_package(duplicate)
+        Draft::from_package(duplicate)
             .unwrap()
             .sheet_text_boxes(2)
             .is_err()
@@ -10494,7 +10492,7 @@ fn numbers_object_catalog_rejects_later_duplicate_ids_and_malformed_archives() {
         .unwrap();
     assert!(NumbersObjectCatalog::build(&malformed).is_err());
     assert!(
-        Editor::from_package(malformed)
+        Draft::from_package(malformed)
             .unwrap()
             .sheet_text_boxes(2)
             .is_err()
@@ -10526,7 +10524,7 @@ fn numbers_object_catalog_enforces_operation_archive_budget() {
     assert!(error.to_string().contains("archive reads"));
 }
 
-fn test_package_with_text_box_metadata() -> IWorkPackage {
+fn test_package_with_text_box_metadata() -> HostPackage {
     let mut package = test_package_with_text_box();
     let metadata = PackageMetadata {
         last_object_identifier: 70,
@@ -10583,7 +10581,7 @@ impl TestStrokeLayerSide {
 }
 
 fn add_test_stroke_layer(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     identifier: u64,
     side: TestStrokeLayerSide,
     row_column_index: u32,
@@ -10644,7 +10642,7 @@ fn add_test_stroke_layer(
         .unwrap();
 }
 
-fn test_stroke_sidecar(package: &IWorkPackage) -> tst::StrokeSidecarArchive {
+fn test_stroke_sidecar(package: &HostPackage) -> tst::StrokeSidecarArchive {
     let archive = package.archive("Index/Document.iwa").unwrap();
     archive
         .object(41)
@@ -10655,7 +10653,7 @@ fn test_stroke_sidecar(package: &IWorkPackage) -> tst::StrokeSidecarArchive {
         .unwrap()
 }
 
-fn test_stroke_layer(package: &IWorkPackage, identifier: u64) -> tst::StrokeLayerArchive {
+fn test_stroke_layer(package: &HostPackage, identifier: u64) -> tst::StrokeLayerArchive {
     let archive = package.archive("Index/Document.iwa").unwrap();
     archive
         .object(identifier)
@@ -10666,7 +10664,7 @@ fn test_stroke_layer(package: &IWorkPackage, identifier: u64) -> tst::StrokeLaye
         .unwrap()
 }
 
-fn add_test_conditional_style_storage(package: &mut IWorkPackage, has_entries: bool) {
+fn add_test_conditional_style_storage(package: &mut HostPackage, has_entries: bool) {
     const CONDITIONAL_STYLE_TABLE_ID: u64 = 90;
     const CONDITIONAL_STYLE_SET_ID: u64 = 91;
     package
@@ -10737,7 +10735,7 @@ fn add_test_conditional_style_storage(package: &mut IWorkPackage, has_entries: b
         .unwrap();
 }
 
-fn add_test_app_native_topology_allocations(package: &mut IWorkPackage) {
+fn add_test_app_native_topology_allocations(package: &mut HostPackage) {
     package
         .update_archive("Index/Document.iwa", |archive| {
             let object = archive.object_mut(10).unwrap();
@@ -10767,7 +10765,7 @@ fn add_test_app_native_topology_allocations(package: &mut IWorkPackage) {
         .unwrap();
 }
 
-fn add_test_spill_dependency(package: &mut IWorkPackage) {
+fn add_test_spill_dependency(package: &mut HostPackage) {
     package
         .update_archive("Index/CalculationEngine.iwa", |archive| {
             let object = archive.object_mut(101).unwrap();
@@ -10799,7 +10797,7 @@ fn add_test_spill_dependency(package: &mut IWorkPackage) {
         .unwrap();
 }
 
-fn test_package() -> IWorkPackage {
+fn test_package() -> HostPackage {
     let mut cell = BncCell::minimal();
     cell.set_string(1);
     let mut cells = vec![None; 4];
@@ -10999,14 +10997,14 @@ fn test_package() -> IWorkPackage {
             ..Default::default()
         }];
     }
-    let mut package = IWorkPackage::new();
+    let mut package = HostPackage::new();
     package
         .replace_archive("Index/Document.iwa", &archive)
         .unwrap();
     package
 }
 
-fn test_package_with_calculation_engine() -> IWorkPackage {
+fn test_package_with_calculation_engine() -> HostPackage {
     let mut package = test_package();
     let owner = tsce::FormulaOwnerDependenciesArchive {
         formula_owner_uid: crate::protobuf::tsp::Uuid {
@@ -11063,7 +11061,7 @@ fn test_package_with_calculation_engine() -> IWorkPackage {
     package
 }
 
-fn test_package_with_column_headers_and_engine() -> IWorkPackage {
+fn test_package_with_column_headers_and_engine() -> HostPackage {
     let mut package = test_package_with_calculation_engine();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -11107,7 +11105,7 @@ fn test_package_with_column_headers_and_engine() -> IWorkPackage {
     package
 }
 
-fn test_package_with_cross_table_engine() -> IWorkPackage {
+fn test_package_with_cross_table_engine() -> HostPackage {
     let mut package = test_package_with_calculation_engine();
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -11210,7 +11208,7 @@ fn test_package_with_cross_table_engine() -> IWorkPackage {
     package
 }
 
-fn two_sheet_package() -> IWorkPackage {
+fn two_sheet_package() -> HostPackage {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {

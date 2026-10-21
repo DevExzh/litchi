@@ -30,7 +30,7 @@
 
 pub(crate) mod cell;
 pub mod creation;
-pub mod editor;
+pub(crate) mod editor;
 pub(crate) mod formula;
 
 pub(crate) use litchi_numbers::table::dimension::{
@@ -68,21 +68,23 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
 
 pub use creation::Builder;
 pub use editor::{
-    Direction, Editor, PivotCategoryInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
+    Direction, Draft, PivotCategoryInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
     RemovedNumbersSheetImage, RemovedNumbersSheetMovie, RemovedNumbersSheetShape,
     RemovedNumbersTextBox, SheetAudioInfo, SheetAudioOptions, SheetChartInfo, SheetImageInfo,
     SheetImageOptions, SheetInfo, SheetMovieInfo, SheetMovieOptions, SheetShapeInfo,
-    TableCellConditionalHighlightInfo, TableCellParagraphList, TableCellParagraphListBullet,
-    TableCellParagraphListBulletGeometry, TableCellParagraphListIndentation,
-    TableCellParagraphListLabelColor, TableCellParagraphListLevel,
-    TableCellParagraphListLevelPlacement, TableCellParagraphListNumberFormat,
-    TableCellParagraphListNumberScale, TableCellParagraphListNumberTiering,
-    TableCellParagraphListNumbering, TableCellParagraphListPlacement, TableCellParagraphTabStops,
-    TableCellTextBackground, TableCellTextBaselineShift, TableCellTextCapitalization,
-    TableCellTextCharacterSpacing, TableCellTextColor, TableCellTextDecorations, TableCellTextFont,
-    TableCellTextLigatures, TableCellTextOutline, TableCellTextScript, TableCellTextShadow,
-    TableCellTextStyle, TableInfo, TableSortColumnIndex, TableSortDirection, TableSortOrder,
-    TableSortRowRange, TableSortRule, TableSortScope, TextBoxInfo, UnverifiedTopologyEdit,
+    TableCellConditionalHighlightInfo, TableCellParagraphIndents, TableCellParagraphLineSpacing,
+    TableCellParagraphList, TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
+    TableCellParagraphListIndentation, TableCellParagraphListLabelColor,
+    TableCellParagraphListLevel, TableCellParagraphListLevelPlacement,
+    TableCellParagraphListNumberFormat, TableCellParagraphListNumberScale,
+    TableCellParagraphListNumberTiering, TableCellParagraphListNumbering,
+    TableCellParagraphListPlacement, TableCellParagraphSpacing, TableCellParagraphTabStops,
+    TableCellTextAlignment, TableCellTextBackground, TableCellTextBaselineShift,
+    TableCellTextCapitalization, TableCellTextCharacterSpacing, TableCellTextColor,
+    TableCellTextDecorations, TableCellTextFont, TableCellTextLigatures, TableCellTextOutline,
+    TableCellTextScript, TableCellTextShadow, TableCellTextStyle, TableInfo, TableSortColumnIndex,
+    TableSortDirection, TableSortOrder, TableSortRowRange, TableSortRule, TableSortScope,
+    TextBoxInfo, UnverifiedAxisChange,
 };
 pub use formula::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference,

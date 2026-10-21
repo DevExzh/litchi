@@ -135,16 +135,10 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No ordinary body chart matched the checked source-order selector.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartNotFound { position: Position },
-    /// Alias used by callers that name checked positions explicitly.
-    #[error("the Pages body has no chart at position {position:?}")]
-    ChartPositionNotFound { position: Position },
-    /// The source does not retain an exact physical artifact suitable for a
-    /// changed publication.
-    #[error("this Pages source does not support exact body-chart arrangement edits")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted chart graph or selected payload was malformed or ambiguous.
     #[error("the selected Pages body-chart arrangement source is invalid")]
     InvalidSource,
@@ -152,7 +146,7 @@ pub enum Error {
     #[error(
         "Pages body-chart arrangement {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -169,6 +163,43 @@ pub enum Error {
     /// The patch was produced from another exact package artifact.
     #[error("the Pages body-chart arrangement patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No ordinary body chart matched the checked source-order selector.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartNotFound { position: Position },
+    /// Alias used by callers that name checked positions explicitly.
+    #[error("the Pages body has no chart at position {position:?}")]
+    ChartPositionNotFound { position: Position },
+    /// The source does not retain an exact physical artifact suitable for a
+    /// changed publication.
+    #[error("this Pages source does not support exact body-chart arrangement edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::ChartNotFound { .. } | Self::ChartPositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic chart Arrange value staged against an immutable
@@ -382,6 +413,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the exact-source reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -566,7 +603,7 @@ impl ArrangementBudget {
     ) -> Result<(), Error> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -640,7 +677,7 @@ impl ArrangementBudget {
         depth: usize,
     ) -> Result<WireView<'a>, Error> {
         if depth > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
@@ -687,7 +724,7 @@ impl ArrangementBudget {
             .checked_sub(self.work)
             .ok_or(Error::InvalidSource)?;
         if input == 0 || fields == 0 || work == 0 {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: 1,
                 maximum: 0,
@@ -757,7 +794,7 @@ impl ArrangementBudget {
         self.retained(report.retained_bytes())?;
         self.retained(report.scratch_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.max_nesting as u64,
@@ -798,7 +835,7 @@ impl ArrangementBudget {
         self.retained(retained_bytes)?;
         self.retained(scratch_bytes)?;
         if usize::try_from(max_depth).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(max_depth),
                 maximum: self.max_nesting as u64,
@@ -837,7 +874,7 @@ impl ArrangementBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         if usize::try_from(report.max_depth()).unwrap_or(usize::MAX) > self.max_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(report.max_depth()),
                 maximum: self.max_nesting as u64,
@@ -852,7 +889,7 @@ impl ArrangementBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if observed > self.max_output {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
                 observed: observed as u64,
                 maximum: self.max_output as u64,
@@ -864,7 +901,7 @@ impl ArrangementBudget {
     fn preflight_work(&self, amount: usize) -> Result<(), Error> {
         let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireWork,
                 observed: observed as u64,
                 maximum: self.max_work as u64,
@@ -879,7 +916,7 @@ impl ArrangementBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if observed > self.max_allocations {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireAllocations,
                 observed: observed as u64,
                 maximum: self.max_allocations as u64,
@@ -894,7 +931,7 @@ impl ArrangementBudget {
             .checked_add(amount)
             .ok_or(Error::InvalidSource)?;
         if observed > self.max_retained {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireRetainedBytes,
                 observed: observed as u64,
                 maximum: self.max_retained as u64,
@@ -1067,7 +1104,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let mut budget = ArrangementBudget::new(source)?;
     let current = resolve_target(
@@ -1127,9 +1164,9 @@ pub(super) fn resolve_target(
     resolve_targets(package, budget)?
         .into_iter()
         .find(|target| target.position == requested)
-        .ok_or(Error::ChartNotFound {
+        .ok_or(Error::Refused(Refusal::ChartNotFound {
             position: requested,
-        })
+        }))
 }
 
 pub(super) fn resolve_targets(
@@ -1823,7 +1860,7 @@ pub(super) fn rewrite_chart_payload(
         .find(|entry| entry.name() == target.component_name.as_ref())
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let archive_limits = source
         .state
@@ -1891,7 +1928,7 @@ pub(super) fn rewrite_chart_payload(
         .max_compressed_stream();
     if replacement_bound > maximum_entry || compressed_bound > maximum_entry.min(maximum_compressed)
     {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: replacement_bound.max(compressed_bound) as u64,
             maximum: maximum_entry.min(maximum_compressed) as u64,
@@ -2917,7 +2954,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
         },
         codec::DecodeLimit::Work { observed, maximum } => (LimitKind::WireWork, observed, maximum),
         codec::DecodeLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -2934,7 +2971,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
         },
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
@@ -2957,7 +2994,7 @@ fn map_drawable_order_error(error: pages_drawable_order_codec::DecodeError) -> E
                 (LimitKind::WireWork, observed, maximum)
             },
             pages_drawable_order_codec::WireResourceLimit::Nesting { observed, maximum } => {
-                return Error::LimitExceeded {
+                return Error::Limit {
                     kind: LimitKind::WireNesting,
                     observed: observed as u64,
                     maximum: maximum as u64,
@@ -2968,7 +3005,7 @@ fn map_drawable_order_error(error: pages_drawable_order_codec::DecodeError) -> E
             },
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -2986,7 +3023,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
@@ -3010,7 +3047,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
                 ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3030,7 +3067,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
         },
         ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Iwa(error) => map_core_error(error),
-        ArchiveError::Reassembly(_) => Error::UnsupportedSource,
+        ArchiveError::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         ArchiveError::Io(_)
         | ArchiveError::Zip { .. }
         | ArchiveError::InvalidLimits(_)
@@ -3050,7 +3087,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages

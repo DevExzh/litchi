@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn patch_placeholder_presentation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &ObjectGraph,
     current_id: u64,
     target_id: u64,
@@ -81,7 +81,7 @@ pub(super) fn patch_placeholder_presentation(
 }
 
 pub(super) fn patch_slide_relationship(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &ObjectGraph,
     slide_id: u64,
     current: &kn::SlideArchive,
@@ -145,7 +145,7 @@ pub(super) fn patch_slide_relationship(
 }
 
 pub(super) fn patch_node_template_uuid(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &ObjectGraph,
     node_id: u64,
     current: &kn::SlideNodeArchive,

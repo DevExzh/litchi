@@ -12,7 +12,7 @@ use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, U
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
 use crate::text::style_registry::{insert_private_style, register_private_style};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 pub(crate) const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
 pub(crate) const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
@@ -148,7 +148,7 @@ struct DrawableCaptionArchives<'package> {
 }
 
 impl<'package> DrawableCaptionArchives<'package> {
-    fn discover(package: &'package IWorkPackage, drawable_object_id: u64) -> Result<Self> {
+    fn discover(package: &'package HostPackage, drawable_object_id: u64) -> Result<Self> {
         let mut object_archives = HashMap::new();
         let mut duplicate_objects = HashSet::new();
         let mut drawable_archive = None;
@@ -206,7 +206,7 @@ impl<'package> DrawableCaptionArchives<'package> {
 
     fn require_exact_message_count(
         &self,
-        package: &IWorkPackage,
+        package: &HostPackage,
         object_id: u64,
         message_type: u32,
         label: &str,
@@ -236,9 +236,8 @@ impl<'package> DrawableCaptionArchives<'package> {
 
 /// Resolve and validate a drawable title or caption graph without assuming a
 /// particular iWork application or drawable type.
-#[allow(deprecated)]
 pub(crate) fn drawable_caption_slot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     drawable_object_id: u64,
     reference_id: Option<u64>,
     kind: DrawableCaptionKind,
@@ -389,7 +388,7 @@ pub(crate) fn drawable_caption_slot(
 /// exactly one aggregate object owner; FieldInfo references may only repeat
 /// that same owner, while data references are always rejected.
 fn ensure_exclusive_caption_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     selected_drawable_id: u64,
     selected_info_id: u64,
     selected_storage_id: u64,
@@ -560,7 +559,7 @@ fn ensure_exclusive_caption_storage(
 }
 
 fn caption_info_decode_options(
-    package: &IWorkPackage,
+    package: &HostPackage,
     source: &[u8],
 ) -> PagesMovieCaptionDecodeOptions {
     let limits = package.limits().archive_limits();
@@ -613,7 +612,6 @@ impl CaptionObjectIds {
 }
 
 /// Create all four native objects that back one drawable title or caption.
-#[allow(deprecated)]
 pub(crate) fn caption_objects(
     ids: CaptionObjectIds,
     drawable_id: u64,
@@ -751,7 +749,7 @@ fn caption_objects_with_profile(
 /// Insert a componentized title/caption style into the document stylesheet and
 /// expose it to the drawable component.
 pub(crate) fn insert_componentized_caption_style(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     drawable_archive_name: &str,
     stylesheet_id: u64,
     style: ArchiveObject,
@@ -907,7 +905,7 @@ fn require_exact_caption_message_count_in_archive(
     Ok(())
 }
 
-fn unique_object_archive_name(package: &IWorkPackage, identifier: u64) -> Result<String> {
+fn unique_object_archive_name(package: &HostPackage, identifier: u64) -> Result<String> {
     let mut archive_name = None;
     for name in package.iwa_entry_names() {
         if package.archive(name)?.object(identifier).is_none() {

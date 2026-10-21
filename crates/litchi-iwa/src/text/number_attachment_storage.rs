@@ -8,7 +8,7 @@ use crate::wire::{
     patch_length_delimited_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage_with_archive, require_text_boundary,
@@ -27,14 +27,14 @@ pub(super) struct AttachmentEntry {
 }
 
 pub(super) fn locate_attachment_storage(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<StorageLocation> {
     locate_attachment_storage_with_archive(package, storage_id).map(|located| located.location)
 }
 
 pub(super) fn locate_attachment_storage_with_archive(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<LocatedStorage> {
     let located =
@@ -157,7 +157,7 @@ fn utf16_unit_at(text: &[String], requested: u32) -> Option<u16> {
 }
 
 pub(super) fn insert_attachment_reference(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     position: u32,

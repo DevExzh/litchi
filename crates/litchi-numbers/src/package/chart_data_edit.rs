@@ -125,7 +125,7 @@ impl<'a> Edit<'a> {
     ///
     /// Row and column labels are retained from the source.  A replacement
     /// whose labels or dimensions differ is rejected by `commit` with a
-    /// typed [`ChartDataError::ShapeMismatch`].
+    /// typed [`crate::sheet::chart::data::Refusal::ShapeMismatch`].
     #[must_use]
     pub fn set(mut self, data: ChartData) -> Self {
         self.after = Some(data);
@@ -297,6 +297,12 @@ impl Commit {
     #[must_use]
     pub fn into_package(self) -> Package {
         self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Borrow the reversible exact-source patch.
@@ -519,7 +525,9 @@ fn commit_patch_parts(
     }
     let source_catalog = physical_catalog(source).map_err(map_arrangement_error)?;
     if !source_catalog.source_is_exact() {
-        return Err(ChartDataError::UnsupportedSource);
+        return Err(ChartDataError::Refused(
+            crate::package::chart_data::Refusal::UnsupportedSource,
+        ));
     }
     let candidate = rewrite_sheet_chart_data(source, selection, after.as_ref(), &mut budget)?;
     let target_catalog = physical_catalog(&candidate).map_err(map_arrangement_error)?;
@@ -672,13 +680,15 @@ fn map_rewrite_error(error: codec::RewriteError) -> ChartDataError {
                 ),
                 _ => return ChartDataError::InvalidSource,
             };
-            ChartDataError::LimitExceeded {
+            ChartDataError::Limit {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
             }
         },
-        codec::RewriteError::Shape { .. } => ChartDataError::ShapeMismatch,
+        codec::RewriteError::Shape { .. } => {
+            ChartDataError::Refused(crate::package::chart_data::Refusal::ShapeMismatch)
+        },
         codec::RewriteError::NonFiniteNumeric { .. } => ChartDataError::InvalidSource,
         codec::RewriteError::Allocation { amount } => ChartDataError::Allocation { amount },
         codec::RewriteError::Projection => ChartDataError::InvalidSource,
@@ -687,7 +697,9 @@ fn map_rewrite_error(error: codec::RewriteError) -> ChartDataError {
 
 fn ensure_axes(before: &ChartData, after: &ChartData) -> Result<(), ChartDataError> {
     if before.row_names() != after.row_names() || before.column_names() != after.column_names() {
-        return Err(ChartDataError::ShapeMismatch);
+        return Err(ChartDataError::Refused(
+            crate::package::chart_data::Refusal::ShapeMismatch,
+        ));
     }
     Ok(())
 }
@@ -887,13 +899,17 @@ fn ensure_standalone_chart(
         .index
         .resolve_ref_id(&package.state.components, identifier)
         .map_err(chart_arrangement::map_package_error)?
-        .ok_or(ChartArrangementError::UnsupportedDependency)?;
+        .ok_or(ChartArrangementError::Refused(
+            chart_arrangement::Refusal::UnsupportedDependency,
+        ))?;
     let mediator_object = chart_arrangement::object_from_resolved(package, resolved)?;
     chart_arrangement::validate_message_metadata(mediator_object)?;
     let Some((message_index, message)) =
         chart_arrangement::unique_typed_message(mediator_object, CHART_MEDIATOR_MESSAGE_TYPE)?
     else {
-        return Err(ChartArrangementError::UnsupportedDependency);
+        return Err(ChartArrangementError::Refused(
+            chart_arrangement::Refusal::UnsupportedDependency,
+        ));
     };
     if message_index >= resolved.messages.len() {
         return Err(ChartArrangementError::InvalidSource);
@@ -940,7 +956,9 @@ fn validate_mediator_metadata(
     budget.work(metadata_work)?;
     budget.references(references)?;
     if references != 0 {
-        return Err(ChartArrangementError::UnsupportedDependency);
+        return Err(ChartArrangementError::Refused(
+            chart_arrangement::Refusal::UnsupportedDependency,
+        ));
     }
     Ok(())
 }
@@ -1001,11 +1019,17 @@ fn validate_standalone_mediator(
                 }
                 let value = scalar_varint(field)?;
                 if value != 0 {
-                    return Err(ChartArrangementError::UnsupportedDependency);
+                    return Err(ChartArrangementError::Refused(
+                        chart_arrangement::Refusal::UnsupportedDependency,
+                    ));
                 }
                 *seen = true;
             },
-            _ => return Err(ChartArrangementError::UnsupportedDependency),
+            _ => {
+                return Err(ChartArrangementError::Refused(
+                    chart_arrangement::Refusal::UnsupportedDependency,
+                ));
+            },
         }
     }
     let super_payload = super_payload.ok_or(ChartArrangementError::InvalidSource)?;
@@ -1042,7 +1066,11 @@ fn validate_standalone_mediator_super(
                 }
                 let _ = scalar_varint(field)?;
             },
-            _ => return Err(ChartArrangementError::UnsupportedDependency),
+            _ => {
+                return Err(ChartArrangementError::Refused(
+                    chart_arrangement::Refusal::UnsupportedDependency,
+                ));
+            },
         }
     }
     let Some(info) = info else {
@@ -1059,7 +1087,9 @@ fn validate_standalone_mediator_super(
         }
         let value = scalar_varint(field)?;
         if value != 0 {
-            return Err(ChartArrangementError::UnsupportedDependency);
+            return Err(ChartArrangementError::Refused(
+                chart_arrangement::Refusal::UnsupportedDependency,
+            ));
         }
         identifier = Some(value);
     }
@@ -1099,9 +1129,15 @@ fn validate_standalone_formula_storage(
             | FORMULA_ERROR_NEG_FIELD
             | FORMULA_SCATTER_POS_FIELD
             | FORMULA_SCATTER_NEG_FIELD => {
-                return Err(ChartArrangementError::UnsupportedDependency);
+                return Err(ChartArrangementError::Refused(
+                    chart_arrangement::Refusal::UnsupportedDependency,
+                ));
             },
-            _ => return Err(ChartArrangementError::UnsupportedDependency),
+            _ => {
+                return Err(ChartArrangementError::Refused(
+                    chart_arrangement::Refusal::UnsupportedDependency,
+                ));
+            },
         }
     }
     Ok(())

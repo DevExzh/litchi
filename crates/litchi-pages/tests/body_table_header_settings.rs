@@ -401,13 +401,20 @@ fn selectors_read_position_and_name_and_reject_ambiguity() -> TestResult {
     assert_eq!(by_position, fixture_settings());
     assert!(matches!(
         package.body_table_header_settings(BodyTableSelector::name("Missing")),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::headers::transaction::Refusal::TableNotFound
+        ))
     ));
 
     let ambiguous = Package::from_bytes(&synthetic_package(["Revenue", "Revenue"], None)?)?;
     assert!(matches!(
         ambiguous.body_table_header_settings(BodyTableSelector::name("Revenue")),
-        Err(Error::AmbiguousTableName | Error::AmbiguousSelector)
+        Err(
+            Error::Refused(litchi_pages::table::headers::transaction::Refusal::AmbiguousTableName)
+                | Error::Refused(
+                    litchi_pages::table::headers::transaction::Refusal::AmbiguousSelector
+                )
+        )
     ));
     Ok(())
 }
@@ -541,7 +548,7 @@ fn patch_conflict_and_malformed_selected_fields_are_atomic() -> TestResult<()> {
         let before = malformed.exact_bytes();
         assert!(matches!(
             malformed.body_table_header_settings(0usize),
-            Err(Error::InvalidSource) | Err(Error::LimitExceeded { .. })
+            Err(Error::InvalidSource) | Err(Error::Limit { .. })
         ));
         assert_eq!(malformed.exact_bytes(), before.as_slice());
     }
@@ -557,7 +564,10 @@ fn locked_and_count_dependent_tables_refuse_partition_changes_but_allow_freeze()
         .set(changed_settings())
         .commit()
         .expect_err("a locked table must reject a changed header edit");
-    assert!(matches!(locked_error, Error::TableLocked));
+    assert!(matches!(
+        locked_error,
+        Error::Refused(litchi_pages::table::headers::transaction::Refusal::TableLocked)
+    ));
     assert_eq!(locked.exact_bytes(), locked_source.as_slice());
 
     let dependency_source =
@@ -642,7 +652,7 @@ fn finite_limits_fail_closed_before_publication() -> TestResult<()> {
         let result = package
             .edit_body_table_header_settings(0usize)
             .and_then(|edit| edit.set(changed_settings()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(package.exact_bytes(), before.as_slice());
             transaction_rejected = true;
             break;

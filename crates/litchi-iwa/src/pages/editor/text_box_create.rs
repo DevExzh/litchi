@@ -99,7 +99,7 @@ impl BodyTextShapeRole {
     }
 }
 
-impl Editor {
+impl Draft {
     /// Add a body-anchored text box without requiring a source drawable.
     ///
     /// The text box, writable storage, title/caption stand-ins, body
@@ -155,7 +155,7 @@ impl Editor {
             Ok(())
         })?;
 
-        let mut text_editor = IWorkTextEditor::from_package(staged);
+        let mut text_editor = crate::text::Draft::from_package(staged);
         text_editor.replace_text(
             self.body_storage_id,
             anchor_character_index..anchor_character_index,
@@ -222,7 +222,7 @@ fn validate_text_box_geometry(
     .validate()
 }
 
-fn text_box_style_id(package: &IWorkPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
+fn text_box_style_id(package: &HostPackage, root: &PagesDocumentRootFacts) -> Result<u64> {
     let theme_id = root
         .theme
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".to_owned()))?;
@@ -447,7 +447,7 @@ fn pages_object(
 }
 
 pub(super) fn create_drawable_z_order(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     z_order_id: u64,
 ) -> Result<()> {
@@ -526,7 +526,7 @@ mod tests {
 
     #[test]
     fn scratch_document_supports_text_box_crud_without_a_source_drawable() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         assert!(editor.drawables().unwrap().is_empty());
 
         let created = editor
@@ -566,7 +566,7 @@ mod tests {
 
     #[test]
     fn multiple_created_text_boxes_share_one_z_order_and_round_trip() {
-        let mut editor = Editor::create_with_text("Report").unwrap();
+        let mut editor = Draft::create_with_text("Report").unwrap();
         let first = editor
             .add_text_box(6, "First", FIRST_POSITION, FIRST_SIZE)
             .unwrap();
@@ -575,7 +575,7 @@ mod tests {
             .add_text_box(0, "Second", second_position, FIRST_SIZE)
             .unwrap();
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let root = pages_document_root_facts(reopened.package()).unwrap();
         let z_order_id = root.drawables_zorder.unwrap();
         let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
@@ -608,7 +608,7 @@ mod tests {
 
     #[test]
     fn invalid_text_box_creation_is_transactional() {
-        let mut editor = Editor::create_with_text("Body").unwrap();
+        let mut editor = Draft::create_with_text("Body").unwrap();
         let baseline = editor.to_bytes().unwrap();
 
         assert!(

@@ -863,11 +863,15 @@ fn selectors_non_file_movies_and_conflicts_are_typed_and_atomic() -> TestResult<
     let package = Package::from_bytes(&source)?;
     assert!(matches!(
         package.slide_movie_title(SlideSelector::index(9), 0usize),
-        Err(SlideMovieTitleError::SlidePositionNotFound { .. })
+        Err(SlideMovieTitleError::Refused(
+            litchi_keynote::slide::movie::title::Refusal::SlidePositionNotFound { .. }
+        ))
     ));
     assert!(matches!(
         package.slide_movie_title(0usize, MovieSelector::index(9)),
-        Err(SlideMovieTitleError::MoviePositionNotFound { .. })
+        Err(SlideMovieTitleError::Refused(
+            litchi_keynote::slide::movie::title::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     let mut movie = tsd::MovieArchive::decode(
         message_payload(&source, MOVIES[0], MOVIE_MESSAGE_TYPE)?.as_slice(),
@@ -942,7 +946,9 @@ fn malformed_title_edge_info_storage_parent_and_duplicate_fields_fail_closed() -
         assert!(matches!(
             result,
             Err(SlideMovieTitleError::InvalidSource)
-                | Err(SlideMovieTitleError::UnsupportedDependency)
+                | Err(SlideMovieTitleError::Refused(
+                    litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+                ))
         ));
         assert_eq!(exact_bytes(&package)?, hostile);
     }
@@ -971,8 +977,9 @@ fn shared_aggregate_and_field_info_title_owners_are_rejected() -> TestResult<()>
             .and_then(|edit| edit.commit());
         assert!(matches!(
             result,
-            Err(SlideMovieTitleError::UnsupportedDependency)
-                | Err(SlideMovieTitleError::InvalidSource)
+            Err(SlideMovieTitleError::Refused(
+                litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+            )) | Err(SlideMovieTitleError::InvalidSource)
         ));
         assert_eq!(exact_bytes(&package)?, hostile);
     }
@@ -1004,7 +1011,9 @@ fn aliases_and_reserved_metadata_ids_fail_closed_or_skip_safely() -> TestResult<
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieTitleError::UnsupportedDependency) | Err(SlideMovieTitleError::InvalidSource)
+        Err(SlideMovieTitleError::Refused(
+            litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+        )) | Err(SlideMovieTitleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, alias);
     let mut metadata = metadata_stream(&source)?;
@@ -1023,7 +1032,10 @@ fn aliases_and_reserved_metadata_ids_fail_closed_or_skip_safely() -> TestResult<
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieTitleError::InvalidSource) | Err(SlideMovieTitleError::UnsupportedDependency)
+        Err(SlideMovieTitleError::InvalidSource)
+            | Err(SlideMovieTitleError::Refused(
+                litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, duplicate);
     let overflow = synthetic_package_with_titles([Some("North title"), None], u64::MAX)?;
@@ -1035,8 +1047,10 @@ fn aliases_and_reserved_metadata_ids_fail_closed_or_skip_safely() -> TestResult<
     assert!(matches!(
         result,
         Err(SlideMovieTitleError::InvalidSource)
-            | Err(SlideMovieTitleError::LimitExceeded { .. })
-            | Err(SlideMovieTitleError::UnsupportedDependency)
+            | Err(SlideMovieTitleError::Limit { .. })
+            | Err(SlideMovieTitleError::Refused(
+                litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, overflow);
     Ok(())
@@ -1062,9 +1076,12 @@ fn missing_metadata_and_tight_ingress_are_atomic() -> TestResult<()> {
         .and_then(|edit| edit.commit());
     assert!(matches!(
         result,
-        Err(SlideMovieTitleError::UnsupportedSource)
-            | Err(SlideMovieTitleError::InvalidSource)
-            | Err(SlideMovieTitleError::UnsupportedDependency)
+        Err(SlideMovieTitleError::Refused(
+            litchi_keynote::slide::movie::title::Refusal::UnsupportedSource
+        )) | Err(SlideMovieTitleError::InvalidSource)
+            | Err(SlideMovieTitleError::Refused(
+                litchi_keynote::slide::movie::title::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, no_metadata);
     let defaults = Limits::default();

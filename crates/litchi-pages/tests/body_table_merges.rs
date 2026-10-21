@@ -126,7 +126,9 @@ fn native_merge_reads_by_name_and_position_without_rewriting_source() -> TestRes
     );
     assert_eq!(
         package.body_table_merges(BodyTableSelector::name("missing")),
-        Err(BodyTableMergesError::TableNotFound)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::TableNotFound
+        ))
     );
     assert_eq!(exact_bytes(&package)?, NATIVE);
     Ok(())
@@ -317,7 +319,7 @@ fn merge_transaction_limit_failure_is_atomic() -> TestResult {
                 edit.merge(replacement)?;
                 edit.commit()
             });
-        if matches!(result, Err(BodyTableMergesError::LimitExceeded { .. })) {
+        if matches!(result, Err(BodyTableMergesError::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             found_boundary = true;
             break;
@@ -344,7 +346,9 @@ fn merge_transaction_noop_and_missing_unmerge_are_byte_exact() -> TestResult {
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
     assert!(matches!(
         edit.merge(existing),
-        Err(BodyTableMergesError::OverlappingRegion)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::OverlappingRegion
+        ))
     ));
     Ok(())
 }
@@ -356,7 +360,9 @@ fn merge_transaction_rejects_out_of_bounds_regions_before_mutation() -> TestResu
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
     assert!(matches!(
         edit.merge(region),
-        Err(BodyTableMergesError::InvalidRegion)
+        Err(BodyTableMergesError::Refused(
+            litchi_pages::table::merge::transaction::Refusal::InvalidRegion
+        ))
     ));
     assert!(!edit.unmerge(region)?);
     let commit = edit.commit()?;

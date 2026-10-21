@@ -380,7 +380,7 @@ fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     assert!(
         matches!(
             comment.as_ref(),
-            Err(SlideDrawableCommentError::LimitExceeded {
+            Err(SlideDrawableCommentError::Limit {
                 kind: SlideDrawableCommentLimitKind::Entries,
                 observed: 257,
                 maximum: 256,
@@ -401,7 +401,7 @@ fn entry_limit_is_typed_and_source_stays_unchanged() -> TestResult {
     assert!(
         matches!(
             mutation.as_ref(),
-            Err(SlideDrawableCommentError::LimitExceeded {
+            Err(SlideDrawableCommentError::Limit {
                 kind: SlideDrawableCommentLimitKind::Entries,
                 observed: 257,
                 maximum: 256,

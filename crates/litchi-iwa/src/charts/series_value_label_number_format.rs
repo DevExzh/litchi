@@ -19,7 +19,7 @@ use crate::charts::series_non_style::{
     set_chart_series_non_style_values,
 };
 use crate::protobuf::tsch;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 const SERIES_NUMBER_FORMAT_FIELDS: DualNumberFormatFields = DualNumberFormatFields {
     legacy: 21,
@@ -30,7 +30,7 @@ const FORMAT_CONTEXT: &str = "chart series value-label";
 
 /// Read number formats in native series order.
 pub(crate) fn chart_series_value_label_number_formats(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -51,7 +51,7 @@ pub(crate) fn chart_series_value_label_number_formats(
 
 /// Set number formats in native series order.
 pub(crate) fn set_chart_series_value_label_number_formats(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

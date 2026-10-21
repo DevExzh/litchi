@@ -170,23 +170,13 @@ pub mod comments;
 /// Cross-application content extractors
 pub mod shapes;
 
-// Internal modules use short aliases while the native bundle and package
-// implementations remain private to this migration host.
-#[deprecated(
-    since = "0.0.1",
-    note = "legacy migration-host drawable-comment editor; use focused format-semantic comment owners where available; direct-drawable comment migration remains pending"
-)]
-#[expect(
-    deprecated,
-    reason = "retain the deprecated migration-host export until drawable-comment parity permits its removal"
-)]
-pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
-pub use media::{
-    EmbeddedMediaAsset, IWorkMediaEditor, MediaAsset, MediaAssetId, MediaManager, MediaStats,
-};
-pub(crate) use package::IWorkPackage;
+pub use media::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaManager, MediaStats};
+pub use package::Package;
+/// The host package under its crate-internal name, distinct from the leaf
+/// crates' `Package` types that host modules import alongside it.
+pub(crate) use package::Package as HostPackage;
 pub use shapes::DrawableTitleCaption;
 pub use text::{
     Format, Fragment, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,

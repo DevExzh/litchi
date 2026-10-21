@@ -7,7 +7,7 @@ use crate::charts::axis_number_format::{
 };
 use crate::charts::{Axis, NumberFormat};
 
-impl Editor {
+impl Draft {
     /// Read the decimal-number format of one native sheet-chart axis.
     pub fn sheet_chart_axis_number_format(
         &self,
@@ -31,7 +31,7 @@ impl Editor {
 }
 
 fn sheet_chart_axis_number_format(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -47,7 +47,7 @@ fn sheet_chart_axis_number_format(
 }
 
 fn set_sheet_chart_axis_number_format(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     axis: Axis,
@@ -63,7 +63,7 @@ fn set_sheet_chart_axis_number_format(
         axis,
         format,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_axis_number_format(sheet_id, drawable_object_id, axis)? != format {
         return Err(Error::InvalidFormat(
             "Numbers chart axis number-format update failed validation".to_owned(),
@@ -116,7 +116,7 @@ mod tests {
                 expected,
             )
             .unwrap();
-        let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .sheet_chart_axis_number_format(sheet_id, chart.drawable_object_id, Axis::Value,)

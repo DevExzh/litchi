@@ -42,8 +42,19 @@ LEAF_PACKAGES = (
 LEAF_CRATE_NAMES = {package: package.replace("-", "_") for package in LEAF_PACKAGES}
 
 
-# The family-named semantic projection modules (ADR 0034 §2).
-SEMANTIC_MODULES = ("document", "workbook", "presentation")
+# The family-named semantic projection module of each leaf crate (ADR 0034
+# §2): `workbook` for Numbers (record 0297), `document` for Pages and
+# `presentation` for Keynote (record 0298).
+SEMANTIC_MODULES = {
+    "litchi_numbers": "workbook",
+    "litchi_pages": "document",
+    "litchi_keynote": "presentation",
+}
+
+
+def semantic_module(crate_name: str) -> str:
+    """Return the public semantic projection module name of one leaf crate."""
+    return SEMANTIC_MODULES[crate_name.replace("-", "_")]
 
 
 DEFAULT_JSON = {
@@ -431,11 +442,9 @@ def _document_ids(
 
     The projection module is named for its family (ADR 0034 §2): `document`
     for word processing, `workbook` for spreadsheets (record 0297) and
-    `presentation` for decks; any of them that exists is checked.
+    `presentation` for decks; each crate is checked at its own family module.
     """
-    module_paths = tuple(
-        (crate_name, name) for name in SEMANTIC_MODULES
-    )
+    module_paths = ((crate_name, semantic_module(crate_name)),)
     roots = {
         item_id
         for item_id, entry in paths.items()
@@ -480,7 +489,7 @@ def _document_ids(
             roots.add(item_id)
 
     if not roots:
-        return set(), f"missing public module `{crate_name}::document`, `::workbook` or `::presentation`"
+        return set(), f"missing public module `{crate_name}::{semantic_module(crate_name)}`"
     return roots, None
 
 

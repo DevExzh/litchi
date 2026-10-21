@@ -7,7 +7,7 @@ use crate::charts::axis::{
     set_chart_axis_labels_visible as set_native_chart_axis_labels_visible,
 };
 
-impl Editor {
+impl Draft {
     /// Read whether Pages shows labels for one native body-chart axis.
     pub fn body_chart_axis_labels_visible(
         &self,
@@ -29,7 +29,7 @@ impl Editor {
 }
 
 fn body_chart_axis_labels_visible(
-    editor: &Editor,
+    editor: &Draft,
     drawable_object_id: u64,
     axis: Axis,
 ) -> Result<bool> {
@@ -44,7 +44,7 @@ fn body_chart_axis_labels_visible(
 }
 
 fn set_body_chart_axis_labels_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     axis: Axis,
     visible: bool,
@@ -59,7 +59,7 @@ fn set_body_chart_axis_labels_visible(
         axis,
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_axis_labels_visible(drawable_object_id, axis)? != visible {
         return Err(Error::InvalidFormat(
             "Pages chart axis-label update failed validation".to_owned(),

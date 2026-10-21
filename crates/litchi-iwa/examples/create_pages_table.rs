@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut dimension_bytes = Vec::new();
     dimensions.write_to(&mut dimension_bytes)?;
-    editor = pages::Editor::from_bytes(&dimension_bytes)?;
+    editor = pages::Draft::from_bytes(&dimension_bytes)?;
     editor.insert_table_row(table.model_object_id, RowInsertion::body(2))?;
     editor.insert_table_column(table.model_object_id, ColumnInsertion::body(1))?;
     editor.set_table_cells(

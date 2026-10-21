@@ -134,7 +134,9 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
     let missing_position = Position::new(slide_count.saturating_add(1));
     let mut missing_position_edit = package.edit_slide_deletion();
     match missing_position_edit.remove_slide(missing_position) {
-        Err(DeletionError::SlidePositionNotFound { position }) => {
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::SlidePositionNotFound { position },
+        )) => {
             assert_eq!(position, missing_position);
         },
         Err(error) => observe_error(error),
@@ -149,7 +151,9 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
         return;
     }
     match staged.remove_slide(SlideSelector::index(second)) {
-        Err(DeletionError::OperationAlreadyStaged) => {},
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::OperationAlreadyStaged,
+        )) => {},
         Err(error) => observe_error(error),
         Ok(_) => panic!("a second slide deletion unexpectedly replaced the staged operation"),
     }
@@ -162,7 +166,8 @@ fn exercise_selector_staging(package: &Package, data: &[u8]) {
     assert_eq!(package_bytes(package), source);
 
     match package.edit_slide_deletion().commit() {
-        Err(DeletionError::NoStagedOperation) => {},
+        Err(DeletionError::Refused(litchi::keynote::slide::delete::Refusal::NoStagedOperation)) => {
+        },
         Err(error) => observe_error(error),
         Ok(_) => panic!("an empty slide deletion transaction unexpectedly committed"),
     }
@@ -300,7 +305,9 @@ fn exercise_final_slide(package: &Package) {
     let source = package_bytes(one_slide);
     let mut edit = one_slide.edit_slide_deletion();
     match edit.remove_slide(SlideSelector::index(0)) {
-        Err(DeletionError::CannotDeleteFinalSlide) => {},
+        Err(DeletionError::Refused(
+            litchi::keynote::slide::delete::Refusal::CannotDeleteFinalSlide,
+        )) => {},
         Err(error) => observe_error(error),
         Ok(_) => panic!("the final Keynote slide unexpectedly became deletable"),
     }

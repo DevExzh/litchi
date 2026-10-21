@@ -71,7 +71,9 @@ pub(super) fn create_root_comment(
     {
         return Err(Error::InvalidSource { path });
     }
-    let tile = located.tile.ok_or(Error::UnsupportedDependency { path })?;
+    let tile = located.tile.ok_or(Error::Refused(
+        crate::package::comments::Refusal::UnsupportedDependency { path },
+    ))?;
     let source_cell = located.cell_bytes.as_ref().cloned().unwrap_or_default();
     let graph = creation_graph(source, located, path)?;
     // The list's component (or, for a new list, the model's) takes the new
@@ -88,7 +90,9 @@ pub(super) fn create_root_comment(
         .map_or(owner_component_index, |route| route.component_index);
     let physical = physical_source(source)?;
     if !physical.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::package::comments::Refusal::UnsupportedSource,
+        ));
     }
     let metadata_source =
         comments_metadata::strict_source(source).map_err(|_| Error::InvalidSource { path })?;
@@ -131,7 +135,9 @@ pub(super) fn create_root_comment(
         };
     let fresh = registry
         .allocate_identifiers(allocation_count)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| {
+            Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+        })?;
     let list_fresh = graph.list.is_none().then(|| fresh[0]);
     let comment_index = usize::from(list_fresh.is_some());
     let comment_fresh = fresh
@@ -275,27 +281,41 @@ pub(super) fn create_root_comment(
     additions.push(
         registry
             .uuid_addition(owner_component_index, comment_fresh)
-            .map_err(|_| Error::UnsupportedDependency { path })?,
+            .map_err(|_| {
+                Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+            })?,
     );
     if let Some(fresh) = author_fresh {
         additions.push(
             registry
                 .uuid_addition(new_author_component, fresh)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| {
+                    Error::Refused(crate::package::comments::Refusal::UnsupportedDependency {
+                        path,
+                    })
+                })?,
         );
     }
     if let Some(fresh) = author_storage_fresh {
         additions.push(
             registry
                 .uuid_addition(owner_component_index, fresh)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| {
+                    Error::Refused(crate::package::comments::Refusal::UnsupportedDependency {
+                        path,
+                    })
+                })?,
         );
     }
     if let Some(fresh) = list_fresh {
         additions.push(
             registry
                 .uuid_addition(owner_component_index, fresh)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| {
+                    Error::Refused(crate::package::comments::Refusal::UnsupportedDependency {
+                        path,
+                    })
+                })?,
         );
     }
     // The comment storage reads its author across components.
@@ -314,12 +334,14 @@ pub(super) fn create_root_comment(
             external_edges.push(edge);
         }
     }
-    let external_additions = registry
-        .external_additions(&external_edges)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let external_additions = registry.external_additions(&external_edges).map_err(|_| {
+        Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+    })?;
     let selectors = registry
         .touched_selectors(&touched_components)
-        .map_err(|_| Error::UnsupportedDependency { path })?;
+        .map_err(|_| {
+            Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+        })?;
     let transition = CombinedBatch::new(
         registry.last_object_identifier(),
         fresh.last().ok_or(Error::Verification)?.identifier,
@@ -334,7 +356,9 @@ pub(super) fn create_root_comment(
         CombinedSaveTokenBatch::new(transition, SaveTokenBatch::new(&selectors)),
         metadata_options,
     )
-    .map_err(|_| Error::UnsupportedDependency { path })?;
+    .map_err(|_| {
+        Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+    })?;
     let requirements = prepared.execution_requirements();
     let metadata_payload = prepared
         .execute(requirements.exact_limits())
@@ -443,7 +467,9 @@ impl<'a> Archives<'a> {
                 .package()
                 .iter()
                 .find(|entry| entry.name() == component.name() && !entry.is_opaque())
-                .ok_or(Error::UnsupportedSource)?;
+                .ok_or(Error::Refused(
+                    crate::package::comments::Refusal::UnsupportedSource,
+                ))?;
             let stream = SnappyStream::decompress_with_limits(
                 entry.data(),
                 self.physical
@@ -553,7 +579,9 @@ fn creation_graph(source: &Package, located: &Located, path: Path) -> Result<Cre
             .iter()
             .any(|edge| edge.root_id == table_id)
         {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::comments::Refusal::UnsupportedDependency { path },
+            ));
         }
         let resolved = source
             .state
@@ -667,7 +695,9 @@ fn author_storage(source: &Package, path: Path) -> Result<MessageRoute, Error> {
             }
         }
     }
-    found.ok_or(Error::UnsupportedDependency { path })
+    found.ok_or(Error::Refused(
+        crate::package::comments::Refusal::UnsupportedDependency { path },
+    ))
 }
 
 fn empty_author_storage(source: &Package, path: Path) -> Result<Option<MessageRoute>, Error> {
@@ -681,7 +711,9 @@ fn empty_author_storage(source: &Package, path: Path) -> Result<Option<MessageRo
                 let fields = litchi_iwa_common::wire::WireView::parse(message.data.as_slice())
                     .map_err(|_| Error::InvalidSource { path })?;
                 if fields.fields().any(|field| field.number() == 1) {
-                    return Err(Error::UnsupportedDependency { path });
+                    return Err(Error::Refused(
+                        crate::package::comments::Refusal::UnsupportedDependency { path },
+                    ));
                 }
                 if found
                     .replace(MessageRoute {
@@ -758,13 +790,17 @@ fn append_author_storage(
             return Ok(());
         }
         let [field] = info.field_infos.as_slice() else {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::comments::Refusal::UnsupportedDependency { path },
+            ));
         };
         if info.object_references != present
             || field.object_references != present
             || field.path.as_slice() != [1]
         {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(
+                crate::package::comments::Refusal::UnsupportedDependency { path },
+            ));
         }
         let mut after = present.clone();
         after.push(identifier);
@@ -889,7 +925,9 @@ fn append_comment_entry(
     .map_err(|error| super::map_table_codec_error(error, path))?
     .0;
     if snapshot.list_type() != COMMENT_LIST_TYPE {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(
+            crate::package::comments::Refusal::UnsupportedDependency { path },
+        ));
     }
     let key = snapshot.next_list_id().max(2);
     let mut reference = Vec::new();
@@ -1286,8 +1324,10 @@ fn map_tile_error(error: tile::TileError, path: Path) -> Error {
     match error {
         tile::TileError::NeedSparse { .. }
         | tile::TileError::UnsupportedSource { .. }
-        | tile::TileError::UnsupportedValue { .. } => Error::UnsupportedDependency { path },
-        tile::TileError::LimitExceeded { observed, maximum } => Error::LimitExceeded {
+        | tile::TileError::UnsupportedValue { .. } => {
+            Error::Refused(crate::package::comments::Refusal::UnsupportedDependency { path })
+        },
+        tile::TileError::LimitExceeded { observed, maximum } => Error::Limit {
             kind: super::LimitKind::WireWork,
             observed: usize::try_from(observed).unwrap_or(usize::MAX),
             maximum: usize::try_from(maximum).unwrap_or(usize::MAX),

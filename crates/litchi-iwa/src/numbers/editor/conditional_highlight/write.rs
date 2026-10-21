@@ -18,7 +18,7 @@ pub(super) struct RuleStyleIdentifiers {
 }
 
 pub(super) fn insert_conditional_style_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     style_set_id: u64,
     rules: &[Rule],
@@ -36,7 +36,7 @@ pub(super) fn insert_conditional_style_graph(
 }
 
 pub(super) fn replace_conditional_style_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     object_locations: &HashMap<u64, String>,
     style_set_id: u64,

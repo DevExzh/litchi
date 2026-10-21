@@ -6,7 +6,7 @@
 pub mod arrangement {
     pub use crate::ChartArrangement;
     pub use crate::package::families::chart_arrangement::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 
@@ -14,7 +14,7 @@ pub mod arrangement {
 /// [`crate::Package::edit_sheet_chart_data`].
 pub mod data {
     pub use crate::package::families::chart_data::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
 

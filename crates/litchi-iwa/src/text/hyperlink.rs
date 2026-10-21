@@ -8,7 +8,7 @@ use crate::package_metadata::{
     release_package_identifier_suffix, remove_component_external_references_to_object,
     remove_component_object_uuids, set_package_last_object_identifier,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::hyperlink_object::{
     new_hyperlink_object, patch_hyperlink_target, validate_hyperlink_object,
@@ -30,7 +30,7 @@ use litchi_iwa_text::position::{TextPosition, TextRange};
 
 /// Read every native hyperlink in a storage, ordered by text position.
 pub(crate) fn text_hyperlinks(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<TextHyperlink>> {
     let located = locate_storage_with_archive(package, storage_id, RangedObjectTable::SmartField)?;
@@ -41,7 +41,7 @@ pub(crate) fn text_hyperlinks(
 
 /// Create a hyperlink over a currently unoccupied smart-field range.
 pub(crate) fn add_text_hyperlink(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     range: TextRange,
     target: &TextHyperlinkTarget,
@@ -101,7 +101,7 @@ pub(crate) fn add_text_hyperlink(
 
 /// Atomically change a hyperlink's range and target without changing its ID.
 pub(crate) fn update_text_hyperlink(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextHyperlinkId,
     range: TextRange,
@@ -166,7 +166,7 @@ pub(crate) fn update_text_hyperlink(
 
 /// Delete one hyperlink and reclaim its owned smart-field object.
 pub(crate) fn remove_text_hyperlink(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     id: TextHyperlinkId,
 ) -> Result<TextHyperlink> {
@@ -239,7 +239,7 @@ pub(crate) fn remove_text_hyperlink(
 
 /// Reclaim hyperlink objects whose table references disappeared during text replacement.
 pub(crate) fn remove_unreferenced_hyperlink_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     candidates: &HashSet<u64>,
 ) -> Result<()> {
@@ -295,7 +295,7 @@ pub(crate) fn remove_unreferenced_hyperlink_objects(
 }
 
 fn hyperlink_by_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     id: TextHyperlinkId,
 ) -> Result<TextHyperlink> {
@@ -357,8 +357,8 @@ fn collect_hyperlinks(
     Ok(hyperlinks)
 }
 
-fn roundtrip(package: &IWorkPackage) -> Result<IWorkPackage> {
-    IWorkPackage::from_bytes(&package.to_bytes()?)
+fn roundtrip(package: &HostPackage) -> Result<HostPackage> {
+    HostPackage::from_bytes(&package.to_bytes()?)
 }
 
 #[cfg(test)]

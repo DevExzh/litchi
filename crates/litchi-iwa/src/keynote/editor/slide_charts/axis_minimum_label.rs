@@ -7,7 +7,7 @@ use crate::charts::axis_style::{
 };
 use litchi_iwa_common::chart::axis::style::Visibility;
 
-impl Editor {
+impl Draft {
     /// Read whether Keynote shows the minimum value label on a native slide chart.
     pub fn slide_chart_value_axis_minimum_label_visible(
         &self,
@@ -34,7 +34,7 @@ impl Editor {
 }
 
 fn slide_chart_value_axis_minimum_label_visible(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Visibility> {
@@ -48,7 +48,7 @@ fn slide_chart_value_axis_minimum_label_visible(
 }
 
 fn set_slide_chart_value_axis_minimum_label_visible(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     visible: Visibility,
@@ -62,7 +62,7 @@ fn set_slide_chart_value_axis_minimum_label_visible(
         "Keynote",
         visible,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_value_axis_minimum_label_visible(slide_index, drawable_object_id)?
         != visible
     {

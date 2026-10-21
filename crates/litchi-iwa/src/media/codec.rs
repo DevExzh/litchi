@@ -5,7 +5,7 @@ use std::hash::Hash;
 use std::io::Write;
 use std::path::{Component, Path};
 
-use crate::package::IWorkPackage;
+use crate::HostPackage;
 use crate::{Error, Result};
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into, encoded_len};
 use litchi_iwa_common::wire::{WireField, parse_wire_fields_with_limits};
@@ -145,7 +145,7 @@ pub(crate) fn insert_unique_asset(
 }
 
 pub(crate) fn write_package_entry<W: Write>(
-    package: &IWorkPackage,
+    package: &HostPackage,
     asset: &MediaAsset,
     limits: MediaLimits,
     sink: &mut W,
@@ -244,7 +244,7 @@ pub(crate) fn materialized_file_name(
     )
 }
 
-pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMediaAsset>> {
+pub(crate) fn embedded_assets(package: &HostPackage) -> Result<Vec<EmbeddedMediaAsset>> {
     let metadata = decode_package_metadata(package)?;
     let mut component_counts = HashMap::<u64, u64>::new();
     let mut component_record_counts = HashMap::<u64, usize>::new();
@@ -497,7 +497,7 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
 }
 
 pub(crate) fn reachable_embedded_assets(
-    package: &IWorkPackage,
+    package: &HostPackage,
     roots: impl IntoIterator<Item = u64>,
 ) -> Result<Vec<EmbeddedMediaAsset>> {
     let assets = embedded_assets(package)?;
@@ -1363,7 +1363,7 @@ fn metadata_utf8<'a>(data: &'a [u8], field: &WireField, name: &str) -> Result<&'
         .map_err(|_error| Error::InvalidFormat(format!("{name} is not valid UTF-8")))
 }
 
-fn decode_package_metadata(package: &IWorkPackage) -> Result<PackageMetadataSnapshot> {
+fn decode_package_metadata(package: &HostPackage) -> Result<PackageMetadataSnapshot> {
     let archive = package.archive(PACKAGE_METADATA_ENTRY)?;
     let mut payload = None;
     for object in &archive.objects {
@@ -1786,7 +1786,7 @@ mod tests {
         metadata
     }
 
-    fn package_with_media_reachability_graph() -> IWorkPackage {
+    fn package_with_media_reachability_graph() -> HostPackage {
         let mut metadata = Vec::new();
         append_wire_varint(&mut metadata, 1, 100);
         append_wire_bytes(&mut metadata, 4, &data_info(8));
@@ -1847,7 +1847,7 @@ mod tests {
         let document_archive = Archive {
             objects: vec![root, middle, reachable_leaf, unreachable_leaf],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(PACKAGE_METADATA_ENTRY, &metadata_archive)
             .expect("metadata archive");

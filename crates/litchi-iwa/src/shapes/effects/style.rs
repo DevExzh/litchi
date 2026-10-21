@@ -9,7 +9,7 @@ use crate::package_metadata::{
     next_object_identifier, set_package_last_object_identifier,
 };
 use crate::protobuf::tswp;
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::line_end::{
     ShapeStyleOverrides, ShapeStyleVariationLocation, collapse_style_variation,
@@ -25,7 +25,7 @@ use litchi_iwa_common::shape::effects::{Effects, Opacity, Reflection};
 const MAX_STYLE_INHERITANCE_DEPTH: usize = 64;
 
 pub(crate) fn shape_effects(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<Effects> {
@@ -39,7 +39,7 @@ pub(crate) fn shape_effects(
 }
 
 pub(crate) fn set_shape_effects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
     effects: Effects,
@@ -93,7 +93,7 @@ pub(crate) fn set_shape_effects(
 
 /// Remove direct opacity and reflection overrides and restore inheritance.
 pub(crate) fn reset_shape_effects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_id: u64,
 ) -> Result<bool> {
@@ -187,7 +187,7 @@ struct EffectVariationLocation<'a> {
 }
 
 fn insert_effect_variation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: EffectVariationLocation<'_>,
     overrides: ShapeStyleOverrides,
     expected: Effects,
@@ -239,7 +239,7 @@ fn insert_effect_variation(
 }
 
 fn validate_effects(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     drawable_id: u64,
     expected: Effects,
@@ -253,7 +253,7 @@ fn validate_effects(
 }
 
 fn stylesheet_id(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_archive_name: &str,
     style_id: u64,
     style: &tswp::ShapeStyleArchive,
@@ -289,7 +289,7 @@ fn parent_style_id(style_id: u64, style: &tswp::ShapeStyleArchive) -> Result<u64
         })
 }
 
-fn inherited_shape_effects(package: &IWorkPackage, first_style_id: u64) -> Result<Effects> {
+fn inherited_shape_effects(package: &HostPackage, first_style_id: u64) -> Result<Effects> {
     let mut visited = HashSet::new();
     let mut style_id = Some(first_style_id);
     let mut opacity = None;

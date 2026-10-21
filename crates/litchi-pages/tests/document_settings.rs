@@ -1359,7 +1359,9 @@ fn legacy_noop_is_exact_but_changed_edit_is_unsupported() -> TestResult {
             .edit_document_settings()?
             .set(changed_both(before)?)
             .commit(),
-        Err(SettingsError::UnsupportedSource)
+        Err(SettingsError::Refused(
+            litchi_pages::document_settings::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
     Ok(())
@@ -1464,7 +1466,7 @@ fn output_limit_is_typed_and_failure_is_atomic() -> TestResult {
     )?;
     assert!(matches!(
         package.edit_document_settings()?.set(after).commit(),
-        Err(SettingsError::LimitExceeded {
+        Err(SettingsError::Limit {
             kind: LimitKind::OutputBytes,
             ..
         })

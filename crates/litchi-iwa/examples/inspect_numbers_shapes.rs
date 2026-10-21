@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_numbers_shapes <input.numbers>")?;
-    let editor = numbers::Editor::open(input)?;
+    let editor = numbers::Draft::open(input)?;
     for sheet in editor.sheets()? {
         for (shape_index, shape) in editor.sheet_shapes(sheet.id())?.into_iter().enumerate() {
             let fill = editor.sheet_shape_fill(sheet.id(), shape.drawable_object_id)?;

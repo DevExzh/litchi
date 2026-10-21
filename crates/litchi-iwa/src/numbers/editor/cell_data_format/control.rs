@@ -24,7 +24,7 @@ pub(super) enum ControlCellSpecKind {
 }
 
 pub(super) fn acquire_spec(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &model::CellLocation,
     current_identifier: Option<u32>,
     kind: ControlCellSpecKind,
@@ -106,7 +106,7 @@ pub(super) fn acquire_spec(
 }
 
 pub(super) fn acquire_pop_up_menu_spec(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &model::CellLocation,
     current_identifier: Option<u32>,
     format: &PopUpMenu,
@@ -221,7 +221,7 @@ pub(super) fn acquire_pop_up_menu_spec(
 }
 
 pub(super) fn read_spec(
-    package: &IWorkPackage,
+    package: &HostPackage,
     location: &model::CellLocation,
     identifier: u32,
 ) -> Result<ControlCellSpecKind> {
@@ -297,7 +297,7 @@ pub(super) fn read_spec(
 }
 
 pub(super) fn release_spec(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     location: &model::CellLocation,
     identifier: u32,
 ) -> Result<()> {
@@ -345,7 +345,7 @@ pub(super) fn release_spec(
     Ok(())
 }
 
-fn ensure_control_table(package: &mut IWorkPackage, location: &model::CellLocation) -> Result<u64> {
+fn ensure_control_table(package: &mut HostPackage, location: &model::CellLocation) -> Result<u64> {
     if let Some(reference) = &location
         .descriptor
         .model

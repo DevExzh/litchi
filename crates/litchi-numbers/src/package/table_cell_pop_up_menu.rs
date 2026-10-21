@@ -129,30 +129,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// No rooted sheet matched the selector.
-    #[error("the Numbers workbook has no sheet matching the requested selector")]
-    SheetNotFound,
-    /// No table on the selected sheet matched the selector.
-    #[error("the selected Numbers sheet has no table matching the requested selector")]
-    TableNotFound,
-    /// The selected semantic cell was not present in the rooted table.
-    #[error("the selected Numbers table cell was not found")]
-    CellNotFound,
-    /// A changed operation targeted an effectively locked table.
-    #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked { path: Path },
-    /// A native dependency is not safe to rewrite in this owner.
-    #[error("the selected Numbers Pop-Up Menu has an unsupported dependency at {path:?}")]
-    UnsupportedDependency { path: Path },
-    /// The exact native Pop-Up Menu owner is not available for this source.
-    #[error("this Numbers source does not support exact Pop-Up Menu editing")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// Rooted ownership or wire framing is invalid.
     #[error("the Numbers Pop-Up Menu source is invalid at {path:?}")]
     InvalidSource { path: Path },
     /// A finite transaction resource ceiling was exceeded.
     #[error("Numbers Pop-Up Menu {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed or requested amount.
@@ -171,6 +157,54 @@ pub enum Error {
     /// A patch was created for another exact package artifact.
     #[error("the Pop-Up Menu patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// No rooted sheet matched the selector.
+    #[error("the Numbers workbook has no sheet matching the requested selector")]
+    SheetNotFound,
+    /// No table on the selected sheet matched the selector.
+    #[error("the selected Numbers sheet has no table matching the requested selector")]
+    TableNotFound,
+    /// The selected semantic cell was not present in the rooted table.
+    #[error("the selected Numbers table cell was not found")]
+    CellNotFound,
+    /// A changed operation targeted an effectively locked table.
+    #[error("the selected Numbers table is locked at {path:?}")]
+    TableLocked { path: Path },
+    /// A native dependency is not safe to rewrite in this owner.
+    #[error("the selected Numbers Pop-Up Menu has an unsupported dependency at {path:?}")]
+    UnsupportedDependency { path: Path },
+    /// The exact native Pop-Up Menu owner is not available for this source.
+    #[error("this Numbers source does not support exact Pop-Up Menu editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotFound { .. } | Self::TableNotFound { .. } | Self::CellNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+            Self::TableLocked { .. } => RefusalKind::Protected,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A selector-first Pop-Up Menu edit staged against one package snapshot.
@@ -368,6 +402,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -420,7 +460,7 @@ impl Package {
     /// Apply a reversible exact-source Pop-Up Menu patch.
     pub fn apply_table_cell_pop_up_menu_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
         let source = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
@@ -452,7 +492,7 @@ impl Package {
         let target_owner = patch.artifacts.target_owner();
         let mut budget = TransactionBudget::new(self);
         let source_catalog = super::table_headers::rewrite::physical_source(self)
-            .map_err(|_| Error::UnsupportedSource)?;
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
         budget.charge_package_source(source_catalog, patch.path)?;
         budget.charge_output(target_owner.as_ref().len(), patch.path)?;
         budget
@@ -675,7 +715,7 @@ impl TransactionBudget {
     ) -> Result<(), Error> {
         if amount > *remaining {
             let observed = maximum.saturating_sub(*remaining).saturating_add(amount);
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind,
                 observed: u64::try_from(observed).unwrap_or(u64::MAX),
                 maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
@@ -835,7 +875,7 @@ impl TransactionBudget {
             .max_wire_nesting
             .saturating_sub(self.remaining_wire_nesting);
         if depth > self.max_wire_nesting {
-            return Err(Error::LimitExceeded {
+            return Err(Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(depth),
                 maximum: u64::from(self.max_wire_nesting),
@@ -1145,7 +1185,7 @@ fn no_op_commit(
     after: Option<PopUpMenu>,
 ) -> Result<Commit, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     let owner = catalog.__source_owner();
     Ok(Commit {
         package: source.snapshot(),
@@ -1185,13 +1225,13 @@ fn rewrite_transaction(
         position,
     )?;
     if target.locked {
-        return Err(Error::TableLocked { path });
+        return Err(Error::Refused(Refusal::TableLocked { path }));
     }
     let mut budget = TransactionBudget::new(source);
     let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::UnsupportedSource)?;
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     budget.charge_package_source(catalog, path)?;
     let observed = read_popup_with_budget(source, target, &mut budget, false)?;
@@ -1217,7 +1257,7 @@ fn rewrite_transaction(
         path,
     )?;
     if metadata_facts.has_physical_alias() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     metadata_facts
         .require_single_current_component(core::slice::from_ref(&target.component_index))
@@ -1527,7 +1567,9 @@ fn rewrite_native_entry(
         .iter()
         .filter(|tile| tile.0 == tile_id)
         .map(|tile| tile.1);
-    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    let tile_identifier = tile_matches
+        .next()
+        .ok_or(Error::Refused(Refusal::CellNotFound))?;
     if tile_matches.next().is_some() {
         return Err(Error::InvalidSource { path });
     }
@@ -1551,7 +1593,7 @@ fn rewrite_native_entry(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
@@ -1676,7 +1718,7 @@ fn rewrite_native_entry(
                 // A model referenced by another package member cannot be
                 // safely removed or repointed by this same-component owner;
                 // reject before the native candidate is allocated.
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
             }
         }
     }
@@ -1727,7 +1769,7 @@ fn rewrite_native_entry(
     let added_model = match output.added_object_identifiers.as_slice() {
         [] => None,
         [identifier] => Some(*identifier),
-        _ => return Err(Error::UnsupportedDependency { path }),
+        _ => return Err(Error::Refused(Refusal::UnsupportedDependency { path })),
     };
     let added_model_component = added_model.map(|_| control_component_index);
     let mut removed_model_components = Vec::new();
@@ -1764,10 +1806,10 @@ fn rewrite_native_entry(
 fn map_native_error(error: popup_native::NativePopUpError, path: Path) -> Error {
     match error {
         popup_native::NativePopUpError::UnsupportedDependency => {
-            Error::UnsupportedDependency { path }
+            Error::Refused(Refusal::UnsupportedDependency { path })
         },
         popup_native::NativePopUpError::Allocation => Error::Allocation { amount: 1, path },
-        popup_native::NativePopUpError::Limit => Error::LimitExceeded {
+        popup_native::NativePopUpError::Limit => Error::Limit {
             kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
@@ -2124,7 +2166,7 @@ pub(super) fn rewrite_component_save_tokens(
         path,
     )?;
     if facts.has_physical_alias() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     let selectors = facts
         .selectors_for_components(component_indices)
@@ -2182,7 +2224,7 @@ fn pack_metadata_payload(
         .state
         .components
         .physical()
-        .ok_or(Error::UnsupportedSource)?;
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let entry = physical
         .package()
         .iter()
@@ -2231,7 +2273,7 @@ fn pack_metadata_payload(
     let compressed =
         SnappyStream::compress(&archive_bytes).map_err(|_| Error::InvalidSource { path })?;
     if archive_bytes.len() > archive_upper_bound || compressed.len() > maximum_compressed {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: u64::try_from(archive_bytes.len().max(compressed.len())).unwrap_or(u64::MAX),
             maximum: u64::try_from(archive_upper_bound.max(maximum_compressed)).unwrap_or(u64::MAX),
@@ -2243,8 +2285,10 @@ fn pack_metadata_payload(
 
 fn map_popup_metadata_error(error: popup_metadata::MetadataError, path: Path) -> Error {
     match error.kind {
-        popup_metadata::FailureKind::Unsupported => Error::UnsupportedDependency { path },
-        popup_metadata::FailureKind::Limit => Error::LimitExceeded {
+        popup_metadata::FailureKind::Unsupported => {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        },
+        popup_metadata::FailureKind::Limit => Error::Limit {
             kind: LimitKind::WireWork,
             observed: u64::try_from(error.observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(error.maximum).unwrap_or(u64::MAX),
@@ -2276,7 +2320,7 @@ pub(super) fn resolve_cell<'sheet, 'table>(
         .map_err(|_| Error::InvalidSource {
             path: Path::Package,
         })?
-        .ok_or(Error::SheetNotFound)?;
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let table_selector = table.into();
     let table_position = match table_selector {
         TableSelector::Position(index) => {
@@ -2301,7 +2345,7 @@ pub(super) fn resolve_cell<'sheet, 'table>(
             first
         },
     }
-    .ok_or(Error::TableNotFound)?;
+    .ok_or(Error::Refused(Refusal::TableNotFound))?;
     let native = super::table_headers::resolve::resolve_target(
         source,
         selected_sheet.index(),
@@ -2315,7 +2359,7 @@ pub(super) fn resolve_cell<'sheet, 'table>(
         },
     })?;
     if position.row() >= native.rows || position.column() >= native.columns {
-        return Err(Error::CellNotFound);
+        return Err(Error::Refused(Refusal::CellNotFound));
     }
     Ok(CellTarget {
         sheet_position: selected_sheet.index(),
@@ -2398,7 +2442,7 @@ fn read_non_popup_control<'source>(
         .iter()
         .find(|tile| tile.0 == tile_id)
         .map(|tile| tile.1)
-        .ok_or(Error::CellNotFound)?;
+        .ok_or(Error::Refused(Refusal::CellNotFound))?;
     let tile_component_index = resolved_component_index(source, tile_ref, path)?;
     validate_selected_model_reference(source, target, tile_ref, path)?;
     prove_cross_component_reference(
@@ -2421,7 +2465,7 @@ fn read_non_popup_control<'source>(
         .rows
         .iter()
         .find(|row| row.index == target.position.row())
-        .ok_or(Error::CellNotFound)?;
+        .ok_or(Error::Refused(Refusal::CellNotFound))?;
     let cell_bytes = row
         .cell(target.position.column())
         .ok_or(Error::InvalidSource { path })?;
@@ -2948,7 +2992,7 @@ fn read_popup_with_policy<'source>(
         .iter()
         .find(|tile| tile.0 == tile_id)
         .map(|tile| tile.1)
-        .ok_or(Error::CellNotFound)?;
+        .ok_or(Error::Refused(Refusal::CellNotFound))?;
     let tile_component_index = resolved_component_index(source, tile_ref, path)?;
     validate_selected_model_reference(source, target, tile_ref, path)?;
     prove_cross_component_reference(
@@ -2971,7 +3015,7 @@ fn read_popup_with_policy<'source>(
         .rows
         .iter()
         .find(|row| row.index == target.position.row())
-        .ok_or(Error::CellNotFound)?;
+        .ok_or(Error::Refused(Refusal::CellNotFound))?;
     let cell_buffer = row
         .cell(target.position.column())
         .ok_or(Error::InvalidSource { path })?;
@@ -3025,7 +3069,7 @@ fn read_popup_with_policy<'source>(
             continue;
         }
         if candidate_entries.segments != 0 || duplicate_list_keys(&candidate_entries.entries) {
-            return Err(Error::UnsupportedDependency { path });
+            return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
         }
         if format_entries.replace(candidate_entries).is_some() {
             return Err(Error::InvalidSource { path });
@@ -3073,7 +3117,7 @@ fn read_popup_with_policy<'source>(
         .map_err(|_| Error::InvalidSource { path })?;
         if list.list_type() == 12 {
             if candidate_entries.segments != 0 {
-                return Err(Error::UnsupportedDependency { path });
+                return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
             }
             let object = source
                 .state
@@ -3476,14 +3520,14 @@ pub(super) fn prove_cross_component_reference<'source>(
         );
         *authority = Some(
             popup_metadata::inspect_cross_component_read(source, options)
-                .map_err(|_| Error::UnsupportedDependency { path })?,
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?,
         );
     }
     let facts = authority
         .as_ref()
-        .ok_or(Error::UnsupportedDependency { path })?;
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
     if facts.has_physical_alias() {
-        return Err(Error::UnsupportedDependency { path });
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
     }
     facts
         .require_external_edge(
@@ -3492,7 +3536,7 @@ pub(super) fn prove_cross_component_reference<'source>(
             object_identifier,
             Some(false),
         )
-        .map_err(|_| Error::UnsupportedDependency { path })
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))
 }
 
 #[derive(Default)]

@@ -26,7 +26,7 @@ use crate::text::style_registry::{
     unregister_private_style,
 };
 use crate::wire::{rewrite_repeated_length_delimited_fields, transform_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::wire::{
     direct_paragraph_style_index, patch_direct_paragraph_style_index, patch_existing_font,
@@ -55,7 +55,7 @@ enum TypographyPropertyKind {
 
 /// Read the exact direct legend font-identity and face-trait state.
 pub(crate) fn chart_legend_font(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -71,7 +71,7 @@ pub(crate) fn chart_legend_font(
 
 /// Read the exact direct legend font-size state of one native chart.
 pub(crate) fn chart_legend_font_size(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -87,7 +87,7 @@ pub(crate) fn chart_legend_font_size(
 
 /// Set or remove the direct legend font-identity and face-trait override.
 pub(crate) fn set_chart_legend_font(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -147,7 +147,7 @@ pub(crate) fn set_chart_legend_font(
 
 /// Set or remove the direct legend font-size override of one native chart.
 pub(crate) fn set_chart_legend_font_size(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -217,7 +217,7 @@ struct LegendFontGraph {
 
 impl LegendFontGraph {
     fn locate(
-        package: &IWorkPackage,
+        package: &HostPackage,
         chart_archive_name: &str,
         drawable_object_id: u64,
         drawable_label: &str,
@@ -289,7 +289,7 @@ impl LegendFontGraph {
         })
     }
 
-    fn direct_overrides(&self, package: &IWorkPackage) -> Result<Option<ParagraphStyleOverrides>> {
+    fn direct_overrides(&self, package: &HostPackage) -> Result<Option<ParagraphStyleOverrides>> {
         let Some(index) = self.direct_index else {
             return Ok(None);
         };
@@ -304,7 +304,7 @@ impl LegendFontGraph {
             })
     }
 
-    fn read_font(&self, package: &IWorkPackage) -> Result<ChartLegendFont> {
+    fn read_font(&self, package: &HostPackage) -> Result<ChartLegendFont> {
         let Some(index) = self.direct_index else {
             return Ok(ChartLegendFont::Inherited);
         };
@@ -324,7 +324,7 @@ impl LegendFontGraph {
         ))
     }
 
-    fn read_size(&self, package: &IWorkPackage) -> Result<ChartLegendFontSize> {
+    fn read_size(&self, package: &HostPackage) -> Result<ChartLegendFontSize> {
         let Some(overrides) = self.direct_overrides(package)? else {
             return Ok(ChartLegendFontSize::Inherited);
         };
@@ -336,7 +336,7 @@ impl LegendFontGraph {
 
     fn set_property(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         property: TypographyProperty<'_>,
     ) -> Result<()> {
         if let Some(index) = self.direct_index {
@@ -397,7 +397,7 @@ impl LegendFontGraph {
 
     fn reset_property(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         kind: TypographyPropertyKind,
     ) -> Result<()> {
         let Some(index) = self.direct_index else {
@@ -470,7 +470,7 @@ impl LegendFontGraph {
 
     fn replace_shared_style(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         index: usize,
         previous_style_id: u64,
         overrides: ParagraphStyleOverrides,
@@ -511,7 +511,7 @@ impl LegendFontGraph {
         set_package_last_object_identifier(package, style_id)
     }
 
-    fn patch_legend_index(&self, package: &mut IWorkPackage, index: Option<u64>) -> Result<()> {
+    fn patch_legend_index(&self, package: &mut HostPackage, index: Option<u64>) -> Result<()> {
         self.legend_style.update(package, |data| {
             patch_direct_paragraph_style_index(data, index)
         })
@@ -519,7 +519,7 @@ impl LegendFontGraph {
 
     fn patch_chart_paragraph_styles(
         &self,
-        package: &mut IWorkPackage,
+        package: &mut HostPackage,
         next_ids: &[u64],
     ) -> Result<()> {
         let encoded = next_ids
@@ -593,7 +593,7 @@ impl LegendFontGraph {
 }
 
 fn apply_property(
-    package: &IWorkPackage,
+    package: &HostPackage,
     parent_style_id: u64,
     overrides: &mut ParagraphStyleOverrides,
     property: TypographyProperty<'_>,
@@ -630,7 +630,7 @@ fn clear_property(overrides: &mut ParagraphStyleOverrides, kind: TypographyPrope
 }
 
 fn patch_existing_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     overrides: &ParagraphStyleOverrides,
     property: TypographyProperty<'_>,
@@ -646,7 +646,7 @@ fn patch_existing_property(
 }
 
 fn patch_cleared_property(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     style_id: u64,
     overrides: &ParagraphStyleOverrides,
     kind: TypographyPropertyKind,
@@ -658,7 +658,7 @@ fn patch_cleared_property(
 }
 
 fn style_is_exclusive_to_chart(
-    package: &IWorkPackage,
+    package: &HostPackage,
     style_id: u64,
     chart_archive_name: &str,
     drawable_object_id: u64,

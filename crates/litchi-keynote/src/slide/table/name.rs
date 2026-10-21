@@ -118,6 +118,6 @@ fn validate(value: &str) -> Result<()> {
 /// Exact-source transaction types for a rooted Keynote slide-table name.
 pub mod transaction {
     pub use crate::package::slide_table_name::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

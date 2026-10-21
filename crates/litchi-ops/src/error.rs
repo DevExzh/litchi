@@ -1065,20 +1065,27 @@ impl Classify for litchi_core::edit::Refusal {
 
 impl Classify for litchi_core::edit::RefusalKind {
     fn classify(&self) -> Class {
-        use litchi_core::edit::RefusalKind;
+        Class::of(refusal_code(*self))
+    }
+}
 
-        Class::of(match self {
-            RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
-                Code::UnsupportedCapability
-            },
-            RefusalKind::UnsupportedTarget => Code::UnsupportedType,
-            RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
-            RefusalKind::InvalidValue => Code::InvalidValue,
-            RefusalKind::NotFound => Code::NotFound,
-            RefusalKind::Protected => Code::DocumentProtected,
-            // A kind added later is unsupported until it is classified.
-            _ => Code::UnsupportedCapability,
-        })
+/// The one code of each refusal kind (record 0351 §2.4), for callers that
+/// map a leaf error to a [`Code`] directly (the iWork leaf errors, record
+/// 0361).
+pub(crate) const fn refusal_code(kind: litchi_core::edit::RefusalKind) -> Code {
+    use litchi_core::edit::RefusalKind;
+
+    match kind {
+        RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
+            Code::UnsupportedCapability
+        },
+        RefusalKind::UnsupportedTarget => Code::UnsupportedType,
+        RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
+        RefusalKind::InvalidValue => Code::InvalidValue,
+        RefusalKind::NotFound => Code::NotFound,
+        RefusalKind::Protected => Code::DocumentProtected,
+        // A kind added later is unsupported until it is classified.
+        _ => Code::UnsupportedCapability,
     }
 }
 

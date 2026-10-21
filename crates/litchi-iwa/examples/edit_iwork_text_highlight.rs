@@ -2,7 +2,7 @@
 
 use std::env;
 
-use litchi_iwa::text::{IWorkTextEditor, TextRange, TextStorageId};
+use litchi_iwa::text::{TextRange, TextStorageId};
 use litchi_iwa_text::highlight::raw;
 
 const USAGE: &str = "usage:\n  edit_iwork_text_highlight list <input> <storage-id>\n  edit_iwork_text_highlight add <input> <output> <storage-id> <start> <end>\n  edit_iwork_text_highlight update <input> <output> <storage-id> <highlight-id> <start> <end>\n  edit_iwork_text_highlight remove <input> <output> <storage-id> <highlight-id>";
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let input = arguments.next().ok_or(USAGE)?;
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             require_end(arguments)?;
-            let editor = IWorkTextEditor::open(input)?;
+            let editor = litchi_iwa::text::Draft::open(input)?;
             for highlight in editor.text_highlights(storage_id)? {
                 println!(
                     "id={} range={}..{}",
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let range = parse_range(&mut arguments)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             let highlight = editor.add_text_highlight(storage_id, range)?;
             editor.save(output)?;
             println!("created highlight {}", raw::object_id(highlight.id));
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let highlight_id = raw::from_object_id(parse_u64(arguments.next(), "highlight-id")?)?;
             let range = parse_range(&mut arguments)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.update_text_highlight(storage_id, highlight_id, range)?;
             editor.save(output)?;
             println!("updated highlight {}", raw::object_id(highlight_id));
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let storage_id = parse_storage_id(arguments.next(), "storage-id")?;
             let highlight_id = raw::from_object_id(parse_u64(arguments.next(), "highlight-id")?)?;
             require_end(arguments)?;
-            let mut editor = IWorkTextEditor::open(input)?;
+            let mut editor = litchi_iwa::text::Draft::open(input)?;
             editor.remove_text_highlight(storage_id, highlight_id)?;
             editor.save(output)?;
             println!("removed highlight {}", raw::object_id(highlight_id));

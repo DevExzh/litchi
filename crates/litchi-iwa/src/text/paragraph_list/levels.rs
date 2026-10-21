@@ -8,7 +8,7 @@ use crate::wire::{
     patch_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::super::storage_wire::{
     LocatedStorage, StorageLocation, locate_storage as locate_native_storage,
@@ -29,7 +29,7 @@ fn level_from_native(value: u32) -> Result<ParagraphListLevel> {
 }
 
 pub(crate) fn paragraph_list_levels(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
 ) -> Result<Vec<ParagraphListLevelPlacement>> {
     let location = locate_storage(package, storage_id)?;
@@ -53,7 +53,7 @@ pub(crate) fn paragraph_list_levels(
 }
 
 pub(crate) fn paragraph_list_level(
-    package: &IWorkPackage,
+    package: &HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<ParagraphListLevel> {
@@ -80,7 +80,7 @@ pub(crate) fn paragraph_list_level(
 }
 
 pub(in crate::text) fn set_paragraph_list_level(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
     level: ParagraphListLevel,
@@ -101,7 +101,7 @@ pub(in crate::text) fn set_paragraph_list_level(
 }
 
 pub(in crate::text) fn reset_paragraph_list_level(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     storage_id: u64,
     paragraph: TextPosition,
 ) -> Result<bool> {
@@ -113,7 +113,7 @@ pub(in crate::text) fn reset_paragraph_list_level(
 }
 
 fn patch_level(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     located: LocatedStorage,
     storage_id: u64,
     paragraph: TextPosition,
@@ -262,7 +262,7 @@ fn patch_table(
     rewrite_repeated_length_delimited_fields(table, TABLE_ENTRIES_FIELD, &encoded)
 }
 
-fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLocation> {
+fn locate_storage(package: &HostPackage, storage_id: u64) -> Result<StorageLocation> {
     let location = locate_native_storage(
         package,
         storage_id,
@@ -277,7 +277,7 @@ fn locate_storage(package: &IWorkPackage, storage_id: u64) -> Result<StorageLoca
     Ok(location)
 }
 
-fn locate_storage_with_archive(package: &IWorkPackage, storage_id: u64) -> Result<LocatedStorage> {
+fn locate_storage_with_archive(package: &HostPackage, storage_id: u64) -> Result<LocatedStorage> {
     let located = locate_native_storage_with_archive(
         package,
         storage_id,
@@ -441,9 +441,9 @@ mod tests {
         );
     }
 
-    fn test_package(messages: Vec<RawMessage>) -> IWorkPackage {
+    fn test_package(messages: Vec<RawMessage>) -> HostPackage {
         let object = ArchiveObject::new(42, messages).unwrap();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive(
                 "Index/Document.iwa",

@@ -73,7 +73,7 @@ fn comment_storage(identifier: u64, text: &str, replies: Vec<u64>) -> ArchiveObj
     object
 }
 
-fn keynote_package(shared_comment: bool) -> IWorkPackage {
+fn keynote_package(shared_comment: bool) -> HostPackage {
     let document = kn::DocumentArchive {
         show: reference(2),
         ..Default::default()
@@ -88,7 +88,7 @@ fn keynote_package(shared_comment: bool) -> IWorkPackage {
             .object_references
             .push(20);
     }
-    let mut package = IWorkPackage::new();
+    let mut package = HostPackage::new();
     package
         .replace_archive(
             "Index/Document.iwa",
@@ -115,7 +115,7 @@ fn keynote_package(shared_comment: bool) -> IWorkPackage {
     package
 }
 
-fn keynote_package_with_empty_author_storage() -> IWorkPackage {
+fn keynote_package_with_empty_author_storage() -> HostPackage {
     let mut package = keynote_package(false);
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -180,7 +180,7 @@ fn keynote_package_with_empty_author_storage() -> IWorkPackage {
     package
 }
 
-fn package_metadata(package: &IWorkPackage) -> tsp::PackageMetadata {
+fn package_metadata(package: &HostPackage) -> tsp::PackageMetadata {
     let archive = package.archive("Index/Metadata.iwa").unwrap();
     let message = archive
         .objects
@@ -191,7 +191,7 @@ fn package_metadata(package: &IWorkPackage) -> tsp::PackageMetadata {
     tsp::PackageMetadata::decode(message.data.as_slice()).unwrap()
 }
 
-fn detached_keynote_comment_package(metadata: tsp::PackageMetadata) -> IWorkPackage {
+fn detached_keynote_comment_package(metadata: tsp::PackageMetadata) -> HostPackage {
     let mut package = keynote_package(false);
     package
         .update_archive("Index/Document.iwa", |archive| {
@@ -247,7 +247,7 @@ fn decode_test_varint(source: &[u8]) -> (usize, usize) {
     panic!("truncated test varint")
 }
 
-fn inject_unknown_archive_info(package: &mut IWorkPackage, member: &str, object_identifier: u64) {
+fn inject_unknown_archive_info(package: &mut HostPackage, member: &str, object_identifier: u64) {
     let compressed = package.entry(member).unwrap();
     let source = crate::snappy::SnappyStream::decompress(compressed)
         .unwrap()
@@ -305,7 +305,7 @@ fn placeholder_bytes_with_unknown_fields() -> Vec<u8> {
     placeholder
 }
 
-fn object_payload(package: &IWorkPackage, identifier: u64) -> Vec<u8> {
+fn object_payload(package: &HostPackage, identifier: u64) -> Vec<u8> {
     let locations = object_locations(package).unwrap();
     let archive = package.archive(&locations[&identifier]).unwrap();
     archive.object(identifier).unwrap().messages[0].data.clone()
@@ -321,8 +321,7 @@ fn drawable_and_storage_ids_reject_zero_and_support_typed_editor_calls() {
     assert_eq!(u64::from(drawable_id), 5);
 
     let mut editor =
-        IWorkDrawableCommentEditor::from_package(keynote_package_with_empty_author_storage())
-            .unwrap();
+        crate::comments::Draft::from_package(keynote_package_with_empty_author_storage()).unwrap();
     editor.set_comment(drawable_id, "Typed root").unwrap();
     let root = editor.comment(drawable_id).unwrap().unwrap();
     assert_eq!(root.drawable_id, drawable_id);
@@ -360,7 +359,7 @@ fn creates_updates_and_clears_direct_drawable_comments() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     assert_eq!(editor.application(), Application::Keynote);
     assert_eq!(editor.drawables().unwrap().len(), 2);
     assert!(editor.comment(drawable(5)).unwrap().is_none());
@@ -390,8 +389,7 @@ fn creates_updates_and_clears_direct_drawable_comments() {
 #[test]
 fn creates_reuses_and_cleans_native_author_graph() {
     let mut editor =
-        IWorkDrawableCommentEditor::from_package(keynote_package_with_empty_author_storage())
-            .unwrap();
+        crate::comments::Draft::from_package(keynote_package_with_empty_author_storage()).unwrap();
 
     editor.set_comment(drawable(5), "First").unwrap();
     let first = editor.comment(drawable(5)).unwrap().unwrap();
@@ -567,8 +565,7 @@ fn creates_reuses_and_cleans_native_author_graph() {
 #[test]
 fn duplicate_author_component_reference_fails_transactionally() {
     let mut editor =
-        IWorkDrawableCommentEditor::from_package(keynote_package_with_empty_author_storage())
-            .unwrap();
+        crate::comments::Draft::from_package(keynote_package_with_empty_author_storage()).unwrap();
     editor.set_comment(drawable(5), "First").unwrap();
     let mut package = editor.into_package();
     package
@@ -593,7 +590,7 @@ fn duplicate_author_component_reference_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_comment(drawable(6), "Rejected").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -745,7 +742,7 @@ fn malformed_present_metadata_rejects_comment_creation_atomically() {
         })
         .unwrap();
     let before = package.to_bytes().unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     assert!(editor.set_comment(drawable(5), "must fail").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
 }
@@ -853,8 +850,7 @@ fn comment_cull_failure_after_root_removal_is_atomic() {
 #[test]
 fn creates_updates_and_removes_replies_with_native_copy_on_write() {
     let mut editor =
-        IWorkDrawableCommentEditor::from_package(keynote_package_with_empty_author_storage())
-            .unwrap();
+        crate::comments::Draft::from_package(keynote_package_with_empty_author_storage()).unwrap();
     editor.set_comment(drawable(5), "Root").unwrap();
     let original_root = editor.comment(drawable(5)).unwrap().unwrap();
     assert_eq!(original_root.storage_id.get(), 102);
@@ -945,7 +941,7 @@ fn creates_updates_and_removes_replies_with_native_copy_on_write() {
 
 #[test]
 fn reply_mutations_isolate_shared_comment_threads() {
-    let mut editor = IWorkDrawableCommentEditor::from_package(keynote_package(true)).unwrap();
+    let mut editor = crate::comments::Draft::from_package(keynote_package(true)).unwrap();
     let added_reply = editor.add_reply(drawable(5), "Added").unwrap();
     assert_eq!(added_reply.get(), 32);
     assert_eq!(
@@ -1025,7 +1021,7 @@ fn malformed_reply_graph_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     assert!(editor.replies(drawable(5)).is_err());
     let before = editor.to_bytes().unwrap();
     assert!(editor.add_reply(drawable(5), "Rejected").is_err());
@@ -1054,7 +1050,7 @@ fn clearing_malformed_reply_graph_fails_transactionally() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.clear_comment(drawable(5)).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1086,7 +1082,7 @@ fn generated_author_is_not_confused_with_existing_native_author() {
             ))?)
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor.set_comment(drawable(5), "Generated author").unwrap();
     assert_eq!(
         editor
@@ -1124,7 +1120,7 @@ fn generated_author_is_not_confused_with_existing_native_author() {
 
 #[test]
 fn shared_comment_uses_copy_on_write_and_preserves_metadata() {
-    let mut editor = IWorkDrawableCommentEditor::from_package(keynote_package(true)).unwrap();
+    let mut editor = crate::comments::Draft::from_package(keynote_package(true)).unwrap();
     editor.set_comment(drawable(5), "Only first").unwrap();
     let first = editor.comment(drawable(5)).unwrap().unwrap();
     let second = editor.comment(drawable(6)).unwrap().unwrap();
@@ -1136,7 +1132,7 @@ fn shared_comment_uses_copy_on_write_and_preserves_metadata() {
     assert_eq!(first.comment.reply_ids.as_ref(), [storage(21)]);
     assert_ne!(first.comment.storage_uuid, second.comment.storage_uuid);
 
-    let reparsed = IWorkDrawableCommentEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reparsed = crate::comments::Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(reparsed.comment(drawable(5)).unwrap(), Some(first));
     assert_eq!(reparsed.comment(drawable(6)).unwrap(), Some(second));
 }
@@ -1162,7 +1158,7 @@ fn create_then_clear_restores_unknown_drawable_bytes_exactly() {
         })
         .unwrap();
     let before = package.to_bytes().unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
 
     editor.set_comment(drawable(5), "Temporary").unwrap();
     assert_ne!(object_payload(editor.package(), 5), original_payload);
@@ -1192,7 +1188,7 @@ fn storage_updates_and_copy_on_write_preserve_unknown_fields() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor.set_comment(drawable(5), "In place").unwrap();
     assert!(object_payload(editor.package(), 20).ends_with(&unknown));
 
@@ -1212,7 +1208,7 @@ fn storage_updates_and_copy_on_write_preserve_unknown_fields() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor.set_comment(drawable(5), "Copy").unwrap();
     let clone_id = editor.comment(drawable(5)).unwrap().unwrap().storage_id;
     assert_ne!(clone_id.get(), 20);
@@ -1245,7 +1241,7 @@ fn drawable_reference_updates_preserve_unknown_leaf_fields() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor
         .set_comment(drawable(5), "copy with extension")
         .unwrap();
@@ -1283,7 +1279,7 @@ fn annotation_author_storage_projection_preserves_unknown_fields() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor
         .set_comment(drawable(5), "author projection")
         .unwrap();
@@ -1328,7 +1324,7 @@ fn malformed_annotation_author_metadata_is_rejected_before_mutation() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_comment(drawable(5), "must fail").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1351,7 +1347,7 @@ fn malformed_annotation_author_reference_is_rejected_strictly() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_comment(drawable(5), "must fail").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1372,7 +1368,7 @@ fn wire_patcher_rejects_duplicate_and_truncated_fields() {
 
 #[test]
 fn clearing_last_user_removes_orphan_reply_graph_but_keeps_author() {
-    let mut editor = IWorkDrawableCommentEditor::from_package(keynote_package(true)).unwrap();
+    let mut editor = crate::comments::Draft::from_package(keynote_package(true)).unwrap();
     editor.clear_comment(drawable(5)).unwrap();
     assert!(
         object_locations(editor.package())
@@ -1402,7 +1398,7 @@ fn malformed_storage_fails_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.set_comment(drawable(5), "No").is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
@@ -1412,7 +1408,7 @@ fn malformed_storage_fails_transactionally() {
 
 #[test]
 fn malformed_drawable_comment_reference_fails_transactionally() {
-    let mut editor = IWorkDrawableCommentEditor::from_package(keynote_package(false)).unwrap();
+    let mut editor = crate::comments::Draft::from_package(keynote_package(false)).unwrap();
     editor
         .package
         .update_archive("Index/Document.iwa", |archive| {
@@ -1452,7 +1448,7 @@ fn duplicate_comment_storage_scalar_fails_transactionally() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     let before = editor.to_bytes().unwrap();
     assert!(editor.comment(drawable(5)).is_err());
     assert!(editor.set_comment(drawable(5), "Rejected").is_err());
@@ -1503,7 +1499,7 @@ fn comment_storage_updates_preserve_nested_author_reply_and_unknown_bytes() {
         })
         .unwrap();
 
-    let mut editor = IWorkDrawableCommentEditor::from_package(package).unwrap();
+    let mut editor = crate::comments::Draft::from_package(package).unwrap();
     editor.set_comment(drawable(5), "Updated").unwrap();
     let root = editor.comment(drawable(5)).unwrap().unwrap();
     let root_bytes = object_payload(editor.package(), root.storage_id.get());

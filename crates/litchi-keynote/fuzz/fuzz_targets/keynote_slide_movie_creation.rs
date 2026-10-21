@@ -87,14 +87,18 @@ fn exercise_package(package: &Package, data: &[u8], source_movie: &[u8], source_
     let movie_filename = requested_movie_filename(data);
     let poster_filename = requested_poster_filename(data);
     let options = requested_options(data);
-    let commit = match package.add_slide_movie(
-        requested_slide(data),
-        &movie_filename,
-        &movie,
-        &poster_filename,
-        &poster,
-        options,
-    ) {
+    let commit = match package
+        .edit_slide_movie_creation()
+        .add(
+            requested_slide(data),
+            &movie_filename,
+            &movie,
+            &poster_filename,
+            &poster,
+            options,
+        )
+        .and_then(|edit| edit.commit())
+    {
         Ok(commit) => commit,
         Err(error) => {
             observe_error(error);
@@ -163,7 +167,8 @@ fn verify_seed_success_contract(package: &Package) {
     let (movie, poster) = native_assets_without_cache(package);
     let options = seed_options();
     let commit = package
-        .add_slide_movie(
+        .edit_slide_movie_creation()
+        .add(
             SlideSelector::index(0),
             "fuzz-seed.mov",
             &movie,
@@ -171,6 +176,7 @@ fn verify_seed_success_contract(package: &Package) {
             &poster,
             options,
         )
+        .and_then(|edit| edit.commit())
         .unwrap_or_else(|error| panic!("native movie seed must commit: {error}"));
     assert!(!commit.patch().is_noop());
     assert_eq!(commit.patch().options(), options);
@@ -266,7 +272,8 @@ fn exercise_limit_budget(movie: &[u8], poster: &[u8]) {
     let source_bytes = package_bytes(&package);
     assert!(
         package
-            .add_slide_movie(
+            .edit_slide_movie_creation()
+            .add(
                 SlideSelector::index(0),
                 "limit.mov",
                 movie,
@@ -274,6 +281,7 @@ fn exercise_limit_budget(movie: &[u8], poster: &[u8]) {
                 poster,
                 seed_options(),
             )
+            .and_then(|edit| edit.commit())
             .is_err(),
         "the tight reference budget must reject movie creation"
     );

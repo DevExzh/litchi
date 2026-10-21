@@ -69,7 +69,10 @@ fn corpus_body_tables_take_values_or_refuse_typed() -> TestResult {
                 ));
                 written += 1;
             },
-            Err(error @ (Error::Formulas | Error::UnsupportedStorage)) => {
+            Err(
+                error @ (Error::Refused(litchi_pages::table::values::Refusal::Formulas)
+                | Error::Refused(litchi_pages::table::values::Refusal::UnsupportedStorage)),
+            ) => {
                 refused.push((path, error));
             },
             Err(error) => panic!("{}: {error:?}", path.display()),
@@ -88,21 +91,29 @@ fn refusals_are_typed() -> TestResult {
     let mut edit = package.edit_body_table_values(BodyTableSelector::index(0))?;
     assert!(matches!(
         edit.set(1_000, 0, Value::Empty),
-        Err(Error::InvalidCell)
+        Err(Error::Refused(
+            litchi_pages::table::values::Refusal::InvalidCell
+        ))
     ));
     assert!(matches!(
         edit.set(0, 0, Value::Number(f64::NAN)),
-        Err(Error::InvalidCell)
+        Err(Error::Refused(
+            litchi_pages::table::values::Refusal::InvalidCell
+        ))
     ));
     assert!(matches!(
         package.edit_body_table_values(BodyTableSelector::index(40)),
-        Err(Error::TableNotFound)
+        Err(Error::Refused(
+            litchi_pages::table::values::Refusal::TableNotFound
+        ))
     ));
     assert!(matches!(
         package
             .edit_body_table_values(BodyTableSelector::index(0))?
             .commit(),
-        Err(Error::NoStagedOperation)
+        Err(Error::Refused(
+            litchi_pages::table::values::Refusal::NoStagedOperation
+        ))
     ));
     Ok(())
 }

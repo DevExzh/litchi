@@ -24,7 +24,7 @@ mod cases {
     use prost::Message as _;
 
     use super::super::*;
-    use crate::keynote::{self, BuildSettings, Editor};
+    use crate::keynote::{self, BuildSettings, Draft};
     use crate::shapes::DrawablePoint;
 
     const AUDIO: &[u8] = b"FORM\0\0\0\x10AIFCsource-built-audio";
@@ -236,10 +236,7 @@ mod cases {
             .collect())
     }
 
-    fn native_audio_graph(
-        editor: &Editor,
-        drawable_object_id: u64,
-    ) -> TestResult<NativeAudioGraph> {
+    fn native_audio_graph(editor: &Draft, drawable_object_id: u64) -> TestResult<NativeAudioGraph> {
         let slides = editor.slides()?;
         let slide = slides
             .first()
@@ -279,17 +276,17 @@ mod cases {
         })
     }
 
-    fn focused_audio_package(editor: &Editor) -> TestResult<Package> {
+    fn focused_audio_package(editor: &Draft) -> TestResult<Package> {
         Ok(Package::from_bytes(&editor.to_bytes()?)?)
     }
 
-    fn replace_with_focused_package(editor: &mut Editor, package: &Package) -> TestResult {
+    fn replace_with_focused_package(editor: &mut Draft, package: &Package) -> TestResult {
         let bytes = package_bytes(package)?;
-        *editor = Editor::from_bytes(&bytes)?;
+        *editor = Draft::from_bytes(&bytes)?;
         Ok(())
     }
 
-    fn audio_snapshot(editor: &Editor, movie_position: usize) -> TestResult<AudioSnapshot> {
+    fn audio_snapshot(editor: &Draft, movie_position: usize) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
         let slide = package
             .show()?
@@ -337,7 +334,7 @@ mod cases {
         })
     }
 
-    fn audio_positions(editor: &Editor) -> TestResult<Vec<usize>> {
+    fn audio_positions(editor: &Draft) -> TestResult<Vec<usize>> {
         let package = focused_audio_package(editor)?;
         Ok(package
             .show()?
@@ -351,14 +348,14 @@ mod cases {
             .collect())
     }
 
-    fn audio_snapshots(editor: &Editor) -> TestResult<Vec<AudioSnapshot>> {
+    fn audio_snapshots(editor: &Draft) -> TestResult<Vec<AudioSnapshot>> {
         audio_positions(editor)?
             .into_iter()
             .map(|position| audio_snapshot(editor, position))
             .collect()
     }
 
-    fn audio_data_ids(editor: &Editor) -> TestResult<Vec<u64>> {
+    fn audio_data_ids(editor: &Draft) -> TestResult<Vec<u64>> {
         if audio_positions(editor)?.is_empty() {
             return Ok(Vec::new());
         }
@@ -378,14 +375,16 @@ mod cases {
     }
 
     fn add_audio(
-        editor: &mut Editor,
+        editor: &mut Draft,
         preferred_filename: &str,
         data: &[u8],
         options: SlideAudioOptions,
     ) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
-        let commit =
-            package.add_slide_audio(SlideSelector::index(0), preferred_filename, data, options)?;
+        let commit = package
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), preferred_filename, data, options)
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let position = audio_positions(editor)?
             .last()
@@ -395,7 +394,7 @@ mod cases {
     }
 
     fn set_audio_properties(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie_position: usize,
         properties: MediaProperties,
     ) -> TestResult {
@@ -411,7 +410,7 @@ mod cases {
     }
 
     fn set_audio_playback(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie_position: usize,
         playback: MediaPlaybackSettings,
     ) -> TestResult {
@@ -427,7 +426,7 @@ mod cases {
     }
 
     fn set_audio_position(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie_position: usize,
         position: DrawablePoint,
     ) -> TestResult {
@@ -445,7 +444,7 @@ mod cases {
         replace_with_focused_package(editor, commit.package())
     }
 
-    fn replace_audio_data(editor: &mut Editor, movie_position: usize, data: &[u8]) -> TestResult {
+    fn replace_audio_data(editor: &mut Draft, movie_position: usize, data: &[u8]) -> TestResult {
         let package = focused_audio_package(editor)?;
         let commit = package
             .edit_slide_media_data(
@@ -458,12 +457,15 @@ mod cases {
         replace_with_focused_package(editor, commit.package())
     }
 
-    fn duplicate_audio(editor: &mut Editor, movie_position: usize) -> TestResult<AudioSnapshot> {
+    fn duplicate_audio(editor: &mut Draft, movie_position: usize) -> TestResult<AudioSnapshot> {
         let package = focused_audio_package(editor)?;
-        let commit = package.duplicate_slide_audio(
-            SlideSelector::index(0),
-            MovieSelector::index(movie_position),
-        )?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .duplicate_audio(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+            )
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let position = audio_positions(editor)?
             .last()
@@ -473,7 +475,7 @@ mod cases {
     }
 
     fn remove_audio(
-        editor: &mut Editor,
+        editor: &mut Draft,
         movie_position: usize,
     ) -> TestResult<(Vec<u64>, Vec<Vec<u8>>)> {
         let before_data_ids = audio_data_ids(editor)?;
@@ -482,10 +484,13 @@ mod cases {
             .map(|audio| audio.content)
             .collect::<Vec<_>>();
         let package = focused_audio_package(editor)?;
-        let commit = package.remove_slide_audio(
-            SlideSelector::index(0),
-            MovieSelector::index(movie_position),
-        )?;
+        let commit = package
+            .edit_slide_media_lifecycle()
+            .remove_audio(
+                SlideSelector::index(0),
+                MovieSelector::index(movie_position),
+            )
+            .and_then(|edit| edit.commit())?;
         replace_with_focused_package(editor, commit.package())?;
         let after = audio_snapshots(editor)?
             .into_iter()
@@ -505,7 +510,7 @@ mod cases {
         ))
     }
 
-    fn audio_count(editor: &Editor) -> TestResult<usize> {
+    fn audio_count(editor: &Draft) -> TestResult<usize> {
         Ok(focused_audio_package(editor)?
             .show()?
             .slides()
@@ -528,7 +533,7 @@ mod cases {
         )?;
         let baseline = audio_snapshot(&seed, 0)?;
         assert_eq!(created, baseline);
-        let mut editor = Editor::from_bytes(&seed.to_bytes()?)?;
+        let mut editor = Draft::from_bytes(&seed.to_bytes()?)?;
         let focused_before = focused_audio_package(&editor)?
             .slide_media_properties(SlideSelector::index(0), MovieSelector::index(0))?;
         assert_eq!(baseline.properties, focused_before);
@@ -596,7 +601,7 @@ mod cases {
         assert_eq!(builds[0].settings, BuildSettings::audio_start());
         assert_eq!(builds[0].chunks.len(), 1);
 
-        let roundtripped = Editor::from_bytes(&editor.to_bytes()?)?;
+        let roundtripped = Draft::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(audio_snapshot(&roundtripped, 0)?, created);
 
         let changed_playback = MediaPlaybackSettings {
@@ -658,7 +663,7 @@ mod cases {
         );
         assert!(audio_data_ids(&editor)?.is_empty());
         assert_eq!(native_asset_count(&editor.to_bytes()?)?, 0);
-        Editor::from_bytes(&editor.to_bytes()?)?;
+        Draft::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
@@ -737,7 +742,7 @@ mod cases {
             source.native.data_identifier
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes()?)?;
+        let reopened = Draft::from_bytes(&editor.to_bytes()?)?;
         assert_eq!(audio_count(&reopened)?, 2);
         assert_eq!(
             audio_snapshot(&reopened, 0)?.native.data_identifier,
@@ -780,7 +785,7 @@ mod cases {
         );
         assert!(audio_data_ids(&editor)?.is_empty());
         assert_eq!(native_asset_count(&editor.to_bytes()?)?, 0);
-        Editor::from_bytes(&editor.to_bytes()?)?;
+        Draft::from_bytes(&editor.to_bytes()?)?;
         Ok(())
     }
 
@@ -790,23 +795,31 @@ mod cases {
         let baseline = editor.to_bytes()?;
         assert!(
             focused_audio_package(&editor)?
-                .duplicate_slide_audio(SlideSelector::index(0), MovieSelector::index(0))
+                .edit_slide_media_lifecycle()
+                .duplicate_audio(SlideSelector::index(0), MovieSelector::index(0))
+                .and_then(|edit| edit.commit())
                 .is_err()
         );
         assert_eq!(editor.to_bytes()?, baseline);
         for result in [
-            focused_audio_package(&editor)?.add_slide_audio(
-                SlideSelector::index(0),
-                "payload.bin",
-                b"not audio",
-                SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
-            ),
-            focused_audio_package(&editor)?.add_slide_audio(
-                SlideSelector::index(1),
-                "audio.aiff",
-                AUDIO,
-                SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
-            ),
+            focused_audio_package(&editor)?
+                .edit_slide_audio_creation()
+                .add(
+                    SlideSelector::index(0),
+                    "payload.bin",
+                    b"not audio",
+                    SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
+                )
+                .and_then(|edit| edit.commit()),
+            focused_audio_package(&editor)?
+                .edit_slide_audio_creation()
+                .add(
+                    SlideSelector::index(1),
+                    "audio.aiff",
+                    AUDIO,
+                    SlideAudioOptions::new(POSITION, Duration::from_secs(1))?,
+                )
+                .and_then(|edit| edit.commit()),
         ] {
             assert!(result.is_err());
             assert_eq!(editor.to_bytes()?, baseline);

@@ -70,31 +70,16 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
-    /// The section selector resolved no section.
-    #[error("section selector did not resolve")]
-    SectionNotFound,
-    /// The span is empty or past the section's text.
-    #[error("text span outside the section")]
-    InvalidSpan,
-    /// The style sets no property.
-    #[error("the style sets no property")]
-    EmptyStyle,
-    /// Commit was requested before staging a span.
-    #[error("no text style is staged")]
-    NoStagedOperation,
-    /// The body storage has no stylesheet, or its styles live in another
-    /// component than the stylesheet.
-    #[error("the body's styles are outside what this transaction rewrites")]
-    UnsupportedDependency,
-    /// The source cannot publish an exact changed artifact.
-    #[error("source representation does not support text styling")]
-    UnsupportedSource,
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The rooted source is malformed or ambiguous.
     #[error("rooted text-style source is invalid")]
     InvalidSource,
     /// A finite transaction limit was exceeded.
     #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed amount.
@@ -116,6 +101,54 @@ pub enum Error {
     PatchConflict,
 }
 
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The section selector resolved no section.
+    #[error("section selector did not resolve")]
+    SectionNotFound,
+    /// The span is empty or past the section's text.
+    #[error("text span outside the section")]
+    InvalidSpan,
+    /// The style sets no property.
+    #[error("the style sets no property")]
+    EmptyStyle,
+    /// Commit was requested before staging a span.
+    #[error("no text style is staged")]
+    NoStagedOperation,
+    /// The body storage has no stylesheet, or its styles live in another
+    /// component than the stylesheet.
+    #[error("the body's styles are outside what this transaction rewrites")]
+    UnsupportedDependency,
+    /// The source cannot publish an exact changed artifact.
+    #[error("source representation does not support text styling")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SectionNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidSpan { .. } | Self::EmptyStyle { .. } => RefusalKind::InvalidValue,
+            Self::NoStagedOperation { .. } => RefusalKind::UnsupportedOperation,
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
 impl From<litchi_iwa_core::Error> for Error {
     fn from(error: litchi_iwa_core::Error) -> Self {
         match error {
@@ -130,7 +163,7 @@ impl From<litchi_iwa_core::Error> for Error {
 impl From<litchi_iwa_text_wire::CharStyleError> for Error {
     fn from(error: litchi_iwa_text_wire::CharStyleError) -> Self {
         match error {
-            litchi_iwa_text_wire::CharStyleError::Span => Self::InvalidSpan,
+            litchi_iwa_text_wire::CharStyleError::Span => Self::Refused(Refusal::InvalidSpan),
             _ => Self::InvalidSource,
         }
     }
@@ -141,7 +174,7 @@ fn map_archive(error: &litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Allocation { amount, .. } => {
             Error::Allocation { amount: *amount }
         },
-        _ => Error::UnsupportedSource,
+        _ => Error::Refused(Refusal::UnsupportedSource),
     }
 }
 
@@ -150,7 +183,7 @@ fn map_rewrite(error: &RewriteError) -> Error {
         return Error::Allocation { amount };
     }
     if error.resource_limit().is_some() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::RegistryBytes,
             observed: 0,
             maximum: 0,
@@ -292,15 +325,15 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidSpan`] for an empty span or one past the section;
-    /// [`Error::EmptyStyle`] for a style that sets nothing.
+    /// [`Refusal::InvalidSpan`] for an empty span or one past the section;
+    /// [`Refusal::EmptyStyle`] for a style that sets nothing.
     pub fn set(&mut self, span: TextSpan, style: CharacterProperties) -> Result<&mut Self, Error> {
         if style.is_empty() {
-            return Err(Error::EmptyStyle);
+            return Err(Error::Refused(Refusal::EmptyStyle));
         }
         let range = section_range(self.source, self.section)?;
         if span.is_empty() || span.end().utf16_index() as usize > range.len() {
-            return Err(Error::InvalidSpan);
+            return Err(Error::Refused(Refusal::InvalidSpan));
         }
         self.spans
             .try_reserve(1)
@@ -313,13 +346,13 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit;
-    /// [`Error::UnsupportedDependency`] for a body whose styles this
+    /// [`Refusal::NoStagedOperation`] for an empty edit;
+    /// [`Refusal::UnsupportedDependency`] for a body whose styles this
     /// transaction does not rewrite; source, resource and verification
     /// errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
         if self.spans.is_empty() {
-            return Err(Error::NoStagedOperation);
+            return Err(Error::Refused(Refusal::NoStagedOperation));
         }
         let range = section_range(self.source, self.section)?;
         let mut absolute = Vec::new();
@@ -387,7 +420,9 @@ fn overrides_hold(run: &CharacterProperties, requested: &CharacterProperties) ->
 fn section_range(package: &Package, section: Position) -> Result<std::ops::Range<usize>, Error> {
     let body = native_body(package).map_err(|_error| Error::InvalidSource)?;
     native_section_range(package, &body, section).map_err(|error| match error {
-        super::section_text::Error::PositionNotFound { .. } => Error::SectionNotFound,
+        super::section_text::Error::Refused(crate::section::text::Refusal::PositionNotFound {
+            ..
+        }) => Error::Refused(Refusal::SectionNotFound),
         _ => Error::InvalidSource,
     })
 }
@@ -578,7 +613,7 @@ pub(super) fn parse_member(package: &Package, name: &str) -> Result<Archive, Err
         .find(|entry| entry.name() == name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let limits = catalog.limits();
     let snappy = limits
@@ -599,7 +634,7 @@ pub(super) fn component_name_of(package: &Package, identifier: u64) -> Result<St
         if component.archive().object(identifier).is_some()
             && found.replace(component.name().to_owned()).is_some()
         {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
     }
     found.ok_or(Error::InvalidSource)
@@ -629,7 +664,8 @@ fn publish(
         .ok_or(Error::InvalidSource)?
         .object_references
         .clone();
-    let stylesheet = reference_field(&payload, 2)?.ok_or(Error::UnsupportedDependency)?;
+    let stylesheet =
+        reference_field(&payload, 2)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let storage_member = component_name_of(source, storage)?;
     let sheet_member = component_name_of(source, stylesheet)?;
     let text_len = native_body(source)
@@ -672,7 +708,7 @@ fn publish(
     )
     .map_err(|error| map_rewrite(&error))?;
     if registry.unknown {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let current_last = inspection.last_object_identifier();
     let mut maximum = current_last;
@@ -681,7 +717,7 @@ fn publish(
             maximum = maximum.max(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
         }
     }
-    let mut next = maximum.checked_add(1).ok_or(Error::LimitExceeded {
+    let mut next = maximum.checked_add(1).ok_or(Error::Limit {
         kind: LimitKind::Identifiers,
         observed: u64::MAX,
         maximum: u64::MAX,
@@ -694,7 +730,7 @@ fn publish(
                 return Err(Error::InvalidSource);
             }
         }
-        found.ok_or(Error::UnsupportedSource)
+        found.ok_or(Error::Refused(Refusal::UnsupportedSource))
     };
     let storage_component = component_id(&storage_member)?;
     let sheet_component = component_id(&sheet_member)?;
@@ -729,10 +765,10 @@ fn publish(
                 && component_name_of_staged(source, &sheet_archive, &sheet_member, parent)?
                     != sheet_member
             {
-                return Err(Error::UnsupportedDependency);
+                return Err(Error::Refused(Refusal::UnsupportedDependency));
             }
             let identifier = next;
-            next = next.checked_add(1).ok_or(Error::LimitExceeded {
+            next = next.checked_add(1).ok_or(Error::Limit {
                 kind: LimitKind::Identifiers,
                 observed: u64::MAX,
                 maximum: u64::MAX,
@@ -948,7 +984,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::SectionNotFound`]; source errors.
+    /// [`Refusal::SectionNotFound`]; source errors.
     pub fn section_text_runs<'selector>(
         &self,
         section: impl Into<SectionSelector<'selector>>,
@@ -979,7 +1015,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// [`Error::SectionNotFound`].
+    /// [`Refusal::SectionNotFound`].
     pub fn edit_section_text_style<'selector>(
         &self,
         section: impl Into<SectionSelector<'selector>>,
@@ -1021,7 +1057,7 @@ fn resolve(package: &Package, selector: SectionSelector<'_>) -> Result<Position,
     let selected = package
         .document_ref()
         .select_section(selector)
-        .map_err(|_error| Error::SectionNotFound)?
-        .ok_or(Error::SectionNotFound)?;
+        .map_err(|_error| Error::Refused(Refusal::SectionNotFound))?
+        .ok_or(Error::Refused(Refusal::SectionNotFound))?;
     Ok(Position::new(selected.index()))
 }

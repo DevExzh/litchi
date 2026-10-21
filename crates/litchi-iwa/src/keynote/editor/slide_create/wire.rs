@@ -49,7 +49,7 @@ const IWORK_MESSAGE_VERSIONS: &[u32] = &[1, 0, 5];
 const STORAGELESS_PLACEHOLDER_STORAGE_ID: u64 = 0;
 
 pub(super) fn insert_slide_node(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     show_id: u64,
     index: usize,

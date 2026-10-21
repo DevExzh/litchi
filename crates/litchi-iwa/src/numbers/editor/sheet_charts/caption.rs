@@ -16,7 +16,7 @@ enum ChartCaptionGraphLayout {
     Componentized,
 }
 
-impl Editor {
+impl Draft {
     /// Read the native caption attached to one sheet chart.
     pub fn sheet_chart_caption(
         &self,
@@ -51,14 +51,14 @@ impl Editor {
 }
 
 fn sheet_chart_caption(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Option<String>> {
     let slot = sheet_chart_caption_slot(editor, sheet_id, drawable_object_id)?;
     slot.storage_id
         .map(|storage_id| {
-            IWorkTextEditor::from_package(editor.package.clone())
+            crate::text::Draft::from_package(editor.package.clone())
                 .storage(crate::text::native_storage_id(storage_id)?)
                 .map(|storage| storage.storage.into_text())
         })
@@ -66,7 +66,7 @@ fn sheet_chart_caption(
 }
 
 pub(super) fn sheet_chart_caption_slot(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<DrawableCaptionSlot> {
@@ -97,7 +97,7 @@ pub(super) fn sheet_chart_caption_slot(
 }
 
 fn set_sheet_chart_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     text: &str,
@@ -106,7 +106,7 @@ fn set_sheet_chart_caption(
     let slot = sheet_chart_caption_slot(editor, sheet_id, drawable_object_id)?;
     let expected = Some(text.to_owned());
     let staged = if let Some(storage_id) = slot.storage_id {
-        let mut text_editor = IWorkTextEditor::from_package(editor.package.clone());
+        let mut text_editor = crate::text::Draft::from_package(editor.package.clone());
         text_editor.set_text(crate::text::native_storage_id(storage_id)?, text)?;
         text_editor.into_package()
     } else {
@@ -147,7 +147,7 @@ fn set_sheet_chart_caption(
         set_package_last_object_identifier(&mut staged, ids.last())?;
         staged
     };
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_caption(sheet_id, drawable_object_id)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers chart caption update failed validation".to_owned(),
@@ -158,7 +158,7 @@ fn set_sheet_chart_caption(
 }
 
 fn remove_sheet_chart_caption(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<bool> {
@@ -178,7 +178,7 @@ fn remove_sheet_chart_caption(
     )?;
     add_component_object_uuids(&mut staged, source.component_id, &[standin_id])?;
     set_package_last_object_identifier(&mut staged, standin_id)?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified
         .sheet_chart_caption(sheet_id, drawable_object_id)?
         .is_some()
@@ -191,7 +191,7 @@ fn remove_sheet_chart_caption(
     Ok(true)
 }
 
-fn sheet_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Option<String>)> {
+fn sheet_chart_caption_theme(editor: &Draft) -> Result<(CaptionThemeStyle, Option<String>)> {
     let document = numbers_document(&editor.package)?;
     let theme_id = document.theme.identifier;
     let stylesheet_id = document.stylesheet.identifier;
@@ -244,7 +244,7 @@ fn sheet_chart_caption_theme(editor: &Editor) -> Result<(CaptionThemeStyle, Opti
 }
 
 fn insert_sheet_chart_caption(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,
@@ -309,7 +309,7 @@ fn insert_sheet_chart_caption(
 }
 
 fn chart_caption_graph_layout(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
 ) -> Result<ChartCaptionGraphLayout> {
     let componentized = package
@@ -330,7 +330,7 @@ fn chart_caption_graph_layout(
 }
 
 fn insert_sheet_chart_caption_standin(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     drawable_object_id: u64,
     old_reference_id: u64,

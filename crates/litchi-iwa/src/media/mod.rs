@@ -10,7 +10,7 @@ mod package;
 mod tests;
 
 pub use model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, MediaStats, MediaType};
-pub use package::{IWorkMediaEditor, MediaManager};
+pub use package::{Draft, MediaManager, OpenOptions};
 
 pub(crate) use codec::{embedded_assets, reachable_embedded_assets};
 

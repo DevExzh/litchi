@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let initial = HiddenAxes::new([AxisIndex::row(2), AxisIndex::column(1)])?;
 
-    let mut editor = numbers::Editor::open(source)?;
+    let mut editor = numbers::Draft::open(source)?;
     let table = TableSelector::index(0);
     assert_eq!(editor.table_hidden_axes(table)?, initial);
     editor.remove_table_row(table, RowDeletion::body(1))?;

@@ -8,7 +8,7 @@ use crate::charts::series_value_label_affixes::{
 };
 use crate::charts::{Index, LabelAffixes};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label affixes in native series order.
     pub fn slide_chart_series_value_label_affixes(
         &self,
@@ -66,7 +66,7 @@ impl Editor {
 }
 
 fn slide_chart_series_value_label_affixes(
-    editor: &Editor,
+    editor: &Draft,
     slide_index: usize,
     drawable_object_id: u64,
 ) -> Result<Vec<LabelAffixes>> {
@@ -89,7 +89,7 @@ fn slide_chart_series_value_label_affixes(
 }
 
 fn set_slide_chart_series_value_label_affixes(
-    editor: &mut Editor,
+    editor: &mut Draft,
     slide_index: usize,
     drawable_object_id: u64,
     affixes: &[LabelAffixes],
@@ -129,7 +129,7 @@ fn set_slide_chart_series_value_label_affixes(
         graph.info.kind,
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.slide_chart_series_value_label_affixes(slide_index, drawable_object_id)? != expected
     {
         return Err(Error::InvalidFormat(

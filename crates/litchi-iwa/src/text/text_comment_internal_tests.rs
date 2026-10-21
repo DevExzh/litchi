@@ -19,12 +19,12 @@ const SIZE: DrawableSize = DrawableSize {
     height: 140.0,
 };
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId, Vec<u8>) {
-    let mut pages = pages::Editor::create_with_text("Body").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId, Vec<u8>) {
+    let mut pages = pages::Draft::create_with_text("Body").unwrap();
     let text_box = pages.add_text_box(4, "Alpha Beta", POSITION, SIZE).unwrap();
     let baseline = pages.to_bytes().unwrap();
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         text_box.storage.id,
         baseline,
     )
@@ -116,7 +116,7 @@ fn unknown_annotation_and_comment_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_comment(storage_id, comment.id(), range(6, 10), body("two"))
         .unwrap();
@@ -266,7 +266,7 @@ fn reply_updates_preserve_unknown_fields_and_identity() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let updated = editor
         .update_text_comment_reply(storage_id, comment.id(), reply.id(), reply_body("updated"))
         .unwrap();
@@ -345,7 +345,7 @@ fn shared_or_wrong_parent_replies_are_rejected_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before_shared = editor.to_bytes().unwrap();
     assert!(
         editor
@@ -398,7 +398,7 @@ fn shared_comment_storage_rejects_update_and_delete_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

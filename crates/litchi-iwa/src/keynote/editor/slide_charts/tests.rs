@@ -69,12 +69,12 @@ fn focused_bytes(package: &FocusedKeynotePackage) -> Vec<u8> {
     bytes
 }
 
-fn focused_package(editor: &Editor) -> FocusedKeynotePackage {
+fn focused_package(editor: &Draft) -> FocusedKeynotePackage {
     FocusedKeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
 }
 
 fn chart_title<'chart>(
-    editor: &Editor,
+    editor: &Draft,
     selector: impl Into<ChartSelector<'chart>>,
 ) -> Option<String> {
     focused_package(editor)
@@ -83,7 +83,7 @@ fn chart_title<'chart>(
 }
 
 fn set_chart_title<'chart>(
-    editor: &mut Editor,
+    editor: &mut Draft,
     selector: impl Into<ChartSelector<'chart>>,
     title: impl AsRef<str>,
 ) {
@@ -95,23 +95,23 @@ fn set_chart_title<'chart>(
         .unwrap()
         .commit()
         .unwrap();
-    *editor = Editor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    *editor = Draft::from_bytes(&focused_bytes(commit.package())).unwrap();
 }
 
 fn clear_chart_title<'chart>(
-    editor: &mut Editor,
+    editor: &mut Draft,
     selector: impl Into<ChartSelector<'chart>>,
 ) -> bool {
     let package = focused_package(editor);
     let edit = package.edit_slide_chart_title(0usize, selector).unwrap();
     let changed = edit.before().is_some();
     let commit = edit.clear().unwrap().commit().unwrap();
-    *editor = Editor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    *editor = Draft::from_bytes(&focused_bytes(commit.package())).unwrap();
     changed
 }
 
 fn chart_axis_title<'chart>(
-    editor: &Editor,
+    editor: &Draft,
     selector: impl Into<ChartSelector<'chart>>,
     axis: Axis,
 ) -> Option<String> {
@@ -121,7 +121,7 @@ fn chart_axis_title<'chart>(
 }
 
 fn set_chart_axis_title<'chart>(
-    editor: &mut Editor,
+    editor: &mut Draft,
     selector: impl Into<ChartSelector<'chart>>,
     axis: Axis,
     title: impl AsRef<str>,
@@ -134,11 +134,11 @@ fn set_chart_axis_title<'chart>(
         .unwrap()
         .commit()
         .unwrap();
-    *editor = Editor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    *editor = Draft::from_bytes(&focused_bytes(commit.package())).unwrap();
 }
 
 fn clear_chart_axis_title<'chart>(
-    editor: &mut Editor,
+    editor: &mut Draft,
     selector: impl Into<ChartSelector<'chart>>,
     axis: Axis,
 ) -> bool {
@@ -148,7 +148,7 @@ fn clear_chart_axis_title<'chart>(
         .unwrap();
     let changed = edit.before().is_some();
     let commit = edit.clear().unwrap().commit().unwrap();
-    *editor = Editor::from_bytes(&focused_bytes(commit.package())).unwrap();
+    *editor = Draft::from_bytes(&focused_bytes(commit.package())).unwrap();
     changed
 }
 
@@ -210,7 +210,7 @@ fn fixture(relative: &str) -> Vec<u8> {
 /// package mutation, which keeps graph validation and codec validation as
 /// separate transaction gates.
 fn mutate_keynote_chart_non_style(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     mutate: impl FnOnce(&mut Vec<u8>),
 ) {
@@ -254,10 +254,10 @@ fn mutate_keynote_chart_non_style(
             Ok(())
         })
         .unwrap();
-    *editor = Editor::from_package(package).unwrap();
+    *editor = Draft::from_package(package).unwrap();
 }
 
-fn keynote_chart_non_style_data(editor: &Editor, drawable_object_id: u64) -> Vec<u8> {
+fn keynote_chart_non_style_data(editor: &Draft, drawable_object_id: u64) -> Vec<u8> {
     let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
     let archive = editor.package().archive(&graph.archive_name).unwrap();
     let chart_object = archive.object(drawable_object_id).unwrap();
@@ -324,7 +324,7 @@ fn assert_only_title_fields_changed(before: &[u8], after: &[u8]) {
     }
 }
 
-fn mutate_keynote_chart_title_standin(editor: &mut Editor, drawable_object_id: u64) {
+fn mutate_keynote_chart_title_standin(editor: &mut Draft, drawable_object_id: u64) {
     let graph = chart_graph(editor, 0, drawable_object_id).unwrap();
     let archive_name = graph.archive_name.clone();
     let title_id = {
@@ -364,7 +364,7 @@ fn mutate_keynote_chart_title_standin(editor: &mut Editor, drawable_object_id: u
             Ok(())
         })
         .unwrap();
-    *editor = Editor::from_package(package).unwrap();
+    *editor = Draft::from_package(package).unwrap();
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn scratch_presentation_supports_standalone_chart_crud() {
         .set_slide_chart_geometry(0, chart_selector(&editor, &created), changed_geometry)
         .unwrap();
 
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let chart = &reopened.slide_charts(0).unwrap()[0];
     assert_eq!(chart.kind, Kind::Bar2d);
     assert_eq!(chart.direction, Direction::Columns);
@@ -727,7 +727,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         Some("Revenue by region".to_owned())
     );
 
-    let mut editor = Editor::from_bytes(&focused_bytes(created.package())).unwrap();
+    let mut editor = Draft::from_bytes(&focused_bytes(created.package())).unwrap();
     let duplicate = editor
         .duplicate_slide_chart(0, chart_selector(&editor, &source))
         .unwrap();
@@ -803,7 +803,7 @@ fn scratch_presentation_supports_native_chart_caption_crud() {
         Some("Revenue by region".to_owned())
     );
 
-    let mut host_reopened = Editor::from_bytes(&cleared_bytes).unwrap();
+    let mut host_reopened = Draft::from_bytes(&cleared_bytes).unwrap();
     host_reopened
         .remove_slide_chart(0, chart_selector(&host_reopened, &duplicate))
         .unwrap();
@@ -860,7 +860,7 @@ fn scratch_presentation_supports_native_chart_title_crud() {
     assert!(!clear_chart_title(&mut editor, ChartSelector::index(0)));
     assert_eq!(chart_title(&editor, ChartSelector::index(0)), None);
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         chart_title(&reopened, ChartSelector::index(1)),
         Some("Revenue by region".to_owned())
@@ -1108,7 +1108,7 @@ fn selector_chart_title_host_paths_interoperate_with_focused_package() {
         .commit()
         .unwrap();
     let set_bytes = focused_bytes(set_commit.package());
-    let set_editor = Editor::from_bytes(&set_bytes).unwrap();
+    let set_editor = Draft::from_bytes(&set_bytes).unwrap();
     assert_only_title_fields_changed(
         &before_non_style,
         &keynote_chart_non_style_data(&set_editor, chart.drawable_object_id),
@@ -1283,7 +1283,7 @@ fn scratch_presentation_supports_native_chart_border_crud() {
         .set_slide_chart_border_visible(0, source.drawable_object_id, false)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         !reopened
             .slide_chart_border_visible(0, source.drawable_object_id)
@@ -1347,7 +1347,7 @@ fn scratch_presentation_supports_native_chart_rounded_corner_crud() {
         .set_slide_chart_rounded_corners(0, source.drawable_object_id, changed)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_rounded_corners(0, source.drawable_object_id)
@@ -1406,7 +1406,7 @@ fn scratch_presentation_supports_native_chart_gap_crud() {
         .set_slide_chart_gap_spacing(0, source.drawable_object_id, changed)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_gap_spacing(0, source.drawable_object_id)
@@ -1481,7 +1481,7 @@ fn scratch_presentation_supports_native_chart_value_axis_minimum_label_visibilit
             AxisVisibility::Visible,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         reopened
             .slide_chart_value_axis_minimum_label_visible(0, source.drawable_object_id)
@@ -1550,7 +1550,7 @@ fn scratch_presentation_supports_native_chart_category_axis_series_names_visibil
     editor
         .set_slide_chart_category_axis_series_names_visible(0, source.drawable_object_id, false)
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert!(
         !reopened
             .slide_chart_category_axis_series_names_visible(0, source.drawable_object_id)
@@ -1619,7 +1619,7 @@ fn scratch_presentation_supports_native_chart_axis_label_visibility_crud() {
             .unwrap();
     }
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -1695,7 +1695,7 @@ fn scratch_presentation_supports_native_chart_axis_line_visibility_crud() {
             .unwrap();
     }
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -1792,7 +1792,7 @@ fn scratch_presentation_supports_native_chart_axis_major_gridline_visibility_cru
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert_eq!(
             reopened
@@ -1870,7 +1870,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_gridline_visibility_cru
             .unwrap();
     }
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             !reopened
@@ -1953,7 +1953,7 @@ fn scratch_presentation_supports_native_chart_axis_minor_tick_mark_visibility_cr
             .unwrap();
     }
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     for axis in [Axis::Category, Axis::Value] {
         assert!(
             reopened
@@ -2075,7 +2075,7 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_axis_tick_mark_location(0, source.drawable_object_id, Axis::Category)
@@ -2125,7 +2125,7 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
         .set_slide_chart_legend_fill(0, object_id, &solid)
         .unwrap();
     assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), solid);
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.slide_chart_legend_fill(0, object_id).unwrap(),
         solid
@@ -2166,7 +2166,7 @@ fn scratch_presentation_supports_exact_chart_legend_frame_crud() {
         frame
     );
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.slide_chart_legend_frame(0, object_id).unwrap(),
         frame
@@ -2216,7 +2216,7 @@ fn scratch_presentation_supports_exact_chart_legend_typography_crud() {
     );
     assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), fill);
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.slide_chart_legend_font(0, object_id).unwrap(),
         bold
@@ -2343,7 +2343,7 @@ fn scratch_presentation_supports_exact_chart_legend_stroke_crud() {
     );
     assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), fill);
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     reopened
         .set_slide_chart_legend_stroke(0, object_id, ChartLegendStroke::NoStroke)
         .unwrap();
@@ -2410,7 +2410,7 @@ fn scratch_presentation_supports_exact_chart_legend_shadow_crud() {
         stroke
     );
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     reopened
         .set_slide_chart_legend_shadow(0, object_id, ChartLegendShadow::NoShadow)
         .unwrap();
@@ -2473,7 +2473,7 @@ fn scratch_presentation_supports_native_chart_border_stroke_crud() {
         .set_slide_chart_border_stroke(0, duplicate.drawable_object_id, None)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_border_stroke(0, source.drawable_object_id)
@@ -2536,7 +2536,7 @@ fn scratch_presentation_supports_native_chart_background_fill_crud() {
         .set_slide_chart_background_fill(0, source.drawable_object_id, &customized)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_background_fill(0, source.drawable_object_id)
@@ -2620,7 +2620,7 @@ fn scratch_presentation_supports_inherited_series_fill_crud() {
         defaults[0]
     );
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_fill(0, source.drawable_object_id, first)
@@ -2698,7 +2698,7 @@ fn scratch_presentation_supports_inherited_series_stroke_crud() {
         None
     );
 
-    let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_stroke(0, source.drawable_object_id, first)
@@ -2755,7 +2755,7 @@ fn scratch_presentation_supports_native_chart_shadow_crud() {
         .set_slide_chart_shadow(0, source.drawable_object_id, ChartShadow::None)
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_shadow(0, source.drawable_object_id)
@@ -2822,7 +2822,7 @@ fn scratch_presentation_supports_native_pie_start_angle_crud() {
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_pie_start_angle(0, source.drawable_object_id)
@@ -2936,7 +2936,7 @@ fn scratch_presentation_supports_native_donut_inner_radius_crud() {
             ChartDonutInnerRadius::MINIMUM,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_donut_inner_radius(0, source.drawable_object_id)
@@ -3032,7 +3032,7 @@ fn scratch_presentation_supports_native_pie_wedge_explosion_crud() {
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_pie_wedge_explosion(
@@ -3176,7 +3176,7 @@ fn scratch_presentation_supports_native_pie_label_visibility_crud() {
             LabelVisibility::VALUES_ONLY,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_pie_label_visibilities(0, duplicate.drawable_object_id)
@@ -3339,7 +3339,7 @@ fn scratch_presentation_supports_native_pie_label_distance_crud() {
             LeaderLineVisibility::Visible,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_pie_label_distances(0, duplicate.drawable_object_id)
@@ -3458,7 +3458,7 @@ fn scratch_presentation_supports_native_series_value_label_crud() {
             Visibility::Hidden,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_value_label_visibilities(0, source.drawable_object_id)
@@ -3557,7 +3557,7 @@ fn scratch_presentation_supports_native_series_value_label_location_crud() {
             ChartSeriesValueLabelLocation::Top,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_value_label_locations(0, source.drawable_object_id)
@@ -3658,7 +3658,7 @@ fn scratch_presentation_supports_native_series_value_label_affix_crud() {
         )
         .unwrap();
 
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_value_label_affixes(0, source.drawable_object_id)
@@ -3755,7 +3755,7 @@ fn scratch_presentation_supports_native_series_value_label_number_format_crud() 
             NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_value_label_number_formats(0, source.drawable_object_id)
@@ -3846,7 +3846,7 @@ fn scratch_presentation_supports_native_series_value_label_auto_fit_crud() {
             ChartSeriesValueLabelAutoFit::Enabled,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_value_label_auto_fits(0, source.drawable_object_id)
@@ -3945,7 +3945,7 @@ fn scratch_presentation_supports_native_series_trendline_crud() {
             )
             .unwrap();
     }
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_trendlines(0, source.drawable_object_id)
@@ -4069,7 +4069,7 @@ fn scratch_presentation_supports_native_series_error_bar_crud() {
             &default_auto_fits,
         )
         .unwrap();
-    let mut reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    let mut reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
             .slide_chart_series_error_bars(0, source.drawable_object_id)

@@ -300,13 +300,17 @@ fn semantic_state_and_exact_noop_are_selector_first() -> Result<(), Box<dyn std:
 
     assert!(matches!(
         package.edit().commit(),
-        Err(EditError::NoStagedOperation)
+        Err(EditError::Refused(
+            litchi_keynote::edit::Refusal::NoStagedOperation
+        ))
     ));
     let mut bounded = package.edit();
     bounded.skip_slide(SlideSelector::index(0))?;
     assert!(matches!(
         bounded.include_slide(SlideSelector::index(1)),
-        Err(EditError::OperationAlreadyStaged)
+        Err(EditError::Refused(
+            litchi_keynote::edit::Refusal::OperationAlreadyStaged
+        ))
     ));
     let bounded_commit = bounded.commit()?;
     assert!(bounded_commit.package().show()?.slides()[0].is_skipped());
@@ -323,14 +327,17 @@ fn selector_misses_and_ambiguity_are_typed() -> Result<(), Box<dyn std::error::E
     let mut by_position = package.edit();
     assert!(matches!(
         by_position.skip_slide(SlideSelector::position(Position::new(9))),
-        Err(EditError::SlidePositionNotFound { position }) if position == Position::new(9)
+        Err(EditError::Refused(litchi_keynote::edit::Refusal::SlidePositionNotFound { position })) if position == Position::new(9)
     ));
 
     let mut by_name = package.edit();
     let Err(missing_name) = by_name.skip_slide("Missing") else {
         return Err(io::Error::other("missing name was accepted").into());
     };
-    assert!(matches!(&missing_name, EditError::SlideNameNotFound));
+    assert!(matches!(
+        &missing_name,
+        EditError::Refused(litchi_keynote::edit::Refusal::SlideNameNotFound)
+    ));
     assert!(!missing_name.to_string().contains("Missing"));
 
     let mut ambiguous = package.edit();

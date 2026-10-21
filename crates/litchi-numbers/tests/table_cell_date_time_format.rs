@@ -336,7 +336,9 @@ fn date_time_wrong_family_and_automatic_marker_fail_closed() -> TestResult {
     )?)?;
     assert!(matches!(
         number.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
 
     let secondary = fixture::rewrite_tile_cells(&source()?, |cells| {
@@ -491,7 +493,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
     let plain_before = plain_package.exact_bytes();
     assert!(matches!(
         plain_package.table_cell_date_time_format(0usize, 0usize, selected_position()),
-        Err(Error::WrongFormatFamily { .. })
+        Err(Error::Refused(
+            litchi_numbers::cell::data_format::date_time::transaction::Refusal::WrongFormatFamily { .. }
+        ))
     ));
     assert_eq!(plain_package.exact_bytes(), plain_before);
 
@@ -719,7 +723,7 @@ fn date_time_changed_edit_reads_locked_but_refuses_publication() -> TestResult {
         .commit()
         .expect_err("a changed Date & Time edit must refuse a locked table");
     assert!(
-        matches!(error, Error::TableLocked { path: Path::Cell { sheet: 0, table: 0, position } } if position == selected_position())
+        matches!(error, Error::Refused(litchi_numbers::cell::data_format::date_time::transaction::Refusal::TableLocked { path: Path::Cell { sheet: 0, table: 0, position } }) if position == selected_position())
     );
     assert_eq!(package.exact_bytes(), before);
     Ok(())

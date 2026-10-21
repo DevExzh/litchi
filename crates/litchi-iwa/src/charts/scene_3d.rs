@@ -15,7 +15,7 @@ use crate::protobuf::tsch;
 use crate::wire::{
     patch_fixed32_field, patch_length_delimited_field, transform_length_delimited_field,
 };
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefault3drotation` in the generated chart non-style archive.
 const CHART_3D_ROTATION_FIELD: u32 = 4;
@@ -79,7 +79,7 @@ impl Default for Chart3dRotation {
 
 /// Read one chart's effective native 3D scene rotation.
 pub(crate) fn chart_3d_rotation(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -95,7 +95,7 @@ pub(crate) fn chart_3d_rotation(
 
 /// Set one chart's native 3D scene rotation.
 pub(crate) fn set_chart_3d_rotation(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

@@ -11,7 +11,7 @@ use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 const MOVIE_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
 
-pub(super) fn movie_playback_wire_limits(package: &IWorkPackage) -> Result<WireLimits> {
+pub(super) fn movie_playback_wire_limits(package: &HostPackage) -> Result<WireLimits> {
     let archive_limits = package.limits().archive_limits();
     let source_bytes = archive_limits
         .max_message_bytes()
@@ -41,7 +41,7 @@ pub(super) fn movie_playback_wire_limits(package: &IWorkPackage) -> Result<WireL
 }
 
 pub(super) fn movie_playback_settings(
-    package: &IWorkPackage,
+    package: &HostPackage,
     archive_name: &str,
     movie_id: u64,
     context: &str,
@@ -58,7 +58,7 @@ pub(super) fn movie_playback_settings(
 }
 
 pub(super) fn replace_movie_playback_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     movie_id: u64,
     context: &str,

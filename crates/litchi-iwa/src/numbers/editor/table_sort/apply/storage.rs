@@ -19,7 +19,7 @@ struct RelocatedHeader {
 }
 
 pub(super) fn reorder_body_table_tile_rows(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     body_start: usize,
@@ -171,7 +171,7 @@ pub(super) fn reorder_body_table_tile_rows(
 }
 
 pub(super) fn reorder_body_row_headers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     body_start: usize,
@@ -307,7 +307,7 @@ pub(super) fn reorder_body_row_headers(
 }
 
 pub(super) fn reorder_row_uids(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     rows: usize,

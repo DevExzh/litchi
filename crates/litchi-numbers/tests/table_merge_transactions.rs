@@ -75,12 +75,16 @@ fn staging_rejects_overlap_and_out_of_bounds_without_mutation() -> TestResult {
     let existing = Region::new(10, 1, 2, 2)?;
     assert!(matches!(
         edit.merge(existing),
-        Err(TableMergesError::OverlappingRegion)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::OverlappingRegion
+        ))
     ));
     let outside = Region::new(11, 2, 2, 2)?;
     assert!(matches!(
         edit.merge(outside),
-        Err(TableMergesError::InvalidRegion)
+        Err(TableMergesError::Refused(
+            litchi_numbers::table::merge::transaction::Refusal::InvalidRegion
+        ))
     ));
     let committed = edit.commit()?;
     assert!(committed.patch().is_noop());
@@ -180,10 +184,7 @@ fn changed_publication_honors_the_package_output_ceiling() -> TestResult {
     let region = Region::new(1, 1, 1, 2)?;
     let mut edit = bounded.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;
     edit.merge(region)?;
-    assert!(matches!(
-        edit.commit(),
-        Err(TableMergesError::LimitExceeded { .. })
-    ));
+    assert!(matches!(edit.commit(), Err(TableMergesError::Limit { .. })));
     assert_eq!(
         source.table_merges(SheetSelector::index(0), TableSelector::index(0))?,
         [Region::new(10, 1, 2, 2)?,]

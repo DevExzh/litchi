@@ -136,6 +136,38 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The selected graph or payload is not safe to edit.
+    #[error("the Keynote slide-background source cannot be edited safely")]
+    InvalidSource,
+    /// A finite resource ceiling was exceeded.
+    #[error(
+        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
+    )]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
+    Allocation { amount: usize },
+    /// Candidate reopening did not reproduce the requested semantic state.
+    #[error("the edited Keynote slide background failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Keynote slide-background patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical slide-background edits")]
     UnsupportedSource,
@@ -151,27 +183,29 @@ pub enum Error {
     /// A name selector matched multiple slides.
     #[error("the Keynote slide-background selector is ambiguous")]
     AmbiguousSelector,
-    /// The selected graph or payload is not safe to edit.
-    #[error("the Keynote slide-background source cannot be edited safely")]
-    InvalidSource,
-    /// A finite resource ceiling was exceeded.
-    #[error(
-        "Keynote slide-background {kind} limit exceeded: observed {observed}, maximum {maximum}"
-    )]
-    LimitExceeded {
-        kind: LimitKind,
-        observed: u64,
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} units for the Keynote slide-background transaction")]
-    Allocation { amount: usize },
-    /// Candidate reopening did not reproduce the requested semantic state.
-    #[error("the edited Keynote slide background failed semantic verification")]
-    Verification,
-    /// The patch does not belong to this exact immutable package artifact.
-    #[error("the Keynote slide-background patch does not match the exact source package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+            Self::EmptySlideName { .. } | Self::AmbiguousSelector { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. } | Self::SlidePositionNotFound { .. } => {
+                RefusalKind::NotFound
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// One mutable semantic slide-background edit staged against an immutable
@@ -248,7 +282,7 @@ impl<'a> Edit<'a> {
     /// Stage a semantic background value, including explicit [`Background::None`].
     pub fn set(mut self, background: Background) -> Result<Self, Error> {
         if matches!(&background, Background::Unsupported) {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         self.desired = Desired::Set(background);
         Ok(self)
@@ -475,6 +509,12 @@ impl Commit {
     pub fn into_package(self) -> Package {
         self.package
     }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
     /// Borrow the exact reversible patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -554,7 +594,7 @@ fn resolve_slide_position(
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_| position)
-            .ok_or(Error::SlidePositionNotFound { position }),
+            .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position })),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -563,7 +603,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(Error::SlideNameNotFound)
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
         },
     }
 }
@@ -572,7 +612,7 @@ fn select_slide(package: &Package, position: Position) -> Result<Selection, Erro
     let record = package
         .slide_record_at(position.get())
         .map_err(map_read_error)?
-        .ok_or(Error::SlidePositionNotFound { position })?;
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound { position }))?;
     let (slide_component, slide_object) = package
         .object_with_component(record.slide_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -862,10 +902,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if edit.before == Background::Unsupported {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     if !catalog.source_is_exact() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     edit.source.validate().map_err(map_read_error)?;
     let reset_effective = if reset {
@@ -961,7 +1001,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
 fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
     }
 }
 
@@ -2191,14 +2231,14 @@ fn encode_background(
                 options,
             )
         },
-        Background::Unsupported => return Err(Error::UnsupportedSource),
+        Background::Unsupported => return Err(Error::Refused(Refusal::UnsupportedSource)),
     };
     rewritten
         .map(|(bytes, _report)| bytes)
         .map_err(map_codec_error)
         .and_then(|bytes| {
             if bytes.len() > limits.max_output_bytes() {
-                Err(Error::LimitExceeded {
+                Err(Error::Limit {
                     kind: LimitKind::OutputBytes,
                     observed: usize_to_u64(bytes.len()),
                     maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3343,7 +3383,7 @@ fn rewrite_repeated_length_field(
 
 fn check_wire_output(output: &[u8], limits: WireLimits) -> Result<(), Error> {
     if output.len() > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
@@ -3413,14 +3453,14 @@ fn codec_options(package: &Package, _source: &[u8]) -> Result<codec::DecodeOptio
 
 fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -3428,12 +3468,12 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            codec::WireResourceLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+            codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            codec::WireResourceLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+            codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -3481,7 +3521,7 @@ fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
             ),
             _ => return Error::InvalidSource,
         };
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind,
             observed,
             maximum,
@@ -3495,8 +3535,8 @@ fn map_metadata_error(error: metadata_codec::RewriteError) -> Error {
 
 fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+        SlideSelectorError::DuplicateSlideName { .. } => Error::Refused(Refusal::AmbiguousSelector),
     }
 }
 
@@ -3507,7 +3547,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 SemanticLimitKind::Objects => LimitKind::Entries,
                 SemanticLimitKind::Slides => LimitKind::Slides,
@@ -3524,7 +3564,7 @@ fn map_read_error(error: ReadError) -> Error {
             observed,
             maximum,
             ..
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
                 super::PayloadLimitKind::Fields => LimitKind::WireFields,
@@ -3545,7 +3585,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3571,7 +3611,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -3594,7 +3634,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects

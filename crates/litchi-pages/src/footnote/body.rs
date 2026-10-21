@@ -200,6 +200,6 @@ mod tests {
 /// Exact-source transactions over the rooted body's footnotes.
 pub mod transaction {
     pub use crate::package::body_footnote::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
     };
 }

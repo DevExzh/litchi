@@ -105,7 +105,7 @@ pub(super) fn validate_selected_media_assets<'a>(
             },
             // A poster edge on an audio control is malformed.  An audio
             // control with no edge never enters this branch and is accepted.
-            Err(SlideMediaDataError::AudioPoster) => {
+            Err(SlideMediaDataError::Refused(crate::slide::media::data::Refusal::AudioPoster)) => {
                 return Err(Error::InvalidSource);
             },
             Err(error) => return Err(map_media_error(error)),
@@ -139,28 +139,34 @@ fn debit_geometry_budget(
 
 fn map_media_error(error: SlideMediaDataError) -> Error {
     match error {
-        SlideMediaDataError::UnsupportedSource => Error::UnsupportedSource,
-        SlideMediaDataError::LimitExceeded {
+        SlideMediaDataError::Refused(crate::slide::media::data::Refusal::UnsupportedSource) => {
+            Error::Refused(crate::slide::media::properties::Refusal::UnsupportedSource)
+        },
+        SlideMediaDataError::Limit {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
         SlideMediaDataError::Allocation { amount } => Error::Allocation { amount },
-        SlideMediaDataError::EmptySlideName
-        | SlideMediaDataError::SlideNameNotFound
-        | SlideMediaDataError::SlidePositionNotFound { .. }
-        | SlideMediaDataError::AmbiguousSelector
-        | SlideMediaDataError::MoviePositionNotFound { .. } => Error::InvalidSource,
-        SlideMediaDataError::AudioPoster
+        SlideMediaDataError::Refused(crate::slide::media::data::Refusal::EmptySlideName)
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::SlideNameNotFound)
+        | SlideMediaDataError::Refused(
+            crate::slide::media::data::Refusal::SlidePositionNotFound { .. },
+        )
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::AmbiguousSelector)
+        | SlideMediaDataError::Refused(
+            crate::slide::media::data::Refusal::MoviePositionNotFound { .. },
+        ) => Error::InvalidSource,
+        SlideMediaDataError::Refused(crate::slide::media::data::Refusal::AudioPoster)
         | SlideMediaDataError::InvalidSource
         | SlideMediaDataError::Read
-        | SlideMediaDataError::EmptyReplacement
-        | SlideMediaDataError::ReplacementTooLarge
-        | SlideMediaDataError::ReplacementType
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::EmptyReplacement)
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::ReplacementTooLarge)
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::ReplacementType)
         | SlideMediaDataError::Verification
         | SlideMediaDataError::PatchConflict => Error::InvalidSource,
     }

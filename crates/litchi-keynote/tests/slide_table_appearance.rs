@@ -1686,7 +1686,7 @@ fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
         let result = package
             .edit_slide_table_appearance(0usize, 0usize)
             .and_then(|edit| edit.set(custom_appearance()).commit());
-        if matches!(result, Err(Error::LimitExceeded { .. })) {
+        if matches!(result, Err(Error::Limit { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             saw_limit = true;
             break;

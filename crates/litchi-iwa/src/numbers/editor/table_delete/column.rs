@@ -3,7 +3,7 @@
 use super::*;
 
 pub(super) fn delete_table_tile_column(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     model: &TableModelArchive,
     deletion: usize,
@@ -83,7 +83,7 @@ pub(super) fn delete_table_tile_column(
 }
 
 pub(super) fn delete_column_headers(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     locations: &HashMap<u64, String>,
     identifier: u64,
     deletion: usize,

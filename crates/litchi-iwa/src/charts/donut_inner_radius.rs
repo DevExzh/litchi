@@ -13,7 +13,7 @@ use crate::charts::non_style::{
 };
 use crate::protobuf::tsch;
 use crate::wire::{patch_fixed32_field, patch_length_delimited_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 /// `tschchartinfodefaultinnerradius` in the generated non-style archive.
 const CHART_DONUT_INNER_RADIUS_FIELD: u32 = 27;
@@ -87,7 +87,7 @@ impl TryFrom<f32> for ChartDonutInnerRadius {
 
 /// Read the effective inner radius of one native donut chart.
 pub(crate) fn chart_donut_inner_radius(
-    package: &IWorkPackage,
+    package: &HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,
@@ -103,7 +103,7 @@ pub(crate) fn chart_donut_inner_radius(
 
 /// Set the inner radius of one native donut chart.
 pub(crate) fn set_chart_donut_inner_radius(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     chart_archive_name: &str,
     drawable_object_id: u64,
     drawable_label: &str,

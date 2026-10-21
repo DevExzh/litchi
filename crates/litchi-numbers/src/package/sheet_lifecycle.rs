@@ -68,6 +68,42 @@ impl fmt::Display for InvalidName {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The rooted source is malformed or ambiguous.
+    #[error("rooted sheet-lifecycle source is invalid")]
+    InvalidSource,
+    /// A finite transaction limit was exceeded.
+    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded allocation failed.
+    #[error("could not allocate {amount} sheet-lifecycle items or bytes")]
+    Allocation {
+        /// Requested amount.
+        amount: usize,
+    },
+    /// The reopened candidate did not reproduce the requested state.
+    #[error("sheet-lifecycle candidate verification failed")]
+    Verification,
+    /// The patch was applied to an artifact other than its exact source.
+    #[error("sheet-lifecycle patch conflicts with this package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
     /// The selector did not resolve one sheet.
     #[error("sheet selector did not resolve")]
     SheetNotFound,
@@ -95,31 +131,32 @@ pub enum Error {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support sheet lifecycle changes")]
     UnsupportedSource,
-    /// The rooted source is malformed or ambiguous.
-    #[error("rooted sheet-lifecycle source is invalid")]
-    InvalidSource,
-    /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
-        /// Resource category.
-        kind: LimitKind,
-        /// Observed amount.
-        observed: u64,
-        /// Configured maximum.
-        maximum: u64,
-    },
-    /// A bounded allocation failed.
-    #[error("could not allocate {amount} sheet-lifecycle items or bytes")]
-    Allocation {
-        /// Requested amount.
-        amount: usize,
-    },
-    /// The reopened candidate did not reproduce the requested state.
-    #[error("sheet-lifecycle candidate verification failed")]
-    Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("sheet-lifecycle patch conflicts with this package")]
-    PatchConflict,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::SheetNotEmpty { .. } => RefusalKind::UnsupportedTarget,
+            Self::LastSheet { .. } => RefusalKind::UnsupportedTarget,
+            Self::SheetNotFound { .. } => RefusalKind::NotFound,
+            Self::InvalidName { .. } => RefusalKind::InvalidValue,
+            Self::OperationAlreadyStaged { .. } | Self::NoStagedOperation { .. } => {
+                RefusalKind::UnsupportedOperation
+            },
+            Self::UnsupportedDependency { .. } | Self::UnsupportedSource { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,8 +193,8 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::InvalidName`] for an empty name, a name containing NUL, or a
-    /// name another sheet already has; [`Error::OperationAlreadyStaged`]
+    /// [`Refusal::InvalidName`] for an empty name, a name containing NUL, or a
+    /// name another sheet already has; [`Refusal::OperationAlreadyStaged`]
     /// after one operation.
     #[allow(
         clippy::should_implement_trait,
@@ -165,7 +202,7 @@ impl Edit<'_> {
     )]
     pub fn add(mut self, name: &str) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let reason = if name.is_empty() {
             Some(InvalidName::Empty)
@@ -183,7 +220,7 @@ impl Edit<'_> {
             None
         };
         if let Some(reason) = reason {
-            return Err(Error::InvalidName { reason });
+            return Err(Error::Refused(Refusal::InvalidName { reason }));
         }
         let mut owned = String::new();
         owned
@@ -198,25 +235,25 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::SheetNotFound`] when the selector resolves no sheet,
-    /// [`Error::LastSheet`] for a workbook's only sheet,
-    /// [`Error::OperationAlreadyStaged`] after one operation. A sheet that
+    /// [`Refusal::SheetNotFound`] when the selector resolves no sheet,
+    /// [`Refusal::LastSheet`] for a workbook's only sheet,
+    /// [`Refusal::OperationAlreadyStaged`] after one operation. A sheet that
     /// holds drawables other than tables is refused at commit
-    /// ([`Error::SheetNotEmpty`]).
+    /// ([`Refusal::SheetNotEmpty`]).
     pub fn remove<'selector>(
         mut self,
         selector: impl Into<SheetSelector<'selector>>,
     ) -> Result<Self, Error> {
         if self.operation.is_some() {
-            return Err(Error::OperationAlreadyStaged);
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
         let workbook = self.source.workbook_ref();
         let sheet = workbook
             .sheet(selector)
             .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::SheetNotFound)?;
+            .ok_or(Error::Refused(Refusal::SheetNotFound))?;
         if workbook.sheet_count() <= 1 {
-            return Err(Error::LastSheet);
+            return Err(Error::Refused(Refusal::LastSheet));
         }
         self.operation = Some(Operation::Remove(sheet.index()));
         Ok(self)
@@ -226,11 +263,13 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Error::NoStagedOperation`] for an empty edit; source, dependency,
+    /// [`Refusal::NoStagedOperation`] for an empty edit; source, dependency,
     /// resource and verification errors. Failure never publishes a partial
     /// package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let operation = self.operation.ok_or(Error::NoStagedOperation)?;
+        let operation = self
+            .operation
+            .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source = self.source;
         let (published, sheets) = match &operation {
             Operation::Add(name) => add_sheet(source, name)?,
@@ -320,7 +359,7 @@ fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<
     if working.locate(1)?.as_deref() != Some(DOCUMENT_COMPONENT)
         || working.locate(template)?.as_deref() != Some(DOCUMENT_COMPONENT)
     {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(Refusal::UnsupportedSource));
     }
 
     // The new sheet record: the template's settings without its private
@@ -377,7 +416,7 @@ fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<
     if let Some(root) = roots.sidebar {
         let node = fresh[1];
         if working.locate(root)?.as_deref() != Some(DOCUMENT_COMPONENT) {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         let mut data = Vec::new();
         litchi_iwa_common::wire::append_length_delimited_field(
@@ -444,19 +483,21 @@ fn remove_sheet(
         .workbook_ref()
         .sheets()
         .get(position)
-        .ok_or(Error::SheetNotFound)?
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?
         .table_count();
     let mut current = source.clone();
     for _ in 0..tables {
         current = super::table_lifecycle::remove_table(&current, position, 0)
             .map_err(|error| match error {
-                super::table_lifecycle::Error::UnsupportedDependency => {
-                    Error::UnsupportedDependency
-                },
-                super::table_lifecycle::Error::UnsupportedSource => Error::UnsupportedSource,
-                super::table_lifecycle::Error::LimitExceeded {
+                super::table_lifecycle::Error::Refused(
+                    crate::package::table_lifecycle::Refusal::UnsupportedDependency,
+                ) => Error::Refused(Refusal::UnsupportedDependency),
+                super::table_lifecycle::Error::Refused(
+                    crate::package::table_lifecycle::Refusal::UnsupportedSource,
+                ) => Error::Refused(Refusal::UnsupportedSource),
+                super::table_lifecycle::Error::Limit {
                     observed, maximum, ..
-                } => Error::LimitExceeded {
+                } => Error::Limit {
                     kind: LimitKind::PayloadBytes,
                     observed,
                     maximum,
@@ -489,14 +530,17 @@ fn remove_sheet(
 fn remove_empty_sheet(source: &Package, position: usize) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
     let roots = roots(&working)?;
-    let sheet = *roots.sheets.get(position).ok_or(Error::SheetNotFound)?;
+    let sheet = *roots
+        .sheets
+        .get(position)
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     if roots.sheets.len() <= 1 {
-        return Err(Error::LastSheet);
+        return Err(Error::Refused(Refusal::LastSheet));
     }
     let sheet_object = working.object(sheet)?;
     let (index, path) = structure::sheet_message(sheet_object)?;
     if !references::identifiers(&sheet_object.messages[index].data, path)?.is_empty() {
-        return Err(Error::SheetNotEmpty);
+        return Err(Error::Refused(Refusal::SheetNotEmpty));
     }
 
     // Detach the sheet from the document and its node from the sidebar.

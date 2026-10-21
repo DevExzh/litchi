@@ -219,8 +219,8 @@ RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS = (
     Path("crates/litchi-iwa/examples/create_pages_stacked_shapes.rs"),
 )
 IWORK_EXAMPLE_LEGACY_API = re.compile(
-    r"(?<![A-Za-z0-9_])(?:litchi_iwa|Editor|Editor|Editor|"
-    r"IWorkPackage)(?![A-Za-z0-9_])"
+    r"(?<![A-Za-z0-9_])(?:litchi_iwa|Draft|Draft|Draft|"
+    r"HostPackage)(?![A-Za-z0-9_])"
 )
 IWORK_EXAMPLE_NATIVE_ID_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:id|object_id|native_id)[ \t\r\n]*\("
@@ -268,7 +268,7 @@ RETIRED_IWA_KEYNOTE_DRAWABLE_COMMENT_METHOD_SET = frozenset(
 )
 IWA_SHARED_DRAWABLE_COMMENT_SOURCE = IWA_CORE_SOURCE_ROOT / "comments.rs"
 IWA_SHARED_DRAWABLE_COMMENT_EXPORT_SOURCE = IWA_CORE_SOURCE_ROOT / "lib.rs"
-IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE = "IWorkDrawableCommentEditor"
+IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE = "Draft"
 RETIRED_IWA_KEYNOTE_SHOW_SETTINGS_METHODS = (
     "show_settings",
     "set_show_settings",
@@ -586,7 +586,7 @@ KEYNOTE_CHART_ARRANGEMENT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -684,7 +684,7 @@ KEYNOTE_CHART_ARRANGEMENT_RAW_HELPER = re.compile(
 KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_OWNERSHIP = re.compile(
     r"\b(?:buffa|prost|prost_types|tsch|tsd|tsp|litchi_iwa_protos|"
     r"Archive|ArchiveObject|ComponentCatalog|EntryEdit|ExactArtifacts|"
-    r"IWorkPackage|RawMessage|SnappyStream|SourceCatalog|"
+    r"HostPackage|RawMessage|SnappyStream|SourceCatalog|"
     r"DecodeError|DecodeLimit|DecodeOptions|WireError|WireView|"
     r"WireFieldView|WireLimits|WireResourceLimit|"
     r"decode_chart_arrangement(?:_with_report)?|"
@@ -984,7 +984,7 @@ KEYNOTE_CHART_CAPTION_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -1104,7 +1104,7 @@ KEYNOTE_CHART_AXIS_TITLE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -1412,7 +1412,7 @@ KEYNOTE_MOVIE_CAPTION_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "MovieCaptionSnapshot",
         "MovieCaptionWrite",
         "PhysicalSource",
@@ -1647,7 +1647,7 @@ KEYNOTE_MOVIE_TITLE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "MovieTitleSnapshot",
         "MovieTitleWrite",
         "PhysicalSource",
@@ -1956,7 +1956,7 @@ KEYNOTE_MOVIE_PLAYBACK_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "MoviePlaybackSnapshot",
         "MoviePlaybackWrite",
         "PhysicalSource",
@@ -2516,7 +2516,7 @@ KEYNOTE_MOVIE_GEOMETRY_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "MovieGeometrySnapshot",
         "MovieGeometryWrite",
         "PhysicalSource",
@@ -2846,7 +2846,7 @@ KEYNOTE_AUDIO_POSITION_PHYSICAL_TYPES = frozenset(
         "Entry",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -3084,7 +3084,7 @@ KEYNOTE_MEDIA_PROPERTIES_PHYSICAL_TYPES = frozenset(
         "Entry",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -3254,7 +3254,7 @@ def _audit_keynote_media_properties_native_evidence(root: Path) -> list[str]:
 # data into one selector-first package owner.  The owner deliberately covers
 # the shared media payload edge (movie content, movie poster, and audio
 # content) without owning movie/audio creation, duplication, deletion,
-# playback, geometry, title/caption, or generic ``Editor::replace_media``
+# playback, geometry, title/caption, or generic ``Draft::replace_media``
 # compatibility.  Keep this inventory independent from the playback and
 # geometry ratchets: a payload replacement must prove both the nested
 # ``TSP.DataReference`` edge and the PackageMetadata digest/length closure.
@@ -3328,7 +3328,7 @@ KEYNOTE_SLIDE_MEDIA_DATA_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "MediaRecord",
         "MetadataVisitor",
         "OwnerRecord",
@@ -3576,7 +3576,7 @@ KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS = frozenset(
         "Allocations",
     }
 )
-# ``Editor`` itself lives at ``keynote/editor.rs`` while focused
+# ``Draft`` itself lives at ``keynote/editor.rs`` while focused
 # compatibility helpers live below ``keynote/editor/``.  Scan the whole
 # Keynote source root, but keep the lexical inventory exact to the three
 # retired replacement wrappers so unrelated editor APIs remain untouched.
@@ -3686,27 +3686,28 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_MODULES = frozenset(
     {"budget", "comment_graph"}
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SHARED_CHILD_VISIBILITY = "pub(in crate::package)"
+# Record 0361 (W7): the lifecycle is a scoped family. ``Package`` starts the
+# edit and replays its patch; the selector-first verbs stage on ``Edit``.
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS = frozenset(
     {
-        "duplicate_slide_media",
-        "remove_slide_media",
+        "edit_slide_media_lifecycle",
         "apply_slide_media_lifecycle",
-        "apply_slide_media_lifecycle_patch",
     }
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS = frozenset(
     {
-        "duplicate_slide_media",
-        "remove_slide_media",
-        "duplicate_slide_movie",
-        "duplicate_slide_audio",
-        "remove_slide_movie",
-        "remove_slide_audio",
+        "duplicate",
+        "remove",
+        "duplicate_movie",
+        "duplicate_audio",
+        "remove_movie",
+        "remove_audio",
     }
 )
-KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS = frozenset(
-    {"apply_slide_media_lifecycle", "apply_slide_media_lifecycle_patch"}
-)
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS = frozenset({"apply_slide_media_lifecycle"})
+# The functions that run a lifecycle transaction (one aggregate budget each):
+# the staged edit's commit and the exact-source patch replay.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OPERATIONS = frozenset({"commit", "apply_slide_media_lifecycle"})
 # These names are intentionally accepted in both the short and prefixed
 # forms.  Existing Keynote owners use the prefixed form, while the lifecycle
 # module may keep a concise internal semantic spelling before re-exporting it.
@@ -3732,7 +3733,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "SourceCatalog",
         "WireView",
@@ -4517,7 +4518,7 @@ KEYNOTE_SLIDE_TABLE_TITLE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -4643,7 +4644,7 @@ KEYNOTE_SLIDE_TABLE_SORT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -4810,7 +4811,7 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PHYSICAL_TYPES = frozenset(
         "HeaderStorageArchive",
         "HeaderStorageBucketArchive",
         "HiddenStatesArchive",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -5254,7 +5255,7 @@ KEYNOTE_SLIDE_TABLE_LOCK_STATE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -5380,7 +5381,7 @@ KEYNOTE_SLIDE_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "FieldType",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -5502,7 +5503,7 @@ KEYNOTE_SLIDE_TABLE_NAME_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "FieldType",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -5752,7 +5753,7 @@ KEYNOTE_SLIDE_TABLE_HEADERS_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "FieldType",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -6018,7 +6019,7 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "FieldType",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -6747,7 +6748,7 @@ IWA_KEYNOTE_README_SHOW_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>show_settings|set_show_settings)\b"
         r"[ \t\r\n]*\("
     ),
@@ -6850,7 +6851,7 @@ IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>soundtrack_settings|set_soundtrack_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -6956,7 +6957,7 @@ KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "ReferenceSnapshot",
@@ -7070,7 +7071,7 @@ KEYNOTE_SOUNDTRACK_ITEMS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -7158,7 +7159,7 @@ IWA_KEYNOTE_README_SLIDE_TRANSITION_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>slide_transition|set_slide_transition|clear_slide_transition)"
         r"\b[ \t\r\n]*\("
     ),
@@ -7275,7 +7276,7 @@ KEYNOTE_SLIDE_TRANSITION_PHYSICAL_TYPES = frozenset(
     {
         "Archive",
         "EntryEdit",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -7447,8 +7448,7 @@ IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_GENERATED_MARKERS = frozenset(
         "Message",
         "ArchiveObject",
         "RawMessage",
-        "IWorkPackage",
-        "IWorkTextEditor",
+        "HostPackage",
         "SlideArchive",
         "SlideStyleArchive",
         "SlideStylePropertiesArchive",
@@ -7586,7 +7586,7 @@ IWA_KEYNOTE_README_SLIDE_DELETE_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>remove_slide)\b[ \t\r\n]*\("
     ),
 )
@@ -7656,7 +7656,7 @@ KEYNOTE_SLIDE_DELETE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -7722,7 +7722,7 @@ IWA_KEYNOTE_README_PLACEHOLDER_VISIBILITY_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>set_slide_text_placeholder_visible|"
         r"set_slide_title_visible|set_slide_body_visible)"
         r"\b[ \t\r\n]*\("
@@ -7774,7 +7774,7 @@ IWA_KEYNOTE_README_SLIDE_NUMBER_VISIBILITY_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>set_slide_number_visible)\b[ \t\r\n]*\("
     ),
 )
@@ -7908,7 +7908,7 @@ KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "NodeVisibilitySnapshot",
         "PhysicalSource",
         "PlaceholderOwnerSnapshot",
@@ -8052,7 +8052,7 @@ IWA_NUMBERS_README_NAMES_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>rename_sheet|rename_table)\b"
         r"[ \t\r\n]*\("
     ),
@@ -8102,7 +8102,7 @@ IWA_NUMBERS_README_TABLE_HEADER_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>table_header_settings|set_table_header_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -8212,7 +8212,7 @@ NUMBERS_TABLE_HEADER_SETTINGS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -8303,7 +8303,7 @@ IWA_NUMBERS_README_TABLE_TITLE_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>table_title_settings|set_table_title_settings)"
         r"\b[ \t\r\n]*\("
     ),
@@ -8386,7 +8386,7 @@ NUMBERS_TABLE_TITLE_SETTINGS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -8620,7 +8620,7 @@ NUMBERS_TABLE_APPEARANCE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -8818,7 +8818,7 @@ NUMBERS_TABLE_CELL_POP_UP_MENU_PHYSICAL_TYPES = frozenset(
         "ControlCellSpec",
         "ExactArtifacts",
         "FormatStructArchive",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "PopUpMenuModel",
         "RawMessage",
@@ -8930,7 +8930,7 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_TEST_SET = frozenset(
 RETIRED_IWA_NUMBERS_TABLE_CELL_CONTROL_EXAMPLE = Path(
     "crates/litchi-iwa/examples/create_iwork_table_number_formats.rs"
 )
-# The generic Editor data-format bridge is a compatibility surface, but
+# The generic Draft data-format bridge is a compatibility surface, but
 # its interactive-control branch must remain selector-first internally.  Keep
 # this audit separate from the retired method scan: Pages/Keynote adapters and
 # the private cell_data_format implementation are intentionally out of scope.
@@ -9077,7 +9077,7 @@ NUMBERS_TABLE_CELL_CONTROL_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "ControlCellSpec",
         "FormatStructArchive",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "PopUpMenuModel",
         "RawMessage",
@@ -9453,7 +9453,7 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_PHYSICAL_TYPES = frozenset(
         "FormatEntry",
         "FormatStructArchive",
         "FormatTableArchive",
-        "IWorkPackage",
+        "HostPackage",
         "NumberFormatArchive",
         "NumberFormatSnapshot",
         "PhysicalSource",
@@ -10069,7 +10069,7 @@ NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_TRANSACTION_TYPES = (
 NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS = frozenset(
     {
         "RawMessage",
-        "IWorkPackage",
+        "HostPackage",
         "SourceCatalog",
         "ObjectId",
         "ObjectID",
@@ -10085,7 +10085,7 @@ NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS = frozenset(
 # transaction.  Keep the migration-host retirement inventory deliberately
 # narrow: the generic ``DataFormat`` helpers (``cell_date_time_format`` and
 # friends) remain a compatibility surface for source-built packages and for
-# the Pages/Keynote attached-table adapters.  Only these Editor
+# the Pages/Keynote attached-table adapters.  Only these Draft
 # table-cell methods are retired once the focused owner is present.
 RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS = (
     "table_cell_date_time_format",
@@ -10178,7 +10178,7 @@ NUMBERS_TABLE_CELL_DURATION_FORMAT_RAW_MARKERS = frozenset(
     {
         "Archive",
         "ArchiveObject",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "SourceCatalog",
         "ObjectId",
@@ -10204,7 +10204,7 @@ NUMBERS_TABLE_CELL_DURATION_FORMAT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "FormatStructArchive",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -10312,7 +10312,7 @@ NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_REQUIRED_MARKERS = {
     ),
 }
 
-# Only the dedicated Editor convenience methods are retired.  The
+# Only the dedicated Draft convenience methods are retired.  The
 # generic ``DataFormat`` helpers intentionally remain available to source-
 # built packages and to the attached Pages/Keynote table adapters.
 RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS = (
@@ -10433,7 +10433,7 @@ NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PHYSICAL_TYPES = frozenset(
         "EntryEdit",
         "ExactArtifacts",
         "FormatStructArchive",
-        "IWorkPackage",
+        "HostPackage",
         "OwnedExactArtifacts",
         "RawMessage",
         "SourceCatalog",
@@ -11942,9 +11942,9 @@ def _numbers_table_cell_fraction_format_public_leak(identifier: str) -> str | No
     """Classify native vocabulary forbidden by the Fraction facade."""
 
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -12074,7 +12074,7 @@ IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
-# The focused Custom owner now replaces the three Editor convenience
+# The focused Custom owner now replaces the three Draft convenience
 # methods.  Keep this inventory separate from generic ``DataFormat`` helper
 # names: source-built Numbers packages and attached Pages/Keynote tables still
 # use those compatibility routes.  The shared retirement scanner also masks
@@ -12272,7 +12272,7 @@ NUMBERS_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -12833,7 +12833,7 @@ NUMBERS_COMMENT_SOURCE = Path("crates/litchi-numbers/src/package/comments.rs")
 # Wave91 adds a read-only, selector-first projection of direct table-cell
 # comment replies.  Keep this ratchet dormant until the canonical semantic
 # type is present: the existing root-comment owner and the raw-ID
-# Editor reply mutation/identity APIs remain compatibility surfaces.
+# Draft reply mutation/identity APIs remain compatibility surfaces.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE = NUMBERS_COMMENT_SOURCE
 NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/comment_storage_codec.rs"
@@ -14216,7 +14216,7 @@ IWA_NUMBERS_README_SHEET_ORDER_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>move_sheet)\b[ \t\r\n]*\("
     ),
 )
@@ -14291,7 +14291,7 @@ NUMBERS_SHEET_ORDER_PHYSICAL_TYPES = frozenset(
         "DocumentSnapshot",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -14492,7 +14492,7 @@ NUMBERS_TABLE_SORT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -15228,7 +15228,7 @@ IWA_PAGES_README_TABLE_LOCK_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>body_table_lock_state|set_body_table_lock_state)"
         r"\b[ \t\r\n]*\("
     ),
@@ -15265,7 +15265,7 @@ IWA_PAGES_TABLE_TITLE_CALL = re.compile(
 IWA_PAGES_TABLE_TITLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_TABLE_TITLE_README_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_title_settings|set_table_title_settings)\b"
         r"[ \t\r\n]*\(",
@@ -15299,7 +15299,7 @@ IWA_PAGES_TABLE_HEADER_CALL = re.compile(
 IWA_PAGES_TABLE_HEADER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_HEADER_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_header_settings|set_table_header_settings)\b"
         r"[ \t\r\n]*\(",
@@ -15338,7 +15338,7 @@ IWA_PAGES_TABLE_DIMENSION_CALL = re.compile(
 IWA_PAGES_TABLE_DIMENSION_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_DIMENSION_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_dimension_size|set_table_dimension_size|"
         r"table_row_height|set_table_row_height|table_column_width|"
@@ -15400,7 +15400,7 @@ IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL = re.compile(
     r"[ \t\r\n]*\("
 )
 IWA_PAGES_FOOTNOTE_READ_CALL = re.compile(
-    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?(?:self|editor|pages|Editor))"
+    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?(?:self|editor|pages|Draft))"
     r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?body_footnotes\b"
     r"[ \t\r\n]*\("
 )
@@ -15411,7 +15411,7 @@ IWA_PAGES_FOOTNOTE_FACADE_HELPER = re.compile(
 IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
         r"[ \t\r\n]*\(",
@@ -15419,7 +15419,7 @@ IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
 )
 IWA_PAGES_README_FOOTNOTE_READ_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>body_footnotes)\b[ \t\r\n]*\(",
     ),
@@ -15544,7 +15544,7 @@ PAGES_FOOTNOTE_LIFECYCLE_PHYSICAL_TYPES = frozenset(
         "FootnoteGraph",
         "FootnoteObjectIds",
         "FootnoteStorageProjection",
-        "IWorkPackage",
+        "HostPackage",
         "NativeFootnote",
         "RawMessage",
         "Resolved",
@@ -15631,6 +15631,8 @@ PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
 # legacy-name overrides)``.  The legacy name of a short name is
 # ``prefix + short`` unless the override map names it.
 PAGES_TRANSACTION_SIX = ("Commit", "Diagnostics", "Edit", "Error", "LimitKind", "Patch")
+# Record 0361: a family may also export its typed refusal reasons (0351 §2.4).
+PAGES_TRANSACTION_OPTIONAL_EXPORTS = frozenset({"Refusal"})
 PAGES_TRANSACTION_FAMILIES: tuple[
     tuple[str, str, tuple[str, ...], tuple[str, ...], dict[str, str]], ...
 ] = (
@@ -15646,7 +15648,7 @@ PAGES_TRANSACTION_FAMILIES: tuple[
         ("Catalog", "Error", "LimitKind", "Snapshot"),
         {"Catalog": "BodyTableCatalog", "Snapshot": "BodyTableSnapshot"},
     ),
-    ("body_table_deletion", "BodyTableDeletion", ("table", "deletion"), ("Commit", "Diagnostics", "Error", "LimitKind", "Patch"), {}),
+    ("body_table_deletion", "BodyTableDeletion", ("table", "deletion"), PAGES_TRANSACTION_SIX, {}),
     ("body_table_dimension", "BodyTableDimension", ("table", "dimension", "transaction"), PAGES_TRANSACTION_SIX, {}),
     ("body_table_headers", "BodyTableHeaderSettings", ("table", "headers", "transaction"), PAGES_TRANSACTION_SIX + ("InvalidReason",), {}),
     ("body_table_hidden_axes", "BodyTableHiddenAxes", ("table", "hidden_axes", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
@@ -16070,7 +16072,7 @@ KEYNOTE_MEDIA_CREATION_CODEC_FORBIDDEN_OPERATIONS = (
     "OwnedView",
     "crate::tsd::",
     "ArchiveObject",
-    "IWorkPackage",
+    "HostPackage",
     "RawMessage",
 )
 KEYNOTE_MEDIA_CREATION_PROJECTION_FIELDS = {
@@ -16282,7 +16284,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
     (
         "legacy editor delegation",
         re.compile(
-            r"(?<![A-Za-z0-9_#])(?:Editor|IWorkPackage)"
+            r"(?<![A-Za-z0-9_#])(?:Draft|HostPackage)"
             r"(?:[ \t\r\n]*::|[ \t\r\n]*\.)|"
             r"(?<![A-Za-z0-9_#])(?:editor|host|legacy_editor)"
             r"[ \t\r\n]*\.[ \t\r\n]*add_slide_movie\b"
@@ -16292,7 +16294,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_FORBIDDEN_SOURCE_PATTERNS = (
 KEYNOTE_SLIDE_MOVIE_CREATION_ROUTE = re.compile(
     r"(?<![A-Za-z0-9_#])(?:CreationOptions|MediaCreationOptions)"
     r"[ \t\r\n]*::[ \t\r\n]*Movie\b|"
-    r"(?<![A-Za-z0-9_#])(?:pub[ \t]+)?fn[ \t\r\n]+add_slide_movie\b|"
+    r"(?<![A-Za-z0-9_#])(?:pub(?:\([^()]*\))?[ \t]+)?fn[ \t\r\n]+(?:add|create)_slide_movie\b|"
     r"(?<![A-Za-z0-9_#])make_movie_objects\b|"
     r"(?<![A-Za-z0-9_#])SlideMovieCreation(?:Commit|Patch|Error|Diagnostics)\b"
 )
@@ -16308,7 +16310,7 @@ KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER = re.compile(
     r"(?:u64|u32|usize|Option[ \t\r\n]*<[ \t\r\n]*u64[ \t\r\n]*>)"
 )
 KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_TYPE = re.compile(
-    r"(?<![A-Za-z0-9_#])(?:ArchiveObject|RawMessage|Editor|IWorkPackage)\b"
+    r"(?<![A-Za-z0-9_#])(?:ArchiveObject|RawMessage|Draft|HostPackage)\b"
 )
 
 
@@ -16597,7 +16599,7 @@ PAGES_TABLE_LOCK_PHYSICAL_TYPES = frozenset(
         "DrawableArchive",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -16724,7 +16726,7 @@ PAGES_TABLE_TITLE_PHYSICAL_TYPES = frozenset(
         "DrawableArchive",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "Resolved",
         "SnappyStream",
@@ -16751,7 +16753,7 @@ PAGES_TABLE_TITLE_PROTO_ORIGINS = frozenset(
     {"buffa", "prost", "prost_types", "tsd", "tsp", "tst", "tswp"}
 )
 # Body-table display names are a separate ownership seam from title visibility
-# settings.  The current Pages host still exposes ``Editor::rename_table``
+# settings.  The current Pages host still exposes ``Draft::rename_table``
 # and routes it through the shared Numbers raw-ID helper; keep that migration
 # baseline dormant until the selector-first package owner is actually wired.
 RETIRED_IWA_PAGES_TABLE_NAME_METHODS = ("rename_table",)
@@ -16777,7 +16779,7 @@ IWA_PAGES_TABLE_NAME_HELPER_CALL = re.compile(
 IWA_PAGES_TABLE_NAME_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_TABLE_NAME_README_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Draft|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>rename_table|body_table_name|edit_body_table_name|"
         r"apply_body_table_name)\b[ \t\r\n]*\(",
@@ -16909,7 +16911,7 @@ PAGES_TABLE_HEADERS_PHYSICAL_TYPES = frozenset(
         "DrawableArchive",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "Resolved",
         "SnappyStream",
@@ -17045,7 +17047,7 @@ PAGES_TABLE_DIMENSION_PHYSICAL_TYPES = frozenset(
         "DrawableArchive",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "Resolved",
         "SnappyStream",
@@ -17105,7 +17107,7 @@ RETIRED_IWA_PAGES_TABLE_SORT_EXAMPLES = (
 IWA_PAGES_TABLE_SORT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_SORT_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_sort_order|set_table_sort_order|clear_table_sort_order)"
         r"\b[ \t\r\n]*\(",
@@ -17280,7 +17282,7 @@ PAGES_TABLE_SORT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -17342,7 +17344,7 @@ PAGES_TABLE_SORT_RAW_PARAMETER = re.compile(
 # the current host still resolves native TextStorageId values and owns the
 # package graph.  Once activated, the facade ratchet requires the semantic
 # role vocabulary plus one private package transaction owner, and the host
-# ratchet retires every raw Editor discovery/mutation method together.
+# ratchet retires every raw Draft discovery/mutation method together.
 RETIRED_IWA_PAGES_HEADER_FOOTER_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
 RETIRED_IWA_PAGES_HEADER_FOOTER_METHODS = (
     "header_footers",
@@ -17363,7 +17365,7 @@ IWA_PAGES_HEADER_FOOTER_CALL = re.compile(
 IWA_PAGES_HEADER_FOOTER_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_HEADER_FOOTER_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>header_footers|replace_header_footer_text|"
         r"set_header_footer_text|clear_header_footer)\b[ \t\r\n]*\(",
@@ -17482,7 +17484,7 @@ PAGES_HEADER_FOOTER_PHYSICAL_TYPES = frozenset(
         "HeaderFooterArchive",
         "HeaderFooterLocation",
         "HeaderFooterSnapshot",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "Resolved",
         "SectionArchive",
@@ -17563,7 +17565,7 @@ RETIRED_IWA_PAGES_SECTION_TEXT_EXAMPLE = Path(
 IWA_PAGES_SECTION_TEXT_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_SECTION_TEXT_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|Draft)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?(?P<method>"
         r"section_text|replace_section_text|set_section_text|clear_section_text)"
         r"\b[ \t\r\n]*\(",
@@ -17733,7 +17735,7 @@ PAGES_SECTION_TEXT_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "NativeSectionReference",
         "RawMessage",
         "Resolved",
@@ -17813,7 +17815,7 @@ IWA_PAGES_TABLE_APPEARANCE_CALL = re.compile(
 IWA_PAGES_TABLE_APPEARANCE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_APPEARANCE_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Draft|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>body_table_appearance|set_body_table_appearance|"
         r"table_appearance|set_table_appearance)\b[ \t\r\n]*\(",
@@ -18019,7 +18021,7 @@ PAGES_TABLE_APPEARANCE_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -18238,21 +18240,21 @@ IWA_PAGES_TABLE_HIDDEN_AXES_CALL = re.compile(
 IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_TABLE_HIDDEN_AXES_CALLS = (
     re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Editor|editor)"
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|Draft|editor)"
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>table_hidden_axes|set_table_hidden_axes)\b"
         r"[ \t\r\n]*\(",
     ),
 )
 # The focused package must remain a terminal semantic owner.  A new
-# ``litchi_iwa``/``Editor`` call or a direct shared-helper call in its
+# ``litchi_iwa``/``Draft`` call or a direct shared-helper call in its
 # owner would turn an unsupported focused operation into an implicit host
 # fallback.  These patterns are applied after comments, literals, and
 # cfg(test) items are masked.
 PAGES_TABLE_HIDDEN_AXES_FOCUSED_FALLBACK_PATTERNS = (
     re.compile(r"\blitchi_iwa[ \t\r\n]*::"),
     re.compile(r"\blitchi_pages[ \t\r\n]*::"),
-    re.compile(r"\b(?:Editor|PagesPackage|FocusedPagesPackage)\b"),
+    re.compile(r"\b(?:Draft|PagesPackage|FocusedPagesPackage)\b"),
     re.compile(
         r"(?<![A-Za-z0-9_])(?:crate[ \t\r\n]*::[ \t\r\n]*)?"
         r"(?:table_hidden_axes|set_table_hidden_axes)[ \t\r\n]*\("
@@ -18399,7 +18401,7 @@ PAGES_TABLE_HIDDEN_AXES_PHYSICAL_TYPES = frozenset(
         "HiddenStateExtentArchive",
         "HiddenStatesArchive",
         "HiddenStatesOwnerArchive",
-        "IWorkPackage",
+        "HostPackage",
         "RawMessage",
         "Resolved",
         "RowOrColumnState",
@@ -18699,7 +18701,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_TEST_MARKERS = {
     ),
     "focused hidden-axis read": re.compile(r"\bbody_table_hidden_axes\s*\("),
     "source-built reopen": re.compile(
-        r"\b(?:Editor|PagesPackage|Package)\s*::\s*from_bytes\s*\("
+        r"\b(?:Draft|PagesPackage|Package)\s*::\s*from_bytes\s*\("
     ),
     "source-built exact bytes": re.compile(
         r"\b(?:to_bytes|write_to)\s*\("
@@ -18726,7 +18728,7 @@ PAGES_TABLE_HIDDEN_AXES_RETIREMENT_SOURCE_BUILT_EXAMPLE_MARKERS = {
     ),
     "Pages focused package write": re.compile(r"\bwrite_to\s*\("),
     "Pages source-built reopen": re.compile(
-        r"\bEditor\s*::\s*from_bytes\s*\("
+        r"\bDraft\s*::\s*from_bytes\s*\("
     ),
     "Pages focused native reopen": re.compile(
         r"\bPagesPackage\s*::\s*(?:open|from_bytes)\s*\("
@@ -18831,7 +18833,7 @@ IWA_PAGES_README_SECTION_SETTINGS_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>section_settings|set_section_settings|set_section_name)"
         r"\b[ \t\r\n]*\("
     ),
@@ -18926,7 +18928,7 @@ PAGES_SECTION_SETTINGS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "Resolved",
@@ -18992,7 +18994,7 @@ IWA_PAGES_README_SECTION_BACKGROUND_CALLS = (
     re.compile(
         r"(?<![A-Za-z0-9_])"
         r"(?:(?:r#)?[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*::[ \t\r\n]*)*"
-        r"(?:r#)?Editor[ \t\r\n]*::[ \t\r\n]*"
+        r"(?:r#)?Draft[ \t\r\n]*::[ \t\r\n]*"
         r"(?:r#)?(?P<method>section_background|set_section_background)"
         r"\b[ \t\r\n]*\("
     ),
@@ -19086,7 +19088,7 @@ PAGES_SECTION_BACKGROUND_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "Opaque",
         "PhysicalSource",
         "RawMessage",
@@ -19219,7 +19221,7 @@ SEMANTIC_FACADE_FORBIDDEN_NAMES = frozenset(
         "ArchiveView",
         "ComponentId",
         "Generated",
-        "IWorkPackage",
+        "HostPackage",
         "NativeId",
         "ObjectId",
         "Package",
@@ -22280,7 +22282,7 @@ def _iwork_public_leak(identifier: str) -> str | None:
         return "archive/IWA type"
     if identifier in {"buffa", "prost", "prost_types"}:
         return "protobuf type"
-    if identifier in {"IWorkPackage", "SourceCatalog"}:
+    if identifier in {"HostPackage", "SourceCatalog"}:
         return "archive/IWA type"
     words: list[str] = []
     for part in identifier.split("_"):
@@ -22644,7 +22646,7 @@ def _is_numbers_table_cell_pop_up_menu_public_declaration(
 def _numbers_table_cell_number_format_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden by the Number-format facade."""
 
-    if identifier in {"Editor", "Editor", "Editor", "LitchiIwaPackage"}:
+    if identifier in {"Draft", "Draft", "Draft", "LitchiIwaPackage"}:
         return "monolithic host type"
     if identifier in NUMBERS_TABLE_CELL_NUMBER_FORMAT_PROTO_ORIGINS:
         return "protobuf type"
@@ -23279,7 +23281,7 @@ def _is_pages_table_hidden_axes_public_declaration(
                     "ComponentCatalog",
                     "EntryEdit",
                     "ExactArtifacts",
-                    "IWorkPackage",
+                    "HostPackage",
                     "RawMessage",
                     "Resolved",
                     "SnappyStream",
@@ -24179,10 +24181,10 @@ def audit_iwa_keynote_drawable_comment_host_source_topology(
 
     The focused Keynote package owns the selector-first drawable-comment API.
     The migration host must therefore have no production or test-only
-    identifier for any of the seven former ``Editor`` routes.  Scan
+    identifier for any of the seven former ``Draft`` routes.  Scan
     the complete iwa source tree after masking comments and literals so a
     private helper or public re-export cannot quietly recreate the old route.
-    The generic ``IWorkDrawableCommentEditor`` remains an intentional shared
+    The generic ``comments::Draft`` remains an intentional shared
     host API for Pages and Numbers and is checked explicitly below.
     """
 
@@ -24234,11 +24236,10 @@ def audit_iwa_keynote_drawable_comment_host_source_topology(
         export_source = _mask_rust_non_code(
             export_source_path.read_text(encoding="utf-8")
         )
-        if re.search(
-            rf"\bpub(?:\s*\([^)]*\))?\s+use\s+"
-            rf"[^;\n]*\b{re.escape(IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE)}\b",
-            export_source,
-        ) is None:
+        # Record 0361: the shared draft is public as ``comments::Draft``; the
+        # crate root exports the ``comments`` module rather than a prefixed
+        # root alias.
+        if re.search(r"\bpub\s+mod\s+comments\s*;", export_source) is None:
             violations.append(
                 "shared litchi-iwa drawable-comment editor export is missing: "
                 f"{IWA_SHARED_DRAWABLE_COMMENT_EDITOR_TYPE}: "
@@ -24294,12 +24295,12 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
 def audit_iwa_legacy_method_deprecation_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep retained Numbers/Pages raw-ID compatibility methods deprecated.
+    """Keep retained Numbers/Pages native-ID host methods plain and documented.
 
     These methods remain available because the migration host still handles
-    sources that the focused package owners cannot edit.  Their signatures
-    nevertheless accept native object identities, so dropping the marker
-    would make a compatibility path look like a supported semantic API again.
+    sources that the focused package owners cannot edit.  Record 0361 made
+    them plain API: no item may stay deprecated, and each doc comment states
+    its native-ID host scope so it does not read as a semantic owner.
     Keep this source-only check exact to the two migrated method families; it
     does not classify unrelated host capabilities that have no focused owner.
     """
@@ -24326,7 +24327,8 @@ def audit_iwa_legacy_method_deprecation_source_topology(
         path = root / relative
         if not path.is_file():
             continue
-        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        raw = path.read_text(encoding="utf-8")
+        source = _mask_rust_non_code(raw)
         for match in declaration.finditer(source):
             name = match.group(1)
             if name not in names:
@@ -24344,11 +24346,17 @@ def audit_iwa_legacy_method_deprecation_source_topology(
                     closing = attribute.rfind("]")
                     deprecated = closing >= 0 and not attribute[closing + 1 :].strip()
 
-            if not deprecated:
-                line_number = source.count("\n", 0, match.start()) + 1
+            line_number = source.count("\n", 0, match.start()) + 1
+            if deprecated:
                 violations.append(
-                    f"litchi-iwa {product} legacy method must remain deprecated "
+                    f"litchi-iwa {product} native-ID method must not be deprecated "
                     f"{name}: {relative}:{line_number}"
+                )
+            raw_prefix = raw[max(0, match.start() - 1200) : match.start()]
+            if "Native-ID host API" not in raw_prefix:
+                violations.append(
+                    f"litchi-iwa {product} native-ID method must document its "
+                    f"native-ID host scope {name}: {relative}:{line_number}"
                 )
 
     return sorted(set(violations))
@@ -24573,7 +24581,7 @@ def _iwa_numbers_cell_comment_reader_retirement_evidence_ready(
 def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire only ``Editor::cell_comment`` after parity evidence.
+    """Retire only ``Draft::cell_comment`` after parity evidence.
 
     ``cell_comment_replies`` intentionally remains in the retention audit
     above.  This scan is limited to the Numbers host and its callers, so
@@ -24609,7 +24617,7 @@ def audit_iwa_numbers_cell_comment_reader_retirement_source_topology(
                 continue
             name = function.group(1)
             violations.append(
-                "retired litchi-iwa Editor::cell_comment method returned: "
+                "retired litchi-iwa Draft::cell_comment method returned: "
                 f"{relative}:{line_number}"
             )
             for match in IWA_NUMBERS_CELL_COMMENT_READER_RAW_ID_PARAMETER.finditer(
@@ -27770,7 +27778,7 @@ def audit_iwa_numbers_table_move_source_topology(
             if name != NUMBERS_TABLE_MOVE_PACKAGE_METHOD:
                 continue
             violations.append(
-                "retired litchi-iwa Editor::move_table returned: "
+                "retired litchi-iwa Draft::move_table returned: "
                 f"{path.relative_to(root)}:{line_number}"
             )
         host_move_calls.extend(
@@ -29237,7 +29245,7 @@ def audit_iwa_numbers_table_cell_pop_up_menu_source_topology(
 
     The Pages table popup adapter and the shared private cell-data-format
     implementation are intentionally outside this ratchet.  They may remain
-    while Numbers migrates, but public Editor/raw-ID entry points and
+    while Numbers migrates, but public Draft/raw-ID entry points and
     example calls must not bypass the selector-first package owner.
     """
 
@@ -30664,12 +30672,12 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
 def audit_iwa_numbers_table_cell_custom_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire Editor Custom-format raw-ID routes after owner cutover.
+    """Retire Draft Custom-format raw-ID routes after owner cutover.
 
     The focused ``litchi-numbers::Package`` owns the selector-first Custom
     transaction.  Generic ``DataFormat`` helpers remain compatibility-only
     ingress for source-built Numbers packages and attached Pages/Keynote
-    tables, so this audit bans only the three dedicated Editor method
+    tables, so this audit bans only the three dedicated Draft method
     names.  Focused Package calls with the same names remain valid and are
     checked for their lexical receiver by the shared retirement scanner.
     """
@@ -30743,9 +30751,9 @@ def _numbers_table_cell_text_format_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden by the Text facade."""
 
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -31846,9 +31854,9 @@ def _numbers_table_cell_duration_format_public_leak(
     if identifier == "wire" or identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_WIRE_TYPES:
         return "wire type"
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -33280,9 +33288,9 @@ def _numbers_table_cell_percentage_format_public_leak(identifier: str) -> str | 
     """Classify native vocabulary forbidden by the Percentage facade."""
 
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -33389,9 +33397,9 @@ def _numbers_table_cell_currency_format_public_leak(identifier: str) -> str | No
     """Classify native vocabulary forbidden by the Currency facade."""
 
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -33498,9 +33506,9 @@ def _numbers_table_cell_scientific_format_public_leak(identifier: str) -> str | 
     """Classify native vocabulary forbidden by the Scientific facade."""
 
     if identifier in {
-        "Editor",
-        "Editor",
-        "Editor",
+        "Draft",
+        "Draft",
+        "Draft",
         "LitchiIwaPackage",
     }:
         return "monolithic host type"
@@ -37691,7 +37699,7 @@ def _audit_iwa_numbers_table_cell_format_retirement(
             name = match.group("name")
             # Calls through the focused Package are canonical and may remain
             # in a migration-host adapter.  The retired surface is the
-            # Editor raw-ID method, not the focused owner call with the
+            # Draft raw-ID method, not the focused owner call with the
             # same semantic method name.  Validate the receiver and its local
             # scope exactly; a focused call elsewhere on a statement or in a
             # different function must not exempt an unrelated receiver.
@@ -37808,13 +37816,13 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
 def audit_iwa_numbers_table_cell_date_time_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire Editor Date & Time raw-ID methods after owner cutover.
+    """Retire Draft Date & Time raw-ID methods after owner cutover.
 
     Date & Time has no migration-only bridge/fallback helpers: source-built
     and attached-table compatibility continues through the generic
     ``DataFormat`` routes, while the focused ``litchi-numbers::Package`` owns
     the selector-first DateTime transaction.  Pass empty inventories to the
-    shared retired-route scanner so only the dedicated Editor methods
+    shared retired-route scanner so only the dedicated Draft methods
     are rejected.
     """
 
@@ -37832,11 +37840,11 @@ def audit_iwa_numbers_table_cell_date_time_format_source_topology(
 def audit_iwa_numbers_table_cell_duration_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire Editor Duration raw-ID methods after owner cutover.
+    """Retire Draft Duration raw-ID methods after owner cutover.
 
     Generic ``DataFormat`` helpers remain compatibility-only routes for
     source-built Numbers packages and attached Pages/Keynote tables.  Once
-    the focused Duration owner is wired, only the dedicated Editor
+    the focused Duration owner is wired, only the dedicated Draft
     methods are forbidden; focused ``litchi_numbers::Package`` calls remain
     valid adapter ingress.
     """
@@ -38083,7 +38091,7 @@ def audit_iwa_numbers_table_cell_control_bridge_source_topology(
 ) -> list[str]:
     """Verify the generic Numbers bridge delegates controls by selectors.
 
-    The compatibility ``Editor`` still exposes the historical generic
+    The compatibility ``Draft`` still exposes the historical generic
     data-format entry point.  Interactive controls must nevertheless enter
     ``litchi-numbers::Package`` through ``SheetSelector``/
     ``TableSelector``/``At`` and the unified control transaction;
@@ -40001,7 +40009,7 @@ def audit_iwa_numbers_cell_comment_delegation_source_topology(
 ) -> list[str]:
     """Keep the retained Numbers comment writer on the focused owner seam.
 
-    ``Editor::set_cell_comment`` is a deprecated compatibility entry
+    ``Draft::set_cell_comment`` is a deprecated compatibility entry
     point.  It may retain the old archive writer for comment graphs that the
     focused package cannot yet own, but every supported existing-root
     creation or replacement must first cross the selector-first
@@ -40271,7 +40279,7 @@ def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
 ) -> list[str]:
     """Audit only the Numbers reply bridge after the package owner activates.
 
-    The old ``Editor`` methods are allowed during the migration while
+    The old ``Draft`` methods are allowed during the migration while
     they remain explicitly deprecated and route through a narrow private
     compatibility helper.  Calls in Numbers examples/production must not be
     mistaken for the supported API.  Pages, Keynote, and the shared
@@ -40382,15 +40390,17 @@ def audit_iwa_numbers_cell_comment_reply_mutation_source_topology(
                 )
                 offset = declaration_match.start() if declaration_match else 0
                 prefix = raw_source[max(0, offset - 700) : offset]
-                if re.search(r"#\s*\[\s*deprecated\b", prefix) is None:
+                # Record 0361: retained native-ID host API is plain, documented
+                # API, never deprecated (no deprecated item may remain).
+                if re.search(r"#\s*\[\s*deprecated\b", prefix) is not None:
                     violations.append(
-                        "litchi-iwa Numbers comment-reply compatibility method must be "
+                        "litchi-iwa Numbers comment-reply native-ID method must not be "
                         f"deprecated {method}: {location(path, line_number)}"
                     )
-                if re.search(r"(?i)\b(?:legacy|compatibility|raw[- ]?id)\b", prefix) is None:
+                if re.search(r"Native-ID host API", prefix) is None:
                     violations.append(
-                        "litchi-iwa Numbers comment-reply compatibility method must document "
-                        f"legacy scope {method}: {location(path, line_number)}"
+                        "litchi-iwa Numbers comment-reply native-ID method must document "
+                        f"its native-ID host scope {method}: {location(path, line_number)}"
                     )
                 body = _rust_any_function_body(source, method)
                 if body is None or re.search(
@@ -40783,7 +40793,7 @@ def _pages_table_name_focused_package_call(
 def audit_iwa_pages_table_name_source_topology(root: Path = ROOT) -> list[str]:
     """Retire raw Pages body-table renames once the focused owner is wired.
 
-    ``Editor::rename_table`` and the shared
+    ``Draft::rename_table`` and the shared
     ``crate::numbers::editor::rename_table_in_package`` helper both accept a
     native model identifier.  They must disappear from production Pages host
     code when ``body_table_name.rs`` is present.  A typed
@@ -41175,7 +41185,7 @@ def audit_iwa_pages_table_hidden_axes_source_topology(
     The focused owner is selector-first and archive free, but it currently
     refuses to create the native hidden-state closure for source-built Pages
     tables.  Until the native changed-edit gate closes, the raw-ID
-    ``Editor`` route, its test coverage, and the mixed iWork example are
+    ``Draft`` route, its test coverage, and the mixed iWork example are
     required compatibility paths.  The host route must continue to use the
     shared executor, while the focused owner remains terminal and cannot call
     back into this compatibility seam.
@@ -42282,7 +42292,7 @@ def _pages_table_appearance_legacy_read_compatibility_call(
     """Allow the sole read-only legacy fallback used by table listing.
 
     The exact package owner intentionally rejects producer profiles it cannot
-    rewrite safely. Legacy ``Editor`` physical table discovery must still
+    rewrite safely. Legacy ``Draft`` physical table discovery must still
     report their existing appearance, but this exception is confined to one
     private helper and never permits a write or package-owner fallback.
     """
@@ -43345,7 +43355,7 @@ def audit_iwa_pages_header_footer_source_topology(
     """Retire the raw Pages header/footer host after owner activation.
 
     Header/footer discovery and text mutation currently live on
-    ``Editor`` and expose ``TextStorageId``/``PagesHeaderFooterInfo``.
+    ``Draft`` and expose ``TextStorageId``/``PagesHeaderFooterInfo``.
     Keep this audit dormant until the private package owner exists so the
     compatibility host remains an intentional migration baseline.  Activation
     is deliberately item-scoped: unrelated Pages graph readers remain valid,
@@ -43753,7 +43763,7 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
             for match in IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL.finditer(code):
                 # Focused Package calls are the replacement route and are
                 # allowed to retain the semantic method names. The ratchet
-                # targets host Editor compatibility calls only.
+                # targets host Draft compatibility calls only.
                 if match.group("receiver") in {"Package", "PagesPackage"}:
                     continue
                 line_start = code.rfind("\n", 0, match.start()) + 1
@@ -44514,7 +44524,7 @@ def audit_iwa_pages_drawable_order_retirement_source_topology(
     ``litchi-pages`` owns selector-first body ordering now.  The compatibility
     host may continue to use the neutral codec for generic reachability and
     drawable creation, so this ratchet only targets the removed module,
-    ``Editor`` method names, and their executable calls.
+    ``Draft`` method names, and their executable calls.
     """
 
     source_root = root / IWA_PAGES_SOURCE_ROOT
@@ -49373,7 +49383,7 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
     use ``SheetSelector``/``TableSelector`` and semantic cell positions, while
     strict comment-storage decoding and a package-wide ownership census stay
     behind the private owner boundary.  This ratchet does not require reply
-    mutation.  The legacy raw-ID ``Editor`` reply read/add/set/remove
+    mutation.  The legacy raw-ID ``Draft`` reply read/add/set/remove
     methods remain retained mutation/identity compatibility and are
     intentionally neither required nor retired here.
     """
@@ -51408,7 +51418,7 @@ def audit_iwork_atomic_publication(root: Path = ROOT) -> list[str]:
     if legacy_path.is_file():
         legacy_source = production_source(legacy_path)
         report_forbidden(legacy_path, "legacy", _mask_rust_non_code(legacy_source))
-        legacy_methods = _rust_public_methods_in_impl(legacy_source, "IWorkPackage")
+        legacy_methods = _rust_public_methods_in_impl(legacy_source, "Package")
         legacy_saves = [
             (declaration, line_number)
             for name, declaration, line_number in legacy_methods
@@ -51416,7 +51426,7 @@ def audit_iwork_atomic_publication(root: Path = ROOT) -> list[str]:
         ]
         if not legacy_saves:
             violations.append(
-                "legacy litchi-iwa IWorkPackage::save is missing a production "
+                "legacy litchi-iwa Package::save is missing a production "
                 f"method: {IWORK_LEGACY_PACKAGE_SOURCE}"
             )
         else:
@@ -51435,7 +51445,7 @@ def audit_iwork_atomic_publication(root: Path = ROOT) -> list[str]:
                 not legacy_routes
             ):
                 violations.append(
-                    "legacy litchi-iwa IWorkPackage::save must route through "
+                    "legacy litchi-iwa HostPackage::save must route through "
                     f"litchi-iwa-archive::{IWORK_ARCHIVE_PUBLICATION_MODULE}::"
                     f"{IWORK_ARCHIVE_PUBLICATION_HELPER}: "
                     f"{IWORK_LEGACY_PACKAGE_SOURCE}:{legacy_saves[0][1]}"
@@ -52775,11 +52785,11 @@ def audit_keynote_slide_movie_creation_source_topology(
 
         # Keep raw-ID rejection local to a semantic entry point.  The shared
         # owner necessarily uses u64 references while staging the archive.
-        function = _rust_named_function_body(production_source, "add_slide_movie")
+        function = _rust_named_function_body(production_source, "create_slide_movie")
         if function is not None:
             body, body_offset = function
             signature = production_code[:body_offset]
-            signature_start = signature.rfind("fn add_slide_movie")
+            signature_start = signature.rfind("fn create_slide_movie")
             if signature_start >= 0:
                 signature = signature[max(0, signature_start - 240) :]
                 for match in KEYNOTE_SLIDE_MOVIE_CREATION_RAW_API_PARAMETER.finditer(
@@ -53217,7 +53227,7 @@ def audit_keynote_chart_legend_visibility_facade_source_topology(
             )
         if re.search(
             r"\b(?:prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
-            r"Archive|RawMessage|IWorkPackage|ComponentCatalog|WireView)\b",
+            r"Archive|RawMessage|HostPackage|ComponentCatalog|WireView)\b",
             declaration,
         ):
             violations.append(
@@ -53265,7 +53275,7 @@ def audit_keynote_chart_legend_visibility_facade_source_topology(
                 )
             if re.search(
                 r"\b(?:prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
-                r"Archive|RawMessage|IWorkPackage|ComponentCatalog|WireView)\b",
+                r"Archive|RawMessage|HostPackage|ComponentCatalog|WireView)\b",
                 declaration,
             ):
                 violations.append(
@@ -54775,7 +54785,7 @@ def _keynote_chart_axis_title_check_codec(root: Path) -> list[str]:
                 "focused litchi-keynote chart-axis-title hidden codec is missing "
                 f"{label} marker: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
             )
-    if any(marker in code for marker in ("prost", "IWorkPackage", "chart_graph")):
+    if any(marker in code for marker in ("prost", "HostPackage", "chart_graph")):
         violations.append(
             "focused litchi-keynote chart-axis-title hidden codec must remain neutral "
             f"and generated-free: {KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE}"
@@ -55263,7 +55273,7 @@ KEYNOTE_CHART_AXIS_VALUE_SETTINGS_PHYSICAL_TYPES = frozenset(
         "ComponentCatalog",
         "EntryEdit",
         "ExactArtifacts",
-        "IWorkPackage",
+        "HostPackage",
         "PhysicalSource",
         "RawMessage",
         "SnappyStream",
@@ -56030,7 +56040,7 @@ def _keynote_chart_axis_value_settings_check_codec(root: Path) -> list[str]:
                 f"use eager generated decode/encode {match.group(0).strip()}: "
                 f"{KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CODEC_SOURCE}:{line_number}"
             )
-    for marker in ("IWorkPackage", "chart_graph"):
+    for marker in ("HostPackage", "chart_graph"):
         if marker in code:
             violations.append(
                 "focused litchi-keynote chart value-axis settings hidden codec must remain "
@@ -58543,7 +58553,7 @@ def audit_keynote_movie_playback_facade_source_topology(
 
     The audit is intentionally dormant until the private owner, neutral codec,
     and package wiring exist together.  This avoids turning the still-live
-    Editor compatibility surface into a false migration failure while
+    Draft compatibility surface into a false migration failure while
     the owner is being assembled.
     """
 
@@ -58795,12 +58805,12 @@ def audit_keynote_movie_playback_resource_source_topology(
 
 
 def audit_iwa_keynote_movie_playback_source_topology(root: Path = ROOT) -> list[str]:
-    """Retire Editor movie playback methods after package activation.
+    """Retire Draft movie playback methods after package activation.
 
     Pages/Numbers/audio users of the shared ``media_playback`` helper are
     deliberately outside this source-root scan.  The migration surface is
     Keynote-only and callers should use ``litchi_keynote::Package`` directly;
-    no replacement public Editor bridge is accepted.
+    no replacement public Draft bridge is accepted.
     """
 
     if not _keynote_movie_playback_owner_present(root):
@@ -60049,6 +60059,10 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
         (name, declaration)
         for name, declaration, _line in _rust_public_methods_in_impl(owner, "Package")
     )
+    edit_declarations = dict(
+        (name, declaration)
+        for name, declaration, _line in _rust_public_methods_in_impl(owner, "Edit")
+    )
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
         declaration = declarations.get(name)
         if declaration is None:
@@ -60057,20 +60071,17 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
                 f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
             continue
-    for name in sorted(
-        KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS
-        - KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS
-    ):
-        declaration = declarations.get(name)
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS):
+        declaration = edit_declarations.get(name)
         if declaration is None:
             violations.append(
-                "focused litchi-keynote slide-media lifecycle Package method is missing "
+                "focused litchi-keynote slide-media lifecycle Edit method is missing "
                 f"{name}: {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
             continue
 
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS):
-        declaration = declarations.get(name)
+        declaration = edit_declarations.get(name)
         if declaration is None:
             continue
         for selector in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES):
@@ -60083,18 +60094,19 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
     for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS):
         declaration = declarations.get(name)
         if declaration is None:
-            if name == "apply_slide_media_lifecycle_patch":
-                # This compatibility spelling may be omitted by a minimal
-                # owner, but if it exists it is still part of the typed facade.
-                continue
             continue
         if not re.search(r"\b(?:LifecyclePatch|Patch)\b", declaration):
             violations.append(
                 "focused litchi-keynote slide-media lifecycle apply method must accept "
                 f"its typed patch ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
             )
-    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
-        declaration = declarations.get(name)
+    staged_declarations = [
+        declarations.get(name) for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS)
+    ] + [
+        edit_declarations.get(name)
+        for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_TYPED_PACKAGE_METHODS)
+    ]
+    for declaration in staged_declarations:
         if declaration is None:
             continue
         if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
@@ -60251,7 +60263,7 @@ def _audit_keynote_slide_media_lifecycle_comment_codec(
                 f"eager generated operation {match.group(0).strip()}: "
                 f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE}:{line_number}"
             )
-    for marker in ("IWorkPackage", "ArchiveObject", "SourceCatalog", "RawMessage"):
+    for marker in ("HostPackage", "ArchiveObject", "SourceCatalog", "RawMessage"):
         if re.search(rf"\b{re.escape(marker)}\b", code):
             violations.append(
                 "focused Keynote media lifecycle comment codec must remain neutral and archive-free "
@@ -60324,7 +60336,7 @@ def audit_keynote_slide_media_lifecycle_codec_source_topology(
                 f"eager generated operation {match.group(0).strip()}: "
                 f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE}:{line_number}"
             )
-    for marker in ("IWorkPackage", "ArchiveObject", "SourceCatalog"):
+    for marker in ("HostPackage", "ArchiveObject", "SourceCatalog"):
         if re.search(rf"\b{re.escape(marker)}\b", code):
             violations.append(
                 "focused Keynote media lifecycle codec must remain neutral and archive-free "
@@ -60382,7 +60394,7 @@ def audit_keynote_slide_media_lifecycle_codec_source_topology(
                     f"eager generated operation {match.group(0).strip()}: "
                     f"{KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_NODE_CACHE_SOURCE}:{line_number}"
                 )
-        for marker in ("IWorkPackage", "ArchiveObject", "SourceCatalog"):
+        for marker in ("HostPackage", "ArchiveObject", "SourceCatalog"):
             if re.search(rf"\b{re.escape(marker)}\b", child_code):
                 violations.append(
                     "focused Keynote media lifecycle codec must remain neutral and archive-free "
@@ -61599,7 +61611,7 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             )
         return reachable
 
-    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_METHODS):
+    for name in sorted(KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OPERATIONS):
         signature_body = functions.get(name)
         if signature_body is None:
             continue
@@ -63469,7 +63481,7 @@ def audit_iwa_keynote_audio_position_source_topology(
                 ):
                     continue
                 # Focused package calls in host tests/examples are allowed to
-                # retain the semantic spelling.  Editor receivers are not.
+                # retain the semantic spelling.  Draft receivers are not.
                 if _keynote_audio_position_focused_package_call(source, match):
                     continue
                 line_number = source.count("\n", 0, match.start("method")) + 1
@@ -66977,7 +66989,7 @@ def audit_iwa_keynote_slide_table_name_source_topology(
 ) -> list[str]:
     """Retire raw Keynote table-name mutation in favor of Package calls.
 
-    ``Editor::rename_slide_table`` and the shared Numbers
+    ``Draft::rename_slide_table`` and the shared Numbers
     ``rename_table_in_package`` helper both accept native model identity.  A
     focused ``litchi_keynote::Package`` call remains valid, while editor/self
     calls, helper imports, and helper invocations disappear from production
@@ -67233,7 +67245,7 @@ def audit_iwa_keynote_movie_geometry_source_topology(root: Path = ROOT) -> list[
     """Require the historical bridge before completion, then enforce host exit.
 
     MovieGeometry intentionally does not cover native angle/flip/flags and
-    synthetic compatibility graphs.  The legacy Editor declarations
+    synthetic compatibility graphs.  The legacy Draft declarations
     and their internal calls therefore remain allowed in the focused host and
     its geometry helper until the expanded owner explicitly activates.  At
     activation, the completion audit takes over and retires every selector
@@ -70340,13 +70352,10 @@ KEYNOTE_TABLE_MERGE_READER_SOURCE = Path(
 FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
     {
         "open",
-        "open_with_limits",
         "open_with_options",
         "from_bytes",
-        "from_bytes_with_limits",
         "from_bytes_with_options",
         "from_shared_bytes",
-        "from_shared_bytes_with_limits",
         "from_shared_bytes_with_options",
         "table_merges",
         "body_table_merges",
@@ -70617,13 +70626,17 @@ IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
     {
         "Commit",
         "Diagnostics",
+        "Edit",
         "Error",
         "LimitKind",
         "Patch",
     }
 )
+# Record 0361 (W7): ``Package::edit_body_table_deletion`` starts the scoped
+# edit, ``Edit::remove`` stages the selector and ``Edit::commit`` resolves it
+# before any staging or publication helper runs.
 IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS = (
-    "remove_body_table",
+    "edit_body_table_deletion",
     "apply_body_table_deletion",
 )
 IWA_PAGES_BODY_TABLE_DELETION_CHILD_MARKER_GROUPS = {
@@ -71042,7 +71055,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
         "format_name": "Pages",
         "source": Path("crates/litchi-iwa/src/pages/editor/tables/semantic.rs"),
         "reader_source": Path("crates/litchi-iwa/src/pages/editor/tables/reader.rs"),
-        "impl_type": "Editor",
+        "impl_type": "Draft",
         "method": "table_cell_merges",
         "focused_method": "body_table_merges",
         "selectors": (
@@ -71054,7 +71067,7 @@ IWA_TABLE_MERGE_HOST_READ_DELEGATIONS = (
         "format_name": "Keynote",
         "source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
         "reader_source": Path("crates/litchi-iwa/src/keynote/editor/slide_tables/reader.rs"),
-        "impl_type": "Editor",
+        "impl_type": "Draft",
         "method": "slide_table_cell_merges",
         "focused_method": "slide_table_merges",
         "selectors": (
@@ -71073,7 +71086,10 @@ IWA_TABLE_MERGE_HOST_FOCUSED_CALL = re.compile(
 IWA_KEYNOTE_TABLE_MERGE_ALLOWED_FALLBACK_ARM = re.compile(
     r"\bErr\s*\(\s*litchi_keynote\s*::\s*slide\s*::\s*table\s*::\s*merge"
     r"\s*::\s*transaction\s*::\s*Error"
-    r"\s*::\s*UnsupportedDependency\s*\)\s*=>"
+    # Record 0361: the refusal is `Error::Refused(Refusal::UnsupportedDependency)`.
+    r"\s*::\s*Refused\s*\(\s*litchi_keynote\s*::\s*slide\s*::\s*table\s*::\s*merge"
+    r"\s*::\s*transaction\s*::\s*Refusal"
+    r"\s*::\s*UnsupportedDependency\s*,?\s*\)\s*\)\s*=>"
 )
 
 # Selected table-cell reads share the same three-layer boundary as merged
@@ -71103,7 +71119,7 @@ IWA_COMMON_TABLE_READ_FORBIDDEN_IMPORT = re.compile(
 )
 IWA_TABLE_READ_PUBLIC_PHYSICAL_TYPES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"Archive(?:Object)?|RawMessage|IWorkPackage|Native(?:Id|Object)|"
+    r"Archive(?:Object)?|RawMessage|HostPackage|Native(?:Id|Object)|"
     r"(?:Object|Package|Table|DataStore|Tile|Sidecar)Id|"
     r"(?:TableModel|DataStore|Native|Tile|Sidecar)Snapshot|"
     r"DecodeOptions|Wire(?:View|Limits|FieldView|Descent)|"
@@ -71280,7 +71296,7 @@ IWA_COMMON_CHART_METADATA_FORBIDDEN_IMPORT = re.compile(
 )
 IWA_CHART_METADATA_PUBLIC_PHYSICAL_TYPES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"Archive(?:Object)?|RawMessage|IWorkPackage|Native(?:Id|Object)|"
+    r"Archive(?:Object)?|RawMessage|HostPackage|Native(?:Id|Object)|"
     r"(?:Object|Package|Chart|Drawable|Message|Component)Id|"
     r"(?:Chart|Drawable|Message|Component)Archive|"
     r"DecodeOptions|DecodeReport|Wire(?:View|Limits|FieldView|Descent)|"
@@ -71412,7 +71428,7 @@ IWA_COMMON_CHART_DATA_FORBIDDEN_IMPORT = re.compile(
 )
 IWA_CHART_DATA_PUBLIC_PHYSICAL_TYPES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"Archive(?:Object)?|RawMessage|IWorkPackage|Native(?:Id|Object)|"
+    r"Archive(?:Object)?|RawMessage|HostPackage|Native(?:Id|Object)|"
     r"(?:Object|Package|Chart|Drawable|Message|Component)Id|"
     r"(?:Chart|Drawable|Message|Component|Grid|Value)Archive|"
     r"ChartDataSnapshot|DecodeError|DecodeLimit|LabelList|ValueList|"
@@ -71742,14 +71758,15 @@ def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]
                 "Numbers table-cell Borders compatibility source defines a duplicate model: "
                 f"{IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
             )
+        # Record 0361 deleted the deprecated ``numbers::editor::table::cell``
+        # alias; ``litchi_iwa_common::table::cell::Borders`` is the one path.
         if re.search(
-            r"(?s)#\s*\[\s*deprecated\b.*?\]\s*"
             r"pub[ \t]+use[ \t]+litchi_iwa_common::table::cell::Borders\s*;",
             compatibility_code,
-        ) is None:
+        ) is not None:
             violations.append(
-                "Numbers table-cell Borders compatibility source must retain a deprecated "
-                "common re-export: "
+                "Numbers table-cell Borders compatibility source must not re-export "
+                "the common Borders (record 0361): "
                 f"{IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
             )
 
@@ -72785,6 +72802,7 @@ def audit_pages_table_merge_reader_source_topology(root: Path = ROOT) -> list[st
         query_method="body_table_merges",
         selector_types=PAGES_TABLE_MERGE_SELECTOR_TYPES,
         limits_type="Limits",
+        options_type="OpenOptions",
     )
 
 
@@ -73265,7 +73283,7 @@ def _audit_numbers_cached_merge_handoff(root: Path) -> list[str]:
     if not (root / owner_path).is_file():
         return []
     owner = (root / owner_path).read_text(encoding="utf-8")
-    methods = _rust_public_method_bodies(owner, "table_cell_merges", type_name="Editor")
+    methods = _rust_public_method_bodies(owner, "table_cell_merges", type_name="Draft")
     if not methods:
         return []
     violations: list[str] = []
@@ -74438,6 +74456,8 @@ def audit_pages_body_table_deletion_source_topology(
     package_method_records: dict[str, list[tuple[str, str, int, Path]]] = {
         name: [] for name in IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS
     }
+    commit_records: list[tuple[str, str, int, Path]] = []
+    stage_records: list[tuple[str, str, int, Path]] = []
     for path, source in sources:
         for method_name in package_method_records:
             for declaration, body, line in _rust_public_method_bodies(
@@ -74446,30 +74466,46 @@ def audit_pages_body_table_deletion_source_topology(
                 package_method_records[method_name].append(
                     (declaration, body, line, path)
                 )
+        for declaration, body, line in _rust_public_method_bodies(
+            source, "commit", type_name="Edit"
+        ):
+            commit_records.append((declaration, body, line, path))
+        for declaration, body, line in _rust_public_method_bodies(
+            source, "remove", type_name="Edit"
+        ):
+            stage_records.append((declaration, body, line, path))
 
-    remove_records = package_method_records["remove_body_table"]
-    if not remove_records:
+    if not package_method_records["edit_body_table_deletion"]:
         violations.append(
-            "Pages body-table deletion Package method is missing remove_body_table: "
-            f"{owner_path}"
+            "Pages body-table deletion Package method is missing "
+            f"edit_body_table_deletion: {owner_path}"
         )
-    for declaration, body, line, path in remove_records:
+    if not stage_records:
+        violations.append(
+            f"Pages body-table deletion Edit method is missing remove: {owner_path}"
+        )
+    for declaration, _body, line, path in stage_records:
         if re.search(r"\bBodyTableSelector\b", declaration) is None:
             violations.append(
-                "Pages remove_body_table must accept BodyTableSelector: "
+                "Pages body-table deletion Edit::remove must accept BodyTableSelector: "
                 f"{path}:{line}"
             )
+    if not commit_records:
+        violations.append(
+            f"Pages body-table deletion Edit method is missing commit: {owner_path}"
+        )
+    for declaration, body, line, path in commit_records:
         if re.search(r"\bResult\s*<\s*Commit\s*,\s*Error\s*>", declaration) is None:
             violations.append(
-                "Pages remove_body_table must return the typed deletion result: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit must return the typed deletion "
+                f"result: {path}:{line}"
             )
         body_code = _mask_rust_non_code(body)
         body_opening = body_code.find("{")
         if body_opening >= 0:
             body_code = body_code[body_opening + 1 :]
         admission = re.search(
-            r"\b(?:BodyTableSelector|resolve_body_table|select_body_table|"
+            r"\b(?:select_target|resolve_body_table|select_body_table|"
             r"body_table_catalog)\b",
             body_code,
         )
@@ -74480,23 +74516,23 @@ def audit_pages_body_table_deletion_source_topology(
         )
         if admission is None:
             violations.append(
-                "Pages remove_body_table must resolve its typed selector before staging: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit must resolve its typed selector "
+                f"before staging: {path}:{line}"
             )
         elif staging is not None and staging.start() < admission.start():
             violations.append(
-                "Pages remove_body_table stages deletion before selector admission: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit stages deletion before selector "
+                f"admission: {path}:{line}"
             )
         if IWA_PAGES_BODY_TABLE_DELETION_LEGACY_FALLBACK.search(body_code):
             violations.append(
-                "Pages remove_body_table retains a legacy/catchall deletion fallback: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit retains a legacy/catchall "
+                f"deletion fallback: {path}:{line}"
             )
         if re.search(r"\bErr\s*\(\s*_\s*\)\s*=>", body_code):
             violations.append(
-                "Pages remove_body_table uses a post-admission catchall error arm: "
-                f"{path}:{line}"
+                "Pages body-table deletion Edit::commit uses a post-admission catchall "
+                f"error arm: {path}:{line}"
             )
 
     apply_records = package_method_records["apply_body_table_deletion"]
@@ -77370,7 +77406,7 @@ def _pages_transaction_family_violations(
                 f"{title} public module {public_path} is missing canonical export "
                 f"{name}: {public_relative}"
             )
-    for name in sorted(exported - expected):
+    for name in sorted(exported - expected - PAGES_TRANSACTION_OPTIONAL_EXPORTS):
         violations.append(
             f"{title} public module {public_path} exports non-canonical {name}: "
             f"{public_relative}"

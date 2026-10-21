@@ -264,7 +264,9 @@ impl CreationBudget {
         let source = match &package.state.source {
             PhysicalSource::Package(source) if source.source_is_exact() => source,
             PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-                return Err(SlideAudioCreationError::UnsupportedSource);
+                return Err(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::UnsupportedSource,
+                ));
             },
         };
         budget.charge_input(source.source_bytes().len())?;
@@ -506,11 +508,7 @@ impl CreationBudget {
 }
 
 impl Package {
-    /// Create one independently positioned, slide-owned audio control.
-    ///
-    /// The source remains unchanged. The returned commit contains the candidate
-    /// package and an exact patch whose inverse restores the original bytes.
-    /// Identical materialized audio is reused when its metadata is unambiguous.
+    /// Start an immutable single-creation slide audio edit.
     ///
     /// ```no_run
     /// use std::{fs, time::Duration};
@@ -520,11 +518,21 @@ impl Package {
     /// let source = Package::from_bytes(&fs::read("presentation.key")?)?;
     /// let audio = fs::read("narration.wav")?;
     /// let options = Options::new(Point { x: 120.0, y: 240.0 }, Duration::from_secs(8))?;
-    /// let commit = source.add_slide_audio(SlideSelector::index(0), "narration.wav", &audio, options)?;
+    /// let commit = source
+    ///     .edit_slide_audio_creation()
+    ///     .add(SlideSelector::index(0), "narration.wav", &audio, options)?
+    ///     .commit()?;
     /// commit.package().write_to(&mut fs::File::create("narrated.key")?)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn add_slide_audio<'slide>(
+    #[must_use]
+    pub const fn edit_slide_audio_creation(&self) -> crate::slide::audio::creation::Edit<'_> {
+        crate::slide::audio::creation::Edit::new(self)
+    }
+
+    /// Create one independently positioned, slide-owned audio control: the
+    /// commit of [`crate::slide::audio::creation::Edit`].
+    pub(crate) fn create_slide_audio<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         preferred_filename: &str,
@@ -967,26 +975,36 @@ pub(super) fn validate_media_input(
         || filename == "."
         || filename == ".."
     {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     let Some(dot) = filename.rfind('.') else {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     };
     if dot == 0 || dot + 1 >= filename.len() {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     if litchi_iwa_common::media::Type::from_extension(&filename[dot + 1..]) != expected {
-        return Err(SlideAudioCreationError::InvalidFilename);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::InvalidFilename,
+        ));
     }
     if data.len() > maximum {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed: u64::try_from(data.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         });
     }
     if data.is_empty() || litchi_iwa_common::media::Type::from_bytes(data) != expected {
-        return Err(SlideAudioCreationError::UnsupportedAudio);
+        return Err(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::UnsupportedAudio,
+        ));
     }
     Ok(())
 }
@@ -997,7 +1015,9 @@ pub(super) fn physical_catalog(
     match &package.state.source {
         PhysicalSource::Package(catalog) if catalog.source_is_exact() => Ok(catalog),
         PhysicalSource::Package(_) | PhysicalSource::Semantic(_) => {
-            Err(SlideAudioCreationError::UnsupportedSource)
+            Err(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::UnsupportedSource,
+            ))
         },
     }
 }
@@ -1013,26 +1033,38 @@ pub(super) fn resolve_context(
             .slide_record_at(position.get())
             .map_err(|_| SlideAudioCreationError::InvalidSource)?
             .map(|_| position)
-            .ok_or(SlideAudioCreationError::SlidePositionNotFound { position })?,
+            .ok_or(SlideAudioCreationError::Refused(
+                crate::slide::audio::creation::Refusal::SlidePositionNotFound { position },
+            ))?,
         SlideSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SlideAudioCreationError::EmptySlideName);
+                return Err(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::EmptySlideName,
+                ));
             }
             package
                 .show()
                 .map_err(|_| SlideAudioCreationError::InvalidSource)?
                 .select_slide(SlideSelector::name(name))
-                .map_err(|_| SlideAudioCreationError::AmbiguousSelector)?
+                .map_err(|_| {
+                    SlideAudioCreationError::Refused(
+                        crate::slide::audio::creation::Refusal::AmbiguousSelector,
+                    )
+                })?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(SlideAudioCreationError::SlideNameNotFound)?
+                .ok_or(SlideAudioCreationError::Refused(
+                    crate::slide::audio::creation::Refusal::SlideNameNotFound,
+                ))?
         },
     };
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(|_| SlideAudioCreationError::InvalidSource)?
-        .ok_or(SlideAudioCreationError::SlidePositionNotFound {
-            position: slide_position,
-        })?;
+        .ok_or(SlideAudioCreationError::Refused(
+            crate::slide::audio::creation::Refusal::SlidePositionNotFound {
+                position: slide_position,
+            },
+        ))?;
     let (slide_component, slide_object) = package
         .object_with_component(record.slide_identifier)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
@@ -2402,7 +2434,7 @@ pub(super) fn serialize_component(
     let compressed =
         SnappyStream::compress(&bytes).map_err(|_| SlideAudioCreationError::InvalidSource)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
-        return Err(SlideAudioCreationError::LimitExceeded {
+        return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
             observed: u64::try_from(compressed.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
@@ -2533,7 +2565,7 @@ fn limit(
     observed: usize,
     maximum: usize,
 ) -> SlideAudioCreationError {
-    SlideAudioCreationError::LimitExceeded {
+    SlideAudioCreationError::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

@@ -1377,14 +1377,18 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     )?)?;
     assert!(matches!(
         duplicate_names.edit_slide_transition("Missing"),
-        Err(Error::SlideNameNotFound)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::SlideNameNotFound
+        ))
     ));
     assert!(
-        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::SlidePositionNotFound { position }) if position == Position::new(99))
+        matches!(duplicate_names.edit_slide_transition(99usize), Err(Error::Refused(litchi_keynote::transition::Refusal::SlidePositionNotFound { position })) if position == Position::new(99))
     );
     assert!(matches!(
         duplicate_names.edit_slide_transition("Same"),
-        Err(Error::AmbiguousSelector)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::AmbiguousSelector
+        ))
     ));
 
     let flat = package_bytes(
@@ -1399,7 +1403,9 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     assert_eq!(no_modern_edit.settings(), None);
     assert!(matches!(
         no_modern_edit.set(full_settings()?),
-        Err(Error::UnsupportedTransition)
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedTransition
+        ))
     ));
 
     for malformed in [
@@ -1454,7 +1460,12 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let changed = legacy
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(changed.commit(), Err(Error::UnsupportedSource)));
+    assert!(matches!(
+        changed.commit(),
+        Err(Error::Refused(
+            litchi_keynote::transition::Refusal::UnsupportedSource
+        ))
+    ));
 
     let unrestricted = Package::from_bytes(&flat)?;
     let target_len = unrestricted
@@ -1476,10 +1487,7 @@ fn selector_malformed_legacy_and_limits_fail_without_publication() -> TestResult
     let limited_edit = limited
         .edit_slide_transition("Alpha")?
         .set(full_settings()?)?;
-    assert!(matches!(
-        limited_edit.commit(),
-        Err(Error::LimitExceeded { .. })
-    ));
+    assert!(matches!(limited_edit.commit(), Err(Error::Limit { .. })));
     Ok(())
 }
 

@@ -19,6 +19,6 @@ pub use litchi_iwa_common::table::appearance::RowSizing;
 /// Transaction types for persisted Keynote slide-table appearance.
 pub mod transaction {
     pub use crate::package::slide_table_appearance::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
     };
 }

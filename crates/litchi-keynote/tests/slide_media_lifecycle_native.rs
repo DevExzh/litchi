@@ -418,7 +418,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(0),
             MediaPart::Poster,
         ),
-        Err(litchi_keynote::slide::media::data::Error::AudioPoster)
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::AudioPoster
+        ))
     ));
     assert!(matches!(
         removed.slide_media_data(
@@ -426,7 +428,9 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(2),
             MediaPart::Content,
         ),
-        Err(litchi_keynote::slide::media::data::Error::MoviePositionNotFound { .. })
+        Err(litchi_keynote::slide::media::data::Error::Refused(
+            litchi_keynote::slide::media::data::Refusal::MoviePositionNotFound { .. }
+        ))
     ));
     Ok(())
 }

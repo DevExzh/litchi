@@ -12900,9 +12900,36 @@
           "name": "PagesTableCellVerticalAlignment",
           "scope": "litchi_iwa",
           "replacement": "use litchi_iwa::pages::TableCellVerticalAlignment; no redundant format prefix inside a per-format module (ADR 0034, record 0352)"
+        },
+        {
+          "name": "IWork",
+          "scope": "litchi_iwa",
+          "replacement": "the host's types live in focused modules with unprefixed names: litchi_iwa::Package (was IWorkPackage), comments::Draft (IWorkDrawableCommentEditor), media::Draft (IWorkMediaEditor), text::Draft (IWorkTextEditor) (record 0361)",
+          "match": "prefix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_iwa",
+          "replacement": "the host's mutable working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft, text::Draft, comments::Draft, media::Draft (record 0351 §2.1 rule 7, record 0361)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa",
+          "replacement": "limits come from an OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
+        },
+        {
+          "name": "Editor",
+          "scope": "litchi_iwa",
+          "replacement": "the host's per-format working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft (record 0351 §2.1 rule 7, record 0361)"
         }
       ],
-      "families": []
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa::Package",
+        "litchi_iwa::Document"
+      ]
     },
     {
       "id": "numbers-minimal",
@@ -13520,6 +13547,17 @@
           "name": "CellRange",
           "scope": "litchi_numbers",
           "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_numbers",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_numbers",
+          "replacement": "use Error::Limit { kind, observed, maximum } (glossary §5, record 0361)"
         }
       ],
       "families": [
@@ -13559,7 +13597,8 @@
       "immutable_owners": [
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "numbers-full",
@@ -14179,6 +14218,17 @@
           "name": "CellRange",
           "scope": "litchi_numbers",
           "replacement": "use litchi_numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_numbers",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_numbers",
+          "replacement": "use Error::Limit { kind, observed, maximum } (glossary §5, record 0361)"
         }
       ],
       "families": [
@@ -14218,7 +14268,8 @@
       "immutable_owners": [
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "ops-iwork",
@@ -15437,6 +15488,17 @@
           "name": "CellRange",
           "scope": "litchi_pages",
           "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_pages",
+          "replacement": "limits come from OpenOptions (owners) or a required limits argument (record APIs); record 0351 §2.5 rule 3, record 0361",
+          "match": "suffix"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_pages",
+          "replacement": "use Error::Limit { kind, observed, maximum } (glossary §5, record 0361)"
         }
       ],
       "families": [
@@ -15466,12 +15528,16 @@
         "litchi_pages::table::name::transaction",
         "litchi_pages::table::sort::transaction",
         "litchi_pages::table::title",
-        "litchi_pages::table::lock"
+        "litchi_pages::table::lock",
+        "litchi_pages::section::paragraphs",
+        "litchi_pages::table::creation",
+        "litchi_pages::table::deletion"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
         "litchi_pages::Document"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "keynote-minimal",
@@ -16824,6 +16890,11 @@
           "name": "CellRange",
           "scope": "litchi_keynote",
           "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::Limit { kind, observed, maximum } (glossary §5, record 0361)"
         }
       ],
       "families": [
@@ -16867,12 +16938,16 @@
         "litchi_keynote::soundtrack",
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
-        "litchi_keynote::slide::placeholder"
+        "litchi_keynote::slide::placeholder",
+        "litchi_keynote::slide::audio::creation",
+        "litchi_keynote::slide::movie::creation",
+        "litchi_keynote::slide::media::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "keynote-full",
@@ -18221,6 +18296,11 @@
           "name": "CellRange",
           "scope": "litchi_keynote",
           "replacement": "use litchi_iwa_common::table::coordinate::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::Limit { kind, observed, maximum } (glossary §5, record 0361)"
         }
       ],
       "families": [
@@ -18264,12 +18344,16 @@
         "litchi_keynote::soundtrack",
         "litchi_keynote::soundtrack::order",
         "litchi_keynote::soundtrack::items",
-        "litchi_keynote::slide::placeholder"
+        "litchi_keynote::slide::placeholder",
+        "litchi_keynote::slide::audio::creation",
+        "litchi_keynote::slide::movie::creation",
+        "litchi_keynote::slide::media::lifecycle"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
-      ]
+      ],
+      "family_methods": true
     }
   ]
 }

@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra arguments".into());
     }
 
-    let editor = pages::Editor::open(input)?;
+    let editor = pages::Draft::open(input)?;
     for chart in editor.body_charts()? {
         println!(
             "anchor={} object={} kind={:?} direction={:?} rows={} columns={}",

@@ -36,7 +36,7 @@ enum SheetDrawableClone {
     },
 }
 
-impl Editor {
+impl Draft {
     /// Duplicate a populated sheet immediately after its source.
     ///
     /// Sheet settings and unknown wire fields are retained. Populated tables,
@@ -211,7 +211,7 @@ impl Editor {
     }
 }
 
-/// Place one table produced by [`Editor::duplicate_table`] while
+/// Place one table produced by [`Draft::duplicate_table`] while
 /// keeping the focused compatibility seam private to populated-sheet
 /// duplication.
 ///
@@ -219,9 +219,9 @@ impl Editor {
 /// built snapshots use the focused compatibility ingress; exact snapshots use
 /// the strict focused package reader and public relocation transaction. Both
 /// routes are terminal after focused admission, and the same bit is passed to
-/// [`Editor::from_validation_bytes`] so validation preserves provenance.
+/// [`Draft::from_validation_bytes`] so validation preserves provenance.
 fn place_cloned_table(
-    editor: &mut Editor,
+    editor: &mut Draft,
     cloned: &TableInfo,
     target_sheet_id: u64,
     target_sheet_name: &str,
@@ -268,7 +268,7 @@ fn place_cloned_table(
             .map_err(|error| Error::Io(error.into_io_error()))?;
         bytes
     };
-    let verified = Editor::from_validation_bytes(&bytes, source_built)?;
+    let verified = Draft::from_validation_bytes(&bytes, source_built)?;
     let verified_owner = find_table_owner(verified.package(), table_id)?;
     let verified_table = verified
         .tables()?
@@ -296,7 +296,7 @@ fn place_cloned_table(
 }
 
 fn classify_sheet_drawables(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     sheet: &tn::SheetArchive,
 ) -> Result<Vec<SheetDrawableClone>> {
@@ -401,8 +401,8 @@ fn duplicate_sheet_name(source: &str, existing: &HashSet<&str>) -> Result<String
 }
 
 fn register_sheet_uuid_if_needed(
-    staged: &mut IWorkPackage,
-    source: &IWorkPackage,
+    staged: &mut HostPackage,
+    source: &HostPackage,
     archive_name: &str,
     source_sheet_id: u64,
     new_sheet_id: u64,
@@ -419,7 +419,7 @@ fn register_sheet_uuid_if_needed(
 }
 
 fn restore_table_geometry(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     source_table_id: u64,
     cloned_table_id: u64,
 ) -> Result<()> {
@@ -648,7 +648,7 @@ mod tests {
             Some("Native movie title")
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_copy = reopened
             .sheet_movies(duplicate.object_id)
             .unwrap()
@@ -725,7 +725,7 @@ mod tests {
             source.playback
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_copy = reopened.sheet_audio(duplicate.object_id).unwrap().remove(0);
         assert_eq!(reopened_copy.position, MOVED_AUDIO_POSITION);
         assert_eq!(reopened_copy.playback, copied_playback);
@@ -812,7 +812,7 @@ mod tests {
             SOURCE_SHAPE_FILL
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         let reopened_source = reopened
             .sheet_shapes(source_sheet.object_id)
             .unwrap()
@@ -888,7 +888,7 @@ mod tests {
             moved
         );
 
-        let reopened = Editor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let reopened = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.sheet_images(source_sheet.object_id).unwrap().len(),
             1

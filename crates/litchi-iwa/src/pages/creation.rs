@@ -9,12 +9,12 @@ use prost::Message;
 
 use litchi_pages::section::{PageNumbering, Start};
 
-use super::editor::Editor;
+use super::editor::Draft;
 use crate::archive::{Archive, ArchiveObject, RawMessage};
 use crate::identity::IWorkDocumentIdentity;
 use crate::protobuf::{tp, tsa, tsd, tsk, tsp, tss, tst, tswp};
 use crate::text::{ParagraphList, preset_style_object};
-use crate::{IWorkPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
+use crate::{HostPackage, IWorkThemeArchive, IWorkThemeExtensions, Result};
 
 const DOCUMENT_ARCHIVE_ENTRY: &str = "Index/Document.iwa";
 const STYLESHEET_ARCHIVE_ENTRY: &str = "Index/DocumentStylesheet.iwa";
@@ -494,7 +494,7 @@ impl Builder {
     /// Append one empty native table to the initial document body.
     ///
     /// The table owns independent cell storage and is immediately writable
-    /// through [`Editor::set_table_cell`](super::editor::Editor::set_table_cell).
+    /// through [`Draft::set_table_cell`](super::editor::Draft::set_table_cell).
     pub fn body_table(mut self, name: impl Into<String>, rows: usize, columns: usize) -> Self {
         self.initial_tables.push(InitialPagesTable {
             name: name.into(),
@@ -505,12 +505,12 @@ impl Builder {
     }
 
     /// Build a mutable editor for the new document.
-    pub fn build(self) -> Result<Editor> {
-        Editor::from_package(self.build_package()?)
+    pub fn build(self) -> Result<Draft> {
+        Draft::from_package(self.build_package()?)
     }
 
     /// Build the underlying package for lower-level IWA manipulation.
-    pub(crate) fn build_package(self) -> Result<IWorkPackage> {
+    pub(crate) fn build_package(self) -> Result<HostPackage> {
         crate::text::TextLanguageTag::new(self.language.as_str())?;
         if self.locale.trim().is_empty() {
             return Err(crate::Error::InvalidFormat(
@@ -524,7 +524,7 @@ impl Builder {
         let first_table = self.initial_tables.first();
 
         let identity = IWorkDocumentIdentity::generate();
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package.replace_archive(
             DOCUMENT_ARCHIVE_ENTRY,
             &document_archive(&self.body_text, &self.language, &self.locale, first_table)?,
@@ -543,7 +543,7 @@ impl Builder {
         }
         insert_property_lists(&mut package, &identity)?;
         if self.initial_tables.len() > 1 {
-            let mut editor = Editor::from_package(package)?;
+            let mut editor = Draft::from_package(package)?;
             for table in &self.initial_tables[1..] {
                 let anchor = editor.body_text()?.encode_utf16().count();
                 editor.add_table(anchor, &table.name, table.rows, table.columns)?;
@@ -1278,7 +1278,7 @@ fn object_uuid_raw(identifier: u64) -> tsp::ObjectUuidMapEntry {
 }
 
 fn insert_property_lists(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     identity: &IWorkDocumentIdentity,
 ) -> Result<()> {
     let mut properties = plist::Dictionary::new();
@@ -1420,7 +1420,7 @@ fn validate_initial_table(table: &InitialPagesTable) -> Result<()> {
 }
 
 fn install_initial_table_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     table: &InitialPagesTable,
     language: &str,
     locale: &str,
@@ -1814,7 +1814,7 @@ mod tests {
 
         editor.set_body_text("Updated through CRUD").unwrap();
         let encoded = editor.to_bytes().unwrap();
-        let reopened = Editor::from_bytes(&encoded).unwrap();
+        let reopened = Draft::from_bytes(&encoded).unwrap();
         assert_eq!(reopened.body_text().unwrap(), "Updated through CRUD");
         assert_eq!(reopened.sections().len(), 1);
     }
@@ -1870,7 +1870,7 @@ mod tests {
                 .all(|name| !name.starts_with("preview"))
         );
         assert_eq!(
-            Editor::from_package(package).unwrap().body_text().unwrap(),
+            Draft::from_package(package).unwrap().body_text().unwrap(),
             ""
         );
     }

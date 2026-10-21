@@ -8,7 +8,7 @@ use crate::archive::{ArchiveObject, RawMessage};
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::protobuf::{tsce, tsp, tst};
 use crate::wire::{parse_wire_fields, patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::axis::{AxisIndex, HiddenAxes};
 use litchi_iwa_common::wire::parse_wire_view;
@@ -42,10 +42,7 @@ const STANDARD_MESSAGE_VERSION: [u32; 3] = [1, 0, 5];
 const TABLE_HIDDEN_STATES_UID_OFFSET: u64 = 4;
 const COLUMN_HIDDEN_EXTENT_UID_OFFSET: u64 = 7;
 
-pub(crate) fn table_hidden_axes(
-    package: &IWorkPackage,
-    model_object_id: u64,
-) -> Result<HiddenAxes> {
+pub(crate) fn table_hidden_axes(package: &HostPackage, model_object_id: u64) -> Result<HiddenAxes> {
     let graph = table_hidden_graph(package, model_object_id)?;
     hidden_axes_from_graph(&graph)
 }
@@ -55,7 +52,7 @@ pub(crate) fn table_hidden_axes(
 /// Row sorting uses this stricter view because native iWork keeps user-hidden
 /// positions fixed while row payloads and stable row UIDs move.
 pub(crate) fn positional_user_hidden_axes(
-    package: &IWorkPackage,
+    package: &HostPackage,
     model_object_id: u64,
 ) -> Result<HiddenAxes> {
     let graph = table_hidden_graph(package, model_object_id)?;
@@ -95,7 +92,7 @@ pub(crate) fn positional_user_hidden_axes(
 /// The caller must provide transactionality. This performs no package clone,
 /// which keeps the shared table-sort executor to one outer staging copy.
 pub(crate) fn restore_positional_user_hidden_axes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     model_object_id: u64,
     expected: &HiddenAxes,
 ) -> Result<()> {
@@ -141,7 +138,7 @@ pub(crate) fn restore_positional_user_hidden_axes(
 }
 
 pub(crate) fn set_table_hidden_axes(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     model_object_id: u64,
     hidden: &HiddenAxes,
 ) -> Result<()> {
@@ -241,7 +238,7 @@ pub(crate) fn set_table_hidden_axes(
 /// Remaining hidden states keep their stable UUIDs, so deleting the matching
 /// entry before compacting the UID map preserves their logical positions.
 pub(crate) fn remove_table_hidden_axis(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     model_object_id: u64,
     axis: AxisIndex,
 ) -> Result<()> {
@@ -298,7 +295,7 @@ struct HiddenStateObjectIds {
 }
 
 impl HiddenStateObjectIds {
-    fn allocate(package: &IWorkPackage) -> Result<Self> {
+    fn allocate(package: &HostPackage) -> Result<Self> {
         let filter_columns = next_object_identifier(package)?;
         let filter_rows = filter_columns.checked_add(1).ok_or_else(|| {
             Error::InvalidFormat("iWork hidden-state object identifier overflow".to_owned())
@@ -394,7 +391,7 @@ struct TableHiddenGraph {
     column_uids: Vec<tsp::Uuid>,
 }
 
-fn table_hidden_graph(package: &IWorkPackage, model_object_id: u64) -> Result<TableHiddenGraph> {
+fn table_hidden_graph(package: &HostPackage, model_object_id: u64) -> Result<TableHiddenGraph> {
     let mut model_match = None;
     let mut info_match = None;
     let mut uid_maps = HashMap::new();
@@ -544,7 +541,7 @@ pub(crate) struct TableHiddenGraphSnapshot {
 
 #[cfg(test)]
 pub(crate) fn table_hidden_graph_snapshot(
-    package: &IWorkPackage,
+    package: &HostPackage,
     model_object_id: u64,
 ) -> Result<TableHiddenGraphSnapshot> {
     let graph = table_hidden_graph(package, model_object_id)?;
@@ -844,7 +841,7 @@ fn empty_extent(
 }
 
 fn insert_hidden_state_objects(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &TableHiddenGraph,
     owner: &tst::HiddenStatesOwnerArchive,
     identifiers: HiddenStateObjectIds,
@@ -906,7 +903,7 @@ fn insert_hidden_state_objects(
 }
 
 fn patch_model(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &TableHiddenGraph,
     owner: &tst::HiddenStatesOwnerArchive,
     active_uuid: &tsp::Uuid,
@@ -1052,7 +1049,7 @@ fn extent_hidden_counts(extent: &tst::HiddenStateExtentArchive, axis: &str) -> R
 }
 
 fn patch_info(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     graph: &TableHiddenGraph,
     active_uuid: &tsp::Uuid,
 ) -> Result<()> {

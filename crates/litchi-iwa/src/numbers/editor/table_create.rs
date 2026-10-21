@@ -15,7 +15,7 @@ pub(super) struct EmptyTableGraph {
 /// the returned model is immediately writable and formula-ready.
 #[allow(deprecated)]
 pub(super) fn create_empty_table_graph(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     template_info_id: u64,
     template_model_id: u64,
     template_parent_id: u64,
@@ -206,7 +206,7 @@ pub(super) fn create_empty_table_graph(
     })
 }
 
-fn attached_table_templates(package: &IWorkPackage) -> Result<Vec<TableDescriptor>> {
+fn attached_table_templates(package: &HostPackage) -> Result<Vec<TableDescriptor>> {
     let locations = object_locations(package)?;
     let archive_names = locations.values().collect::<HashSet<_>>();
     let mut result = Vec::new();
@@ -285,14 +285,14 @@ mod tests {
     fn package_with_template(
         info_messages: Vec<RawMessage>,
         model_messages: Vec<RawMessage>,
-    ) -> IWorkPackage {
+    ) -> HostPackage {
         let archive = Archive {
             objects: vec![
                 ArchiveObject::new(3, info_messages).unwrap(),
                 ArchiveObject::new(10, model_messages).unwrap(),
             ],
         };
-        let mut package = IWorkPackage::new();
+        let mut package = HostPackage::new();
         package
             .replace_archive("Index/Document.iwa", &archive)
             .unwrap();

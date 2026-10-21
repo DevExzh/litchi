@@ -8,7 +8,7 @@ use crate::charts::gaps::{
     set_chart_gap_spacing as set_native_chart_gap_spacing,
 };
 
-impl Editor {
+impl Draft {
     /// Read the spacing between items and sets for one native body chart.
     pub fn body_chart_gap_spacing(&self, drawable_object_id: u64) -> Result<Spacing> {
         body_chart_gap_spacing(self, drawable_object_id)
@@ -24,7 +24,7 @@ impl Editor {
     }
 }
 
-fn body_chart_gap_spacing(editor: &Editor, drawable_object_id: u64) -> Result<Spacing> {
+fn body_chart_gap_spacing(editor: &Draft, drawable_object_id: u64) -> Result<Spacing> {
     let graph = body_chart_graph(editor, drawable_object_id)?;
     read_native_chart_gap_spacing(
         editor.package(),
@@ -35,7 +35,7 @@ fn body_chart_gap_spacing(editor: &Editor, drawable_object_id: u64) -> Result<Sp
 }
 
 fn set_body_chart_gap_spacing(
-    editor: &mut Editor,
+    editor: &mut Draft,
     drawable_object_id: u64,
     spacing: Spacing,
 ) -> Result<()> {
@@ -51,7 +51,7 @@ fn set_body_chart_gap_spacing(
         "Pages",
         spacing,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.body_chart_gap_spacing(drawable_object_id)? != spacing {
         return Err(Error::InvalidFormat(
             "Pages chart gap update failed validation".to_owned(),

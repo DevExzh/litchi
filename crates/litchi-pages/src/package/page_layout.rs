@@ -103,18 +103,19 @@ impl fmt::Display for LimitKind {
 #[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it
+    /// (record 0351 §2.4, record 0361).
+    #[error(transparent)]
+    Refused(Refusal),
     /// The requested value violates an archive-free page-layout invariant.
     #[error("invalid Pages page layout: {0}")]
     InvalidLayout(#[source] page_layout::Error),
-    /// The package source cannot publish a preservation-safe changed edit.
-    #[error("the Pages package source does not support exact page-layout editing")]
-    UnsupportedSource,
     /// The selected native layout or its derived cache cannot be handled safely.
     #[error("the Pages source has no unambiguous editable page layout")]
     InvalidSource,
     /// A finite transaction resource ceiling was exceeded.
     #[error("Pages page-layout {kind} limit exceeded: observed {observed}, maximum {maximum}")]
-    LimitExceeded {
+    Limit {
         /// Resource category that exceeded its ceiling.
         kind: LimitKind,
         /// Observed or requested resource amount.
@@ -134,6 +135,33 @@ pub enum Error {
     /// The supplied patch was not created from this exact package artifact.
     #[error("the Pages page-layout patch does not match the exact source package")]
     PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`] (record 0351 §2.4, record 0361).
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The package source cannot publish a preservation-safe changed edit.
+    #[error("the Pages package source does not support exact page-layout editing")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
 }
 
 /// A document-wide page layout staged against one immutable package snapshot.
@@ -228,7 +256,7 @@ impl Edit<'_> {
             });
         }
         if !source_catalog.source_is_exact() {
-            return Err(Error::UnsupportedSource);
+            return Err(Error::Refused(Refusal::UnsupportedSource));
         }
 
         let source_layout_state = view_state_layout_identifier(self.source)?;
@@ -418,6 +446,12 @@ impl Commit {
         self.package
     }
 
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Borrow the reversible exact-source patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -571,7 +605,7 @@ fn document_payload(package: &Package) -> Result<(&str, u64, &[u8]), Error> {
 }
 
 fn strict_layout(payload: &[u8], limits: WireLimits) -> Result<Layout, Error> {
-    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::LimitExceeded {
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::Limit {
         kind: LimitKind::WireNesting,
         observed: usize_to_u64(limits.max_nesting()),
         maximum: u64::from(u32::MAX),
@@ -1014,7 +1048,7 @@ fn rewrite_layout_payload(
         return Err(output_limit_error(output_length, limits));
     }
     if output_fields > limits.max_fields() {
-        return Err(Error::LimitExceeded {
+        return Err(Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
@@ -1116,7 +1150,7 @@ fn append_layout_scalar(output: &mut Vec<u8>, field_number: u32, scalar: LayoutS
 }
 
 fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::OutputBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_output_bytes()),
@@ -1124,7 +1158,7 @@ fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
 }
 
 fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind: LimitKind::WireWork,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_rewrite_work()),
@@ -1406,7 +1440,7 @@ pub(super) fn wire_limits(package: &Package) -> Result<WireLimits, Error> {
 fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
-        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1415,13 +1449,13 @@ fn map_package_error(error: PackageError) -> Error {
         | PackageError::NotOfficeFile
         | PackageError::MissingIdentity
         | PackageError::InvalidLimit { .. }
-        | PackageError::Limit { .. } => Error::UnsupportedSource,
-        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+        | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
@@ -1440,26 +1474,26 @@ fn map_package_error(error: PackageError) -> Error {
 )]
 fn map_layout_codec_error(error: pages_page_layout_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return Error::LimitExceeded {
+        return Error::Limit {
             kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     match error.wire_resource_limit() {
-        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
@@ -1474,7 +1508,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
@@ -1491,7 +1525,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
@@ -1513,7 +1547,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1558,7 +1592,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             kind,
             observed,
             limit,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: match kind {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,

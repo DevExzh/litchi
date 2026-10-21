@@ -6,7 +6,7 @@ use super::*;
 pub type TableCellConditionalHighlightInfo =
     crate::numbers::editor::TableCellConditionalHighlightInfo;
 
-impl Editor {
+impl Draft {
     /// Inspect conditional highlighting attached to a reachable slide-table cell.
     pub fn slide_table_cell_conditional_highlighting(
         &self,

@@ -142,7 +142,9 @@ fn native_movie_geometry_composition_preserves_media_and_inverse() -> R {
     for index in [0, 1] {
         assert_eq!(
             package.slide_movie_geometry(slide, MovieSelector::index(index)),
-            Err(SlideMovieGeometryError::UnsupportedDependency)
+            Err(SlideMovieGeometryError::Refused(
+                litchi_keynote::slide::movie::geometry::Refusal::UnsupportedDependency
+            ))
         );
     }
     let edit = package

@@ -8,7 +8,7 @@ use crate::charts::series_value_label_auto_fit::{
 };
 use crate::charts::{ChartSeriesValueLabelAutoFit, Index};
 
-impl Editor {
+impl Draft {
     /// Read every series' value-label Auto-Fit setting in native series order.
     pub fn sheet_chart_series_value_label_auto_fits(
         &self,
@@ -64,7 +64,7 @@ impl Editor {
 }
 
 fn sheet_chart_series_value_label_auto_fits(
-    editor: &Editor,
+    editor: &Draft,
     sheet_id: u64,
     drawable_object_id: u64,
 ) -> Result<Vec<ChartSeriesValueLabelAutoFit>> {
@@ -86,7 +86,7 @@ fn sheet_chart_series_value_label_auto_fits(
 }
 
 fn set_sheet_chart_series_value_label_auto_fits(
-    editor: &mut Editor,
+    editor: &mut Draft,
     sheet_id: u64,
     drawable_object_id: u64,
     values: &[ChartSeriesValueLabelAutoFit],
@@ -124,7 +124,7 @@ fn set_sheet_chart_series_value_label_auto_fits(
         "Numbers",
         &expected,
     )?;
-    let verified = Editor::from_bytes(&staged.to_bytes()?)?;
+    let verified = Draft::from_bytes(&staged.to_bytes()?)?;
     if verified.sheet_chart_series_value_label_auto_fits(sheet_id, drawable_object_id)? != expected
     {
         return Err(Error::InvalidFormat(

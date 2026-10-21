@@ -9,7 +9,7 @@ use litchi_pages::{BodyChartSelector, Package as FocusedPagesPackage};
 
 /// Populate the public Pages chart listing with one checked focused traversal.
 pub(super) fn fill_focused_chart_arrangements(
-    editor: &Editor,
+    editor: &Draft,
     charts: &mut [BodyChartInfo],
     chart_positions: &[usize],
 ) -> Result<()> {
@@ -40,7 +40,7 @@ pub(super) fn fill_focused_chart_arrangements(
 }
 
 pub(super) fn focused_chart_arrangement_at(
-    editor: &Editor,
+    editor: &Draft,
     chart_count: usize,
     chart_position: usize,
 ) -> Result<ChartArrangement> {
@@ -54,7 +54,7 @@ pub(super) fn focused_chart_arrangement_at(
         .map_err(map_focused_chart_arrangement_error)
 }
 
-fn focused_chart_arrangement_package(editor: &Editor) -> Result<FocusedPagesPackage> {
+fn focused_chart_arrangement_package(editor: &Draft) -> Result<FocusedPagesPackage> {
     let bytes = editor.to_bytes()?;
     FocusedPagesPackage::from_bytes(&bytes).map_err(|error| {
         Error::InvalidFormat(format!(
@@ -187,7 +187,7 @@ mod tests {
             .unwrap();
         let mut changed_bytes = Vec::new();
         changed.package().write_to(&mut changed_bytes).unwrap();
-        let reopened = Editor::from_bytes(&changed_bytes).unwrap();
+        let reopened = Draft::from_bytes(&changed_bytes).unwrap();
         assert_eq!(reopened.body_charts().unwrap()[0].arrangement, replacement);
 
         let restored = changed
@@ -254,7 +254,7 @@ mod tests {
             .unwrap();
         let mut changed_bytes = Vec::new();
         changed.package().write_to(&mut changed_bytes).unwrap();
-        let reopened = Editor::from_bytes(&changed_bytes).unwrap();
+        let reopened = Draft::from_bytes(&changed_bytes).unwrap();
         let mut expected_listing = baseline_listing;
         expected_listing[TARGET_POSITION].arrangement = replacement;
         assert_eq!(reopened.body_charts().unwrap(), expected_listing);
@@ -269,7 +269,7 @@ mod tests {
     }
 
     fn set_focused_arrangement(
-        editor: &mut Editor,
+        editor: &mut Draft,
         chart_position: usize,
         arrangement: ChartArrangement,
     ) {
@@ -282,7 +282,7 @@ mod tests {
             .unwrap();
         let mut bytes = Vec::new();
         commit.package().write_to(&mut bytes).unwrap();
-        *editor = Editor::from_bytes(&bytes).unwrap();
+        *editor = Draft::from_bytes(&bytes).unwrap();
     }
 
     fn data() -> ChartData {

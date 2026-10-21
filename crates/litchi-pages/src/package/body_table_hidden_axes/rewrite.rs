@@ -167,7 +167,7 @@ fn maximum_physical_identifier(
         for info in &object.archive_info.message_infos {
             work = work
                 .checked_add(metadata_scan_work(info)?)
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -214,13 +214,11 @@ fn maximum_physical_identifier(
                 archive_limits,
             )
             .map_err(map_core_error)?;
-        work = work
-            .checked_add(occurrence_count)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            })?;
+        work = work.checked_add(occurrence_count).ok_or(Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+        })?;
         maximum = maximum.max(references.maximum);
     }
     budget.charge_payload_work(work).map_err(map_lock_error)?;
@@ -474,7 +472,7 @@ fn charge_metadata_report(
                 .and_then(|value| value.checked_add(report.allocations()))
                 .and_then(|value| value.checked_add(report.retained_bytes()))
                 .and_then(|value| value.checked_add(report.scratch_bytes()))
-                .ok_or(table_lock::Error::LimitExceeded {
+                .ok_or(table_lock::Error::Limit {
                     kind: table_lock::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -505,7 +503,7 @@ fn charge_metadata_requirements(
                 .checked_add(requirements.allocations())
                 .and_then(|value| value.checked_add(requirements.retained_bytes()))
                 .and_then(|value| value.checked_add(requirements.scratch_bytes()))
-                .ok_or(table_lock::Error::LimitExceeded {
+                .ok_or(table_lock::Error::Limit {
                     kind: table_lock::LimitKind::WireWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -574,14 +572,11 @@ fn prepare_metadata_probe<'source>(
         .ok_or(Error::InvalidSource)?;
     let target_identity_capacity = target_object_count.max(metadata_item_capacity);
     let component_identity_capacity = component_capacity.max(metadata_item_capacity);
-    let metadata_identity_capacity =
-        metadata_item_capacity
-            .checked_mul(2)
-            .ok_or(Error::LimitExceeded {
-                kind: LimitKind::PayloadItems,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
-            })?;
+    let metadata_identity_capacity = metadata_item_capacity.checked_mul(2).ok_or(Error::Limit {
+        kind: LimitKind::PayloadItems,
+        observed: u64::MAX,
+        maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
+    })?;
     budget
         .charge_payload_items(target_identity_capacity)
         .and_then(|_| budget.charge_payload_items(component_identity_capacity))
@@ -659,7 +654,7 @@ fn prepare_metadata_probe<'source>(
         if component_identifier == target_component_identifier {
             if census.target_object_identifiers.len() == census.target_object_identifiers.capacity()
             {
-                return Err(Error::LimitExceeded {
+                return Err(Error::Limit {
                     kind: LimitKind::PayloadItems,
                     observed: u64::try_from(
                         census.target_object_identifiers.len().saturating_add(1),
@@ -741,7 +736,7 @@ fn finish_metadata_plan<'source>(
         .maximum_identifier
         .checked_add(OWNER_CREATION_OBJECTS as u64)
         .filter(|identifier| *identifier != 0)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
@@ -763,22 +758,22 @@ fn next_owner_creation_ids(floor: u64) -> Result<OwnerCreationIds, Error> {
     let first = floor
         .checked_add(1)
         .filter(|identifier| *identifier != 0)
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX - 1,
         })?;
-    let second = first.checked_add(1).ok_or(Error::LimitExceeded {
+    let second = first.checked_add(1).ok_or(Error::Limit {
         kind: LimitKind::PayloadObjects,
         observed: u64::MAX,
         maximum: u64::MAX - 1,
     })?;
-    let third = second.checked_add(1).ok_or(Error::LimitExceeded {
+    let third = second.checked_add(1).ok_or(Error::Limit {
         kind: LimitKind::PayloadObjects,
         observed: u64::MAX,
         maximum: u64::MAX - 1,
     })?;
-    let fourth = third.checked_add(1).ok_or(Error::LimitExceeded {
+    let fourth = third.checked_add(1).ok_or(Error::Limit {
         kind: LimitKind::PayloadObjects,
         observed: u64::MAX,
         maximum: u64::MAX - 1,
@@ -876,13 +871,11 @@ fn creation_states(
         .iter()
         .filter(|axis| matches!(axis, AxisIndex::Column(_)))
         .count();
-    let state_count = row_count
-        .checked_add(column_count)
-        .ok_or(Error::LimitExceeded {
-            kind: LimitKind::PayloadItems,
-            observed: u64::MAX,
-            maximum: u64::MAX,
-        })?;
+    let state_count = row_count.checked_add(column_count).ok_or(Error::Limit {
+        kind: LimitKind::PayloadItems,
+        observed: u64::MAX,
+        maximum: u64::MAX,
+    })?;
     // Admit all state and owner collection storage before constructing any
     // vectors. The helper objects themselves are charged separately below.
     budget
@@ -890,7 +883,7 @@ fn creation_states(
             state_count
                 .checked_add(OWNER_CREATION_OBJECTS)
                 .and_then(|value| value.checked_add(OWNER_CREATION_FIELD_INFOS))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::PayloadItems,
                     observed: u64::MAX,
                     maximum: u64::MAX,
@@ -990,7 +983,7 @@ fn validate_creation_uuid_namespace(
         .len()
         .checked_add(graph.columns.len())
         .and_then(|value| value.checked_add(objects.len()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: u64::MAX,
             maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
@@ -1048,7 +1041,9 @@ fn validate_creation_uuid_namespace(
                     || !info.data_references.is_empty()
                     || !info.field_infos.is_empty()
                 {
-                    return Err(Error::UnsupportedDependency);
+                    return Err(Error::Refused(
+                        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                    ));
                 }
                 let (owner, report) = codec::decode_hidden_state_formula_owner_with_report(
                     message.data.as_slice(),
@@ -1057,7 +1052,9 @@ fn validate_creation_uuid_namespace(
                 .map_err(map_codec_error)?;
                 charge_codec(budget, report)?;
                 if let Some(owner_id) = owner.owner_id() {
-                    let uuid = owner_id.words_uuid().ok_or(Error::UnsupportedDependency)?;
+                    let uuid = owner_id.words_uuid().ok_or(Error::Refused(
+                        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                    ))?;
                     push_logical_uuid(&mut logical_uuids, uuid, budget)?;
                 }
             } else if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
@@ -1074,10 +1071,14 @@ fn validate_creation_uuid_namespace(
                 charge_codec(budget, report)?;
                 if owner.has_dependencies() {
                     let Some(expected_formula_owner_uid) = expected_formula_owner_uid else {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(
+                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                        ));
                     };
                     let Some(reference) = owner.formula_owner() else {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(
+                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                        ));
                     };
                     validate_reference_shape(reference)?;
                     if owner.internal_formula_owner_id() == 0
@@ -1086,13 +1087,17 @@ fn validate_creation_uuid_namespace(
                         || owner.formula_owner_uid() != expected_formula_owner_uid
                         || reference.identifier().get() != graph.target.drawable_identifier.get()
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(
+                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                        ));
                     }
                     let drawable = object_location(objects, graph.target.drawable_identifier)?;
                     if location.component_index == drawable.component_index
                         || location.identifier == graph.target.model_identifier.get()
                     {
-                        return Err(Error::UnsupportedDependency);
+                        return Err(Error::Refused(
+                            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+                        ));
                     }
                     validate_aggregate_formula_owner_component(
                         package,
@@ -1192,17 +1197,12 @@ fn validate_creation_uuid_namespace(
                         && location.object_index == graph.target.object_index
                         && message_index == graph.target.info_message_index;
                 if !selected {
-                    let attempt_work =
-                        message
-                            .data
-                            .len()
-                            .checked_mul(2)
-                            .ok_or(Error::LimitExceeded {
-                                kind: LimitKind::TransactionWork,
-                                observed: u64::MAX,
-                                maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                                    .unwrap_or(u64::MAX),
-                            })?;
+                    let attempt_work = message.data.len().checked_mul(2).ok_or(Error::Limit {
+                        kind: LimitKind::TransactionWork,
+                        observed: u64::MAX,
+                        maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                            .unwrap_or(u64::MAX),
+                    })?;
                     budget
                         .charge_payload_work(attempt_work)
                         .map_err(map_lock_error)?;
@@ -1258,7 +1258,9 @@ fn validate_creation_uuid_namespace(
         if pair[0].identifier == pair[1].identifier
             && (pair[0].columns != pair[1].columns || pair[0].rows != pair[1].rows)
         {
-            return Err(Error::UnsupportedDependency);
+            return Err(Error::Refused(
+                crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+            ));
         }
     }
     map_dimensions.dedup_by_key(|dimensions| dimensions.identifier);
@@ -1301,7 +1303,9 @@ fn validate_creation_uuid_namespace(
             .binary_search_by_key(&map_identifier, |dimensions| dimensions.identifier)
             .ok()
             .map(|index| map_dimensions[index])
-            .ok_or(Error::UnsupportedDependency)?;
+            .ok_or(Error::Refused(
+                crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+            ))?;
         if map_dimensions
             .get(map_dimension_cursor)
             .is_none_or(|expected| expected.identifier != dimensions.identifier)
@@ -1346,7 +1350,9 @@ fn validate_creation_uuid_namespace(
             )
             .is_ok()
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ));
     }
     let levels = if logical_uuids.len() <= 1 {
         0
@@ -1354,13 +1360,17 @@ fn validate_creation_uuid_namespace(
         (usize::BITS - (logical_uuids.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(logical_uuids.len().checked_mul(levels).ok_or(
-            Error::LimitExceeded {
-                kind: LimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
+        .charge_payload_work(
+            logical_uuids
+                .len()
+                .checked_mul(levels)
+                .ok_or(Error::Limit {
+                    kind: LimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })?,
+        )
         .map_err(map_lock_error)?;
     Ok(())
 }
@@ -1476,7 +1486,7 @@ fn append_uid_map_uuids(
     let element_count = columns
         .checked_mul(3)
         .and_then(|value| rows.checked_mul(3).and_then(|row| value.checked_add(row)))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::PayloadItems,
             observed: u64::MAX,
             maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
@@ -1508,7 +1518,7 @@ fn append_uid_map_uuids(
                 .records()
                 .checked_add(report.elements())
                 .and_then(|value| value.checked_add(element_count))
-                .ok_or(Error::LimitExceeded {
+                .ok_or(Error::Limit {
                     kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
@@ -1757,27 +1767,29 @@ fn metadata_replacement_bounds(
         .checked_sub(old_payload_len)
         .and_then(|length| length.checked_add(new_payload_len))
         .and_then(|length| length.checked_add(64))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_input_bytes(),
         })?;
     let compressed_bound =
-        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::LimitExceeded {
+        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_input_bytes(),
         })?;
     let replacement_entry_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => {
-            table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::LimitExceeded {
-                kind: LimitKind::OutputBytes,
-                observed: u64::MAX,
-                maximum: source.state.source.limits().max_input_bytes(),
-            })?
+        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: u64::MAX,
+            maximum: source.state.source.limits().max_input_bytes(),
+        })?,
+        _ => {
+            return Err(Error::Refused(
+                crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
+            ));
         },
-        _ => return Err(Error::UnsupportedSource),
     };
     Ok((archive_bound, compressed_bound, replacement_entry_bound))
 }
@@ -1792,11 +1804,14 @@ fn formula_owner_for_creation(
     let model = object_location(&objects, graph.target.model_identifier)?;
     if drawable.component_index != model.component_index || drawable.identifier == model.identifier
     {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ));
     }
     let messages = formula_owner_messages(package, &objects, budget)?;
-    formula_owner_for(package, &messages, drawable, model, graph.profile, budget)?
-        .ok_or(Error::UnsupportedDependency)
+    formula_owner_for(package, &messages, drawable, model, graph.profile, budget)?.ok_or(
+        Error::Refused(crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency),
+    )
 }
 
 fn desired_owner(
@@ -1804,11 +1819,9 @@ fn desired_owner(
     axes: &HiddenAxes,
     budget: &mut table_lock::WireBudget,
 ) -> Result<(codec::HiddenStatesOwnerSnapshot, codec::UuidSnapshot), Error> {
-    let owner = graph
-        .model
-        .owner
-        .as_ref()
-        .ok_or(Error::UnsupportedDependency)?;
+    let owner = graph.model.owner.as_ref().ok_or(Error::Refused(
+        crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+    ))?;
     let active_uuid = graph.info.hidden_uuid.ok_or(Error::InvalidSource)?;
     if owner.hidden_states().len() != 1
         || owner
@@ -1819,7 +1832,9 @@ fn desired_owner(
         // The strict owner codec can preserve opaque fields, but it cannot
         // prove byte-exact preservation of an inactive view while changing a
         // sibling.  Reject that shape before allocating a candidate.
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ));
     }
     let state = owner.hidden_states().first().ok_or(Error::InvalidSource)?;
     let column = update_extent(
@@ -1838,15 +1853,11 @@ fn desired_owner(
         true,
         budget,
     )?;
-    let additional_states = axes
-        .as_slice()
-        .len()
-        .checked_mul(2)
-        .ok_or(Error::LimitExceeded {
-            kind: LimitKind::TransactionWork,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        })?;
+    let additional_states = axes.as_slice().len().checked_mul(2).ok_or(Error::Limit {
+        kind: LimitKind::TransactionWork,
+        observed: u64::MAX,
+        maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+    })?;
     charge_owner_storage(owner, additional_states, budget)?;
     let updated_state = codec::HiddenStatesSnapshot::new(active_uuid, column, row);
     let rebuilt = codec::HiddenStatesOwnerSnapshot::new(owner.owner_uid(), [updated_state])
@@ -1866,7 +1877,7 @@ fn update_extent(
         .base_hidden_states()
         .len()
         .checked_add(physical_order.len())
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -1894,17 +1905,11 @@ fn update_extent(
         (usize::BITS - (existing.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(
-            existing
-                .len()
-                .checked_mul(levels)
-                .ok_or(Error::LimitExceeded {
-                    kind: LimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
-                        .unwrap_or(u64::MAX),
-                })?,
-        )
+        .charge_payload_work(existing.len().checked_mul(levels).ok_or(Error::Limit {
+            kind: LimitKind::TransactionWork,
+            observed: u64::MAX,
+            maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+        })?)
         .map_err(map_lock_error)?;
     let mut states = Vec::new();
     states
@@ -1995,13 +2000,13 @@ fn charge_owner_storage(
             .and_then(|value| {
                 value.checked_add(state.row_hidden_state_extent().base_hidden_states().len())
             })
-            .ok_or(Error::LimitExceeded {
+            .ok_or(Error::Limit {
                 kind: LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
             })?;
     }
-    count = count.checked_add(additional).ok_or(Error::LimitExceeded {
+    count = count.checked_add(additional).ok_or(Error::Limit {
         kind: LimitKind::TransactionWork,
         observed: u64::MAX,
         maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2018,7 +2023,7 @@ fn charge_rewrite_requirements(
         .checked_add(requirements.allocations())
         .and_then(|value| value.checked_add(requirements.retained_bytes()))
         .and_then(|value| value.checked_add(requirements.scratch_bytes()))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2062,7 +2067,7 @@ fn desired_model_snapshot(
                 .len(),
         )
         .and_then(|count| count.checked_mul(5))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
@@ -2170,7 +2175,9 @@ fn rewrite(
         .get_index(graph.target.model_component_index)
         .ok_or(Error::InvalidSource)?;
     if graph.target.component_index != graph.target.model_component_index {
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ));
     }
     let component_name = component.name();
     let entry = source
@@ -2181,7 +2188,9 @@ fn rewrite(
         .find(|entry| entry.name() == component_name)
         .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(Error::UnsupportedSource);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
+        ));
     }
     let archive_limits = source
         .state
@@ -2193,7 +2202,9 @@ fn rewrite(
     if graph.profile.is_native() && creation {
         // Native owner creation has no qualified producer envelope. Keep
         // this restriction at the private rewrite boundary as well.
-        return Err(Error::UnsupportedDependency);
+        return Err(Error::Refused(
+            crate::table::hidden_axes::transaction::Refusal::UnsupportedDependency,
+        ));
     }
     let creation_plan = if creation {
         Some(prepare_owner_creation(source, graph, axes, budget)?)
@@ -2387,30 +2398,32 @@ fn rewrite(
         .and_then(|value| value.checked_add(new_payload_length))
         .and_then(|value| value.checked_add(helper_archive_length))
         .and_then(|value| value.checked_add(64))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_input_bytes(),
         })?;
     let compressed_bound =
-        table_lock::snappy_compressed_bound(rewritten_bound).ok_or(Error::LimitExceeded {
+        table_lock::snappy_compressed_bound(rewritten_bound).ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_input_bytes(),
         })?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => {
-            table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::LimitExceeded {
-                kind: LimitKind::OutputBytes,
-                observed: u64::MAX,
-                maximum: source.state.source.limits().max_input_bytes(),
-            })?
+        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: u64::MAX,
+            maximum: source.state.source.limits().max_input_bytes(),
+        })?,
+        _ => {
+            return Err(Error::Refused(
+                crate::table::hidden_axes::transaction::Refusal::UnsupportedSource,
+            ));
         },
-        _ => return Err(Error::UnsupportedSource),
     };
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::Limit {
             kind: LimitKind::EntryBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_entry_bytes(),
@@ -2423,12 +2436,10 @@ fn rewrite(
             .iter()
             .find(|entry| entry.name() == METADATA_ENTRY_NAME)
             .ok_or(Error::InvalidSource)?;
-        usize::try_from(metadata_entry.metadata().compressed_size()).map_err(|_| {
-            Error::LimitExceeded {
-                kind: LimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: source.state.source.limits().max_entry_bytes(),
-            }
+        usize::try_from(metadata_entry.metadata().compressed_size()).map_err(|_| Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: u64::MAX,
+            maximum: source.state.source.limits().max_entry_bytes(),
         })?
     } else {
         0
@@ -2442,7 +2453,7 @@ fn rewrite(
         .and_then(|value| value.checked_sub(old_metadata_compressed_size))
         .and_then(|value| value.checked_add(replacement_compressed_bound))
         .and_then(|value| value.checked_add(metadata_replacement_bound.unwrap_or(0)))
-        .ok_or(Error::LimitExceeded {
+        .ok_or(Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: u64::MAX,
             maximum: source.state.source.limits().max_input_bytes(),
@@ -2693,7 +2704,7 @@ fn map_metadata_error(error: MetadataRewriteError) -> Error {
             (LimitKind::WireWork, observed, maximum)
         },
         litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting { observed, maximum } => {
-            return Error::LimitExceeded {
+            return Error::Limit {
                 kind: LimitKind::WireNesting,
                 observed: u64::from(observed),
                 maximum: u64::from(maximum),
@@ -2713,7 +2724,7 @@ fn map_metadata_error(error: MetadataRewriteError) -> Error {
         } => (LimitKind::PayloadItems, observed, maximum),
         _ => return Error::InvalidSource,
     };
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),

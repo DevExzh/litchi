@@ -379,7 +379,7 @@ pub enum Error {
     #[error(
         "Keynote slide-table cells {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: LimitKind,
         /// Observed resource count.
@@ -1707,7 +1707,7 @@ impl Package {
 }
 
 fn limit_error(kind: LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
+    Error::Limit {
         kind,
         observed: usize_as_u64(observed),
         maximum: usize_as_u64(maximum),
@@ -1732,7 +1732,7 @@ fn map_core_error(error: core::Error) -> Error {
             kind,
             observed,
             maximum,
-        } => Error::LimitExceeded {
+        } => Error::Limit {
             kind: map_core_limit(kind),
             observed,
             maximum,
@@ -1937,7 +1937,7 @@ mod tests {
             .expect_err("the next cumulative cell must be refused");
         assert_eq!(
             error,
-            Error::LimitExceeded {
+            Error::Limit {
                 kind: LimitKind::PayloadItems,
                 observed: usize_as_u64(MAX_MATERIALIZED_CELLS + 1),
                 maximum: usize_as_u64(MAX_MATERIALIZED_CELLS),

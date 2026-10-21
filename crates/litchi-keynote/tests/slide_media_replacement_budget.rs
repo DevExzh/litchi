@@ -166,7 +166,7 @@ fn edge_reference_profile_rejects_media_operation_after_validation() -> TestResu
             io::Error::other("the edge reference budget must reject the operation-local closure")
         })?;
     match error {
-        SlideMediaDataError::LimitExceeded {
+        SlideMediaDataError::Limit {
             kind: SlideMediaDataLimitKind::References,
             observed,
             maximum,

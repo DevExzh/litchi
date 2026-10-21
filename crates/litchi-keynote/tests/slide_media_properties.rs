@@ -1002,7 +1002,9 @@ fn native_media_properties_read_placeholder_fixture_and_refuse_mutation() -> Tes
         package.edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(4));
     assert!(matches!(
         error,
-        Err(SlideMediaPropertiesError::WrongMediaKind)
+        Err(SlideMediaPropertiesError::Refused(
+            litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1079,7 +1081,9 @@ fn placeholder_and_live_video_properties_are_read_only_and_preserve_sparse_field
             .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie));
         assert!(matches!(
             error,
-            Err(SlideMediaPropertiesError::WrongMediaKind)
+            Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::WrongMediaKind
+            ))
         ));
         assert_eq!(exact_bytes(&package)?, before);
     }
@@ -1112,7 +1116,9 @@ fn native_media_properties_edit_rejects_sparse_materialized_data_atomically() ->
         matches!(
             error,
             Err(SlideMediaPropertiesError::InvalidSource)
-                | Err(SlideMediaPropertiesError::UnsupportedDependency)
+                | Err(SlideMediaPropertiesError::Refused(
+                    litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+                ))
         ),
         "editing a media item without its materialized Data member must be rejected"
     );
@@ -1230,7 +1236,9 @@ fn native_audio_properties_reject_a_duplicate_geometry_envelope() -> TestResult 
     assert!(matches!(
         error,
         Err(SlideMediaPropertiesError::InvalidSource)
-            | Err(SlideMediaPropertiesError::UnsupportedDependency)
+            | Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1263,7 +1271,9 @@ fn native_media_properties_reject_duplicate_slide_owned_movie_references_atomica
         .and_then(|edit| edit.commit());
     assert!(matches!(
         error,
-        Err(SlideMediaPropertiesError::UnsupportedDependency)
+        Err(SlideMediaPropertiesError::Refused(
+            litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1315,7 +1325,9 @@ fn native_media_properties_reject_stale_selected_field_info_atomically() -> Test
     assert!(matches!(
         error,
         Err(SlideMediaPropertiesError::InvalidSource)
-            | Err(SlideMediaPropertiesError::UnsupportedDependency)
+            | Err(SlideMediaPropertiesError::Refused(
+                litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+            ))
     ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
@@ -1344,7 +1356,9 @@ fn native_media_properties_reject_missing_movie_and_poster_data_refs_atomically(
             matches!(
                 error,
                 Err(SlideMediaPropertiesError::InvalidSource)
-                    | Err(SlideMediaPropertiesError::UnsupportedDependency)
+                    | Err(SlideMediaPropertiesError::Refused(
+                        litchi_keynote::slide::media::properties::Refusal::UnsupportedDependency
+                    ))
             ),
             "{label} must be rejected"
         );

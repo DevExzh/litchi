@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected extra argument".into());
     }
 
-    let mut editor = keynote::Editor::open(input)?;
+    let mut editor = keynote::Draft::open(input)?;
     editor.insert_slide_table_row(slide_index, table_id, RowInsertion::body(row))?;
     editor.save(output)?;
     Ok(())

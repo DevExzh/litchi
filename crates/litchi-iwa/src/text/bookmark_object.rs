@@ -5,7 +5,7 @@ use prost::Message;
 use crate::archive::{ArchiveObject, RawMessage};
 use crate::protobuf::tswp;
 use crate::wire::{patch_length_delimited_field, patch_varint_field};
-use crate::{Error, IWorkPackage, Result};
+use crate::{Error, HostPackage, Result};
 
 use super::bookmark_types::{TextBookmarkSettings, TextBookmarkVisibility};
 use super::smart_field_object::{generated_text_attribute_uuid, validate_text_attribute_uuid};
@@ -86,7 +86,7 @@ pub(super) fn new_bookmark_object(
 }
 
 pub(super) fn patch_bookmark_settings(
-    package: &mut IWorkPackage,
+    package: &mut HostPackage,
     archive_name: &str,
     identifier: u64,
     settings: &TextBookmarkSettings,

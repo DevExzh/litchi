@@ -15,11 +15,11 @@ use litchi_iwa_text::number_attachment::{
 };
 use prost::Message;
 
-fn fixture() -> (super::super::IWorkTextEditor, TextStorageId) {
-    let pages = pages::Editor::create_with_text("Page ").unwrap();
+fn fixture() -> (crate::text::Draft, TextStorageId) {
+    let pages = pages::Draft::create_with_text("Page ").unwrap();
     let storage_id = pages.body_storage().unwrap().id;
     (
-        super::super::IWorkTextEditor::from_package(pages.into_package()),
+        crate::text::Draft::from_package(pages.into_package()),
         storage_id,
     )
 }
@@ -29,7 +29,7 @@ fn settings(kind: TextNumberAttachmentKind) -> TextNumberAttachmentSettings {
         .with_string_equivalent(TextNumberAttachmentText::new("").unwrap())
 }
 
-fn storage_message_index(package: &crate::IWorkPackage, storage_id: TextStorageId) -> usize {
+fn storage_message_index(package: &crate::HostPackage, storage_id: TextStorageId) -> usize {
     locate_attachment_storage(package, storage_id.get())
         .unwrap()
         .message_index
@@ -83,7 +83,7 @@ fn unknown_table_root_and_nested_fields_survive_updates() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     editor
         .update_text_number_attachment(
             storage_id,
@@ -143,7 +143,7 @@ fn attachment_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
         })
         .unwrap();
 
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let created = editor
         .insert_text_number_attachment(
             storage_id,
@@ -236,7 +236,7 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let editor = super::super::IWorkTextEditor::from_package(package);
+    let editor = crate::text::Draft::from_package(package);
     assert!(editor.text_number_attachments(storage_id).is_err());
 
     let (mut editor, storage_id) = fixture();
@@ -267,7 +267,7 @@ fn missing_kind_and_additional_owner_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = super::super::IWorkTextEditor::from_package(package);
+    let mut editor = crate::text::Draft::from_package(package);
     let before = editor.to_bytes().unwrap();
     assert!(
         editor

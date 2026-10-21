@@ -674,7 +674,9 @@ fn selector_first_astral_edit_shifts_only_following_boundaries() -> TestResult<(
     );
     assert!(matches!(
         package.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 3 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 3 }
+        ))
     ));
 
     let span = TextSpan::from_utf16_indexes(1, 1)?;
@@ -747,7 +749,9 @@ fn no_op_shares_exact_and_legacy_sources() -> TestResult<()> {
     changed.set("Changed")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     Ok(())
 }
@@ -788,7 +792,9 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     changed.set("replacement")?;
     assert!(matches!(
         changed.commit(),
-        Err(SectionTextError::UnsupportedSource)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::UnsupportedSource
+        ))
     ));
     assert_eq!(exact_bytes(&package)?, bytes);
 
@@ -798,11 +804,13 @@ fn rootless_fallback_and_empty_body_semantics_remain_fail_closed() -> TestResult
     assert_eq!(empty.text()?, "");
     assert!(matches!(
         empty.edit_body_text(),
-        Err(SectionTextError::BodySectionCount { actual: 0 })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::BodySectionCount { actual: 0 }
+        ))
     ));
     assert!(matches!(
         empty.section_text(SectionSelector::index(0)),
-        Err(SectionTextError::PositionNotFound { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position }))
             if position == Position::new(0)
     ));
     Ok(())
@@ -1065,39 +1073,51 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let package = Package::from_bytes(&bytes)?;
     assert!(matches!(
         package.edit_section_text(SectionSelector::name("Missing")),
-        Err(SectionTextError::NameNotFound)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::NameNotFound
+        ))
     ));
     assert!(matches!(
         package.edit_section_text(SectionSelector::index(3)),
-        Err(SectionTextError::PositionNotFound { position }) if position == Position::new(3)
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::PositionNotFound { position })) if position == Position::new(3)
     ));
 
     let mut edit = package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{0004}break"),
-        Err(SectionTextError::SectionBreakReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SectionBreakReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{000e}footnote"),
-        Err(SectionTextError::FootnoteAnchorReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::FootnoteAnchorReplacement
+        ))
     ));
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "bad\u{fffc}object"),
-        Err(SectionTextError::ObjectMarkerReplacement)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::ObjectMarkerReplacement
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(100, 100)?),
-        Err(SectionTextError::SpanOutOfBounds { .. })
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::SpanOutOfBounds { .. }
+        ))
     ));
     assert!(matches!(
         edit.delete(TextSpan::from_utf16_indexes(6, 6)?),
-        Err(SectionTextError::SurrogateBoundary { position })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::SurrogateBoundary { position }))
             if position == TextPosition::from_utf16_code_units(6)
     ));
     edit.insert(TextPosition::ZERO, "valid")?;
     assert!(matches!(
         edit.insert(TextPosition::ZERO, "second"),
-        Err(SectionTextError::OperationAlreadyStaged)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::OperationAlreadyStaged
+        ))
     ));
 
     let dependent_bytes =
@@ -1106,12 +1126,16 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let mut dependent_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         dependent_edit.delete(TextSpan::from_utf16_indexes(5, 6)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     let mut object_edit = dependent_package.edit_section_text(SectionSelector::index(0))?;
     assert!(matches!(
         object_edit.delete(TextSpan::from_utf16_indexes(6, 7)?),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
 
     let referenced_bytes = package_with_hidden_bookmark_reference()?;
@@ -1121,7 +1145,9 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     referenced_edit.delete(TextSpan::from_utf16_indexes(2, 3)?)?;
     assert!(matches!(
         referenced_edit.commit(),
-        Err(SectionTextError::DependentContent)
+        Err(SectionTextError::Refused(
+            litchi_pages::section::text::Refusal::DependentContent
+        ))
     ));
     assert_eq!(exact_bytes(&referenced_package)?, referenced_source);
 
@@ -1156,7 +1182,7 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let duplicate_name_package = Package::from_bytes(&duplicate_name_bytes)?;
     assert!(matches!(
         duplicate_name_package.edit_section_text(SectionSelector::name("First")),
-        Err(SectionTextError::AmbiguousSelector { first, duplicate })
+        Err(SectionTextError::Refused(litchi_pages::section::text::Refusal::AmbiguousSelector { first, duplicate }))
             if first == Position::new(0) && duplicate == Position::new(1)
     ));
     Ok(())
@@ -1243,7 +1269,7 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
         edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })
@@ -1294,7 +1320,7 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
     limited_edit.set(replacement)?;
     assert!(matches!(
         limited_edit.commit(),
-        Err(SectionTextError::LimitExceeded {
+        Err(SectionTextError::Limit {
             kind: SectionTextLimitKind::OutputBytes,
             ..
         })
