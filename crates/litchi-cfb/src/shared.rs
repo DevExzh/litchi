@@ -1115,6 +1115,19 @@ impl SharedOleFile {
         self.index.dir_entries.iter().filter_map(Option::as_ref)
     }
 
+    /// Returns the number of validated directory slots retained by this
+    /// shared CFB view.
+    ///
+    /// The parsed index has already been admitted under the shared reader's
+    /// directory bounds, so this is an O(1) metadata lookup.  It mirrors
+    /// [`OleFile::directory_entry_count`] and intentionally includes the
+    /// retained slot vector's finite upper bound rather than walking the
+    /// entry iterator.
+    #[must_use]
+    pub fn directory_entry_count(&self) -> usize {
+        self.index.dir_entries.len()
+    }
+
     /// Materializes one stream through immutable positional reads.
     ///
     /// Regular streams never acquire a shared lock or cursor. A selected small

@@ -52,7 +52,7 @@ impl SourceBackedOverlayPublisher {
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned_with_limits(source, version, limits)?;
-        let max_entries = cfb.directory_entries().count();
+        let max_entries = cfb.directory_entry_count();
         reject_protected_shared_container(
             &cfb,
             "source-backed stream overlay publication",
@@ -69,7 +69,7 @@ impl SourceBackedOverlayPublisher {
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_with_limits(source, limits)?;
-        let max_entries = cfb.directory_entries().count();
+        let max_entries = cfb.directory_entry_count();
         reject_protected_shared_container(
             &cfb,
             "source-backed stream overlay publication",
@@ -87,7 +87,7 @@ impl SourceBackedOverlayPublisher {
     /// described on [`Self::open_owned`]; any other source keeps the generic
     /// fences.
     pub fn from_shared(cfb: Arc<SharedOleFile>) -> Result<Self, OverlayError> {
-        let max_entries = cfb.directory_entries().count();
+        let max_entries = cfb.directory_entry_count();
         reject_protected_shared_container(
             &cfb,
             "source-backed stream overlay publication",

@@ -1538,11 +1538,11 @@ fn physical_candidate_limit_survives_snapshot_reopening_and_refusal() {
     let mut reopened = snapshot.edit();
     let path = vec!["Target".to_string()];
     let error = reopened.put_stream(&path, vec![0; 100_000]).unwrap_err();
-    assert!(
-        matches!(error, litchi_ole_common::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
-        resource: "input bytes", observed, maximum: actual,
-    }) if observed > maximum && actual == maximum)
-    );
+    assert!(matches!(error, litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::StreamBytes,
+            observed,
+            maximum: actual,
+        } if observed > maximum && actual == maximum));
     assert_eq!(reopened.cfb_limits(), limits);
     assert_eq!(reopened.finish().unwrap(), original);
     assert_eq!(snapshot.finish().unwrap(), original);
