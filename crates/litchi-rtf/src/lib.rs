@@ -78,6 +78,11 @@ mod policy;
 pub mod redact;
 mod resource;
 pub mod review;
+pub mod source_backed;
+#[cfg(test)]
+extern crate self as litchi_rtf;
+#[cfg(test)]
+mod internal_tests;
 pub mod streaming;
 pub mod tail_append;
 pub mod text;
@@ -195,8 +200,7 @@ pub use codec::error::{RtfError as Error, RtfResult as Result};
 pub use tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendPublicationPlan,
-    TailAppendPublicationReport, TailAppendSourceEdit, TailAppendSourceProof,
-    TailAppendSourcePublicationPlan, TailAppendSourcePublicationReport, TailSelector,
+    TailAppendPublicationReport, TailSelector,
 };
 pub use validation::{
     ValidationCheck, ValidationCounts, ValidationDependency, ValidationLimits, ValidationReport,

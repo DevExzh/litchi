@@ -498,7 +498,7 @@ impl Edit {
     /// `BoundSheet8` state, an invalid final-visible-sheet outcome, a changed
     /// stream length, failed complete semantic readback, or a bounded CFB
     /// overlay failure.
-    pub fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit_source_backed(self) -> Result<SourceBackedCommit> {
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -713,117 +713,154 @@ impl crate::Package {
     }
 }
 
-/// Content-free evidence for a same-length source-backed visibility
-/// publication.
-///
-/// The diagnostics retain only bounded counts, lengths, and opaque CFB
-/// fingerprints. Workbook payload bytes and worksheet names are not copied
-/// into this value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SourceBackedDiagnostics {
-    changed_worksheets: usize,
-    touched_streams: usize,
-    splice_count: usize,
-    replacement_bytes: u64,
-    changed_spans: usize,
-    source_bytes: u64,
-    source_workbook_bytes: u64,
-    target_workbook_bytes: u64,
-    source_fingerprint: ArtifactFingerprint,
-    target_fingerprint: ArtifactFingerprint,
+/// The content-free diagnostics of a source-backed publication, published
+/// as a source-backed family's `Diagnostics` (`crate::source_backed`).
+pub(crate) mod source_diagnostics {
+    #[allow(
+        unused_imports,
+        reason = "the definition keeps its parent module's vocabulary"
+    )]
+    use super::*;
+
+    /// Content-free evidence for a same-length source-backed visibility
+    /// publication.
+    ///
+    /// The diagnostics retain only bounded counts, lengths, and opaque CFB
+    /// fingerprints. Workbook payload bytes and worksheet names are not copied
+    /// into this value.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Diagnostics {
+        pub(super) changed_worksheets: usize,
+        pub(super) touched_streams: usize,
+        pub(super) splice_count: usize,
+        pub(super) replacement_bytes: u64,
+        pub(super) changed_spans: usize,
+        pub(super) source_bytes: u64,
+        pub(super) source_workbook_bytes: u64,
+        pub(super) target_workbook_bytes: u64,
+        pub(super) source_fingerprint: ArtifactFingerprint,
+        pub(super) target_fingerprint: ArtifactFingerprint,
+    }
+
+    impl Diagnostics {
+        /// Whether the commit changed the workbook.
+        #[must_use]
+        pub const fn changed(self) -> bool {
+            self.changed_spans > 0
+        }
+
+        /// Number of distinct worksheet owners changed by the transaction.
+        #[must_use]
+        pub const fn changed_worksheets(self) -> usize {
+            self.changed_worksheets
+        }
+
+        /// Number of logical CFB streams selected for the overlay.
+        #[must_use]
+        pub const fn touched_streams(self) -> usize {
+            self.touched_streams
+        }
+
+        /// Number of source-relative visibility splices submitted to CFB.
+        #[must_use]
+        pub const fn splice_count(self) -> usize {
+            self.splice_count
+        }
+
+        /// Aggregate replacement bytes retained by the splice plan.
+        #[must_use]
+        pub const fn replacement_bytes(self) -> u64 {
+            self.replacement_bytes
+        }
+
+        /// Number of physical CFB spans retained by the overlay plan.
+        #[must_use]
+        pub const fn changed_spans(self) -> usize {
+            self.changed_spans
+        }
+
+        /// Complete source CFB length.
+        #[must_use]
+        pub const fn source_bytes(self) -> u64 {
+            self.source_bytes
+        }
+
+        /// Source `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn source_workbook_bytes(self) -> u64 {
+            self.source_workbook_bytes
+        }
+
+        /// Candidate `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn target_workbook_bytes(self) -> u64 {
+            self.target_workbook_bytes
+        }
+
+        /// Exact source CFB fingerprint checked by the overlay plan.
+        #[must_use]
+        pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+            self.source_fingerprint
+        }
+
+        /// Exact composed target CFB fingerprint checked by the overlay plan.
+        #[must_use]
+        pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+            self.target_fingerprint
+        }
+    }
 }
 
-impl SourceBackedDiagnostics {
-    /// Number of distinct worksheet owners changed by the transaction.
-    #[must_use]
-    pub const fn changed_worksheets(self) -> usize {
-        self.changed_worksheets
-    }
-
-    /// Number of logical CFB streams selected for the overlay.
-    #[must_use]
-    pub const fn touched_streams(self) -> usize {
-        self.touched_streams
-    }
-
-    /// Number of source-relative visibility splices submitted to CFB.
-    #[must_use]
-    pub const fn splice_count(self) -> usize {
-        self.splice_count
-    }
-
-    /// Aggregate replacement bytes retained by the splice plan.
-    #[must_use]
-    pub const fn replacement_bytes(self) -> u64 {
-        self.replacement_bytes
-    }
-
-    /// Number of physical CFB spans retained by the overlay plan.
-    #[must_use]
-    pub const fn changed_spans(self) -> usize {
-        self.changed_spans
-    }
-
-    /// Complete source CFB length.
-    #[must_use]
-    pub const fn source_bytes(self) -> u64 {
-        self.source_bytes
-    }
-
-    /// Source `Workbook`/`Book` stream length.
-    #[must_use]
-    pub const fn source_workbook_bytes(self) -> u64 {
-        self.source_workbook_bytes
-    }
-
-    /// Candidate `Workbook`/`Book` stream length.
-    #[must_use]
-    pub const fn target_workbook_bytes(self) -> u64 {
-        self.target_workbook_bytes
-    }
-
-    /// Exact source CFB fingerprint checked by the overlay plan.
-    #[must_use]
-    pub const fn source_fingerprint(self) -> ArtifactFingerprint {
-        self.source_fingerprint
-    }
-
-    /// Exact composed target CFB fingerprint checked by the overlay plan.
-    #[must_use]
-    pub const fn target_fingerprint(self) -> ArtifactFingerprint {
-        self.target_fingerprint
-    }
-}
-
+use source_diagnostics::Diagnostics as SourceBackedDiagnostics;
 /// A checked source-bound same-length XLS visibility publication plan.
-pub struct SourceBackedCommit {
+pub(crate) struct SourceBackedCommit {
     source: Snapshot,
     plan: ValidatedOverlayPlan,
     diagnostics: SourceBackedDiagnostics,
 }
 
 impl SourceBackedCommit {
+    /// The checked overlay plan and its diagnostics.
+    pub(crate) fn into_plan(self) -> (ValidatedOverlayPlan, SourceBackedDiagnostics) {
+        (self.plan, self.diagnostics)
+    }
+
     /// Exact immutable source snapshot used by this plan.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
-    /// Underlying checked common CFB overlay plan.
-    #[must_use]
-    pub const fn plan(&self) -> &ValidatedOverlayPlan {
-        &self.plan
-    }
-
     /// Content-free publication evidence.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub const fn diagnostics(&self) -> SourceBackedDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
         self.diagnostics
     }
 
     /// Whether this publication is an exact source identity no-op.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.plan.is_noop()
     }
 
@@ -831,33 +868,28 @@ impl SourceBackedCommit {
     ///
     /// A sink failure may leave a typed prefix in the sink; inspect the
     /// returned [`OverlayError`] before deciding whether to retry.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
         self.plan.write_to(writer)
-    }
-
-    /// Alias for [`Self::write_to`] emphasizing sequential publication.
-    pub fn publish_to_stream<W: Write>(
-        &self,
-        writer: &mut W,
-    ) -> Result<PublishReport, OverlayError> {
-        self.write_to(writer)
     }
 
     /// Publishes through the common synced sibling-file and atomic-rename
     /// path.
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
         self.plan.save(path)
-    }
-
-    /// Publishes through the common sibling-file and atomic-rename path at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`litchi_cfb::ValidatedOverlayPlan::save_with_durability`].
-    pub fn save_with_durability<P: AsRef<Path>>(
-        &self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<PublishReport, OverlayError> {
-        self.plan.save_with_durability(path, durability)
     }
 }
 

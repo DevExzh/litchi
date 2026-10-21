@@ -236,7 +236,7 @@ fn signed_owner_publishes_exactly_but_refuses_editing() {
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
-    assert!(package.edit_snapshot().is_err());
+    assert!(package.edit().is_err());
 }
 
 #[test]
@@ -304,24 +304,22 @@ fn retained_narrow_profile_allows_noop_but_refuses_entry_and_input_growth() {
             .unwrap();
 
     let cfb_limits = OleFileLimits::new(u64::try_from(bytes.len()).unwrap()).unwrap();
-    let snapshot = package
-        .edit_snapshot_with_options(
-            litchi_xls::package::edit::EditOptions::new().cfb_limits(cfb_limits),
-        )
+    let options = litchi_xls::package::edit::EditOptions::new().cfb_limits(cfb_limits);
+    let noop = package
+        .edit_with_options(options)
+        .unwrap()
+        .commit()
         .unwrap();
-    let noop = snapshot.edit().commit().unwrap();
-    assert_eq!(noop.package().bytes(), bytes.as_slice());
+    assert_eq!(noop.package().to_bytes().unwrap(), bytes);
 
-    let mut growing = snapshot.edit();
-    growing.rename_sheet(0_usize.into(), "Renamed").unwrap();
+    let mut growing = package.edit_with_options(options).unwrap();
+    growing.rename_sheet(0_usize, "Renamed").unwrap();
     assert!(growing.commit().is_err());
 
     let too_small = OleFileLimits::new(u64::try_from(bytes.len() - 1).unwrap()).unwrap();
     assert!(
         package
-            .edit_snapshot_with_options(
-                litchi_xls::package::edit::EditOptions::new().cfb_limits(too_small)
-            )
+            .edit_with_options(litchi_xls::package::edit::EditOptions::new().cfb_limits(too_small))
             .is_err()
     );
 }
@@ -332,9 +330,8 @@ fn transformed_source_handoff_retains_original_entry_limits() {
     let limits = exact_source_limits(&bytes);
     let package =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits)).unwrap();
-    let snapshot = litchi_xls::raw::cell_values_snapshot_from_bytes(&package, bytes).unwrap();
-    let mut edit = snapshot.edit();
-    edit.rename_sheet(0_usize.into(), "Renamed").unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.rename_sheet(0_usize, "Renamed").unwrap();
     assert!(edit.commit().is_err());
 }
 

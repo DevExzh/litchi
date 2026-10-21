@@ -2502,6 +2502,12 @@ Each sample times transaction creation, `set_number`/`set_numeric`, the eager
 `commit`, ordinary source-backed `commit_source_backed`, or forward-only
 `commit_source_backed_plan`, and publication separately. The plan-only commit
 includes composed semantic validation but retains no complete target artifact.
+Since record 0359a the eager selectors use the primary `Package::edit` and the
+source-backed and plan-only selectors both use the deferred
+`SourceBackedWorkbook::edit_cells` family (`litchi_xls::source_backed::cells`):
+its commit retains no target artifact, its committed workbook writes the
+checked plan, and its exact-pair patch replays and inverts; the
+`commit_source_backed*` routes above are crate-private.
 `total_ns` and the top-level `elapsed_ns` distribution are arithmetic sums of
 those four separately timed phases, not a continuous wall-clock timer.
 All publication paths write the complete target CFB to equivalently configured

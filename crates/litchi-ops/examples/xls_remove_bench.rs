@@ -23,7 +23,7 @@ mod enabled {
     use litchi_core::FileSource;
     use litchi_core::Position;
     use litchi_ops::{File, OpenOptions, SourceMode};
-    use litchi_xls::cell_values::{Reference, Selector, Snapshot, Value};
+    use litchi_xls::cell_values::{Reference, Selector, Value};
     use litchi_xls::writer::Builder;
     use litchi_xls::{Package, SourceBackedWorkbook};
     use serde::Serialize;
@@ -274,9 +274,9 @@ mod enabled {
 
     fn verify_native(fixture: &Fixture, package: &Package) -> NativeSample {
         let bytes = package.to_bytes().expect("serialize native output");
-        let snapshot =
-            Snapshot::from_bytes(bytes.clone(), litchi_xls::ole_object::Limits::default())
-                .expect("parse native output");
+        let snapshot = Package::from_bytes(&bytes.clone())
+            .and_then(|package| package.cell_values())
+            .expect("parse native output");
         let sheet = snapshot
             .worksheet(Selector::Position(Position::new(0)))
             .expect("resolve native output worksheet")

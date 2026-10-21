@@ -239,12 +239,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if wanted("doc_text_set") {
         let bytes = fixture("ole/doc/NoHeadFoot.doc")?;
-        let source = litchi_doc::body_text::Snapshot::open(
-            bytes.clone(),
-            litchi_doc::tracked_revision::Limits::default(),
-        )?;
+        // Record 0359a: the body-text engine is crate-private; its leaf leg is
+        // `Package::edit`, the route it backs.
+        let source = litchi_doc::Package::from_bytes(&bytes)?;
         let target = source
-            .paragraphs(litchi_doc::body_text::Projection::All)?
+            .body_paragraphs(litchi_doc::body_text::Projection::All)?
             .into_iter()
             .find(|paragraph| !paragraph.text().is_empty())
             .expect("a paragraph with text")
@@ -283,15 +282,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // body-text snapshot API and publishes no readable package).
         let bytes = fixture("ole/doc/NoHeadFoot.doc")?;
         let package = litchi_doc::Package::from_bytes(&bytes)?;
-        let target = litchi_doc::body_text::Snapshot::open(
-            bytes.clone(),
-            litchi_doc::tracked_revision::Limits::default(),
-        )?
-        .paragraphs(litchi_doc::body_text::Projection::All)?
-        .into_iter()
-        .find(|paragraph| !paragraph.text().is_empty())
-        .expect("a paragraph with text")
-        .position();
+        let target = package
+            .body_paragraphs(litchi_doc::body_text::Projection::All)?
+            .into_iter()
+            .find(|paragraph| !paragraph.text().is_empty())
+            .expect("a paragraph with text")
+            .position();
         let unified = litchi_ops::open_bytes(bytes.clone())?;
         let path = format!("/body/p[{}]", target.get() + 1);
         paired(

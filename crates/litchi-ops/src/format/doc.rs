@@ -10,7 +10,7 @@ use std::sync::Arc;
 use litchi_cfb::OleFile;
 use litchi_core::{FileFormat, Metadata, Position};
 use litchi_doc::body_text::TransactionLimits as BodyTransactionLimits;
-use litchi_doc::body_text::source::SourceSnapshot;
+use litchi_doc::source_backed::Package as SourcePackage;
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
@@ -342,7 +342,7 @@ impl Doc {
             reason = "the narrow equal-width source route is retained for native regression tests"
         )
     )]
-    pub(crate) fn body_text_editor(&self) -> Result<Option<SourceSnapshot>> {
+    pub(crate) fn body_text_editor(&self) -> Result<Option<SourcePackage>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Doc));
         }
@@ -354,9 +354,9 @@ impl Doc {
                 package.to_bytes()?,
                 litchi_sign::cfb::Format::Doc,
             )?;
-            return Ok(Some(SourceSnapshot::from_bytes(bytes)?));
+            return Ok(Some(SourcePackage::from_bytes(bytes)?));
         }
-        Ok(Some(SourceSnapshot::from_shared(package.shared_source())?))
+        Ok(Some(SourcePackage::from_shared(package.shared_source())?))
     }
 
     /// Return the retained native owner under the explicit signature disposition.
@@ -679,7 +679,7 @@ mod tests {
         let bytes = fixture("documentProperties.doc");
         let doc = open_bytes(bytes.clone(), &OpenOptions::default()).unwrap();
         let editor = doc.body_text_editor().unwrap().expect("retained source");
-        let oracle = SourceSnapshot::from_bytes(bytes).unwrap();
+        let oracle = SourcePackage::from_bytes(bytes).unwrap();
         assert_eq!(editor.fingerprint(), oracle.fingerprint());
         let first = Position::new(0);
         assert_eq!(

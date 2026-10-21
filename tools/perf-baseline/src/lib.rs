@@ -27896,11 +27896,11 @@ fn verify_semantic_doc(
     shape: WriterShape,
     updated: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
-    use litchi_doc::body_text::{Projection, Snapshot};
+    use litchi_doc::body_text::Projection;
 
     let count = shape.doc_paragraph_count();
-    let snapshot = Snapshot::from_bytes(bytes.to_vec())?;
-    let projected = snapshot.paragraphs(Projection::All)?;
+    let snapshot = litchi_doc::Package::from_bytes(bytes)?;
+    let projected = snapshot.body_paragraphs(Projection::All)?;
     if projected.len() != count {
         return Err("semantic DOC paragraph count differs from writer specification".into());
     }
@@ -27951,18 +27951,20 @@ fn run_doc_body_snapshot_list_paragraphs(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::{Projection, Snapshot};
+    use litchi_doc::body_text::Projection;
 
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
     }
-    let snapshot = Snapshot::from_bytes(corpus.archive.clone())?;
+    // Record 0359a: the body-text engine is crate-private; its reads are the
+    // package-level body routes.
+    let snapshot = litchi_doc::Package::from_bytes(&corpus.archive)?;
     let count = shape.doc_paragraph_count();
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let paragraphs = snapshot.paragraphs(Projection::All)?;
+        let paragraphs = snapshot.body_paragraphs(Projection::All)?;
         let duration = started.elapsed();
         if paragraphs.len() != count {
             return Err("DOC body snapshot paragraph count differs from specification".into());
@@ -28160,8 +28162,16 @@ impl DocPhaseRecorder {
 
 fn profile_doc_open(
     input: Vec<u8>,
-) -> Result<(litchi_doc::body_text::Snapshot, DocPhaseDurations, u64), Box<dyn Error>> {
-    use litchi_doc::body_text::{DiagnosticPhase, Snapshot, TransactionLimits};
+) -> Result<
+    (
+        litchi_doc::Package,
+        litchi_doc::Edit,
+        DocPhaseDurations,
+        u64,
+    ),
+    Box<dyn Error>,
+> {
+    use litchi_doc::body_text::DiagnosticPhase;
 
     let expected = [
         DiagnosticPhase::StrictOwnerValidation,
@@ -28170,20 +28180,22 @@ fn profile_doc_open(
     ];
     let mut recorder = DocPhaseRecorder::new(expected.len())?;
     let started = Instant::now();
-    let snapshot = Snapshot::open_bounded_profiled(
-        input,
-        litchi_doc::tracked_revision::Limits::default(),
-        TransactionLimits::default(),
+    // Record 0359a: the profiled body open is reached through
+    // `Package::edit_profiled` (the body-text engine is crate-private).
+    let package = litchi_doc::Package::from_bytes(&input)?;
+    let edit = package.edit_profiled(
+        litchi_doc::EditOptions::default(),
         |event| recorder.observe(event),
+        |_| {},
     )?;
     let outer_ns = elapsed_ns(started.elapsed())?;
     let phases = recorder.finish(&expected)?;
-    Ok((snapshot, phases, outer_ns))
+    Ok((package, edit, phases, outer_ns))
 }
 
 fn profile_doc_changed_commit(
-    edit: litchi_doc::body_text::Edit,
-) -> Result<(litchi_doc::body_text::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
+    edit: litchi_doc::Edit,
+) -> Result<(litchi_doc::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
     use litchi_doc::body_text::DiagnosticPhase;
 
     let expected = [
@@ -28245,12 +28257,14 @@ fn run_doc_owner_public_phases(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::{DiagnosticPhase, Error as DocBodyError, Refusal, Snapshot};
+    use litchi_doc::body_text::{DiagnosticPhase, Error as DocBodyError, Refusal};
+    use litchi_doc::package::edit::Error as DocEditError;
 
     let shape = writer_shape(corpus)?;
     let paragraph_count = shape.doc_paragraph_count();
     let selected = paragraph_count / 2;
-    let source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
+    let source_bytes = source.to_bytes()?;
 
     // All semantic, patch, refusal, hash, and preservation checks are
     // intentionally preflight work. They are not part of timed phase samples.
@@ -28267,28 +28281,32 @@ fn run_doc_owner_public_phases(
     {
         return Err("DOC changed preflight did not produce one semantic change".into());
     }
-    let expected_changed = ordinary_commit.package().finish();
+    let expected_changed = ordinary_commit.package().to_bytes()?;
     verify_semantic_doc(&expected_changed, shape, Some(selected))?;
 
-    let applied = ordinary_commit.patch().apply(&source)?;
-    if applied.bytes() != ordinary_commit.package().bytes()
-        || applied.bytes() != expected_changed.as_slice()
+    let applied = source.apply(ordinary_commit.patch())?.into_package();
+    if applied.to_bytes()? != ordinary_commit.package().to_bytes()?
+        || applied.to_bytes()? != expected_changed
     {
         return Err("DOC changed patch replay differs from the expected output".into());
     }
-    let reopened_source = Snapshot::from_bytes(corpus.archive.clone())?;
-    let reopened_applied = ordinary_commit.patch().apply(&reopened_source)?;
-    if reopened_applied.bytes() != expected_changed.as_slice() {
+    let reopened_source = litchi_doc::Package::from_bytes(&corpus.archive)?;
+    let reopened_applied = reopened_source
+        .apply(ordinary_commit.patch())?
+        .into_package();
+    if reopened_applied.to_bytes()? != expected_changed {
         return Err(
             "DOC independently reopened source patch replay differs from the expected output"
                 .into(),
         );
     }
-    let restored = ordinary_commit.patch().inverse().apply(&applied)?;
-    if restored.bytes() != source.bytes() {
+    let restored = applied
+        .apply(&ordinary_commit.patch().inverse())?
+        .into_package();
+    if restored.to_bytes()? != source_bytes {
         return Err("DOC inverse patch did not restore exact source bytes".into());
     }
-    if ordinary_commit.patch().apply(&applied).is_ok() {
+    if applied.apply(ordinary_commit.patch()).is_ok() {
         return Err("DOC stale-source patch application was accepted".into());
     }
 
@@ -28296,14 +28314,14 @@ fn run_doc_owner_public_phases(
     if no_op.diagnostics().changed()
         || !no_op.patch().is_noop()
         || no_op.patch().changes().len() != 0
-        || no_op.package().bytes() != source.bytes()
+        || no_op.package().to_bytes()? != source_bytes
     {
         return Err("DOC exact no-op preflight changed the source".into());
     }
 
     // Exercise the no-op diagnostic contract outside timed samples as well;
     // changed samples intentionally have a different event cardinality.
-    let no_op_profile_source = Snapshot::from_bytes(corpus.archive.clone())?;
+    let no_op_profile_source = litchi_doc::Package::from_bytes(&corpus.archive)?;
     let no_op_profile_edit = no_op_profile_source.edit()?;
     let no_op_expected = [
         DiagnosticPhase::Finish,
@@ -28316,7 +28334,7 @@ fn run_doc_owner_public_phases(
     no_op_recorder.validate(&no_op_expected)?;
     if no_op_profile_commit.diagnostics().changed()
         || !no_op_profile_commit.patch().is_noop()
-        || no_op_profile_commit.package().bytes() != source.bytes()
+        || no_op_profile_commit.package().to_bytes()? != source_bytes
     {
         return Err("DOC profiled exact no-op contract changed the source".into());
     }
@@ -28324,21 +28342,23 @@ fn run_doc_owner_public_phases(
     let mut refusal_edit = source.clone().edit()?;
     if !matches!(
         refusal_edit.replace_paragraph(Position::new(paragraph_count), "out-of-range"),
-        Err(DocBodyError::Refused(Refusal::ParagraphNotFound))
+        Err(DocEditError::Body(DocBodyError::Refused(
+            Refusal::ParagraphNotFound
+        )))
     ) {
         return Err("DOC out-of-range edit did not return its typed refusal".into());
     }
-    if Snapshot::from_bytes(vec![0_u8; 8]).is_ok() {
+    if litchi_doc::Package::from_bytes(&[0_u8; 8]).is_ok() {
         return Err("DOC malformed source was accepted by the strict owner".into());
     }
     verify_doc_untouched_streams(&corpus.archive, &expected_changed)?;
     let expected_output_sha256 = sha256_hex(&expected_changed);
-    let expected_source_fingerprint = doc_body_text_fnv1a(source.bytes());
+    let expected_source_fingerprint = doc_body_text_fnv1a(&source_bytes);
     let expected_target_fingerprint = doc_body_text_fnv1a(&expected_changed);
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = DocOwnerPublicPhaseSummary {
-        implementation: "litchi-doc::body_text::Snapshot/Edit profiled owner-public seam",
+        implementation: "litchi-doc::Package::edit_profiled/Edit::commit_profiled owner-public seam",
         timing_scope: "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
         performance_claim: "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
         selected_paragraph: selected,
@@ -28355,10 +28375,9 @@ fn run_doc_owner_public_phases(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let input = corpus.archive.clone();
         let lifecycle_started = Instant::now();
-        let (snapshot, open_phases, open_outer_ns) = profile_doc_open(input)?;
+        let (snapshot, mut edit, open_phases, open_outer_ns) = profile_doc_open(input)?;
 
         let edit_new_started = Instant::now();
-        let mut edit = snapshot.edit()?;
         let edit_new_ns = elapsed_ns(edit_new_started.elapsed())?;
 
         let replacement_started = Instant::now();
@@ -28370,7 +28389,7 @@ fn run_doc_owner_public_phases(
 
         let (commit, edit_phases, edit_commit_outer_ns) = profile_doc_changed_commit(edit)?;
         let output_started = Instant::now();
-        let output = commit.package().finish();
+        let output = commit.package().to_bytes()?;
         let output_materialization_ns = elapsed_ns(output_started.elapsed())?;
         let measured_total_ns = elapsed_ns(lifecycle_started.elapsed())?;
 
@@ -28379,9 +28398,10 @@ fn run_doc_owner_public_phases(
         // explicit post-lifecycle workflow extensions rather than hidden in
         // `measured_total_ns`.
         let apply_started = Instant::now();
-        let applied = commit.patch().apply(&snapshot)?;
+        let applied = snapshot.apply(commit.patch())?.into_package();
         let same_lineage_apply_ns = elapsed_ns(apply_started.elapsed())?;
-        if applied.bytes() != expected_changed.as_slice() || applied.bytes() != output.as_slice() {
+        let applied_bytes = applied.to_bytes()?;
+        if applied_bytes != expected_changed || applied_bytes != output {
             return Err("DOC same-lineage patch replay differs from the expected output".into());
         }
 
@@ -28389,8 +28409,8 @@ fn run_doc_owner_public_phases(
         let source_fingerprint = commit.patch().source_fingerprint();
         let target_fingerprint = commit.patch().target_fingerprint();
         let deferred_fingerprint_ns = elapsed_ns(fingerprint_started.elapsed())?;
-        if commit.patch().before().bytes() != snapshot.bytes()
-            || commit.patch().after().bytes() != expected_changed.as_slice()
+        if commit.patch().before_bytes() != source_bytes.as_slice()
+            || commit.patch().after_bytes() != expected_changed.as_slice()
             || source_fingerprint != expected_source_fingerprint
             || target_fingerprint != expected_target_fingerprint
         {
@@ -28416,7 +28436,7 @@ fn run_doc_owner_public_phases(
             return Err("DOC deferred workflow duration arithmetic is inconsistent".into());
         }
         std::hint::black_box((
-            applied.bytes(),
+            applied_bytes,
             source_fingerprint,
             target_fingerprint,
             workflow_no_diagnostic_ns,
@@ -28574,8 +28594,6 @@ fn run_semantic_doc(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    use litchi_doc::body_text::Snapshot;
-
     let shape = writer_shape(corpus)?;
     if shape == WriterShape::PayloadHeavy {
         return Err("payload-heavy DOC corpus is excluded from semantic cases".into());
@@ -28597,13 +28615,13 @@ fn run_semantic_doc(
         shape.doc_paragraph_count()
     };
     let expected_changed = if case == Case::DocSemanticOneEditSave {
-        let source = Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit()?;
         edit.replace_paragraph(
             Position::new(selected),
             &updated_writer_text("doc", 0, selected, 0),
         )?;
-        edit.commit()?.package().finish()
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -28703,7 +28721,7 @@ fn run_semantic_doc(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::DocSemanticNoopEditSave | Case::DocSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(corpus.archive.clone())?;
+                let source = litchi_doc::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::DocSemanticOneEditSave;
                 let started = Instant::now();
                 let mut edit = source.edit()?;
@@ -28714,7 +28732,7 @@ fn run_semantic_doc(
                     )?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.package().finish();
+                let bytes = commit.package().to_bytes()?;
                 let duration = started.elapsed();
                 if commit.diagnostics().changed() != updated
                     || commit.patch().is_noop() == updated
@@ -28723,12 +28741,12 @@ fn run_semantic_doc(
                 {
                     return Err("semantic DOC edit/save has unexpected publication state".into());
                 }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.package().bytes() {
+                let applied = source.apply(commit.patch())?.into_package();
+                if applied.to_bytes()? != bytes {
                     return Err("semantic DOC exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.apply(&commit.patch().inverse())?.into_package();
+                if restored.to_bytes()? != corpus.archive {
                     return Err("semantic DOC inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_doc(&bytes, shape, updated.then_some(selected))?;
@@ -29961,21 +29979,49 @@ fn xls_visibility_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn E
     }
 }
 
+/// The `hide` verb shared by the primary and source-backed sheet-visibility
+/// edits, so one staging closure drives both routes.
+trait XlsVisibilityHide {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsVisibilityHide for litchi_xls::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
+impl XlsVisibilityHide for litchi_xls::source_backed::sheet_visibility::Edit {
+    fn hide_position(&mut self, position: usize) -> Result<(), Box<dyn Error>> {
+        self.hide(position.into())?;
+        Ok(())
+    }
+}
+
 fn stage_xls_visibility_updates(
-    transaction: &mut litchi_xls::sheet_visibility::Edit,
+    transaction: &mut impl XlsVisibilityHide,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     if update_count == 1 {
-        transaction.hide(1usize.into())?;
+        transaction.hide_position(1)?;
         return Ok(());
     }
     if update_count != XLS_VISIBILITY_BATCH_COUNT {
         return Err("XLS visibility benchmark update count is outside its fixed closure".into());
     }
     for position in 1..=XLS_VISIBILITY_BATCH_COUNT {
-        transaction.hide(position.into())?;
+        transaction.hide_position(position)?;
     }
     Ok(())
+}
+
+/// Open owned XLS bytes as the source-backed workbook that owns the
+/// source-backed edit families.
+fn xls_source_workbook(bytes: Vec<u8>) -> Result<litchi_xls::SourceBackedWorkbook, Box<dyn Error>> {
+    Ok(litchi_xls::SourceBackedWorkbook::from_read_at(Arc::new(
+        litchi_core::OwnedSource::new(bytes),
+    ))?)
 }
 
 enum XlsVisibilityPublication {
@@ -29984,7 +30030,7 @@ enum XlsVisibilityPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::sheet_visibility::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::sheet_visibility::Commit>),
 }
 
 impl XlsVisibilityPublication {
@@ -30000,7 +30046,7 @@ impl XlsVisibilityPublication {
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -30071,14 +30117,17 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction =
-        litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
-    stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
-        Ok(XlsVisibilityPublication::SourceBacked(
-            transaction.commit_source_backed()?,
-        ))
+        let mut transaction =
+            xls_source_workbook(source.bytes().to_vec())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
+        Ok(XlsVisibilityPublication::SourceBacked(Box::new(
+            transaction.commit()?,
+        )))
     } else {
+        let mut transaction =
+            litchi_xls::Package::from_bytes(source.bytes())?.edit_sheet_visibility()?;
+        stage_xls_visibility_updates(&mut transaction, update_count)?;
         Ok(XlsVisibilityPublication::Eager {
             commit: transaction.commit()?,
             source_bytes,
@@ -30211,19 +30260,20 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = package.edit_sheet_visibility()?.commit_source_backed()?;
-    if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
+    let workbook = xls_source_workbook(source.to_vec())?;
+    let noop = workbook.edit_sheet_visibility()?.commit()?;
+    if !noop.patch().is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
     let mut noop_bytes = Vec::new();
-    noop.write_to(&mut noop_bytes)?;
+    noop.package().write_to(&mut noop_bytes)?;
     if noop_bytes != source {
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = package.edit_sheet_visibility()?;
+    let mut capped = workbook.edit_sheet_visibility()?;
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
-    let capped = capped.commit_source_backed()?;
+    let capped = capped.commit()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
         || capped.diagnostics().touched_streams() != 1
         || capped.diagnostics().splice_count() != XLS_VISIBILITY_BATCH_COUNT
@@ -30232,7 +30282,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility exact-cap plan has unexpected diagnostics".into());
     }
     let mut capped_bytes = Vec::new();
-    capped.write_to(&mut capped_bytes)?;
+    capped.package().write_to(&mut capped_bytes)?;
     verify_xls_visibility_output(
         &Corpus {
             manifest: CorpusManifest {
@@ -30263,7 +30313,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = package.edit_sheet_visibility()?;
+    let mut over_cap = workbook.edit_sheet_visibility()?;
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -30273,7 +30323,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     {
         return Err("XLS visibility cap-plus-one staging unexpectedly succeeded".into());
     }
-    if !over_cap.commit_source_backed()?.is_noop() {
+    if !over_cap.commit()?.patch().is_noop() {
         return Err("XLS visibility cap-plus-one refusal mutated its source".into());
     }
 
@@ -30467,8 +30517,67 @@ fn xls_comments_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn Err
     }
 }
 
+/// The comment replacement verbs shared by the primary and source-backed
+/// comment edits, so one staging closure drives both routes.
+trait XlsCommentReplace {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>>;
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>>;
+}
+
+impl XlsCommentReplace for litchi_xls::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
+impl XlsCommentReplace for litchi_xls::source_backed::comments::Edit {
+    fn replace(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        reference: litchi_xls::cell_values::Reference,
+        value: litchi_xls::comments::Value,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace(self, selector, reference, value)?;
+        Ok(())
+    }
+
+    fn replace_many(
+        &mut self,
+        selector: litchi_xls::cell_values::Selector<'_>,
+        updates: Vec<litchi_xls::comments::Update>,
+    ) -> Result<(), Box<dyn Error>> {
+        litchi_xls::source_backed::comments::Edit::replace_many(self, selector, updates)?;
+        Ok(())
+    }
+}
+
 fn stage_xls_comment_updates(
-    edit: &mut litchi_xls::comments::Edit,
+    edit: &mut impl XlsCommentReplace,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     use litchi_xls::cell_values::{Reference, Selector};
@@ -30504,7 +30613,7 @@ enum XlsCommentsPublication {
         source_bytes: u64,
         source_workbook_bytes: u64,
     },
-    SourceBacked(litchi_xls::comments::SourceBackedCommit),
+    SourceBacked(Box<litchi_xls::source_backed::comments::Commit>),
 }
 
 impl XlsCommentsPublication {
@@ -30520,7 +30629,7 @@ impl XlsCommentsPublication {
                 writer.flush()?;
                 Ok(None)
             },
-            Self::SourceBacked(commit) => Ok(Some(commit.write_to(writer)?)),
+            Self::SourceBacked(commit) => Ok(commit.package().write_to(writer)?),
         }
     }
 
@@ -30591,13 +30700,15 @@ fn prepare_xls_comments_publication(
 ) -> Result<XlsCommentsPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
-    stage_xls_comment_updates(&mut edit, update_count)?;
     if source_backed {
-        Ok(XlsCommentsPublication::SourceBacked(
-            edit.commit_source_backed()?,
-        ))
+        let mut edit = xls_source_workbook(source.bytes().to_vec())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
+        Ok(XlsCommentsPublication::SourceBacked(Box::new(
+            edit.commit()?,
+        )))
     } else {
+        let mut edit = litchi_xls::Package::from_bytes(source.bytes())?.edit_comments()?;
+        stage_xls_comment_updates(&mut edit, update_count)?;
         Ok(XlsCommentsPublication::Eager {
             commit: edit.commit()?,
             source_bytes,
@@ -30781,23 +30892,23 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     use litchi_xls::comments::Value;
 
     litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
-    let mut rejected = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
+    let mut rejected = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
-    if rejected.commit_source_backed().is_ok() {
+    if rejected.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted a length change".into());
     }
 
-    let mut rejected_width = litchi_xls::Package::from_bytes(source)?.edit_comments()?;
+    let mut rejected_width = xls_source_workbook(source.to_vec())?.edit_comments()?;
     rejected_width.replace(
         Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "作者作者作者作者作")?,
     )?;
-    if rejected_width.commit_source_backed().is_ok() {
+    if rejected_width.commit().is_ok() {
         return Err("XLS source-backed comment edit accepted an encoding-width change".into());
     }
 
@@ -31019,13 +31130,12 @@ fn verify_semantic_xls(
     shape: WriterShape,
     updated: Option<(usize, usize, usize)>,
 ) -> Result<(), Box<dyn Error>> {
-    use litchi_xls::cell_values::{Reference, Snapshot, Value};
+    use litchi_xls::cell_values::{Reference, Value};
 
     let (sheet_count, rows, columns) = shape
         .xls_dimensions()
         .ok_or("payload-heavy XLS corpus is excluded from semantic verification")?;
-    let snapshot =
-        Snapshot::from_bytes(bytes.to_vec(), litchi_ole_common::object::Limits::default())?;
+    let snapshot = litchi_xls::Package::from_bytes(bytes)?.cell_values()?;
     if snapshot.worksheet_count() != sheet_count {
         return Err("semantic XLS worksheet count differs from writer specification".into());
     }
@@ -31061,7 +31171,7 @@ fn run_semantic_xls(
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
     use litchi_core::sheet::{Cell as _, Worksheet as _};
-    use litchi_xls::cell_values::{Reference, Snapshot};
+    use litchi_xls::cell_values::Reference;
 
     let shape = writer_shape(corpus)?;
     let (sheet_count, rows, columns) = shape
@@ -31071,13 +31181,10 @@ fn run_semantic_xls(
     let reference = Reference::new(selected.1 as u32, selected.2 as u32)?;
     let replacement = xls_expected_value(shape, selected.0, selected.1, selected.2)? + 0.5;
     let expected_changed = if case == Case::XlsSemanticOneEditSave {
-        let source = Snapshot::from_bytes(
-            corpus.archive.clone(),
-            litchi_ole_common::object::Limits::default(),
-        )?;
-        let mut edit = source.edit();
-        edit.set_number(selected.0.into(), reference, replacement)?;
-        edit.commit()?.package().bytes().to_vec()
+        let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
+        let mut edit = source.edit()?;
+        edit.set_number(selected.0, reference, replacement)?;
+        edit.commit()?.patch().after().to_vec()
     } else {
         corpus.archive.clone()
     };
@@ -31179,18 +31286,15 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticNoopEditSave | Case::XlsSemanticOneEditSave => {
-                let source = Snapshot::from_bytes(
-                    corpus.archive.clone(),
-                    litchi_ole_common::object::Limits::default(),
-                )?;
+                let source = litchi_xls::Package::from_bytes(&corpus.archive)?;
                 let updated = case == Case::XlsSemanticOneEditSave;
                 let started = Instant::now();
-                let mut edit = source.edit();
+                let mut edit = source.edit()?;
                 if updated {
-                    edit.set_number(selected.0.into(), reference, replacement)?;
+                    edit.set_number(selected.0, reference, replacement)?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.package().bytes().to_vec();
+                let bytes = commit.patch().after().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
                 if commit.patch().is_noop() == updated
@@ -31202,12 +31306,12 @@ fn run_semantic_xls(
                 {
                     return Err("semantic XLS edit/save has unexpected publication state".into());
                 }
-                let applied = commit.patch().apply(&source)?;
-                if applied.bytes() != commit.package().bytes() {
+                let applied = source.apply(commit.patch())?;
+                if applied.patch().after() != commit.patch().after() {
                     return Err("semantic XLS exact patch replay differs from commit".into());
                 }
-                let restored = commit.patch().inverse().apply(&applied)?;
-                if restored.bytes() != source.bytes() {
+                let restored = applied.package().apply(&commit.patch().inverse())?;
+                if restored.patch().after() != corpus.archive.as_slice() {
                     return Err("semantic XLS inverse did not restore exact source bytes".into());
                 }
                 verify_semantic_xls(&bytes, shape, updated.then_some(selected))?;
@@ -67348,8 +67452,7 @@ mod tests {
             doc_body_text_fnv1a(&corpus.archive)
         );
         let selected = writer_shape(&corpus).unwrap().doc_paragraph_count() / 2;
-        let source_snapshot =
-            litchi_doc::body_text::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source_snapshot = litchi_doc::Package::from_bytes(&corpus.archive).unwrap();
         let mut expected_edit = source_snapshot.edit().unwrap();
         expected_edit
             .replace_paragraph(
@@ -67357,7 +67460,12 @@ mod tests {
                 &updated_writer_text("doc", 0, selected, 0),
             )
             .unwrap();
-        let expected_target = expected_edit.commit().unwrap().package().finish();
+        let expected_target = expected_edit
+            .commit()
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap();
         assert_eq!(
             evidence.expected_target_fingerprint,
             doc_body_text_fnv1a(&expected_target)

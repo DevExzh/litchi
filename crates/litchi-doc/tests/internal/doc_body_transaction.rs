@@ -17,7 +17,7 @@ use litchi_doc::{HeaderKind, raw::Reader};
 use std::io::Cursor;
 use std::path::PathBuf;
 
-mod common;
+use super::common;
 
 fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

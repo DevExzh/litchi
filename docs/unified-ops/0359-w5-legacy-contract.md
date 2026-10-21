@@ -201,6 +201,9 @@ cargo command at a time; the working tree was clean afterwards.
 
 ## 9. Gaps and follow-ups
 
+Items 1–4 are closed by [0359a](0359a-w5-legacy-review.md) (F1, F2 and F4
+implemented; F3 accepted under 0351 §2.1 rule 6).
+
 1. **Record-level engines.** `doc::body_text` (Snapshot, `Edit`,
    `PreparedEdit`, `History`, three-way plans) and `xls::cell_values`
    (Snapshot, `Edit`, `SemanticPatch`, `ThreeWayPlan`, `History`) stay public

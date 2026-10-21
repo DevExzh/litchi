@@ -320,6 +320,15 @@ impl Patch {
         Self::from_leaf(self.inner.inverse())
     }
 
+    /// The durable, reversible semantic patch: deterministic JSON
+    /// ([`cell_values::SemanticPatch::to_deterministic_json`]), replayed with
+    /// [`Package::apply_semantic`], merged with [`Package::plan_three_way`]
+    /// and transferred with [`Package::plan_transfer`].
+    #[must_use]
+    pub fn semantic(&self) -> &cell_values::SemanticPatch {
+        self.inner.semantic()
+    }
+
     pub(crate) fn leaf(&self) -> &cell_values::Patch {
         &self.inner
     }
@@ -374,6 +383,39 @@ impl Commit {
     pub fn into_parts(self) -> (Package, Patch) {
         (self.package, self.patch)
     }
+    /// Record this commit's package in `history` as its next state, weighted
+    /// by the patch's before and after artifact lengths.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the history's current package
+    /// is not this commit's source, and a refusal when the history cannot
+    /// hold it.
+    pub fn record_in(self, history: &mut crate::package::History) -> Result<Vec<Package>> {
+        if history
+            .current()
+            .to_bytes()
+            .map_err(Error::Package)?
+            .as_slice()
+            != self.patch.before()
+        {
+            return Err(Error::PatchConflict);
+        }
+        let weight = u64::try_from(self.patch.before().len())
+            .ok()
+            .zip(u64::try_from(self.patch.after().len()).ok())
+            .and_then(|(before, after)| before.checked_add(after))
+            .ok_or(Error::CellValues(crate::Error::Internal(
+                "XLS history weight overflow",
+            )))?;
+        history.record(self.package, weight).map_err(|_error| {
+            Error::CellValues(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "the cell edit history cannot record this commit",
+            ))
+        })
+    }
 }
 
 /// Detached primary XLS edit backed by the checked cell-values snapshot.
@@ -419,6 +461,37 @@ impl Edit {
             options,
             source_guard,
         })
+    }
+
+    /// A primary edit of `package` over a leaf edit already staged from its
+    /// cell-value snapshot (a semantic replay or transfer).
+    pub(crate) fn from_leaf(
+        package: Package,
+        inner: cell_values::Edit,
+        options: EditOptions,
+    ) -> Result<Self> {
+        let source_guard = capture_source_guard(&package)?;
+        Ok(Self {
+            package,
+            inner,
+            options,
+            source_guard,
+        })
+    }
+
+    /// Join another edit of the same source package when the two are provably
+    /// disjoint; the joined edit commits both atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns the structured join refusal with the rejected edit's
+    /// conflicts.
+    pub fn join(
+        &mut self,
+        incoming: Self,
+    ) -> std::result::Result<&mut Self, cell_values::JoinError> {
+        self.inner.join(incoming.inner)?;
+        Ok(self)
     }
 
     /// Immutable package that authorized this edit.
@@ -640,8 +713,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Write one formula cell, replacing an existing scalar cell in place;
-    /// see [`cell_values::Edit::set_formula`].
+    /// Write one formula cell, replacing an existing scalar cell in place.
     ///
     /// # Errors
     ///
@@ -658,8 +730,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Set one row's height in twips and mark it custom; see
-    /// [`cell_values::Edit::set_row_height`].
+    /// Set one row's height in twips and mark it custom.
     ///
     /// # Errors
     ///
@@ -675,7 +746,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Hide or show one row; see [`cell_values::Edit::set_row_hidden`].
+    /// Hide or show one row.
     ///
     /// # Errors
     ///
@@ -691,8 +762,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Set one column's width in 1/256 character; see
-    /// [`cell_values::Edit::set_column_width`].
+    /// Set one column's width in 1/256 character.
     ///
     /// # Errors
     ///
@@ -709,7 +779,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Hide or show one column; see [`cell_values::Edit::set_column_hidden`].
+    /// Hide or show one column.
     ///
     /// # Errors
     ///
@@ -726,8 +796,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Change one cell's alignment, border styles or fill; see
-    /// [`cell_values::Edit::set_cell_format`].
+    /// Change one cell's alignment, border styles or fill.
     ///
     /// # Errors
     ///
@@ -839,8 +908,7 @@ impl Edit {
             .map_err(Error::from)
     }
 
-    /// Reorder the complete tab catalog; see
-    /// [`cell_values::Edit::reorder_sheets`]. The identity order is an exact
+    /// Reorder the complete tab catalog. The identity order is an exact
     /// no-op, and a tab-structure change must be the only operation of its
     /// edit.
     ///
@@ -870,8 +938,7 @@ impl Edit {
         self.inner.reorder_sheets(order).map_err(Error::from)
     }
 
-    /// Insert one empty worksheet at a complete-catalog position; see
-    /// [`cell_values::Edit::insert_sheet`].
+    /// Insert one empty worksheet at a complete-catalog position.
     ///
     /// # Errors
     ///
@@ -881,8 +948,7 @@ impl Edit {
         self.inner.insert_sheet(position, name).map_err(Error::from)
     }
 
-    /// Remove one ordinary worksheet tab; see
-    /// [`cell_values::Edit::remove_sheet`].
+    /// Remove one ordinary worksheet tab.
     ///
     /// # Errors
     ///
@@ -923,6 +989,17 @@ impl Edit {
 }
 
 impl Package {
+    /// The cell-value snapshot an edit of this package starts from, with
+    /// the retained edit options.
+    pub(crate) fn cell_source(&self) -> Result<(cell_values::Snapshot, EditOptions)> {
+        super::ensure_publication_allowed(&self.inner).map_err(Error::Package)?;
+        let options = self.retained_edit_options()?;
+        let snapshot = self
+            .edit_snapshot_with_options(options)
+            .map_err(Error::Package)?;
+        Ok((snapshot, options))
+    }
+
     fn retained_edit_options(&self) -> Result<EditOptions> {
         if let Some(snapshot) = &self.inner.edit_snapshot {
             return Ok(EditOptions::new()

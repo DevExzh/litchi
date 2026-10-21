@@ -5,7 +5,7 @@ use super::prelude::*;
 /// A borrowed, allocation-free traversal of ordinary main-story paragraphs.
 ///
 /// The iterator follows the same source-body rules as
-/// [`crate::body_text::Snapshot::paragraphs`]: only carriage returns outside
+/// [`crate::Package::body_paragraphs`]: only carriage returns outside
 /// table PAPX runs emit paragraphs, cell markers reset the source boundary,
 /// and an unterminated trailing fragment is not emitted. Each item borrows the
 /// decoded text owned by the source [`Document`].
@@ -109,7 +109,7 @@ impl Document {
     ///
     /// A paragraph is emitted at a main-story carriage return whose PAPX is
     /// outside a table. Table-cell paragraph marks and cell marks are skipped,
-    /// exactly as they are by [`crate::body_text::Snapshot::paragraphs`]. A
+    /// exactly as they are by [`crate::Package::body_paragraphs`]. A
     /// trailing unterminated text fragment is not a paragraph in the DOC
     /// source model.
     pub fn body_paragraph_count(&self) -> Result<usize> {
