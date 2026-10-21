@@ -71,8 +71,8 @@ without a production-code repair. The integrated core test suite and
 all-target/all-feature checks of the archive, IWA, Pages, Numbers and Keynote
 consumers pass. Receipts remain under the external
 `constructor-0361f-coordinator` directory. The original worker's broader
-validation logs are retained separately; integration does not imply native
-performance acceptance.
+validation claims are not counted until their receipts are located and
+verified; integration does not imply native performance acceptance.
 
 The coordinator replaced the prepared qualification protocol before building
 it. The earlier protocol timed its counting-allocator binary, omitted host
@@ -126,3 +126,10 @@ base constructor. It produced no qualified timings. The raw traceback,
 protected binary and original probe are retained. The corrected comparison
 uses a one-byte header ceiling, enforced by both endpoints; candidate-only
 header-field rejection remains covered by its correctness tests.
+
+The corrected `matched-v2` fixture and repeated allocation checks pass. Its
+standalone probe inherited the earlier preparation's debug-enabled, non-LTO
+release profile, so those counts remain diagnostic and no native timing was
+started. The final builder uses the workspace release settings (`lto = true`,
+`panic = "abort"`, default debug level) for both native and counting binaries.
+Both earlier build attempts and their protocol sources remain external.

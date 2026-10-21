@@ -112,7 +112,8 @@ allocations = []
 litchi-iwa-core = { path = %s }
 sha2 = "0.11"
 [profile.release]
-debug = 1
+lto = true
+panic = "abort"
 [workspace]
 ''' % json.dumps(str(source / 'crates/litchi-iwa-core')))
         receipts = out / f'build-{label}'
