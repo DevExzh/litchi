@@ -33,13 +33,7 @@ use litchi_ole_common::object::Limits as ObjectLimits;
 use std::fmt;
 use std::sync::Arc;
 
-/// A canonical primary-edit limit dimension.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Number of staged cell, resource, or worksheet operations.
-    Operations,
-}
+pub use crate::error::LimitKind;
 
 /// Explicit bounds for one primary XLS edit.
 ///
@@ -129,10 +123,14 @@ impl From<crate::Error> for Error {
         // here so the package family has the canonical Limit shape while all
         // other leaf refusals remain available as typed sources.
         match error {
-            crate::Error::StagedChangeLimit { observed, maximum } => Self::Limit {
+            crate::Error::Limit {
                 kind: LimitKind::Operations,
                 observed,
                 maximum,
+            } => Self::Limit {
+                kind: LimitKind::Operations,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
             },
             other => Self::CellValues(other),
         }

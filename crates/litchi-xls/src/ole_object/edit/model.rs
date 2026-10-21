@@ -186,11 +186,61 @@ pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 /// Content-free diagnostics of one commit.
 pub use litchi_core::edit::Diagnostics;
 
-/// The OLE-object family has no caller-selected limit dimension beyond the
-/// object capture bounds of [`Limits`], which [`EditOptions`] selects.
+/// A configured OLE-object capture or publication resource dimension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum LimitKind {}
+pub enum LimitKind {
+    /// Selected embedded object count.
+    Objects,
+    /// Bytes retained for one standalone embedded compound file.
+    ObjectBytes,
+    /// Directory entries visited during bounded capture.
+    DirectoryEntries,
+    /// Captured descendant storage count.
+    Storages,
+    /// Nested storage depth.
+    StorageDepth,
+    /// Captured stream count, bounded by both object and package policies.
+    Streams,
+    /// Bytes in one stream, before reading its payload.
+    StreamBytes,
+    /// Aggregate captured stream bytes.
+    AggregateBytes,
+}
+
+impl LimitKind {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::Objects => "OLE object count",
+            Self::ObjectBytes => "OLE object bytes",
+            Self::DirectoryEntries => "OLE directory entries",
+            Self::Storages => "OLE storage count",
+            Self::StorageDepth => "OLE storage depth",
+            Self::Streams => "OLE stream count",
+            Self::StreamBytes => "OLE stream bytes",
+            Self::AggregateBytes => "OLE aggregate stream bytes",
+        }
+    }
+
+    pub(crate) const fn exceeded(self, observed: u64, maximum: u64) -> Error {
+        Error::Limit {
+            kind: crate::LimitKind::OleObject(self),
+            observed,
+            maximum,
+        }
+    }
+
+    pub(crate) const fn invalid_zero(self) -> Error {
+        Error::InvalidLimit {
+            kind: crate::LimitKind::OleObject(self),
+            value: 0,
+            maximum: match self {
+                Self::ObjectBytes | Self::StreamBytes | Self::AggregateBytes => u64::MAX,
+                _ => usize::MAX as u64,
+            },
+        }
+    }
+}
 
 /// Per-edit configuration of an OLE-object edit.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

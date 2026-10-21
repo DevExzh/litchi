@@ -1649,7 +1649,7 @@ impl Classify for litchi_xls::Error {
             Self::EncryptedMetadata => {
                 Class::suggest(Code::UnsupportedCapability, ENCRYPTED_METADATA_SUGGESTION)
             },
-            Self::Limit { .. } | Self::StagedChangeLimit { .. } => Class::of(Code::LimitExceeded),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::Io(error) => error.classify(),
             Self::Cfb(error) => error.classify(),
             Self::PasswordProtected | Self::PasswordRequired => {
@@ -1688,6 +1688,7 @@ impl Classify for litchi_xls::Error {
             | Self::InvalidData(_)
             | Self::UnexpectedRecordType { .. }
             | Self::Eof(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::InternalError),
         }
     }
 }

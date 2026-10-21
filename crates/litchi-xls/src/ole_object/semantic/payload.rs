@@ -1,5 +1,6 @@
 //! Inert, bounded embedded-payload authoring for MS-XLS.
 
+use super::super::LimitKind;
 use super::{FtCf, FtCmo, FtPictFmla, FtPioGrbit, ObjSubrecord, OleObjectRecord};
 use crate::error::{Error, Result};
 use litchi_cfb::{
@@ -45,9 +46,9 @@ impl EmbeddedPayload {
             ));
         }
         if compound_file.len() as u64 > limits.max_object_size {
-            return Err(Error::InvalidData(
-                "embedded payload exceeds the configured object size limit".into(),
-            ));
+            return Err(
+                LimitKind::ObjectBytes.exceeded(compound_file.len() as u64, limits.max_object_size)
+            );
         }
         OleFile::open(Cursor::new(compound_file.as_slice()))?;
         Ok(Self {
@@ -87,16 +88,15 @@ pub(crate) fn validate_compound_file_for_publication(
     // `add_storage` ingress.  Check it before opening the CFB so directory or
     // property-set metadata cannot make a larger caller allocation reachable.
     if bytes.len() as u64 > limits.max_object_size {
-        return Err(Error::InvalidData(
-            "embedded payload exceeds the configured object size limit".into(),
-        ));
+        return Err(LimitKind::ObjectBytes.exceeded(bytes.len() as u64, limits.max_object_size));
     }
     let max_streams = limits.max_streams.min(limits.max_streams_per_object);
     let max_total_size = limits.max_total_size.min(limits.max_object_size);
-    if max_streams == 0 || max_total_size == 0 {
-        return Err(Error::InvalidData(
-            "embedded payload publication limits must be non-zero".into(),
-        ));
+    if max_streams == 0 {
+        return Err(LimitKind::Streams.invalid_zero());
+    }
+    if max_total_size == 0 {
+        return Err(LimitKind::AggregateBytes.invalid_zero());
     }
 
     let mut ole = OleFile::open(Cursor::new(bytes))?;
@@ -173,25 +173,19 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
             return Err(Error::refused(RefusalKind::UnsupportedOperation, "edit OLE objects", "embedded payload contains signed, encrypted, or DRM content; refusing publication"));
         }
         if budget.entries >= budget.max_entries {
-            return Err(Error::InvalidData(
-                "embedded payload directory entry count exceeds the configured limit".into(),
-            ));
+            return Err(LimitKind::DirectoryEntries.exceeded(budget.entries.saturating_add(1) as u64, budget.max_entries as u64));
         }
         budget.entries += 1;
         match entry_type {
             STGTY_STORAGE => {
                 if budget.storages >= budget.max_storages {
-                    return Err(Error::InvalidData(
-                        "embedded payload storage count exceeds the configured limit".into(),
-                    ));
+                    return Err(LimitKind::Storages.exceeded(budget.storages.saturating_add(1) as u64, budget.max_storages as u64));
                 }
                 let next_depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::InvalidData("embedded payload storage depth overflow".into())
+                    LimitKind::StorageDepth.exceeded(u64::MAX, max_storage_depth as u64)
                 })?;
                 if next_depth > max_storage_depth {
-                    return Err(Error::InvalidData(
-                        "embedded payload storage depth exceeds the configured limit".into(),
-                    ));
+                    return Err(LimitKind::StorageDepth.exceeded(next_depth as u64, max_storage_depth as u64));
                 }
                 budget.storages += 1;
                 let mut child = Vec::new();
@@ -204,22 +198,16 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
             },
             STGTY_STREAM => {
                 if budget.streams >= budget.max_streams {
-                    return Err(Error::InvalidData(
-                        "embedded payload stream count exceeds the configured limit".into(),
-                    ));
+                    return Err(LimitKind::Streams.exceeded(budget.streams.saturating_add(1) as u64, budget.max_streams as u64));
                 }
                 if size > budget.max_stream_size {
-                    return Err(Error::InvalidData(
-                        "embedded payload stream exceeds the configured size limit".into(),
-                    ));
+                    return Err(LimitKind::StreamBytes.exceeded(size, budget.max_stream_size));
                 }
                 let total = budget.total_size.checked_add(size).ok_or_else(|| {
-                    Error::InvalidData("embedded payload stream size overflow".into())
+                    LimitKind::AggregateBytes.exceeded(u64::MAX, budget.max_total_size)
                 })?;
                 if total > budget.max_total_size {
-                    return Err(Error::InvalidData(
-                        "embedded payload stream bytes exceed the configured total limit".into(),
-                    ));
+                    return Err(LimitKind::AggregateBytes.exceeded(total, budget.max_total_size));
                 }
                 budget.streams += 1;
                 budget.total_size = total;
@@ -254,10 +242,8 @@ fn inspect_publication_directory<R: std::io::Read + std::io::Seek>(
     .map_err(|error| match error {
         Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "directory entries",
-            ..
-        }) => Error::InvalidData(
-            "embedded payload directory entry count exceeds the configured limit".into(),
-        ),
+            observed, maximum
+        }) => LimitKind::DirectoryEntries.exceeded(observed, maximum),
         other => other,
     })
 }

@@ -19,7 +19,7 @@ use crate::number_format::Formatting;
 use crate::pivot_table;
 use crate::records::{BiffVersion, Encoding};
 use crate::sheet_metadata::SheetMetadata;
-use crate::source_limits::{SourceLimitKind, SourceLimits};
+use crate::{LimitKind, SourceLimits};
 use litchi_biff::Records;
 use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_core::edit::RefusalKind;
@@ -678,7 +678,7 @@ fn validate_source_len(actual: u64, source_limits: SourceLimits) -> Result<()> {
     let maximum = u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX);
     if actual > maximum {
         return Err(Error::Limit {
-            kind: SourceLimitKind::InputBytes,
+            kind: LimitKind::InputBytes,
             observed: actual,
             maximum,
         });
@@ -710,20 +710,20 @@ fn preflight_declared_streams<R: Read + Seek>(
         }
         if entry.size > entry_maximum {
             return Err(Error::Limit {
-                kind: SourceLimitKind::EntryBytes,
+                kind: LimitKind::EntryBytes,
                 observed: entry.size,
                 maximum: entry_maximum,
             });
         }
         aggregate = aggregate.checked_add(entry.size).ok_or(Error::Limit {
-            kind: SourceLimitKind::AggregateBytes,
+            kind: LimitKind::AggregateBytes,
             observed: u64::MAX,
             maximum: aggregate_maximum,
         })?;
     }
     if aggregate > aggregate_maximum {
         return Err(Error::Limit {
-            kind: SourceLimitKind::AggregateBytes,
+            kind: LimitKind::AggregateBytes,
             observed: aggregate,
             maximum: aggregate_maximum,
         });
@@ -734,7 +734,7 @@ fn preflight_declared_streams<R: Read + Seek>(
 #[cfg(test)]
 mod source_limit_tests {
     use super::{preflight_declared_streams, preflight_ole_file, preflight_source_len};
-    use crate::{Error, OpenOptions, SourceLimitKind, SourceLimits, raw::Reader};
+    use crate::{Error, LimitKind, OpenOptions, SourceLimits, raw::Reader};
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::{Cursor, Read, Seek, SeekFrom};
     use std::sync::{Arc, atomic::AtomicUsize, atomic::Ordering};
@@ -778,7 +778,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::EntryBytes,
+                kind: LimitKind::EntryBytes,
                 observed: 5,
                 maximum: 4,
             }
@@ -793,7 +793,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::AggregateBytes,
+                kind: LimitKind::AggregateBytes,
                 observed: 10,
                 maximum: 9,
             }
@@ -815,7 +815,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::InputBytes,
+                kind: LimitKind::InputBytes,
                 observed,
                 maximum,
             } if observed == bytes.len() as u64 && maximum == (bytes.len() - 1) as u64
@@ -861,7 +861,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::InputBytes,
+                kind: LimitKind::InputBytes,
                 ..
             }
         ));
@@ -887,7 +887,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::EntryBytes,
+                kind: LimitKind::EntryBytes,
                 observed: 5,
                 maximum: 4,
             }
@@ -914,7 +914,7 @@ mod source_limit_tests {
         assert!(matches!(
             error,
             Error::Limit {
-                kind: SourceLimitKind::EntryBytes,
+                kind: LimitKind::EntryBytes,
                 observed: 5,
                 maximum: 4,
             }
@@ -963,7 +963,7 @@ mod source_limit_tests {
                 (9, false) => assert!(matches!(
                     result,
                     Err(Error::Limit {
-                        kind: SourceLimitKind::InputBytes,
+                        kind: LimitKind::InputBytes,
                         observed: 10,
                         maximum: 9,
                     })

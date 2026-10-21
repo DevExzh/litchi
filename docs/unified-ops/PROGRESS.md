@@ -942,6 +942,9 @@ Work packages, in waves of up to four agents:
 
 - Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), Graph/XLS/PPT/ODS slice: owner ingress/history use options; raw chart scans and embedded payloads require limits. The PPT Graph draft moves to `builder::graph::Draft`, with semantic models under `chart::semantic`. All consumers migrate; 149 tests, all-target clippy, the locked harness and five glossary profiles pass. The remaining shared-helper constructors and final integrated gate remain open.
 
+- Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), BIFF slice: raw frame constructors and copies require limits; Graph traversal retains its admitted policy and every XLS/Graph/PPT consumer migrates. Redundant iterator error state is removed (104→72 bytes). All 1,416 native tests, 36 tooling tests, clippy, locked harness, five glossary profiles and the bench matrix check pass. Three isolated ABBA blocks show scan medians 0.986/0.794× and encoding medians 0.993/0.994×; complete samples and reproducer are retained. Shared-helper/typed-error audits and W4/W4b/W8 integration remain required.
+- Coordinator follow-up [0359c](0359c-typed-legacy-edit-budgets.md), XLS slice: embedded-payload/publication bounds and cell staging now emit typed budget errors; canonical `LimitKind` replaces `SourceLimitKind` and `StagedChangeLimit` is removed with all consumers migrated. All 1,346 targeted tests, XLS/operations clippy, locked harness compilation and XLS glossary checks pass. Shared OLE/Graph migration and integrated corpus/performance acceptance remain required; this is not a new deferral.
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
@@ -1755,5 +1758,3 @@ resource refusals. Full PPTX tests, Clippy, rustdoc, workspace compilation and
 both glossary profiles pass. Full charts, unified PPTX dispatch and performance
 acceptance remain pending; the full goal is active.
 See [0063](0063-source-pptx-modern-comments.md).
-
-- Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), BIFF slice: raw frame constructors and copies require limits; Graph traversal retains its admitted policy and every XLS/Graph/PPT consumer migrates. Redundant iterator error state is removed (104→72 bytes). All 1,416 native tests, 36 tooling tests, clippy, locked harness, five glossary profiles and the bench matrix check pass. Three isolated ABBA blocks show scan medians 0.986/0.794× and encoding medians 0.993/0.994×; complete samples and reproducer are retained. Shared-helper/typed-error audits and W4/W4b/W8 integration remain required.

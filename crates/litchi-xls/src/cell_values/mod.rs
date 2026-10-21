@@ -3512,9 +3512,10 @@ impl Edit {
             .and_then(|value| value.checked_add(self.resource_changes.len()))
             .ok_or_else(|| Error::InvalidData("transaction resource size overflow".into()))?;
         if observed >= MAX_STAGED_CHANGES {
-            return Err(Error::StagedChangeLimit {
-                observed: observed.saturating_add(1),
-                maximum: MAX_STAGED_CHANGES,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Operations,
+                observed: observed.saturating_add(1) as u64,
+                maximum: MAX_STAGED_CHANGES as u64,
             });
         }
         self.resource_changes
@@ -3843,9 +3844,10 @@ impl Edit {
             .saturating_add(self.resource_changes.len())
             .saturating_add(self.layout_changes.len());
         if observed >= MAX_STAGED_CHANGES {
-            return Err(Error::StagedChangeLimit {
-                observed: observed.saturating_add(1),
-                maximum: MAX_STAGED_CHANGES,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Operations,
+                observed: observed.saturating_add(1) as u64,
+                maximum: MAX_STAGED_CHANGES as u64,
             });
         }
         self.layout_changes
@@ -4225,9 +4227,10 @@ impl Edit {
             .and_then(|value| value.checked_add(self.resource_changes.len()))
             .ok_or_else(|| Error::InvalidData("cell transaction size overflow".into()))?;
         if observed >= MAX_STAGED_CHANGES {
-            return Err(Error::StagedChangeLimit {
-                observed: observed.saturating_add(1),
-                maximum: MAX_STAGED_CHANGES,
+            return Err(Error::Limit {
+                kind: crate::LimitKind::Operations,
+                observed: observed.saturating_add(1) as u64,
+                maximum: MAX_STAGED_CHANGES as u64,
             });
         }
         self.structural_changes
@@ -4275,9 +4278,10 @@ impl Edit {
                 .saturating_add(self.structural_changes.len())
                 .saturating_add(self.resource_changes.len());
             if observed >= MAX_STAGED_CHANGES {
-                return Err(Error::StagedChangeLimit {
-                    observed: observed.saturating_add(1),
-                    maximum: MAX_STAGED_CHANGES,
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::Operations,
+                    observed: observed.saturating_add(1) as u64,
+                    maximum: MAX_STAGED_CHANGES as u64,
                 });
             }
             self.changes

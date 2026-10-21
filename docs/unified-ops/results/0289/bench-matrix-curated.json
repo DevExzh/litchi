@@ -2800,6 +2800,10 @@
  ],
  "evidence_without_rows": [
   {
+   "record": "0359c",
+   "reason": "Validation-only receipt for the XLS typed-budget slice; no timing or leaf-vs-unified performance claim. Shared OLE/Graph migration and integrated performance acceptance remain required."
+  },
+  {
    "record": "0272",
    "reason": "route-identity check only (record 0272: 'no timing claim'); its JSON holds no paired timing"
   },

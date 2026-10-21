@@ -1068,9 +1068,14 @@ fn add_embedded_payload_preflights_target_limit_before_payload_capture() {
     let error = transaction
         .add_embedded_payload(0, draft)
         .expect_err("a second target must be refused before capture");
-    assert!(
-        matches!(error, crate::error::Error::InvalidData(message) if message.contains("object limit"))
-    );
+    assert!(matches!(
+        error,
+        crate::error::Error::Limit {
+            kind: crate::LimitKind::OleObject(super::super::LimitKind::Objects),
+            observed: 2,
+            maximum: 1
+        }
+    ));
     assert_eq!(
         transaction
             .clone()
@@ -1174,9 +1179,14 @@ fn embedded_payload_checks_stream_bounds_before_parsing_nested_pidssi() {
     let error = transaction
         .add_embedded_payload(0, draft)
         .expect_err("oversized PIDDSI must be refused before parsing");
-    assert!(
-        matches!(error, crate::error::Error::InvalidData(message) if message.contains("stream exceeds"))
-    );
+    assert!(matches!(
+        error,
+        crate::error::Error::Limit {
+            kind: crate::LimitKind::OleObject(super::super::LimitKind::StreamBytes),
+            observed: 2048,
+            maximum: 1024
+        }
+    ));
 }
 
 #[test]
@@ -1261,7 +1271,7 @@ fn embedded_payload_publication_bounds_wide_storage_siblings_before_capture() {
         .add_embedded_payload(0, draft)
         .expect_err("wide sibling directories must be bounded before capture");
     assert!(
-        matches!(error, crate::error::Error::InvalidData(message) if message.contains("storage count"))
+        matches!(error, crate::error::Error::Limit { kind: crate::LimitKind::OleObject(super::super::LimitKind::Storages), observed, maximum } if observed == maximum + 1)
     );
     assert_eq!(
         transaction
@@ -1292,6 +1302,71 @@ fn embedded_payload_uses_per_object_storage_ceiling_before_capture() {
         .add_embedded_payload(0, draft)
         .expect_err("one selected payload must use the per-object storage ceiling");
     assert!(
-        matches!(error, crate::error::Error::InvalidData(message) if message.contains("storage count"))
+        matches!(error, crate::error::Error::Limit { kind: crate::LimitKind::OleObject(super::super::LimitKind::Storages), observed, maximum } if observed == maximum + 1)
     );
+}
+
+#[test]
+fn standalone_and_publication_byte_limits_keep_numeric_evidence() {
+    let bytes = payload_with_root_stream("private-payload-name", &[0xa5; 4]);
+    let maximum = bytes.len() as u64 - 1;
+    let error = EmbeddedPayload::new(
+        bytes.clone(),
+        Limits {
+            max_object_size: maximum,
+            ..publication_limits()
+        },
+    )
+    .expect_err("object byte bound is checked before retaining the payload");
+    assert!(matches!(error, crate::Error::Limit {
+        kind: crate::LimitKind::OleObject(super::super::LimitKind::ObjectBytes),
+        observed, maximum: bound,
+    } if observed == maximum + 1 && bound == maximum));
+
+    let limits = Limits {
+        max_total_size: 3,
+        ..publication_limits()
+    };
+    let payload = EmbeddedPayload::new(bytes, limits).expect("standalone admission is unchanged");
+    let error = payload
+        .validate_for_publication(limits)
+        .expect_err("aggregate stream bytes are checked before capture");
+    assert!(matches!(
+        error,
+        crate::Error::Limit {
+            kind: crate::LimitKind::OleObject(super::super::LimitKind::AggregateBytes),
+            observed: 4,
+            maximum: 3,
+        }
+    ));
+    assert!(!error.to_string().contains("private-payload-name"));
+}
+
+#[test]
+fn invalid_publication_limits_are_distinct_from_exhausted_budgets() {
+    let bytes = payload_with_root_stream("Opaque", &[0xa5; 4]);
+    let payload = EmbeddedPayload::new(bytes, Limits::default()).unwrap();
+    for (limits, expected) in [
+        (
+            Limits {
+                max_streams: 0,
+                ..publication_limits()
+            },
+            super::super::LimitKind::Streams,
+        ),
+        (
+            Limits {
+                max_total_size: 0,
+                ..publication_limits()
+            },
+            super::super::LimitKind::AggregateBytes,
+        ),
+    ] {
+        let error = payload
+            .validate_for_publication(limits)
+            .expect_err("zero publication limits are invalid configurations");
+        assert!(matches!(error, crate::Error::InvalidLimit {
+            kind: crate::LimitKind::OleObject(kind), value: 0, ..
+        } if kind == expected));
+    }
 }

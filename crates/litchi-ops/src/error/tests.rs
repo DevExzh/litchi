@@ -1452,15 +1452,15 @@ fn doc_source_limit_configuration_preserves_dimension_and_values() {
 fn xls_source_limits_preserve_error_codes() {
     assert_code(
         litchi_xls::Error::InvalidLimit {
-            kind: litchi_xls::SourceLimitKind::InputBytes,
+            kind: litchi_xls::LimitKind::InputBytes,
             value: 0,
-            maximum: litchi_xls::SourceLimits::MAX_INPUT_BYTES,
+            maximum: litchi_xls::SourceLimits::MAX_INPUT_BYTES as u64,
         },
         Code::InvalidArgument,
     );
     assert_code(
         litchi_xls::Error::Limit {
-            kind: litchi_xls::SourceLimitKind::EntryBytes,
+            kind: litchi_xls::LimitKind::EntryBytes,
             observed: 101,
             maximum: 100,
         },
@@ -1477,7 +1477,7 @@ fn xls_package_errors_preserve_classification() {
     );
     assert_code(
         litchi_xls::package::Error::Reader(litchi_xls::Error::Limit {
-            kind: litchi_xls::SourceLimitKind::EntryBytes,
+            kind: litchi_xls::LimitKind::EntryBytes,
             observed: 101,
             maximum: 100,
         }),
@@ -1489,7 +1489,8 @@ fn xls_package_errors_preserve_classification() {
 #[test]
 fn xls_staged_changes_classify_as_a_limit() {
     assert_code(
-        litchi_xls::Error::StagedChangeLimit {
+        litchi_xls::Error::Limit {
+            kind: litchi_xls::LimitKind::Operations,
             observed: 4097,
             maximum: 4096,
         },
@@ -1741,4 +1742,45 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         },
         Code::InvalidValue,
     );
+}
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_ole_budget_errors_preserve_typed_dimensions_and_codes() {
+    use litchi_xls::ole_object::{EmbeddedPayload, LimitKind, Limits, Snapshot};
+    let native = EmbeddedPayload::new(
+        b"private payload bytes".to_vec(),
+        Limits {
+            max_object_size: 1,
+            ..Limits::default()
+        },
+    )
+    .expect_err("budget admission precedes CFB parsing");
+    assert!(matches!(
+        native,
+        litchi_xls::Error::Limit {
+            kind: litchi_xls::LimitKind::OleObject(LimitKind::ObjectBytes),
+            observed: 21,
+            maximum: 1,
+        }
+    ));
+    assert_code(native, Code::LimitExceeded);
+
+    let native = Snapshot::open(
+        Vec::new(),
+        Limits {
+            max_stream_size: 0,
+            ..Limits::default()
+        },
+    )
+    .expect_err("invalid read policy precedes CFB parsing");
+    assert!(matches!(
+        native,
+        litchi_xls::Error::InvalidLimit {
+            kind: litchi_xls::LimitKind::OleObject(LimitKind::StreamBytes),
+            value: 0,
+            ..
+        }
+    ));
+    assert_code(native, Code::InvalidArgument);
 }

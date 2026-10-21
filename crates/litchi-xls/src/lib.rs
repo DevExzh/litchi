@@ -750,7 +750,7 @@ pub use shapes::Shape;
 pub use shared_string_index::{SharedStringBucket, SharedStringIndex};
 pub use sheet_ext::{SheetExt, SheetExtOptional};
 pub use sheet_metadata::{SheetKind, SheetMetadata, SheetVisibility};
-pub use source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
+pub use source_limits::{SourceLimits, SourceLimitsBuilder};
 pub use style_ext::{StyleCategory, StyleExt};
 pub use sxview_link::SXViewLink;
 pub use table_styles::{

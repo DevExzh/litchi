@@ -6434,6 +6434,16 @@
           "name": "with_limits",
           "scope": "litchi_xls",
           "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
+        },
+        {
+          "name": "SourceLimitKind",
+          "scope": "litchi_xls",
+          "replacement": "use LimitKind for XLS source and edit budgets (record 0359c)"
+        },
+        {
+          "name": "StagedChangeLimit",
+          "scope": "litchi_xls",
+          "replacement": "use Error::Limit with LimitKind::Operations (record 0359c)"
         }
       ],
       "families": [

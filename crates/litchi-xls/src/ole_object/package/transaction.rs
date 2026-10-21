@@ -1,5 +1,6 @@
 //! Workbook and CFB transaction layer for XLS OLE objects.
 
+use super::super::LimitKind;
 use super::super::codec::{parse_subrecords, ranges, u32_at};
 use super::super::semantic::{
     EmbeddedObjectDraft, EmbeddedPayload, FormControl, ObjectMetadataChange, OleObjectRecord,
@@ -560,10 +561,10 @@ impl Editor {
         }
         let count = targets_for_sheets(&self.sheets)?.len();
         if count >= self.limits.max_objects {
-            return Err(Error::InvalidData(format!(
-                "adding storage would exceed the configured object limit of {}",
-                self.limits.max_objects
-            )));
+            return Err(LimitKind::Objects.exceeded(
+                count.saturating_add(1) as u64,
+                self.limits.max_objects as u64,
+            ));
         }
         Ok(())
     }
@@ -572,9 +573,11 @@ impl Editor {
 pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>, Vec<u8>)> {
     let max_size = limits.max_stream_size.min(limits.max_total_size);
     if max_size == 0 {
-        return Err(Error::InvalidData(
-            "Workbook stream limits must be non-zero".into(),
-        ));
+        return Err(if limits.max_stream_size == 0 {
+            LimitKind::StreamBytes.invalid_zero()
+        } else {
+            LimitKind::AggregateBytes.invalid_zero()
+        });
     }
     let mut ole = OleFile::open(Cursor::new(bytes))?;
     let max_entries = limits
@@ -614,23 +617,17 @@ pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>
     }
     if let Some(size) = document_summary_size {
         if size > max_size {
-            return Err(Error::InvalidData(
-                "DocumentSummaryInformation exceeds configured read limit".into(),
-            ));
+            return Err(LimitKind::StreamBytes.exceeded(size, max_size));
         }
     }
     reject_document_summary_signature(&mut ole)?;
     if let Some((actual_name, declared_size)) = workbook_stream.or(book_stream) {
         if declared_size > max_size {
-            return Err(Error::InvalidData(format!(
-                "{actual_name} stream exceeds configured read limit"
-            )));
+            return Err(LimitKind::StreamBytes.exceeded(declared_size, max_size));
         }
         let workbook = ole.open_stream(&[actual_name.as_str()])?;
         if workbook.len() as u64 > max_size {
-            return Err(Error::InvalidData(format!(
-                "{actual_name} stream exceeds configured read limit"
-            )));
+            return Err(LimitKind::StreamBytes.exceeded(workbook.len() as u64, max_size));
         }
         reject_protected_workbook(&workbook)?;
         return Ok((vec![actual_name], workbook));

@@ -95,7 +95,14 @@ fn bounds_workbook_read_before_stream_materialization() {
     };
     let error = read_workbook(&output.into_inner(), limits)
         .expect_err("oversized Workbook must be rejected before reading");
-    assert!(matches!(error, Error::InvalidData(message) if message.contains("read limit")));
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::OleObject(LimitKind::StreamBytes),
+            observed: 128,
+            maximum: 64
+        }
+    ));
 }
 
 fn record(kind: u16, body: &[u8]) -> Vec<u8> {

@@ -143,8 +143,10 @@ source-tail edit setters alongside its OPC API migration. Root coordinates the
 other exact-name migrations and the final profile bans. This record does not
 close the W4/W4b/W8 program or replace its integrated workspace gate.
 
-The typed-error sweep also remains required: XLS embedded payload and compound
-publication budgets still need typed family limit kinds, and Graph's string
-resource labels need review against the raw-codec and edit-family contracts.
-The constructor slices preserve those existing errors; they do not accept them
-as exceptions or complete that audit.
+The typed-error sweep also remains required. Record
+[0359c](0359c-typed-legacy-edit-budgets.md) migrates XLS embedded-payload,
+compound-publication and primary staging budgets to typed kinds. Shared OLE
+capture still emits configured-budget failures through generic format errors,
+and Graph's string resource labels need review against the raw-codec and
+edit-family contracts. The constructor slices do not accept these as exceptions
+or complete that audit.

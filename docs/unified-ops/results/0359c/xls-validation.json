@@ -1,0 +1,106 @@
+{
+  "baseline_commit": "a52f5585925e396074bc5983ed2a5aec30cc338c",
+  "candidate": "commit containing this receipt; changed Rust source hashes below",
+  "scope": "XLS preflight and primary staging typed budgets; shared OLE capture and Graph continuation required",
+  "validation": {
+    "xls_lib_tests": 1313,
+    "ops_xls_error_tests": 33,
+    "total_tests": 1346,
+    "failed": 0,
+    "ignored": 0,
+    "xls_all_target_all_feature_check": "passed",
+    "xls_all_target_all_feature_clippy": "passed",
+    "ops_xls_all_target_clippy": "passed",
+    "locked_perf_baseline_all_targets": "passed",
+    "xls_minimal_glossary": {
+      "status": "passed",
+      "banned_names": 97,
+      "families": 13,
+      "immutable_owners": 3
+    },
+    "tool_tests": 36,
+    "format_check": "passed",
+    "bench_matrix_check": "passed"
+  },
+  "error_code_change": {
+    "previous_ole_preflight_budget": "corrupt_file",
+    "typed_exhausted_budget": "limit_exceeded",
+    "typed_invalid_budget": "invalid_argument",
+    "coverage": "real EmbeddedPayload and Snapshot entry points plus typed XLS boundary tests"
+  },
+  "performance": "No timing claim in this slice. The configured comparisons, default ceilings and successful publication operations are retained. Integrated corpus/performance validation remains required after the shared OLE/Graph typed-budget migration.",
+  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "checks": {
+    "check": {
+      "command": "cargo check --locked -p litchi-xls --all-targets --all-features",
+      "status": "passed",
+      "log": "xls-budget-check.log",
+      "bytes": 161,
+      "sha256": "63625152eaa42f661662b6ad4c6a0915225b5e374c719a092bfdd04ed33a3683"
+    },
+    "tests": {
+      "command": "cargo test --locked -p litchi-xls --all-features --lib",
+      "status": "passed",
+      "log": "xls-budget-tests.log",
+      "bytes": 106000,
+      "sha256": "7c0fda44cbcae0d3cb17fe7a03f0bc80894084ef9bc1c2c1ff9b7ae495c2df67"
+    },
+    "ops-tests": {
+      "command": "cargo test --locked -p litchi-ops --no-default-features --features xls --lib error::tests",
+      "status": "passed",
+      "log": "xls-budget-ops-tests.log",
+      "bytes": 4083,
+      "sha256": "9bec6e798ff2df10a39f1a177ed1c10079ea94362d20f8e3b9042afa1b0b60cd"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p litchi-xls --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "log": "xls-budget-clippy.log",
+      "bytes": 1107,
+      "sha256": "c47fbab9515b6a3e1548755d142175646b2658da3bac840767659ca8bf919047"
+    },
+    "ops-clippy": {
+      "command": "cargo clippy --locked -p litchi-ops --no-default-features --features xls --all-targets -- -D warnings",
+      "status": "passed",
+      "log": "xls-budget-ops-clippy.log",
+      "bytes": 1600,
+      "sha256": "e42bf6ecdc3be0031e0c7944f20bb5224fae40f783d84fd239f0403821aafe69"
+    },
+    "harness": {
+      "command": "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+      "status": "passed",
+      "log": "xls-budget-harness.log",
+      "bytes": 469,
+      "sha256": "8253129751e5f177004aec6a2e0d215e47a98ae4be532b2d1bd5e76a28c45ef9"
+    },
+    "glossary": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile xls-minimal --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "xls-budget-glossary.log",
+      "bytes": 1872,
+      "sha256": "479bbdd99e72b3f1652b1fa94012c81bf226413fe652738bb42821bb28bd12f7"
+    }
+  },
+  "sources": {
+    "crates/litchi-ops/src/error.rs": "fdd8058e8df9e752d5aba8ac8e76f99d4d48d0a4a3047147265c7d0702ad8855",
+    "crates/litchi-ops/src/error/tests.rs": "79c07961681543f52aa81b902cf94151000192ddb3891401c7fbff4a156cf828",
+    "crates/litchi-xls/src/cell_values/mod.rs": "a35400d715cf82e70cf1dd5981fe5a64b1a4d5a0b1f3603028b5297214e13ab6",
+    "crates/litchi-xls/src/error.rs": "10dcdc2de555cd2c344361f8c85fe1fb0d40c84882563ee59a8c9d01f5332672",
+    "crates/litchi-xls/src/lib.rs": "d0adb9195ac2f4889d551628e1c8292c3c90255839005b9f129048c959857b9f",
+    "crates/litchi-xls/src/ole_object/edit/model.rs": "753878d41faa24a91b72b79d51383c653e49555ac69e1c780ef9b00810b1d345",
+    "crates/litchi-xls/src/ole_object/package/transaction.rs": "8ed3f20acfba4263f8acd3f2be26c49b8188a5e83121ea06a71b61a6a1ce6d5a",
+    "crates/litchi-xls/src/ole_object/semantic/payload.rs": "7056a5d29fe06acaf7af6d7929dfbb3fe38baaf2b5ad29e8410f4b7010c332f9",
+    "crates/litchi-xls/src/ole_object/tests/package.rs": "1d7c81a13a8ecaa4aecaa64dde894112ab3106b2baa1ea78115522093fe8fb5a",
+    "crates/litchi-xls/src/ole_object/tests/transaction.rs": "15de38398be30fbef2a250775e0b5d334783584d52455b46b79edb35b806bb66",
+    "crates/litchi-xls/src/package.rs": "7ebb963a7fbed20ef6555a67ae99b14cd6bc4987df1362cd18d73e6a81353a01",
+    "crates/litchi-xls/src/package/edit.rs": "ce29b087c97a3d0788fbd34cb49de5b68bf6324ac7ecb78f381a48c5fa7b0a01",
+    "crates/litchi-xls/src/source_limits.rs": "e3e1b0b0f4d9acdb1ece55eb8e45c4f4bbf3162e36e5590fde5adc5514c728f8",
+    "crates/litchi-xls/src/workbook/mod.rs": "74c50ac03c6af3d63eb365e71f657756d8444ffa6b03e8995c13ac7d63ce1453",
+    "crates/litchi-xls/src/workbook/package.rs": "ca0fdec089af40944cb70118aff2f53c0747368edc7e5aa9bed084d0eda2425c"
+  },
+  "commands_additional": [
+    "cargo fmt --check -p litchi-xls -p litchi-ops",
+    "python3 -m unittest tools.test_check_api_glossary tools.test_unified_bench_matrix",
+    "python3 tools/unified_bench_matrix.py --check"
+  ]
+}

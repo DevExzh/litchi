@@ -274,7 +274,7 @@ impl Package {
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions<'_>) -> Result<Self> {
         if bytes.len() > options.source_limits_value().max_input_bytes() {
             return Err(Error::Reader(ReaderError::Limit {
-                kind: crate::SourceLimitKind::InputBytes,
+                kind: LimitKind::InputBytes,
                 observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(options.source_limits_value().max_input_bytes())
                     .unwrap_or(u64::MAX),
@@ -1426,7 +1426,7 @@ fn read_bounded<R: Read>(reader: &mut R, limits: SourceLimits) -> Result<Vec<u8>
             .ok_or(Error::InvalidData("XLS package input length overflow"))?;
         if next > maximum {
             return Err(Error::Reader(ReaderError::Limit {
-                kind: crate::SourceLimitKind::InputBytes,
+                kind: LimitKind::InputBytes,
                 observed: next as u64,
                 maximum: maximum as u64,
             }));

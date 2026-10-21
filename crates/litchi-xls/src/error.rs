@@ -16,8 +16,43 @@ pub enum EncryptionKind {
     Unknown(u16),
 }
 
+/// Resource dimension governed by an XLS source or edit limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete source bytes, before the CFB container is parsed.
+    InputBytes,
+    /// Bytes in one named CFB stream entry.
+    EntryBytes,
+    /// Aggregate bytes in all declared CFB stream entries.
+    AggregateBytes,
+    /// Changes retained by one primary cell edit.
+    Operations,
+    /// A dimension of the embedded OLE-object capture/publication policy.
+    OleObject(crate::ole_object::LimitKind),
+}
+
+impl LimitKind {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::InputBytes => "input bytes",
+            Self::EntryBytes => "entry bytes",
+            Self::AggregateBytes => "aggregate bytes",
+            Self::Operations => "staged changes",
+            Self::OleObject(kind) => kind.description(),
+        }
+    }
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.description())
+    }
+}
+
 /// Errors that can occur during XLS file parsing
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// I/O error
     Io(std::io::Error),
@@ -89,26 +124,19 @@ pub enum Error {
     /// A broken internal invariant of an edit route (for example a readback
     /// that disagrees with the staged change); never caused by the request.
     Internal(&'static str),
-    /// The finite primary cell-edit staging bound was exceeded.
-    StagedChangeLimit {
-        /// Changes that would be retained after this operation.
-        observed: usize,
-        /// Maximum changes one transaction can retain.
-        maximum: usize,
-    },
-    /// A caller supplied an invalid physical source limit.
+    /// A caller supplied an invalid source or edit limit.
     InvalidLimit {
-        /// Source dimension whose configured value is invalid.
-        kind: crate::SourceLimitKind,
+        /// Dimension whose configured value is invalid.
+        kind: LimitKind,
         /// Requested value.
-        value: usize,
+        value: u64,
         /// Hard safety ceiling.
-        maximum: usize,
+        maximum: u64,
     },
-    /// A caller-selected finite source limit was exceeded during ingress.
+    /// A configured source or edit budget was exceeded.
     Limit {
-        /// Source dimension that exceeded its selected limit.
-        kind: crate::SourceLimitKind,
+        /// Dimension that exceeded its selected limit.
+        kind: LimitKind,
         /// Observed value.
         observed: u64,
         /// Configured maximum.
@@ -241,9 +269,31 @@ impl fmt::Display for Error {
             },
             Error::Internal(reason) => write!(f, "XLS edit invariant failed: {reason}"),
             Error::Signed => f.write_str("changed XLS writes require explicit signature removal"),
-            Error::StagedChangeLimit { observed, maximum } => write!(
+            Error::Limit {
+                kind: LimitKind::Operations,
+                observed,
+                maximum,
+            } => write!(
                 f,
                 "XLS staged change limit exceeded: {observed} > {maximum}"
+            ),
+            Error::Limit {
+                kind: LimitKind::OleObject(kind),
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLS {} limit exceeded: {observed} > {maximum}",
+                kind.description()
+            ),
+            Error::InvalidLimit {
+                kind: LimitKind::OleObject(kind),
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLS {} limit: {value} (maximum {maximum})",
+                kind.description()
             ),
             Error::InvalidLimit {
                 kind,
@@ -428,10 +478,7 @@ impl From<Error> for litchi_core::sheet::Error {
                 RefusalKind::UnsupportedContent,
                 "the XLS workbook uses an unsupported feature",
             ),
-            Error::Limit { .. }
-            | Error::StagedChangeLimit { .. }
-            | Error::InvalidLimit { .. }
-            | Error::Allocation(_) => refused(
+            Error::Limit { .. } | Error::InvalidLimit { .. } | Error::Allocation(_) => refused(
                 RefusalKind::UnsupportedContent,
                 "the XLS workbook exceeds a configured limit",
             ),
