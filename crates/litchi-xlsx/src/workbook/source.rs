@@ -552,10 +552,9 @@ impl SourceBackedWorkbook {
 
     /// Recover the validated deferred OPC package without re-indexing it.
     ///
-    /// The returned package is the one this catalog was opened from, so a
-    /// per-feature `SourceBackedEditor` (for example
-    /// [`crate::cell_values::SourceBackedEditor::from_source_backed_package`])
-    /// can adopt it without a second container index. The lazily parsed
+    /// The returned package is the one this catalog was opened from, so
+    /// [`Self::from_source_backed_package`] can adopt it again without a
+    /// second container index. The lazily parsed
     /// catalog, shared strings and styles, and every parsed worksheet value
     /// the semantic cache retains, are released.
     ///

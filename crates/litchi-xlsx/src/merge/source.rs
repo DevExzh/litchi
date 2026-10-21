@@ -68,13 +68,13 @@ crate::workbook::source::deferred::source_family!("merged-range", Record);
 impl Patch {
     /// The exact worksheet state the patch requires.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub fn before(&self) -> &Snapshot {
         &self.0.before
     }
 
     /// The exact worksheet state the patch produces.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub fn after(&self) -> &Snapshot {
         &self.0.after
     }
 
@@ -87,10 +87,10 @@ impl Patch {
     ///
     /// Returns a limit or allocation error when a payload exceeds the bound.
     pub fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
-        Ok(Self(Record::new(
+        Ok(Self(Arc::new(Record::new(
             self.0.before.clone(),
             self.0.after.materialized(maximum_bytes)?,
-        )))
+        ))))
     }
 }
 

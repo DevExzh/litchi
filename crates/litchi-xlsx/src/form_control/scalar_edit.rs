@@ -753,13 +753,13 @@ crate::workbook::source::deferred::source_family!("form-control", Record);
 impl Patch {
     /// The exact owner state the patch requires.
     #[must_use]
-    pub const fn before(&self) -> &FormControlSnapshot {
+    pub fn before(&self) -> &FormControlSnapshot {
         self.0.before()
     }
 
     /// The exact owner state the patch produces.
     #[must_use]
-    pub const fn after(&self) -> &FormControlSnapshot {
+    pub fn after(&self) -> &FormControlSnapshot {
         self.0.after()
     }
 }

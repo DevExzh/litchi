@@ -12,7 +12,8 @@ use quick_xml::events::Event;
 use quick_xml::reader::NsReader;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::SheetCellValueEdit;
+use crate::cell_values::test_editors::SourceBackedEditor;
 use crate::{Address, Error, Number, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -251,11 +252,12 @@ fn assert_valid_noop(sheet: &[u8]) {
         .expect("cap fallback should accept valid worksheet")
         .commit()
         .expect("valid no-op commit");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("A1").expect("A1 address")),
         Some(&Value::Number(Number::new("1").expect("source number")))
     );
@@ -517,10 +519,11 @@ fn eligible_small_source_uses_successful_value_edit_control() {
     )])
     .expect("stage value edit");
     let commit = edit.commit().expect("commit value edit");
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit
-            .snapshot()
+            .patch()
+            .after()
             .value(0, Address::from_a1("A1").expect("A1 address")),
         Some(&Value::Number(Number::new("2").expect("edited number")))
     );

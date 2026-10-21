@@ -119,13 +119,13 @@ fn assert_error_case(case: &ErrorCase) {
         .commit()
         .unwrap();
     assert!(
-        !unaffected.changed(),
+        !unaffected.diagnostics().changed(),
         "unaffected sheet changed: {}",
         case.name
     );
-    assert_eq!(unaffected.snapshot().len(), 1);
+    assert_eq!(unaffected.patch().after().len(), 1);
     assert_eq!(
-        unaffected.snapshot().value(0, address("A1")),
+        unaffected.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("7").unwrap()))
     );
 }
@@ -368,12 +368,19 @@ fn public_multi_sheet_edit_sheets_accepts_supported_namespace_forms_and_pi() {
             .unwrap()
             .commit()
             .unwrap();
-        assert!(!commit.changed(), "{label} valid control changed");
-        assert_eq!(commit.snapshot().len(), 2, "{label} selected sheet count");
-        assert_eq!(commit.snapshot().sheet_name(0), Some("Sheet1"));
-        assert_eq!(commit.snapshot().sheet_name(1), Some("Sheet2"));
+        assert!(
+            !commit.diagnostics().changed(),
+            "{label} valid control changed"
+        );
         assert_eq!(
-            commit.snapshot().value(0, address("A1")),
+            commit.patch().after().len(),
+            2,
+            "{label} selected sheet count"
+        );
+        assert_eq!(commit.patch().after().sheet_name(0), Some("Sheet1"));
+        assert_eq!(commit.patch().after().sheet_name(1), Some("Sheet2"));
+        assert_eq!(
+            commit.patch().after().value(0, address("A1")),
             Some(&Value::Number(Number::new("7").unwrap())),
             "{label} first-sheet value",
         );
@@ -450,10 +457,10 @@ fn later_selected_worksheet_failure_does_not_publish_the_first_snapshot() {
                 .unwrap()
                 .commit()
                 .unwrap();
-            assert!(!good.changed(), "{label}");
-            assert_eq!(good.snapshot().len(), 1);
+            assert!(!good.diagnostics().changed(), "{label}");
+            assert_eq!(good.patch().after().len(), 1);
             assert_eq!(
-                good.snapshot().value(0, address("A1")),
+                good.patch().after().value(0, address("A1")),
                 Some(&Value::Number(Number::new("7").unwrap()))
             );
             assert_eq!(source.bytes, bytes, "{label}");

@@ -247,7 +247,7 @@ fn publish_source_backed(
     updates: &[XlsxCoordinate],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
     let selectors = super::xlsx_update_sheet_selectors(updates);
     let mut edit = editor.edit_sheets(selectors)?;
     for coordinate in updates {
@@ -261,7 +261,7 @@ fn publish_source_backed(
         )?;
     }
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_cells() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != updates.len() {
         return Err("XLSX attribute fixture source commit changed an unexpected cell count".into());
     }
     let mut output = Vec::new();

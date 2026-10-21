@@ -1,6 +1,13 @@
 #![cfg(any(unix, windows))]
 #![allow(clippy::unwrap_used, reason = "focused filesystem-source assertions")]
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::fs;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -10,7 +17,6 @@ use litchi_core::{
 };
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits, SourceLimits};
-use litchi_xlsx::cell_values::SourceBackedEditor;
 use litchi_xlsx::workbook::{SourceBackedWorkbook, SourceCellView};
 use litchi_xlsx::{Address, Cell, Error, Value};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -204,7 +210,8 @@ fn path_managed_editor_releases_payload_budget_after_drop() {
         context,
     )
     .unwrap();
-    assert_eq!(budget.used(Resource::Memory), 0);
+    // Only the workbook catalog is pinned at open.
+    assert!(budget.used(Resource::Memory) <= workbook_bytes);
     let commit = editor.edit("First").unwrap().commit().unwrap();
     assert!(budget.used(Resource::Memory) >= workbook_bytes + sheet_bytes);
     drop(commit);

@@ -72,6 +72,11 @@
 /// predate the typed sheet error of record 0353a).
 pub(crate) type BoxedResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+// Unit tests drive the source-backed families through the integration
+// tests' drivers, which name this crate `litchi_xlsx`.
+#[cfg(test)]
+extern crate self as litchi_xlsx;
+
 pub mod active_x;
 pub mod auto_filter;
 pub mod calculation_properties;

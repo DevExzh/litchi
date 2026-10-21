@@ -18,11 +18,18 @@
 //! output's member, or that member behind one mark, and a mark appears only on
 //! a member whose input had one.
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
-use litchi_xlsx::cell_values::{CellValueEdit, SourceBackedEditor};
+use litchi_xlsx::cell_values::CellValueEdit;
 use litchi_xlsx::{Address, Hyperlink, HyperlinkReference, Number};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 

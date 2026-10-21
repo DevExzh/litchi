@@ -1,143 +1,68 @@
-//! Exact reversible row-visibility worksheet patches.
-
-use litchi_opc::OpcPackage;
+//! Exact reversible row-visibility worksheet records.
 
 use super::Snapshot;
-use crate::cell_values;
-use crate::error::Result;
+use crate::cell_values::patch::SheetRecord;
 
-/// Exact source-bound replacement of direct existing-row visibility.
+/// Exact source-bound replacement of direct existing-row visibility: the
+/// replay payload of [`super::source::Patch`].
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Record {
     before: Snapshot,
     after: Snapshot,
-    inner: cell_values::Patch,
+    inner: SheetRecord,
+    changed_rows: usize,
 }
 
-impl Patch {
-    pub(super) fn new(before: Snapshot, after: Snapshot) -> Self {
-        let inner = cell_values::Patch::new(before.inner().clone(), after.inner().clone());
+impl Record {
+    pub(super) fn new(before: Snapshot, after: Snapshot, changed_rows: usize) -> Self {
+        let inner = SheetRecord::new(before.inner().clone(), after.inner().clone(), changed_rows);
         Self {
             before,
             after,
             inner,
+            changed_rows,
         }
     }
 
-    /// Required exact source state.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
-    /// Exact target state.
-    #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
-    /// Whether application preserves the selected source bytes exactly.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
-    pub(super) const fn inner(&self) -> &cell_values::Patch {
+    pub(crate) const fn inner(&self) -> &SheetRecord {
         &self.inner
+    }
+
+    /// The record with its target worksheet payload copied out of a managed
+    /// reservation under `maximum_bytes`.
+    pub(crate) fn materialized(&self, maximum_bytes: usize) -> crate::Result<Self> {
+        Ok(Self {
+            before: self.before.clone(),
+            after: self.after.clone(),
+            inner: self.inner.materialized(maximum_bytes)?,
+            changed_rows: self.changed_rows,
+        })
+    }
+
+    pub(crate) const fn changed_rows(&self) -> usize {
+        self.changed_rows
     }
 
     /// Exact source-bound inverse, including the producer's original lexical
     /// representation of the `hidden` attribute.
-    #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
             inner: self.inner.inverse(),
+            changed_rows: self.changed_rows,
         }
-    }
-
-    /// Apply atomically after checking the complete retained package closure.
-    ///
-    /// A managed source target returns
-    /// [`litchi_opc::OpcError::ManagedPartDataArcEscape`] rather than silently
-    /// detaching its payload reservation. Use [`Self::apply_materialized`] for
-    /// an explicit bounded handoff to an owning [`OpcPackage`].
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        self.inner.apply(package)
-    }
-
-    /// Apply after explicitly copying the managed target payload into the
-    /// owning package, bounded by `maximum_bytes`.
-    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
-        self.inner.apply_materialized(package, maximum_bytes)
-    }
-}
-
-/// Successful row-visibility publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    pub(super) const fn new(snapshot: Snapshot, patch: Patch, changed_rows: usize) -> Self {
-        Self {
-            snapshot,
-            patch,
-            diagnostics: Diagnostics { changed_rows },
-        }
-    }
-
-    /// Whether at least one direct row owner changed lexically.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.diagnostics.changed_rows != 0
-    }
-
-    /// Resulting immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free transaction diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// Content-free row-visibility publication diagnostics.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed_rows: usize,
-}
-
-impl Diagnostics {
-    /// Number of existing row owners whose `hidden` attribute changed.
-    #[must_use]
-    pub const fn changed_rows(self) -> usize {
-        self.changed_rows
-    }
-
-    /// Number of worksheet Parts replaced (zero or one).
-    #[must_use]
-    pub const fn touched_worksheets(self) -> usize {
-        if self.changed_rows == 0 { 0 } else { 1 }
     }
 }

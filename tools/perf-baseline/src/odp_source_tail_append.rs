@@ -768,8 +768,7 @@ pub(crate) fn run_odp_source_tail_append_lifecycle(
         let package = open_source_package(&provider)?;
         let opened = open_started.elapsed();
         let plan_started = std::time::Instant::now();
-        let edit =
-            litchi_odp::tail_append::Edit::new(package, iteration_title, iteration_body)?;
+        let edit = litchi_odp::tail_append::Edit::new(package, iteration_title, iteration_body)?;
         let plan = edit.plan(&iteration_options)?;
         let planned = plan_started.elapsed();
         let publication_started = std::time::Instant::now();

@@ -726,8 +726,7 @@ fn source_merge_rejects_stale_and_foreign_lineage_before_output() {
 
     // A replay compares content (record 0360): a second open of the same
     // bytes holds the before state.
-    let second =
-        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let second = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(second.apply_merges(commit.patch()).is_ok());
 }
 

@@ -53,18 +53,52 @@ mod admission_tests;
 #[cfg(test)]
 #[path = "facts_oracle_tests.rs"]
 mod facts_oracle_tests;
-mod patch;
+pub(crate) mod patch;
 #[cfg(test)]
 #[path = "publication_audit_tests.rs"]
 mod publication_audit_tests;
 mod snapshot;
 mod source;
+#[cfg(test)]
+#[path = "../../tests/support/source_editors.rs"]
+pub(crate) mod test_editors;
 mod validation;
 
-pub use patch::Patch;
-pub use patch::{Commit, Diagnostics, MultiCommit, MultiDiagnostics, MultiPatch};
+pub use patch::Diagnostics;
 pub use snapshot::{MAX_MULTI_WORKSHEET_BYTES, MAX_SHEET_OWNERS, MultiSnapshot, Snapshot};
-pub use source::{
-    CellValueEdit, MAX_BATCH_EDITS, MultiSourceEdit, SheetCellValueEdit, SourceBackedEditor,
-    SourceEdit,
-};
+pub use source::{CellValueEdit, Edit, MAX_BATCH_EDITS, SheetCellValueEdit, sheet};
+
+crate::workbook::source::deferred::source_family!(
+    "cell-value",
+    patch::Record,
+    own_limits,
+    own_diagnostics
+);
+
+/// The configured budgets of the source-backed cell-value families. They have
+/// none of their own: the workbook's source limits and the fixed batch bounds
+/// ([`MAX_BATCH_EDITS`], [`MAX_SHEET_OWNERS`], [`MAX_MULTI_WORKSHEET_BYTES`])
+/// bound every edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, _formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {}
+    }
+}
+
+impl Patch {
+    /// The exact source state of every selected worksheet.
+    #[must_use]
+    pub fn before(&self) -> &MultiSnapshot {
+        self.0.before()
+    }
+
+    /// The exact target state of every selected worksheet.
+    #[must_use]
+    pub fn after(&self) -> &MultiSnapshot {
+        self.0.after()
+    }
+}

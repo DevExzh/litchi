@@ -12,9 +12,10 @@ use super::{
     xlsx_cell_values_output_semantic_hash, xlsx_cell_values_payload_budget, xlsx_output_ceiling,
     xlsx_spec, xlsx_update_sheet_selectors, xlsx_value,
 };
+use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
 use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
-use litchi_xlsx::cell_values::{MultiPatch, SourceBackedEditor};
+use litchi_xlsx::cell_values::Patch as MultiPatch;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -382,7 +383,7 @@ fn prepare_inverse_patch(
 fn stage_timed_commit(
     editor: &SourceBackedEditor,
     updates: &[XlsxCoordinate],
-) -> AnyResult<(litchi_xlsx::cell_values::MultiCommit, bool, usize)> {
+) -> AnyResult<(litchi_xlsx::cell_values::Commit, bool, usize)> {
     let selectors = xlsx_update_sheet_selectors(updates);
     let mut edit = editor.edit_sheets(selectors)?;
     for coordinate in updates {
@@ -396,7 +397,7 @@ fn stage_timed_commit(
         )?;
     }
     let commit = edit.commit()?;
-    let changed = commit.changed();
+    let changed = commit.diagnostics().changed();
     let changed_cells = commit.diagnostics().changed_cells();
     Ok((commit, changed, changed_cells))
 }
@@ -525,9 +526,7 @@ fn verify_iteration(
         return Err("managed benchmark semantic output hash changed".into());
     }
     let mut package = OpcPackage::from_bytes(&sink.bytes)?;
-    plan.inverse_patch
-        .inverse()
-        .apply_materialized(&mut package, plan.corpus.archive.len())?;
+    crate::xlsx_source_editors::replay_patch(&mut package, &plan.inverse_patch.inverse())?;
     let restored = PackageWriter::to_bytes(&package)?;
     if restored != plan.corpus.archive {
         return Err("managed benchmark inverse did not restore exact source ZIP".into());

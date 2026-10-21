@@ -1059,7 +1059,6 @@ fn source_patch_checks(
     let forward = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?
         .apply_merges(commit.patch())
         .and_then(|commit| commit.package().to_bytes());
-    let forward_applied = forward.is_ok();
     let Ok(forward) = forward else {
         return Ok(PatchChecks {
             forward_applied: Some(false),

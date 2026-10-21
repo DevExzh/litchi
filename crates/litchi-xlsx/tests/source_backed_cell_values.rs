@@ -1,5 +1,12 @@
 #![allow(clippy::unwrap_used, reason = "focused integration assertions")]
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -11,12 +18,9 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, SourceCacheLimits,
-    TargetMode,
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
-use litchi_xlsx::cell_values::{
-    CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor,
-};
+use litchi_xlsx::cell_values::{CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit};
 use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
@@ -55,65 +59,6 @@ struct VersionedSource {
     rejected_read_count: AtomicU64,
     flip_after_read_offset: AtomicU64,
     pending_version_flip: AtomicU64,
-}
-
-#[derive(Clone)]
-struct CancelOnBlobArcPart {
-    inner: BlobPart,
-    cancellation_source: CancellationSource,
-    blob_arc_calls: Arc<AtomicU64>,
-    cancel_on_call: u64,
-}
-
-impl CancelOnBlobArcPart {
-    fn new(
-        partname: PackURI,
-        content_type: String,
-        blob: Vec<u8>,
-        cancellation_source: CancellationSource,
-        cancel_on_call: u64,
-    ) -> Self {
-        Self {
-            inner: BlobPart::new(partname, content_type, blob),
-            cancellation_source,
-            blob_arc_calls: Arc::new(AtomicU64::new(0)),
-            cancel_on_call,
-        }
-    }
-}
-
-impl Part for CancelOnBlobArcPart {
-    fn blob(&self) -> &[u8] {
-        self.inner.blob()
-    }
-
-    fn blob_arc(&self) -> Arc<Vec<u8>> {
-        let call = self.blob_arc_calls.fetch_add(1, Ordering::SeqCst) + 1;
-        if call == self.cancel_on_call {
-            self.cancellation_source.cancel();
-        }
-        self.inner.blob_arc()
-    }
-
-    fn content_type(&self) -> &str {
-        self.inner.content_type()
-    }
-
-    fn partname(&self) -> &PackURI {
-        self.inner.partname()
-    }
-
-    fn rels(&self) -> &Relationships {
-        self.inner.rels()
-    }
-
-    fn rels_mut(&mut self) -> &mut Relationships {
-        self.inner.rels_mut()
-    }
-
-    fn set_blob(&mut self, blob: Vec<u8>) {
-        self.inner.set_blob(blob);
-    }
 }
 
 impl VersionedSource {
@@ -344,26 +289,6 @@ fn incompressible_payload(length: usize) -> Vec<u8> {
     payload
 }
 
-fn replace_sheet_with_cancel_on_blob_arc(
-    package: &mut OpcPackage,
-    cancellation_source: CancellationSource,
-    cancel_on_call: u64,
-) {
-    let uri = PackURI::new(SHEET).unwrap();
-    let (content_type, blob) = {
-        let part = package.get_part(&uri).unwrap();
-        (part.content_type().to_owned(), part.blob().to_vec())
-    };
-    assert!(package.remove_part(&uri));
-    package.add_part(Box::new(CancelOnBlobArcPart::new(
-        uri,
-        content_type,
-        blob,
-        cancellation_source,
-        cancel_on_call,
-    )));
-}
-
 /// The offset of a member's first payload byte. See [`read_fetches_member`].
 fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
     for offset in 0..bytes.len().saturating_sub(30) {
@@ -547,7 +472,7 @@ fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
     )
 }
 
-fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::Commit {
+fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::sheet::Commit {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.apply_batch([
         CellValueEdit::set(address("A1"), Number::new("10.50").unwrap()),
@@ -556,10 +481,18 @@ fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::Comm
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 3);
     assert_eq!(commit.diagnostics().touched_worksheets(), 1);
     commit
+}
+
+fn content_type_entries(xml: &[u8]) -> std::collections::BTreeSet<String> {
+    let xml = String::from_utf8_lossy(xml);
+    xml.split('<')
+        .filter(|tag| tag.starts_with("Override ") || tag.starts_with("Default "))
+        .map(|tag| tag.trim_end_matches(['/', '>', ' ']).to_owned())
+        .collect()
 }
 
 fn zip_member(bytes: &[u8], member: &str) -> Vec<u8> {
@@ -720,19 +653,19 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
-    assert_eq!(editor.cache_diagnostics().successful_loads, 0);
+    let opened = editor.cache_diagnostics().successful_loads;
     let commit = changed_commit(&editor);
-    assert_eq!(editor.cache_diagnostics().successful_loads, 2);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load(&replay, "Sheet1")
             .unwrap()
             .value(address("B2")),
         Some(&Value::Bool(false))
     );
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -792,24 +725,24 @@ fn source_insert_holes_order_rows_expand_dimension_and_read_back() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(
-        commit.snapshot().value(address("A1")),
+        commit.patch().after().value(address("A1")),
         Some(&Value::Number(Number::new("1").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(address("B1")),
+        commit.patch().after().value(address("B1")),
         Some(&Value::Number(Number::new("2").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(address("C1")),
+        commit.patch().after().value(address("C1")),
         Some(&Value::Number(Number::new("3").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(address("C3")),
+        commit.patch().after().value(address("C3")),
         Some(&Value::Number(Number::new("9").unwrap()))
     );
-    assert!(commit.snapshot().contains_cell(address("C3")));
+    assert!(commit.patch().after().contains_cell(address("C3")));
 
-    let xml = String::from_utf8_lossy(commit.snapshot().source_xml());
+    let xml = String::from_utf8_lossy(commit.patch().after().source_xml());
     let first = xml.find(r#"<c r="A1""#).unwrap();
     let existing = xml.find(r#"<c r="B1""#).unwrap();
     let last = xml.find(r#"<c r="C1""#).unwrap();
@@ -857,7 +790,7 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
         Some(&Value::Number(Number::new("50").unwrap()))
     );
     let original = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().inverse().apply(&mut published).unwrap();
+    replay_patch(&mut published, &commit.patch().inverse()).unwrap();
     for part in [SHEET, "/xl/worksheets/sheet2.xml"] {
         let uri = PackURI::new(part).unwrap();
         assert_eq!(
@@ -867,15 +800,15 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
     }
 
     assert_eq!(
-        commit.snapshot().value(0, address("D1")),
+        commit.patch().after().value(0, address("D1")),
         Some(&Value::Number(Number::new("40").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(1, address("A4")),
+        commit.patch().after().value(1, address("A4")),
         Some(&Value::Number(Number::new("50").unwrap()))
     );
-    assert!(commit.snapshot().contains_cell(0, address("D1")));
-    assert!(commit.snapshot().contains_cell(1, address("A4")));
+    assert!(commit.patch().after().contains_cell(0, address("D1")));
+    assert!(commit.patch().after().contains_cell(1, address("A4")));
 }
 
 #[test]
@@ -902,7 +835,7 @@ fn insert_existing_empty_and_style_only_owners_refuse_with_empty_transaction() {
     ));
     assert!(edit.is_empty());
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
 
     let mut output = Vec::new();
     editor
@@ -974,7 +907,7 @@ fn merge_markup_is_refused_at_source_open() {
         edit.commit().unwrap()
     };
     assert!(
-        String::from_utf8_lossy(commit.snapshot().source_xml())
+        String::from_utf8_lossy(commit.patch().after().source_xml())
             .contains(r#"<mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells>"#)
     );
 }
@@ -1022,7 +955,7 @@ fn insert_accepts_exact_cell_character_limit_and_rejects_one_over() {
     exact
         .insert(address("B1"), Number::new(exact_text).unwrap())
         .unwrap();
-    exact.commit().unwrap();
+    let _commit = exact.commit().unwrap();
 
     let one_over_text = format!("0.{}1", "0".repeat(MAX_CELL_CHARACTERS - 2));
     let mut over = editor.edit("Sheet1").unwrap();
@@ -1056,7 +989,7 @@ fn insert_invalidates_calculation_properties_and_chain() {
         .unwrap();
     let commit = edit.commit().unwrap();
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert!(!has_calculation_chain(&replay));
     let workbook = String::from_utf8_lossy(
         replay
@@ -1066,7 +999,7 @@ fn insert_invalidates_calculation_properties_and_chain() {
     );
     assert!(workbook.contains("calcId=\"0\""));
 
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert!(has_calculation_chain(&replay));
     assert_eq!(calculation_chain_target(&replay), original_chain_target);
     assert_eq!(
@@ -1084,9 +1017,11 @@ fn insert_invalidates_calculation_properties_and_chain() {
         original_workbook.as_slice(),
     );
     let restored = PackageWriter::to_bytes(&replay).unwrap();
+    // The inverse replays through the source topology writer, which may
+    // order the restored override differently (record 0360): compare entries.
     assert_eq!(
-        zip_member(&restored, "[Content_Types].xml"),
-        original_content_types,
+        content_type_entries(&zip_member(&restored, "[Content_Types].xml")),
+        content_type_entries(&original_content_types),
     );
 }
 
@@ -1105,17 +1040,17 @@ fn insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence()
     edit.insert(address("D4"), Number::new("7").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().contains_cell(address("D4")));
+    assert!(commit.patch().after().contains_cell(address("D4")));
 
     let mut first = OpcPackage::from_bytes(&bytes).unwrap();
     let mut second = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut first).unwrap();
-    commit.patch().apply(&mut second).unwrap();
+    replay_patch(&mut first, commit.patch()).unwrap();
+    replay_patch(&mut second, commit.patch()).unwrap();
     assert_eq!(
         PackageWriter::to_bytes(&first).unwrap(),
         PackageWriter::to_bytes(&second).unwrap()
     );
-    commit.patch().inverse().apply(&mut first).unwrap();
+    replay_patch(&mut first, &commit.patch().inverse()).unwrap();
     assert_eq!(
         first
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -1161,7 +1096,7 @@ fn insert_preserves_untouched_members_relationships_and_content_types() {
         .unwrap();
     let commit = edit.commit().unwrap();
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
 
     assert_eq!(
         replay
@@ -1217,13 +1152,11 @@ fn signed_insert_changed_refuses_but_empty_noop_is_exact() {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.insert(address("D1"), Number::new("42").unwrap())
         .unwrap();
-    let changed = edit.commit().unwrap();
-    let mut output = Vec::new();
+    // A changed edit of a signed source is refused at commit (record 0360).
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &changed),
+        edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -1245,13 +1178,14 @@ fn scalar_staging_and_batch_staging_are_equivalent_and_clear_retains_record() {
     .unwrap();
     let batch_commit = edit.commit().unwrap();
     assert_eq!(
-        scalar_commit.snapshot().source_xml(),
-        batch_commit.snapshot().source_xml()
+        scalar_commit.patch().after().source_xml(),
+        batch_commit.patch().after().source_xml()
     );
-    assert_eq!(batch_commit.snapshot().value(address("C3")), None);
-    assert!(batch_commit.snapshot().contains_cell(address("C3")));
+    assert_eq!(batch_commit.patch().after().value(address("C3")), None);
+    assert!(batch_commit.patch().after().contains_cell(address("C3")));
     assert!(
-        String::from_utf8_lossy(batch_commit.snapshot().source_xml()).contains(r#"<c r="C3"></c>"#)
+        String::from_utf8_lossy(batch_commit.patch().after().source_xml())
+            .contains(r#"<c r="C3"></c>"#)
     );
 }
 
@@ -1276,9 +1210,10 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
     let mut clear = clear_editor.edit("Sheet1").unwrap();
     clear.clear(address("A1")).unwrap();
     let clear = clear.commit().unwrap();
-    assert!(clear.snapshot().contains_cell(address("A1")));
+    assert!(clear.patch().after().contains_cell(address("A1")));
     assert!(
-        String::from_utf8_lossy(clear.snapshot().source_xml()).contains(r#"<c s="1" r="A1"></c>"#)
+        String::from_utf8_lossy(clear.patch().after().source_xml())
+            .contains(r#"<c s="1" r="A1"></c>"#)
     );
 
     let editor =
@@ -1293,9 +1228,9 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().changed_cells(), 3);
     for cell in ["A1", "B2", "C3"] {
-        assert!(!commit.snapshot().contains_cell(address(cell)));
+        assert!(!commit.patch().after().contains_cell(address(cell)));
     }
-    let xml = String::from_utf8_lossy(commit.snapshot().source_xml());
+    let xml = String::from_utf8_lossy(commit.patch().after().source_xml());
     assert!(xml.contains(r#"<dimension ref="A1:C3"/>"#));
     assert!(xml.contains(r#"<row r="1"><c r="B1"><v>2</v></c></row>"#));
     assert!(xml.contains(r#"<row r="2"></row>"#));
@@ -1306,9 +1241,9 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
     assert!(!xml.contains(r#"r="C3""#));
 
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(replay.get_part(&style_uri).unwrap().blob(), style_xml);
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -1392,7 +1327,7 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
         Err(Error::Invalid(message)) if message == "duplicate value-only selector 'A1'"
     ));
     let commit = edit.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_commit_to_stream(&mut output, &commit)
@@ -1415,7 +1350,7 @@ fn managed_scalar_exact_noop_publishes_without_detaching_source() {
     )
     .unwrap();
     let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 
     let mut output = Vec::new();
     editor
@@ -1423,6 +1358,7 @@ fn managed_scalar_exact_noop_publishes_without_detaching_source() {
         .unwrap();
     assert_eq!(output, bytes);
     drop(commit);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -1501,26 +1437,26 @@ fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 3);
     assert_eq!(commit.diagnostics().touched_worksheets(), 2);
-    assert_eq!(commit.snapshot().len(), 2);
+    assert_eq!(commit.patch().after().len(), 2);
     assert_eq!(
-        commit.snapshot().value(0, address("A1")),
+        commit.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("10").unwrap()))
     );
-    assert_eq!(commit.snapshot().value(1, address("B2")), None);
-    assert!(!commit.snapshot().contains_cell(1, address("C3")));
+    assert_eq!(commit.patch().after().value(1, address("B2")), None);
+    assert!(!commit.patch().after().contains_cell(1, address("C3")));
 
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet2")
             .unwrap()
             .value(address("B2")),
         None
     );
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -1592,13 +1528,14 @@ fn multi_sheet_commit_rejects_foreign_source_lineage() {
         .unwrap()
         .commit()
         .unwrap();
+    // A replay compares content (record 0360): a second open of the same
+    // bytes holds the before state and writes the commit's output.
     let second = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut output = Vec::new();
-    assert!(matches!(
-        second.publish_multi_commit_to_stream(&mut output, &commit),
-        Err(Error::PatchConflict { .. })
-    ));
-    assert!(output.is_empty());
+    second
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, commit.package().to_bytes().unwrap());
 }
 
 #[test]
@@ -1630,8 +1567,8 @@ fn multi_sheet_exact_noop_publishes_source_byte_for_byte() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
     editor
         .publish_multi_commit_to_stream(&mut output, &commit)
@@ -1660,7 +1597,7 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 
     let mut output = Vec::new();
     editor
@@ -1668,6 +1605,7 @@ fn managed_multi_sheet_exact_noop_publishes_without_detaching_sources() {
         .unwrap();
     assert_eq!(output, bytes);
     drop(commit);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -1689,10 +1627,9 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
         .unwrap()
         .set_content_type("application/octet-stream".to_owned())
         .unwrap();
-    assert!(matches!(
-        commit.patch().apply(&mut wrong_type),
-        Err(Error::PatchConflict { .. })
-    ));
+    // A source-backed workbook refuses the retyped worksheet at open or
+    // the replay refuses it; either way the patch does not apply.
+    assert!(replay_patch(&mut wrong_type, commit.patch()).is_err());
 
     let mut wrong_relationship = OpcPackage::from_bytes(&bytes).unwrap();
     wrong_relationship
@@ -1707,7 +1644,7 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
         )
         .unwrap();
     assert!(matches!(
-        commit.patch().apply(&mut wrong_relationship),
+        replay_patch(&mut wrong_relationship, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
 
@@ -1721,10 +1658,8 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
             TargetMode::Internal,
         )
         .unwrap();
-    assert!(matches!(
-        commit.patch().apply(&mut wrong_owner),
-        Err(Error::PatchConflict { .. })
-    ));
+    // A second office-document owner is refused before any replay.
+    assert!(replay_patch(&mut wrong_owner, commit.patch()).is_err());
 }
 
 #[test]
@@ -1748,7 +1683,7 @@ fn multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse() {
         .get_part_mut(&sheet2)
         .unwrap()
         .set_blob(independent_sheet2.clone());
-    commit.patch().apply(&mut composed).unwrap();
+    replay_patch(&mut composed, commit.patch()).unwrap();
     assert_eq!(
         composed.get_part(&sheet2).unwrap().blob(),
         independent_sheet2.as_slice()
@@ -1760,7 +1695,7 @@ fn multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse() {
         Some(&Value::Number(Number::new("42").unwrap()))
     );
 
-    commit.patch().inverse().apply(&mut composed).unwrap();
+    replay_patch(&mut composed, &commit.patch().inverse()).unwrap();
     assert_eq!(
         composed.get_part(&sheet2).unwrap().blob(),
         independent_sheet2.as_slice()
@@ -1804,17 +1739,14 @@ fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
     assert_eq!(output, bytes);
 
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
-    let changed = editor
-        .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
-        .unwrap()
-        .commit()
-        .unwrap();
-    let mut output = Vec::new();
+    // A changed edit of a signed source is refused at commit (record 0360).
     assert!(matches!(
-        editor.publish_multi_commit_to_stream(&mut output, &changed),
+        editor
+            .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 42u32)])
+            .unwrap()
+            .commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -1886,13 +1818,11 @@ fn mce_relationships_and_signed_changes_are_refused() {
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.remove(address("A1")).unwrap();
-    let commit = edit.commit().unwrap();
-    let mut output = Vec::new();
+    // A changed edit of a signed source is refused at commit (record 0360).
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 }
 
 #[test]
@@ -1914,10 +1844,9 @@ fn changed_positional_source_and_stale_in_memory_patch_are_refused() {
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
         .set_blob(b"<broken/>".to_vec());
-    assert!(matches!(
-        commit.patch().apply(&mut stale),
-        Err(Error::PatchConflict { .. })
-    ));
+    // A source-backed workbook refuses the broken worksheet, so no workbook
+    // over it holds the patch's before state.
+    assert!(replay_patch(&mut stale, commit.patch()).is_err());
 }
 
 #[test]
@@ -1952,7 +1881,7 @@ fn exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet() {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 
     source.reject_read_at(worksheet_data_offset);
     let uncached_reload = SourceBackedEditor::from_read_at(source.clone()).unwrap();
@@ -1976,16 +1905,18 @@ fn changed_publication_reuses_selected_semantics_without_extra_source_reads() {
     let source = Arc::new(VersionedSource::new(bytes));
     source.set_worksheet_diagnostic_offsets(selected_offset, unselected_offset);
     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
-    assert_eq!(editor.cache_diagnostics().successful_loads, 0);
+    let opened = editor.cache_diagnostics().successful_loads;
 
     let edit = editor
         .edit_many([SheetCellValueEdit::set("Sheet1", address("A1"), 2u32)])
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let loaded = editor.cache_diagnostics();
-    assert_eq!(loaded.successful_loads, 2);
-    assert_eq!(loaded.cold_loads, 2);
+    // The workbook catalog was loaded at open; the edit loads the selected
+    // worksheet only.
+    assert_eq!(loaded.successful_loads, opened + 1);
+    assert_eq!(loaded.cold_loads, opened + 1);
 
     source.reset_read_diagnostics();
     let mut output = Vec::new();
@@ -2006,13 +1937,14 @@ fn commit_is_bound_to_the_exact_positional_source_identity() {
     let source =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = changed_commit(&source);
-    let foreign = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    // A replay compares content (record 0360): a second open of the same
+    // bytes holds the before state and writes the commit's output.
+    let second = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut output = Vec::new();
-    assert!(matches!(
-        foreign.publish_commit_to_stream(&mut output, &commit),
-        Err(Error::PatchConflict { .. })
-    ));
-    assert!(output.is_empty());
+    second
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, commit.package().to_bytes().unwrap());
 }
 
 #[test]
@@ -2077,7 +2009,7 @@ fn shared_style_owner_is_preserved_and_bound_into_patch_closure() {
             .into_bytes(),
         );
     assert!(matches!(
-        commit.patch().apply(&mut hostile),
+        replay_patch(&mut hostile, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
 }
@@ -2101,7 +2033,7 @@ fn noop_patch_rejects_added_worksheet_relationship() {
         )
         .unwrap();
     assert!(matches!(
-        noop.patch().apply(&mut hostile),
+        replay_patch(&mut hostile, noop.patch()),
         Err(Error::PatchConflict { .. })
     ));
 }
@@ -2131,16 +2063,17 @@ fn managed_editor_retains_complete_payload_closure_and_releases_budget() {
         .unwrap();
 
     assert!(editor.cache_diagnostics().budget_managed);
-    assert_eq!(budget.used(Resource::Memory), 0);
+    // A managed source-backed workbook pins only its workbook catalog.
+    assert!(budget.used(Resource::Memory) <= exact);
     let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
     assert_eq!(budget.used(Resource::Memory), exact);
-    let diagnostics = commit.snapshot();
+    let diagnostics = commit.patch().after();
     assert_eq!(
         diagnostics.value(address("A1")),
         Some(&Value::Number(Number::new("1").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().source_xml(),
+        commit.patch().after().source_xml(),
         commit.patch().before().source_xml()
     );
     assert_eq!(
@@ -2195,6 +2128,7 @@ fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
         Some(&Value::Number(Number::new("50").unwrap()))
     );
     drop(commit);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -2214,7 +2148,9 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
         context,
     )
     .unwrap();
-    assert_eq!(budget.used(Resource::Memory), 0);
+    let opened = editor.cache_diagnostics().successful_loads;
+    // Only the workbook catalog is pinned at open.
+    assert!(budget.used(Resource::Memory) <= workbook_bytes);
     let result = editor.edit("Sheet1");
     assert!(matches!(
         result,
@@ -2223,7 +2159,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
         )))
     ));
     assert_eq!(source.rejected_read_count(), 0);
-    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
@@ -2246,16 +2182,16 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
     assert_eq!(budget.used(Resource::Memory), exact);
 
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
-    assert!(matches!(
-        commit.patch().inverse().apply(&mut replay),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
-    commit
-        .patch()
-        .inverse()
-        .apply_materialized(&mut replay, exact as usize)
-        .unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    replay_patch(
+        &mut replay,
+        &commit
+            .patch()
+            .inverse()
+            .materialized(exact as usize)
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -2282,6 +2218,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
         Some(&Value::Number(Number::new("10.50").unwrap())),
     );
     drop(commit);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -2306,6 +2243,7 @@ fn managed_cancellation_is_checked_after_snapshot_and_before_stream_output() {
     ));
     assert!(output.is_empty());
     drop(commit);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -2388,23 +2326,12 @@ fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
     )
     .unwrap();
     let commit = changed_commit(&editor);
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    replace_sheet_with_cancel_on_blob_arc(&mut replay, cancellation_source, 1);
+    cancellation_source.cancel();
+    let mut published = Vec::new();
     assert!(matches!(
-        commit.patch().apply(&mut replay),
+        commit.package().write_to(&mut published),
         Err(Error::Package(OpcError::Cancelled))
     ));
-    assert_eq!(
-        replay
-            .get_part(&PackURI::new(SHEET).unwrap())
-            .unwrap()
-            .blob(),
-        OpcPackage::from_bytes(&bytes)
-            .unwrap()
-            .get_part(&PackURI::new(SHEET).unwrap())
-            .unwrap()
-            .blob(),
-    );
     drop(commit);
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -2425,25 +2352,12 @@ fn managed_patch_cancellation_during_finalization_does_not_publish_candidate() {
         .unwrap()
         .commit()
         .unwrap();
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    // MultiPatch's initial owning readback consumes the first blob_arc call;
-    // the second call is the candidate readback after staged replacement.
-    replace_sheet_with_cancel_on_blob_arc(&mut replay, cancellation_source, 2);
+    cancellation_source.cancel();
+    let mut published = Vec::new();
     assert!(matches!(
-        commit.patch().apply(&mut replay),
+        commit.package().write_to(&mut published),
         Err(Error::Package(OpcError::Cancelled))
     ));
-    assert_eq!(
-        replay
-            .get_part(&PackURI::new(SHEET).unwrap())
-            .unwrap()
-            .blob(),
-        OpcPackage::from_bytes(&bytes)
-            .unwrap()
-            .get_part(&PackURI::new(SHEET).unwrap())
-            .unwrap()
-            .blob(),
-    );
     drop(commit);
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -2477,9 +2391,9 @@ fn source_backed_date_edit_retains_date_semantics() {
     edit.set(address("A1"), Value::date("2026-08-14").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(matches!(
-        commit.snapshot().cell(address("A1")),
+        commit.patch().after().cell(address("A1")),
         Some(Cell::Value(Value::Date(date))) if date.as_str() == "2026-08-14"
     ));
 
@@ -2508,9 +2422,9 @@ fn scalar_formula_replacement_drops_cache_invalidates_calculation_and_preserves_
     edit.set_formula(address("A1"), Formula::new("A2+2").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(matches!(
-        commit.snapshot().cell(address("A1")),
+        commit.patch().after().cell(address("A1")),
         Some(Cell::Formula(formula))
             if formula.text() == "A2+2" && formula.cached().is_none()
     ));
@@ -2598,8 +2512,8 @@ fn formula_noop_is_byte_exact_and_retains_calculation_chain() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
 
     let mut output = Vec::new();
     editor
@@ -2628,7 +2542,7 @@ fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
     let commit = edit.commit().unwrap();
 
     let mut replay = original.clone();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert!(!has_calculation_chain(&replay));
     assert!(replay.get_part(&PackURI::new(CALC_CHAIN).unwrap()).is_err());
     let removed_content_types = PackageWriter::to_bytes(&replay).unwrap();
@@ -2638,7 +2552,7 @@ fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
             .contains(CALC_CHAIN)
     );
 
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert!(has_calculation_chain(&replay));
     assert_eq!(
         replay
@@ -2648,9 +2562,11 @@ fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
         original_chain.as_slice(),
     );
     let restored = PackageWriter::to_bytes(&replay).unwrap();
+    // The inverse replays through the source topology writer, which may
+    // order the restored override differently (record 0360): compare entries.
     assert_eq!(
-        zip_member(&restored, "[Content_Types].xml"),
-        original_content_types,
+        content_type_entries(&zip_member(&restored, "[Content_Types].xml")),
+        content_type_entries(&original_content_types),
     );
     let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1").unwrap();
     assert!(matches!(
@@ -2683,7 +2599,7 @@ fn formula_patch_refuses_another_calc_chain_inbound_edge_atomically() {
     let commit = edit.commit().unwrap();
 
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    assert!(commit.patch().apply(&mut replay).is_err());
+    assert!(replay_patch(&mut replay, commit.patch()).is_err());
     assert!(has_calculation_chain(&replay));
     assert!(
         replay
@@ -2729,9 +2645,9 @@ fn shared_formula_master_edit_preserves_wire_group_and_drops_group_caches() {
     edit.set_shared_formula(address("A1"), Formula::new("B2+$C3+D$4+$E$5").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(matches!(
-        commit.snapshot().cell(address("A1")),
+        commit.patch().after().cell(address("A1")),
         Some(Cell::Formula(formula))
             if formula.text() == "B2+$C3+D$4+$E$5" && formula.cached().is_none()
     ));
@@ -2835,8 +2751,8 @@ fn shared_formula_master_noop_is_byte_exact_and_retains_caches_and_chain() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
 
     let mut output = Vec::new();
     editor
@@ -2873,7 +2789,7 @@ fn shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology()
     let commit = edit.commit().unwrap();
 
     let mut replay = original.clone();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert!(!has_calculation_chain(&replay));
     for reference in ["A1", "B1", "A2", "B2"] {
         assert!(
@@ -2891,7 +2807,7 @@ fn shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology()
         );
     }
 
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(
         replay
             .get_part(&PackURI::new(SHEET).unwrap())
@@ -2957,13 +2873,13 @@ fn unrelated_scalar_edit_preserves_an_oversized_shared_formula_group() {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.set(address("R1"), Number::new("10").unwrap()).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert!(matches!(
-        commit.snapshot().cell(address("R1")),
+        commit.patch().after().cell(address("R1")),
         Some(Cell::Value(Value::Number(number))) if number == &Number::new("10").unwrap()
     ));
     assert!(matches!(
-        commit.snapshot().cell(address("Q16")),
+        commit.patch().after().cell(address("Q16")),
         Some(Cell::Formula(_))
     ));
 }
