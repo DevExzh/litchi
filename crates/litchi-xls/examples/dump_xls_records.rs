@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let len = workbook_stream.len();
     eprintln!("Workbook stream size: {len} bytes\n");
 
-    let iter = Records::new(&workbook_stream);
+    let iter = Records::new(&workbook_stream, litchi_biff::Limits::default())?;
 
     let mut in_workbook = true;
     let mut sheet_index: usize = 0;

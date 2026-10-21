@@ -474,7 +474,7 @@ impl Model {
     pub fn parse_with(input: Ref<'_>, context: Context, limits: Limits) -> Result<Self> {
         let validated = limits.validate()?;
         let mut chart = codec::parse(input, context, validated)?;
-        chart.origin = Origin::Parsed(input.own_with(validated)?);
+        chart.origin = Origin::Parsed(input.own(validated)?);
         Ok(chart)
     }
 

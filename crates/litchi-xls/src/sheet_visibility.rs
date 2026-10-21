@@ -1068,7 +1068,7 @@ fn select_workbook_path(package: &PackageEditor) -> Result<Vec<String>> {
 }
 
 fn parse_directory(workbook: &[u8]) -> Result<Vec<SheetEntry>> {
-    let mut records = Records::new(workbook);
+    let mut records = Records::new(workbook, litchi_biff::Limits::default())?;
     let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
     require_bof(first.payload())?;
     let mut encoding = Encoding::from_codepage(1252)?;
@@ -2017,7 +2017,8 @@ mod tests {
         assert!(source.worksheet(99usize.into()).unwrap().is_none());
 
         let chart_typed = edit_workbook(&bytes, |workbook| {
-            let offset = Records::new(workbook)
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
                 .filter_map(std::result::Result::ok)
                 .filter(|record| record.kind().get() == BOUND_SHEET)
                 .nth(1)
@@ -2036,7 +2037,8 @@ mod tests {
         assert!(Snapshot::from_bytes(signed(&bytes)).is_err());
 
         let protected = edit_workbook(&bytes, |workbook| {
-            let offset = Records::new(workbook)
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
                 .filter_map(std::result::Result::ok)
                 .find(|record| record.kind().get() == crate::protection::PROTECT_TYPE)
                 .unwrap()
@@ -2046,7 +2048,8 @@ mod tests {
         assert!(Snapshot::from_bytes(protected).is_err());
 
         let encrypted = edit_workbook(&bytes, |workbook| {
-            let offset = Records::new(workbook)
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
                 .filter_map(std::result::Result::ok)
                 .find(|record| record.kind().get() == CODE_PAGE)
                 .unwrap()
@@ -2059,7 +2062,8 @@ mod tests {
         ));
 
         let reserved_visibility = edit_workbook(&bytes, |workbook| {
-            let offset = Records::new(workbook)
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
                 .filter_map(std::result::Result::ok)
                 .find(|record| record.kind().get() == BOUND_SHEET)
                 .unwrap()
@@ -2073,7 +2077,8 @@ mod tests {
     fn duplicate_case_folded_names_are_refused_or_reported_ambiguous() {
         let duplicate = edit_workbook(&package(2), |workbook| {
             let (offset, payload_len) = {
-                let second = Records::new(workbook)
+                let second = Records::new(workbook, litchi_biff::Limits::default())
+                    .expect("valid BIFF limits")
                     .filter_map(std::result::Result::ok)
                     .filter(|record| record.kind().get() == BOUND_SHEET)
                     .nth(1)

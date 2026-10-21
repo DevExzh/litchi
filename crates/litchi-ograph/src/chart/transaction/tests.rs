@@ -30,8 +30,10 @@ fn fixture(row: u16, col: u16, value: Value) -> Stream {
     chart.authoring_proven = true;
     let source = chart.encode().expect("authoring fixture");
 
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == EOF {
             output
@@ -44,7 +46,8 @@ fn fixture(row: u16, col: u16, value: Value) -> Stream {
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| record.expect("encoded record").encoded().to_vec())
         .collect()
 }

@@ -114,23 +114,13 @@ impl<'a> RecordRef<'a> {
         self.offset
     }
 
-    /// Copies this frame into an owned lossless record.
-    ///
-    /// # Errors
-    ///
-    /// Returns a limit or allocation error before the copy is attempted when
-    /// the configured output budget cannot accommodate this frame.
-    pub fn own(self) -> Result<Record> {
-        self.own_with(Limits::default())
-    }
-
     /// Copies this frame using explicit output and payload limits.
     ///
     /// # Errors
     ///
     /// Returns a limit or allocation error before the copy is attempted when
     /// the configured budget cannot accommodate this frame.
-    pub fn own_with(self, limits: Limits) -> Result<Record> {
+    pub fn own(self, limits: Limits) -> Result<Record> {
         let validated_limits = limits.validate()?;
         ensure_payload_limit(self.payload.len(), validated_limits.max_record_bytes)?;
         ensure_output_limit(self.encoded.len(), validated_limits.max_output_bytes)?;
@@ -156,23 +146,13 @@ pub struct Record {
 }
 
 impl Record {
-    /// Takes ownership of and validates one frame under default limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed error for an empty, truncated, oversized, or multi-frame
-    /// input, or when the input cannot be retained under the default budget.
-    pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::with_limits(bytes, Limits::default())
-    }
-
     /// Takes ownership of and validates one frame under explicit limits.
     ///
     /// # Errors
     ///
     /// Returns a typed error for an empty, truncated, oversized, or multi-frame
     /// input, or when the input cannot be retained under `limits`.
-    pub fn with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub fn open(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         ensure_input_limit(bytes.len(), validated_limits.max_input_bytes)?;
         ensure_output_limit(bytes.len(), validated_limits.max_output_bytes)?;
@@ -319,7 +299,7 @@ mod tests {
     #[test]
     fn borrowed_view_lends_exact_parts_and_can_be_owned() {
         let bytes = frame(0x7777, &[0xAA, 0xBB, 0xCC]);
-        let mut records = Records::new(&bytes);
+        let mut records = Records::new(&bytes, Limits::default()).expect("valid BIFF limits");
         let Some(Ok(view)) = records.next() else {
             panic!("valid frame did not parse");
         };
@@ -329,7 +309,7 @@ mod tests {
         assert_eq!(view.offset(), 0);
         assert_eq!(view.encoded().len(), bytes.len());
 
-        let Ok(owned) = view.own() else {
+        let Ok(owned) = view.own(Limits::default()) else {
             panic!("valid frame did not become owned");
         };
         assert_eq!(owned.as_bytes(), bytes.as_slice());
@@ -339,17 +319,20 @@ mod tests {
 
     #[test]
     fn owned_constructor_rejects_empty_multiple_and_truncated_input() {
-        assert!(matches!(Record::open(Vec::new()), Err(Error::EmptyRecord)));
+        assert!(matches!(
+            Record::open(Vec::new(), Limits::default()),
+            Err(Error::EmptyRecord)
+        ));
 
         let mut multiple = frame(1, &[1]);
         multiple.extend_from_slice(&frame(2, &[2]));
         assert!(matches!(
-            Record::open(multiple),
+            Record::open(multiple, Limits::default()),
             Err(Error::MultipleRecords { offset: 5 })
         ));
 
         assert!(matches!(
-            Record::open(vec![1, 2, 1, 0]),
+            Record::open(vec![1, 2, 1, 0], Limits::default()),
             Err(Error::TruncatedPayload {
                 offset: 0,
                 kind,
@@ -363,7 +346,7 @@ mod tests {
     fn ownership_limits_are_checked_before_copying() {
         let bytes = frame(1, &[1, 2]);
         assert!(matches!(
-            Record::with_limits(
+            Record::open(
                 bytes.clone(),
                 Limits {
                     max_output_bytes: bytes.len() - 1,
@@ -376,12 +359,12 @@ mod tests {
             })
         ));
 
-        let mut records = Records::new(&bytes);
+        let mut records = Records::new(&bytes, Limits::default()).expect("valid BIFF limits");
         let Some(Ok(view)) = records.next() else {
             panic!("valid frame did not parse");
         };
         assert!(matches!(
-            view.own_with(Limits {
+            view.own(Limits {
                 max_record_bytes: 1,
                 ..Limits::default()
             }),

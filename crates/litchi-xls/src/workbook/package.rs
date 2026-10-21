@@ -211,7 +211,7 @@ impl<R: Read + Seek> Reader<R> {
             .report_mut()
             .append_container(self.ole_file.tolerance_report());
 
-        let mut records = Records::new(&workbook_data);
+        let mut records = Records::new(&workbook_data, litchi_biff::Limits::default())?;
         let mut encoding = Encoding::from_codepage(1252)?; // Default codepage
         let mut bound_sheets = Vec::new();
         let mut strings = Vec::new();

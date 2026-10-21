@@ -34,7 +34,7 @@ pub(super) fn scan(chart: &Model) -> Result<Scan> {
         },
     };
     let mut entries = Vec::new();
-    for item in Records::new(source) {
+    for item in Records::new(source, chart.limits.biff)? {
         let record = item?;
         if record.kind() != SERIES {
             continue;

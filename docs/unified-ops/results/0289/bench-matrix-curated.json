@@ -2821,7 +2821,7 @@
   },
   {
    "record": "0362b",
-   "reason": "constructor API migrations with validation counts and unchanged raw constructor body hashes; no paired timing samples. Remaining shared-helper migrations are still required work."
+   "reason": "Constructor API migrations with validation/body-hash receipts and a focused raw BIFF before/after microprobe, not a leaf-vs-unified operation pair. Record 0362b retains and tabulates the raw framing evidence. Remaining shared-helper migrations are still required work."
   }
  ]
 }

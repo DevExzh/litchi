@@ -132,11 +132,11 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 fn record(record_type: u16, data: Vec<u8>) -> Frame {
-    let mut encoder = Encoder::new();
+    let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     encoder
         .push(Kind::from_wire(record_type), &data)
         .expect("test frame fits the BIFF wire limit");
-    Frame::open(encoder.finish()).expect("test frame is complete")
+    Frame::open(encoder.finish(), litchi_biff::Limits::default()).expect("test frame is complete")
 }
 
 fn xf(style: bool, parent: u16, format_id: u16) -> Frame {
@@ -474,11 +474,12 @@ mod real_world_tolerance_tests {
     use litchi_biff::{Encoder, Kind, Record as Frame};
 
     fn record(record_type: u16, data: Vec<u8>) -> Frame {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         encoder
             .push(Kind::from_wire(record_type), &data)
             .expect("test frame fits the BIFF wire limit");
-        Frame::open(encoder.finish()).expect("test frame is complete")
+        Frame::open(encoder.finish(), litchi_biff::Limits::default())
+            .expect("test frame is complete")
     }
 
     fn format_record(id: u16, code: &str) -> Frame {

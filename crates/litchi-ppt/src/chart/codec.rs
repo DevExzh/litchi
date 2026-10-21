@@ -124,7 +124,7 @@ pub(super) fn parse(
 }
 
 fn ensure_kind(book: &Book, expected: litchi_ograph::chart::Kind) -> Result<()> {
-    for chart in book.charts() {
+    for chart in book.charts()? {
         if chart?.kind() != expected {
             return corrupted("chart Workbook grammar conflicts with its PPT object kind");
         }

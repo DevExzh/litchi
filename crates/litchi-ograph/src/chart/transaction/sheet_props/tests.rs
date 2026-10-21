@@ -47,8 +47,10 @@ fn excel_fixture() -> Stream {
 }
 
 fn with_unknown(source: &Stream) -> Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == EOF {
             output
@@ -61,8 +63,10 @@ fn with_unknown(source: &Stream) -> Stream {
 }
 
 fn with_prefix_unknown(source: &Stream) -> Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == SHT_PROPS {
             output.push(UNKNOWN, &[0xFE, 0xED]).expect("prefix record");
@@ -73,7 +77,8 @@ fn with_prefix_unknown(source: &Stream) -> Stream {
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| record.expect("encoded record").encoded().to_vec())
         .collect()
 }

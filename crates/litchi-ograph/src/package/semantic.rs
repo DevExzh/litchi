@@ -124,10 +124,10 @@ impl Package {
         let limits = limits.validate()?;
         let chart = chart.finish_graph_authoring()?;
         let chart_stream = chart.encode_with(limits)?.into_bytes();
-        let mut workbook = Encoder::with_limits(limits.biff)?;
+        let mut workbook = Encoder::new(limits.biff)?;
         workbook.push(validation::BOF, &bof(validation::GLOBALS))?;
         workbook.push(validation::EOF, &[])?;
-        for record in Records::with_limits(&chart_stream, limits.biff)? {
+        for record in Records::new(&chart_stream, limits.biff)? {
             workbook.push_ref(record?)?;
         }
         let workbook = workbook.finish();

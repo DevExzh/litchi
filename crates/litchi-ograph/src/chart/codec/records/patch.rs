@@ -51,7 +51,7 @@ pub(crate) fn patch(chart: &mut Model, requests: &[Request]) -> Result<()> {
 
     let mut section = None;
     let mut cache_index = 0usize;
-    for item in Records::new(source) {
+    for item in Records::new(source, limits.biff)? {
         let record = item?;
         if record.kind() == SI_INDEX && kind == Kind::Excel {
             section = Some(read_section(record)?);
@@ -225,10 +225,10 @@ fn encode_replacement(
         _ => return identity_error(),
     };
 
-    let mut encoder = Encoder::with_limits(limits.biff)?;
+    let mut encoder = Encoder::new(limits.biff)?;
     cache::encode_cache(&mut encoder, &replacement)?;
     let record_bytes = encoder.finish();
-    let mut records = Records::new(&record_bytes);
+    let mut records = Records::new(&record_bytes, limits.biff)?;
     let record = records
         .next()
         .ok_or(Error::Refused(litchi_core::edit::Refusal::new(

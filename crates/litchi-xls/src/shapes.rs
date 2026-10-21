@@ -91,7 +91,7 @@ impl WorkbookDrawing {
         let mut pending: Option<(PendingTxo, bool)> = None;
         let mut drawing_run = false;
         let mut external_txo = false;
-        let records = Records::new(data);
+        let records = Records::new(data, litchi_biff::Limits::default()).map_err(invalid_data)?;
 
         for record in records {
             let record = record.map_err(invalid_data)?;

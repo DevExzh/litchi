@@ -1,0 +1,170 @@
+{
+  "baseline_commit": "90b586ca783527640c1e7361ba705f3c005a22b7",
+  "candidate": "commit containing this receipt; exact BIFF source digests below",
+  "candidate_biff_sources": {
+    "crates/litchi-biff/src/error.rs": "63bd952114f2bb12791e6d3d3a25ca8144921c9e023803f868f82dadfa4dd1fe",
+    "crates/litchi-biff/src/frame.rs": "1b4ccd2368edea75afe7d3536ee2a8366266136c5e07587e0c5a5e57ceb3884a",
+    "crates/litchi-biff/src/lib.rs": "d5647849a49cc0cf6ee48978ced37c536b6debbac8527e598d027c338a504a1a",
+    "crates/litchi-biff/src/limits.rs": "edd57c9484dd4b12fea358b8a476440af02295137c51a63513d05c7524709425",
+    "crates/litchi-biff/src/stream.rs": "8140df880b704edf81487a41845e9370b1d78dc4c86d479a96373d3992e57ce9"
+  },
+  "changes": [
+    "canonical required-limit raw BIFF constructors and ownership copies; no default-only twins or Encoder::default",
+    "eager construction admission removes redundant pending-error field and per-record check",
+    "Graph traversal and physical edits retain admitted bounds; fallible projections propagate through PPT",
+    "every XLS/Graph/PPT frame consumer migrated with previous limits"
+  ],
+  "validation": {
+    "biff_tests": 15,
+    "ograph_tests": 71,
+    "xls_lib_tests": 1311,
+    "ppt_chart_unit_tests": 10,
+    "ppt_chart_integration_tests": 9,
+    "total_native_tests": 1416,
+    "failed": 0,
+    "ignored": 0,
+    "tool_tests": 36,
+    "all_targets_all_features_check": "passed",
+    "all_targets_all_features_clippy": "passed",
+    "locked_perf_baseline_all_targets": "passed",
+    "glossary_profiles": [
+      "biff",
+      "ograph",
+      "xls-minimal",
+      "ppt-minimal",
+      "ppt-full"
+    ],
+    "biff_ograph_inventory_rows": 0,
+    "bench_matrix_check": "passed"
+  },
+  "constructor_equivalence": [
+    {
+      "path": "crates/litchi-biff/src/frame.rs",
+      "constructor": "pub fn open(bytes:",
+      "body_sha256": "a56ca4c181a7887110f711b01594ccb6e19849ad3cdb88e597ff68c759df17c8",
+      "comparison": "byte-identical constructor body"
+    },
+    {
+      "path": "crates/litchi-biff/src/frame.rs",
+      "constructor": "pub fn own(",
+      "body_sha256": "879387ab9744c9efb6677773708131119d6c8a1710c2e5864f284cdc1bf7554d",
+      "comparison": "byte-identical constructor body"
+    },
+    {
+      "path": "crates/litchi-biff/src/stream.rs",
+      "constructor": "pub fn new(limits:",
+      "body_sha256": "2f3426e926636102f998e58382f4d494adfe7a9faec9c2d4fef0cc3e2cddb2d1",
+      "comparison": "byte-identical constructor body"
+    }
+  ],
+  "performance": {
+    "scope": "raw framing probe only, not end-to-end facade operations",
+    "layout_bytes": {
+      "before": 104,
+      "after": 72
+    },
+    "protocol": "three process-level ABBA blocks per route, pinned CPU; W4/W8 acknowledged holds, W4b coordinator-interrupted with no heavy process remaining; process checks found no other builds/benchmarks",
+    "routes": {
+      "scan-default": {
+        "median_after_before": 0.9856878232622327,
+        "min": 0.9831781204224213,
+        "max": 0.9859007309202291
+      },
+      "scan-configured": {
+        "median_after_before": 0.7942259865115812,
+        "min": 0.7933058029869635,
+        "max": 0.7950959584844961
+      },
+      "encode-default": {
+        "median_after_before": 0.99259428588823,
+        "min": 0.985353148715039,
+        "max": 0.9941109644083054
+      },
+      "encode-configured": {
+        "median_after_before": 0.9940153923282553,
+        "min": 0.9824364559223214,
+        "max": 1.0147513677482072
+      }
+    },
+    "samples": "biff-framing-abba.json",
+    "reproducer": [
+      "python3 docs/unified-ops/results/0362b/biff-framing-probe.py build /external/biff",
+      "python3 docs/unified-ops/results/0362b/biff-framing-probe.py run /external/biff"
+    ],
+    "probe_build": "cargo build --release --offline --manifest-path /external/biff/{before,after}/Cargo.toml; fat LTO, one codegen unit, panic=abort; same dependency resolution in both builds",
+    "interpretation": "Scan medians improve; encoding medians are 0.993/0.994 of baseline with 0.982–1.015 individual-block range. No end-to-end timing claim."
+  },
+  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "raw_logs": {
+    "biff-check.log": {
+      "bytes": 262,
+      "sha256": "167f0f2b5e7e59c5e309994dca9f8686a0c4b86a418925dae3a04dfd4c3832a2"
+    },
+    "biff-tests.log": {
+      "bytes": 9193,
+      "sha256": "f72b14757e23b77e35dbcc0d9f20ae2407e3c3d9c311a7c9b97e4c2dcc969eac"
+    },
+    "biff-xls-tests.log": {
+      "bytes": 105788,
+      "sha256": "2a746a21002be048a70fde49cefb829fd4355ce18468949777a25bb7b869907b"
+    },
+    "biff-ppt-tests.log": {
+      "bytes": 3378,
+      "sha256": "0e8e62dbe17132d9c87792cd3cf3a8e0fe7f0b267b5b69c33836d36b62a3a328"
+    },
+    "biff-ppt-integration.log": {
+      "bytes": 1148,
+      "sha256": "637f8c210d3641ca76d3b07484e2f905e8e211c0749bda14e9b5e0579a0b2460"
+    },
+    "biff-clippy.log": {
+      "bytes": 263,
+      "sha256": "8c5fb429621ed534e8bc8d61f0203a2563f5141c8bc592be7ff1fba0573a29f2"
+    },
+    "biff-harness.log": {
+      "bytes": 780,
+      "sha256": "f7d9bf2b43aadb5e0f96c7a116ec773435bf03672727865e142f2e0707bca404"
+    },
+    "biff-tools-tests.log": {
+      "bytes": 541,
+      "sha256": "e4d24587f5497b4ad7c3db31dd44df831a5dac35e2b05de9f97a60d2fe23aa15"
+    },
+    "biff-matrix.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "biff-glossary-biff.log": {
+      "bytes": 440,
+      "sha256": "833992938741c8e76a3f4be6d7f0a6646b46e94638784aa8b073e4e4375a8e92"
+    },
+    "biff-glossary-ograph.log": {
+      "bytes": 843,
+      "sha256": "ea5608bd7067e4e10476228ce24ba3c82ad8a74229b4cb12ae99ea075922a665"
+    },
+    "biff-glossary-xls-minimal.log": {
+      "bytes": 1724,
+      "sha256": "46cd30000d7ad63f08032d47870a0882e65f85f1ee1f8a7fbc95b672d872a69b"
+    },
+    "biff-glossary-ppt-minimal.log": {
+      "bytes": 1987,
+      "sha256": "f2659f9738850371cf715e5c00d2cf6aba5889399eecb045b64ae50a27fd6cd2"
+    },
+    "biff-glossary-ppt-full.log": {
+      "bytes": 2078,
+      "sha256": "e272a472f61864f63f9249ced7064a903186257c530dd8f8f6af09e217957c0e"
+    }
+  },
+  "commands": [
+    "cargo check --locked -p litchi-biff -p litchi-ograph -p litchi-xls -p litchi-ppt --all-targets --all-features",
+    "cargo test --locked -p litchi-biff -p litchi-ograph --all-features",
+    "cargo test --locked -p litchi-xls --all-features --lib",
+    "cargo test --locked -p litchi-ppt --all-features --lib chart",
+    "cargo test --locked -p litchi-ppt --all-features --test ppt_charts --test ppt_chart_writer",
+    "cargo clippy --locked -p litchi-biff -p litchi-ograph -p litchi-xls -p litchi-ppt --all-targets --all-features -- -D warnings",
+    "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+    "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile <each listed profile> --target-dir <root target>",
+    "python3 tools/api_debt_inventory.py target/doc/litchi_biff.json target/doc/litchi_ograph.json",
+    "python3 -m unittest tools.test_check_api_glossary tools.test_unified_bench_matrix",
+    "python3 tools/unified_bench_matrix.py --check"
+  ],
+  "remaining_required": "ODraw/OLE/signing/DrawingML/ZIP/CFB helper audit, typed budget errors, W4/W4b/W8 integration and final workspace gate remain required; no new deferral"
+}

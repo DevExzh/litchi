@@ -76,7 +76,7 @@ const ATTRIBUTE_PATTERN: u8 = 1 << 6;
 /// The workbook palette from the globals' `Palette` record, or the BIFF8
 /// default palette.
 pub(super) fn workbook_palette(workbook: &[u8]) -> Result<Palette> {
-    for item in Records::new(workbook) {
+    for item in Records::new(workbook, litchi_biff::Limits::default())? {
         let record = item?;
         match record.kind().get() {
             PALETTE => {

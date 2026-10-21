@@ -192,11 +192,12 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     let graph_chart = typed_graph
         .book()
         .charts()
+        .expect("validated chart streams")
         .next()
         .expect("one chart")
         .expect("validated chart");
     assert_eq!(graph_chart.kind(), GraphKind::Graph);
-    assert_eq!(graph_chart.records().count(), 3);
+    assert_eq!(graph_chart.records().expect("validated records").count(), 3);
     assert!(graph_chart.offset() > 0);
 
     let excel = inventory.get(1).expect("Excel chart");
@@ -209,11 +210,12 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
     let excel_chart = typed_excel
         .book()
         .charts()
+        .expect("validated chart streams")
         .next()
         .expect("one chart")
         .expect("validated chart");
     assert_eq!(excel_chart.kind(), GraphKind::Excel);
-    assert_eq!(excel_chart.records().count(), 3);
+    assert_eq!(excel_chart.records().expect("validated records").count(), 3);
     assert!(excel_chart.offset() > 0);
 
     assert!(

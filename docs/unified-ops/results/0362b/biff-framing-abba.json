@@ -1,0 +1,492 @@
+{
+  "baseline_commit": "90b586ca78",
+  "cpu": 0,
+  "source_sha256": "e0b218868705882111e9bc611bea6eeeecb801cbe9b287511d6ecf69dc45f7c5",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "binaries": {
+    "before": {
+      "bytes": 398280,
+      "sha256": "6bc2ceaa136ba6afa0eb547835e3a9bd2df342d9ba33634fc50716731ba28022",
+      "lock_sha256": "c2be1c65ae84c564bba54fa449a33d963ab442230c2d61dd6f0dc37a4b5fb13c"
+    },
+    "after": {
+      "bytes": 398144,
+      "sha256": "6186be350aa08841f18b43c61029c4179ade87c190f305fbfe7440a11fc7122a",
+      "lock_sha256": "c2be1c65ae84c564bba54fa449a33d963ab442230c2d61dd6f0dc37a4b5fb13c"
+    }
+  },
+  "rows": [
+    {
+      "route": "scan-default",
+      "after_before": [
+        0.9859007309202291,
+        0.9856878232622327,
+        0.9831781204224213
+      ],
+      "samples": [
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 670598458,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 660008383,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 660787947,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 669086450,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 669811485,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 660848157,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 660414654,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 670636048,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 671299782,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 660109543,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 659854172,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "scan-default",
+          "iterations": 15000,
+          "ns": 671248112,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "scan-configured",
+      "after_before": [
+        0.7942259865115812,
+        0.7950959584844961,
+        0.7933058029869635
+      ],
+      "samples": [
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 835842329,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 663136843,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 662766011,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 833585361,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 834192955,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 663186133,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 663621415,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 834545936,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 834087364,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 663321104,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 662961932,
+          "checksum": 169190277120000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "scan-configured",
+          "iterations": 15000,
+          "ns": 837755992,
+          "checksum": 169190277120000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "encode-default",
+      "after_before": [
+        0.99259428588823,
+        0.9941109644083054,
+        0.985353148715039
+      ],
+      "samples": [
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 361773229,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 359864369,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 361684372,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 365158964,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 365748188,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 367220275,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 362178789,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 367971779,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 369718219,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 365280745,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 369411727,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "encode-default",
+          "iterations": 1000000,
+          "ns": 375895141,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    },
+    {
+      "route": "encode-configured",
+      "after_before": [
+        0.9824364559223214,
+        1.0147513677482072,
+        0.9940153923282553
+      ],
+      "samples": [
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 368663013,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 363510496,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 361941618,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 0
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 369758398,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 0
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 359332064,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 370283782,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 363270575,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 1
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 363558666,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 1
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 365210152,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 362170773,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 364882638,
+          "checksum": 8933000000,
+          "records_size": 72,
+          "build": "after",
+          "block": 2
+        },
+        {
+          "route": "encode-configured",
+          "iterations": 1000000,
+          "ns": 366220585,
+          "checksum": 8933000000,
+          "records_size": 104,
+          "build": "before",
+          "block": 2
+        }
+      ]
+    }
+  ]
+}

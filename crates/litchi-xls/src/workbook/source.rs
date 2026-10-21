@@ -2394,7 +2394,7 @@ fn parse_globals(
             resource: "global records",
             requested: record_count as u64,
         })?;
-    for record in BiffRecords::with_limits(&bytes, biff_limits).map_err(map_biff_error)? {
+    for record in BiffRecords::new(&bytes, biff_limits).map_err(map_biff_error)? {
         records.push(record.map_err(map_biff_error)?);
     }
     let first = records

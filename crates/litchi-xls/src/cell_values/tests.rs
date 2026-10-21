@@ -53,7 +53,8 @@ fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     let mut ole = OleFile::open(Cursor::new(source)).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
-    let parsed = Records::new(&workbook);
+    let parsed =
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits");
     for record in parsed {
         let record = record.unwrap();
         records.push((record.kind().get(), record.payload().to_vec()));
@@ -155,7 +156,9 @@ fn mul_blank_family_package() -> (Vec<u8>, Reference) {
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut replaced = false;
-    for record in Records::new(&workbook) {
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = record.unwrap();
         let mut kind = record.kind().get();
         let mut payload = record.payload().to_vec();
@@ -190,7 +193,9 @@ fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Refe
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut replaced = false;
-    for record in Records::new(&workbook) {
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = record.unwrap();
         let kind = record.kind().get();
         let mut payload = record.payload().to_vec();
@@ -254,7 +259,9 @@ fn ancillary_formula_package() -> Vec<u8> {
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut patched = false;
-    for record in Records::new(&workbook) {
+    for record in
+        Records::new(&workbook, litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = record.unwrap();
         let kind = record.kind().get();
         let mut payload = record.payload().to_vec();
@@ -2833,7 +2840,8 @@ type MatrixRecord = (u16, Vec<u8>);
 fn matrix_records(package: &[u8]) -> Vec<MatrixRecord> {
     let mut ole = OleFile::open(Cursor::new(package.to_vec())).unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
-    Records::new(&stream)
+    Records::new(&stream, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| {
             let record = record.unwrap();
             (record.kind().get(), record.payload().to_vec())

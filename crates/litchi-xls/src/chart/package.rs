@@ -1639,8 +1639,8 @@ pub(super) fn ranges_with(input: &[u8], max_records: usize) -> Result<Vec<Range>
         max_input_bytes: input.len().max(1),
         ..BiffLimits::default()
     };
-    let records = Records::with_limits(input, biff_limits)
-        .map_err(|error| Error::InvalidData(error.to_string()))?;
+    let records =
+        Records::new(input, biff_limits).map_err(|error| Error::InvalidData(error.to_string()))?;
     for record in records {
         let record = record.map_err(|error| Error::InvalidData(error.to_string()))?;
         let start = record.offset();

@@ -1755,3 +1755,5 @@ resource refusals. Full PPTX tests, Clippy, rustdoc, workspace compilation and
 both glossary profiles pass. Full charts, unified PPTX dispatch and performance
 acceptance remain pending; the full goal is active.
 See [0063](0063-source-pptx-modern-comments.md).
+
+- Coordinator follow-up [0362b](0362b-exact-limit-constructors.md), BIFF slice: raw frame constructors and copies require limits; Graph traversal retains its admitted policy and every XLS/Graph/PPT consumer migrates. Redundant iterator error state is removed (104→72 bytes). All 1,416 native tests, 36 tooling tests, clippy, locked harness, five glossary profiles and the bench matrix check pass. Three isolated ABBA blocks show scan medians 0.986/0.794× and encoding medians 0.993/0.994×; complete samples and reproducer are retained. Shared-helper/typed-error audits and W4/W4b/W8 integration remain required.

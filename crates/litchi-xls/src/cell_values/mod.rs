@@ -3745,7 +3745,7 @@ impl Edit {
         let sheet = self.require_sheet(selector, "column layout")?;
         let stream = self.sheet_stream(sheet)?;
         let mut width = 8_u16;
-        for item in Records::new(stream) {
+        for item in Records::new(stream, litchi_biff::Limits::default())? {
             let record = item?;
             match record.kind().get() {
                 0x0055 if record.payload().len() >= 2 => {
@@ -4754,7 +4754,10 @@ fn ensure_transfer_has_no_staged_target_overlap(
 }
 
 fn ensure_scalar_transfer_container(snapshot: &Snapshot, sheet: usize) -> Result<()> {
-    let mut records = Records::new(&snapshot.inner.workbook_stream);
+    let mut records = Records::new(
+        &snapshot.inner.workbook_stream,
+        litchi_biff::Limits::default(),
+    )?;
     let _globals = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
     let mut bound_sheet_position = None;
     let mut bound_sheet_index = 0_usize;
@@ -4805,7 +4808,7 @@ fn ensure_scalar_transfer_container(snapshot: &Snapshot, sheet: usize) -> Result
             "BoundSheet owner lies outside Workbook",
         )
     })?;
-    let mut worksheet_records = Records::new(worksheet);
+    let mut worksheet_records = Records::new(worksheet, litchi_biff::Limits::default())?;
     let first = worksheet_records
         .next()
         .ok_or(Error::Eof("worksheet BOF"))??;
@@ -8359,7 +8362,7 @@ fn require_macro_free_container(publisher: &SourceBackedOverlayPublisher) -> Res
 fn parse_workbook_stream(
     source: &Arc<[u8]>,
 ) -> Result<(Vec<SheetData>, Option<usize>, Vec<Vec<u8>>)> {
-    let mut records = Records::new(source);
+    let mut records = Records::new(source, litchi_biff::Limits::default())?;
     let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
     require_bof(first.payload(), WORKBOOK_GLOBALS)?;
 
@@ -8490,7 +8493,7 @@ fn parse_workbook_stream(
 }
 
 fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
-    let mut records = Records::new(data);
+    let mut records = Records::new(data, litchi_biff::Limits::default())?;
     let first = records.next().ok_or(Error::Eof("worksheet BOF"))??;
     require_bof(first.payload(), WORKSHEET)?;
     let mut entries = Vec::new();

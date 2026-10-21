@@ -100,7 +100,7 @@ struct Frame {
 
 fn frames_until_eof(bytes: &[u8]) -> Result<Vec<Frame>> {
     let mut frames = Vec::new();
-    for item in Records::new(bytes) {
+    for item in Records::new(bytes, litchi_biff::Limits::default())? {
         let record = item?;
         let start = record.offset();
         let end = start
@@ -318,7 +318,7 @@ pub(super) fn apply_columns(between: &[u8], changes: &[&LayoutChange]) -> Result
         return Ok(between.to_vec());
     }
     let mut frames = Vec::new();
-    for item in Records::new(between) {
+    for item in Records::new(between, litchi_biff::Limits::default())? {
         let record = item?;
         let start = record.offset();
         frames.push(Frame {

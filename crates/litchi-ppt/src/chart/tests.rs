@@ -189,7 +189,14 @@ fn semantic_validation_is_opt_in_without_changing_raw_inventory() {
         Compression::Uncompressed,
     ));
 
-    assert!(chart.charts().next().expect("raw chart").is_ok());
+    assert!(
+        chart
+            .charts()
+            .expect("validated chart streams")
+            .next()
+            .expect("raw chart")
+            .is_ok()
+    );
     let semantic = chart
         .semantic_chart(0)
         .expect("semantic chart validation")

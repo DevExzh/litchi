@@ -116,7 +116,7 @@ pub(super) fn validate_workbook(bytes: &[u8], limits: Limits) -> Result<Workbook
     let mut chart_start = None;
     let mut chart_end = None;
     let mut chart_records = 0usize;
-    for item in Records::with_limits(bytes, limits.biff)? {
+    for item in Records::new(bytes, limits.biff)? {
         let record = item?;
         state = match state {
             StreamState::GlobalsBof => {

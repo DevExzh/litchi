@@ -162,8 +162,7 @@ impl Graph {
 
     /// Iterate the single chart-sheet substream through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
-    #[must_use]
-    pub fn semantic_charts(&self) -> Models<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         semantic_charts(&self.book, Kind::Graph)
     }
 
@@ -177,7 +176,7 @@ impl Graph {
     ///
     /// Returns an error if the operation fails.
     pub fn semantic_chart(&self) -> PackageResult<Model> {
-        let mut charts = self.semantic_charts();
+        let mut charts = self.semantic_charts()?;
         let chart = charts
             .next()
             .ok_or_else(|| Error::Corrupted("Graph Workbook has no chart stream".to_string()))??;
@@ -287,8 +286,7 @@ impl Excel {
 
     /// Iterate the Workbook's chart substreams through the bounded semantic
     /// model, retaining source bytes for exact pristine replay.
-    #[must_use]
-    pub fn semantic_charts(&self) -> Models<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         semantic_charts(&self.book, Kind::Excel)
     }
 
@@ -298,7 +296,7 @@ impl Excel {
     ///
     /// Returns an error if the operation fails.
     pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
-        self.semantic_charts().nth(index).transpose()
+        self.semantic_charts()?.nth(index).transpose()
     }
 
     pub(super) fn new(info: Info, book: Book) -> Self {
@@ -335,12 +333,11 @@ impl Chart {
     }
 
     /// Traverse every neutral chart substream without allocation.
-    #[must_use]
-    pub fn charts(&self) -> Refs<'_> {
-        match self {
+    pub fn charts(&self) -> PackageResult<Refs<'_>> {
+        Ok(match self {
             Self::Graph(chart) => chart.book.charts(),
             Self::Excel(chart) => chart.book.charts(),
-        }
+        }?)
     }
 
     /// Iterate every chart substream through the bounded semantic model.
@@ -348,8 +345,7 @@ impl Chart {
     /// This is opt-in; [`Self::charts`] continues to expose the allocation-free
     /// raw view and therefore preserves the existing permissive inventory
     /// contract for callers that only need framed records.
-    #[must_use]
-    pub fn semantic_charts(&self) -> Models<'_> {
+    pub fn semantic_charts(&self) -> PackageResult<Models<'_>> {
         match self {
             Self::Graph(chart) => semantic_charts(&chart.book, Kind::Graph),
             Self::Excel(chart) => semantic_charts(&chart.book, Kind::Excel),
@@ -363,7 +359,7 @@ impl Chart {
     ///
     /// Returns an error if the operation fails.
     pub fn semantic_chart(&self, index: usize) -> PackageResult<Option<Model>> {
-        self.semantic_charts().nth(index).transpose()
+        self.semantic_charts()?.nth(index).transpose()
     }
 
     /// Typed standalone Graph view, when applicable.
@@ -528,12 +524,12 @@ fn semantic_context(kind: Kind) -> Context {
     }
 }
 
-fn semantic_charts(book: &Book, kind: Kind) -> Models<'_> {
-    Models {
-        charts: book.charts(),
+fn semantic_charts(book: &Book, kind: Kind) -> PackageResult<Models<'_>> {
+    Ok(Models {
+        charts: book.charts()?,
         context: semantic_context(kind),
         limits: book.limits(),
-    }
+    })
 }
 
 fn validate_replacement_target(objects: &Collection, info: &Info) -> object::Result<()> {

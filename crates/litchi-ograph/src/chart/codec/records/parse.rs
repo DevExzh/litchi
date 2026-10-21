@@ -116,7 +116,7 @@ pub(crate) fn parse(input: Ref<'_>, context: Context, limits: Limits) -> Result<
     let mut unknown_bytes = 0usize;
     let mut first = true;
 
-    for item in input.records() {
+    for item in input.records()? {
         let record = item?;
         if record.payload().len() > limits.biff.max_record_bytes {
             return limit(

@@ -22,7 +22,7 @@ pub(crate) fn locate(chart: &Model, expected: Rect) -> Result<usize> {
         },
     };
     let mut offset = None;
-    for item in Records::new(source) {
+    for item in Records::new(source, chart.limits.biff)? {
         let record = item?;
         if record.kind() != CHART {
             continue;

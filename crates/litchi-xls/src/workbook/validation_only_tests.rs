@@ -337,7 +337,8 @@ fn parse_both(
 ) -> (String, String) {
     let stream = encode(records);
     let parse = |validate: bool| -> String {
-        let mut framed = Records::new(&stream);
+        let mut framed =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         let Some(bof) = framed.next() else {
             return "empty".into();
         };
@@ -539,7 +540,12 @@ fn mutate(records: &[Record], random: &mut XorShift) -> Vec<Record> {
 fn worksheet_records(workbook_stream: &[u8], bound: &BoundSheetRecord) -> Option<Vec<Record>> {
     let start = usize::try_from(bound.position).ok()?;
     let mut records = Vec::new();
-    for record in Records::new(workbook_stream.get(start..)?) {
+    for record in Records::new(
+        workbook_stream.get(start..)?,
+        litchi_biff::Limits::default(),
+    )
+    .ok()?
+    {
         let record = record.ok()?;
         let kind = record.kind().get();
         records.push((kind, record.payload().to_vec()));
@@ -560,7 +566,7 @@ fn workbook_stream(bytes: &[u8]) -> Option<Vec<u8>> {
 fn bound_sheets(stream: &[u8]) -> Vec<BoundSheetRecord> {
     let encoding = Encoding::from_codepage(1252).unwrap();
     let mut sheets = Vec::new();
-    for record in Records::new(stream) {
+    for record in Records::new(stream, litchi_biff::Limits::default()).expect("valid BIFF limits") {
         let Ok(record) = record else {
             break;
         };
@@ -972,7 +978,9 @@ fn package_outcome_agrees_under_worksheet_mutation() {
         rewritten.extend_from_slice(&stream[start + old_length..]);
         let mut offset = 0;
         let mut globals = Vec::new();
-        for record in Records::new(&rewritten) {
+        for record in
+            Records::new(&rewritten, litchi_biff::Limits::default()).expect("valid BIFF limits")
+        {
             let record = record.unwrap();
             globals.push((offset, record.kind().get(), record.payload().len()));
             offset += record.encoded().len();
@@ -1155,7 +1163,8 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
             Err(error) => error.to_string(),
         };
         let parse = |store: &mut dyn FnMut(&mut Records<'_>) -> crate::Result<Worksheet>| {
-            let mut framed = Records::new(&stream);
+            let mut framed =
+                Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
             outcome(store(&mut framed))
         };
         let region = super::codec::WorksheetStreamRegion {

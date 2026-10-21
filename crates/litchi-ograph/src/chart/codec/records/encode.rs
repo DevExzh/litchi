@@ -78,7 +78,7 @@ pub(crate) fn encode(chart: &Model, limits: Limits) -> Result<Vec<u8>> {
             }
         }
     }
-    let mut out = Encoder::with_limits(limits.biff)?;
+    let mut out = Encoder::new(limits.biff)?;
     push_record(&mut out, BOF, &bof(chart.context.kind()))?;
     if chart.graph_authoring_profile {
         // CHARTSHEETCONTENT requires a complete DATASHEET before the optional

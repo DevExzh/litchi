@@ -32,7 +32,7 @@ fn package(strings: &[&str]) -> Vec<u8> {
 fn sst_records(workbook: &[u8]) -> Vec<litchi_biff::RecordRef<'_>> {
     let mut records = Vec::new();
     let mut in_sst = false;
-    for item in Records::new(workbook) {
+    for item in Records::new(workbook, litchi_biff::Limits::default()).expect("valid BIFF limits") {
         let record = item.unwrap();
         if !in_sst {
             if record.kind().get() == SST {
@@ -333,7 +333,7 @@ fn continued_sst_entries_and_ext_sst_buckets_are_rebuilt_with_true_offsets() {
     let frames: Vec<_> = encoded
         .records
         .iter()
-        .map(|record| Frame::open(record.clone()).unwrap())
+        .map(|record| Frame::open(record.clone(), litchi_biff::Limits::default()).unwrap())
         .collect();
     let refs: Vec<_> = frames.iter().map(Frame::as_ref).collect();
     let table =
@@ -400,7 +400,7 @@ fn continued_sst_entries_and_ext_sst_buckets_are_rebuilt_with_true_offsets() {
     let odd_frames: Vec<_> = odd
         .records
         .iter()
-        .map(|record| Frame::open(record.clone()).unwrap())
+        .map(|record| Frame::open(record.clone(), litchi_biff::Limits::default()).unwrap())
         .collect();
     let odd_refs: Vec<_> = odd_frames.iter().map(Frame::as_ref).collect();
     let odd_table =

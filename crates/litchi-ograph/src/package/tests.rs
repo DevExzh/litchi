@@ -35,7 +35,7 @@ fn workbook() -> Vec<u8> {
 }
 
 fn workbook_with_bofs(globals: [u8; BOF_BYTES], chart: [u8; BOF_BYTES]) -> Vec<u8> {
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &globals).expect("globals BOF");
     out.push(Kind::from_wire(0x7777), &[1, 2, 3])
         .expect("unknown record");
@@ -48,7 +48,7 @@ fn workbook_with_bofs(globals: [u8; BOF_BYTES], chart: [u8; BOF_BYTES]) -> Vec<u
 }
 
 fn editable_chart(with_cache: bool) -> Vec<u8> {
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &bof(CHART_SHEET)).expect("chart BOF");
 
     let mut rect = [0u8; 16];
@@ -101,12 +101,12 @@ fn editable_chart(with_cache: bool) -> Vec<u8> {
 
 fn editable_workbook(with_cache: bool) -> Vec<u8> {
     let chart = editable_chart(with_cache);
-    let mut out = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut out = Encoder::new(Limits::default().biff).expect("BIFF limits");
     out.push(BOF, &bof(GLOBALS)).expect("globals BOF");
     out.push(Kind::from_wire(0x7776), &[0x10, 0x20])
         .expect("opaque globals record");
     out.push(EOF, &[]).expect("globals EOF");
-    for item in Records::new(&chart) {
+    for item in Records::new(&chart, litchi_biff::Limits::default()).expect("valid BIFF limits") {
         out.push_ref(item.expect("chart record"))
             .expect("chart replay");
     }
@@ -225,7 +225,10 @@ fn accepts_exact_standalone_topology_and_reads_workbook() {
     let opened = parsed.workbook().expect("read Workbook");
     assert_eq!(opened.as_bytes(), workbook);
     assert_eq!(opened.chart().kind(), chart::Kind::Graph);
-    assert_eq!(opened.chart().records().count(), 3);
+    assert_eq!(
+        opened.chart().records().expect("validated records").count(),
+        3
+    );
 }
 
 #[test]
@@ -268,7 +271,7 @@ fn rejects_missing_unknown_and_nested_root_entries() {
 
 #[test]
 fn rejects_wrong_substream_shape_and_trailing_records() {
-    let mut wrong = Encoder::with_limits(Limits::default().biff).expect("BIFF limits");
+    let mut wrong = Encoder::new(Limits::default().biff).expect("BIFF limits");
     wrong.push(BOF, &bof(GLOBALS)).expect("BOF");
     wrong.push(EOF, &[]).expect("EOF");
     wrong.push(BOF, &bof(GLOBALS)).expect("wrong BOF");

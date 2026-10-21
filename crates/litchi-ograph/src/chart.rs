@@ -117,18 +117,12 @@ impl<'a> Ref<'a> {
     }
 
     /// Traverse all records in original order without allocation.
-    #[must_use]
-    pub fn records(self) -> Records<'a> {
-        Records::new(self.bytes)
-    }
-
-    /// Copies this bounded substream into an owned chart.
-    pub fn own(self) -> Result<Stream> {
-        self.own_with(self.limits)
+    pub fn records(self) -> Result<Records<'a>> {
+        Ok(Records::new(self.bytes, self.limits.biff)?)
     }
 
     /// Copies this substream under explicit bounds.
-    pub fn own_with(self, limits: Limits) -> Result<Stream> {
+    pub fn own(self, limits: Limits) -> Result<Stream> {
         let limits = limits.validate()?;
         Ref::open(self.bytes, limits)?;
         if self.bytes.len() > limits.biff.max_output_bytes {
@@ -203,8 +197,7 @@ impl Stream {
     }
 
     /// Traverse all records in original order without allocation.
-    #[must_use]
-    pub fn records(&self) -> Records<'_> {
+    pub fn records(&self) -> Result<Records<'_>> {
         self.as_ref().records()
     }
 
@@ -274,9 +267,8 @@ impl Book {
     }
 
     /// Traverse every validated chart in source order without allocation.
-    #[must_use]
-    pub fn charts(&self) -> Refs<'_> {
-        Refs::from_validated(&self.bytes, self.limits)
+    pub fn charts(&self) -> Result<Refs<'_>> {
+        Refs::open_workbook(&self.bytes, self.limits)
     }
 
     /// Resource limits under which all charts were validated.
@@ -332,7 +324,7 @@ impl<'a> Refs<'a> {
     pub fn open_workbook(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_bytes(bytes, limits)?;
-        let records = Records::with_limits(bytes, limits.biff)?;
+        let records = Records::new(bytes, limits.biff)?;
         Ok(Self {
             bytes,
             records,
@@ -341,17 +333,6 @@ impl<'a> Refs<'a> {
             charts: 0,
             done: false,
         })
-    }
-
-    pub(crate) fn from_validated(bytes: &'a [u8], limits: Limits) -> Self {
-        Self {
-            bytes,
-            records: Records::new(bytes),
-            limits,
-            active: None,
-            charts: 0,
-            done: false,
-        }
     }
 
     fn fail(&mut self, error: Error) -> Result<Ref<'a>> {
@@ -541,7 +522,7 @@ mod tests {
     }
 
     fn chart(kind: Kind, unknown: &[u8]) -> Vec<u8> {
-        let mut out = Encoder::new();
+        let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         match kind {
             Kind::Graph => push(&mut out, BOF, &bof(GRAPH_VERSION, GRAPH_DOC_TYPE, 0xA5)),
             Kind::Excel => push(&mut out, BOF, &bof(EXCEL_VERSION, EXCEL_DOC_TYPE, 0x5A)),
@@ -554,21 +535,25 @@ mod tests {
     fn hosted_workbook() -> (Vec<u8>, usize, Vec<u8>, usize, Vec<u8>) {
         let first = chart(Kind::Excel, &[0x10, 0x20, 0x30]);
         let second = chart(Kind::Excel, &[0xFE, 0xDC]);
-        let mut out = Encoder::new();
+        let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut out, BOF, &bof(EXCEL_VERSION, 0x0005, 0));
         push(&mut out, UNKNOWN, &[1]);
         push(&mut out, EOF, &[]);
         push(&mut out, BOF, &bof(EXCEL_VERSION, 0x0010, 0));
         push(&mut out, UNKNOWN, &[2, 3]);
         let first_offset = out.as_bytes().len();
-        for record in Records::new(&first) {
+        for record in
+            Records::new(&first, litchi_biff::Limits::default()).expect("valid BIFF limits")
+        {
             out.push_ref(record.expect("first chart"))
                 .expect("copy first chart");
         }
         push(&mut out, UNKNOWN, &[4]);
         push(&mut out, EOF, &[]);
         let second_offset = out.as_bytes().len();
-        for record in Records::new(&second) {
+        for record in
+            Records::new(&second, litchi_biff::Limits::default()).expect("valid BIFF limits")
+        {
             out.push_ref(record.expect("second chart"))
                 .expect("copy second chart");
         }
@@ -584,7 +569,7 @@ mod tests {
         assert_eq!(book.as_bytes().as_ptr(), pointer);
         assert_eq!(book.len(), 2);
         assert!(!book.is_empty());
-        let mut charts = book.charts();
+        let mut charts = book.charts().expect("validated charts");
 
         let first = charts.next().expect("first").expect("valid first");
         assert_eq!(first.kind(), Kind::Excel);
@@ -595,7 +580,7 @@ mod tests {
             book.as_bytes()[first_offset..].as_ptr()
         );
 
-        let owned = first.own().expect("bounded owned chart");
+        let owned = first.own(Limits::default()).expect("bounded owned chart");
         assert_eq!(owned.offset(), first_offset);
         assert_eq!(owned.as_bytes(), first_bytes);
 
@@ -620,12 +605,13 @@ mod tests {
             owned.as_bytes().len(),
             owned
                 .records()
+                .expect("validated records")
                 .map(|r| r.expect("record").encoded().len())
                 .sum::<usize>()
         );
 
-        let mut replay = Encoder::new();
-        for record in owned.records() {
+        let mut replay = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+        for record in owned.records().expect("validated records") {
             replay
                 .push_ref(record.expect("valid record"))
                 .expect("exact replay");
@@ -635,14 +621,16 @@ mod tests {
         assert_eq!(bytes.as_ptr(), pointer);
         assert_eq!(bytes.capacity(), capacity);
 
-        let frame = Records::new(&bytes)
+        let frame = Records::new(&bytes, litchi_biff::Limits::default())
+            .expect("valid BIFF limits")
             .nth(1)
             .expect("unknown frame")
             .expect("valid frame")
             .encoded()
             .to_vec();
         let frame_pointer = frame.as_ptr();
-        let record = OwnedRecord::open(frame).expect("owned record");
+        let record =
+            OwnedRecord::open(frame, litchi_biff::Limits::default()).expect("owned record");
         assert_eq!(record.kind(), UNKNOWN);
         assert_eq!(record.as_ref().encoded(), record.as_bytes());
         let frame = record.into_bytes();
@@ -650,10 +638,42 @@ mod tests {
     }
 
     #[test]
+    fn repeated_traversal_keeps_the_admitted_record_count_policy() {
+        let count = litchi_biff::Limits::default().max_records + 1;
+        let limits = Limits {
+            biff: litchi_biff::Limits {
+                max_records: count,
+                ..litchi_biff::Limits::default()
+            },
+            max_chart_records: count,
+            ..Limits::default()
+        };
+        let mut output = Encoder::new(limits.biff).expect("valid limits");
+        push(&mut output, BOF, &bof(EXCEL_VERSION, EXCEL_DOC_TYPE, 0));
+        for _ in 0..count - 2 {
+            push(&mut output, UNKNOWN, &[]);
+        }
+        push(&mut output, EOF, &[]);
+        let book = Book::open(output.finish(), limits).expect("configured chart count");
+        let mut charts = book.charts().expect("repeat configured discovery");
+        let chart = charts.next().expect("one chart").expect("configured chart");
+        assert!(charts.next().is_none());
+        let actual = chart
+            .records()
+            .expect("configured records")
+            .try_fold(0_usize, |count, record| record.map(|_| count + 1))
+            .expect("record traversal retains the admitted limits");
+        assert_eq!(actual, count);
+        let owned = chart.own(limits).expect("configured ownership");
+        assert_eq!(owned.as_bytes(), chart.as_bytes());
+        assert_eq!(owned.records().expect("owned records").count(), count);
+    }
+
+    #[test]
     fn rejects_nested_truncated_and_malformed_chart_boundaries() {
         let chart_bof = bof(EXCEL_VERSION, EXCEL_DOC_TYPE, 0);
 
-        let mut nested = Encoder::new();
+        let mut nested = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut nested, BOF, &chart_bof);
         push(&mut nested, BOF, &chart_bof);
         push(&mut nested, EOF, &[]);
@@ -667,7 +687,7 @@ mod tests {
             }))
         ));
 
-        let mut missing = Encoder::new();
+        let mut missing = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut missing, BOF, &chart_bof);
         push(&mut missing, UNKNOWN, &[1]);
         assert!(matches!(
@@ -680,7 +700,7 @@ mod tests {
             }))
         ));
 
-        let mut nonempty = Encoder::new();
+        let mut nonempty = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut nonempty, BOF, &chart_bof);
         push(&mut nonempty, EOF, &[1]);
         assert!(matches!(
@@ -691,7 +711,7 @@ mod tests {
             })
         ));
 
-        let mut short = Encoder::new();
+        let mut short = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut short, BOF, &[0, 6, 0x20]);
         assert!(matches!(
             Book::open(short.finish(), Limits::default()),
@@ -701,7 +721,7 @@ mod tests {
             })
         ));
 
-        let mut version = Encoder::new();
+        let mut version = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         push(&mut version, BOF, &bof(0x0500, EXCEL_DOC_TYPE, 0));
         assert!(matches!(
             Book::open(version.finish(), Limits::default()),

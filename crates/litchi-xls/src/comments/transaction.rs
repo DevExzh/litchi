@@ -1487,7 +1487,8 @@ fn parse_inventory<R: Read + Seek>(
     stream: &Arc<[u8]>,
     workbook: &ValidationWorkbook<R>,
 ) -> Result<Vec<Sheet>> {
-    let mut records = Records::new(stream);
+    let mut records =
+        Records::new(stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
     require_bof(first.payload(), WORKBOOK_GLOBALS)?;
     let mut encoding = Encoding::from_codepage(1252)?;
@@ -1597,7 +1598,8 @@ fn parse_sheet_sites(
     let data = stream
         .get(start..end)
         .ok_or_else(|| Error::InvalidData("worksheet range is outside Workbook".into()))?;
-    let mut records = Records::new(data);
+    let mut records =
+        Records::new(data, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let first = records.next().ok_or(Error::Eof("worksheet BOF"))??;
     require_bof(first.payload(), WORKSHEET)?;
     let mut collector = super::CommentCollector::new();

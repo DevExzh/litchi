@@ -8967,6 +8967,11 @@
           "name": "with_limits",
           "scope": "litchi_ograph",
           "replacement": "use options for owners or required limits for raw codecs (record 0362b)"
+        },
+        {
+          "name": "own_with",
+          "scope": "litchi_ograph::chart",
+          "replacement": "use Ref::own(limits) (record 0362b)"
         }
       ],
       "families": [],
@@ -18535,6 +18540,31 @@
         "litchi_keynote::Presentation"
       ],
       "family_methods": true
+    },
+    {
+      "id": "biff",
+      "package": "litchi-biff",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "with_limits",
+          "scope": "litchi_biff",
+          "replacement": "use the sole raw constructor with required Limits (record 0362b)"
+        },
+        {
+          "name": "own_with",
+          "scope": "litchi_biff",
+          "replacement": "use RecordRef::own(limits) (record 0362b)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_biff",
+          "match": "suffix",
+          "replacement": "raw record APIs require Limits (record 0362b)"
+        }
+      ],
+      "families": []
     }
   ]
 }

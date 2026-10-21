@@ -16,18 +16,10 @@ pub struct Records<'a> {
     offset: usize,
     count: usize,
     limits: Limits,
-    pending: Option<Error>,
     done: bool,
 }
 
 impl<'a> Records<'a> {
-    /// Creates a borrowed parser with conservative default limits.
-    #[must_use]
-    pub fn new(bytes: &'a [u8]) -> Self {
-        let limits = Limits::default();
-        Self::from_parts(bytes, limits)
-    }
-
     /// Creates a borrowed parser with explicit resource limits.
     ///
     /// # Errors
@@ -35,7 +27,7 @@ impl<'a> Records<'a> {
     /// Returns [`Error::InvalidLimit`] for an invalid configuration or
     /// [`Error::LimitExceeded`] when the complete input exceeds the stream
     /// ceiling. No input allocation is performed.
-    pub fn with_limits(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn new(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         ensure_input_limit(bytes.len(), validated_limits.max_input_bytes)?;
         Ok(Self::from_parts(bytes, validated_limits))
@@ -46,17 +38,11 @@ impl<'a> Records<'a> {
     }
 
     fn from_parts(bytes: &'a [u8], limits: Limits) -> Self {
-        let pending = (bytes.len() > limits.max_input_bytes).then_some(Error::LimitExceeded {
-            resource: Resource::InputBytes,
-            observed: as_u64(bytes.len()),
-            maximum: as_u64(limits.max_input_bytes),
-        });
         Self {
             bytes,
             offset: 0,
             count: 0,
             limits,
-            pending,
             done: false,
         }
     }
@@ -157,10 +143,6 @@ impl<'a> Iterator for Records<'a> {
         if self.done {
             return None;
         }
-        if let Some(error) = self.pending.take() {
-            self.done = true;
-            return Some(Err(error));
-        }
         if self.offset == self.bytes.len() {
             self.done = true;
             return None;
@@ -179,10 +161,8 @@ impl<'a> Iterator for Records<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.done || (self.pending.is_none() && self.offset == self.bytes.len()) {
+        if self.done || self.offset == self.bytes.len() {
             (0, Some(0))
-        } else if self.pending.is_some() {
-            (1, Some(1))
         } else {
             (1, None)
         }
@@ -200,23 +180,13 @@ pub struct Encoder {
 }
 
 impl Encoder {
-    /// Creates an empty encoder with conservative default limits.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            bytes: Vec::new(),
-            count: 0,
-            limits: Limits::default(),
-        }
-    }
-
     /// Creates an empty encoder with explicit resource limits.
     ///
     /// # Errors
     ///
     /// Returns [`Error::InvalidLimit`] when the payload ceiling exceeds the
     /// physical BIFF bound.
-    pub fn with_limits(limits: Limits) -> Result<Self> {
+    pub fn new(limits: Limits) -> Result<Self> {
         Ok(Self {
             bytes: Vec::new(),
             count: 0,
@@ -338,12 +308,6 @@ impl Encoder {
     }
 }
 
-impl Default for Encoder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 fn ensure_input_limit(stream_len: usize, maximum: usize) -> Result<()> {
     if stream_len > maximum {
         return Err(Error::LimitExceeded {
@@ -376,7 +340,7 @@ mod tests {
 
     #[test]
     fn parses_empty_stream_and_fuses_after_end() {
-        let mut records = Records::new(&[]);
+        let mut records = Records::new(&[], Limits::default()).expect("valid BIFF limits");
         assert_eq!(records.next(), None);
         assert_eq!(records.next(), None);
         assert_eq!(records.size_hint(), (0, Some(0)));
@@ -391,8 +355,8 @@ mod tests {
 
         let mut kinds = Vec::new();
         let mut offsets = Vec::new();
-        let mut encoder = Encoder::new();
-        for item in Records::new(&input) {
+        let mut encoder = Encoder::new(Limits::default()).expect("valid BIFF limits");
+        for item in Records::new(&input, Limits::default()).expect("valid BIFF limits") {
             let Ok(record) = item else {
                 panic!("valid generated stream did not parse");
             };
@@ -416,7 +380,8 @@ mod tests {
     fn rejects_each_nonempty_truncation_of_a_frame() {
         let complete = frame(0x1234, &[1, 2, 3, 4]);
         for cut in 1..complete.len() {
-            let mut records = Records::new(&complete[..cut]);
+            let mut records =
+                Records::new(&complete[..cut], Limits::default()).expect("valid BIFF limits");
             let Some(Err(error)) = records.next() else {
                 panic!("truncated prefix unexpectedly parsed");
             };
@@ -433,7 +398,7 @@ mod tests {
     fn rejects_input_limits_before_traversal() {
         let bytes = frame(1, &[1]);
         assert!(matches!(
-            Records::with_limits(
+            Records::new(
                 &bytes,
                 Limits {
                     max_input_bytes: bytes.len() - 1,
@@ -446,14 +411,14 @@ mod tests {
             })
         ));
 
-        let mut records = Records::with_limits(
+        let mut records = Records::new(
             &bytes,
             Limits {
                 max_records: 0,
                 ..Limits::default()
             },
         )
-        .unwrap_or_else(|_| Records::new(&[]));
+        .expect("valid BIFF limits");
         let Some(Err(Error::LimitExceeded {
             resource: Resource::RecordCount,
             ..
@@ -471,7 +436,7 @@ mod tests {
             ..Limits::default()
         };
         assert!(matches!(
-            Records::with_limits(&[], invalid),
+            Records::new(&[], invalid),
             Err(Error::InvalidLimit {
                 resource: Resource::RecordBytes,
                 ..
@@ -479,7 +444,7 @@ mod tests {
         ));
 
         let too_large = vec![0x01, 0x00, 0x21, 0x20];
-        let mut records = Records::new(&too_large);
+        let mut records = Records::new(&too_large, Limits::default()).expect("valid BIFF limits");
         assert!(matches!(
             records.next(),
             Some(Err(Error::LimitExceeded {
@@ -493,12 +458,12 @@ mod tests {
 
     #[test]
     fn encoder_failures_are_atomic_and_finish_is_zero_copy() {
-        let mut encoder = Encoder::with_limits(Limits {
+        let mut encoder = Encoder::new(Limits {
             max_records: 1,
             max_output_bytes: 5,
             ..Limits::default()
         })
-        .unwrap_or_else(|_| Encoder::new());
+        .expect("valid BIFF limits");
         assert!(encoder.push(Kind::from_wire(1), &[1]).is_ok());
         let before = encoder.as_bytes().to_vec();
         assert!(matches!(
@@ -514,11 +479,11 @@ mod tests {
         assert!(!encoder.is_empty());
         assert_eq!(encoder.finish(), before);
 
-        let mut output_limited = Encoder::with_limits(Limits {
+        let mut output_limited = Encoder::new(Limits {
             max_output_bytes: HEADER_BYTES - 1,
             ..Limits::default()
         })
-        .unwrap_or_else(|_| Encoder::new());
+        .expect("valid BIFF limits");
         assert!(matches!(
             output_limited.push(Kind::from_wire(3), &[]),
             Err(Error::LimitExceeded {
@@ -532,15 +497,15 @@ mod tests {
     #[test]
     fn encoder_accepts_the_spec_payload_boundary_and_rejects_the_next_byte() {
         let payload = vec![0xA5; crate::MAX_RECORD_BYTES];
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(Limits::default()).expect("valid BIFF limits");
         assert!(encoder.push(Kind::from_wire(1), &payload).is_ok());
         assert_eq!(encoder.len(), HEADER_BYTES + crate::MAX_RECORD_BYTES);
 
-        let mut restricted = Encoder::with_limits(Limits {
+        let mut restricted = Encoder::new(Limits {
             max_record_bytes: crate::MAX_RECORD_BYTES - 1,
             ..Limits::default()
         })
-        .unwrap_or_else(|_| Encoder::new());
+        .expect("valid BIFF limits");
         assert!(matches!(
             restricted.push(Kind::from_wire(1), &payload),
             Err(Error::LimitExceeded {
@@ -578,7 +543,7 @@ mod tests {
         }
 
         let mut index = 0usize;
-        for item in Records::new(&input) {
+        for item in Records::new(&input, Limits::default()).expect("valid BIFF limits") {
             let Ok(record) = item else {
                 panic!("deterministic generated stream did not parse");
             };

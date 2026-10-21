@@ -259,7 +259,7 @@ impl<R: Read + Seek> Reader<R> {
         let worksheet_data = workbook_data.get(worksheet_position..).ok_or_else(|| {
             Error::InvalidData("BoundSheet8 points outside the Workbook stream".to_string())
         })?;
-        let mut records = Records::new(worksheet_data);
+        let mut records = Records::new(worksheet_data, litchi_biff::Limits::default())?;
 
         // Start directly at the worksheet BOF. The borrowed BIFF iterator
         // reports offsets relative to this slice; the absolute base is passed

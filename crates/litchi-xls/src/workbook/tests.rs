@@ -233,7 +233,8 @@ fn worksheet_expands_packed_numeric_and_blank_cells() {
     push_record(&mut stream, 0x00BD, &mul_rk);
     push_record(&mut stream, 0x00BE, &mul_blank);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
@@ -274,7 +275,8 @@ fn worksheet_resolves_formula_value_from_following_string_record() {
     push_record(&mut stream, 0x0006, &string_formula_data(4, 5));
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
@@ -322,7 +324,8 @@ fn worksheet_refuses_several_orphan_ptg_exp_formulas_deterministically() {
     }
     push_record(&mut stream, 0x000A, &[]);
     for _ in 0..32 {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         let error = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
@@ -348,7 +351,8 @@ fn worksheet_rejects_formula_missing_its_string_record() {
     let mut stream = Vec::new();
     push_record(&mut stream, 0x0006, &string_formula_data(0, 0));
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let result = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
@@ -388,7 +392,8 @@ fn custom_view_closing_record_restores_primary_page_setup_collection() {
     push_record(&mut stream, 0x0014, &[]);
     push_record(&mut stream, 0x000A, &[]);
 
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
@@ -436,7 +441,8 @@ fn worksheet_resolves_string_formula_across_intervening_array_record() {
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
@@ -480,7 +486,8 @@ fn worksheet_resolves_string_formula_spanning_continue_records() {
     push_record(&mut stream, 0x0207, &string_data);
     push_record(&mut stream, 0x003C, &continues);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
@@ -513,7 +520,8 @@ fn worksheet_enforces_dval_dv_ordering() {
         &dval_data(0),
     );
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
@@ -543,7 +551,8 @@ fn worksheet_enforces_dval_dv_ordering() {
         &dval_data(1),
     );
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     assert!(
         Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
@@ -660,7 +669,8 @@ fn worksheet_rejects_malformed_optional_validation_records_and_continue() {
             stream
         },
     ] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
             Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
@@ -702,7 +712,8 @@ fn worksheet_expands_shared_formula_relative_references() {
     participant_formula[14..16].copy_from_slice(&0x0008u16.to_le_bytes());
     push_record(&mut stream, 0x0006, &participant_formula);
     push_record(&mut stream, 0x000a, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
@@ -744,7 +755,8 @@ fn worksheet_resolves_array_formula_for_every_cell() {
     push_record(&mut stream, 0x0221, &array);
     push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
     push_record(&mut stream, 0x000a, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
@@ -809,7 +821,8 @@ fn worksheet_rejects_orphan_and_incomplete_array_ptg_exp_links() {
     };
 
     for stream in [orphan, incomplete] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
             Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
@@ -881,7 +894,8 @@ fn worksheet_rejects_array_without_dimensions_and_second_formula_companion() {
         with_second_companion,
         cross_kind_same_anchor,
     ] {
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
             Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
@@ -906,7 +920,8 @@ fn worksheet_rejects_formula_companions_without_an_adjacent_formula() {
         let mut stream = Vec::new();
         push_record(&mut stream, record_type, &[]);
         push_record(&mut stream, 0x000a, &[]);
-        let mut records = Records::new(&stream);
+        let mut records =
+            Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
         assert!(
             Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
@@ -942,7 +957,8 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
         }
     }
     push_record(&mut nonoverlap, 0x000a, &[]);
-    let mut records = Records::new(&nonoverlap);
+    let mut records =
+        Records::new(&nonoverlap, litchi_biff::Limits::default()).expect("valid BIFF limits");
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         nonoverlap.len() as u64,
@@ -968,7 +984,8 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
     push_record(&mut overlap, 0x0006, &formula_data(0, 1, &second_anchor));
     push_record(&mut overlap, 0x0221, &array_data(0, 0, 1, 2));
     push_record(&mut overlap, 0x000a, &[]);
-    let mut records = Records::new(&overlap);
+    let mut records =
+        Records::new(&overlap, litchi_biff::Limits::default()).expect("valid BIFF limits");
     assert!(
         Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
@@ -1010,7 +1027,8 @@ fn worksheet_skips_embedded_chart_substreams() {
     push_record(&mut stream, 0x000A, &[]);
     push_record(&mut stream, 0x0203, &number);
     push_record(&mut stream, 0x000A, &[]);
-    let mut records = Records::new(&stream);
+    let mut records =
+        Records::new(&stream, litchi_biff::Limits::default()).expect("valid BIFF limits");
 
     let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,

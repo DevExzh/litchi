@@ -109,7 +109,7 @@ impl RawRecord {
 
 fn raw_records(bytes: &[u8]) -> Result<Vec<RawRecord>> {
     let mut records = Vec::new();
-    for item in Records::new(bytes) {
+    for item in Records::new(bytes, litchi_biff::Limits::default())? {
         let record = item?;
         let start = record.offset();
         let end = start
@@ -202,7 +202,7 @@ fn parse(workbook: &[u8]) -> Result<(usize, Vec<Tab>)> {
 /// Globals records up to and including the first EOF.
 fn raw_records_until_eof(bytes: &[u8]) -> Result<Vec<RawRecord>> {
     let mut records = Vec::new();
-    for item in Records::new(bytes) {
+    for item in Records::new(bytes, litchi_biff::Limits::default())? {
         let record = item?;
         let start = record.offset();
         let end = start

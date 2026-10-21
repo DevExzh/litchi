@@ -125,7 +125,7 @@ pub(crate) fn write_record<W: Write>(
     record_type: u16,
     payload: &[u8],
 ) -> Result<()> {
-    let mut encoder = Encoder::new();
+    let mut encoder = Encoder::new(litchi_biff::Limits::default()).map_err(map_frame_error)?;
     encoder
         .push(record_kind(record_type)?, payload)
         .map_err(map_frame_error)?;

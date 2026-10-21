@@ -32,8 +32,10 @@ fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> S
     chart.series_mut()[0].bubble_count = Count::new(1).expect("count");
     chart.authoring_proven = true;
     let source = chart.encode().expect("authoring fixture");
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == SERIES {
             output
@@ -46,7 +48,8 @@ fn fixture(category: DataKind, category_count: u16, unknown_payload: &[u8]) -> S
 }
 
 fn series_payload(bytes: &[u8]) -> Vec<u8> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .find_map(|item| {
             let record = item.expect("record");
             (record.kind() == SERIES).then(|| record.payload().to_vec())
@@ -84,7 +87,8 @@ fn edits_series_metadata_in_place_and_preserves_unknown_records() -> Result<()> 
         series_payload(&original),
         series_payload(changed.as_bytes())
     );
-    let unknowns: Vec<_> = Records::new(changed.as_bytes())
+    let unknowns: Vec<_> = Records::new(changed.as_bytes(), litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .filter_map(|item| {
             let record = item.expect("record");
             (record.kind() == UNKNOWN).then(|| record.payload().to_vec())

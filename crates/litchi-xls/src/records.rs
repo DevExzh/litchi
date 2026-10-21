@@ -1662,11 +1662,12 @@ mod sst_measure_tests {
     const LOSSY_SURROGATE: &str = "lossy: unpaired surrogate repaired";
 
     fn frame(kind: u16, payload: &[u8]) -> Frame {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         encoder
             .push(Kind::from_wire(kind), payload)
             .expect("test frame fits the BIFF wire limit");
-        Frame::open(encoder.finish()).expect("test frame is complete")
+        Frame::open(encoder.finish(), litchi_biff::Limits::default())
+            .expect("test frame is complete")
     }
 
     /// Frames `payloads` as one `SST` record followed by `Continue` records.
@@ -2268,7 +2269,9 @@ mod sst_measure_tests {
             };
             with_sst += 1;
             let span = &stream[begin..end];
-            let Ok(records) = Records::new(span).collect::<Result<Vec<RecordRef<'_>>, _>>() else {
+            let Ok(records) = Records::new(span, litchi_biff::Limits::default())
+                .and_then(|records| records.collect::<Result<Vec<RecordRef<'_>>, _>>())
+            else {
                 no_container.push(format!("{relative}: SST span does not reframe"));
                 continue;
             };
@@ -2371,8 +2374,8 @@ mod sst_measure_tests {
             let Some((begin, end)) = locate_sst(&stream) else {
                 continue;
             };
-            let Ok(records) =
-                Records::new(&stream[begin..end]).collect::<Result<Vec<RecordRef<'_>>, _>>()
+            let Ok(records) = Records::new(&stream[begin..end], litchi_biff::Limits::default())
+                .and_then(|records| records.collect::<Result<Vec<RecordRef<'_>>, _>>())
             else {
                 continue;
             };
@@ -2420,11 +2423,12 @@ mod shared_string_tests {
     use litchi_biff::{Encoder, Kind, Record as Frame, RecordRef, Records};
 
     fn record(record_type: u16, data: Vec<u8>) -> Frame {
-        let mut encoder = Encoder::new();
+        let mut encoder = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
         encoder
             .push(Kind::from_wire(record_type), &data)
             .expect("test frame fits the BIFF wire limit");
-        Frame::open(encoder.finish()).expect("test frame is complete")
+        Frame::open(encoder.finish(), litchi_biff::Limits::default())
+            .expect("test frame is complete")
     }
 
     fn record_refs(records: &[Frame]) -> Vec<RecordRef<'_>> {
@@ -2690,7 +2694,10 @@ mod shared_string_tests {
         let expected = vec!["a".repeat(9000), "漢".repeat(5000)];
         let mut bytes = Vec::new();
         crate::writer::biff::write_sst(&mut bytes, &expected, 2).unwrap();
-        let records: Vec<RecordRef<'_>> = Records::new(&bytes).collect::<Result<_, _>>().unwrap();
+        let records: Vec<RecordRef<'_>> = Records::new(&bytes, litchi_biff::Limits::default())
+            .expect("valid BIFF limits")
+            .collect::<Result<_, _>>()
+            .unwrap();
 
         let table = SharedStringTable::parse_from_records(&records, &Encoding::Utf16Le).unwrap();
 
@@ -2700,7 +2707,8 @@ mod shared_string_tests {
     #[test]
     fn maps_truncated_shared_frame_errors_at_the_xls_boundary() {
         let truncated = [0xFC, 0x00, 0x04, 0x00, 0x01, 0x02];
-        let error = Records::new(&truncated)
+        let error = Records::new(&truncated, litchi_biff::Limits::default())
+            .expect("valid BIFF limits")
             .next()
             .expect("the malformed input yields one framing error")
             .expect_err("the payload is shorter than its declared length");

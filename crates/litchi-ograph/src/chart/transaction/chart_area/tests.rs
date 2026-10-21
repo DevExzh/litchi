@@ -33,8 +33,10 @@ fn fixture(rect: Rect) -> crate::chart::Stream {
 }
 
 fn with_unknown(source: &crate::chart::Stream) -> crate::chart::Stream {
-    let mut output = Encoder::new();
-    for item in Records::new(source.as_bytes()) {
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(source.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("fixture record");
         if record.kind() == EOF {
             output
@@ -47,7 +49,8 @@ fn with_unknown(source: &crate::chart::Stream) -> crate::chart::Stream {
 }
 
 fn encoded_records(bytes: &[u8]) -> Vec<Vec<u8>> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
         .map(|record| record.expect("encoded record").encoded().to_vec())
         .collect()
 }

@@ -19,7 +19,7 @@ fn bof() -> [u8; 16] {
 }
 
 fn chart_bytes() -> Vec<u8> {
-    let mut output = Encoder::new();
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     output.push(BOF, &bof()).expect("BOF");
     output.push(UNKNOWN, &[0xAA, 0xBB]).expect("unknown");
     output.push(EOF, &[]).expect("EOF");
@@ -33,6 +33,7 @@ fn canonical_frames_preserve_exact_bytes_and_offsets_through_ograph() {
     assert_eq!(chart.kind(), ChartKind::Excel);
     let records = chart
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid BIFF record"))
         .collect::<Vec<_>>();
 
@@ -95,7 +96,7 @@ fn biff_record_bounds_are_enforced_without_a_second_ograph_frame_policy() {
 
 #[test]
 fn chart_context_still_rejects_non_chart_bofs_after_frame_validation() {
-    let mut output = Encoder::new();
+    let mut output = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut payload = bof();
     payload[2..4].copy_from_slice(&0x0005_u16.to_le_bytes());
     output.push(BOF, &payload).expect("BOF");

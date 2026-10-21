@@ -105,6 +105,7 @@ fn standalone_graph_authoring_roundtrips_bar_line_and_pie_profiles() {
         let stream = chart.encode().expect("Graph chart encoding");
         let orient = stream
             .records()
+            .expect("validated records")
             .map(|item| item.expect("Graph record framing"))
             .find(|record| record.kind() == RecordKind::from_wire(0x1055))
             .expect("Graph Orient record");
@@ -148,8 +149,10 @@ fn fixture(mut chart: Model) -> Stream {
 }
 
 fn omit(stream: &Stream, target: RecordKind) -> Vec<u8> {
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() != target {
             out.push_ref(record).expect("record replay");
@@ -280,8 +283,10 @@ fn graph_and_excel_links_have_distinct_checked_wire_grammars() {
 #[test]
 fn parsed_mutation_is_refused_and_unknown_order_replays_exactly() {
     let original = fixture(excel_chart());
-    let mut out = Encoder::new();
-    for item in Records::new(original.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in Records::new(original.as_bytes(), litchi_biff::Limits::default())
+        .expect("valid BIFF limits")
+    {
         let record = item.expect("valid record");
         if record.kind() == super::super::EOF {
             out.push(UNKNOWN, &[9, 8, 7]).expect("unknown record");
@@ -423,6 +428,7 @@ fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
     let stream = fixture(chart);
     let kinds = stream
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid record").kind())
         .collect::<Vec<_>>();
     let crt = kinds
@@ -453,10 +459,12 @@ fn group_lines_and_drop_bars_emit_mandatory_owned_formats() {
 #[test]
 fn rejects_missing_collection_begin_and_nesting_over_limit() {
     let stream = fixture(excel_chart());
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut after_series = false;
     let mut removed = false;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid record");
         if after_series && record.kind() == RecordKind::from_wire(0x1033) {
             removed = true;
@@ -508,9 +516,11 @@ fn regular_series_requires_one_owner_and_series_text_remains_ai_local() {
         })
     ));
 
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut ai = 0usize;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         out.push_ref(record).expect("record replay");
         if record.kind() == RecordKind::from_wire(0x1051) {
@@ -643,6 +653,7 @@ fn excel_cache_label_uses_xl_unicode_string_wire_format() {
     let stream = fixture(chart);
     let label = stream
         .records()
+        .expect("validated records")
         .map(|record| record.expect("valid fixture record"))
         .find(|record| record.kind() == RecordKind::from_wire(0x0204))
         .expect("Label record");
@@ -709,9 +720,11 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
         assert!(Model::parse(excel_input(&malformed), context).is_err());
     }
 
-    let mut out = Encoder::new();
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
     let mut section = 0usize;
-    for item in Records::new(stream.as_bytes()) {
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == RecordKind::from_wire(0x1065) {
             section += 1;
@@ -732,8 +745,10 @@ fn excel_rejects_proven_topology_violations_and_duplicate_siindex() {
         })
     ));
 
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == RecordKind::from_wire(0x0200) {
             out.push(RecordKind::from_wire(0x1033), &[])
@@ -779,8 +794,10 @@ fn graph_does_not_inherit_excel_outer_order_but_rejects_siindex() {
         without_excel_crt_link
     );
 
-    let mut out = Encoder::new();
-    for item in Records::new(stream.as_bytes()) {
+    let mut out = Encoder::new(litchi_biff::Limits::default()).expect("valid BIFF limits");
+    for item in
+        Records::new(stream.as_bytes(), litchi_biff::Limits::default()).expect("valid BIFF limits")
+    {
         let record = item.expect("valid fixture record");
         if record.kind() == super::super::EOF {
             out.push(RecordKind::from_wire(0x1065), &1u16.to_le_bytes())

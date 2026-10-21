@@ -67,6 +67,7 @@ fn valid_chart_requests_write_graph_objects_and_reopen() {
         let chart = graph
             .book()
             .charts()
+            .expect("validated chart streams")
             .next()
             .expect("one Graph chart")
             .expect("valid Graph chart");

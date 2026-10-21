@@ -592,7 +592,10 @@ fn source_sst_entries(source: &super::Snapshot) -> Result<Vec<Option<RawSstEntry
         .try_reserve(1)
         .map_err(|_error| Error::Allocation("retaining source SST records"))?;
     let mut found = false;
-    for item in Records::new(&source.inner.workbook_stream) {
+    for item in Records::new(
+        &source.inner.workbook_stream,
+        litchi_biff::Limits::default(),
+    )? {
         let record = item?;
         if !found {
             if record.kind().get() == super::SST {
@@ -6003,7 +6006,7 @@ fn raw_records(bytes: &[u8]) -> Result<Vec<RawRecord>> {
             .get(offset..)
             .is_some_and(|tail| tail.iter().all(|byte| *byte == 0))
     };
-    for item in Records::new(bytes) {
+    for item in Records::new(bytes, litchi_biff::Limits::default())? {
         let record = match item {
             Ok(record) => record,
             Err(_) if end_of_last > 0 && padding_from(end_of_last) => break,

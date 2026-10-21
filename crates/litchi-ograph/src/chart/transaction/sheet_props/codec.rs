@@ -23,7 +23,7 @@ pub(crate) fn locate(chart: &Model, expected: Props) -> Result<usize> {
 
     let mut props_offset = None;
     let mut plot_area_count = 0usize;
-    for item in Records::new(source) {
+    for item in Records::new(source, chart.limits.biff)? {
         let record = item?;
         if record.kind() == super::super::super::codec::SHT_PROPS {
             if props_offset.is_some() {
