@@ -19,8 +19,17 @@ use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
 
+/// Immutable, cheap-to-clone owner of a captured OLE object package.
+///
+/// Cloning a package shares the original/current bytes, captured topology and
+/// every stream allocation.  The small owner handle stays inline, so opening
+/// a package does not allocate a second owner-state object when the caller
+/// immediately starts an edit.  Cloning the handle remains O(1): it only
+/// clones the already shared catalogs and byte owners.
+/// An edit clones those `Arc` handles and copies no package topology until a
+/// mutation first needs copy-on-write.
 #[derive(Clone)]
-struct State {
+pub struct Package {
     targets: Arc<Targets>,
     limits: super::model::Limits,
     cfb_limits: OleFileLimits,
@@ -34,28 +43,16 @@ struct State {
     validated_layout: SectorLayoutPolicy,
 }
 
-/// Immutable, cheap-to-clone owner of a captured OLE object package.
-///
-/// Cloning a package shares the original/current bytes, captured topology and
-/// every stream allocation.  An edit keeps those catalogs behind `Arc` handles
-/// and clones only the catalog it first mutates, so starting an edit is O(1)
-/// in package topology.  Use [`Package::edit`] to start an independent
-/// transactional edit.
-#[derive(Clone)]
-pub struct Package {
-    state: Arc<State>,
-}
-
 impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Package")
-            .field("target_count", &self.state.targets.len())
-            .field("object_count", &self.state.objects.len())
-            .field("changed", &self.state.changed)
+            .field("target_count", &self.targets.len())
+            .field("object_count", &self.objects.len())
+            .field("changed", &self.changed)
             .field(
                 "source_is_current",
-                &Arc::ptr_eq(&self.state.original, &self.state.current),
+                &Arc::ptr_eq(&self.original, &self.current),
             )
             .finish()
     }
@@ -76,19 +73,17 @@ impl Package {
         validated_layout: SectorLayoutPolicy,
     ) -> Self {
         Self {
-            state: Arc::new(State {
-                targets,
-                limits,
-                cfb_limits,
-                original,
-                current,
-                base_package,
-                package,
-                objects,
-                changed,
-                layout,
-                validated_layout,
-            }),
+            targets,
+            limits,
+            cfb_limits,
+            original,
+            current,
+            base_package,
+            package,
+            objects,
+            changed,
+            layout,
+            validated_layout,
         }
     }
 
@@ -184,32 +179,32 @@ impl Package {
     /// The target catalog used by this package.
     #[must_use]
     pub fn targets(&self) -> &Targets {
-        self.state.targets.as_ref()
+        self.targets.as_ref()
     }
 
     /// The current target-selected object catalog.
     #[must_use]
     pub fn objects(&self) -> &Objects {
-        self.state.objects.as_ref()
+        self.objects.as_ref()
     }
 
     /// The sector-layout policy captured from the edit that produced this
     /// package.
     #[must_use]
     pub fn sector_layout_policy(&self) -> SectorLayoutPolicy {
-        self.state.layout
+        self.layout
     }
 
     /// Borrows an opaque package stream without copying it.
     #[must_use]
     pub fn stream(&self, path: &[String]) -> Option<&[u8]> {
-        self.state.package.stream(path)
+        self.package.stream(path)
     }
 
     /// Returns shared ownership of an opaque package stream allocation.
     #[must_use]
     pub fn stream_shared(&self, path: &[String]) -> Option<Arc<[u8]>> {
-        self.state.package.stream_shared(path)
+        self.package.stream_shared(path)
     }
 
     /// Returns shared ownership of the exact bytes published by this package.
@@ -219,19 +214,19 @@ impl Package {
     /// second copy.
     #[must_use]
     pub fn source_shared(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.state.original)
+        Arc::clone(&self.original)
     }
 
     /// Object-capture bounds retained by this immutable package.
     #[must_use]
     pub fn limits_value(&self) -> super::model::Limits {
-        self.state.limits
+        self.limits
     }
 
     /// Physical CFB bounds retained by this immutable package.
     #[must_use]
     pub fn cfb_limits_value(&self) -> OleFileLimits {
-        self.state.cfb_limits
+        self.cfb_limits
     }
 
     /// Parses one selected object's OLEDS `\x01Ole` metadata, when present.
@@ -243,8 +238,7 @@ impl Package {
     /// Returns an error when `key` is absent or its OLEDS stream is malformed
     /// or exceeds the metadata limit.
     pub fn link(&self, key: &str, limits: super::link::Limits) -> Result<Option<Link>, Error> {
-        self.state
-            .objects
+        self.objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
             .link(limits)
@@ -257,8 +251,7 @@ impl Package {
         index: usize,
         limits: ole_streams::Limits,
     ) -> Result<Option<presentation::Snapshot>, Error> {
-        self.state
-            .objects
+        self.objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
             .presentation(index, limits)
@@ -270,8 +263,7 @@ impl Package {
         key: &str,
         limits: ole_streams::Limits,
     ) -> Result<Vec<(usize, presentation::Snapshot)>, Error> {
-        self.state
-            .objects
+        self.objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
             .presentations(limits)
@@ -283,8 +275,7 @@ impl Package {
         key: &str,
         limits: ole_streams::Limits,
     ) -> Result<Option<native::Snapshot>, Error> {
-        self.state
-            .objects
+        self.objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
             .native(limits)
@@ -303,34 +294,34 @@ impl Package {
         let requested_limits = if options.has_limits_override() {
             options.limits_value()
         } else {
-            self.state.limits
+            self.limits
         };
-        let limits = requested_limits.constrained_by(self.state.limits);
+        let limits = requested_limits.constrained_by(self.limits);
         limits.validate()?;
         let cfb_limits = if options.has_cfb_limits_override() {
             options.cfb_limits_value()
         } else {
-            self.state.cfb_limits
+            self.cfb_limits
         };
         let cfb_limits = OleFileLimits::new(
             cfb_limits
                 .max_input_bytes()
-                .min(self.state.cfb_limits.max_input_bytes()),
+                .min(self.cfb_limits.max_input_bytes()),
         )?
         .with_max_directory_bytes(
             cfb_limits
                 .max_directory_bytes()
-                .min(self.state.cfb_limits.max_directory_bytes()),
+                .min(self.cfb_limits.max_directory_bytes()),
         )?
         .with_max_allocation_table_bytes(
             cfb_limits
                 .max_allocation_table_bytes()
-                .min(self.state.cfb_limits.max_allocation_table_bytes()),
+                .min(self.cfb_limits.max_allocation_table_bytes()),
         )?;
         let layout = if options.has_sector_layout_override() {
             options.sector_layout_value()
         } else {
-            self.state.layout
+            self.layout
         };
         Ok(Edit::from_package_with_options(
             self, limits, cfb_limits, layout,
@@ -345,51 +336,51 @@ impl Package {
     /// Streams the package bytes to a sequential sink.
     pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), Error> {
         writer
-            .write_all(self.state.current.as_slice())
+            .write_all(self.current.as_slice())
             .map_err(|source| Error::Cfb(OleError::Io(source)))
     }
 
     pub(crate) fn validated_layout(&self) -> SectorLayoutPolicy {
-        self.state.validated_layout
+        self.validated_layout
     }
 
     pub(crate) fn cfb_limits(&self) -> OleFileLimits {
-        self.state.cfb_limits
+        self.cfb_limits
     }
 
     pub(crate) fn targets_shared(&self) -> Arc<Targets> {
-        Arc::clone(&self.state.targets)
+        Arc::clone(&self.targets)
     }
 
     pub(crate) fn limits(&self) -> super::model::Limits {
-        self.state.limits
+        self.limits
     }
 
     pub(crate) fn original(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.state.original)
+        Arc::clone(&self.original)
     }
 
     pub(crate) fn current_bytes(&self) -> &[u8] {
-        self.state.current.as_slice()
+        self.current.as_slice()
     }
 
     pub(crate) fn package(&self) -> Arc<CapturedPackage> {
-        Arc::clone(&self.state.package)
+        Arc::clone(&self.package)
     }
 
     pub(crate) fn base_package(&self) -> Arc<CapturedPackage> {
-        Arc::clone(&self.state.base_package)
+        Arc::clone(&self.base_package)
     }
 
     pub(crate) fn objects_clone(&self) -> Arc<Objects> {
-        Arc::clone(&self.state.objects)
+        Arc::clone(&self.objects)
     }
 
     pub(crate) fn changed(&self) -> bool {
-        self.state.changed
+        self.changed
     }
 
     pub(crate) fn layout(&self) -> SectorLayoutPolicy {
-        self.state.layout
+        self.layout
     }
 }
