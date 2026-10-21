@@ -323,4 +323,35 @@ independent reopen. Existing relationship tests cover absent versus explicit
 empty members and reopened lexical restoration; the XLSB lexical root test
 also replays and inverts a reopened raw relationship edit byte-for-byte.
 
+## 8. Dependency-closure projection publication
+
+Raw OPC commits, staged edit commits, and `apply_opc` now use the same
+`PartPatch::projection_unchanged` proof before publishing a candidate. Root
+relationship edits always take the existing full-reparse path. For part
+deltas, the proof lowercases the changed part names and walks the internal
+relationship closure from both the recorded base and the candidate. External
+relationships are outside the workbook projection; malformed or dangling
+internal targets fail the proof conservatively and retain the full-reparse
+path. A manifest-only or dependency-disjoint part patch still runs the normal
+patch, manifest, signature, source-limit, and lightweight workbook checks, then
+publishes an unparsed package so the workbook projection is not decoded twice.
+Any closure-affecting change continues through
+`reparse_candidate_retaining_projection`, preserving the validating open's
+projection and tolerance policy.
+
+The new `opc` tests cover an unreferenced part through forward replay,
+independent reopen, inverse replay, and independent inverse reopen. A second
+test adds a transitively referenced part and verifies that the raw commit,
+forward replay, inverse replay, and both reopened routes remain eagerly
+validated. These tests compare a name-sorted semantic OPC inventory and exact
+part bytes, content-types publication bytes, and retained relationship bytes;
+they intentionally do not treat ZIP member ordering or writer metadata as
+part-content differences.
+
+Focused validation passed 12 `opc` tests and the full XLSB library suite (740
+tests). `cargo fmt --all -- --check` and `git diff --check` also pass. A fresh
+paired performance measurement of the dependency-disjoint publication path is
+still pending; the earlier structural and inverse replay measurements remain
+preliminary and are not used as acceptance evidence for this optimization.
+
 [0351]: 0351-api-contract.md

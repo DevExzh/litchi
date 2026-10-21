@@ -119,8 +119,10 @@ impl Edit {
         self.staged = None;
     }
 
-    /// Validate the staged graph as a complete workbook and publish it to a
-    /// new package. An unchanged graph returns the source package.
+    /// Validate the staged graph and publish it to a new package. A change
+    /// outside the package relationship closure keeps the workbook projection
+    /// lazy; a change that can affect that closure is reparsed before return.
+    /// An unchanged graph returns the source package.
     ///
     /// # Errors
     ///
@@ -139,7 +141,11 @@ impl Edit {
         }
         staged.validate_signature_edit_from(self.source.opc_package())?;
         crate::Workbook::validate_edit_candidate(&staged)?;
-        let package = self.source.reparse_candidate_retaining_projection(staged)?;
+        let package = if patch.projection_unchanged(self.source.opc_package(), &staged) {
+            self.source.with_unparsed(staged)
+        } else {
+            self.source.reparse_candidate_retaining_projection(staged)?
+        };
         Ok(Commit::new((package, patch)))
     }
 }
@@ -148,7 +154,7 @@ impl Edit {
 mod tests {
     use std::sync::Arc;
 
-    use litchi_opc::{BlobPart, PackURI, TargetMode};
+    use litchi_opc::{BlobPart, PackURI, Relationships, TargetMode};
 
     use crate::Package;
     use crate::package::PackageError;
@@ -159,6 +165,151 @@ mod tests {
             "application/octet-stream".into(),
             vec![1, 2, 3],
         )
+    }
+
+    type RelationshipSnapshot = (String, String, String, bool);
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct PartSnapshot {
+        name: String,
+        content_type: String,
+        blob: Vec<u8>,
+        relationships: Vec<RelationshipSnapshot>,
+        retained_relationships: Option<(Vec<u8>, bool)>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct GraphSnapshot {
+        content_types_publication: Vec<u8>,
+        content_types_source: Option<Vec<u8>>,
+        root_relationships: Vec<RelationshipSnapshot>,
+        retained_root_relationships: Option<(Vec<u8>, bool)>,
+        parts: Vec<PartSnapshot>,
+    }
+
+    fn relationship_snapshot(relationships: &Relationships) -> Vec<RelationshipSnapshot> {
+        let mut snapshot = relationships
+            .iter()
+            .map(|relationship| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.reltype().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.is_external(),
+                )
+            })
+            .collect::<Vec<_>>();
+        snapshot.sort();
+        snapshot
+    }
+
+    fn retained_relationship_snapshot(
+        opc: &litchi_opc::OpcPackage,
+        owner: &PackURI,
+    ) -> Option<(Vec<u8>, bool)> {
+        opc.retained_relationships_xml(owner)
+            .unwrap()
+            .map(|(bytes, member_present)| (bytes.as_slice().to_vec(), member_present))
+    }
+
+    /// Compare semantic part contents and every retained source member while
+    /// deliberately ignoring ZIP member order and writer metadata.
+    fn graph_snapshot(package: &Package) -> GraphSnapshot {
+        let opc = package.opc_package();
+        let mut parts = opc
+            .iter_parts()
+            .map(|metadata| {
+                let part = opc.get_part(metadata.partname()).unwrap();
+                PartSnapshot {
+                    name: metadata.partname().as_str().to_owned(),
+                    content_type: metadata.content_type().to_owned(),
+                    blob: part.blob().to_vec(),
+                    relationships: relationship_snapshot(metadata.rels()),
+                    retained_relationships: retained_relationship_snapshot(
+                        opc,
+                        metadata.partname(),
+                    ),
+                }
+            })
+            .collect::<Vec<_>>();
+        parts.sort_by(|left, right| left.name.cmp(&right.name));
+        let root = PackURI::new("/").unwrap();
+        GraphSnapshot {
+            content_types_publication: opc
+                .source_content_types_with_limits(opc.read_limits())
+                .unwrap()
+                .bytes()
+                .to_vec(),
+            content_types_source: opc
+                .content_types_source_bytes()
+                .map(|bytes| bytes.as_slice().to_vec()),
+            root_relationships: relationship_snapshot(opc.rels()),
+            retained_root_relationships: retained_relationship_snapshot(opc, &root),
+            parts,
+        }
+    }
+
+    fn assert_bytes_equal(label: &str, left: &[u8], right: &[u8]) {
+        if left == right {
+            return;
+        }
+        let first_difference = left
+            .iter()
+            .zip(right)
+            .position(|(left, right)| left != right);
+        panic!(
+            "{label} differs: left_len={}, right_len={}, first_difference={first_difference:?}",
+            left.len(),
+            right.len()
+        );
+    }
+
+    fn assert_graph_equal(left: &Package, right: &Package) {
+        let left = graph_snapshot(left);
+        let right = graph_snapshot(right);
+        assert_bytes_equal(
+            "content-types publication",
+            &left.content_types_publication,
+            &right.content_types_publication,
+        );
+        if let (Some(left), Some(right)) = (
+            left.content_types_source.as_ref(),
+            right.content_types_source.as_ref(),
+        ) {
+            assert_bytes_equal("content-types source", left, right);
+        }
+        assert_eq!(left.root_relationships, right.root_relationships);
+        if let (Some((left, left_present)), Some((right, right_present))) = (
+            left.retained_root_relationships.as_ref(),
+            right.retained_root_relationships.as_ref(),
+        ) {
+            assert_eq!(left_present, right_present);
+            assert_bytes_equal("root relationships source", left, right);
+        }
+        assert_eq!(left.parts.len(), right.parts.len());
+        for (part_left, part_right) in left.parts.iter().zip(&right.parts) {
+            assert_eq!(
+                (part_left.name.as_str(), part_left.content_type.as_str()),
+                (part_right.name.as_str(), part_right.content_type.as_str())
+            );
+            assert_bytes_equal(
+                &format!("part {}", part_left.name),
+                &part_left.blob,
+                &part_right.blob,
+            );
+            assert_eq!(part_left.relationships, part_right.relationships);
+            if let (Some((left, left_present)), Some((right, right_present))) = (
+                part_left.retained_relationships.as_ref(),
+                part_right.retained_relationships.as_ref(),
+            ) {
+                assert_eq!(left_present, right_present);
+                assert_bytes_equal(
+                    &format!("{} relationships source", part_left.name),
+                    left,
+                    right,
+                );
+            }
+        }
     }
 
     fn lexical_content_types_edit(
@@ -248,6 +399,97 @@ mod tests {
             after.apply_opc(&patch),
             Err(PackageError::PatchConflict { .. })
         ));
+    }
+
+    #[test]
+    fn an_unreferenced_part_defers_projection_and_replays_after_reopen() {
+        let package = Package::new().unwrap();
+        let before_bytes = package.to_bytes().unwrap();
+        let mut edit = package.edit_opc().unwrap();
+        edit.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/unreferenced.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        assert!(!after.projection_cached());
+
+        let after_bytes = after.to_bytes().unwrap();
+        assert!(after.workbook().is_ok());
+        assert!(after.projection_cached());
+
+        let reopened_before = Package::from_bytes(&before_bytes).unwrap();
+        let replayed = reopened_before.apply_opc(&patch).unwrap().into_package();
+        assert!(!replayed.projection_cached());
+        assert_graph_equal(&replayed, &after);
+        assert!(replayed.workbook().is_ok());
+
+        let reopened_after = Package::from_bytes(&after_bytes).unwrap();
+        let restored = reopened_after
+            .apply_opc(&patch.inverse())
+            .unwrap()
+            .into_package();
+        assert!(!restored.projection_cached());
+        assert_graph_equal(&restored, &package);
+        assert!(restored.workbook().is_ok());
+    }
+
+    #[test]
+    fn a_transitively_referenced_part_keeps_eager_projection_validation() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            let name = PackURI::new("/custom/transitive-root.bin")?;
+            opc.add_part(Box::new(raw_part(name.as_str())));
+            opc.rels_mut().try_add_relationship(
+                "urn:litchi:test".into(),
+                name.as_str().into(),
+                "rIdTransitiveRoot".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+        assert!(source.projection_cached());
+
+        let mut edit = source.edit_opc().unwrap();
+        edit.update(|opc| {
+            let child = PackURI::new("/custom/transitive-child.bin")?;
+            opc.add_part(Box::new(raw_part(child.as_str())));
+            let parent = PackURI::new("/custom/transitive-root.bin")?;
+            opc.get_part_mut(&parent)?.rels_mut().try_add_relationship(
+                "urn:litchi:test".into(),
+                child.as_str().into(),
+                "rIdTransitiveChild".into(),
+                TargetMode::Internal,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        assert!(after.projection_cached());
+
+        let replayed = source.apply_opc(&patch).unwrap().into_package();
+        assert!(replayed.projection_cached());
+        assert_graph_equal(&replayed, &after);
+
+        let reopened = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+        let reopened_replayed = reopened.apply_opc(&patch).unwrap().into_package();
+        assert!(reopened_replayed.projection_cached());
+        assert_graph_equal(&reopened_replayed, &after);
+
+        let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
+        assert!(restored.projection_cached());
+        assert_graph_equal(&restored, &source);
+
+        let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        let reopened_restored = reopened_after
+            .apply_opc(&patch.inverse())
+            .unwrap()
+            .into_package();
+        assert!(reopened_restored.projection_cached());
+        assert_graph_equal(&reopened_restored, &source);
     }
 
     #[test]

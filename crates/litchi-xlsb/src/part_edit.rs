@@ -622,6 +622,44 @@ impl PartPatch {
         }
     }
 
+    /// Whether the patch leaves the workbook projection's dependency closure
+    /// unchanged.
+    ///
+    /// A raw edit may add, remove, or rewrite an OPC part that is not reachable
+    /// from any package relationship.  Such a change still needs the normal
+    /// patch-state, manifest, signature, and source-limit checks, but it cannot
+    /// alter the typed workbook.  Keeping the projection lazy for that narrow
+    /// case avoids parsing the same workbook graph twice when a caller only
+    /// needs to publish an opaque part.  The closure is walked in both graphs:
+    /// a recipient may have an unrelated relationship that makes a previously
+    /// inert changed part reachable, and that must force the normal reparse.
+    ///
+    /// A malformed or dangling relationship is treated conservatively as
+    /// requiring a reparse.  The full workbook/OPC validation remains the
+    /// authority for that case.
+    pub(crate) fn projection_unchanged(&self, before: &OpcPackage, after: &OpcPackage) -> bool {
+        // A root relationship edit can select a different workbook or expose
+        // a previously unreachable dependency.  Keep the existing full
+        // validation path even when the lexical relationship bytes happen to
+        // describe the same typed edges.
+        if self.root.is_some() {
+            return false;
+        }
+
+        let mut changed = BTreeSet::new();
+        for delta in &self.deltas {
+            changed.insert(delta.name.as_str().to_ascii_lowercase());
+        }
+        // A manifest-only patch changes source publication bytes, not the
+        // already typed part graph.  The replacement is still restored and
+        // bounded by `apply_graph`; no workbook dependency was changed.
+        if changed.is_empty() {
+            return true;
+        }
+
+        closure_is_disjoint(before, &changed) && closure_is_disjoint(after, &changed)
+    }
+
     /// Attach the manifest views of both sides to a changed patch.
     fn with_manifests(
         mut self,
@@ -840,13 +878,20 @@ impl PartPatch {
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
-    /// before state. An empty patch returns `package`.
+    /// before state. Dependency-disjoint changes keep the workbook projection
+    /// lazy; changes in the relationship closure are reparsed. An empty patch
+    /// returns `package`.
     pub(crate) fn apply(&self, package: &Package) -> Result<Package> {
         if self.is_noop() {
             return Ok(package.clone());
         }
         let target = self.apply_graph(package.opc_package())?;
-        package.reparse_candidate_retaining_projection(target)
+        if self.projection_unchanged(package.opc_package(), &target) {
+            Workbook::validate_edit_candidate(&target)?;
+            Ok(package.with_unparsed(target))
+        } else {
+            package.reparse_candidate_retaining_projection(target)
+        }
     }
 
     /// Replay onto `package` and publish the result without validating its
@@ -925,6 +970,62 @@ impl PartPatch {
         }
         Ok(target)
     }
+}
+
+/// Prove that no part in `changed` is reachable from the package's
+/// relationships.
+///
+/// This is deliberately metadata-only: relationship closure is enough for the
+/// projection dependency proof and avoids decoding opaque payloads while a
+/// patch is being published.  Returning `false` means that the graph cannot
+/// be proved safe to leave unparsed, either because a changed part is reachable
+/// or because a malformed/dangling relationship prevents a complete proof.
+/// The walk stops as soon as a changed part is found, which keeps the common
+/// closure-affecting edit on the existing full-reparse path without paying for
+/// the rest of the graph.
+fn closure_is_disjoint(package: &OpcPackage, changed: &BTreeSet<String>) -> bool {
+    let mut reachable = BTreeSet::new();
+    let mut queue = Vec::new();
+    for relationship in package.rels().iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        let Ok(target) = relationship.target_partname() else {
+            return false;
+        };
+        let key = target.as_str().to_ascii_lowercase();
+        if changed.contains(&key) {
+            return false;
+        }
+        if reachable.insert(key) {
+            queue.push(target);
+        }
+    }
+
+    while let Some(name) = queue.pop() {
+        if changed.contains(&name.as_str().to_ascii_lowercase()) {
+            return false;
+        }
+        let Some(part) = package.part_metadata(&name) else {
+            // The source reader tolerates a dangling relationship and records
+            // the repair.  A changed candidate must still go through the full
+            // reparse so that the retained tolerance policy remains correct.
+            return false;
+        };
+        for relationship in part.rels().iter() {
+            if relationship.is_external() {
+                continue;
+            }
+            let Ok(target) = relationship.target_partname() else {
+                return false;
+            };
+            let key = target.as_str().to_ascii_lowercase();
+            if reachable.insert(key) {
+                queue.push(target);
+            }
+        }
+    }
+    true
 }
 
 /// How a changed commit publishes its staged graph.
@@ -1106,6 +1207,12 @@ impl Staged {
         }
         crate::signature_policy::ensure_unsigned(&staged)?;
         let package = match self.publication {
+            Publication::Reparse
+                if patch.projection_unchanged(self.source.opc_package(), &staged) =>
+            {
+                Workbook::validate_edit_candidate(&staged)?;
+                self.source.with_unparsed(staged)
+            },
             Publication::Reparse => self.source.reparse_candidate_retaining_projection(staged)?,
             Publication::Unparsed => self.source.with_unparsed(staged),
         };

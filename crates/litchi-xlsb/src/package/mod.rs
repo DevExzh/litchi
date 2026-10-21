@@ -413,10 +413,10 @@ impl Package {
 
     /// The read-only workbook projection of this package.
     ///
-    /// Every validating open and every commit already parsed it, so this
-    /// borrows that projection; a package adopted without validation
-    /// (`From<OpcPackage>`) parses it once on first use. Clones of a package
-    /// share it.
+    /// A validating open and commits whose dependency closure changed already
+    /// parsed it, so this borrows that projection. A dependency-disjoint raw
+    /// commit, or a package adopted without validation (`From<OpcPackage>`),
+    /// parses it once on first use. Clones of a package share it.
     ///
     /// # Errors
     ///
@@ -429,6 +429,11 @@ impl Package {
         let workbook = self.materialize_workbook()?;
         let workbook = self.5.0.get_or_init(|| Arc::new(workbook));
         Ok(workbook)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn projection_cached(&self) -> bool {
+        self.5.0.get().is_some()
     }
 
     /// The shared workbook projection, parsed on first use.
