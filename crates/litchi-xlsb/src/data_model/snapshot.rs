@@ -42,11 +42,11 @@ impl Snapshot {
         )?;
         let workbook = package.main_document_part()?;
         if workbook.blob().len() > limits.max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Data Model Workbook bytes",
-                actual: workbook.blob().len(),
-                maximum: limits.max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::data_model::LimitKind::WorkbookBytes,
+                workbook.blob().len(),
+                limits.max_part_bytes,
+            ));
         }
         let parsed = codec::parse_workbook(workbook.blob(), limits)?;
         let part = inspect_model_part(package)?;
@@ -58,11 +58,11 @@ impl Snapshot {
             let actual = connections
                 .as_ref()
                 .map_or(0, |value| value.connections.len());
-            return Err(Error::LimitExceeded {
-                resource: "Data Model External Data Connections",
+            return Err(Error::limit(
+                crate::data_model::LimitKind::Connections,
                 actual,
-                maximum: limits.max_connections,
-            });
+                limits.max_connections,
+            ));
         }
         let connection_source = crate::package::connections::package::capture_source(package)?;
         let model = match (parsed.definition, part) {

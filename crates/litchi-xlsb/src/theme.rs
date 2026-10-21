@@ -251,11 +251,11 @@ pub(crate) fn read_source(package: &SourceBackedPackage, limits: Limits) -> Resu
             resource: "Theme XML limit",
         })?;
     if declared > maximum {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: usize::try_from(declared).unwrap_or(usize::MAX),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            usize::try_from(declared).unwrap_or(usize::MAX),
+            limits.max_xml_bytes,
+        ));
     }
     let source = part.data()?;
     let (theme, family) = parse_theme_content(source.as_bytes(), limits)?;
@@ -662,22 +662,22 @@ fn validate_model(theme: &Theme, limits: Limits) -> Result<()> {
     };
     let xml = codec::encode_part(name, &theme.colors, &theme.fonts)?;
     if xml.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "generated Theme XML bytes",
-            actual: xml.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     Ok(())
 }
 
 fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
     if xml.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: xml.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = Reader::from_reader(xml);
     let mut stack = Vec::<Vec<u8>>::new();
@@ -692,38 +692,30 @@ fn bounded_xml_preflight(xml: &[u8], limits: Limits) -> Result<()> {
                     resource: "Theme XML node count",
                 })?;
                 if nodes > limits.max_nodes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML nodes",
-                        actual: nodes,
-                        maximum: limits.max_nodes,
-                    });
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
                 if stack.len() >= limits.max_depth {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML depth",
-                        actual: stack.len() + 1,
-                        maximum: limits.max_depth,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 stack.push(element.local_name().as_ref().to_vec());
             },
             Event::Empty(_) => {
                 if stack.len() >= limits.max_depth {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML depth",
-                        actual: stack.len() + 1,
-                        maximum: limits.max_depth,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 nodes = nodes.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "Theme XML node count",
                 })?;
                 if nodes > limits.max_nodes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Theme XML nodes",
-                        actual: nodes,
-                        maximum: limits.max_nodes,
-                    });
+                    return Err(Error::limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
             },
             Event::End(element) => {
@@ -819,11 +811,11 @@ fn rewrite_base_source(
         previous_end = replacement.range.end;
     }
     if output_len > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "patched Theme XML bytes",
-            actual: output_len,
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            LimitKind::XmlBytes,
+            output_len,
+            limits.max_xml_bytes,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -886,11 +878,7 @@ fn strict_fragment(mut fragment: Vec<u8>, strict: bool) -> Result<Vec<u8>> {
 
 fn source_namespace(xml: &[u8]) -> Result<Option<&'static str>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(Error::LimitExceeded {
-            resource: "Theme XML bytes",
-            actual: xml.len(),
-            maximum: MAX_XML_BYTES,
-        });
+        return Err(Error::limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let mut reader = quick_xml::reader::NsReader::from_reader(xml);
     reader.resolver_mut().set_max_declarations_per_element(256);

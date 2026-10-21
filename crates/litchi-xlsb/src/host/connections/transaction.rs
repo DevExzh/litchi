@@ -93,12 +93,24 @@ impl Snapshot {
     }
 }
 
-/// A bounded dimension of this family.
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
     /// Connections of one catalog.
     Connections,
+    /// Bytes of the External Data Connections part.
+    PartBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Connections => "External Data Connections",
+            Self::PartBytes => "External Data Connections bytes",
+        })
+    }
 }
 
 /// A staged connections edit. Dropping it discards it.

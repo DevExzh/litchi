@@ -832,11 +832,11 @@ fn encode_new_theme(
         )?;
     }
     if source.len() > limits.max_xml_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "generated Theme XML bytes",
-            actual: source.len(),
-            maximum: limits.max_xml_bytes,
-        });
+        return Err(Error::limit(
+            crate::theme::LimitKind::XmlBytes,
+            source.len(),
+            limits.max_xml_bytes,
+        ));
     }
     Ok(source)
 }

@@ -60,15 +60,6 @@ pub enum Error {
         /// Found length
         found: usize,
     },
-    /// A format-owned resource exceeded its explicit finite caller limit.
-    LimitExceeded {
-        /// Resource whose caller ceiling was crossed.
-        resource: &'static str,
-        /// Observed or requested amount.
-        actual: usize,
-        /// Configured maximum.
-        maximum: usize,
-    },
     /// End of stream reached unexpectedly
     UnexpectedEndOfStream(String),
     /// Invalid formula
@@ -202,6 +193,22 @@ pub enum LimitKind {
     CellValues(crate::cell_values::LimitKind),
     /// Raw OPC edits ([`crate::opc::LimitKind`]).
     Opc(crate::opc::LimitKind),
+    /// Worksheet binary indexes ([`crate::binary_index::LimitKind`]).
+    BinaryIndex(crate::binary_index::LimitKind),
+    /// The Calculation Chain family ([`crate::calculation_chain::LimitKind`]).
+    CalculationChain(crate::calculation_chain::LimitKind),
+    /// The External Data Connections family ([`crate::package::connections::LimitKind`]).
+    Connections(crate::package::connections::LimitKind),
+    /// The Custom Data family ([`crate::custom_data::LimitKind`]).
+    CustomData(crate::custom_data::LimitKind),
+    /// The Data Model family ([`crate::data_model::LimitKind`]).
+    DataModel(crate::data_model::LimitKind),
+    /// The Theme family ([`crate::theme::LimitKind`]).
+    Theme(crate::theme::LimitKind),
+    /// The Volatile Dependencies family ([`crate::volatile_dependencies::LimitKind`]).
+    VolatileDependencies(crate::volatile_dependencies::LimitKind),
+    /// Source-backed workbook indexing ([`crate::workbook::LimitKind`]).
+    Workbook(crate::workbook::LimitKind),
 }
 
 impl fmt::Display for LimitKind {
@@ -209,6 +216,14 @@ impl fmt::Display for LimitKind {
         match self {
             Self::CellValues(kind) => fmt::Display::fmt(kind, f),
             Self::Opc(crate::opc::LimitKind::Parts) => f.write_str("changed package parts"),
+            Self::BinaryIndex(kind) => fmt::Display::fmt(kind, f),
+            Self::CalculationChain(kind) => fmt::Display::fmt(kind, f),
+            Self::Connections(kind) => fmt::Display::fmt(kind, f),
+            Self::CustomData(kind) => fmt::Display::fmt(kind, f),
+            Self::DataModel(kind) => fmt::Display::fmt(kind, f),
+            Self::Theme(kind) => fmt::Display::fmt(kind, f),
+            Self::VolatileDependencies(kind) => fmt::Display::fmt(kind, f),
+            Self::Workbook(kind) => fmt::Display::fmt(kind, f),
         }
     }
 }
@@ -216,6 +231,54 @@ impl fmt::Display for LimitKind {
 impl From<crate::cell_values::LimitKind> for LimitKind {
     fn from(kind: crate::cell_values::LimitKind) -> Self {
         Self::CellValues(kind)
+    }
+}
+
+impl From<crate::binary_index::LimitKind> for LimitKind {
+    fn from(kind: crate::binary_index::LimitKind) -> Self {
+        Self::BinaryIndex(kind)
+    }
+}
+
+impl From<crate::calculation_chain::LimitKind> for LimitKind {
+    fn from(kind: crate::calculation_chain::LimitKind) -> Self {
+        Self::CalculationChain(kind)
+    }
+}
+
+impl From<crate::package::connections::LimitKind> for LimitKind {
+    fn from(kind: crate::package::connections::LimitKind) -> Self {
+        Self::Connections(kind)
+    }
+}
+
+impl From<crate::custom_data::LimitKind> for LimitKind {
+    fn from(kind: crate::custom_data::LimitKind) -> Self {
+        Self::CustomData(kind)
+    }
+}
+
+impl From<crate::data_model::LimitKind> for LimitKind {
+    fn from(kind: crate::data_model::LimitKind) -> Self {
+        Self::DataModel(kind)
+    }
+}
+
+impl From<crate::theme::LimitKind> for LimitKind {
+    fn from(kind: crate::theme::LimitKind) -> Self {
+        Self::Theme(kind)
+    }
+}
+
+impl From<crate::volatile_dependencies::LimitKind> for LimitKind {
+    fn from(kind: crate::volatile_dependencies::LimitKind) -> Self {
+        Self::VolatileDependencies(kind)
+    }
+}
+
+impl From<crate::workbook::LimitKind> for LimitKind {
+    fn from(kind: crate::workbook::LimitKind) -> Self {
+        Self::Workbook(kind)
     }
 }
 
@@ -268,14 +331,6 @@ impl fmt::Display for Error {
             Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
-            Error::LimitExceeded {
-                resource,
-                actual,
-                maximum,
-            } => write!(
-                f,
-                "{resource} limit exceeded: actual {actual}, maximum {maximum}"
-            ),
             Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
@@ -393,7 +448,6 @@ impl std::error::Error for Error {
             Error::InvalidRecordType(_)
             | Error::UnexpectedRecord { .. }
             | Error::InvalidLength { .. }
-            | Error::LimitExceeded { .. }
             | Error::UnexpectedEndOfStream(_)
             | Error::InvalidFormula(_)
             | Error::InvalidCellReference(_)
@@ -639,8 +693,7 @@ impl From<Error> for litchi_core::sheet::Error {
                 "the XLSB workbook uses an unsupported feature",
             ),
             Error::Refused(refusal) => Self::Refused(refusal),
-            Error::LimitExceeded { .. }
-            | Error::Limit { .. }
+            Error::Limit { .. }
             | Error::InvalidLimit { .. }
             | Error::ExternalLinkLimitExceeded { .. }
             | Error::Allocation { .. }

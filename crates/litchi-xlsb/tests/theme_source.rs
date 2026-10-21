@@ -174,8 +174,8 @@ fn theme_byte_limit_is_checked_before_payload_reads() {
     let before = source.reads.load(Ordering::SeqCst);
     assert!(matches!(
         below.theme(),
-        Err(PackageError::LimitExceeded {
-            actual: 7_646,
+        Err(PackageError::Limit {
+            observed: 7_646,
             maximum: 7_645,
             ..
         })

@@ -27,7 +27,7 @@ pub(crate) fn preflight_metadata(
 ) -> Result<()> {
     if package.part_count() > limits.max_graph_parts {
         return Err(limit(
-            "Data Model graph parts",
+            crate::data_model::LimitKind::GraphParts,
             package.part_count(),
             limits.max_graph_parts,
         ));
@@ -49,7 +49,7 @@ pub(crate) fn preflight_metadata(
             let actual = package.get_part(part.partname())?.blob().len();
             if actual > limits.max_part_bytes {
                 return Err(limit(
-                    "Data Model payload bytes",
+                    crate::data_model::LimitKind::PayloadBytes,
                     actual,
                     limits.max_part_bytes,
                 ));
@@ -59,7 +59,7 @@ pub(crate) fn preflight_metadata(
             let actual = package.get_part(part.partname())?.blob().len();
             if actual > limits.max_connection_bytes {
                 return Err(limit(
-                    "Data Model External Data Connections bytes",
+                    crate::data_model::LimitKind::ConnectionsBytes,
                     actual,
                     limits.max_connection_bytes,
                 ));
@@ -101,16 +101,20 @@ pub(crate) fn opc_capture_limits(
 ) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 || limits.max_metadata_bytes == 0 {
         return Err(limit(
-            "Data Model source capture bytes",
+            crate::data_model::LimitKind::SourceBytes,
             0,
             limits.max_part_bytes.max(limits.max_metadata_bytes),
         ));
     }
     if limits.max_graph_parts == 0 {
-        return Err(limit("Data Model graph parts", 1, 0));
+        return Err(limit(crate::data_model::LimitKind::GraphParts, 1, 0));
     }
     if limits.max_graph_relationships == 0 {
-        return Err(limit("Data Model graph relationships", 1, 0));
+        return Err(limit(
+            crate::data_model::LimitKind::GraphRelationships,
+            1,
+            0,
+        ));
     }
     // OPC defaults are ordinary safety policy, not hard ceilings. The Data
     // Model limits have already been validated against this feature's finite
@@ -172,7 +176,7 @@ fn preflight_relationships(
             })?;
         if *relationship_count > limits.max_graph_relationships {
             return Err(limit(
-                "Data Model graph relationships",
+                crate::data_model::LimitKind::GraphRelationships,
                 *relationship_count,
                 limits.max_graph_relationships,
             ));
@@ -238,7 +242,11 @@ fn checked_metadata_add(
         .checked_add(addition)
         .ok_or(Error::CapacityOverflow { resource })?;
     if total > limits.max_metadata_bytes {
-        return Err(limit(resource, total, limits.max_metadata_bytes));
+        return Err(limit(
+            super::LimitKind::MetadataBytes,
+            total,
+            limits.max_metadata_bytes,
+        ));
     }
     Ok(total)
 }
@@ -271,10 +279,10 @@ fn preflight_xml_attribute(key: &str, value: &str, maximum: usize) -> Result<()>
     Ok(())
 }
 
-fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
-        resource,
-        actual,
+const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::package::LimitKind::DataModel(kind),
+        observed: actual,
         maximum,
     }
 }

@@ -782,16 +782,19 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         .apply_custom_data(&commit.patch().inverse())
         .map(Commit::into_package);
     match inverse {
-        Err(PackageError::LimitExceeded {
-            resource,
-            actual,
+        Err(PackageError::Limit {
+            kind,
+            observed,
             maximum,
         }) => {
-            assert!(
-                resource.contains("temporary"),
-                "oversized restoration should name temporary resource: {resource}"
+            assert_eq!(
+                kind,
+                litchi_xlsb::package::LimitKind::CustomData(
+                    litchi_xlsb::custom_data::LimitKind::TemporaryBytes
+                ),
+                "oversized restoration should name the temporary budget"
             );
-            assert!(actual > maximum);
+            assert!(observed > maximum);
         },
         other => panic!("oversized source restoration unexpectedly succeeded: {other:?}"),
     }
@@ -1074,10 +1077,7 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
     under
         .rename(StorageSelector::Index(0), long_id)
         .expect("stage one-under connections rename");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 
     let under_properties = Limits::new()
@@ -1091,10 +1091,7 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
     under
         .rename(StorageSelector::Index(0), long_id)
         .expect("stage one-under properties rename");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 
     let temporary_source_cap = Limits::new()
@@ -1110,7 +1107,7 @@ fn rename_growth_accepts_exact_wire_and_xml_caps_and_rejects_one_under() {
         .expect("stage source-sized temporary rename");
     assert!(matches!(
         temporary.commit(),
-        Err(PackageError::LimitExceeded { .. })
+        Err(PackageError::Limit { .. })
     ));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 }
@@ -1180,10 +1177,7 @@ fn final_output_cap_counts_mixed_shrink_and_growth_without_overcharging() {
             b"0123456789abcdefghijklmnopqrstuv0123456789".to_vec(),
         )
         .expect("stage one-under growing payload");
-    assert!(matches!(
-        under.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(under.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
 }
 
@@ -1238,7 +1232,7 @@ fn relationship_xml_cap_includes_inserted_edges_at_exact_boundary() {
         .expect("stage one-under relationship insertion");
     let under_result = under.commit();
     assert!(
-        matches!(under_result, Err(PackageError::LimitExceeded { .. })),
+        matches!(under_result, Err(PackageError::Limit { .. })),
         "one-under relationship cap unexpectedly admitted: exact={exact}, source_workbook={source_workbook_relationships}, candidate_workbook={candidate_workbook_relationships}, result={under_result:?}"
     );
     assert_eq!(package_bytes(&fixture.package), source_before_failure);
@@ -1275,8 +1269,8 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
                 litchi_xlsb::SemanticLimits::new().custom_data(Limits::new().with_max_storages(1))
             )
             .custom_data(),
-        Err(PackageError::LimitExceeded {
-            actual: 2,
+        Err(PackageError::Limit {
+            observed: 2,
             maximum: 1,
             ..
         })
@@ -1290,9 +1284,11 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
         .expect("one-under storage cardinality admits source");
     assert!(matches!(
         one_under.insert(CustomData::new("uid-A", b"one-under".to_vec())),
-        Err(PackageError::LimitExceeded {
-            resource: "Custom Data storages",
-            actual: 2,
+        Err(PackageError::Limit {
+            kind: litchi_xlsb::package::LimitKind::CustomData(
+                litchi_xlsb::custom_data::LimitKind::Storages
+            ),
+            observed: 2,
             maximum: 1,
         })
     ));
@@ -1365,7 +1361,7 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
             .package
             .with_semantic_limits(litchi_xlsb::SemanticLimits::new().custom_data(connections_limit))
             .custom_data(),
-        Err(PackageError::LimitExceeded { .. })
+        Err(PackageError::Limit { .. })
     ));
 
     let uid_limit = Limits::new().with_max_uid_units(3);
@@ -1392,10 +1388,7 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
         )
         .expect("staging does not publish output");
     let before_staged = limited.storages()[0].data().to_vec();
-    assert!(matches!(
-        limited.commit(),
-        Err(PackageError::LimitExceeded { .. })
-    ));
+    assert!(matches!(limited.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(before_staged, b"staged within transaction");
 
     let (cancellation_source, context) = managed_context();

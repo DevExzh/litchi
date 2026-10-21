@@ -512,9 +512,9 @@ fn row_resource_limits_are_limit_exceeded() {
     #[cfg(feature = "xlsb")]
     {
         check(
-            litchi_xlsb::package::PackageError::LimitExceeded {
-                resource: "cells",
-                actual: 11,
+            litchi_xlsb::package::PackageError::Limit {
+                kind: litchi_xlsb::cell_values::LimitKind::Cells.into(),
+                observed: 11,
                 maximum: 10,
             }
             .into(),

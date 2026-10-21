@@ -308,11 +308,11 @@ impl Edit {
         self.validate_connection_closure(definition)?;
         validate_payload(&part)?;
         if part.bytes.len() > self.before.limits().max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Data Model payload bytes",
-                actual: part.bytes.len(),
-                maximum: self.before.limits().max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::data_model::LimitKind::PayloadBytes,
+                part.bytes.len(),
+                self.before.limits().max_part_bytes,
+            ));
         }
         if self
             .payload
@@ -341,11 +341,11 @@ impl Edit {
                 self.validate_connection_closure(&model.definition)?;
                 validate_payload(&model.part)?;
                 if model.part.bytes.len() > self.before.limits().max_part_bytes {
-                    return Err(Error::LimitExceeded {
-                        resource: "Data Model payload bytes",
-                        actual: model.part.bytes.len(),
-                        maximum: self.before.limits().max_part_bytes,
-                    });
+                    return Err(Error::limit(
+                        crate::data_model::LimitKind::PayloadBytes,
+                        model.part.bytes.len(),
+                        self.before.limits().max_part_bytes,
+                    ));
                 }
                 validate_time_groupings(model.part.bytes(), &model.definition.time_groupings)?;
                 ensure_opaque_identity_compatible(
@@ -583,11 +583,11 @@ fn rename_xldm_table_payload(
         ));
     }
     if patch.after().len() > max_part_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "Data Model payload bytes",
-            actual: patch.after().len(),
-            maximum: max_part_bytes,
-        });
+        return Err(Error::limit(
+            crate::data_model::LimitKind::PayloadBytes,
+            patch.after().len(),
+            max_part_bytes,
+        ));
     }
     Ok(patch.after().to_vec())
 }
@@ -742,11 +742,11 @@ fn validate_table_rename_name(
         ));
     }
     if new_name.len() > MAX_XLDM_TABLE_NAME_BYTES {
-        return Err(Error::LimitExceeded {
-            resource: "Data Model table name bytes",
-            actual: new_name.len(),
-            maximum: MAX_XLDM_TABLE_NAME_BYTES,
-        });
+        return Err(Error::limit(
+            crate::data_model::LimitKind::TableNameBytes,
+            new_name.len(),
+            MAX_XLDM_TABLE_NAME_BYTES,
+        ));
     }
     let folded = new_name.to_lowercase();
     if definition
@@ -800,11 +800,7 @@ fn map_xldm_rename_error(context: &str, error: Xldm140RenameError) -> Error {
             let Some((actual, maximum)) = error.limit_bounds() else {
                 return invalid(message);
             };
-            Error::LimitExceeded {
-                resource: error.limit_resource().unwrap_or("Data Model payload bytes"),
-                actual,
-                maximum,
-            }
+            Error::limit(super::LimitKind::Model, actual, maximum)
         },
         Xldm140RenameErrorKind::Allocation => {
             let Some(source) = error.allocation_source() else {
@@ -831,14 +827,8 @@ fn map_xldm_olap_proof_error(context: &str, error: litchi_xldm::OlapProofError) 
             Error::UnsupportedFeature(format!("{context}: XLDM OLAP profile is unsupported"))
         },
         litchi_xldm::OlapProofError::LimitExceeded {
-            resource,
-            actual,
-            maximum,
-        } => Error::LimitExceeded {
-            resource,
-            actual,
-            maximum,
-        },
+            actual, maximum, ..
+        } => Error::limit(super::LimitKind::Model, actual, maximum),
         litchi_xldm::OlapProofError::Invalid { path, detail }
         | litchi_xldm::OlapProofError::Unproven { path, detail } => {
             invalid(format!("{context}: {path}: {detail}"))

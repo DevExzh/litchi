@@ -45,6 +45,14 @@ pub enum LimitKind {
     HistoryEntries,
     /// Aggregate bytes retained by history ([`TransferLimits::history_bytes`]).
     HistoryBytes,
+    /// Entries of the workbook shared-string table.
+    SharedStrings,
+    /// Bytes of the workbook shared-string part.
+    SharedStringBytes,
+    /// Stable sheet identifiers of one workbook.
+    SheetIdentifiers,
+    /// Attempts to allocate a fresh worksheet part name.
+    PartNameAttempts,
 }
 
 impl std::fmt::Display for LimitKind {
@@ -56,6 +64,10 @@ impl std::fmt::Display for LimitKind {
             Self::Changes => "patch changes",
             Self::HistoryEntries => "history entries",
             Self::HistoryBytes => "history bytes",
+            Self::SharedStrings => "shared-string entries",
+            Self::SharedStringBytes => "shared-string part bytes",
+            Self::SheetIdentifiers => "stable sheet identifiers",
+            Self::PartNameAttempts => "worksheet part-name attempts",
         })
     }
 }

@@ -1489,9 +1489,9 @@ impl Classify for litchi_xlsb::package::PackageError {
             Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Wire(error) => error.classify(),
             Self::Execution(error) => error.classify(),
-            Self::LimitExceeded { .. }
-            | Self::ExternalLinkLimitExceeded { .. }
-            | Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::ExternalLinkLimitExceeded { .. } | Self::Limit { .. } => {
+                Class::of(Code::LimitExceeded)
+            },
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             // Typed refusals, patches for another base and invalid configured
             // limits (record 0360b).

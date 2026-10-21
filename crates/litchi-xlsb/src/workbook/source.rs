@@ -278,11 +278,11 @@ impl SourceBackedIndexedWorksheet {
                     resource: "indexed worksheet record count",
                 })?;
                 if record_count > self.limits.max_records {
-                    return Err(Error::LimitExceeded {
-                        resource: "indexed worksheet records",
-                        actual: record_count,
-                        maximum: self.limits.max_records,
-                    });
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedRecords,
+                        record_count,
+                        self.limits.max_records,
+                    ));
                 }
                 match record.kind() {
                     kind::BEGIN_SHEET_DATA => {
@@ -401,11 +401,11 @@ impl SourceBackedIndexedWorksheet {
                 })?;
                 let units = string.text.encode_utf16().count();
                 if units > self.limits.raw.string_units() {
-                    return Err(Error::LimitExceeded {
-                        resource: "indexed shared-string code units",
-                        actual: units,
-                        maximum: self.limits.raw.string_units(),
-                    });
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedStringUnits,
+                        units,
+                        self.limits.raw.string_units(),
+                    ));
                 }
                 let mut text = String::new();
                 text.try_reserve_exact(string.text.len())
@@ -1497,9 +1497,13 @@ impl SourceBackedWorksheet {
                 limits
                     .source_bytes
                     .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
-                "binary-index bytes",
+                crate::binary_index::LimitKind::Bytes.into(),
             )?;
-            preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
+            preflight_indexed_part(
+                &part,
+                limits.source_bytes,
+                crate::workbook::LimitKind::IndexedPartBytes.into(),
+            )?;
             let index_data = index_part.data()?;
             let worksheet = part.data()?;
             let _ = preflight_package(&self.inner.package)?;
@@ -2552,16 +2556,15 @@ fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
 fn preflight_indexed_part(
     part: &PartView<'_>,
     maximum: usize,
-    resource: &'static str,
+    kind: crate::package::LimitKind,
 ) -> Result<()> {
-    let actual = usize::try_from(part.declared_uncompressed_size()?)
-        .map_err(|_error| Error::CapacityOverflow { resource })?;
+    let actual = usize::try_from(part.declared_uncompressed_size()?).map_err(|_error| {
+        Error::CapacityOverflow {
+            resource: "indexed part size",
+        }
+    })?;
     if actual > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
-            actual,
-            maximum,
-        });
+        return Err(Error::limit(kind, actual, maximum));
     }
     Ok(())
 }

@@ -3053,11 +3053,11 @@ fn allocate_worksheet_uris(package: &litchi_opc::OpcPackage) -> Result<(PackURI,
             return Ok((sheet_uri, index_uri));
         }
     }
-    Err(Error::LimitExceeded {
-        resource: "XLSB worksheet URI allocation attempts",
-        actual: attempts,
-        maximum: attempts,
-    })
+    Err(Error::limit(
+        LimitKind::PartNameAttempts,
+        attempts,
+        attempts,
+    ))
 }
 
 fn worksheet_relationship_flavor(package: &litchi_opc::OpcPackage) -> Result<(String, String)> {
@@ -3192,11 +3192,11 @@ fn allocate_tab_id(records: &[crate::package::records::BundleSheetRecord]) -> Re
             return Ok(candidate);
         }
     }
-    Err(Error::LimitExceeded {
-        resource: "XLSB stable sheet identifiers",
-        actual: records.len().saturating_add(1),
-        maximum: usize::from(u16::MAX),
-    })
+    Err(Error::limit(
+        LimitKind::SheetIdentifiers,
+        records.len().saturating_add(1),
+        usize::from(u16::MAX),
+    ))
 }
 
 fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> Result<Vec<u8>> {

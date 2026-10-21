@@ -37,7 +37,8 @@ pub(crate) use package::{
 /// Alias matching the concise limits naming used by other XLSB feature modules.
 pub use crate::package::error::{Error, Result};
 
-/// A bounded dimension of this family.
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
@@ -47,8 +48,37 @@ pub enum LimitKind {
     MetadataBytes,
     /// Connections of the Data Model closure.
     Connections,
+    /// Bytes of the External Data Connections part of the closure.
+    ConnectionsBytes,
     /// Parts of the Data Model closure.
     GraphParts,
+    /// Relationships of the Data Model closure.
+    GraphRelationships,
+    /// Bytes of the captured Data Model source closure.
+    SourceBytes,
+    /// Bytes of the workbook part.
+    WorkbookBytes,
+    /// Bytes of one Data Model table name.
+    TableNameBytes,
+    /// A bounded resource of the MS-XLDM model itself.
+    Model,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::PayloadBytes => "Data Model payload bytes",
+            Self::MetadataBytes => "Data Model workbook record bytes",
+            Self::Connections => "Data Model connections",
+            Self::ConnectionsBytes => "Data Model connections bytes",
+            Self::GraphParts => "Data Model graph parts",
+            Self::GraphRelationships => "Data Model graph relationships",
+            Self::SourceBytes => "Data Model source bytes",
+            Self::WorkbookBytes => "Data Model workbook bytes",
+            Self::TableNameBytes => "Data Model table name bytes",
+            Self::Model => "Data Model model resources",
+        })
+    }
 }
 
 pub(crate) fn serialize_workbook_records(definition: &Definition) -> Result<Vec<u8>> {

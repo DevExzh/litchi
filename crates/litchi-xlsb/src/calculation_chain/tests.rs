@@ -641,8 +641,8 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         large_package
             .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(small_bytes))
             .calculation_chain(),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain part bytes",
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::PartBytes),
             ..
         })
     ));
@@ -658,8 +658,8 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
     let before_diagnostic = snapshot.part().expect("part").bytes().to_vec();
     assert!(matches!(
         snapshot.part().expect("part").record_count(),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain records",
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::Records),
             ..
         })
     ));
@@ -673,8 +673,8 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         package
             .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_relationships))
             .calculation_chain(),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::Relationships),
             ..
         })
     ));
@@ -687,8 +687,8 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         package
             .with_semantic_limits(crate::SemanticLimits::new().calculation_chain(no_parts))
             .calculation_chain(),
-        Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
+        Err(Error::Limit {
+            kind: crate::package::LimitKind::CalculationChain(LimitKind::GraphParts),
             ..
         })
     ));

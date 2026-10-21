@@ -130,11 +130,11 @@ fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<
         resource: "Volatile Dependencies relationships",
     })?;
     if actual > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Volatile Dependencies relationships",
+        return Err(Error::limit(
+            crate::volatile_dependencies::LimitKind::Relationships,
             actual,
-            maximum: limits.max_relationships,
-        });
+            limits.max_relationships,
+        ));
     }
     Ok(actual)
 }

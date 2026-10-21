@@ -39,7 +39,8 @@ pub use litchi_core::edit::Diagnostics;
 /// the diagnostics.
 pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
-/// A bounded dimension of this family.
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
@@ -49,6 +50,16 @@ pub enum LimitKind {
     XmlNodes,
     /// Theme XML nesting depth ([`Limits::max_depth`]).
     XmlDepth,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::XmlBytes => "Theme XML bytes",
+            Self::XmlNodes => "Theme XML nodes",
+            Self::XmlDepth => "Theme XML depth",
+        })
+    }
 }
 
 /// The configuration of a Theme edit.

@@ -30,7 +30,8 @@ pub use transaction::{Edit, EditOptions};
 /// Alias matching the concise limits naming used by other XLSB feature owners.
 pub use crate::package::error::{Error, Result};
 
-/// A bounded dimension of this family.
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
@@ -42,4 +43,21 @@ pub enum LimitKind {
     Relationships,
     /// Parts of the Calculation Chain closure.
     GraphParts,
+    /// Bytes of the workbook part read while binding the chain.
+    WorkbookBytes,
+    /// Bytes of the captured Calculation Chain source closure.
+    SourceBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::PartBytes => "Calculation Chain part bytes",
+            Self::Records => "Calculation Chain records",
+            Self::Relationships => "Calculation Chain relationships",
+            Self::GraphParts => "Calculation Chain graph parts",
+            Self::WorkbookBytes => "Calculation Chain workbook bytes",
+            Self::SourceBytes => "Calculation Chain source closure bytes",
+        })
+    }
 }

@@ -786,7 +786,15 @@ fn data_model_limits_bound_borrowed_graph_metadata_before_snapshot_ownership() {
         .with_semantic_limits(litchi_xlsb::SemanticLimits::new().data_model(limits))
         .data_model()
         .expect_err("metadata admission must be bounded");
-    assert!(error.to_string().contains("metadata"));
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::Limit {
+            kind: litchi_xlsb::package::LimitKind::DataModel(
+                litchi_xlsb::data_model::LimitKind::MetadataBytes
+            ),
+            ..
+        }
+    ));
 }
 
 #[test]

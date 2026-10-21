@@ -76,19 +76,81 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 )]
 fn map_common_error(error: litchi_ooxml_common::Error) -> Error {
     match error {
-        litchi_ooxml_common::Error::Limit {
-            resource,
-            max,
-            actual,
-        } => Error::LimitExceeded {
-            resource,
-            actual,
-            maximum: max,
+        litchi_ooxml_common::Error::Limit { max, actual, .. } => {
+            Error::limit(LimitKind::PropertiesXmlBytes, actual, max)
         },
         litchi_ooxml_common::Error::Allocation { resource, source } => {
             Error::Allocation { resource, source }
         },
         other => Error::Common(other),
+    }
+}
+
+/// A bounded dimension of this family; an exceeded bound is reported as
+/// [`crate::package::PackageError::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Storages of one catalog ([`Limits::max_storages`]).
+    Storages,
+    /// UTF-16 units of one storage UID.
+    UidUnits,
+    /// Bytes of one Properties XML part.
+    PropertiesXmlBytes,
+    /// Bytes of one Properties extension list.
+    ExtensionXmlBytes,
+    /// Nesting depth of one XML part.
+    XmlDepth,
+    /// Element events of one XML part.
+    XmlNodes,
+    /// Bytes of one storage payload.
+    PayloadBytes,
+    /// Bytes of the External Data Connections part.
+    ConnectionsBytes,
+    /// BIFF12 records of the connections part.
+    BiffRecords,
+    /// Connection bindings of one catalog.
+    Bindings,
+    /// Opaque connection blocks of one catalog.
+    OpaqueBlocks,
+    /// Relationships of the Custom Data closure.
+    Relationships,
+    /// Bytes of one relationship or content-types XML part.
+    RelationshipXmlBytes,
+    /// Parts and relationships of the package.
+    PackageNodes,
+    /// Bytes of the package.
+    PackageBytes,
+    /// Bytes of the published package.
+    OutputBytes,
+    /// Work units of one BIFF12 binding operation.
+    WorkBytes,
+    /// Bytes of one temporary staging buffer.
+    TemporaryBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Storages => "Custom Data storages",
+            Self::UidUnits => "Custom Data UID units",
+            Self::PropertiesXmlBytes => "Custom Data Properties XML bytes",
+            Self::ExtensionXmlBytes => "Custom Data extension XML bytes",
+            Self::XmlDepth => "Custom Data XML depth",
+            Self::XmlNodes => "Custom Data XML nodes",
+            Self::PayloadBytes => "Custom Data payload bytes",
+            Self::ConnectionsBytes => "Custom Data connections bytes",
+            Self::BiffRecords => "Custom Data BIFF12 records",
+            Self::Bindings => "Custom Data bindings",
+            Self::OpaqueBlocks => "Custom Data opaque blocks",
+            Self::Relationships => "Custom Data relationships",
+            Self::RelationshipXmlBytes => "Custom Data relationship XML bytes",
+            Self::PackageNodes => "Custom Data package nodes",
+            Self::PackageBytes => "Custom Data package bytes",
+            Self::OutputBytes => "Custom Data output bytes",
+            Self::WorkBytes => "Custom Data binding work",
+            Self::TemporaryBytes => "Custom Data temporary bytes",
+        })
     }
 }
 
@@ -581,11 +643,11 @@ impl Snapshot {
             capture_source(package, limits, context.as_ref())?;
         entries.sort_unstable_by(|left, right| left.id().cmp(right.id()));
         if entries.len() > limits.max_storages() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data storages",
-                actual: entries.len(),
-                maximum: limits.max_storages(),
-            });
+            return Err(Error::limit(
+                LimitKind::Storages,
+                entries.len(),
+                limits.max_storages(),
+            ));
         }
         check_context(context.as_ref())?;
         Ok(Self {
@@ -891,11 +953,11 @@ impl Edit {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
         if self.draft.len() >= self.limits.max_storages() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data storages",
-                actual: self.draft.len() + 1,
-                maximum: self.limits.max_storages(),
-            });
+            return Err(Error::limit(
+                LimitKind::Storages,
+                self.draft.len() + 1,
+                self.limits.max_storages(),
+            ));
         }
         let identity = allocate_identity(&self.package, &self.draft)?;
         let mut candidate = clone_storages(&self.draft, "Custom Data insertion draft")?;
@@ -1309,26 +1371,32 @@ fn reserve_context(
 fn map_binding_error(error: BindingError) -> Error {
     match error {
         BindingError::SourceLimit { actual, limit }
-        | BindingError::RecordPayloadLimit { actual, limit }
-        | BindingError::RecordLimit { actual, limit }
-        | BindingError::BindingLimit { actual, limit }
-        | BindingError::OpaqueLimit { actual, limit }
-        | BindingError::CalculatedMemberLimit { actual, limit }
-        | BindingError::OutputLimit { actual, limit }
-        | BindingError::WorkLimit { actual, limit }
+        | BindingError::RecordPayloadLimit { actual, limit } => {
+            Error::limit(LimitKind::ConnectionsBytes, actual, limit)
+        },
+        BindingError::RecordLimit { actual, limit } => {
+            Error::limit(LimitKind::BiffRecords, actual, limit)
+        },
+        BindingError::BindingLimit { actual, limit }
+        | BindingError::CalculatedMemberLimit { actual, limit } => {
+            Error::limit(LimitKind::Bindings, actual, limit)
+        },
+        BindingError::OpaqueLimit { actual, limit } => {
+            Error::limit(LimitKind::OpaqueBlocks, actual, limit)
+        },
+        BindingError::OutputLimit { actual, limit } => {
+            Error::limit(LimitKind::OutputBytes, actual, limit)
+        },
+        BindingError::WorkLimit { actual, limit }
         | BindingError::StringLimit {
             units: actual,
             limit,
             ..
-        }
-        | BindingError::UidLimit {
+        } => Error::limit(LimitKind::WorkBytes, actual, limit),
+        BindingError::UidLimit {
             units: actual,
             limit,
-        } => Error::LimitExceeded {
-            resource: "XLSB Custom Data BIFF12 operation",
-            actual,
-            maximum: limit,
-        },
+        } => Error::limit(LimitKind::UidUnits, actual, limit),
         BindingError::HiddenReference => {
             unsupported("an opaque AC/FRT/ExtConn15 block may hide a Custom Data reference")
         },
@@ -1350,31 +1418,31 @@ fn map_binding_error_with_budget(error: BindingError, budget: &mut ContextWorkBu
 fn validate_uid_limits(id: &str, limits: Limits) -> Result<()> {
     let units = id.encode_utf16().count();
     if units > limits.max_uid_units() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data UID UTF-16 units",
-            actual: units,
-            maximum: limits.max_uid_units(),
-        });
+        return Err(Error::limit(
+            LimitKind::UidUnits,
+            units,
+            limits.max_uid_units(),
+        ));
     }
     Ok(())
 }
 
 fn validate_value(value: &CustomDataView, limits: &Limits) -> Result<()> {
     if value.data.len() > limits.max_payload_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data payload bytes",
-            actual: value.data.len(),
-            maximum: limits.max_payload_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::PayloadBytes,
+            value.data.len(),
+            limits.max_payload_bytes(),
+        ));
     }
     validate_uid_limits(&value.properties.id, *limits)?;
     if let Some(extension) = value.properties.extension_list.as_ref() {
         if extension.xml.len() > limits.max_extension_xml_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data extension XML bytes",
-                actual: extension.xml.len(),
-                maximum: limits.max_extension_xml_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::ExtensionXmlBytes,
+                extension.xml.len(),
+                limits.max_extension_xml_bytes(),
+            ));
         }
     }
     let xml_limits = codec_limits(*limits);
@@ -1404,11 +1472,11 @@ fn codec_limits_with_output(limits: Limits, output_bytes: usize) -> XmlLimits {
 
 fn validate_staged_entries(entries: &[Storage], limits: &Limits) -> Result<()> {
     if entries.len() > limits.max_storages() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data storages",
-            actual: entries.len(),
-            maximum: limits.max_storages(),
-        });
+        return Err(Error::limit(
+            LimitKind::Storages,
+            entries.len(),
+            limits.max_storages(),
+        ));
     }
     let mut ids = HashSet::new();
     ids.try_reserve(entries.len())
@@ -1548,27 +1616,27 @@ fn package_size(package: &OpcPackage) -> Result<usize> {
 
 fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     if package.part_count() > limits.max_package_nodes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data package nodes",
-            actual: package.part_count(),
-            maximum: limits.max_package_nodes(),
-        });
+        return Err(Error::limit(
+            LimitKind::PackageNodes,
+            package.part_count(),
+            limits.max_package_nodes(),
+        ));
     }
     let bytes = package_size(package)?;
     if bytes > limits.max_package_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data package bytes",
-            actual: bytes,
-            maximum: limits.max_package_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::PackageBytes,
+            bytes,
+            limits.max_package_bytes(),
+        ));
     }
     let relationships = package_relationship_count(package)?;
     if relationships > limits.max_relationships() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data relationships",
-            actual: relationships,
-            maximum: limits.max_relationships(),
-        });
+        return Err(Error::limit(
+            LimitKind::Relationships,
+            relationships,
+            limits.max_relationships(),
+        ));
     }
     Ok(())
 }
@@ -1576,11 +1644,11 @@ fn validate_package_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
 fn validate_output_limits(package: &OpcPackage, limits: Limits) -> Result<()> {
     let bytes = package_size(package)?;
     if bytes > limits.max_output_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data final output bytes",
-            actual: bytes,
-            maximum: limits.max_output_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::OutputBytes,
+            bytes,
+            limits.max_output_bytes(),
+        ));
     }
     Ok(())
 }
@@ -1611,27 +1679,27 @@ fn capture_source(
     let workbook_bytes = workbook.blob_arc();
     let content_types = package.source_content_types()?;
     if content_types.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data content-types XML bytes",
-            actual: content_types.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            content_types.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
     let root_relationships = package.source_relationships(&PackURI::new("/").map_err(invalid)?)?;
     if root_relationships.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data package relationships XML bytes",
-            actual: root_relationships.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            root_relationships.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
     let workbook_relationships = package.source_relationships(&workbook_name)?;
     if workbook_relationships.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data workbook relationships XML bytes",
-            actual: workbook_relationships.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            workbook_relationships.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
 
     let mut source = SourceState {
@@ -1673,11 +1741,11 @@ fn load_entries(
         check_context(context)?;
         if part.content_type() == PROPERTIES_CONTENT_TYPE {
             if properties_parts.len() >= limits.max_storages() {
-                return Err(Error::LimitExceeded {
-                    resource: "Custom Data storages",
-                    actual: properties_parts.len() + 1,
-                    maximum: limits.max_storages(),
-                });
+                return Err(Error::limit(
+                    LimitKind::Storages,
+                    properties_parts.len() + 1,
+                    limits.max_storages(),
+                ));
             }
             properties_parts.push(part);
         }
@@ -1707,11 +1775,11 @@ fn load_entries(
         // (ADR 0030).
         let properties_xml = package.get_part(properties_part.partname())?.blob();
         if properties_xml.len() > limits.max_properties_xml_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data Properties XML bytes",
-                actual: properties_xml.len(),
-                maximum: limits.max_properties_xml_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::PropertiesXmlBytes,
+                properties_xml.len(),
+                limits.max_properties_xml_bytes(),
+            ));
         }
         let mut owner = None;
         for relationship in workbook.rels().iter() {
@@ -1784,11 +1852,11 @@ fn load_entries(
             });
         }
         if data_part.blob().len() > limits.max_payload_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data payload bytes",
-                actual: data_part.blob().len(),
-                maximum: limits.max_payload_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::PayloadBytes,
+                data_part.blob().len(),
+                limits.max_payload_bytes(),
+            ));
         }
         if !data_part.rels().is_empty() {
             return Err(invalid("Custom Data payload has outbound relationships"));
@@ -1889,14 +1957,14 @@ fn capture_member_proofs(
         if properties_relationships.bytes().len() > limits.max_relationship_xml_bytes()
             || data_relationships.bytes().len() > limits.max_relationship_xml_bytes()
         {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data relationship XML bytes",
-                actual: properties_relationships
+            return Err(Error::limit(
+                LimitKind::RelationshipXmlBytes,
+                properties_relationships
                     .bytes()
                     .len()
                     .max(data_relationships.bytes().len()),
-                maximum: limits.max_relationship_xml_bytes(),
-            });
+                limits.max_relationship_xml_bytes(),
+            ));
         }
         let properties_xml = package.source_xml_part(&identity.properties_part_name).ok();
         let properties_key = inbound_key(&identity.properties_part_name);
@@ -2043,11 +2111,11 @@ fn capture_inbound_proofs(
     // tightened independently in the future.
     let matched = proofs.values().map(Vec::len).sum::<usize>();
     if matched > limits.max_relationships() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data inbound relationship proofs",
-            actual: matched,
-            maximum: limits.max_relationships(),
-        });
+        return Err(Error::limit(
+            LimitKind::Relationships,
+            matched,
+            limits.max_relationships(),
+        ));
     }
     Ok(proofs)
 }
@@ -2212,11 +2280,11 @@ fn capture_connection(
         ));
     }
     if part.blob().len() > limits.max_connections_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data connections.bin bytes",
-            actual: part.blob().len(),
-            maximum: limits.max_connections_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::ConnectionsBytes,
+            part.blob().len(),
+            limits.max_connections_bytes(),
+        ));
     }
     let mut binding_limits = limits.binding_limits();
     // A longer UID can grow the BIFF12 stream. Make the rewrite planner see
@@ -2466,11 +2534,11 @@ fn transition_content_types(
             .map_err(|error| map_content_types_error(error, maximum))?;
     }
     if result.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data content-types XML bytes",
-            actual: result.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            result.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
     Ok(result)
 }
@@ -2481,11 +2549,11 @@ fn map_content_types_error(error: litchi_opc::OpcError, maximum: usize) -> Error
         || detail.contains("source exceeds")
         || detail.contains("selectors exceed")
     {
-        return Error::LimitExceeded {
-            resource: "Custom Data content-types XML bytes",
-            actual: maximum.saturating_add(1),
+        return Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            maximum.saturating_add(1),
             maximum,
-        };
+        );
     }
     Error::Opc(error)
 }
@@ -2541,19 +2609,19 @@ fn restore_content_types_template_if_scoped(
         return Ok(());
     }
     if after.source.content_types.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data content-types XML bytes",
-            actual: after.source.content_types.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            after.source.content_types.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
     let output_limit = replacement_output_limit(package, current.bytes().len(), limits)?;
     if after.source.content_types.bytes().len() > output_limit {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data final output bytes",
-            actual: after.source.content_types.bytes().len(),
-            maximum: output_limit,
-        });
+        return Err(Error::limit(
+            LimitKind::OutputBytes,
+            after.source.content_types.bytes().len(),
+            output_limit,
+        ));
     }
     package.try_replace_content_types(current.bytes(), &after.source.content_types)?;
     Ok(())
@@ -2663,19 +2731,19 @@ fn restore_one_relationship_template(
         return Ok(());
     }
     if desired.bytes().len() > limits.max_relationship_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data relationship XML bytes",
-            actual: desired.bytes().len(),
-            maximum: limits.max_relationship_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::RelationshipXmlBytes,
+            desired.bytes().len(),
+            limits.max_relationship_xml_bytes(),
+        ));
     }
     let output_limit = replacement_output_limit(package, current.bytes().len(), limits)?;
     if desired.bytes().len() > output_limit {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data final output bytes",
-            actual: desired.bytes().len(),
-            maximum: output_limit,
-        });
+        return Err(Error::limit(
+            LimitKind::OutputBytes,
+            desired.bytes().len(),
+            output_limit,
+        ));
     }
     package.try_replace_relationships(current, desired)?;
     Ok(())
@@ -2704,11 +2772,11 @@ fn restore_member_templates_if_scoped(
             let current = package.source_xml_part(&member.name)?;
             let output_limit = replacement_output_limit(package, current.bytes().len(), limits)?;
             if replacement.bytes().len() > output_limit {
-                return Err(Error::LimitExceeded {
-                    resource: "Custom Data final output bytes",
-                    actual: replacement.bytes().len(),
-                    maximum: output_limit,
-                });
+                return Err(Error::limit(
+                    LimitKind::OutputBytes,
+                    replacement.bytes().len(),
+                    output_limit,
+                ));
             }
             package.try_replace_owned_xml_part(current.bytes(), replacement.clone())?;
         }
@@ -2724,11 +2792,11 @@ fn restore_member_templates_if_scoped(
             if data.blob() != member.data_bytes.as_slice() {
                 let output_limit = replacement_output_limit(package, data.blob().len(), limits)?;
                 if member.data_bytes.len() > output_limit {
-                    return Err(Error::LimitExceeded {
-                        resource: "Custom Data final output bytes",
-                        actual: member.data_bytes.len(),
-                        maximum: output_limit,
-                    });
+                    return Err(Error::limit(
+                        LimitKind::OutputBytes,
+                        member.data_bytes.len(),
+                        output_limit,
+                    ));
                 }
                 package
                     .get_part_mut(&data_name)?
@@ -2741,18 +2809,18 @@ fn restore_member_templates_if_scoped(
 
 fn check_restored_properties_limits(bytes: usize, limits: Limits) -> Result<()> {
     if bytes > limits.max_temporary_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data temporary Properties restoration bytes",
-            actual: bytes,
-            maximum: limits.max_temporary_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::TemporaryBytes,
+            bytes,
+            limits.max_temporary_bytes(),
+        ));
     }
     if bytes > limits.max_properties_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data Properties XML bytes",
-            actual: bytes,
-            maximum: limits.max_properties_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::PropertiesXmlBytes,
+            bytes,
+            limits.max_properties_xml_bytes(),
+        ));
     }
     Ok(())
 }
@@ -2880,11 +2948,7 @@ fn preflight_output_budget(package: &OpcPackage, before: &Snapshot, limits: Limi
             .ok_or_else(|| invalid("Custom Data output relationship byte count overflow"))?;
     }
     if immutable > maximum {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data final output bytes",
-            actual: immutable,
-            maximum,
-        });
+        return Err(Error::limit(LimitKind::OutputBytes, immutable, maximum));
     }
     Ok(())
 }
@@ -2913,11 +2977,11 @@ fn apply_existing_entry(
     let data_changed = previous.value.data != entry.value.data;
     if properties_changed {
         if member.bytes.len() > limits.max_temporary_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data temporary Properties source bytes",
-                actual: member.bytes.len(),
-                maximum: limits.max_temporary_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::TemporaryBytes,
+                member.bytes.len(),
+                limits.max_temporary_bytes(),
+            ));
         }
         let proof = member.properties_xml.as_ref().ok_or_else(|| {
             unsupported("Custom Data Properties source has no retained XML provenance for editing")
@@ -2963,18 +3027,18 @@ fn apply_existing_entry(
             .map_err(map_common_error)?;
         }
         if replacement.bytes().len() > limits.max_properties_xml_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data Properties XML bytes",
-                actual: replacement.bytes().len(),
-                maximum: limits.max_properties_xml_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::PropertiesXmlBytes,
+                replacement.bytes().len(),
+                limits.max_properties_xml_bytes(),
+            ));
         }
         if replacement.bytes().len() > limits.max_temporary_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data temporary Properties replacement bytes",
-                actual: replacement.bytes().len(),
-                maximum: limits.max_temporary_bytes(),
-            });
+            return Err(Error::limit(
+                LimitKind::TemporaryBytes,
+                replacement.bytes().len(),
+                limits.max_temporary_bytes(),
+            ));
         }
         package.try_replace_owned_xml_part(&member.bytes, replacement)?;
     }
@@ -2985,11 +3049,11 @@ fn apply_existing_entry(
         }
         let output_limit = replacement_output_limit(package, previous.value.data.len(), *limits)?;
         if entry.value.data.len() > output_limit {
-            return Err(Error::LimitExceeded {
-                resource: "Custom Data final output bytes",
-                actual: entry.value.data.len(),
-                maximum: output_limit,
-            });
+            return Err(Error::limit(
+                LimitKind::OutputBytes,
+                entry.value.data.len(),
+                output_limit,
+            ));
         }
         package
             .get_part_mut(&identity.data_part_name)?
@@ -3008,11 +3072,11 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     }
     validate_value(&entry.value, limits)?;
     if entry.value.data.len() > limits.max_temporary_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data temporary payload bytes",
-            actual: entry.value.data.len(),
-            maximum: limits.max_temporary_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::TemporaryBytes,
+            entry.value.data.len(),
+            limits.max_temporary_bytes(),
+        ));
     }
     let output_limit = replacement_output_limit(package, 0, *limits)?;
     let properties_xml = write_properties(
@@ -3021,18 +3085,18 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     )
     .map_err(map_common_error)?;
     if properties_xml.len() > limits.max_properties_xml_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data Properties XML bytes",
-            actual: properties_xml.len(),
-            maximum: limits.max_properties_xml_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::PropertiesXmlBytes,
+            properties_xml.len(),
+            limits.max_properties_xml_bytes(),
+        ));
     }
     if properties_xml.len() > limits.max_temporary_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data temporary Properties bytes",
-            actual: properties_xml.len(),
-            maximum: limits.max_temporary_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::TemporaryBytes,
+            properties_xml.len(),
+            limits.max_temporary_bytes(),
+        ));
     }
     let workbook_name = package.main_document_part()?.partname().clone();
     let workbook_relationships_before = package.source_relationships(&workbook_name)?;
@@ -3051,11 +3115,11 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     )?;
     let data_output_limit = replacement_output_limit(package, 0, *limits)?;
     if entry.value.data.len() > data_output_limit {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data final output bytes",
-            actual: entry.value.data.len(),
-            maximum: data_output_limit,
-        });
+        return Err(Error::limit(
+            LimitKind::OutputBytes,
+            entry.value.data.len(),
+            data_output_limit,
+        ));
     }
     package.try_add_part(Box::new(BlobPart::new(
         identity.data_part_name.clone(),
@@ -3207,11 +3271,11 @@ fn apply_connection_edits(
     }
     let source = part.blob_arc();
     if source.len() > limits.max_temporary_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data temporary connections source bytes",
-            actual: source.len(),
-            maximum: limits.max_temporary_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::TemporaryBytes,
+            source.len(),
+            limits.max_temporary_bytes(),
+        ));
     }
     // The source bytes are retained by the snapshot; the rewrite output and
     // scanner scratch are temporary and must release their reservation when
@@ -3263,18 +3327,18 @@ fn apply_connection_edits(
         return Ok(());
     }
     if output.len() > limits.max_connections_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data connections.bin bytes",
-            actual: output.len(),
-            maximum: limits.max_connections_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::ConnectionsBytes,
+            output.len(),
+            limits.max_connections_bytes(),
+        ));
     }
     if output.len() > limits.max_temporary_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "Custom Data temporary connections replacement bytes",
-            actual: output.len(),
-            maximum: limits.max_temporary_bytes(),
-        });
+        return Err(Error::limit(
+            LimitKind::TemporaryBytes,
+            output.len(),
+            limits.max_temporary_bytes(),
+        ));
     }
     package
         .get_part_mut(&state.part_name)?

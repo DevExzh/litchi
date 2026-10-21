@@ -74,71 +74,71 @@ impl SemanticLimits {
     /// Validate caller limits against physical and semantic hard ceilings.
     pub const fn validate(self) -> Result<Self> {
         if self.max_part_bytes > HARD_MAX_PART_BYTES {
-            return Err(limit(
-                "Volatile Dependencies part bytes",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::PartBytes,
                 self.max_part_bytes,
                 HARD_MAX_PART_BYTES,
             ));
         }
         if self.max_records > HARD_MAX_RECORDS {
-            return Err(limit(
-                "Volatile Dependencies records",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::Records,
                 self.max_records,
                 HARD_MAX_RECORDS,
             ));
         }
         if self.max_types > 2 {
-            return Err(limit(
-                "Volatile Dependencies type collections",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::TypeCollections,
                 self.max_types,
                 2,
             ));
         }
         if self.max_mains > HARD_MAX_ITEMS {
-            return Err(limit(
-                "Volatile main collections",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::MainCollections,
                 self.max_mains,
                 HARD_MAX_ITEMS,
             ));
         }
         if self.max_topics > HARD_MAX_ITEMS {
-            return Err(limit(
-                "Volatile topic collections",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::TopicCollections,
                 self.max_topics,
                 HARD_MAX_ITEMS,
             ));
         }
         if self.max_subtopics > HARD_MAX_ITEMS {
-            return Err(limit(
-                "Volatile subtopic records",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::SubtopicRecords,
                 self.max_subtopics,
                 HARD_MAX_ITEMS,
             ));
         }
         if self.max_references > HARD_MAX_ITEMS {
-            return Err(limit(
-                "Volatile cell references",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::CellReferences,
                 self.max_references,
                 HARD_MAX_ITEMS,
             ));
         }
         if self.max_string_units > HARD_MAX_STRING_UNITS {
-            return Err(limit(
-                "Volatile UTF-16 string",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::StringUnits,
                 self.max_string_units,
                 HARD_MAX_STRING_UNITS,
             ));
         }
         if self.max_total_string_units > HARD_MAX_TOTAL_STRING_UNITS {
-            return Err(limit(
-                "Volatile UTF-16 strings",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::TotalStringUnits,
                 self.max_total_string_units,
                 HARD_MAX_TOTAL_STRING_UNITS,
             ));
         }
         if self.max_relationships > HARD_MAX_RELATIONSHIPS {
-            return Err(limit(
-                "Volatile Dependencies relationships",
+            return Err(invalid_limit(
+                crate::volatile_dependencies::LimitKind::Relationships,
                 self.max_relationships,
                 HARD_MAX_RELATIONSHIPS,
             ));
@@ -334,7 +334,7 @@ impl Dependencies {
         let limits = limits.validate()?;
         if self.types.len() > limits.max_types {
             return Err(limit(
-                "volatile type collections",
+                crate::volatile_dependencies::LimitKind::TypeCollections,
                 self.types.len(),
                 limits.max_types,
             ));
@@ -353,7 +353,7 @@ impl Dependencies {
             kinds |= bit;
             if volatile_type.mains.len() > limits.max_mains.saturating_sub(mains) {
                 return Err(limit(
-                    "volatile main collections",
+                    crate::volatile_dependencies::LimitKind::MainCollections,
                     mains + volatile_type.mains.len(),
                     limits.max_mains,
                 ));
@@ -364,10 +364,10 @@ impl Dependencies {
                 "volatile main collections",
             )?;
             for main in &volatile_type.mains {
-                add_string(&mut strings, &main.first, limits, "volatile first string")?;
+                add_string(&mut strings, &main.first, limits)?;
                 if main.topics.len() > limits.max_topics.saturating_sub(topics) {
                     return Err(limit(
-                        "volatile topic collections",
+                        crate::volatile_dependencies::LimitKind::TopicCollections,
                         topics + main.topics.len(),
                         limits.max_topics,
                     ));
@@ -376,7 +376,7 @@ impl Dependencies {
                 for topic in &main.topics {
                     if topic.subtopics.len() > limits.max_subtopics.saturating_sub(subtopics) {
                         return Err(limit(
-                            "volatile subtopic records",
+                            crate::volatile_dependencies::LimitKind::SubtopicRecords,
                             subtopics + topic.subtopics.len(),
                             limits.max_subtopics,
                         ));
@@ -387,12 +387,12 @@ impl Dependencies {
                         "volatile subtopic records",
                     )?;
                     for subtopic in &topic.subtopics {
-                        add_string(&mut strings, subtopic, limits, "volatile subtopic")?;
+                        add_string(&mut strings, subtopic, limits)?;
                     }
                     validate_cached_value(&topic.value, &mut strings, limits)?;
                     if topic.references.len() > limits.max_references.saturating_sub(references) {
                         return Err(limit(
-                            "volatile cell references",
+                            crate::volatile_dependencies::LimitKind::CellReferences,
                             references + topic.references.len(),
                             limits.max_references,
                         ));
@@ -458,7 +458,7 @@ fn validate_cached_value(
     match value {
         CachedValue::Number(value) => validate_xnum(*value),
         CachedValue::Error(_) | CachedValue::Bool(_) => Ok(()),
-        CachedValue::String(value) => add_string(strings, value, limits, "volatile cached string"),
+        CachedValue::String(value) => add_string(strings, value, limits),
     }
 }
 
@@ -476,20 +476,19 @@ pub(crate) fn validate_xnum(value: f64) -> Result<()> {
     Ok(())
 }
 
-fn add_string(
-    value: &mut usize,
-    string: &str,
-    limits: SemanticLimits,
-    what: &'static str,
-) -> Result<()> {
+fn add_string(value: &mut usize, string: &str, limits: SemanticLimits) -> Result<()> {
     let units = string.encode_utf16().count();
     if units > limits.max_string_units {
-        return Err(limit(what, units, limits.max_string_units));
+        return Err(limit(
+            super::LimitKind::StringUnits,
+            units,
+            limits.max_string_units,
+        ));
     }
     *value = checked_add(*value, units, "volatile UTF-16 strings")?;
     if *value > limits.max_total_string_units {
         return Err(limit(
-            "volatile UTF-16 strings",
+            crate::volatile_dependencies::LimitKind::TotalStringUnits,
             *value,
             limits.max_total_string_units,
         ));
@@ -502,10 +501,18 @@ fn checked_add(left: usize, right: usize, resource: &'static str) -> Result<usiz
         .ok_or(Error::CapacityOverflow { resource })
 }
 
-const fn limit(resource: &'static str, actual: usize, maximum: usize) -> Error {
-    Error::LimitExceeded {
-        resource,
-        actual,
+const fn invalid_limit(kind: super::LimitKind, value: usize, maximum: usize) -> Error {
+    Error::InvalidLimit {
+        kind: crate::package::LimitKind::VolatileDependencies(kind),
+        value,
+        maximum,
+    }
+}
+
+const fn limit(kind: super::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::package::LimitKind::VolatileDependencies(kind),
+        observed: actual,
         maximum,
     }
 }

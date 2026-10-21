@@ -142,7 +142,7 @@ fn multiple_replacements_have_one_checked_output_size() {
     );
     assert!(matches!(
         rewrite_source(source.as_bytes(), &before, &after, Limits::new(output.len() - 1, 100_000, 128)),
-        Err(Error::LimitExceeded { actual, maximum, .. }) if actual == output.len() && maximum == output.len() - 1
+        Err(Error::Limit { observed: actual, maximum, .. }) if actual == output.len() && maximum == output.len() - 1
     ));
 }
 
@@ -150,8 +150,8 @@ fn multiple_replacements_have_one_checked_output_size() {
 fn empty_elements_count_toward_the_caller_depth_limit() {
     assert!(matches!(
         bounded_xml_preflight(b"<root><child/></root>", Limits::new(128, 10, 1)),
-        Err(Error::LimitExceeded {
-            actual: 2,
+        Err(Error::Limit {
+            observed: 2,
             maximum: 1,
             ..
         })

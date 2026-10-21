@@ -287,10 +287,12 @@ impl SharedStringTable {
                 "shared-string table has no BrtEndSst".to_string(),
             ));
         }
-        let found = u32::try_from(items.len()).map_err(|_error| Error::LimitExceeded {
-            resource: "shared-string table entries",
-            actual: items.len(),
-            maximum: usize::try_from(MAX_SST_COUNT).unwrap_or(usize::MAX),
+        let found = u32::try_from(items.len()).map_err(|_error| {
+            Error::limit(
+                crate::cell_values::LimitKind::SharedStrings,
+                items.len(),
+                usize::try_from(MAX_SST_COUNT).unwrap_or(usize::MAX),
+            )
         })?;
         if found != unique {
             return Err(Error::InvalidFormat(format!(
@@ -403,10 +405,12 @@ impl SharedStringTable {
         let mut saw_begin = false;
         let mut saw_end = false;
         let kept_unique = mapping.iter().filter(|value| value.is_some()).count();
-        let kept_unique = u32::try_from(kept_unique).map_err(|_error| Error::LimitExceeded {
-            resource: "shared-string unique count",
-            actual: kept_unique,
-            maximum: usize::try_from(MAX_SST_COUNT).unwrap_or(usize::MAX),
+        let kept_unique = u32::try_from(kept_unique).map_err(|_error| {
+            Error::limit(
+                crate::cell_values::LimitKind::SharedStrings,
+                kept_unique,
+                usize::try_from(MAX_SST_COUNT).unwrap_or(usize::MAX),
+            )
         })?;
         let occurrence_count = references.iter().try_fold(0_u64, |sum, count| {
             sum.checked_add(*count).ok_or(Error::CapacityOverflow {
@@ -484,11 +488,11 @@ fn scan_worksheet(
     references: &mut [u64],
 ) -> Result<()> {
     if source.len() > source_limit {
-        return Err(Error::LimitExceeded {
-            resource: "shared-string worksheet source",
-            actual: source.len(),
-            maximum: source_limit,
-        });
+        return Err(Error::limit(
+            crate::cell_values::LimitKind::SourceBytes,
+            source.len(),
+            source_limit,
+        ));
     }
     let mut in_sheet_data = false;
     let mut frt_depth = 0_usize;
@@ -565,11 +569,11 @@ fn rewrite_worksheet(
     mapping: &[Option<u32>],
 ) -> Result<Vec<u8>> {
     if source.len() > source_limit {
-        return Err(Error::LimitExceeded {
-            resource: "shared-string worksheet source",
-            actual: source.len(),
-            maximum: source_limit,
-        });
+        return Err(Error::limit(
+            crate::cell_values::LimitKind::SourceBytes,
+            source.len(),
+            source_limit,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -751,22 +755,22 @@ fn check_replacement_limits(package: &OpcPackage, replacements: &[(PackURI, usiz
             resource: "shared-string total part bytes",
         })?;
         if size_u64 > maximum_part {
-            return Err(Error::LimitExceeded {
-                resource: "shared-string part image",
-                actual: size,
-                maximum: usize::try_from(maximum_part).unwrap_or(usize::MAX),
-            });
+            return Err(Error::limit(
+                crate::cell_values::LimitKind::SharedStringBytes,
+                size,
+                usize::try_from(maximum_part).unwrap_or(usize::MAX),
+            ));
         }
         total = total.checked_add(size_u64).ok_or(Error::CapacityOverflow {
             resource: "shared-string total part bytes",
         })?;
     }
     if total > limits.max_total_part_bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "shared-string total part bytes",
-            actual: usize::try_from(total).unwrap_or(usize::MAX),
-            maximum: usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
-        });
+        return Err(Error::limit(
+            crate::cell_values::LimitKind::SharedStringBytes,
+            usize::try_from(total).unwrap_or(usize::MAX),
+            usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+        ));
     }
     Ok(())
 }

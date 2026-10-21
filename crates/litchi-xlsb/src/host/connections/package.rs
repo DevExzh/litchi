@@ -72,11 +72,11 @@ pub(crate) fn preflight(
     };
     let part = package.get_part(&graph.part_name)?;
     if part.blob().len() > max_part_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "External Data Connections bytes",
-            actual: part.blob().len(),
-            maximum: max_part_bytes,
-        });
+        return Err(Error::limit(
+            crate::package::connections::LimitKind::PartBytes,
+            part.blob().len(),
+            max_part_bytes,
+        ));
     }
     let raw_limit = max_part_bytes.min(crate::raw::MAX_WIRE_PAYLOAD);
     let mut records =
@@ -90,11 +90,11 @@ pub(crate) fn preflight(
                     resource: "External Data Connections",
                 })?;
             if connection_count > max_connections {
-                return Err(Error::LimitExceeded {
-                    resource: "External Data Connections",
-                    actual: connection_count,
-                    maximum: max_connections,
-                });
+                return Err(Error::limit(
+                    crate::package::connections::LimitKind::Connections,
+                    connection_count,
+                    max_connections,
+                ));
             }
         }
     }

@@ -32,11 +32,11 @@ impl Snapshot {
         let (dependencies, rewrite_safe) = if let Some(graph) = graph.as_ref() {
             let part = package.get_part(&graph.part_name)?;
             if part.blob().len() > limits.max_part_bytes {
-                return Err(Error::LimitExceeded {
-                    resource: "Volatile Dependencies part bytes",
-                    actual: part.blob().len(),
-                    maximum: limits.max_part_bytes,
-                });
+                return Err(Error::limit(
+                    crate::volatile_dependencies::LimitKind::PartBytes,
+                    part.blob().len(),
+                    limits.max_part_bytes,
+                ));
             }
             let parsed = codec::read(part.blob(), limits, sheet_count)?;
             (Some(Arc::new(parsed.dependencies)), parsed.rewrite_safe)
@@ -120,11 +120,11 @@ impl Snapshot {
 fn workbook_sheet_count(workbook: &dyn Part, limits: SemanticLimits) -> Result<usize> {
     let data = workbook.blob();
     if data.len() > limits.max_part_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "Workbook bytes while binding volatile sheet ordinals",
-            actual: data.len(),
-            maximum: limits.max_part_bytes,
-        });
+        return Err(Error::limit(
+            crate::volatile_dependencies::LimitKind::WorkbookBytes,
+            data.len(),
+            limits.max_part_bytes,
+        ));
     }
     let raw_limits = crate::raw::Limits::new(limits.max_part_bytes, limits.max_string_units);
     let mut records = crate::raw::Records::bounded(data, raw_limits)?;
@@ -138,11 +138,11 @@ fn workbook_sheet_count(workbook: &dyn Part, limits: SemanticLimits) -> Result<u
             resource: "Workbook records while binding volatile sheet ordinals",
         })?;
         if record_count > limits.max_records {
-            return Err(Error::LimitExceeded {
-                resource: "Workbook records while binding volatile sheet ordinals",
-                actual: record_count,
-                maximum: limits.max_records,
-            });
+            return Err(Error::limit(
+                crate::volatile_dependencies::LimitKind::WorkbookRecords,
+                record_count,
+                limits.max_records,
+            ));
         }
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
@@ -236,11 +236,11 @@ impl SourceState {
                 resource: "Volatile Dependencies relationships",
             })?;
         if relationship_count > limits.max_relationships {
-            return Err(Error::LimitExceeded {
-                resource: "Volatile Dependencies relationships",
-                actual: relationship_count,
-                maximum: limits.max_relationships,
-            });
+            return Err(Error::limit(
+                crate::volatile_dependencies::LimitKind::Relationships,
+                relationship_count,
+                limits.max_relationships,
+            ));
         }
         let workbook_relationships = package.source_relationships(workbook_name)?;
         let root_name =
@@ -251,15 +251,15 @@ impl SourceState {
             || root_relationships.bytes().len() > limits.max_part_bytes
             || content_types.bytes().len() > limits.max_part_bytes
         {
-            return Err(Error::LimitExceeded {
-                resource: "Volatile Dependencies lexical source bytes",
-                actual: workbook_relationships
+            return Err(Error::limit(
+                crate::volatile_dependencies::LimitKind::SourceBytes,
+                workbook_relationships
                     .bytes()
                     .len()
                     .max(root_relationships.bytes().len())
                     .max(content_types.bytes().len()),
-                maximum: limits.max_part_bytes,
-            });
+                limits.max_part_bytes,
+            ));
         }
         let workbook = SourcePart {
             name: workbook_name.as_str().to_string(),
