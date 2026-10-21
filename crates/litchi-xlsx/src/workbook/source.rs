@@ -153,7 +153,8 @@ pub(crate) struct SourceInner {
     /// Repairs made while the workbook catalog was parsed at open time.
     tolerance: ToleranceReport,
     /// Defined names parsed with the mandatory workbook catalog at open.
-    defined_names: Box<[raw::DefinedName]>,
+    /// Source-backed snapshots share this immutable catalog.
+    defined_names: Arc<[raw::DefinedName]>,
     /// Weighted clean-value cache of parsed worksheet values.
     values: values::ValueCache,
     /// Number of differential formats in the styles part, parsed once for
@@ -297,6 +298,14 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
     ) -> Result<Self> {
+        Self::from_read_at_with_options_and_shared_names(source, options, None)
+    }
+
+    fn from_read_at_with_options_and_shared_names(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+        shared_defined_names: Option<Arc<[raw::DefinedName]>>,
+    ) -> Result<Self> {
         let limits = options.source_limits;
         let cache_limits = options.cache_limits.unwrap_or_default();
         let package = match options.execution_context.clone() {
@@ -314,7 +323,7 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::open_source_backed_package(package, options)
+        Self::open_source_backed_package_with_shared_names(package, options, shared_defined_names)
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -360,6 +369,14 @@ impl SourceBackedWorkbook {
         package: SourceBackedPackage,
         options: crate::OpenOptions,
     ) -> Result<Self> {
+        Self::open_source_backed_package_with_shared_names(package, options, None)
+    }
+
+    fn open_source_backed_package_with_shared_names(
+        package: SourceBackedPackage,
+        options: crate::OpenOptions,
+        shared_defined_names: Option<Arc<[raw::DefinedName]>>,
+    ) -> Result<Self> {
         let execution = options.execution_context.clone();
         let leniency = options.leniency;
         check_execution(execution.as_ref())?;
@@ -388,7 +405,17 @@ impl SourceBackedWorkbook {
         check_execution(execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
-        let defined_names = catalog.defined_names.into_boxed_slice();
+        let defined_names = match shared_defined_names {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.as_ref() {
+                    return Err(invalid(
+                        "reopened workbook changed its defined-name catalog",
+                    ));
+                }
+                shared
+            },
+            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+        };
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(catalog.sheets.len())
@@ -498,6 +525,10 @@ impl SourceBackedWorkbook {
             Some(catalog) => &catalog.defined_names,
             None => &self.current().defined_names,
         }
+    }
+
+    pub(crate) fn shared_defined_names(&self) -> Arc<[raw::DefinedName]> {
+        Arc::clone(&self.current().defined_names)
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.

@@ -244,9 +244,12 @@ impl RestoreEndpoint {
 }
 
 /// The catalog fields a workbook-level family can change.
+///
+/// Defined names are immutable for tab-state changes and are shared through
+/// an `Arc` across the snapshot, deferred owner, and exact restore endpoint.
 #[derive(Clone)]
 pub(crate) struct Catalog {
-    pub(crate) defined_names: Box<[crate::raw::DefinedName]>,
+    pub(crate) defined_names: Arc<[crate::raw::DefinedName]>,
     pub(crate) active_sheet: Option<usize>,
 }
 
@@ -290,11 +293,22 @@ impl SourceBackedWorkbook {
         if let Some(view) = pending.materialized.get() {
             return Ok(view);
         }
+        // A committed workbook either carries the catalog captured while its
+        // change was authored, or changes only non-workbook parts. In both
+        // cases the immutable defined-name records are unchanged. Keep the
+        // existing Arc when the output is reopened so a long edit/replay
+        // history does not allocate one catalog per materialized owner.
+        let shared_defined_names = pending
+            .catalog
+            .as_ref()
+            .map(|catalog| Arc::clone(&catalog.defined_names))
+            .unwrap_or_else(|| Arc::clone(&self.inner.defined_names));
         let mut bytes = Vec::new();
         pending.publish.write(&self.inner.package, &mut bytes)?;
-        let view = Self::from_read_at_with_options(
+        let view = Self::from_read_at_with_options_and_shared_names(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             self.inner.options.clone(),
+            Some(shared_defined_names),
         )?;
         Ok(pending.materialized.get_or_init(|| view))
     }
@@ -693,7 +707,7 @@ impl<C: Change> DeferredPublisher for C {
         let parsed = crate::raw::parse_catalog(xml, &package.read_limits())?;
         Ok(Some(Catalog {
             active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
-            defined_names: parsed.defined_names.into_boxed_slice(),
+            defined_names: Arc::from(parsed.defined_names.into_boxed_slice()),
         }))
     }
 }
@@ -736,7 +750,7 @@ pub(crate) fn publish<C: Change>(
             let parsed = crate::raw::parse_catalog(&xml, &package.read_limits())?;
             Some(Catalog {
                 active_sheet: (!parsed.sheets.is_empty()).then_some(parsed.active_sheet_index),
-                defined_names: parsed.defined_names.into_boxed_slice(),
+                defined_names: Arc::from(parsed.defined_names.into_boxed_slice()),
             })
         },
     };

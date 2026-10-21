@@ -54,12 +54,26 @@ receipt therefore attributes the +1,016,864 bytes to both the new read-only
 owner admission and the duplicate snapshot catalog; it must not be presented
 as an isolated cost of the deferred publisher.
 
-The first repair direction is to share immutable catalog records across the
-snapshot, deferred catalog, and exact endpoint (for example one `Arc` around
-the defined-name slice), then to reuse the already-admitted owner catalog or
-graph where the exact source closure permits it. The recipient's source-limit
-policy must still govern a replay with different limits; sharing cannot bypass
-that check. No source change was made in this return record.
+The repair is now implemented in the W4 candidate, but this returned receipt
+remains unaccepted until the candidate is rebuilt and the paired allocator
+route is rerun. `SourceInner`, the defined-name and tab-state snapshots, the
+deferred `Catalog`, and both restore endpoints now share an immutable
+`Arc<[DefinedName]>`; a changed defined-name edit creates a new Arc. Deferred
+materialization passes the known Arc into the normal source-backed open path.
+That path still parses and validates the reopened workbook under the owner
+options and compares its parsed names with the shared catalog before retaining
+the Arc. A non-workbook family reuses the base Arc because its change contract
+does not alter workbook XML. Catalog replay with different `SourceLimits`
+continues through the publisher's recipient-policy parse, so this sharing does
+not bypass stricter admission.
+
+The source validation after this repair passed the focused defined-name suite
+(7 tests), focused tab-state suite (14 tests), all-feature checks for the W4
+consumers, and warning-denied Clippy for the same consumer set. These checks
+establish correctness and policy preservation only; they do not replace the
+required paired allocator rerun. The original admission and retained-history
+numbers above remain the baseline evidence, and the b1a5 result remains a
+returned performance failure until the new binary is measured.
 
 The native source-family attempt was not a measurement: a wrapper path typo
 failed before any child launch. Its host/error files are retained under

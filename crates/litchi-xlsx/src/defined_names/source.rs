@@ -100,7 +100,9 @@ impl SourceBackedWorkbook {
     /// Returns an error when the workbook XML is invalid or the source cannot
     /// be read.
     pub fn edit_defined_names(&self) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?)?;
+        let package = self.edit_package()?;
+        let shared_names = self.shared_defined_names();
+        let before = Snapshot::load_source_backed_with_names(package, Some(shared_names))?;
         Ok(Edit::new(self.clone(), before))
     }
 

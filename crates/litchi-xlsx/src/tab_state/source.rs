@@ -295,7 +295,10 @@ impl SourceBackedWorkbook {
 
     /// Begin an isolated tab-state edit with explicit XML audit limits.
     pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, Arc::new(()))?;
+        let package = self.edit_package()?;
+        let shared_names = self.shared_defined_names();
+        let before =
+            Snapshot::load_source_backed_with_names(package, Arc::new(()), Some(shared_names))?;
         Edit::new(self.clone(), before, options.limits.unwrap_or_default())
     }
 

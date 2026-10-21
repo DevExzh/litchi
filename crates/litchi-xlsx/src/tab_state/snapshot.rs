@@ -56,7 +56,9 @@ impl Tab {
 pub struct Snapshot {
     tabs: Arc<[Tab]>,
     active: usize,
-    defined_names: Box<[raw::DefinedName]>,
+    /// Immutable catalog records shared by the snapshot, deferred catalog,
+    /// and exact restore endpoint. A tab-state edit does not change names.
+    defined_names: Arc<[raw::DefinedName]>,
     pub(super) limits: SourceLimits,
     pub(super) source: SourceState,
     origin: Option<Arc<()>>,
@@ -68,9 +70,10 @@ impl Snapshot {
         Self::load_owned_with_touched(package, &[])
     }
 
-    pub(super) fn load_source_backed(
+    pub(super) fn load_source_backed_with_names(
         package: &SourceBackedPackage,
         origin: Arc<()>,
+        shared_names: Option<Arc<[raw::DefinedName]>>,
     ) -> Result<Self> {
         package.check_execution()?;
         let source_version = package.source_version()?;
@@ -80,7 +83,15 @@ impl Snapshot {
         let catalog = raw::parse_catalog(workbook_bytes.as_bytes(), &package.read_limits())?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
-        let defined_names = catalog.defined_names.into_boxed_slice();
+        let defined_names = match shared_names {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.as_ref() {
+                    return Err(invalid("tab-state source catalog changed during snapshot"));
+                }
+                shared
+            },
+            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+        };
         let snapshot = Self {
             tabs,
             active,
@@ -113,7 +124,7 @@ impl Snapshot {
         let graph = capture_owned_graph(package, workbook, &catalog.sheets)?;
         let touched = capture_owned_touched(package, &graph, positions)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
-        let defined_names = catalog.defined_names.into_boxed_slice();
+        let defined_names = Arc::from(catalog.defined_names.into_boxed_slice());
         Ok(Self {
             tabs,
             active,
@@ -171,7 +182,14 @@ impl Snapshot {
                 "tab-state rewrite changed workbook sheet topology or relationships",
             ));
         }
-        let defined_names = catalog.defined_names.into_boxed_slice();
+        if catalog.defined_names.as_slice() != before.defined_names.as_ref() {
+            return Err(invalid(
+                "tab-state rewrite changed the defined-name catalog",
+            ));
+        }
+        // Tab-state rewrites leave the defined-name XML untouched. Reuse the
+        // source catalog rather than retaining a second deep copy per patch.
+        let defined_names = Arc::clone(&before.defined_names);
 
         let mut rewritten_parts = Vec::new();
         rewritten_parts

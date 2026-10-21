@@ -15,7 +15,9 @@ use crate::source_payload::SourcePayload;
 /// Exact workbook owner state plus its inert defined-name catalog.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
-    names: Box<[DefinedName]>,
+    /// Immutable catalog records shared with the deferred output and restore
+    /// endpoint. A defined-name edit replaces this Arc only when names change.
+    names: Arc<[DefinedName]>,
     active_sheet: Option<usize>,
     source: SourceState,
     context: Option<ExecutionContext>,
@@ -36,10 +38,18 @@ impl Snapshot {
             owner,
             None,
             package.read_limits(),
+            None,
         )
     }
 
     pub(super) fn load_source_backed(package: &SourceBackedPackage) -> Result<Self> {
+        Self::load_source_backed_with_names(package, None)
+    }
+
+    pub(super) fn load_source_backed_with_names(
+        package: &SourceBackedPackage,
+        shared_names: Option<Arc<[DefinedName]>>,
+    ) -> Result<Self> {
         package.check_execution()?;
         let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
@@ -53,6 +63,7 @@ impl Snapshot {
             owner,
             package.execution_context(),
             package.read_limits(),
+            shared_names,
         )?;
         package.check_execution()?;
         if package.source_version()? != source_version {
@@ -69,6 +80,7 @@ impl Snapshot {
         owner: &Relationship,
         context: Option<ExecutionContext>,
         limits: SourceLimits,
+        shared_names: Option<Arc<[DefinedName]>>,
     ) -> Result<Self> {
         Self::from_parts(
             workbook.partname().clone(),
@@ -77,6 +89,7 @@ impl Snapshot {
             owner,
             context,
             limits,
+            shared_names,
         )
     }
 
@@ -87,10 +100,21 @@ impl Snapshot {
         owner: &Relationship,
         context: Option<ExecutionContext>,
         limits: SourceLimits,
+        shared_names: Option<Arc<[DefinedName]>>,
     ) -> Result<Self> {
         let catalog = raw::parse_catalog(bytes.as_bytes(), &limits)?;
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
-        let names = catalog.defined_names.into_boxed_slice();
+        let names = match shared_names {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.as_ref() {
+                    return Err(invalid(
+                        "defined-name source catalog changed during snapshot",
+                    ));
+                }
+                shared
+            },
+            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+        };
         Ok(Self {
             names,
             active_sheet,
@@ -108,7 +132,7 @@ impl Snapshot {
     pub(super) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
         let catalog = raw::parse_catalog(&bytes, &source.limits)?;
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
-        let names = catalog.defined_names.into_boxed_slice();
+        let names = Arc::from(catalog.defined_names.into_boxed_slice());
         let mut rewritten = source.clone();
         rewritten.names = names;
         rewritten.active_sheet = active_sheet;
