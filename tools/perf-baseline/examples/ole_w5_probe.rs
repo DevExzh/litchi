@@ -33,15 +33,14 @@ use litchi_xls::cell_values::{
 ///
 /// The native ABBA probe does not enable this feature.  Keeping the allocator
 /// behind a feature makes the extra atomics and the reporting path impossible
-/// to include accidentally in the timing binaries.  Reports are emitted with
-/// counting disabled so formatting the receipt cannot inflate the operation
-/// being measured.
+/// to include accidentally in the timing binaries.  Reports are emitted after
+/// the before/after snapshots, so their own formatting allocations become the
+/// next operation's baseline rather than entering the preceding delta.
 #[cfg(feature = "w5-counting-allocator")]
 mod w5_counting_allocator {
     use std::alloc::{GlobalAlloc, Layout, System};
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    static ENABLED: AtomicBool = AtomicBool::new(true);
     static TOTAL_CALLS: AtomicUsize = AtomicUsize::new(0);
     static TOTAL_BYTES: AtomicUsize = AtomicUsize::new(0);
     static LIVE_CALLS: AtomicUsize = AtomicUsize::new(0);
@@ -66,9 +65,6 @@ mod w5_counting_allocator {
 
     #[inline]
     fn record_alloc(bytes: usize) {
-        if !ENABLED.load(Ordering::Relaxed) {
-            return;
-        }
         TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
         TOTAL_BYTES.fetch_add(bytes, Ordering::Relaxed);
         let live_calls = LIVE_CALLS.fetch_add(1, Ordering::Relaxed) + 1;
@@ -79,9 +75,6 @@ mod w5_counting_allocator {
 
     #[inline]
     fn record_realloc(old_bytes: usize, new_bytes: usize) {
-        if !ENABLED.load(Ordering::Relaxed) {
-            return;
-        }
         TOTAL_CALLS.fetch_add(1, Ordering::Relaxed);
         TOTAL_BYTES.fetch_add(new_bytes, Ordering::Relaxed);
         let live_bytes = if new_bytes >= old_bytes {
@@ -95,9 +88,6 @@ mod w5_counting_allocator {
 
     #[inline]
     fn record_dealloc(bytes: usize) {
-        if !ENABLED.load(Ordering::Relaxed) {
-            return;
-        }
         LIVE_CALLS.fetch_sub(1, Ordering::Relaxed);
         LIVE_BYTES.fetch_sub(bytes, Ordering::Relaxed);
     }
@@ -153,15 +143,12 @@ mod w5_counting_allocator {
     }
 
     pub fn print_header() {
-        let enabled = ENABLED.swap(false, Ordering::SeqCst);
         println!(
             "w5_alloc,route,iteration,delta_calls,delta_bytes,live_calls,live_bytes,peak_calls,peak_bytes,base_live_calls,base_live_bytes,base_peak_calls,base_peak_bytes"
         );
-        ENABLED.store(enabled, Ordering::SeqCst);
     }
 
     pub fn print_delta(route: &str, iteration: usize, before: Snapshot, after: Snapshot) {
-        let enabled = ENABLED.swap(false, Ordering::SeqCst);
         println!(
             "w5_alloc,{route},{iteration},{},{},{},{},{},{},{},{},{},{}",
             after.total_calls.saturating_sub(before.total_calls),
@@ -175,7 +162,6 @@ mod w5_counting_allocator {
             before.peak_calls,
             before.peak_bytes,
         );
-        ENABLED.store(enabled, Ordering::SeqCst);
     }
 }
 
