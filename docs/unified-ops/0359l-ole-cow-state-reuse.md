@@ -161,3 +161,16 @@ blocks are qualified observations and remain usable alongside a fresh run
 with the same binaries and protocol. The interrupted fifth block is excluded
 from timing evidence. A fresh quiet grant and fresh output directory are
 required after those processes drain.
+
+The four qualified clone ratios retained from that attempt are:
+
+| completed block | small after/before | large after/before |
+| ---: | ---: | ---: |
+| 0 | 0.999886856 | 0.999462079 |
+| 1 | 0.999502977 | 0.999901993 |
+| 2 | 0.999891273 | 0.999710884 |
+| 3 | 0.999989514 | 0.999034764 |
+
+These rows each used three samples per leg after two warmups, with every
+sample above 603 ms. They are retained as the first four of the eventual
+same-binary nine-block clone distribution; the fresh run supplies five more.
