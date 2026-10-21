@@ -108,7 +108,8 @@ pub(super) fn prepare(
         if part.content_type() != CONNECTIONS_CONTENT_TYPE {
             return Err(invalid("unexpected Connections content type"));
         }
-        let values = crate::connections::Connections::parse(part.blob())
+        let limits = package.read_limits();
+        let values = crate::connections::Connections::parse(part.blob(), &limits)
             .map_err(|error| invalid(error.to_string()))?;
         model_ids
             .try_reserve(values.connections.len())
@@ -365,7 +366,8 @@ pub(super) fn prepare(
             return Err(invalid("ambiguous connection removal spans"));
         }
         let after = before.update_elements(&updates, MAX_XML_BYTES)?;
-        crate::connections::Connections::parse(after.bytes())
+        let limits = package.read_limits();
+        crate::connections::Connections::parse(after.bytes(), &limits)
             .map_err(|error| invalid(error.to_string()))?;
         Some(ConnectionChange::Update { before, after })
     };

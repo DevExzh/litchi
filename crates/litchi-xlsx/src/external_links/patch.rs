@@ -4,7 +4,7 @@ use litchi_opc::OpcPackage;
 
 use super::package::apply_entries;
 use super::snapshot::Snapshot;
-use crate::error::Result;
+use crate::error::{Error as XlsxError, Result};
 
 /// A reversible replacement of the workbook's external-link graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -48,9 +48,10 @@ impl Patch {
     /// Apply atomically after checking the workbook owner and every owned
     /// external-link part.
     pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<()> {
-        let current = Snapshot::load(target)?;
+        let limits = target.read_limits();
+        let current = Snapshot::load(target, &limits)?;
         if !current.same_source(&self.before) {
-            return Err(Error::PatchConflict {
+            return Err(XlsxError::PatchConflict {
                 part: self.before.workbook_part_name().to_owned(),
             });
         }
@@ -65,9 +66,9 @@ impl Patch {
             self.after.entries(),
             self.after.conformance(),
         )?;
-        let resulting = Snapshot::load(&candidate)?;
+        let resulting = Snapshot::load(&candidate, &limits)?;
         if !resulting.same_source(&self.after) || resulting.entries() != self.after.entries() {
-            return Err(Error::PatchConflict {
+            return Err(XlsxError::PatchConflict {
                 part: self.after.workbook_part_name().to_owned(),
             });
         }
@@ -80,6 +81,8 @@ crate::record::record_family!("external-link");
 
 crate::record::limit_kinds!("external-link", ExternalLinks {
     XmlBytes => "external-link XML bytes",
+    Events => "external-link XML events",
+    Depth => "external-link XML depth",
     TargetUri => "external-link target URI bytes",
     SheetNames => "external-link sheet names",
     DefinedNames => "external-link defined names",

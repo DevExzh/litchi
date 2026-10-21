@@ -7,6 +7,7 @@ use crate::raw::namespace::{is_spreadsheetml_name, relationship_attribute_value}
 use litchi_ooxml_common::external_link::EXTERNAL_WORKBOOK_RELATIONSHIP_TYPES;
 use litchi_ooxml_common::relationships::{STRICT_NAMESPACE, TRANSITIONAL_NAMESPACE};
 use litchi_ooxml_common::xml::{decode_xml_reference, is_ncname, unqualified_attribute_value};
+use litchi_opc::SourceLimits;
 use litchi_opc::constants::relationship_type as rt;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -25,16 +26,24 @@ use super::model::{
 use super::{invalid, limit};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+fn source_xml_limit(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_CACHE_TEXT_BYTES as u64) as usize
+}
+
 impl Link {
     /// Serialize this link as a canonical transitional `SpreadsheetML` external-link part.
     ///
     /// External targets are represented only as OPC relationship metadata and are never opened.
-    pub fn to_xml(&self) -> Result<Vec<u8>> {
-        self.to_xml_with_conformance(Conformance::Transitional)
+    pub fn to_xml(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        self.to_xml_with_conformance(Conformance::Transitional, limits)
     }
 
     /// Serialize this link without dereferencing or executing any target metadata.
-    pub fn to_xml_with_conformance(&self, conformance: Conformance) -> Result<Vec<u8>> {
+    pub fn to_xml_with_conformance(
+        &self,
+        conformance: Conformance,
+        limits: &SourceLimits,
+    ) -> Result<Vec<u8>> {
         let has_x14 = matches!(self, Self::Ole(link) if link.items.iter().any(|item| item.source == ItemSource::Office2010));
         let mut xml = format!(
             r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><externalLink xmlns="{}""#,
@@ -58,11 +67,12 @@ impl Link {
             Self::Ole(link) => write_ole_link(&mut xml, link)?,
         }
         xml.push_str("</externalLink>");
-        if xml.len() > MAX_CACHE_TEXT_BYTES {
+        let maximum = source_xml_limit(limits);
+        if xml.len() > maximum {
             return Err(Error::limit(
                 super::LimitKind::CacheTextBytes,
                 xml.len(),
-                MAX_CACHE_TEXT_BYTES,
+                maximum,
             ));
         }
         Ok(xml.into_bytes())
@@ -1296,13 +1306,29 @@ impl Parser {
     }
 }
 
-pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
+pub fn parse_external_link(xml: &[u8], limits: &SourceLimits) -> Result<Link> {
+    let maximum = source_xml_limit(limits);
+    if xml.len() > maximum {
+        return Err(Error::limit(super::LimitKind::XmlBytes, xml.len(), maximum));
+    }
     let xml = litchi_ooxml_common::mce::process_ooxml(xml)?;
+    if xml.len() > maximum {
+        return Err(Error::limit(super::LimitKind::XmlBytes, xml.len(), maximum));
+    }
     let mut reader = NsReader::from_reader(xml.as_ref());
     let mut parser = Parser::new();
     let mut stack = Vec::new();
     let mut closed_root = false;
+    let mut events = 0usize;
     loop {
+        events = events.saturating_add(1);
+        if events > limits.max_events() {
+            return Err(Error::limit(
+                super::LimitKind::Events,
+                events,
+                limits.max_events(),
+            ));
+        }
         let decoder = reader.decoder();
         let event = reader
             .read_event()
@@ -1337,6 +1363,13 @@ pub fn parse_external_link(xml: &[u8]) -> Result<Link> {
                     .ok_or_else(|| invalid("external-link XML is missing its root"))?;
                 let context = parser.start(parent, &namespace, &element, decoder, &resolver)?;
                 stack.push(context);
+                if stack.len() > limits.max_depth() {
+                    return Err(Error::limit(
+                        super::LimitKind::Depth,
+                        stack.len(),
+                        limits.max_depth(),
+                    ));
+                }
             },
             Event::Empty(element) => {
                 let parent = *stack
@@ -1446,12 +1479,13 @@ pub(super) fn patch_source(
     before: &Link,
     after: &Link,
     conformance: Conformance,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     if before == after {
         return Ok(source.to_vec());
     }
     if !compatible_topology(before, after) {
-        return after.to_xml_with_conformance(conformance);
+        return after.to_xml_with_conformance(conformance, limits);
     }
     let tree = XmlTree::parse(source)?;
     let mut edits = Vec::new();
@@ -1466,7 +1500,7 @@ pub(super) fn patch_source(
         (Link::Ole(before), Link::Ole(after)) => {
             patch_ole(&tree, kind, before, after, &mut edits)?;
         },
-        _ => return after.to_xml_with_conformance(conformance),
+        _ => return after.to_xml_with_conformance(conformance, limits),
     }
     apply_source_edits(source, edits)
 }

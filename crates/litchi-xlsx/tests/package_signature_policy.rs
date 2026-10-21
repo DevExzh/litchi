@@ -224,6 +224,11 @@ mod connections_family {
         edit.commit().unwrap().into_package()
     }
 
+    fn load(package: &OpcPackage) -> litchi_xlsx::Result<Option<Connections>> {
+        let limits = package.read_limits();
+        connections::load_from_package(package, &limits)
+    }
+
     #[test]
     fn a_signed_fixture_refuses_a_store_and_keeps_exact_noops() {
         for name in SIGNED {
@@ -247,10 +252,7 @@ mod connections_family {
 
             let output = bytes(&with_catalog(&package.unsign().unwrap()));
             assert!(!carries_signature(&output), "{name}");
-            assert_eq!(
-                connections::load_from_package(&open(&output)).unwrap(),
-                Some(catalog())
-            );
+            assert_eq!(load(&open(&output)).unwrap(), Some(catalog()));
         }
     }
 
@@ -274,7 +276,7 @@ mod connections_family {
         };
         assert_signed(package.apply_connections(&patch));
         assert_eq!(
-            connections::load_from_package(&open(&bytes(&package)))
+            load(&open(&bytes(&package)))
                 .unwrap()
                 .unwrap()
                 .connections
@@ -291,14 +293,7 @@ mod connections_family {
                 .package(),
         );
         assert!(!carries_signature(&output));
-        assert_eq!(
-            connections::load_from_package(&open(&output))
-                .unwrap()
-                .unwrap()
-                .connections
-                .len(),
-            1
-        );
+        assert_eq!(load(&open(&output)).unwrap().unwrap().connections.len(), 1);
     }
 }
 

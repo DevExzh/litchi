@@ -18,18 +18,18 @@ mod package;
 
 /// Typed and package-level validation for inert connection metadata.
 pub mod validation {
-    use litchi_opc::OpcPackage;
+    use litchi_opc::{OpcPackage, SourceLimits};
 
     use super::model::Connections;
     use super::package;
     use crate::error::Result;
 
-    pub fn connections(value: &Connections) -> Result<()> {
-        value.to_xml(false).map(|_| ())
+    pub fn connections(value: &Connections, limits: &SourceLimits) -> Result<()> {
+        value.to_xml(false, limits).map(|_| ())
     }
 
-    pub fn graph(package: &OpcPackage) -> Result<Option<Connections>> {
-        package::validate_graph(package)
+    pub fn graph(package: &OpcPackage, limits: &SourceLimits) -> Result<Option<Connections>> {
+        package::validate_graph(package, limits)
     }
 }
 

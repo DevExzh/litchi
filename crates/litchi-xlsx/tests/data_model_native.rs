@@ -1,7 +1,7 @@
 //! Native version-150 read, descriptor publication, and compatibility boundaries.
 #![allow(clippy::unwrap_used, reason = "test assertions panic on failure")]
 
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::{Error, Package};
 
 const SOURCE: &[u8] = include_bytes!("data/data_model/tdf167689_x15_namespace.xlsx");
@@ -197,7 +197,7 @@ fn public_data_model_writer_enforces_xml10_character_boundaries() {
         let mut value = definition();
         value.tables[0].name = format!("table{forbidden}");
         assert!(matches!(
-            litchi_xlsx::write_data_model(&value, &litchi_opc::SourceLimits::default()),
+            litchi_xlsx::write_data_model(&value, &SourceLimits::default()),
             Err(Error::Invalid(message)) if message.contains("XML 1.0-forbidden character")
         ));
     }
@@ -207,10 +207,8 @@ fn public_data_model_writer_enforces_xml10_character_boundaries() {
     value.tables[0].id = format!("id{valid}");
     value.tables[0].name = format!("table{valid}");
     value.tables[0].connection = format!("connection{valid}");
-    let encoded =
-        litchi_xlsx::write_data_model(&value, &litchi_opc::SourceLimits::default()).unwrap();
-    let decoded =
-        litchi_xlsx::parse_data_model(&encoded, &litchi_opc::SourceLimits::default()).unwrap();
+    let encoded = litchi_xlsx::write_data_model(&value, &SourceLimits::default()).unwrap();
+    let decoded = litchi_xlsx::parse_data_model(&encoded, &SourceLimits::default()).unwrap();
     assert_eq!(decoded.tables[0], value.tables[0]);
 }
 
@@ -443,6 +441,7 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
                 .get_part(&PackURI::new("/xl/connections.xml").unwrap())
                 .unwrap()
                 .blob(),
+            &SourceLimits::default(),
         )
         .unwrap();
         assert_eq!(

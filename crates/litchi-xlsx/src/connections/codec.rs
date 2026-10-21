@@ -13,6 +13,7 @@ use crate::error::Result;
 use crate::error::{Error as XlsxError, Result as XlsxResult};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 use quick_xml::{
     Reader, XmlVersion,
     encoding::Decoder,
@@ -68,22 +69,49 @@ pub(super) struct Node {
     content: Vec<Content>,
 }
 
+fn source_maximum(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_XML_BYTES as u64) as usize
+}
+
+pub(super) fn source_profile(
+    limits: &SourceLimits,
+) -> (usize, usize, usize, usize, usize, usize, usize, usize) {
+    let maximum = source_maximum(limits);
+    (
+        maximum,
+        MAX_DOM_NODES,
+        limits.max_events().min(MAX_DOM_NODES.saturating_mul(4)),
+        limits.max_depth().min(MAX_DOM_DEPTH),
+        MAX_STRING_BYTES.min(maximum),
+        MAX_XML_BYTES.min(maximum),
+        limits.max_xml_attribute_bytes().min(MAX_DOM_NODES),
+        MAX_XML_BYTES.min(maximum),
+    )
+}
+
 impl Connections {
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(invalid("connections part exceeds 16 MiB"));
-        }
-        // The MCE processor rejects otherwise legal processing instructions.
-        // They do not contribute to the typed connection projection, while
-        // source-bound callers retain the original bytes for exact splicing.
-        // Remove only PI events before MCE processing; all schema-bearing
-        // markup still goes through the normal full parser and validator.
-        let without_pi = strip_processing_instructions(xml)?;
-        let x = litchi_ooxml_common::mce::process_ooxml(without_pi.as_ref())?;
-        if x.len() > MAX_XML_BYTES {
-            return Err(invalid("processed connections part exceeds 16 MiB"));
-        }
-        project(&parse_dom(x.as_ref())?)
+    pub fn parse(xml: &[u8], limits: &SourceLimits) -> Result<Self> {
+        let (
+            max_bytes,
+            max_nodes,
+            max_events,
+            max_depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+            max_temporary_bytes,
+        ) = source_profile(limits);
+        Self::parse_with_limits(
+            xml,
+            max_bytes,
+            max_nodes,
+            max_events,
+            max_depth,
+            max_string_bytes,
+            max_namespace_bytes,
+            max_attributes,
+            max_temporary_bytes,
+        )
     }
 
     /// Parse one connections part under a caller-selected byte ceiling.
@@ -177,14 +205,14 @@ impl Connections {
         .map_err(|error| XlsxError::Invalid(error.to_string()))?;
         project(&root).map_err(|error| XlsxError::Invalid(error.to_string()))
     }
-    pub fn to_xml(&self, strict: bool) -> Result<Vec<u8>> {
+    pub fn to_xml(&self, strict: bool, limits: &SourceLimits) -> Result<Vec<u8>> {
         validate(self)?;
         let ns = if strict {
             STRICT_NAMESPACE
         } else {
             CORE_NAMESPACE
         };
-        let mut x = BoundedXml::new();
+        let mut x = BoundedXml::new(source_maximum(limits));
         x.push_str(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><connections xmlns=\"",
         )?;
@@ -1250,11 +1278,15 @@ fn parse_parameters(n: &Node) -> Result<Vec<ConnectionParameter>> {
 
 pub(super) struct BoundedXml {
     pub(super) bytes: Vec<u8>,
+    maximum: usize,
 }
 
 impl BoundedXml {
-    pub(super) fn new() -> Self {
-        Self { bytes: Vec::new() }
+    pub(super) fn new(maximum: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            maximum,
+        }
     }
 
     fn push_str(&mut self, value: &str) -> Result<()> {
@@ -1273,8 +1305,12 @@ impl BoundedXml {
             .len()
             .checked_add(value.len())
             .ok_or_else(|| invalid("serialized connections length overflows"))?;
-        if length > MAX_XML_BYTES {
-            return Err(invalid("serialized connections part exceeds 16 MiB"));
+        if length > self.maximum {
+            return Err(super::limit(
+                "connections output bytes",
+                length,
+                self.maximum,
+            ));
         }
         self.bytes
             .try_reserve_exact(value.len())
@@ -1811,7 +1847,16 @@ pub(super) fn patch_connections_source(
     before: &Connections,
     after: &Connections,
     strict: bool,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
+    let maximum = source_maximum(limits);
+    if source.len() > maximum {
+        return Err(super::limit(
+            "connections input XML bytes",
+            source.len(),
+            maximum,
+        ));
+    }
     if before == after {
         return Ok(source.to_vec());
     }
@@ -1890,6 +1935,7 @@ pub(super) fn patch_connections_source(
                 &before.connections[before_index],
                 connection,
                 strict,
+                maximum,
                 &mut edits,
                 &mut extension_replacements,
             )?;
@@ -1897,7 +1943,7 @@ pub(super) fn patch_connections_source(
             let (parent, offset) = insertion.ok_or_else(|| {
                 invalid("connection source has no safe connection insertion point")
             })?;
-            let canonical = canonical_connection(connection, strict)?;
+            let canonical = canonical_connection(connection, strict, maximum)?;
             let replacement = qualify_fragment(canonical.clone(), &tree, parent)?;
             if connection.extension_xml.is_some() {
                 let extension = canonical_extension(&canonical, strict)?
@@ -1922,7 +1968,7 @@ pub(super) fn patch_connections_source(
             });
         }
     }
-    let updated = apply_source_edits(source, edits)?;
+    let updated = apply_source_edits_with_limit(source, edits, maximum)?;
     let updated = reorder_connections_source(&updated, &after.connections)?;
     verify_extension_publications(&updated, &extension_replacements)?;
     Ok(updated)
@@ -2114,6 +2160,7 @@ fn patch_connection_source(
     before: &Connection,
     after: &Connection,
     strict: bool,
+    maximum: usize,
     edits: &mut Vec<SourceEdit>,
     extension_replacements: &mut Vec<PublishedExtension>,
 ) -> Result<()> {
@@ -2291,7 +2338,7 @@ fn patch_connection_source(
         after
             .database
             .is_some()
-            .then(|| canonical_child(after, "dbPr", strict))
+            .then(|| canonical_child(after, "dbPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2308,7 +2355,7 @@ fn patch_connection_source(
         after
             .olap
             .is_some()
-            .then(|| canonical_child(after, "olapPr", strict))
+            .then(|| canonical_child(after, "olapPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2325,7 +2372,7 @@ fn patch_connection_source(
         after
             .web
             .is_some()
-            .then(|| canonical_child(after, "webPr", strict))
+            .then(|| canonical_child(after, "webPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2342,7 +2389,7 @@ fn patch_connection_source(
         after
             .text
             .is_some()
-            .then(|| canonical_child(after, "textPr", strict))
+            .then(|| canonical_child(after, "textPr", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2359,7 +2406,7 @@ fn patch_connection_source(
         after
             .parameters
             .is_some()
-            .then(|| canonical_child(after, "parameters", strict))
+            .then(|| canonical_child(after, "parameters", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2376,7 +2423,7 @@ fn patch_connection_source(
         after
             .extension_xml
             .as_ref()
-            .map(|_| canonical_child(after, "extLst", strict))
+            .map(|_| canonical_child(after, "extLst", strict, maximum))
             .transpose()?,
         edits,
         &mut self_closing_children,
@@ -2386,14 +2433,19 @@ fn patch_connection_source(
     Ok(())
 }
 
-fn canonical_connection(value: &Connection, strict: bool) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+fn canonical_connection(value: &Connection, strict: bool, maximum: usize) -> Result<Vec<u8>> {
+    let mut output = BoundedXml::new(maximum);
     write_connection(&mut output, value, strict)?;
     Ok(output.finish())
 }
 
-fn canonical_child(value: &Connection, name: &str, strict: bool) -> Result<Vec<u8>> {
-    let source = canonical_connection(value, strict)?;
+fn canonical_child(
+    value: &Connection,
+    name: &str,
+    strict: bool,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    let source = canonical_connection(value, strict, maximum)?;
     let namespace = if strict {
         STRICT_NAMESPACE
     } else {
@@ -2924,7 +2976,7 @@ fn patch_existing_child_source(
 }
 
 fn canonical_web_table(value: &WebTableSelector) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     match value {
         WebTableSelector::Missing => output.push_str("<m/>")?,
         WebTableSelector::String(value) => {
@@ -2966,7 +3018,7 @@ fn web_table_key(value: &WebTableSelector) -> u64 {
 }
 
 fn canonical_web_tables(values: &[WebTableSelector]) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<tables")?;
     num(&mut output, "count", values.len())?;
     output.push_char('>')?;
@@ -2978,7 +3030,7 @@ fn canonical_web_tables(values: &[WebTableSelector]) -> Result<Vec<u8>> {
 }
 
 fn canonical_text_field(value: &TextField) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<textField")?;
     if let Some(value) = value.field_type {
         attr(&mut output, "type", field_str(value))?;
@@ -2996,7 +3048,7 @@ fn text_field_key(value: &TextField) -> u64 {
 }
 
 fn canonical_text_fields(values: &[TextField]) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<textFields")?;
     num(&mut output, "count", values.len())?;
     output.push_char('>')?;
@@ -3008,7 +3060,7 @@ fn canonical_text_fields(values: &[TextField]) -> Result<Vec<u8>> {
 }
 
 fn canonical_parameter(value: &ConnectionParameter) -> Result<Vec<u8>> {
-    let mut output = BoundedXml::new();
+    let mut output = BoundedXml::new(MAX_XML_BYTES);
     output.push_str("<parameter")?;
     str_opt(&mut output, "name", value.name.as_deref())?;
     num_opt(&mut output, "sqlType", value.sql_type)?;
@@ -3760,7 +3812,15 @@ struct SourceEdit {
     replacement: Vec<u8>,
 }
 
-fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+fn apply_source_edits(source: &[u8], edits: Vec<SourceEdit>) -> Result<Vec<u8>> {
+    apply_source_edits_with_limit(source, edits, MAX_XML_BYTES)
+}
+
+fn apply_source_edits_with_limit(
+    source: &[u8],
+    mut edits: Vec<SourceEdit>,
+    maximum: usize,
+) -> Result<Vec<u8>> {
     let mut indexed = edits.drain(..).enumerate().collect::<Vec<_>>();
     indexed.sort_by(|(left_index, left), (right_index, right)| {
         left.range
@@ -3783,8 +3843,12 @@ fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u
             .ok_or_else(|| invalid("connection source output length overflows"))?;
         covered_end = edit.range.end;
     }
-    if output_len > MAX_XML_BYTES {
-        return Err(invalid("connection source output exceeds 16 MiB"));
+    if output_len > maximum {
+        return Err(super::limit(
+            "connections output bytes",
+            output_len,
+            maximum,
+        ));
     }
     let mut result = Vec::new();
     result
@@ -3803,6 +3867,10 @@ fn apply_source_edits(source: &[u8], mut edits: Vec<SourceEdit>) -> Result<Vec<u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse_default(xml: &[u8]) -> Result<Connections> {
+        Connections::parse(xml, &SourceLimits::default())
+    }
 
     fn connection(id: u32, name: Option<&str>) -> Connection {
         Connection {
@@ -3890,13 +3958,20 @@ mod tests {
         assert_eq!(shadowed.namespace.as_ref(), "urn:shadow");
         assert!(!Arc::ptr_eq(&shadowed.namespace, &large_nodes[0].namespace));
 
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let expected = source.replace("name=\"before\"", "name=\"after\"");
         assert_eq!(patched, expected.as_bytes());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -3968,17 +4043,24 @@ mod tests {
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:f="urn:foreign"><p:connection f:id="99" id="&#49;" refreshedVersion="7" name="before"><f:dbPr f:marker="keep"/></p:connection></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         assert_eq!(before.connections[0].id, 1);
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("p:connections"));
         assert!(text.contains("f:id=\"99\""));
         assert!(text.contains("f:dbPr f:marker=\"keep\""));
         assert!(!text.contains("<connection id="));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -3986,26 +4068,40 @@ mod tests {
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"><p:extLst/></p:connection></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.find("dbPr").unwrap() < text.find("extLst").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"/></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
         after.connections[0].olap = Some(OlapProperties::default());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("</p:connection>"));
         assert!(text.find("dbPr").unwrap() < text.find("olapPr").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4027,18 +4123,24 @@ mod tests {
         ];
 
         for (source, closing_tag) in cases {
-            let before = Connections::parse(source.as_bytes()).unwrap();
+            let before = parse_default(source.as_bytes()).unwrap();
             let mut after = before.clone();
             after.connections[0].name = Some("after".into());
             after.connections[0].database = Some(database_connection());
 
-            let patched =
-                patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+            let patched = patch_connections_source(
+                source.as_bytes(),
+                &before,
+                &after,
+                false,
+                &SourceLimits::default(),
+            )
+            .unwrap();
             let text = std::str::from_utf8(&patched).unwrap();
             assert!(text.contains(closing_tag));
             assert!(text.contains("name=\"after\""));
             assert!(text.contains("f:marker=\"keep\""));
-            assert_eq!(Connections::parse(&patched).unwrap(), after);
+            assert_eq!(parse_default(&patched).unwrap(), after);
         }
     }
 
@@ -4047,16 +4149,23 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><dbPr connection="before"><?keep?><!--keep--></dbPr></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database.as_mut().unwrap().connection = "after".into();
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?keep?>"));
         assert!(text.contains("<!--keep-->"));
         assert!(text.contains("connection=\"after\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4065,7 +4174,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:foreign" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><?outside-before?><extLst f:old="keep"><?old?><mc:AlternateContent><mc:Choice Requires="u"><u:old/></mc:Choice><mc:Fallback><!--old-fallback--><f:old-child/></mc:Fallback></mc:AlternateContent><!--old-comment--></extLst><?outside-after?></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].extension_xml = Some(
             format!(
@@ -4076,23 +4185,36 @@ mod tests {
             .into_bytes(),
         );
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?outside-before?>") && text.contains("<?outside-after?>"));
         assert!(text.contains("f:new=\"owned\"") && text.contains("f:new-child"));
         assert!(text.contains("<!--new-comment-->") && text.contains("mc:AlternateContent"));
         assert!(!text.contains("f:old=\"keep\"") && !text.contains("<?old?>"));
         assert!(!text.contains("old-fallback") && !text.contains("old-comment"));
-        Connections::parse(&patched).unwrap();
+        parse_default(&patched).unwrap();
 
         let mut removed = before.clone();
         removed.connections[0].extension_xml = None;
-        let patched =
-            patch_connections_source(source.as_bytes(), &before, &removed, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &removed,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?outside-before?>") && text.contains("<?outside-after?>"));
         assert!(!text.contains("<extLst") && !text.contains("<?old?>"));
-        Connections::parse(&patched).unwrap();
+        parse_default(&patched).unwrap();
     }
 
     #[test]
@@ -4101,14 +4223,21 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr url="before"><?before?><mc:AlternateContent><mc:Choice Requires="u"><u:tables count="1"><u:m/></u:tables></mc:Choice><mc:Fallback><?inside?><tables count="1"><m/></tables></mc:Fallback></mc:AlternateContent><?after?></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().url = Some("after".into());
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let expected = source.replace("url=\"before\"", "url=\"after\"");
         assert_eq!(patched, expected.as_bytes());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4116,7 +4245,7 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><?before?><m/><?inside?><s v="A"/></tables><?after?></webPr><textPr><textFields count="1"><?field?><textField type="text" position="1"/></textFields></textPr><parameters count="1"><parameter name="old"><?parameter?></parameter></parameters></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::Missing,
@@ -4150,7 +4279,14 @@ mod tests {
                 cell: None,
             });
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         for marker in [
             "<?before?>",
@@ -4164,7 +4300,7 @@ mod tests {
         assert!(text.contains("<tables count=\"3\">") && text.contains("<s v=\"B\"/>"));
         assert!(text.contains("<textFields count=\"2\">") && text.contains("position=\"2\""));
         assert!(text.contains("<parameters count=\"2\">") && text.contains("name=\"new\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4173,19 +4309,26 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr><mc:AlternateContent><mc:Choice Requires="u"><u:tables count="1"><u:s v="inactive"/></u:tables></mc:Choice><mc:Fallback><?inside?><tables count="1"><m/></tables></mc:Fallback></mc:AlternateContent></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::Missing,
             WebTableSelector::String("active".into()),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<mc:Choice") && text.contains("v=\"inactive\""));
         assert!(text.contains("<mc:Fallback>") && text.contains("<?inside?>"));
         assert!(text.contains("<tables count=\"2\">") && text.contains("<s v=\"active\"/>"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4194,7 +4337,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><s v="A"/><mc:AlternateContent><mc:Choice Requires="u"><u:s v="inactive"/></mc:Choice><mc:Fallback><s v="B"/></mc:Fallback></mc:AlternateContent></tables></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         assert_eq!(
             before.connections[0].web.as_ref().unwrap().tables.as_ref(),
             Some(&vec![
@@ -4208,21 +4351,34 @@ mod tests {
             WebTableSelector::String("B".into()),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<s v=\"C\"/>") && text.contains("<s v=\"B\"/>"));
         assert!(text.contains(
             "<mc:AlternateContent><mc:Choice Requires=\"u\"><u:s v=\"inactive\"/></mc:Choice><mc:Fallback><s v=\"B\"/></mc:Fallback></mc:AlternateContent>"
         ));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let mut moved = before.clone();
         moved.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::String("B".into()),
             WebTableSelector::String("A".into()),
         ]);
-        let error =
-            patch_connections_source(source.as_bytes(), &before, &moved, false).unwrap_err();
+        let error = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &moved,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap_err();
         assert!(
             error
                 .to_string()
@@ -4235,18 +4391,25 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7"><webPr url="before"/></connection></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         let web = after.connections[0].web.as_mut().unwrap();
         web.url = Some("after".into());
         web.tables = Some(vec![WebTableSelector::String("A".into())]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(
             text.contains("<webPr url=\"after\"><tables count=\"1\"><s v=\"A\"/></tables></webPr>")
         );
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4255,7 +4418,7 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:f="urn:f" xmlns:mc="{MCE}" xmlns:u="urn:u"><connection id="1" refreshedVersion="7"><webPr><tables count="2"><s v="A" xmlns:f="urn:f" f:opaque="table-a"><mc:AlternateContent><mc:Choice Requires="u"><u:inactive/></mc:Choice><mc:Fallback/></mc:AlternateContent></s><s v="B" xmlns:f="urn:f" f:opaque="table-b"/></tables></webPr><textPr><textFields count="2"><textField type="text" position="1" xmlns:f="urn:f" f:opaque="field-a"/><textField type="general" position="2" xmlns:f="urn:f" f:opaque="field-b"/></textFields></textPr><parameters count="2"><parameter name="A" xmlns:f="urn:f" f:opaque="parameter-a"/><parameter name="B" xmlns:f="urn:f" f:opaque="parameter-b"/></parameters></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = Some(vec![
             WebTableSelector::String("B".into()),
@@ -4276,7 +4439,14 @@ mod tests {
             after.connections[0].parameters.as_ref().unwrap()[0].clone(),
         ]);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         for marker in [
             "f:opaque=\"table-a\"",
@@ -4298,7 +4468,7 @@ mod tests {
             text.find("f:opaque=\"parameter-b\"").unwrap()
                 < text.find("f:opaque=\"parameter-a\"").unwrap()
         );
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4307,15 +4477,22 @@ mod tests {
             r#"<connections xmlns="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:u"><connection id="1" refreshedVersion="7"><webPr><?before?><tables count="1"><s v="A"><?inside?><mc:AlternateContent><mc:Choice Requires="u"><u:inactive/></mc:Choice><mc:Fallback/></mc:AlternateContent></s></tables><?after?></webPr></connection></connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].web.as_mut().unwrap().tables = None;
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("<?before?>") && text.contains("<?after?>"));
         assert!(!text.contains("<tables") && !text.contains("<?inside?>"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4323,14 +4500,21 @@ mod tests {
         let source = format!(
             r#"<connections xmlns="{CORE_NAMESPACE}"><connection id="1" refreshedVersion="7" name="one"/><connection id="2" refreshedVersion="7" name="two"/></connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections.swap(0, 1);
 
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.find("id=\"2\"").unwrap() < text.find("id=\"1\"").unwrap());
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]
@@ -4359,25 +4543,39 @@ mod tests {
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><u:connection id="9" refreshedVersion="7"/></mc:Choice><mc:Fallback><p:connection id="1" refreshedVersion="7" name="before"/></mc:Fallback></mc:AlternateContent></p:connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].name = Some("after".into());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("mc:AlternateContent"));
         assert!(text.contains("mc:Fallback"));
         assert!(text.contains("u:connection"));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
 
         let source = format!(
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}"><p:connection id="1" refreshedVersion="7"/></p:connections>"#
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections.push(connection(2, None));
         after.connections.push(connection(3, None));
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
-        let actual = Connections::parse(&patched).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
+        let actual = parse_default(&patched).unwrap();
         assert_eq!(
             actual
                 .connections
@@ -4394,14 +4592,21 @@ mod tests {
             r#"<p:connections xmlns:p="{CORE_NAMESPACE}" xmlns:mc="{MCE}" xmlns:u="urn:unsupported"><p:connection id="1" refreshedVersion="7"><mc:AlternateContent><mc:Choice Requires="u"><u:dbPr connection="inactive"/></mc:Choice><mc:Fallback><p:dbPr connection="before"/></mc:Fallback></mc:AlternateContent></p:connection></p:connections>"#,
             MCE = litchi_ooxml_common::mce::NAMESPACE,
         );
-        let before = Connections::parse(source.as_bytes()).unwrap();
+        let before = parse_default(source.as_bytes()).unwrap();
         let mut after = before.clone();
         after.connections[0].database = Some(database_connection());
-        let patched = patch_connections_source(source.as_bytes(), &before, &after, false).unwrap();
+        let patched = patch_connections_source(
+            source.as_bytes(),
+            &before,
+            &after,
+            false,
+            &SourceLimits::default(),
+        )
+        .unwrap();
         let text = std::str::from_utf8(&patched).unwrap();
         assert!(text.contains("connection=\"inactive\""));
         assert!(text.contains("connection=\"Provider=opaque\""));
-        assert_eq!(Connections::parse(&patched).unwrap(), after);
+        assert_eq!(parse_default(&patched).unwrap(), after);
     }
 
     #[test]

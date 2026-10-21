@@ -562,7 +562,8 @@ fn validate_connections(
             "Connections part has forbidden outbound relationships",
         ));
     }
-    let connections = crate::connections::Connections::parse(part.blob())
+    let limits = package.read_limits();
+    let connections = crate::connections::Connections::parse(part.blob(), &limits)
         .map_err(|error| invalid(format!("invalid Connections part: {error}")))?;
     validate_model_connection_extensions(part.blob())?;
     let mut names = HashMap::<String, usize>::new();

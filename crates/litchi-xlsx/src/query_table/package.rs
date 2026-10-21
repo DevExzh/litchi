@@ -277,7 +277,8 @@ fn relationships_already_ordered(
 }
 
 fn validate_query_table_connection(package: &OpcPackage, connection_id: u32) -> Result<()> {
-    let connections = crate::connections::load_from_package(package)
+    let limits = package.read_limits();
+    let connections = crate::connections::load_from_package(package, &limits)
         .map_err(|_source| invalid("connections graph is invalid"))?
         .ok_or_else(|| invalid("query table requires a connections part"))?;
     if connections

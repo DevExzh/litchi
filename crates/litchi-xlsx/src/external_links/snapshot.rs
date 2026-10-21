@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 
 use super::model::Conformance;
 use super::package::{Entry, load_external_links};
@@ -26,11 +26,11 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Capture and validate the complete workbook external-link graph.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        let entries = load_external_links(package)?;
+    pub fn load(package: &OpcPackage, limits: &SourceLimits) -> Result<Self> {
+        let entries = load_external_links(package, limits)?;
         let source = SourceState::capture(package, &entries)?;
         let conformance = source.conformance;
-        validation::entries(&entries, conformance)?;
+        validation::entries(&entries, conformance, limits)?;
         let next_relationship_id = next_relationship_id(&source.workbook_relationships);
         let next_part_uri = next_part_uri(package)?;
         Ok(Self {

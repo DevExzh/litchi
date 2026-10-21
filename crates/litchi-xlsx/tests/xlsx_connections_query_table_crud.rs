@@ -49,6 +49,12 @@ fn plain(package: &Package) -> OpcPackage {
     package.clone().into_plain_opc()
 }
 
+fn load(package: &Package) -> litchi_xlsx::Result<Option<Connections>> {
+    let plain = plain(package);
+    let limits = plain.read_limits();
+    load_from_package(&plain, &limits)
+}
+
 fn table(name: &str, connection_id: u32) -> Table {
     let mut refresh = Refresh::new();
     let mut field = Field::new(1);
@@ -74,14 +80,7 @@ fn generated_connections_and_query_tables_round_trip_inertly() {
     };
     connections.reorder(&[2, 1]).unwrap();
     let (package, worksheet) = package(connections);
-    assert_eq!(
-        load_from_package(&plain(&package))
-            .unwrap()
-            .unwrap()
-            .connections[0]
-            .id,
-        2
-    );
+    assert_eq!(load(&package).unwrap().unwrap().connections[0].id, 2);
 
     let mut edit = package.edit_query_tables(0_usize).unwrap();
     let first = edit

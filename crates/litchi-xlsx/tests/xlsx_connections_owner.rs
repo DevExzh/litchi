@@ -38,6 +38,11 @@ fn package() -> OpcPackage {
     Package::new().unwrap().into_plain_opc()
 }
 
+fn load(package: &OpcPackage) -> litchi_xlsx::Result<Option<Connections>> {
+    let limits = package.read_limits();
+    load_from_package(package, &limits)
+}
+
 fn store(package: OpcPackage, value: Connections) -> litchi_xlsx::Result<OpcPackage> {
     let mut edit = Package::from_opc(package)?.edit_connections()?;
     edit.replace(Some(value))?;
@@ -53,8 +58,8 @@ fn standalone_connections_api_uses_the_canonical_owner() {
     accepts_canonical_owner(&value);
 
     let package = store(package(), value).unwrap();
-    let forwarded = load_from_package(&package).unwrap().unwrap();
-    let canonical = load_from_package(&package).unwrap().unwrap();
+    let forwarded = load(&package).unwrap().unwrap();
+    let canonical = load(&package).unwrap().unwrap();
     assert_eq!(forwarded, canonical);
     assert_eq!(forwarded.connections[0].id, 7);
 }
@@ -83,5 +88,5 @@ fn standalone_adapter_retains_query_table_reference_validation() {
             .contains("query-table parts require a workbook connections part"),
         "{error}"
     );
-    assert!(load_from_package(&package).unwrap().is_none());
+    assert!(load(&package).unwrap().is_none());
 }

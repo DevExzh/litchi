@@ -25,7 +25,8 @@ pub struct Edit {
 impl Edit {
     /// Start an edit after validating and capturing the workbook graph.
     fn start(target: crate::record::Source) -> Result<Self> {
-        let before = Snapshot::load(&target)?;
+        let limits = target.read_limits();
+        let before = Snapshot::load(&target, &limits)?;
         let next_part_uri = next_part_uri(&target)?;
         Ok(Self {
             target,
@@ -60,7 +61,8 @@ impl Edit {
             .get_mut(index)
             .ok_or_else(|| invalid(format!("external-link index {index} is absent")))?;
         edit(&mut entry.link)?;
-        validation::link(&entry.link, self.before.conformance())?;
+        let limits = self.target.read_limits();
+        validation::link(&entry.link, self.before.conformance(), &limits)?;
         if draft == self.draft {
             return Ok(false);
         }
@@ -99,7 +101,8 @@ impl Edit {
 
     /// Insert a new link with an allocated workbook relationship and part URI.
     pub fn insert(&mut self, link: Link) -> Result<usize> {
-        validation::link(&link, self.before.conformance())?;
+        let limits = self.target.read_limits();
+        validation::link(&link, self.before.conformance(), &limits)?;
         let mut relationship_id = self.next_relationship_id.clone();
         while self
             .draft
@@ -120,7 +123,8 @@ impl Edit {
             part_uri,
             link,
         });
-        validation::entries(&self.draft, self.before.conformance())?;
+        let limits = self.target.read_limits();
+        validation::entries(&self.draft, self.before.conformance(), &limits)?;
         Ok(index)
     }
 
@@ -134,7 +138,8 @@ impl Edit {
             entry.index = u32::try_from(index)
                 .map_err(|_source| invalid("external-link index exceeds u32"))?;
         }
-        validation::entries(&self.draft, self.before.conformance())?;
+        let limits = self.target.read_limits();
+        validation::entries(&self.draft, self.before.conformance(), &limits)?;
         Ok(Some(removed))
     }
 
@@ -173,7 +178,8 @@ impl Edit {
         }
 
         let mut candidate = OpcPackage::clone(&self.target);
-        let current = Snapshot::load(&candidate)?;
+        let limits = candidate.read_limits();
+        let current = Snapshot::load(&candidate, &limits)?;
         if !current.same_source(&self.before) {
             return Err(crate::error::Error::PatchConflict {
                 part: self.before.workbook_part_name().to_owned(),
@@ -185,7 +191,7 @@ impl Edit {
             &self.draft,
             self.before.conformance(),
         )?;
-        let snapshot = Snapshot::load(&candidate)?;
+        let snapshot = Snapshot::load(&candidate, &limits)?;
         if snapshot.entries() != self.draft.as_slice() {
             return Err(invalid(
                 "external-link publication changed the staged graph",
