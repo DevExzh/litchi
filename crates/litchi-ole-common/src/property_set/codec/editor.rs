@@ -8,7 +8,7 @@ use super::super::model::{
 use super::package::try_path_refs;
 use super::semantic::validate_section;
 use super::support::allocation;
-use crate::protection::reject_protected_container;
+use crate::protection::{Limits as ProtectionLimits, reject_protected_container};
 use litchi_cfb::{OleError, OleFile, OleWriter};
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -31,7 +31,12 @@ impl Edit {
     pub fn new(bytes: Vec<u8>) -> Result<Self, OleError> {
         let streams = {
             let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
-            reject_protected_container(&ole, "Property Set editing", ole.directory_entry_count())?;
+            let max_entries = ole.directory_entry_count();
+            reject_protected_container(
+                &ole,
+                "Property Set editing",
+                ProtectionLimits { max_entries },
+            )?;
             let paths = ole.list_streams();
             let mut streams = try_vec_with_capacity(paths.len(), "property-set editor streams")?;
             for path in paths {

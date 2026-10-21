@@ -5,7 +5,7 @@ use super::directory::{self, EntryKind};
 use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
 use crate::property_set::Guid;
-use crate::protection::reject_protected_container;
+use crate::protection::{Limits as ProtectionLimits, reject_protected_container};
 use crate::{Error, LimitKind};
 use litchi_cfb::{
     OleError, OleFile, OleFileLimits, OleWriter, OverlayError, OverlayLimits,
@@ -1386,7 +1386,8 @@ fn find_storage<R: Read + Seek>(
 }
 
 pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>, max_entries: usize) -> Result<(), Error> {
-    reject_protected_container(ole, "object editing", max_entries).map_err(Error::from)
+    reject_protected_container(ole, "object editing", ProtectionLimits { max_entries })
+        .map_err(Error::from)
 }
 
 fn path_refs(path: &[String]) -> Vec<&str> {

@@ -5,7 +5,7 @@
 //! semantic candidate validation and it deliberately does not fall back to a
 //! topology-changing render.
 
-use crate::protection::reject_protected_shared_container;
+use crate::protection::{Limits as ProtectionLimits, reject_protected_shared_container};
 use litchi_cfb::{
     ComposedOverlaySource, OverlayError, OverlayLimits, SameLengthStreamOverlay,
     SameLengthStreamSplice, SharedOleFile, SharedOleFileLimits, StreamSpliceLimits,
@@ -52,7 +52,12 @@ impl SourceBackedOverlayPublisher {
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_owned_with_limits(source, version, limits)?;
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        let max_entries = cfb.directory_entries().count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
@@ -64,7 +69,12 @@ impl SourceBackedOverlayPublisher {
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
         let cfb = SharedOleFile::open_with_limits(source, limits)?;
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        let max_entries = cfb.directory_entries().count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
@@ -77,7 +87,12 @@ impl SourceBackedOverlayPublisher {
     /// described on [`Self::open_owned`]; any other source keeps the generic
     /// fences.
     pub fn from_shared(cfb: Arc<SharedOleFile>) -> Result<Self, OverlayError> {
-        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        let max_entries = cfb.directory_entries().count();
+        reject_protected_shared_container(
+            &cfb,
+            "source-backed stream overlay publication",
+            ProtectionLimits { max_entries },
+        )?;
         Ok(Self { cfb })
     }
 
