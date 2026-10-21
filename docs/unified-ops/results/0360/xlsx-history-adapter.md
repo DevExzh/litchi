@@ -271,7 +271,8 @@ exact N, and per-leg sums are retained. Compact merge/unmerge children are
 repeated to the same summed-span floor and report per-leg primary-time sums;
 those repeated spans are not presented as one contiguous child clock.
 
-The adapter has a --plan mode that invokes no child. A timing run uses only
+The adapter has a --plan mode that invokes no child; `--preflight-only` is not
+an alias for it. A timing run uses only
 protected copies outside the repository, for example:
 
 ~~~sh
@@ -284,8 +285,21 @@ python3 tools/xlsx_source_family_abba_batched.py \\
   --out-dir /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-batched-v1
 ~~~
 
-The adapter source SHA-256 at this checkpoint is
-3891f7bac2e60ec4cbd9c5b40772a8da0722f4b8c9b25726b608b00bdc0b4da4. It has
-passed python3 -m py_compile and a fake-child smoke run covering one eager
-family, compact merge/unmerge, batching, failure-safe journaling, and atomic
-checkpoints. No native timing has been run with the replacement adapter.
+The adapter refuses an existing nonempty result directory, records its own
+runner hash, every protected family/compact binary identity, CPU affinity, and
+durable compiler/profiler process scans before the run and between ABBA blocks.
+A busy scan aborts before another child starts. Child `elapsed_ns.samples`
+already contains one value per complete operation: the values are retained
+unchanged, each leg reports `sum_elapsed_ns` and `mean_elapsed_ns`, and each
+block reports the paired mean ratio after/before. Source read vectors and sink
+geometry are checked for their requested length and stability within each
+revision; before and after signatures remain separate, while output hashes are
+required to match across the paired route. The focused adapter tests cover
+different endpoint sample counts, real-shaped source vectors, one-time mean
+normalization, per-revision stability, fresh directories, and rejection of the
+removed preflight alias.
+
+The corrected adapter source SHA-256 is
+cb73985eeee78aa520ac17f1a406030a3399ccf3ba1498c8f66bf565b7747073. It has
+passed `python3 -m py_compile` and the focused fake-report tests. No native
+timing has been run with the corrected adapter.

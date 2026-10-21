@@ -15,6 +15,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -31,6 +32,14 @@ FAMILIES: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
 LEG_ORDER = ("before", "after", "after", "before")
 MAX_SAMPLES = 100_000
 MAX_CHILD_OUTPUT = 64 * 1024 * 1024
+HEAVY_PROCESS_NAMES = {
+    "cargo", "rustc", "rustdoc", "rustfmt", "perf", "heaptrack", "valgrind",
+    "clang", "clang++", "gcc", "cc", "ld.lld",
+}
+HEAVY_PROCESS_WORD = re.compile(
+    r"(?:^|[\s/'\"])(?:cargo|rustc|rustdoc|rustfmt|perf|heaptrack|valgrind|"
+    r"clang(?:\+\+)?|gcc|cc|ld\.lld)(?:$|[\s/'\"])",
+)
 
 
 class RunFailure(RuntimeError):
@@ -49,12 +58,12 @@ def canonical_sha(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def percentile(values: list[int], fraction: float) -> int:
+def percentile(values: list[int | float], fraction: float) -> int | float:
     ordered = sorted(values)
     return ordered[round((len(ordered) - 1) * fraction)]
 
 
-def statistics(values: list[int]) -> dict[str, Any]:
+def statistics(values: list[int | float]) -> dict[str, Any]:
     if not values:
         raise ValueError("statistics requires at least one value")
     ordered = sorted(values)
@@ -79,11 +88,18 @@ class Recorder:
 
     def __init__(self, out_dir: Path) -> None:
         self.out_dir = out_dir
+        if out_dir.exists():
+            if not out_dir.is_dir():
+                raise RunFailure(f"result path is not a directory: {out_dir}")
+            if any(out_dir.iterdir()):
+                raise RunFailure(f"result directory must be new and empty: {out_dir}")
+        else:
+            out_dir.mkdir(parents=True)
         self.raw_dir = out_dir / "raw"
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.journal_path = out_dir / "events.ndjson"
         self.stream = self.journal_path.open("a", encoding="utf-8")
-        self.index = sum(1 for _ in self.journal_path.open("r", encoding="utf-8")) - 1 if self.journal_path.stat().st_size else 0
+        self.index = 0
 
     def append(self, event: dict[str, Any]) -> int:
         event["event_index"] = self.index
@@ -112,7 +128,7 @@ class Recorder:
         self.stream.close()
 
 
-def extract_result(report: dict[str, Any], expected_case: str) -> dict[str, Any]:
+def extract_result(report: dict[str, Any], expected_case: str, expected_samples: int) -> dict[str, Any]:
     results = report.get("results")
     if not isinstance(results, list) or len(results) != 1 or not isinstance(results[0], dict):
         raise RunFailure(f"{expected_case}: child report must contain exactly one object result")
@@ -121,34 +137,134 @@ def extract_result(report: dict[str, Any], expected_case: str) -> dict[str, Any]
         raise RunFailure(f"{expected_case}: child reported case {result.get('case')!r}")
     elapsed = result.get("elapsed_ns")
     samples = elapsed.get("samples") if isinstance(elapsed, dict) else None
-    if not isinstance(samples, list) or not samples or any(not isinstance(value, int) or value <= 0 for value in samples):
-        raise RunFailure(f"{expected_case}: child has no positive elapsed samples")
+    if (
+        not isinstance(samples, list)
+        or len(samples) != expected_samples
+        or not samples
+        or any(type(value) is not int or value <= 0 for value in samples)
+    ):
+        raise RunFailure(f"{expected_case}: child must have exactly {expected_samples} positive elapsed samples")
     if not isinstance(result.get("output_sha256"), str):
         raise RunFailure(f"{expected_case}: child has no output_sha256")
     sink = result.get("sink")
-    if isinstance(sink, dict) and isinstance(sink.get("largest_write"), int) and sink["largest_write"] > 64 * 1024:
-        raise RunFailure(f"{expected_case}: largest sink write exceeds 64 KiB")
+    if isinstance(sink, dict):
+        largest_write = sink.get("largest_write")
+        if isinstance(largest_write, list):
+            if len(largest_write) != expected_samples or any(type(value) is not int for value in largest_write):
+                raise RunFailure(f"{expected_case}: sink largest_write vector has the wrong shape")
+            largest_write = max(largest_write, default=0)
+        if type(largest_write) is int and largest_write > 64 * 1024:
+            raise RunFailure(f"{expected_case}: largest sink write exceeds 64 KiB")
     return result
 
 
-def source_signature(result: dict[str, Any]) -> tuple[Any, Any]:
+def _metric_vector(value: Any, expected_samples: int, label: str) -> int | list[int] | None:
+    """Validate a scalar/vector metric without changing its reported values."""
+    if value is None:
+        return None
+    if type(value) is int:
+        if value < 0:
+            raise RunFailure(f"{label} must be nonnegative")
+        return value
+    if not isinstance(value, list) or len(value) != expected_samples:
+        raise RunFailure(f"{label} must have exactly {expected_samples} samples")
+    if any(type(item) is not int or item < 0 for item in value):
+        raise RunFailure(f"{label} samples must be nonnegative integers")
+    return list(value)
+
+
+def source_signature(result: dict[str, Any], expected_samples: int) -> dict[str, Any]:
     source = result.get("source")
     if not isinstance(source, dict):
-        return (None, None)
+        return {}
     calls = source.get("read_calls")
+    calls_name = "read_calls"
     if calls is None:
         calls = source.get("source_read_calls")
+        calls_name = "source_read_calls"
     bytes_read = source.get("read_bytes")
+    bytes_name = "read_bytes"
     if bytes_read is None:
         bytes_read = source.get("source_read_bytes")
-    return (calls, bytes_read)
+        bytes_name = "source_read_bytes"
+    return {
+        "read_calls": _metric_vector(calls, expected_samples, f"source.{calls_name}"),
+        "read_bytes": _metric_vector(bytes_read, expected_samples, f"source.{bytes_name}"),
+    }
 
 
-def sink_signature(result: dict[str, Any]) -> tuple[Any, Any]:
+def sink_signature(result: dict[str, Any], expected_samples: int) -> dict[str, Any]:
     sink = result.get("sink")
     if not isinstance(sink, dict):
-        return (None, None)
-    return (sink.get("accepted_bytes"), sink.get("largest_write"))
+        return {}
+    return {
+        "accepted_bytes": _metric_vector(sink.get("accepted_bytes"), expected_samples, "sink.accepted_bytes"),
+        "largest_write": _metric_vector(sink.get("largest_write"), expected_samples, "sink.largest_write"),
+    }
+
+
+def paired_block_mean_ratio(legs: list[dict[str, Any]]) -> float:
+    """Return mean(after leg means) / mean(before leg means) for one ABBA block."""
+    means = {
+        revision: [leg["mean_elapsed_ns"] for leg in legs if leg["revision"] == revision]
+        for revision in ("before", "after")
+    }
+    if not means["before"] or not means["after"]:
+        raise RunFailure("an ABBA block must contain before and after legs")
+    before = sum(means["before"]) / len(means["before"])
+    after = sum(means["after"]) / len(means["after"])
+    if before <= 0:
+        raise RunFailure("before ABBA mean must be positive")
+    return after / before
+
+
+def elapsed_summary(samples: list[int], expected_samples: int) -> dict[str, Any]:
+    """Summarize child per-operation samples without scaling them twice."""
+    if len(samples) != expected_samples or any(type(value) is not int or value <= 0 for value in samples):
+        raise RunFailure(f"child must provide exactly {expected_samples} positive elapsed samples")
+    return {
+        "sum_elapsed_ns": sum(samples),
+        "mean_elapsed_ns": sum(samples) / len(samples),
+        "per_op_elapsed_ns": list(samples),
+    }
+
+
+def _process_scan() -> list[dict[str, Any]]:
+    """Capture compiler/profiler processes that would contaminate a timing run."""
+    processes: list[dict[str, Any]] = []
+    proc_root = Path("/proc")
+    for entry in proc_root.glob("[0-9]*"):
+        try:
+            pid = int(entry.name)
+            if pid == os.getpid():
+                continue
+            raw = (entry / "cmdline").read_bytes()
+        except (FileNotFoundError, PermissionError, ValueError):
+            continue
+        parts = [part.decode("utf-8", errors="replace") for part in raw.split(b"\0") if part]
+        if not parts:
+            continue
+        executable = Path(parts[0]).name
+        command = " ".join(parts)
+        if executable not in HEAVY_PROCESS_NAMES and not HEAVY_PROCESS_WORD.search(command):
+            continue
+        processes.append({"pid": pid, "executable": executable, "command": parts})
+    return sorted(processes, key=lambda process: process["pid"])
+
+
+def record_quiet_scan(recorder: Recorder, phase: str) -> dict[str, Any]:
+    processes = _process_scan()
+    scan = {"phase": phase, "checked_unix_ns": time.time_ns(), "heavy_processes": processes}
+    recorder.append({"kind": "process_scan", "status": "quiet" if not processes else "busy", **scan})
+    if processes:
+        raise RunFailure(f"heavy processes present during {phase}: {[process['pid'] for process in processes]}")
+    return scan
+
+
+def binary_identity(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise RunFailure(f"binary is not a regular file: {path}")
+    return {"path": str(path), "bytes": path.stat().st_size, "sha256": sha256_file(path)}
 
 
 def run_family_child(
@@ -201,7 +317,9 @@ def run_family_child(
         report = json.loads(raw)
         if not isinstance(report, dict):
             raise RunFailure(f"{case}: child JSON is not an object")
-        result = extract_result(report, case)
+        result = extract_result(report, case, samples)
+        sink = sink_signature(result, samples)
+        source = source_signature(result, samples)
     except Exception as error:
         base["status"] = "invalid_report"
         base["error"] = repr(error)
@@ -213,8 +331,9 @@ def run_family_child(
     base.update({
         "status": "ok", "result": result, "report_sha256": canonical_sha(report),
         "output_sha256": result["output_sha256"], "elapsed_samples_ns": elapsed,
-        "sum_elapsed_ns": sum(elapsed), "per_op_elapsed_ns": [value / samples for value in elapsed],
-        "sink": sink_signature(result), "source": source_signature(result),
+        # The child already reports one elapsed value per complete operation.
+        # Preserve those values; only the leg mean is normalized.
+        **elapsed_summary(elapsed, samples), "sink": sink, "source": source,
     })
     event_index = recorder.append(base)
     return event_index, base
@@ -348,39 +467,78 @@ def family_leg(
     observations: list[dict[str, Any]] = []
     checkpoints: list[dict[str, Any]] = []
     for block in range(blocks):
+        process_scan_before = record_quiet_scan(recorder, f"before_{family}_{implementation}_block_{block}")
         legs: list[dict[str, Any]] = []
         for leg, revision in enumerate(LEG_ORDER):
             event_index, event = run_family_child(recorder, binary_by_revision[revision], case, extra, revision, implementation, "sample", family, normalization[revision]["samples"], 0, block=block, leg=leg)
             if event["sum_elapsed_ns"] < minimum_ns:
                 # The short result is already durable in the journal.
                 raise RunFailure(f"{family}/{implementation}/{revision} block {block} leg {leg}: measured {event['sum_elapsed_ns']} ns below {minimum_ns}")
-            legs.append({"event_index": event_index, "revision": revision, "leg": leg, "sum_elapsed_ns": event["sum_elapsed_ns"], "elapsed_samples_ns": event["elapsed_samples_ns"], "per_op_elapsed_ns": event["per_op_elapsed_ns"], "output_sha256": event["output_sha256"], "sink": event["sink"], "source": event["source"]})
+            legs.append({"event_index": event_index, "revision": revision, "leg": leg, "sum_elapsed_ns": event["sum_elapsed_ns"], "mean_elapsed_ns": event["mean_elapsed_ns"], "elapsed_samples_ns": event["elapsed_samples_ns"], "per_op_elapsed_ns": event["per_op_elapsed_ns"], "output_sha256": event["output_sha256"], "sink": event["sink"], "source": event["source"]})
             observations.append(event)
-        checkpoint = {"family": family, "implementation": implementation, "block": block, "legs": legs}
+        checkpoint = {
+            "family": family,
+            "implementation": implementation,
+            "block": block,
+            "legs": legs,
+            "paired_block_mean_ratio": paired_block_mean_ratio(legs),
+            "process_scan_before_block": process_scan_before,
+        }
+        checkpoint["mean_elapsed_ns_by_revision"] = {
+            revision: sum(leg["mean_elapsed_ns"] for leg in legs if leg["revision"] == revision)
+            / len([leg for leg in legs if leg["revision"] == revision])
+            for revision in ("before", "after")
+        }
+        checkpoint["process_scan"] = record_quiet_scan(recorder, f"after_{family}_{implementation}_block_{block}")
         recorder.checkpoint(f"checkpoint-{family}-{implementation}-block-{block:03d}.json", checkpoint)
         checkpoints.append(checkpoint)
     validate_family_observations(family, implementation, observations)
     per_revision = {revision: [value for event in observations if event["revision"] == revision for value in event["per_op_elapsed_ns"]] for revision in ("before", "after")}
-    return {"family": family, "implementation": implementation, "normalization": normalization, "warmup_event_indices": warmup_events, "blocks": checkpoints, "statistics_per_op": {revision: statistics(values) for revision, values in per_revision.items()}, "output_sha256": observations[0]["output_sha256"], "sink": observations[0]["sink"], "source": observations[0]["source"]}
+    source_by_revision = {
+        revision: next(event["source"] for event in observations if event["revision"] == revision)
+        for revision in ("before", "after")
+    }
+    sink_by_revision = {
+        revision: next(event["sink"] for event in observations if event["revision"] == revision)
+        for revision in ("before", "after")
+    }
+    ratios = [checkpoint["paired_block_mean_ratio"] for checkpoint in checkpoints]
+    return {
+        "family": family,
+        "implementation": implementation,
+        "normalization": normalization,
+        "warmup_event_indices": warmup_events,
+        "blocks": checkpoints,
+        "paired_block_mean_ratios": ratios,
+        "statistics_paired_block_mean_ratio": statistics(ratios),
+        "statistics_per_op": {revision: statistics(values) for revision, values in per_revision.items()},
+        "output_sha256": observations[0]["output_sha256"],
+        "sink_by_revision": sink_by_revision,
+        "source_by_revision": source_by_revision,
+    }
 
 
 def validate_family_observations(family: str, implementation: str, observations: list[dict[str, Any]]) -> None:
     if not observations:
         raise RunFailure(f"{family}/{implementation}: no observations")
     output = observations[0]["output_sha256"]
-    sink = observations[0]["sink"]
-    source = observations[0]["source"]
+    sink_by_revision: dict[str, dict[str, Any]] = {}
+    source_by_revision: dict[str, dict[str, Any]] = {}
     for event in observations:
         if event["output_sha256"] != output:
             raise RunFailure(f"{family}/{implementation}: output hash changed")
-        if event["sink"] != sink:
-            raise RunFailure(f"{family}/{implementation}: sink evidence changed")
+        revision = event["revision"]
+        if revision not in sink_by_revision:
+            sink_by_revision[revision] = event["sink"]
+            source_by_revision[revision] = event["source"]
+        elif event["sink"] != sink_by_revision[revision]:
+            raise RunFailure(f"{family}/{implementation}/{revision}: sink geometry changed")
+        elif event["source"] != source_by_revision[revision]:
+            raise RunFailure(f"{family}/{implementation}/{revision}: source read evidence changed")
         if implementation == "source":
-            calls, bytes_read = event["source"]
-            if not calls or not bytes_read:
+            source = event["source"]
+            if not source.get("read_calls") or not source.get("read_bytes"):
                 raise RunFailure(f"{family}/{implementation}: source read evidence absent")
-            if event["source"] != source:
-                raise RunFailure(f"{family}/{implementation}: source read evidence changed")
 
 
 def run_compact(
@@ -420,6 +578,7 @@ def run_compact(
         blocks_out: list[dict[str, Any]] = []
         measured: list[dict[str, Any]] = []
         for block in range(blocks):
+            process_scan_before = record_quiet_scan(recorder, f"before_compact_{operation}_block_{block}")
             legs: list[dict[str, Any]] = []
             for leg, revision in enumerate(LEG_ORDER):
                 repetitions = normalized[f"{operation}/{revision}"]
@@ -430,9 +589,19 @@ def run_compact(
                 first_hash = events[0]["output_sha256"]
                 if any(event["output_sha256"] != first_hash for event in events):
                     raise RunFailure(f"compact/{operation}/{revision} block {block}: output hash changed")
-                legs.append({"revision": revision, "leg": leg, "event_indices": [event["event_index"] for event in events], "sum_primary_ns": total, "primary_ns": times, "output_sha256": first_hash})
+                legs.append({"revision": revision, "leg": leg, "event_indices": [event["event_index"] for event in events], "sum_primary_ns": total, "mean_primary_ns": total / len(times), "primary_ns": times, "output_sha256": first_hash})
                 measured.extend(events)
-            checkpoint = {"operation": operation, "block": block, "legs": legs}
+            before_means = [leg["mean_primary_ns"] for leg in legs if leg["revision"] == "before"]
+            after_means = [leg["mean_primary_ns"] for leg in legs if leg["revision"] == "after"]
+            paired_ratio = (sum(after_means) / len(after_means)) / (sum(before_means) / len(before_means))
+            checkpoint = {
+                "operation": operation,
+                "block": block,
+                "legs": legs,
+                "paired_block_mean_ratio": paired_ratio,
+                "process_scan_before_block": process_scan_before,
+                "process_scan": record_quiet_scan(recorder, f"after_compact_{operation}_block_{block}"),
+            }
             recorder.checkpoint(f"checkpoint-compact-{operation}-block-{block:03d}.json", checkpoint)
             blocks_out.append(checkpoint)
         hashes = {event["output_sha256"] for event in measured}
@@ -451,6 +620,8 @@ def run_compact(
             "blocks": blocks_out,
             "statistics_primary_ns_per_child": {revision: statistics([event["result"]["primary_ns"] for event in measured if event["revision"] == revision]) for revision in ("before", "after")},
             "statistics_primary_sum_ns_per_leg": {revision: statistics(values) for revision, values in leg_totals.items()},
+            "paired_block_mean_ratios": [block["paired_block_mean_ratio"] for block in blocks_out],
+            "statistics_paired_block_mean_ratio": statistics([block["paired_block_mean_ratio"] for block in blocks_out]),
             "output_sha256": measured[0]["output_sha256"],
         }
     return summaries
@@ -469,7 +640,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-ms", type=float, default=500.0)
     parser.add_argument("--minimum-ms", type=float, default=150.0)
     parser.add_argument("--compact", action="store_true")
-    parser.add_argument("--plan", "--preflight-only", dest="plan_only", action="store_true", help="write the complete route/normalization plan without invoking children")
+    parser.add_argument("--plan", dest="plan_only", action="store_true", help="write the complete route/normalization plan without invoking children")
     return parser.parse_args()
 
 
@@ -486,14 +657,30 @@ def main() -> int:
     if target_ns < minimum_ns or minimum_ns <= 0:
         raise SystemExit("target must be >= positive minimum")
     selected = [family_spec(name) for name in args.family] if args.family else list(FAMILIES)
-    out = args.out_dir.resolve()
-    out.mkdir(parents=True, exist_ok=True)
-    recorder = Recorder(out)
     binaries = {"before": args.before_bin.resolve(), "after": args.after_bin.resolve()}
+    binary_metadata = {revision: binary_identity(path) for revision, path in binaries.items()}
+    merge_binaries = None
+    if args.compact:
+        merge_binaries = {
+            "before": args.merge_before_bin.resolve(),
+            "after": args.merge_after_bin.resolve(),
+        }
+    merge_metadata = {
+        revision: binary_identity(path) for revision, path in merge_binaries.items()
+    } if merge_binaries is not None else None
+    runner = Path(__file__).resolve()
+    try:
+        cpu_affinity = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cpu_affinity = None
+    out = args.out_dir.resolve()
+    recorder = Recorder(out)
     metadata = {
         "schema": "litchi.xlsx.source-family-abba.batched.v1", "claim": "paired complete-operation evidence with batched child samples",
-        "before_binary": {"path": str(binaries["before"]), "bytes": binaries["before"].stat().st_size, "sha256": sha256_file(binaries["before"])},
-        "after_binary": {"path": str(binaries["after"]), "bytes": binaries["after"].stat().st_size, "sha256": sha256_file(binaries["after"])},
+        "before_binary": binary_metadata["before"], "after_binary": binary_metadata["after"],
+        "merge_before_binary": merge_metadata["before"] if merge_metadata is not None else None,
+        "merge_after_binary": merge_metadata["after"] if merge_metadata is not None else None,
+        "runner": binary_identity(runner), "cpu_affinity": cpu_affinity,
         "families": [family[0] for family in selected], "blocks": args.blocks, "warmup": args.warmup,
         "target_ns": target_ns, "minimum_ns": minimum_ns, "started_unix_ns": time.time_ns(),
         "plan_only": args.plan_only,
@@ -505,6 +692,8 @@ def main() -> int:
         recorder.close()
         return 0
     try:
+        metadata["pre_run_process_scan"] = record_quiet_scan(recorder, "pre_run")
+        write_json(out / "run.json", metadata)
         route_summaries: list[dict[str, Any]] = []
         for spec in selected:
             family = spec[0]
