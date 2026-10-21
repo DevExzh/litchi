@@ -796,6 +796,48 @@ impl OpcPackage {
         self.source_content_types_with_limits(SourceLimits::default())
     }
 
+    /// Share the retained content-types bytes when they still describe this
+    /// graph. This is a read-only projection of admitted source bytes, not a
+    /// source token or a new admission under a caller's parsing policy.
+    ///
+    /// Structural edits can invalidate coverage, in which case this returns
+    /// `None`; [`Self::authored_content_types_xml`] provides the bounded
+    /// deterministic fallback. Changing the returned allocation with
+    /// `Arc::make_mut` cannot change this package or authorize replacement.
+    pub fn retained_content_types_xml(&self) -> Result<Option<Arc<Vec<u8>>>> {
+        if self.source_content_types_source()?.is_some() {
+            Ok(self.source_content_types_xml.clone())
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Compare the original content-types members even when either is no
+    /// longer compatible with its typed graph. Unlike publication comparison,
+    /// this distinguishes replacement of the raw member from a structural
+    /// edit that only invalidated its coverage. No XML is parsed or authored.
+    #[must_use]
+    pub fn same_content_types_source(&self, other: &Self) -> bool {
+        match (
+            &self.source_content_types_xml,
+            &other.source_content_types_xml,
+        ) {
+            (None, None) => true,
+            (Some(left), Some(right)) => Arc::ptr_eq(left, right) || left == right,
+            _ => false,
+        }
+    }
+
+    /// Serialize the typed content-type graph under required output limits.
+    /// This deterministic authored view does not retain producer XML and does
+    /// not grant source-replacement authority. Use the retained projection
+    /// first when an exact publication view is needed.
+    pub fn authored_content_types_xml(&self, limits: SourceLimits) -> Result<Arc<Vec<u8>>> {
+        Ok(Arc::new(
+            crate::pkgwriter::authored_content_types_xml_with_limits(self, limits)?,
+        ))
+    }
+
     /// Capture the current `[Content_Types].xml` publication view under an
     /// explicit bounded read policy. Retained source bytes and declarations
     /// are checked before compatibility indexing; authored fallback uses the
@@ -1027,6 +1069,39 @@ impl OpcPackage {
             self.source_content_types_source()?.map(|(bytes, _)| bytes),
             other.source_content_types_source()?.map(|(bytes, _)| bytes),
         ))
+    }
+
+    /// Return the retained relationship-member bytes when their semantic
+    /// binding still matches the current typed graph.
+    ///
+    /// This is the zero-copy provenance path for format patch capture. A
+    /// caller that needs a canonical member for an authored or changed graph
+    /// should use [`Self::source_relationships`]. The boolean reports whether
+    /// the physical relationship member is present; a source member with no
+    /// edges is therefore distinguishable from an absent part member.
+    pub fn retained_relationships_xml(
+        &self,
+        owner: &PackURI,
+    ) -> Result<Option<(Arc<Vec<u8>>, bool)>> {
+        let (owner_ref, relationships) = if owner.as_str() == PACKAGE_URI {
+            (owner, self.rels())
+        } else {
+            let Some(part) = self.part_metadata(owner) else {
+                return Ok(None);
+            };
+            (part.partname(), part.rels())
+        };
+        let Some(source) = self
+            .source_relationships_xml
+            .get(owner_ref)
+            .filter(|source| source.binding.matches(relationships))
+        else {
+            return Ok(None);
+        };
+        let member_present = owner_ref.as_str() == PACKAGE_URI
+            || !relationships.is_empty()
+            || self.source_relationships_member_present(owner_ref);
+        Ok(Some((Arc::clone(&source.bytes), member_present)))
     }
 
     /// Compare one owner's retained relationship spelling and physical presence.
@@ -3889,6 +3964,86 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn compact_manifest_views_match_tokens_and_bound_authored_output() {
+        let mut package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
+        let limits = package.read_limits();
+        let root = PackURI::new("/").unwrap();
+        assert_eq!(
+            package
+                .retained_content_types_xml()
+                .unwrap()
+                .unwrap()
+                .as_slice(),
+            package
+                .source_content_types_with_limits(limits)
+                .unwrap()
+                .bytes(),
+        );
+        let (bytes, present) = package.retained_relationships_xml(&root).unwrap().unwrap();
+        let token = package
+            .source_relationships_with_limits(&root, limits)
+            .unwrap();
+        assert_eq!(bytes.as_slice(), token.bytes());
+        assert_eq!(present, token.member_present());
+        let original = package.clone();
+        package
+            .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .set_content_type("application/example+xml".to_owned())
+            .unwrap();
+        package
+            .rels_mut()
+            .try_add_relationship(
+                "urn:example:external".to_owned(),
+                "https://example.invalid/".to_owned(),
+                "external".to_owned(),
+                crate::TargetMode::External,
+            )
+            .unwrap();
+        assert!(package.same_content_types_source(&original));
+        assert!(package.retained_content_types_xml().unwrap().is_none());
+        assert!(package.retained_relationships_xml(&root).unwrap().is_none());
+        assert_eq!(
+            package
+                .authored_content_types_xml(limits)
+                .unwrap()
+                .as_slice(),
+            package
+                .source_content_types_with_limits(limits)
+                .unwrap()
+                .bytes(),
+        );
+        assert_eq!(
+            package
+                .authored_relationships_xml(&root, limits)
+                .unwrap()
+                .as_slice(),
+            package
+                .source_relationships_with_limits(&root, limits)
+                .unwrap()
+                .bytes(),
+        );
+        let small = SourceLimits::builder()
+            .max_content_types_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.authored_content_types_xml(small).is_err());
+        let small = SourceLimits::builder()
+            .max_relationship_xml_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.authored_relationships_xml(&root, small).is_err());
+        let small = SourceLimits::builder()
+            .max_total_relationship_xml_events(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(package.authored_relationships_xml(&root, small).is_err());
     }
 
     #[test]
