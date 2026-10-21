@@ -104,6 +104,28 @@ pub mod shared {
     pub type Commit = std::time::Duration;
     pub use std::time::Instant as Diagnostics;
 }
+pub mod staged_output {
+    pub use crate::strict::{Package, Patch, Commit, Diagnostics, Error, LimitKind};
+    pub struct Edit;
+    impl Edit {
+        pub fn commit(self) -> Commit { Commit }
+        pub fn put_stream_shared_with_rendered(&mut self) -> Vec<u8> { vec![] }
+        pub fn put_streams_shared_with_rendered(&mut self) -> Option<Vec<u8>> { None }
+        pub fn write_to(&self) {}
+        pub fn to_bytes(&self) -> Vec<u8> { vec![] }
+        pub fn save(&self) {}
+        pub fn publish_to_stream(self) {}
+        pub fn prepare(&self) {}
+        fn to_plain_bytes(&self) -> Vec<u8> { vec![] }
+    }
+}
+pub use staged_output::Edit as StagedEdit;
+pub mod builder {
+    pub struct Edit;
+    impl Edit { pub fn to_bytes(&self) -> Vec<u8> { vec![] } }
+}
+impl strict::Package { pub fn to_bytes(&self) -> Vec<u8> { vec![] } }
+impl strict::Patch { pub fn to_bytes(&self) -> Vec<u8> { vec![] } }
 pub fn with_limits() {}
 pub fn open_with_limits() {}
 pub fn open_with_options() {}
@@ -191,6 +213,16 @@ class RustdocTests(unittest.TestCase):
                   if kind == "with_limits"}
         self.assertEqual(limits, {"fixture::with_limits", "fixture::open_with_limits"})
         self.assertTrue(self.check("with_limits"))
+
+    def test_inventory_reports_staged_output_through_reexport(self):
+        outputs = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
+                   if kind == "edit_output"}
+        self.assertEqual(outputs, {
+            "fixture::StagedEdit::" + name for name in (
+                "put_stream_shared_with_rendered", "put_streams_shared_with_rendered",
+                "write_to", "to_bytes", "save", "publish_to_stream",
+            )
+        })
 
     def test_empty_rules_pass_real_graph_with_cycles(self):
         self.assertEqual(self.check(), [])
@@ -372,6 +404,15 @@ class RustdocTests(unittest.TestCase):
         # checks them. Local members of the same family are still checked.
         self.assertEqual(
             gate.violations(self.document, profile(families=["fixture::shared"], family_methods=True)), [])
+
+    def test_family_methods_reject_staged_artifact_output(self):
+        failures = gate.violations(self.document, profile(
+            families=["fixture::staged_output"], family_methods=True))
+        self.assertEqual(set(failures), {
+            f"fixture::staged_output::Edit exposes forbidden method {name} (record 0351)"
+            for name in ("put_stream_shared_with_rendered", "put_streams_shared_with_rendered",
+                         "write_to", "to_bytes", "save", "publish_to_stream")
+        })
 
     def test_cli_exit_codes_and_unknown_profile(self):
         policy_path = self.directory / "policy.json"

@@ -11,6 +11,7 @@ gate sees. Each row names one public item that a migration wave must change:
   snapshot/workbook (item 15); edit_type: a staging type still named
   *Transaction or exposing rollback/is_changed/snapshot (items 15-16);
 - commit_snapshot, into_workbook, is_changed, rollback, transaction_type;
+- edit_output: artifact output on an Edit instead of its committed Package;
 - unsafe_edit: an `UnsafeEdit` error variant (item 17);
 - with_limits: a public `with_limits` or `*_with_limits` entry point (items 18-19).
 
@@ -132,6 +133,9 @@ def rows(document, crate: str):
                 yield "into_workbook", text, receiver, "delete: Package owns; Workbook is read-only"
             if name == "is_changed":
                 yield "is_changed", text, receiver, "delete: diagnostics().changed() / patch.is_noop()"
+            if (not draft and owner.endswith(("Edit", "Transaction", "Editor"))
+                    and gate.is_edit_output(name)):
+                yield "edit_output", text, receiver, "commit().package() owns artifact output"
         elif kind in ("struct", "enum", "type_alias"):
             members = methods.get(path, set())
             if surface.foreign.get(path) == CORE_COMMIT:

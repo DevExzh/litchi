@@ -44,8 +44,22 @@ FAMILY_METHODS = {
 }
 FAMILY_FORBIDDEN = {"Edit": frozenset({"rollback", "is_changed", "snapshot"}),
                     "Commit": frozenset({"snapshot", "into_snapshot", "is_changed"})}
+# An edit stages changes; only its committed package exposes artifact output.
+# Keep this shared with the debt inventory so an unregistered family is still
+# reported. These names identify output, not ordinary read projections or
+# preparation methods such as `prepare`/`plan`.
+EDIT_OUTPUT_NAMES = frozenset({
+    "to_bytes", "into_bytes", "to_plain_bytes", "to_encrypted_bytes",
+    "to_reencrypted_bytes", "write_to", "save", "save_plain", "save_encrypted",
+    "save_reencrypted", "save_with_durability",
+})
 TYPE_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
+
+
+def is_edit_output(name: str) -> bool:
+    """Known artifact-output verbs that bypass Edit::commit (record 0351)."""
+    return name in EDIT_OUTPUT_NAMES or name.endswith(("_with_rendered", "_to_stream"))
 
 
 def read_json(path: Path) -> Any:
@@ -415,7 +429,10 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
             present = methods.get(member, set())
             for method in sorted(required - present):
                 failures.add(f"{family}::{name} requires method {method} (record 0351)")
-            for method in sorted(FAMILY_FORBIDDEN.get(name, frozenset()) & present):
+            forbidden = FAMILY_FORBIDDEN.get(name, frozenset()) & present
+            if name == "Edit":
+                forbidden = forbidden | {method for method in present if is_edit_output(method)}
+            for method in sorted(forbidden):
                 failures.add(f"{family}::{name} exposes forbidden method {method} (record 0351)")
     return sorted(failures)
 
