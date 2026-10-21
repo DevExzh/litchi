@@ -62,7 +62,7 @@ pub(super) fn body_footnote_graphs(
     package: &HostPackage,
     body_storage_id: u64,
 ) -> Result<Vec<BodyFootnoteGraph>> {
-    let mut wire_budget = FootnoteGraphBudget::default();
+    let mut wire_budget = FootnoteGraphBudget::from_package(package)?;
     let entries = with_storage_projection(
         package,
         body_storage_id,
@@ -179,6 +179,7 @@ fn footnote_cleanup_identifier_count(removed_count: usize) -> Result<usize> {
 #[derive(Debug, Clone, Copy, Default)]
 struct FootnoteGraphBudget {
     limits: WireLimits,
+    rewrite_limits: litchi_iwa_text_wire::RewriteLimits,
     input_bytes: usize,
     fields: usize,
     work: usize,
@@ -187,6 +188,66 @@ struct FootnoteGraphBudget {
 }
 
 impl FootnoteGraphBudget {
+    fn from_package(package: &HostPackage) -> Result<Self> {
+        let limits = package.limits();
+        let archive = limits
+            .effective_archive_limits()
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let wire_limits = WireLimits::default()
+            .with_input_bytes(
+                archive
+                    .max_message_bytes()
+                    .clamp(1, WireLimits::MAX_INPUT_BYTES),
+            )
+            .and_then(|limits| {
+                limits.with_fields(archive.max_header_fields().min(WireLimits::MAX_FIELDS))
+            })
+            .and_then(|limits| {
+                limits.with_nesting(archive.max_header_nesting().min(WireLimits::MAX_NESTING))
+            })
+            .and_then(|limits| limits.with_rewrite_work(WireLimits::MAX_REWRITE_WORK))?;
+        let defaults = litchi_iwa_text_wire::RewriteLimits::default();
+        let message_bytes = defaults
+            .max_message_bytes()
+            .min(archive.max_message_bytes())
+            .min(archive.max_archive_bytes());
+        let fields = defaults.max_fields().min(archive.max_header_fields());
+        let nesting = defaults.max_nesting().min(archive.max_header_nesting());
+        if nesting < 4 {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: 4,
+                limit: nesting,
+            }));
+        }
+        let fragments = defaults.max_fragments().min(archive.max_header_fields());
+        let text_bytes = defaults.max_text_bytes().min(message_bytes);
+        let table_entries = defaults
+            .max_table_entries()
+            .min(archive.max_header_fields());
+        let object_references = defaults
+            .max_object_references()
+            .min(archive.max_metadata_items());
+        let output_bytes = defaults.max_output_bytes().min(message_bytes);
+        let rewrite_limits = litchi_iwa_text_wire::RewriteLimits::new(
+            message_bytes,
+            fields,
+            nesting,
+            fragments,
+            text_bytes,
+            table_entries,
+            object_references,
+            output_bytes,
+            defaults.max_rewrite_work(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        Ok(Self {
+            limits: wire_limits,
+            rewrite_limits,
+            ..Self::default()
+        })
+    }
+
     fn remaining_limits(&self) -> Result<WireLimits> {
         let input_bytes = self.remaining(
             self.input_bytes,
@@ -202,6 +263,7 @@ impl FootnoteGraphBudget {
         self.limits
             .with_input_bytes(input_bytes)
             .and_then(|limits| limits.with_fields(fields))
+            .and_then(|limits| limits.with_nesting(self.limits.max_nesting()))
             .and_then(|limits| limits.with_rewrite_work(work))
             .map_err(Into::into)
     }
@@ -323,48 +385,100 @@ impl FootnoteGraphBudget {
         Ok((view, report))
     }
 
+    fn codec_budget(
+        &self,
+        source: &[u8],
+        report: WirePreflight,
+    ) -> Result<(usize, usize, usize, u32)> {
+        let input_bytes = source.len().max(1);
+        if input_bytes > self.limits.max_input_bytes() {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: input_bytes,
+                limit: self.limits.max_input_bytes(),
+            }));
+        }
+        let fields = report.fields().max(1);
+        let remaining_fields = self
+            .limits
+            .max_fields()
+            .checked_sub(self.fields)
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages footnote aggregate field count overflows usize".to_owned(),
+                )
+            })?;
+        if fields > remaining_fields {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: fields,
+                limit: remaining_fields,
+            }));
+        }
+        let work = report.scanned_bytes().checked_mul(2).ok_or_else(|| {
+            Error::InvalidFormat("Pages footnote codec work overflows usize".to_owned())
+        })?;
+        let remaining_work = self
+            .limits
+            .max_rewrite_work()
+            .checked_sub(self.work)
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages footnote aggregate work count overflows usize".to_owned(),
+                )
+            })?;
+        if work > remaining_work {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed: work,
+                limit: remaining_work,
+            }));
+        }
+        let nesting = u32::try_from(self.limits.max_nesting()).map_err(|_| {
+            Error::InvalidFormat("Pages footnote codec nesting overflows u32".to_owned())
+        })?;
+        Ok((input_bytes, fields, work.max(1), nesting))
+    }
+
     fn reference_decode_options(
+        &self,
         source: &[u8],
         report: WirePreflight,
     ) -> Result<pages_footnote_codec::DecodeOptions> {
-        let work = report.scanned_bytes().checked_mul(2).ok_or_else(|| {
-            Error::InvalidFormat("Pages footnote reference work overflows usize".to_owned())
-        })?;
+        let (input_bytes, fields, work, nesting) = self.codec_budget(source, report)?;
         Ok(pages_footnote_codec::DecodeOptions::new(
-            source.len().max(1),
-            report.fields().max(1),
-            work.max(1),
-            FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+            input_bytes,
+            fields,
+            work,
+            nesting.min(FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT),
         ))
     }
 
     fn body_decode_options(
+        &self,
         source: &[u8],
         report: WirePreflight,
     ) -> Result<pages_body_codec::DecodeOptions> {
-        let work = report.scanned_bytes().checked_mul(2).ok_or_else(|| {
-            Error::InvalidFormat("Pages footnote body work overflows usize".to_owned())
-        })?;
+        let (input_bytes, fields, work, nesting) = self.codec_budget(source, report)?;
         Ok(pages_body_codec::DecodeOptions::new(
-            source.len().max(1),
-            report.fields().max(1),
-            work.max(1),
-            FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+            input_bytes,
+            fields,
+            work,
+            nesting.min(FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT),
         ))
     }
 
     fn marker_decode_options(
+        &self,
         source: &[u8],
         report: WirePreflight,
     ) -> Result<pages_footnote_marker_codec::DecodeOptions> {
-        let work = report.scanned_bytes().checked_mul(2).ok_or_else(|| {
-            Error::InvalidFormat("Pages footnote marker work overflows usize".to_owned())
-        })?;
+        let (input_bytes, fields, work, nesting) = self.codec_budget(source, report)?;
         Ok(pages_footnote_marker_codec::DecodeOptions::new(
-            source.len().max(1),
-            report.fields().max(1),
-            work.max(1),
-            FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT,
+            input_bytes,
+            fields,
+            work,
+            nesting.min(FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT),
         ))
     }
 
@@ -400,11 +514,8 @@ impl<'source> FootnoteStorageProjection<'source> {
         label: &str,
         wire_budget: &mut FootnoteGraphBudget,
     ) -> Result<Self> {
-        let validation = litchi_iwa_text_wire::validate_storage(
-            source,
-            litchi_iwa_text_wire::RewriteLimits::default(),
-        )
-        .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
+        let validation = litchi_iwa_text_wire::validate_storage(source, wire_budget.rewrite_limits)
+            .map_err(|error| map_storage_wire_error(storage_id, label, error))?;
         wire_budget.charge_input(source.len())?;
         wire_budget.charge_fields(validation.fields())?;
         wire_budget.charge_work(validation.validation_work())?;
@@ -602,7 +713,7 @@ fn decode_footnote_graph(
     let (_, reference_report) = wire_budget.scan(reference_data, footnote_reference_descent)?;
     let reference = pages_footnote_codec::decode_footnote_reference(
         reference_data,
-        FootnoteGraphBudget::reference_decode_options(reference_data, reference_report)?,
+        wire_budget.reference_decode_options(reference_data, reference_report)?,
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(
@@ -801,7 +912,7 @@ fn validate_footnote_marker(
     let (_, report) = wire_budget.scan(marker_data, no_footnote_descent)?;
     let marker = pages_footnote_marker_codec::decode_textual_attachment(
         marker_data,
-        FootnoteGraphBudget::marker_decode_options(marker_data, report)?,
+        wire_budget.marker_decode_options(marker_data, report)?,
     )
     .map_err(|error| {
         Error::InvalidFormat(format!(
@@ -998,7 +1109,7 @@ fn parse_footnote_table_entries<F: AsRef<str>>(
         reserve_footnote_entries(&mut entries, 1, "Pages body footnote table entries")?;
         let entry = pages_body_codec::decode_section_boundary(
             raw,
-            FootnoteGraphBudget::body_decode_options(raw, report)?,
+            wire_budget.body_decode_options(raw, report)?,
         )
         .map_err(|error| {
             Error::InvalidFormat(format!(

@@ -1327,7 +1327,11 @@ fn rewrite_component(
     }
 
     let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)
 }
 
 /// Compare source and candidate logical members while allowing only decoded
@@ -1836,6 +1840,15 @@ fn map_package_error_with_kind(error: PackageError, payload_limit_kind: LimitKin
 fn map_storage_wire_limits_error(error: super::StorageWireLimitsError) -> Error {
     match error {
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
+        super::StorageWireLimitsError::Wire(RewriteError::InvalidLimit {
+            field: "nesting",
+            value,
+            ..
+        }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: 4,
+            maximum: value as u64,
+        },
         super::StorageWireLimitsError::Wire(error) => map_text_rewrite_error(error),
     }
 }

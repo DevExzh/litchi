@@ -1286,6 +1286,88 @@ fn map_text_wire_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
     }
 }
 
+fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes
+                | litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_storage_rewrite_limits_error(error: super::StorageWireLimitsError) -> Error {
+    match error {
+        super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
+        super::StorageWireLimitsError::Wire(litchi_iwa_text_wire::RewriteError::InvalidLimit {
+            field: "nesting",
+            value,
+            ..
+        }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: 4,
+            maximum: value as u64,
+        },
+        super::StorageWireLimitsError::Wire(error) => map_text_wire_error(error),
+    }
+}
+
+fn storage_wire_limits(
+    physical: super::Limits,
+    input_bytes: usize,
+    output_bytes: usize,
+) -> Result<WireLimits, Error> {
+    let archive = physical
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let input_bytes = input_bytes.max(1);
+    let input_limit = archive
+        .max_message_bytes()
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    if input_bytes > input_limit {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: input_bytes as u64,
+            maximum: input_limit as u64,
+        });
+    }
+    let output_bytes = output_bytes.max(1);
+    let output_limit = archive
+        .max_message_bytes()
+        .clamp(1, WireLimits::MAX_OUTPUT_BYTES);
+    if output_bytes > output_limit {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: output_bytes as u64,
+            maximum: output_limit as u64,
+        });
+    }
+    WireLimits::default()
+        .with_input_bytes(input_bytes)
+        .and_then(|limits| limits.with_output_bytes(output_bytes))
+        .and_then(|limits| {
+            limits.with_fields(archive.max_header_fields().min(WireLimits::MAX_FIELDS))
+        })
+        .and_then(|limits| {
+            limits.with_nesting(archive.max_header_nesting().min(WireLimits::MAX_NESTING))
+        })
+        .and_then(|limits| limits.with_rewrite_work(WireLimits::MAX_REWRITE_WORK))
+        .map_err(map_common_wire_error)
+}
+
 #[derive(Debug, Clone)]
 struct MetadataComponent {
     identifier: u64,
@@ -1643,6 +1725,12 @@ fn rewrite_metadata_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     // The strict metadata pass above is complete and charged before this
     // copy-on-write archive clone. Read-only callers and rejected metadata
     // batches therefore retain only borrowed source data.
@@ -1667,15 +1755,14 @@ fn rewrite_metadata_archive(
     let encoded_length = archive
         .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let maximum_compressed =
-        SnappyStream::maximum_compressed_len(encoded_length, Default::default())
-            .map_err(map_core_error)?;
+    let maximum_compressed = SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_archive_output(encoded_length, maximum_compressed)?;
     let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_length {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > maximum_compressed {
         return Err(Error::Verification);
     }
@@ -1995,10 +2082,12 @@ fn insert_lifecycle(
     // the new candidate is published.
     validate_existing_footnote_graphs(source, &mut budget)?;
     let (body_archive, archive_limits) = editable_archive(source, &body_component, &mut budget)?;
+    let rewrite_limits = super::storage_rewrite_limits(source_catalog.limits())
+        .map_err(map_storage_rewrite_limits_error)?;
     let body_object = body_archive
         .object(body_identifier.get())
         .ok_or(Error::InvalidSource)?;
-    let body_message_index = unique_body_message_index(body_object)?;
+    let body_message_index = unique_body_message_index(body_object, rewrite_limits)?;
     let body_message = body_object.messages[body_message_index].clone();
     let position_u32 =
         u32::try_from(position_index).map_err(|_| Error::Refused(Refusal::PositionOutOfBounds))?;
@@ -2065,7 +2154,11 @@ fn insert_lifecycle(
     archive
         .append_objects(objects.to_vec(), archive_limits)
         .map_err(map_core_error)?;
-    let body_compressed = compress_archive(archive, archive_limits, &mut budget)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let body_compressed = compress_archive(archive, archive_limits, snappy_limits, &mut budget)?;
 
     let metadata = metadata_addition(
         source,
@@ -2130,10 +2223,12 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
     let source_catalog = &source.state.source;
     let body_component = component_for_object(source, graph.body_identifier.get())?;
     let (mut archive, archive_limits) = editable_archive(source, &body_component, &mut budget)?;
+    let rewrite_limits = super::storage_rewrite_limits(source_catalog.limits())
+        .map_err(map_storage_rewrite_limits_error)?;
     let body_object = archive
         .object(graph.body_identifier.get())
         .ok_or(Error::InvalidSource)?;
-    let body_message_index = unique_body_message_index(body_object)?;
+    let body_message_index = unique_body_message_index(body_object, rewrite_limits)?;
     let body_message = body_object.messages[body_message_index].clone();
     let body_payload = rewrite_body_storage(
         &body_message.data,
@@ -2175,7 +2270,11 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
     ] {
         archive.remove_object(id.get());
     }
-    let compressed = compress_archive(archive, archive_limits, &mut budget)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let compressed = compress_archive(archive, archive_limits, snappy_limits, &mut budget)?;
     let metadata = metadata_removal(source, graph.storage_identifier.get(), &mut budget)?;
     let mut edits = Vec::new();
     budget.charge(LimitKind::Allocations, 1)?;
@@ -2315,27 +2414,40 @@ fn editable_archive(
 fn compress_archive(
     archive: Archive,
     limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
     let encoded_length = archive.encoded_len(limits).map_err(map_core_error)?;
-    let maximum_compressed =
-        SnappyStream::maximum_compressed_len(encoded_length, Default::default())
-            .map_err(map_core_error)?;
+    let maximum_compressed = SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_archive_output(encoded_length, maximum_compressed)?;
     let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > maximum_compressed {
         return Err(Error::Verification);
     }
     Ok(compressed)
 }
 
-fn unique_body_message_index(object: &ArchiveObject) -> Result<usize, Error> {
+fn unique_body_message_index(
+    object: &ArchiveObject,
+    rewrite_limits: RewriteLimits,
+) -> Result<usize, Error> {
     let mut found = None;
     for (index, message) in object.messages.iter().enumerate() {
-        if is_body_storage_message_type(message.type_)
-            || litchi_iwa_text_wire::decode_storage(&message.data, RewriteLimits::default()).is_ok()
-        {
+        let is_candidate = if is_body_storage_message_type(message.type_) {
+            true
+        } else {
+            match litchi_iwa_text_wire::decode_storage(&message.data, rewrite_limits) {
+                Ok(_) => true,
+                Err(error @ litchi_iwa_text_wire::RewriteError::LimitExceeded { .. })
+                | Err(error @ litchi_iwa_text_wire::RewriteError::Allocation { .. }) => {
+                    return Err(map_text_wire_error(error));
+                },
+                Err(_) => false,
+            }
+        };
+        if is_candidate {
             if found.replace(index).is_some() {
                 return Err(Error::InvalidSource);
             }
@@ -2362,8 +2474,10 @@ fn rewrite_body_storage(
     // projection.  Inspect the source table first so deprecated
     // `TSP.Reference` fields cannot disappear during that rewrite and make a
     // hostile graph look canonical to the strict graph codec.
-    reject_deprecated_body_references(payload)?;
-    let rewrite_limits = super::storage_rewrite_limits(limits).map_err(|_| Error::InvalidSource)?;
+    let source_wire_limits = storage_wire_limits(limits, payload.len(), payload.len())?;
+    reject_deprecated_body_references(payload, source_wire_limits)?;
+    let rewrite_limits =
+        super::storage_rewrite_limits(limits).map_err(map_storage_rewrite_limits_error)?;
     let range = if remove_reference.is_some() {
         position
             ..position
@@ -2415,11 +2529,8 @@ fn rewrite_body_storage(
         .checked_mul(2)
         .ok_or(Error::InvalidSource)?
         .max(1);
-    let wire_limits = WireLimits::default()
-        .with_input_bytes(rewritten.len().max(1))
-        .and_then(|value| value.with_output_bytes(wire_output))
-        .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse(&rewritten, wire_limits).map_err(|_| Error::InvalidSource)?;
+    let wire_limits = storage_wire_limits(limits, rewritten.len(), wire_output)?;
+    let view = WireView::parse(&rewritten, wire_limits).map_err(map_common_wire_error)?;
     let table_field = view
         .fields()
         .find(|field| field.number() == FOOTNOTE_TABLE_FIELD)
@@ -2497,6 +2608,12 @@ fn rewrite_body_storage(
     budget.charge(LimitKind::WireBytes, replacement_capacity)?;
     budget.charge(LimitKind::RetainedBytes, replacement_capacity)?;
     budget.charge(LimitKind::Allocations, 1)?;
+    let replacement_output = rewritten
+        .len()
+        .checked_add(replacement_bytes)
+        .and_then(|value| value.checked_add(32))
+        .ok_or(Error::InvalidSource)?;
+    let replacement_limits = storage_wire_limits(limits, rewritten.len(), replacement_output)?;
     let output = replace_length_delimited_field(
         &rewritten,
         FOOTNOTE_TABLE_FIELD,
@@ -2505,16 +2622,14 @@ fn rewrite_body_storage(
         } else {
             Some(&rewritten_table)
         },
+        replacement_limits,
     )?;
-    let template = body_template_from_storage_wire(&rewritten)?;
+    let template = body_template_from_storage_wire(&rewritten, wire_limits)?;
     Ok((output, template))
 }
 
-fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let storage = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+fn reject_deprecated_body_references(source: &[u8], limits: WireLimits) -> Result<(), Error> {
+    let storage = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let Some(table_field) = storage
         .fields()
         .find(|field| field.number() == FOOTNOTE_TABLE_FIELD)
@@ -2524,13 +2639,13 @@ fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
     if table_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let table = WireView::parse(table_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+    let table = WireView::parse(table_field.payload(), limits).map_err(map_common_wire_error)?;
     for entry_field in table.fields().filter(|field| field.number() == 1) {
         if entry_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
         let entry =
-            WireView::parse(entry_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+            WireView::parse(entry_field.payload(), limits).map_err(map_common_wire_error)?;
         let Some(reference_field) = entry.fields().find(|field| field.number() == 2) else {
             continue;
         };
@@ -2538,7 +2653,7 @@ fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
             return Err(Error::InvalidSource);
         }
         let reference =
-            WireView::parse(reference_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+            WireView::parse(reference_field.payload(), limits).map_err(map_common_wire_error)?;
         if reference
             .fields()
             .any(|field| matches!(field.number(), 2 | 3))
@@ -2549,11 +2664,11 @@ fn reject_deprecated_body_references(source: &[u8]) -> Result<(), Error> {
     Ok(())
 }
 
-fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error> {
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+fn body_template_from_storage_wire(
+    source: &[u8],
+    limits: WireLimits,
+) -> Result<BodyTemplate, Error> {
+    let view = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut stylesheet = None;
     let mut paragraph_style: Option<Option<NonZeroU64>> = None;
     let mut list_style: Option<Option<NonZeroU64>> = None;
@@ -2565,7 +2680,7 @@ fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error>
                     .validate_canonical_key()
                     .and_then(|_| field.validate_canonical_length())
                     .map_err(|_| Error::InvalidSource)?;
-                let value = parse_storage_reference(field.payload())?;
+                let value = parse_storage_reference(field.payload(), limits)?;
                 if stylesheet.replace(value).is_some() {
                     return Err(Error::InvalidSource);
                 }
@@ -2575,7 +2690,7 @@ fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error>
                     .validate_canonical_key()
                     .and_then(|_| field.validate_canonical_length())
                     .map_err(|_| Error::InvalidSource)?;
-                let value = parse_style_table_reference(field.payload())?;
+                let value = parse_style_table_reference(field.payload(), limits)?;
                 let slot = if field.number() == 5 {
                     &mut paragraph_style
                 } else {
@@ -2590,7 +2705,7 @@ fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error>
                     .validate_canonical_key()
                     .and_then(|_| field.validate_canonical_length())
                     .map_err(|_| Error::InvalidSource)?;
-                let value = parse_language_table(field.payload())?;
+                let value = parse_language_table(field.payload(), limits)?;
                 if language.replace(value).is_some() {
                     return Err(Error::InvalidSource);
                 }
@@ -2606,11 +2721,8 @@ fn body_template_from_storage_wire(source: &[u8]) -> Result<BodyTemplate, Error>
     })
 }
 
-fn parse_language_table(source: &[u8]) -> Result<Option<String>, Error> {
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let table = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+fn parse_language_table(source: &[u8], limits: WireLimits) -> Result<Option<String>, Error> {
+    let table = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut language_at_zero = None;
     for field in table.fields() {
         if field.number() != 1 {
@@ -2632,7 +2744,7 @@ fn parse_language_table(source: &[u8]) -> Result<Option<String>, Error> {
 }
 
 fn parse_language_entry(source: &[u8], limits: WireLimits) -> Result<(u32, Option<String>), Error> {
-    let entry = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+    let entry = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut index = None;
     let mut value = None;
     for field in entry.fields() {
@@ -2671,11 +2783,8 @@ fn parse_language_entry(source: &[u8], limits: WireLimits) -> Result<(u32, Optio
     Ok((index.ok_or(Error::InvalidSource)?, value))
 }
 
-fn parse_storage_reference(source: &[u8]) -> Result<NonZeroU64, Error> {
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+fn parse_storage_reference(source: &[u8], limits: WireLimits) -> Result<NonZeroU64, Error> {
+    let view = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut identifier = None;
     for field in view.fields() {
         match field.number() {
@@ -2700,11 +2809,11 @@ fn parse_storage_reference(source: &[u8]) -> Result<NonZeroU64, Error> {
     identifier.ok_or(Error::InvalidSource)
 }
 
-fn parse_style_table_reference(source: &[u8]) -> Result<Option<NonZeroU64>, Error> {
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let table = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+fn parse_style_table_reference(
+    source: &[u8],
+    limits: WireLimits,
+) -> Result<Option<NonZeroU64>, Error> {
+    let table = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut reference_at_zero = None;
     let mut saw_entry = false;
     for field in table.fields() {
@@ -2735,7 +2844,7 @@ fn parse_style_table_entry(
     source: &[u8],
     limits: WireLimits,
 ) -> Result<(u32, Option<NonZeroU64>), Error> {
-    let entry = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+    let entry = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut index = None;
     let mut reference = None;
     for field in entry.fields() {
@@ -2762,7 +2871,7 @@ fn parse_style_table_entry(
                 if reference.is_some() {
                     return Err(Error::InvalidSource);
                 }
-                reference = Some(parse_storage_reference(field.payload())?);
+                reference = Some(parse_storage_reference(field.payload(), limits)?);
             },
             _ => {},
         }
@@ -2774,22 +2883,14 @@ fn replace_length_delimited_field(
     source: &[u8],
     number: u32,
     replacement: Option<&[u8]>,
+    limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
     let replacement_bytes = replacement.map_or(0, |value| value.len());
-    let output_capacity = source
-        .len()
-        .checked_add(replacement_bytes)
-        .and_then(|value| value.checked_add(32))
-        .ok_or(Error::InvalidSource)?;
     let reserve_capacity = source
         .len()
         .checked_add(replacement_bytes)
         .ok_or(Error::InvalidSource)?;
-    let limits = WireLimits::default()
-        .with_input_bytes(source.len().max(1))
-        .and_then(|value| value.with_output_bytes(output_capacity))
-        .map_err(|_| Error::InvalidSource)?;
-    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(map_common_wire_error)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(reserve_capacity)
@@ -3261,11 +3362,12 @@ fn validate_storage_attachment_owners(
     if message.next().is_some() {
         return Err(Error::InvalidSource);
     }
-    let limits = WireLimits::default()
-        .with_input_bytes(storage_message.data.len().max(1))
-        .map_err(|_| Error::InvalidSource)?;
-    let storage =
-        WireView::parse(&storage_message.data, limits).map_err(|_| Error::InvalidSource)?;
+    let limits = storage_wire_limits(
+        package.state.source.limits(),
+        storage_message.data.len(),
+        storage_message.data.len(),
+    )?;
+    let storage = WireView::parse(&storage_message.data, limits).map_err(map_common_wire_error)?;
     let mut attachment_field = None;
     for field in storage.fields().filter(|field| field.number() == 9) {
         if attachment_field.replace(field).is_some() {
@@ -3277,14 +3379,14 @@ fn validate_storage_attachment_owners(
         return Err(Error::InvalidSource);
     }
     let table =
-        WireView::parse(attachment_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+        WireView::parse(attachment_field.payload(), limits).map_err(map_common_wire_error)?;
     let mut marker_count = 0usize;
     for entry_field in table.fields().filter(|field| field.number() == 1) {
         if entry_field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
         let entry =
-            WireView::parse(entry_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+            WireView::parse(entry_field.payload(), limits).map_err(map_common_wire_error)?;
         let mut reference_field = None;
         for field in entry.fields().filter(|field| field.number() == 2) {
             if reference_field.replace(field).is_some() {
@@ -3296,7 +3398,7 @@ fn validate_storage_attachment_owners(
             return Err(Error::InvalidSource);
         }
         let reference =
-            WireView::parse(reference_field.payload(), limits).map_err(|_| Error::InvalidSource)?;
+            WireView::parse(reference_field.payload(), limits).map_err(map_common_wire_error)?;
         let mut identifier_field = None;
         for field in reference.fields().filter(|field| field.number() == 1) {
             if identifier_field.replace(field).is_some() {
@@ -3441,5 +3543,106 @@ mod tests {
             }],
         };
         assert!(ambiguous.entry(7).is_none());
+    }
+
+    fn raw_length_delimited(field: u32, payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        litchi_iwa_common::encode_varint_into(&mut bytes, (u64::from(field) << 3) | 2);
+        litchi_iwa_common::encode_varint_into(
+            &mut bytes,
+            u64::try_from(payload.len()).expect("test payload length fits"),
+        );
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn raw_varint(field: u32, value: u64) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        litchi_iwa_common::encode_varint_into(&mut bytes, u64::from(field) << 3);
+        litchi_iwa_common::encode_varint_into(&mut bytes, value);
+        bytes
+    }
+
+    #[test]
+    fn retained_wire_limits_reject_tight_input_and_output_before_parse() {
+        let archive = litchi_iwa_core::Limits::default()
+            .with_archive_bytes(32)
+            .expect("archive bytes")
+            .with_message_bytes(8)
+            .expect("message bytes")
+            .with_header_fields(4)
+            .expect("header fields");
+        let physical = litchi_iwa_archive::Limits::default()
+            .with_archive_limits(archive)
+            .expect("physical archive limits");
+
+        let exact = storage_wire_limits(physical, 8, 8).expect("exact profile is admitted");
+        assert_eq!(exact.max_input_bytes(), 8);
+        assert_eq!(exact.max_output_bytes(), 8);
+        assert_eq!(exact.max_fields(), 4);
+
+        assert!(matches!(
+            storage_wire_limits(physical, 9, 8),
+            Err(Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: 9,
+                maximum: 8,
+            })
+        ));
+        assert!(matches!(
+            storage_wire_limits(physical, 8, 9),
+            Err(Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: 9,
+                maximum: 8,
+            })
+        ));
+    }
+
+    #[test]
+    fn retained_rewrite_profile_reports_unsupported_nesting_as_a_limit() {
+        let archive = litchi_iwa_core::Limits::default()
+            .with_header_nesting(3)
+            .expect("archive nesting");
+        let physical = litchi_iwa_archive::Limits::default()
+            .with_archive_limits(archive)
+            .expect("physical archive limits");
+        let error = crate::package::storage_rewrite_limits(physical).unwrap_err();
+        assert!(matches!(
+            map_storage_rewrite_limits_error(error),
+            Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: 4,
+                maximum: 3,
+            }
+        ));
+    }
+
+    #[test]
+    fn unique_storage_candidate_preserves_unknown_wire_fields_and_reports_limits() {
+        let mut payload = raw_length_delimited(3, b"abc");
+        payload.extend_from_slice(&raw_varint(99, 7));
+        let object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 9_999,
+                data: payload,
+            }],
+            Default::default(),
+        )
+        .expect("test archive object");
+        let admitted =
+            RewriteLimits::new(1024, 8, 4, 8, 1024, 8, 8, 1024, 4096).expect("rewrite limits");
+        assert_eq!(unique_body_message_index(&object, admitted).unwrap(), 0);
+
+        let fields_limited = RewriteLimits::new(1024, 1, 4, 8, 1024, 8, 8, 1024, 4096)
+            .expect("field-limited rewrite profile");
+        assert!(matches!(
+            unique_body_message_index(&object, fields_limited),
+            Err(Error::Limit {
+                kind: LimitKind::WireFields,
+                ..
+            })
+        ));
     }
 }
