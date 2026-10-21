@@ -2800,6 +2800,10 @@
  ],
  "evidence_without_rows": [
   {
+   "record": "0359d",
+   "reason": "Native Graph owner before/after probes, not a leaf-vs-unified operation pair. Record 0359d retains source/binary hashes, isolated ABBA and retained-history heap evidence. The storage-level and integrated API/performance audits remain required."
+  },
+  {
    "record": "0359c",
    "reason": "XLS typed-budget validation and a focused native Graph before/after microprobe, not a leaf-vs-unified operation pair. Record 0359c retains and tabulates the Graph samples, including rejected candidates. Shared OLE migration, Graph owner consolidation and integrated performance acceptance remain required."
   },

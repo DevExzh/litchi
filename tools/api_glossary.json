@@ -8987,10 +8987,40 @@
           "name": "own_with",
           "scope": "litchi_ograph::chart",
           "replacement": "use Ref::own(limits) (record 0362b)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ograph",
+          "recursive": false,
+          "replacement": "Package owns the source and is returned by Commit (record 0359d)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ograph::Package",
+          "replacement": "start Package::edit directly (record 0359d)"
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_ograph::Patch",
+          "replacement": "Package::apply returns a Commit (record 0359d)"
+        },
+        {
+          "name": "revert",
+          "scope": "litchi_ograph::Patch",
+          "replacement": "apply patch.inverse() on Package (record 0359d)"
         }
       ],
-      "families": [],
-      "family_methods": true
+      "families": [
+        "litchi_ograph"
+      ],
+      "family_methods": true,
+      "immutable_owners": [
+        "litchi_ograph::Package",
+        "litchi_ograph::PackageRef",
+        "litchi_ograph::Workbook",
+        "litchi_ograph::WorkbookRef",
+        "litchi_ograph::Payload"
+      ]
     },
     {
       "id": "ops-rtf",

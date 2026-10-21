@@ -1,0 +1,78 @@
+{
+  "scope": "Complete probe process: fixture construction and forward/inverse/no-op preflight, then five independent 128-patch histories (one expected-value run, three warmups and one measured run). Each history retains every Patch plus its current owner through black_box before dropping the history. This is peak process heap, not a retained-bytes-at-mark counter.",
+  "command": "heaptrack -o /external/graph/heap-final-LABEL /external/graph/LABEL/target/release/graph-owner-probe history128 1 0",
+  "analysis_command": "heaptrack_print -f /external/graph/heap-final-LABEL.zst",
+  "units": "heaptrack_print defaults; K is decimal KB, displayed values are rounded",
+  "before": {
+    "peak_heap_display": "439.69K",
+    "allocation_calls": 135154,
+    "reported_leak_bytes": 544,
+    "temporary_allocations": 17388
+  },
+  "after": {
+    "peak_heap_display": "437.88K",
+    "allocation_calls": 135150,
+    "reported_leak_bytes": 544,
+    "temporary_allocations": 17388
+  },
+  "rejected": {
+    "peak_heap_display": "440.76K",
+    "allocation_calls": 135150,
+    "reported_leak_bytes": 544,
+    "configuration": "Same shared owner, before releasing CFB reader caches and temporary Workbook buffer before writer output allocation."
+  },
+  "external_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits/graph-owner-probe",
+  "artifacts": {
+    "heap-final-before.zst": {
+      "bytes": 36897,
+      "sha256": "4defd3e6f5c95248227b3f88e9840e73d397d282482bfb967d49d0b73c951fd5"
+    },
+    "heap-final-before.log": {
+      "bytes": 750,
+      "sha256": "e448cbeea6ec46d38b42c8e2df635ea9afa1a8948222c92a4891ff9f08f5e21b"
+    },
+    "heap-final-before.txt": {
+      "bytes": 138784,
+      "sha256": "6964782a5bd85f95415b483554f091dbba577a21efd4834eeb7312514883fba0"
+    },
+    "heap-final-after.zst": {
+      "bytes": 37331,
+      "sha256": "e8ce6c92c770523202186ea3eb28397f3de42471e7bcaaa1446f2f2e3073e5d4"
+    },
+    "heap-final-after.log": {
+      "bytes": 748,
+      "sha256": "90a59499bbfc83d306fc9959c778dfc73987fd237f13350b856381d8f44aed6d"
+    },
+    "heap-final-after.txt": {
+      "bytes": 133871,
+      "sha256": "013a2088f6413c9a8a5f80468b07e7198c24fe314e2b35c7d81b266a281ba9ee"
+    },
+    "heap-rejected-0.zst": {
+      "bytes": 36759,
+      "sha256": "9359b6825636ee240b0cc2f0564c1b9ffb220ed30e9749bc6eee1adef19de66e"
+    },
+    "heap-rejected-0.log": {
+      "bytes": 736,
+      "sha256": "abc307b14958eed5c9d0eef29f2f6dbfee51d234a1412045248bbf2426db2c03"
+    },
+    "heap-rejected-0.txt": {
+      "bytes": 135581,
+      "sha256": "b491cf8284fc403ec1e60076bbe50ab890ef689675321e9bcda4b57546084a56"
+    }
+  },
+  "binaries": {
+    "before": {
+      "bytes": 993304,
+      "sha256": "8509970454e52f79a845033f1564527563e5bfa7a48555cd681c581e191cda9f",
+      "lock_sha256": "0f6858c8869790c56ecf094d30c59dc76a17fbce5ae206a5fa0c18b9a1ba6d1f",
+      "sources_sha256": "bcea7a71e41f6bc0b27ccd96664370a17697306d5307a53de430c36f6c14e588"
+    },
+    "after": {
+      "bytes": 1002168,
+      "sha256": "9382adaff84072914307716ba045407d1e2be733d7a67d5e0860169de1320d91",
+      "lock_sha256": "0f6858c8869790c56ecf094d30c59dc76a17fbce5ae206a5fa0c18b9a1ba6d1f",
+      "sources_sha256": "826bff949f727de3f9c063434a78a609c77ecc7aca019d4970d1185770e07aa7"
+    }
+  },
+  "source_sha256": "51093eb6922afda6802e59ffdb3b2405e01ad6f53de22b1af154eeed5642176a"
+}

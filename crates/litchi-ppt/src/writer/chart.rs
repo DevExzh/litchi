@@ -315,9 +315,11 @@ impl Chart {
                 ))?;
             }
         }
-        Ok(GraphPackage::from_chart(graph, limits)?
-            .finish()
-            .into_bytes())
+        Ok(
+            GraphPackage::from_chart(graph, litchi_ograph::OpenOptions::new().limits(limits))?
+                .finish()
+                .into_bytes(),
+        )
     }
 }
 

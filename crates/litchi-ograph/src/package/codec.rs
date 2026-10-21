@@ -7,7 +7,7 @@ use crate::Limits;
 use crate::Result;
 use crate::chart;
 
-use super::snapshot::Snapshot;
+use super::Package;
 use super::validation::{WorkbookLayout, check_limit};
 
 pub(super) const WORKBOOK: &str = "Workbook";
@@ -30,8 +30,8 @@ pub(super) fn read_workbook(
     Ok(bytes)
 }
 
-pub(super) fn read_chart(source: &Snapshot) -> Result<chart::Model> {
-    let bytes = read_workbook(source.source_bytes(), source.workbook, source.limits)?;
+pub(super) fn read_chart(source: &Package) -> Result<chart::Model> {
+    let bytes = read_workbook(source.as_bytes(), source.workbook, source.limits)?;
     let workbook = super::semantic::Workbook::open_with_options(
         bytes,
         crate::OpenOptions::new().limits(source.limits),
@@ -39,8 +39,8 @@ pub(super) fn read_chart(source: &Snapshot) -> Result<chart::Model> {
     chart::Model::parse(workbook.chart(), chart::Context::graph())
 }
 
-pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec<u8>> {
-    let workbook = read_workbook(source.source_bytes(), source.workbook, source.limits)?;
+pub(super) fn replace_chart(source: &Package, replacement: &[u8]) -> Result<Vec<u8>> {
+    let workbook = read_workbook(source.as_bytes(), source.workbook, source.limits)?;
     let chart_range = source.workbook.chart_start..source.workbook.chart_end;
     let chart = workbook
         .get(chart_range.clone())
@@ -66,7 +66,7 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
         )))?
         .copy_from_slice(replacement);
 
-    let mut cfb = OleFile::open(Cursor::new(source.source_bytes()))?;
+    let mut cfb = OleFile::open(Cursor::new(source.as_bytes()))?;
     let comp_obj = if source.topology.comp_obj_bytes().is_some() {
         Some(cfb.open_stream(&[COMP_OBJ])?)
     } else {
@@ -78,7 +78,10 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
         None
     };
 
-    let sector_size = match source.source_bytes().get(0x1E..0x20) {
+    // Stream bytes are owned now. Release the reader's FAT/directory caches
+    // before the writer allocates its publication buffers.
+    drop(cfb);
+    let sector_size = match source.as_bytes().get(0x1E..0x20) {
         Some([0x09, 0x00]) => 512,
         Some([0x0C, 0x00]) => 4096,
         _ => {
@@ -91,6 +94,7 @@ pub(super) fn replace_chart(source: &Snapshot, replacement: &[u8]) -> Result<Vec
     };
     let mut writer = OleWriter::with_sector_size(sector_size)?;
     writer.create_stream(&[WORKBOOK], &workbook)?;
+    drop(workbook);
     if let Some(comp_obj) = comp_obj {
         writer.create_stream(&[COMP_OBJ], &comp_obj)?;
     }

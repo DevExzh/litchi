@@ -119,8 +119,9 @@ All 75 Graph tests, 1,313 XLS library tests, 19 PPT chart tests and 39 unified
 error tests pass (1,446 total, none failed or ignored). Graph/PPT and operations
 all-target clippy, the locked performance harness, four glossary profiles,
 crate boundaries, formatting, 36 tooling tests and the benchmark-matrix check
-pass. The Graph glossary currently has no owner/family registrations: it checks
-the removed error name here, not completion of the owner contract. Commands and
+pass. At this slice the Graph glossary had no owner/family registrations;
+[0359d](0359d-graph-package-owner.md) subsequently registers the canonical
+root family and immutable owners. Commands and
 source/log hashes are in [the validation receipt](results/0359c/graph-validation.json).
 
 ## Required continuation
@@ -129,12 +130,12 @@ The shared `litchi-ole-common::object` capture/editor still reports several
 configured bounds through `OleError::InvalidFormat`. Its typed error migration
 must cover every DOC/XLS/Graph/PPT consumer in the same change.
 
-A semantic publication audit also found that Graph's standalone package edit
-still returns `Commit<Snapshot, Patch>` while a second `Package` owner exists.
-That owner split must be resolved on the canonical edit/apply/commit contract;
-zero name-inventory rows do not prove the returned owner conforms. The shared
-OLE object's snapshot publication needs the same return-type audit against its
-raw-codec role. These are required work, not accepted exceptions.
+[0359d](0359d-graph-package-owner.md) consolidates Graph's standalone edit
+onto `Commit<Package, Patch>`, removes the second Snapshot owner and migrates
+all consumers. Its unchanged-stream sharing and nested raw chart model audit
+remain required. The shared OLE object's snapshot publication needs the same
+return-type audit against its raw-codec role. Zero name-inventory rows do not
+prove these semantic obligations; they are not accepted exceptions.
 
 This record does not complete the legacy API/error audit. The final integrated
 corpus, performance and workspace gate remain required alongside W4/W4b/W8

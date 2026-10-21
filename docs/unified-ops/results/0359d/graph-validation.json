@@ -1,0 +1,168 @@
+{
+  "baseline_commit": "1d7516988f19eeb0373d0d4c39a0279750eb71ce",
+  "candidate": "Commit containing this receipt; exact source hashes below and complete paired Graph source maps beside it.",
+  "scope": "Canonical Graph Package returned owner, lazy shared immutable bytes, constant-time edit creation, content-matched replay, PPT host migration, root family/owner gate.",
+  "validation": {
+    "graph_tests": 78,
+    "ppt_chart_tests": 19,
+    "ops_error_tests": 39,
+    "total_tests": 136,
+    "failed": 0,
+    "ignored": 0,
+    "tool_tests": 36,
+    "glossary": {
+      "profiles": 1,
+      "banned_names": 17,
+      "families": 1,
+      "immutable_owners": 5
+    }
+  },
+  "performance": {
+    "final_samples": "graph-measurements.json",
+    "heap": "graph-owner-heap.json",
+    "reproducer": [
+      "python3 docs/unified-ops/results/0359d/graph-owner-probe.py build /external/graph",
+      "python3 docs/unified-ops/results/0359d/graph-owner-probe.py run /external/graph"
+    ],
+    "quiet": "W4, W4b and W8 acknowledged holds including build, formatting, test and profiling activity; process audit was empty immediately before launch. W4b ABBA began only after Graph completed.",
+    "sampling": "Three process ABBA blocks per route on CPU24. Small routes 5000 iterations, large routes 50 except begin-edit/attachment 5000, history128 five. All process preflights match exact bytes.",
+    "rejected_candidates": [
+      {
+        "samples": "graph-rejected-0.json",
+        "configuration": "Eager Arc<Vec> backing; attachment setup included old Snapshot preflight.",
+        "reason": "Large attachment median 1.035; history heap overlap separately fixed."
+      },
+      {
+        "samples": "graph-rejected-1.json",
+        "configuration": "Eager Arc<Vec>; independent attachment preflight/warmup.",
+        "reason": "Large attachment median 1.030 confirms the slower route is not merely setup."
+      },
+      {
+        "samples": "graph-rejected-2.json",
+        "configuration": "Lazy Vec-to-Arc promotion; options boundary default compiler inlining.",
+        "reason": "Large attachment median 1.021; lost default-policy constant folding identified in outlined entry."
+      }
+    ],
+    "excluded_capture": {
+      "samples": "graph-contaminated-1.json",
+      "reason": "Worker cargo-fmt overlapped a requested quiet hold. Never used for acceptance."
+    },
+    "final": "Lazy backing and inline options/payload boundaries. Attachment ranges overlap baseline; changed commit/replay/history improve. No broader facade or untouched-stream publication conclusion claimed.",
+    "instruction_check": {
+      "command": "valgrind --tool=callgrind --callgrind-out-file=/external/graph/payload-LABEL.callgrind /external/graph/LABEL/target/release/graph-owner-probe open_payload 100 2097152",
+      "before": 111704452,
+      "after": 111728371,
+      "after_artifact_label": "inline",
+      "scope": "Whole process including fixture, preflight, 100 warmup and 100 timed iterations; callgrind wall times not used.",
+      "artifacts": {
+        "payload-before.callgrind": {
+          "bytes": 120260,
+          "sha256": "ccfd758faadd9ddd4f1cc1c18f7fe57ed661e748aae634a36315107a9db9c050"
+        },
+        "payload-inline.callgrind": {
+          "bytes": 120868,
+          "sha256": "35ffa5dd73fdb8508d5bcdd5b8743a378f9daa3d8b2634d2799d17227c7afedd"
+        }
+      }
+    }
+  },
+  "remaining_required_work": [
+    "Untouched CFB stream sharing during changed publication",
+    "Nested raw chart Model/edit publication and required-limit semantic audit",
+    "Shared OLE typed budgets and publication audit, every consumer migrated",
+    "Integrated corpus, performance, inventory and full 53-check gate after W4/W4b/W8 merge"
+  ],
+  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "checks": {
+    "tests": {
+      "command": "cargo test --locked -p litchi-ograph --all-features",
+      "status": "passed",
+      "log": "graph-owner-tests.log",
+      "bytes": 7866,
+      "sha256": "42f86256465077bd70b7835cd315e6e27c3e06a273724c5dd3856eb9518e93d9",
+      "passed": 78
+    },
+    "ppt-tests": {
+      "command": "cargo test --locked -p litchi-ppt --all-features --lib chart",
+      "status": "passed",
+      "log": "graph-owner-ppt-tests.log",
+      "bytes": 1237,
+      "sha256": "2da0af6275b7db293d3bb196a1b5580ce302a671d6b1145e8cd374a53e142baa",
+      "passed": 10
+    },
+    "ppt-integration": {
+      "command": "cargo test --locked -p litchi-ppt --all-features --test ppt_chart_writer --test ppt_charts",
+      "status": "passed",
+      "log": "graph-owner-ppt-integration.log",
+      "bytes": 1148,
+      "sha256": "d508c77a34f23731cffe5ea90fa0e8a0af1fe0872daeb14145d2121e836490b9",
+      "passed": 9
+    },
+    "ops-tests": {
+      "command": "cargo test --locked -p litchi-ops --no-default-features --features xls,ppt --lib error::tests",
+      "status": "passed",
+      "log": "graph-owner-ops-tests.log",
+      "bytes": 3495,
+      "sha256": "0674fd827e303247d6b7f0f46736016a0bf9bee39baa091073e44c4f4e6f744e",
+      "passed": 39
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p litchi-ograph -p litchi-ppt --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "log": "graph-owner-clippy.log",
+      "bytes": 269,
+      "sha256": "4839fa0ddaaafcf551a7f5c96ef4b0694aba61048ddb8d40690cd0de9fb70758"
+    },
+    "harness": {
+      "command": "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+      "status": "passed",
+      "log": "graph-owner-harness.log",
+      "bytes": 677,
+      "sha256": "468795de7df4b3728fb7b17e1eba35295afc783c0b14a837f184ecdf8d75e32a"
+    },
+    "glossary": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ograph --target-dir /home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+      "status": "passed",
+      "log": "graph-owner-glossary.log",
+      "bytes": 904,
+      "sha256": "89a72697aae87db07a59dc430dd6b3640a72bf305d3e977fd98c4b06ac29ae71"
+    },
+    "fmt": {
+      "command": "cargo fmt --check -p litchi-ograph -p litchi-ppt",
+      "status": "passed",
+      "log": "graph-owner-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tools-tests": {
+      "command": "python3 -m unittest tools.test_check_api_glossary tools.test_unified_bench_matrix",
+      "status": "passed",
+      "log": "graph-owner-tools-tests.log",
+      "bytes": 541,
+      "sha256": "0986dcadb1d6df73787861efb7900f58771bc5625ebd7b61a21a6c7c918a82f6"
+    },
+    "matrix": {
+      "command": "python3 tools/unified_bench_matrix.py --check",
+      "status": "passed",
+      "log": "graph-owner-matrix.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "sources": {
+    "crates/litchi-ograph/src/lib.rs": "99ad87676a54b58e077578711210f9fa066675ad551210ab8af6d6f4a1220762",
+    "crates/litchi-ograph/src/package/codec.rs": "abbf1ceb9f937d720ba6bfb6f8155167b6174cdb853cc599073fac8ae17da8dc",
+    "crates/litchi-ograph/src/package/mod.rs": "a60c8ec7d249c9f40cfe0fcdb14293b7d2ccfb5e994466fd63ecf2a5311fb3ce",
+    "crates/litchi-ograph/src/package/patch.rs": "dddb5c08970f197518faa02eadd96e97657f05fbfbce3942d347a251d6c270d3",
+    "crates/litchi-ograph/src/package/semantic.rs": "1a55842861c0af21f637f1107c42c14c9839b12b7c97c385e7132fc003ecfe98",
+    "crates/litchi-ograph/src/package/tests.rs": "14a4308bf7e3e3b25e349aeba7d19465cebf4ec8c0bd26f02fbdc07acb30e664",
+    "crates/litchi-ograph/src/package/transaction.rs": "14c2db74cb8c5d44b9e60a81bd1e70ec401a85258bdf6ff352052b8e906eef59",
+    "crates/litchi-ppt/src/writer/chart.rs": "b2de3ee3aa16e2c362a0aa3393f0e0becd0ac9b374692c5d2f4e0392c794461e",
+    "tools/api_glossary.json": "d00c2899b0b41560b452657c6fc4e21dca1ea38be8847d07a6f8b2bb02724802",
+    "docs/unified-ops/results/0359d/graph-owner-probe.py": "22c4a4567562125ad7b04b57860b1475e42722f2b98baa83625ea7af692950dc",
+    "docs/unified-ops/results/0359d/graph-owner-probe.rs": "51093eb6922afda6802e59ffdb3b2405e01ad6f53de22b1af154eeed5642176a"
+  },
+  "deleted_sources": [
+    "crates/litchi-ograph/src/package/snapshot.rs"
+  ]
+}

@@ -148,7 +148,8 @@ The typed-error sweep also remains required. Record
 compound-publication and primary staging budgets to typed kinds, followed by
 Graph ingress, authoring and fixed-record budgets with every host consumer and
 unified classifier migrated. Shared OLE capture still emits configured-budget
-failures through generic format errors. Graph's separate `Package` and edit
-`Snapshot` owners also need consolidation onto the canonical returned-owner
-contract. The constructor slices do not accept these as exceptions or complete
-that audit.
+failures through generic format errors. [0359d](0359d-graph-package-owner.md)
+consolidates Graph's separate `Package` and edit `Snapshot` owners onto the
+canonical returned owner. Untouched-stream sharing, nested raw chart models
+and shared OLE publication remain required semantic work. The constructor
+slices do not accept these as exceptions or complete that audit.

@@ -1759,3 +1759,5 @@ resource refusals. Full PPTX tests, Clippy, rustdoc, workspace compilation and
 both glossary profiles pass. Full charts, unified PPTX dispatch and performance
 acceptance remain pending; the full goal is active.
 See [0063](0063-source-pptx-modern-comments.md).
+
+- Coordinator follow-up [0359d](0359d-graph-package-owner.md): standalone Graph edits and replay now return `Commit<Package, Patch>`; Snapshot publication is removed and every consumer migrates. Edits start in constant time and replay shares validated bytes. All 136 targeted tests, clippy, locked harness, Graph owner/family glossary, 36 tooling tests and matrix checks pass. The initial attachment/heap regressions were repaired: final large attachment ABBA is 0.996–1.003×, replay median 0.081× and retained-history median 0.948×; peak history heap is 437.88 KB versus 439.69 KB. Untouched-CFB-stream sharing, nested raw chart/shared OLE audits and W4/W4b/W8 integration remain required.
