@@ -3,7 +3,7 @@
 - Date: 2026-10-21.
 - Base: `61515148e1`.
 - Parent source checkpoint: `08f586ca42`.
-- Candidate source: `58b53ef522`.
+- Candidate source: `33f4981030`.
 - Status: source repair and focused validation complete; native timing and the
   post-policy matched release/allocator rebuild remain pending coordinator
   scheduling.
