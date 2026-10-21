@@ -144,6 +144,12 @@ mod tests {
         )
     }
 
+    fn same_reopened_content(left: &Package, right: &Package) -> bool {
+        let left = Package::from_bytes(&left.to_bytes().unwrap()).unwrap();
+        let right = Package::from_bytes(&right.to_bytes().unwrap()).unwrap();
+        left.same_content(&right).unwrap()
+    }
+
     #[test]
     fn starting_an_edit_copies_nothing_and_a_no_op_returns_the_source() {
         let package = Package::new().unwrap();
@@ -179,6 +185,15 @@ mod tests {
         let replayed = package.apply_opc(&patch).unwrap().into_package();
         assert!(replayed.same_content(&after).unwrap());
         assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+        let reopened_source = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        let reopened_forward = reopened_source.apply_opc(&patch).unwrap().into_package();
+        assert!(same_reopened_content(&reopened_forward, &after));
+        let reopened_restored = reopened_after
+            .apply_opc(&patch.inverse())
+            .unwrap()
+            .into_package();
+        assert!(same_reopened_content(&reopened_restored, &package));
         let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
         assert!(restored.opc().rels().get("rIdRaw").is_none());
         assert!(restored.same_content(&package).unwrap());

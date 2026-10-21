@@ -46,6 +46,12 @@ fn root_task_pane_relationship(package: &Package) -> (String, String) {
     )
 }
 
+fn same_reopened_content(left: &Package, right: &Package) -> bool {
+    let left = Package::from_bytes(&left.to_bytes().unwrap()).unwrap();
+    let right = Package::from_bytes(&right.to_bytes().unwrap()).unwrap();
+    left.same_content(&right).unwrap()
+}
+
 #[test]
 fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
     let mut package = Package::new().unwrap();
@@ -206,6 +212,18 @@ fn commits_publish_new_packages_and_patches_replay_root_relationships_exactly() 
     assert!(replayed.same_content(&after).unwrap());
     assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
     assert_eq!(replayed.task_panes().unwrap(), after.task_panes().unwrap());
+    let reopened_source = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+    let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+    let reopened_forward = reopened_source
+        .apply_task_panes(&patch)
+        .unwrap()
+        .into_package();
+    assert!(same_reopened_content(&reopened_forward, &after));
+    let reopened_restored = reopened_after
+        .apply_task_panes(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert!(same_reopened_content(&reopened_restored, &source));
     let restored = after
         .apply_task_panes(&patch.inverse())
         .unwrap()
