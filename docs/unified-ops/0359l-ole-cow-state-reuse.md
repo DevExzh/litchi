@@ -68,6 +68,80 @@ The matched baseline binaries are retained there with SHA-256 values
 `03e74e97525628b281e3f9d58664301f53bdd26841fe5af3c8cc3ebf1f586328` and
 `bc1eaaa0e99c5607d9a2a2486fb44a1a3442a7e5637ffbf3f73ca8d040c67627`.
 
+## Frozen native qualification runner
+
+The final runner is outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-a84650-final.py`.
+It is mode `0555`, 21,359 bytes, and has SHA-256
+`88ff6682ff2d4437e188aa77cdcff97cf159a2f96da7d1b8b2d56258292bb1a1`.
+The previous runner remains preserved at
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-cow.py`
+with SHA-256
+`ca12ae007b4babebbc1c1302edc849dd5c27601fa7cb8d8ed458cdd474b1c37e`.
+
+The exact final command, which must be run only after a coordinator quiet
+grant and with a new output directory, is:
+
+```text
+python3 /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-a84650-final.py \
+  --before /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/baseline/ole_w5_probe \
+  --after /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/candidate/ole_w5_probe \
+  --clone-before /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/baseline/ole_package_clone_probe \
+  --clone-after /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/candidate/ole_package_clone_probe \
+  --out /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/abba-a84650-final \
+  --before-source /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/baseline/examples/ole_w5_probe.rs \
+  --after-source /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/current/examples/ole_w5_probe.rs \
+  --lock /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/current/Cargo.lock \
+  --before-id baseline-0ce4-src-8f0ffa \
+  --after-id a84650cd70 --cpu 29 --blocks 5
+```
+
+The baseline and candidate probe sources are byte-identical at
+`ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a`; the
+matched lock is
+`bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a`.
+The manifest records baseline features
+`--no-default-features --features legacy-owner-api,legacy-property-api` and
+candidate features `--features current-api`.
+
+The runner requires exactly five ABBA blocks. It calibrates every endpoint to
+500 ms and rejects any measured sample below 250 ms for each of the eleven
+selectors (`open`, `begin_edit`, `noop_commit`, `replace_stream`, `read`,
+`edit`, `doc_tracked_revision`, `xls_cells`, `xls_cells_stage`, `doc_history`,
+and `xls_history`) plus both `small` and `large` clone sizes. A child with a
+nonzero exit status or any stderr is a hard failure. Each probe performs its
+expected-output, forward-replay, and inverse-replay checks before emitting
+timing rows; the runner also requires equal output extents across paired legs.
+
+The host guard snapshots before and after every child and every 100 ms while
+it runs. It ignores only the runner's ancestry and the live child subtree. It
+recognizes actual `test-adblock-*.py` scripts whether invoked directly or by
+Python/shell, all known probe/runtime names, and any direct executable whose
+basename contains `peculiar`. The only peculiar exemption is an argv whose
+first word is exactly `/usr/local/bin/peculiar_shell`; no other path receives
+that exemption. Native timing has not been run for this receipt.
+
+## Remaining XLS allocation attribution
+
+The residual XLS cells delta is 1,589 to 1,587 calls, +437 requested bytes
+(+0.0185%) and +94 peak bytes. XLS history is +67,246 requested bytes
+(+0.0152%) over 128 publications, or about 525 bytes per publication, with
+fewer calls and unchanged retained-live and peak bytes. These are separate
+from the removed 152-byte per-publication state allocation.
+
+The source trace identifies the residual as the owner migration's
+pre-mutation copy-on-write path. `cell_values::commit` opens an
+`ObjectPackage`, calls `package.edit()`, and mutates the editor while the
+source `package` remains alive. The current object owner stores the captured
+targets, package, and objects behind Arc boxes; the first mutation therefore
+detaches the editor state and captured package. The pre-wave editor was unique
+at this point and mutated its captured package directly. This accounts for
+the one small owner/captured-package allocation on each XLS publication; it
+does not indicate a lost output or replay allocation. A narrow follow-up is to
+drop the temporary owner immediately after creating the editor, before the
+first mutation, in every matching XLS consumer. That repair is not included in
+the protected `a84650cd70` binaries and must be measured as a new candidate.
+
 Native qualification still must cover the owner clone and all eleven OLE
-selectors with exact output/replay checks, host-overlap checks, and accepted
-batched legs of at least 250 ms.
+selectors with the frozen runner, exact output/replay checks, host-overlap
+checks, and accepted batched legs of at least 250 ms.
