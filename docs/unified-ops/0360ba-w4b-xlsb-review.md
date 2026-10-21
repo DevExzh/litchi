@@ -50,6 +50,18 @@ content-type fallback used during capture and restore receives the package's
 explicit `read_limits()`, so a source admitted under a larger limit remains
 editable through replay.
 
+Content-types-only lexical edits are retained as manifest patches, so they
+are no longer mistaken for an empty raw OPC edit. Replay compares the
+destination manifest with the recorded current-side bytes: a retained
+lexical image refuses a divergent manifest instead of silently disappearing,
+while an authored structural fallback is regenerated alongside unrelated
+additions. Source allocation identity distinguishes an explicit replacement
+from a structural edit that temporarily invalidates an older source binding;
+both directions of an explicit replacement retain the conflict guard. The
+patch stores compact shared manifest byte images and changed-owner relationship
+images, so retaining patches does not retain complete before/after package
+graphs. This keeps structural composition and lexical fidelity separate.
+
 The regression test
 `theme::raw_opc_lexical_relationship_edit_is_reversible` proves that a
 relationship-only lexical edit changes the package, replays to the same
@@ -90,12 +102,13 @@ Focused validation on this review tree:
 | `cargo test -p litchi-xlsb --all-features --lib sparkline` | 41 passed |
 | `cargo test -p litchi-xlsb --all-features comments` | 18 passed |
 | `cargo test -p litchi-xlsb --all-features conditional` | 58 passed |
-| `cargo test -p litchi-xlsb --all-features` | 731 unit, all integration and doctests passed |
-| raw OPC lexical relationship regression | passed |
+| `cargo test -p litchi-xlsb --all-features --lib opc` | 13 passed |
+| `cargo test -p litchi-xlsb --all-features` | 736 unit, all integration and doctests passed |
+| raw OPC lexical relationship and content-types regressions | passed |
 | source-backed metadata replay regression | passed |
 
 The complete `cargo test -p litchi-xlsb --all-features` run passes after the
-consumer expectation and edit-boundary corrections: 731 unit tests, every
+consumer expectation and edit-boundary corrections: 736 unit tests, every
 integration target, 40 passing doctests, 11 ignored doctests and 2 compile-fail
 doctests. The focused comments and conditional-formatting filters also pass.
 ABBA measurements for this corrected tree remain a coordinator measurement

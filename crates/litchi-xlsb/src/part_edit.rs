@@ -29,10 +29,7 @@ use std::collections::BTreeSet;
 use std::ops::Range;
 use std::sync::Arc;
 
-use litchi_opc::{
-    BlobPart, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, Relationships,
-    TargetMode,
-};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
 
 use crate::Workbook;
 use crate::package::Package;
@@ -94,6 +91,19 @@ fn relationships_equal(left: &Relationships, right: &Relationships) -> bool {
         })
 }
 
+/// Whether a typed relationship graph has the captured entries, without
+/// allocating a temporary sorted vector during patch replay.
+fn relationships_match(graph: &Relationships, states: &[Relationship]) -> bool {
+    graph.len() == states.len()
+        && states.iter().all(|state| {
+            graph.get(&state.id).is_some_and(|candidate| {
+                candidate.reltype() == state.kind
+                    && candidate.target_ref() == state.target
+                    && candidate.is_external() == state.external
+            })
+        })
+}
+
 /// One relationship owner's exact semantic and publication state.
 ///
 /// OPC relationship members are not ordinary parts: their XML spelling lives
@@ -119,16 +129,17 @@ impl Eq for RelationshipState {}
 
 impl RelationshipState {
     fn read(package: &OpcPackage, owner: &PackURI, graph: &Relationships) -> Result<Self> {
-        let (xml, member_present) = if let Some((xml, member_present)) =
-            package.retained_relationships_xml(owner)?
-        {
-            (xml, member_present)
-        } else if owner.as_str() != "/" && graph.is_empty() {
-            (Arc::new(Vec::new()), false)
-        } else {
-            let source = package.source_relationships_with_limits(owner, package.read_limits())?;
-            (source.bytes_arc(), source.member_present())
-        };
+        let (xml, member_present) =
+            if let Some((xml, member_present)) = package.retained_relationships_xml(owner)? {
+                (xml, member_present)
+            } else if owner.as_str() != "/" && graph.is_empty() {
+                (Arc::new(Vec::new()), false)
+            } else {
+                (
+                    package.authored_relationships_xml(owner, package.read_limits())?,
+                    owner.as_str() == "/" || !graph.is_empty(),
+                )
+            };
         Ok(Self {
             entries: relationships(graph),
             xml,
@@ -142,7 +153,7 @@ impl RelationshipState {
         owner: &PackURI,
         graph: &Relationships,
     ) -> Result<bool> {
-        if self.entries != relationships(graph) {
+        if !relationships_match(graph, &self.entries) {
             return Ok(false);
         }
         let current = package.retained_relationships_xml(owner)?;
@@ -156,8 +167,11 @@ impl RelationshipState {
         if !self.member_present {
             return Ok(true);
         }
-        let source = package.source_relationships_with_limits(owner, package.read_limits())?;
-        Ok(self.xml.as_slice() == source.bytes())
+        if let Some((bytes, _)) = current {
+            return Ok(self.xml.as_slice() == bytes.as_slice());
+        }
+        let source = package.authored_relationships_xml(owner, package.read_limits())?;
+        Ok(self.xml.as_slice() == source.as_slice())
     }
 }
 
@@ -240,6 +254,26 @@ struct Delta {
     after: Option<State>,
 }
 
+/// A compact retained content-types image for one side of a patch.
+///
+/// The byte image is enough for bounded exact replacement; retaining the
+/// whole parsed package graph just to defer this capture would pin every
+/// unchanged part while callers keep a patch alive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ContentTypesImage {
+    bytes: Arc<Vec<u8>>,
+    source: bool,
+    explicit: bool,
+}
+
+/// A compact retained relationship image for one changed owner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RelationshipImage {
+    owner: PackURI,
+    bytes: Arc<Vec<u8>>,
+    member_present: bool,
+}
+
 /// The publication manifests of one side of a patch: the content-types view
 /// and the relationship views of the changed owners, so a replay publishes
 /// the same manifest spelling as the commit it was captured from.
@@ -251,8 +285,8 @@ struct Delta {
 /// payload alone changes is replayed in place, so its own views are kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Manifests {
-    content_types: Option<OwnedContentTypes>,
-    relationships: Vec<OwnedRelationships>,
+    content_types: Option<ContentTypesImage>,
+    relationships: Vec<RelationshipImage>,
 }
 
 impl Delta {
@@ -267,44 +301,44 @@ impl Delta {
             _ => false,
         }
     }
-
-    /// Whether the part is added, removed or changes its content type.
-    fn changes_content_types(&self) -> bool {
-        match (&self.before, &self.after) {
-            (Some(before), Some(after)) => before.content_type != after.content_type,
-            _ => true,
-        }
-    }
 }
 
 impl Manifests {
     /// Whether a patch of `deltas` changes any manifest view.
-    fn needed(deltas: &[Delta], root: bool) -> bool {
-        root || deltas.iter().any(|delta| !delta.payload_only())
+    fn needed(deltas: &[Delta], root: bool, content_types_changed: bool) -> bool {
+        root || content_types_changed || deltas.iter().any(|delta| !delta.payload_only())
     }
 
-    fn capture(package: &OpcPackage, deltas: &[Delta], after: bool, root: bool) -> Result<Self> {
-        let limits = package.read_limits();
+    fn capture(
+        deltas: &[Delta],
+        root: Option<&(RelationshipState, RelationshipState)>,
+        after: bool,
+        content_types: Option<ContentTypesImage>,
+    ) -> Result<Self> {
         let mut relationships = Vec::new();
         for delta in deltas.iter().filter(|delta| !delta.payload_only()) {
-            let present = if after {
-                delta.after.is_some()
+            let state = if after {
+                delta.after.as_ref()
             } else {
-                delta.before.is_some()
+                delta.before.as_ref()
             };
-            if present {
-                relationships.push(package.source_relationships_with_limits(&delta.name, limits)?);
+            if let Some(state) = state.filter(|state| state.relationships.member_present) {
+                relationships.push(RelationshipImage {
+                    owner: delta.name.clone(),
+                    bytes: Arc::clone(&state.relationships.xml),
+                    member_present: true,
+                });
             }
         }
-        if root {
+        if let Some((before, after_state)) = root {
+            let state = if after { after_state } else { before };
             let owner = PackURI::new("/")?;
-            relationships.push(package.source_relationships_with_limits(&owner, limits)?);
+            relationships.push(RelationshipImage {
+                owner,
+                bytes: Arc::clone(&state.xml),
+                member_present: state.member_present,
+            });
         }
-        let content_types = if deltas.iter().any(Delta::changes_content_types) {
-            Some(package.source_content_types_with_limits(limits)?)
-        } else {
-            None
-        };
         Ok(Self {
             content_types,
             relationships,
@@ -313,19 +347,64 @@ impl Manifests {
 
     /// Publish these manifest views on `package`, whose typed graph is the
     /// one they were captured from.
-    fn restore(&self, package: &mut OpcPackage) -> Result<()> {
+    fn restore(
+        &self,
+        package: &mut OpcPackage,
+        expected: Option<&ContentTypesImage>,
+    ) -> Result<()> {
         let limits = package.read_limits();
         if let Some(content_types) = &self.content_types {
-            let current = package.source_content_types_with_limits(limits)?;
-            if current.bytes() != content_types.bytes() {
-                package.try_replace_content_types(current.bytes(), content_types)?;
+            let current = match package.retained_content_types_xml()? {
+                Some(bytes) => bytes,
+                None => package.authored_content_types_xml(limits)?,
+            };
+            if current.as_slice() != content_types.bytes.as_slice() {
+                let current_matches_base = expected
+                    .is_some_and(|expected| current.as_slice() == expected.bytes.as_slice());
+                if current_matches_base {
+                    package.try_replace_content_types_bytes_with_limits(
+                        current.as_slice(),
+                        Arc::clone(&content_types.bytes),
+                        limits,
+                    )?;
+                } else if content_types.explicit {
+                    return Err(Error::PatchConflict {
+                        part: "content types",
+                    });
+                }
             }
         }
-        for relationships in &self.relationships {
-            let current =
-                package.source_relationships_with_limits(relationships.owner(), limits)?;
-            if current != *relationships {
-                package.try_replace_relationships(&current, relationships)?;
+        for relationship in &self.relationships {
+            let (current, current_member_present) = if let Some((bytes, member_present)) =
+                package.retained_relationships_xml(&relationship.owner)?
+            {
+                (bytes, member_present)
+            } else {
+                let member_present = if relationship.owner.as_str() == "/" {
+                    true
+                } else {
+                    match package.get_part(&relationship.owner) {
+                        Ok(part) => !part.rels().is_empty(),
+                        Err(litchi_opc::OpcError::PartNotFound(_)) => false,
+                        Err(error) => return Err(error.into()),
+                    }
+                };
+                (
+                    package.authored_relationships_xml(&relationship.owner, limits)?,
+                    member_present,
+                )
+            };
+            if current.as_slice() != relationship.bytes.as_slice()
+                || current_member_present != relationship.member_present
+            {
+                package.try_replace_relationships_source_bytes_with_limits(
+                    &relationship.owner,
+                    current.as_slice(),
+                    current_member_present,
+                    Arc::clone(&relationship.bytes),
+                    relationship.member_present,
+                    limits,
+                )?;
             }
         }
         Ok(())
@@ -342,38 +421,26 @@ pub(crate) struct PartPatch {
     manifests: Option<LazyManifests>,
 }
 
-/// The manifest views of both sides of a changed patch, captured on first
-/// replay: a commit publishes its own staged graph and never needs them, so
-/// the patch keeps (shares of) the two graphs instead of serializing their
-/// manifests on every commit.
+/// The compact manifest views of both sides of a changed patch. The changed
+/// part states already retain every relationship image needed for replay, so
+/// this value does not retain either whole package graph.
 #[derive(Debug, Clone)]
 struct LazyManifests {
-    graphs: (Arc<OpcPackage>, Arc<OpcPackage>),
-    deltas: Arc<[Delta]>,
-    root: bool,
+    captured: Arc<(Manifests, Manifests)>,
+    content_types_changed: bool,
     /// Whether this is the inverse of the captured direction.
     inverse: bool,
-    captured: Arc<std::sync::OnceLock<(Manifests, Manifests)>>,
 }
 
 impl LazyManifests {
     /// The `(before, after)` manifest views of this direction.
-    fn get(&self) -> Result<(&Manifests, &Manifests)> {
-        let pair = if let Some(pair) = self.captured.get() {
-            pair
-        } else {
-            let (before, after) = &self.graphs;
-            let captured = (
-                Manifests::capture(before, &self.deltas, false, self.root)?,
-                Manifests::capture(after, &self.deltas, true, self.root)?,
-            );
-            self.captured.get_or_init(|| captured)
-        };
-        Ok(if self.inverse {
+    fn get(&self) -> (&Manifests, &Manifests) {
+        let pair = self.captured.as_ref();
+        if self.inverse {
             (&pair.1, &pair.0)
         } else {
             (&pair.0, &pair.1)
-        })
+        }
     }
 
     fn inverse(&self) -> Self {
@@ -384,25 +451,13 @@ impl LazyManifests {
     }
 }
 
-/// Two patches are equal when they change the same parts the same way; the
-/// manifest views are derived from the graphs the patches were captured on.
+/// Two patches are equal when they change the same parts and manifest images
+/// the same way.
 impl PartialEq for LazyManifests {
     fn eq(&self, other: &Self) -> bool {
-        if self.root != other.root
-            || self.inverse != other.inverse
-            || self.deltas.as_ref() != other.deltas.as_ref()
-        {
-            return false;
-        }
-        match (self.get(), other.get()) {
-            (Ok((before, after)), Ok((other_before, other_after))) => {
-                before == other_before && after == other_after
-            },
-            // Equality is only used as a diagnostic/value comparison. If a
-            // lazy capture cannot be reproduced under its source limits,
-            // treating the values as different is the conservative result.
-            _ => false,
-        }
+        self.content_types_changed == other.content_types_changed
+            && self.inverse == other.inverse
+            && self.captured == other.captured
     }
 }
 
@@ -410,13 +465,22 @@ impl Eq for LazyManifests {}
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
-        self.deltas.is_empty() && self.root.is_none()
+        self.deltas.is_empty() && self.root.is_none() && self.manifests.is_none()
     }
 
     /// The number of parts (and the package-level relationship set) the
     /// patch changes.
     pub(crate) fn parts(&self) -> usize {
-        self.deltas.len() + usize::from(self.root.is_some())
+        let parts = self.deltas.len() + usize::from(self.root.is_some());
+        if parts == 0 {
+            usize::from(
+                self.manifests
+                    .as_ref()
+                    .is_some_and(|manifests| manifests.content_types_changed),
+            )
+        } else {
+            parts
+        }
     }
 
     /// The bytes the patch retains: every before and after payload.
@@ -449,17 +513,58 @@ impl PartPatch {
     }
 
     /// Attach the manifest views of both sides to a changed patch.
-    fn with_manifests(mut self, before: &Arc<OpcPackage>, after: &Arc<OpcPackage>) -> Result<Self> {
-        if Manifests::needed(&self.deltas, self.root.is_some()) {
+    fn with_manifests(
+        mut self,
+        before: &Arc<OpcPackage>,
+        after: &Arc<OpcPackage>,
+        content_types_changed: bool,
+    ) -> Result<Self> {
+        if Manifests::needed(&self.deltas, self.root.is_some(), content_types_changed) {
+            let (before_content_types, after_content_types) = if content_types_changed {
+                let mut before_content_types = Self::content_types_image(before)?;
+                let mut after_content_types = Self::content_types_image(after)?;
+                let source_changed = !before.same_content_types_source(after);
+                // A source allocation change is the provenance of an explicit
+                // raw manifest replacement. Mark both directions so an
+                // inverse cannot silently discard that lexical image on a
+                // divergent target; a structural source-to-fallback change
+                // keeps the allocation and leaves both sides composable.
+                let explicit =
+                    source_changed && (before_content_types.source || after_content_types.source);
+                before_content_types.explicit = explicit;
+                after_content_types.explicit = explicit;
+                (Some(before_content_types), Some(after_content_types))
+            } else {
+                (None, None)
+            };
+            let before_manifests = Manifests::capture(
+                &self.deltas,
+                self.root.as_ref(),
+                false,
+                before_content_types,
+            )?;
+            let after_manifests =
+                Manifests::capture(&self.deltas, self.root.as_ref(), true, after_content_types)?;
             self.manifests = Some(LazyManifests {
-                graphs: (Arc::clone(before), Arc::clone(after)),
-                deltas: self.deltas.clone().into(),
-                root: self.root.is_some(),
+                captured: Arc::new((before_manifests, after_manifests)),
+                content_types_changed,
                 inverse: false,
-                captured: Arc::default(),
             });
         }
         Ok(self)
+    }
+
+    fn content_types_image(package: &OpcPackage) -> Result<ContentTypesImage> {
+        let source = package.has_content_types_source();
+        let bytes = match package.content_types_source_xml() {
+            Some(bytes) => bytes,
+            None => package.authored_content_types_xml(package.read_limits())?,
+        };
+        Ok(ContentTypesImage {
+            bytes,
+            source,
+            explicit: false,
+        })
     }
 
     fn root(
@@ -504,7 +609,11 @@ impl PartPatch {
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(before, after)
+        .with_manifests(
+            before,
+            after,
+            !before.same_retained_content_types(after)? || !before.same_content_types_source(after),
+        )
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -566,7 +675,11 @@ impl PartPatch {
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(before, after)
+        .with_manifests(
+            before,
+            after,
+            !before.same_retained_content_types(after)? || !before.same_content_types_source(after),
+        )
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
@@ -639,7 +752,8 @@ impl PartPatch {
             add_relationships(graph, &after.entries)?;
         }
         if let Some(manifests) = &self.manifests {
-            manifests.get()?.1.restore(&mut target)?;
+            let (before, after) = manifests.get();
+            after.restore(&mut target, before.content_types.as_ref())?;
         }
         Ok(target)
     }

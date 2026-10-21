@@ -146,6 +146,8 @@ impl Edit {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use litchi_opc::{BlobPart, PackURI, TargetMode};
 
     use crate::Package;
@@ -157,6 +159,27 @@ mod tests {
             "application/octet-stream".into(),
             vec![1, 2, 3],
         )
+    }
+
+    fn lexical_content_types_edit(
+        opc: &mut litchi_opc::OpcPackage,
+    ) -> crate::package::error::Result<()> {
+        let limits = opc.read_limits();
+        let source = opc.source_content_types_with_limits(limits)?;
+        let marker = b"</Types>";
+        let at = source
+            .bytes()
+            .windows(marker.len())
+            .rposition(|window| window == marker)
+            .expect("content-types root close");
+        let mut replacement = source.bytes().to_vec();
+        replacement.splice(at..at, [b'\n']);
+        opc.try_replace_content_types_bytes_with_limits(
+            source.bytes(),
+            Arc::new(replacement),
+            limits,
+        )?;
+        Ok(())
     }
 
     #[test]
@@ -200,6 +223,221 @@ mod tests {
             after.apply_opc(&patch),
             Err(PackageError::PatchConflict { .. })
         ));
+    }
+
+    #[test]
+    fn lexical_content_types_edit_is_replayed_and_inverted() {
+        let package = Package::new().unwrap();
+        let before = package.to_bytes().unwrap();
+        let mut edit = package.edit_opc().unwrap();
+        edit.update(lexical_content_types_edit).unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        assert!(!patch.is_noop());
+
+        let replayed = package.apply_opc(&patch).unwrap().into_package();
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+        let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
+        assert_eq!(restored.to_bytes().unwrap(), before);
+
+        let mut divergent = after.edit_opc().unwrap();
+        divergent
+            .update(|opc| {
+                opc.add_part(Box::new(raw_part("/custom/inverse-unrelated.bin")));
+                Ok(())
+            })
+            .unwrap();
+        let (divergent, _) = divergent.commit().unwrap().into_parts();
+        assert!(matches!(
+            divergent.apply_opc(&patch.inverse()),
+            Err(PackageError::PatchConflict {
+                part: "content types"
+            })
+        ));
+    }
+
+    #[test]
+    fn invalid_raw_content_types_source_is_retained_for_graph_replay() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/source.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+
+        let mut edit = source.edit_opc().unwrap();
+        let replacement = edit
+            .update(|opc| {
+                let limits = opc.read_limits();
+                let current = opc.source_content_types_with_limits(limits)?;
+                let marker = b"application/octet-stream";
+                let at = current
+                    .bytes()
+                    .windows(marker.len())
+                    .position(|window| window == marker)
+                    .expect("authored content type");
+                let mut bytes = current.bytes().to_vec();
+                bytes.splice(at..at + marker.len(), b"application/custom".iter().copied());
+                opc.try_replace_content_types_bytes_with_limits(
+                    current.bytes(),
+                    Arc::new(bytes.clone()),
+                    limits,
+                )?;
+                Ok(bytes)
+            })
+            .unwrap();
+        let (after, patch) = edit.commit().unwrap().into_parts();
+        let source_bytes = after
+            .opc_package()
+            .content_types_source_xml()
+            .expect("raw source allocation");
+        assert_eq!(source_bytes.as_slice(), replacement.as_slice());
+
+        let replayed = patch.0.apply_graph(source.opc_package()).unwrap();
+        assert_eq!(
+            replayed
+                .content_types_source_xml()
+                .expect("replayed raw source allocation")
+                .as_slice(),
+            replacement.as_slice()
+        );
+    }
+
+    #[test]
+    fn mixed_lexical_content_types_edit_refuses_an_unrelated_manifest_change() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/source.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+
+        let mut edit = source.edit_opc().unwrap();
+        edit.update(|opc| {
+            let name = PackURI::new("/custom/source.bin")?;
+            opc.get_part_mut(&name)?
+                .set_content_type("application/custom".to_owned())?;
+            lexical_content_types_edit(opc)
+        })
+        .unwrap();
+        let (_, patch) = edit.commit().unwrap().into_parts();
+
+        let mut divergent = source.edit_opc().unwrap();
+        divergent
+            .update(|opc| {
+                opc.add_part(Box::new(raw_part("/custom/unrelated.bin")));
+                Ok(())
+            })
+            .unwrap();
+        let (divergent, _) = divergent.commit().unwrap().into_parts();
+        assert!(matches!(
+            divergent.apply_opc(&patch),
+            Err(PackageError::PatchConflict {
+                part: "content types"
+            })
+        ));
+    }
+
+    #[test]
+    fn structural_content_type_patch_composes_with_an_unrelated_part() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/source.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+
+        let mut edit = source.edit_opc().unwrap();
+        edit.update(|opc| {
+            let name = PackURI::new("/custom/source.bin")?;
+            opc.get_part_mut(&name)?
+                .set_content_type("application/custom".to_owned())?;
+            Ok(())
+        })
+        .unwrap();
+        let (_, patch) = edit.commit().unwrap().into_parts();
+
+        let mut divergent = source.edit_opc().unwrap();
+        divergent
+            .update(|opc| {
+                opc.add_part(Box::new(raw_part("/custom/unrelated.bin")));
+                Ok(())
+            })
+            .unwrap();
+        let (divergent, _) = divergent.commit().unwrap().into_parts();
+        let applied = divergent.apply_opc(&patch).unwrap().into_package();
+        assert_eq!(
+            applied
+                .opc_package()
+                .get_part(&PackURI::new("/custom/source.bin").unwrap())
+                .unwrap()
+                .content_type(),
+            "application/custom"
+        );
+        assert!(
+            applied
+                .opc_package()
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn structural_inverse_composes_with_an_unrelated_part_after_a_retained_source() {
+        let package = Package::new().unwrap();
+        let mut seed = package.edit_opc().unwrap();
+        seed.update(|opc| {
+            opc.add_part(Box::new(raw_part("/custom/source.bin")));
+            Ok(())
+        })
+        .unwrap();
+        let (source, _) = seed.commit().unwrap().into_parts();
+
+        let mut lexical = source.edit_opc().unwrap();
+        lexical.update(lexical_content_types_edit).unwrap();
+        let (source, _) = lexical.commit().unwrap().into_parts();
+
+        let mut edit = source.edit_opc().unwrap();
+        edit.update(|opc| {
+            let name = PackURI::new("/custom/source.bin")?;
+            opc.get_part_mut(&name)?
+                .set_content_type("application/custom".to_owned())?;
+            Ok(())
+        })
+        .unwrap();
+        let (changed, patch) = edit.commit().unwrap().into_parts();
+
+        let mut divergent = changed.edit_opc().unwrap();
+        divergent
+            .update(|opc| {
+                opc.add_part(Box::new(raw_part("/custom/unrelated.bin")));
+                Ok(())
+            })
+            .unwrap();
+        let (divergent, _) = divergent.commit().unwrap().into_parts();
+        let restored = divergent
+            .apply_opc(&patch.inverse())
+            .unwrap()
+            .into_package();
+        assert_eq!(
+            restored
+                .opc_package()
+                .get_part(&PackURI::new("/custom/source.bin").unwrap())
+                .unwrap()
+                .content_type(),
+            "application/octet-stream"
+        );
+        assert!(
+            restored
+                .opc_package()
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .is_ok()
+        );
     }
 
     #[test]

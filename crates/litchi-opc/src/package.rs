@@ -812,6 +812,16 @@ impl OpcPackage {
         }
     }
 
+    /// Share the admitted source content-types bytes even when a structural
+    /// edit has made their binding incompatible with the current part graph.
+    /// This is provenance only; publication uses the authored fallback until
+    /// the graph matches the source binding again, and callers still need the
+    /// validating replacement API to install new bytes.
+    #[must_use]
+    pub fn content_types_source_xml(&self) -> Option<Arc<Vec<u8>>> {
+        self.source_content_types_xml.clone()
+    }
+
     /// Compare the original content-types members even when either is no
     /// longer compatible with its typed graph. Unlike publication comparison,
     /// this distinguishes replacement of the raw member from a structural
@@ -826,6 +836,19 @@ impl OpcPackage {
             (Some(left), Some(right)) => Arc::ptr_eq(left, right) || left == right,
             _ => false,
         }
+    }
+
+    /// Whether this package still carries a source content-types member and
+    /// its parsed binding, even when structural edits make that source token
+    /// incompatible with the current part graph.
+    ///
+    /// Format patch capture uses this provenance bit together with
+    /// [`Self::same_content_types_source`] to keep an explicitly replaced
+    /// lexical member distinguishable from an unchanged source token that a
+    /// structural edit temporarily invalidated.
+    #[must_use]
+    pub fn has_content_types_source(&self) -> bool {
+        self.source_content_types_xml.is_some() && self.source_content_types.is_some()
     }
 
     /// Serialize the typed content-type graph under required output limits.
