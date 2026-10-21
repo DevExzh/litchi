@@ -241,3 +241,51 @@ duration before any performance claim. A separate page-margin run enables
 and exact-overlay checks. The full six-family `--samples 64 --compact` command
 is retained in the same runbook for a later grant when the coordinator wants
 the complete matrix. No native timing has been started.
+
+## Batched source-family harness correction
+
+The first native attempt with the Rust xlsx_source_family_abba driver is
+unaccepted. That driver invoked the protected child once for every leg with
+--samples 1 and retained a route checkpoint only after both implementations
+finished. The coordinator stopped it after a complete partial ABBA block when
+the missing batching and checkpointing were found. Its temporary child JSON
+files were deleted by TemporaryJson; no elapsed observations survived. The
+external diagnostic receipt records the protected binary identities and this
+loss at
+/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-v1/attempt-aborted-20261021.json (SHA-256
+a521dda6ae331e3db55a530baa26e7efea5502cf0ad3038194c89f70e95fc25a). It is
+not a timing result.
+
+The replacement adapter is tracked at
+tools/xlsx_source_family_abba_batched.py. It invokes each protected child
+with its existing --samples N complete-operation batch, independently
+normalizes N for each endpoint and revision, and uses five ABBA blocks by
+default. Its target is 500 ms of summed measured operation time per leg, with
+150 ms as the hard minimum. Two explicit warmup child calls per endpoint are
+recorded separately and excluded from measured sums. Every calibration,
+warmup, measured, short, invalid, or failed child result is appended to an
+fsync'ed events.ndjson journal before the next child starts; each completed
+ABBA block has an atomic checkpoint. Raw child reports, output hashes, sink
+bytes and largest-write bounds, source read counters, per-operation samples,
+exact N, and per-leg sums are retained. Compact merge/unmerge children are
+repeated to the same summed-span floor and report per-leg primary-time sums;
+those repeated spans are not presented as one contiguous child clock.
+
+The adapter has a --plan mode that invokes no child. A timing run uses only
+protected copies outside the repository, for example:
+
+~~~sh
+python3 tools/xlsx_source_family_abba_batched.py \\
+  --before-bin /tmp/litchi-w4-final-binaries-20261021/litchi-perf-baseline-base-e63a1fe353-v1 \\
+  --after-bin /tmp/litchi-w4-final-binaries-20261021/litchi-perf-baseline-candidate-6800ddc682-v1 \\
+  --merge-before-bin /tmp/litchi-w4-final-binaries-20261021/xlsx_merge_source_abba-base-e63a1fe353-v1 \\
+  --merge-after-bin /tmp/litchi-w4-final-binaries-20261021/xlsx_merge_source_abba-head-6800ddc682-v1 \\
+  --compact --blocks 5 --warmup 2 --target-ms 500 --minimum-ms 150 \\
+  --out-dir /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-batched-v1
+~~~
+
+The adapter source SHA-256 at this checkpoint is
+3891f7bac2e60ec4cbd9c5b40772a8da0722f4b8c9b25726b608b00bdc0b4da4. It has
+passed python3 -m py_compile and a fake-child smoke run covering one eager
+family, compact merge/unmerge, batching, failure-safe journaling, and atomic
+checkpoints. No native timing has been run with the replacement adapter.
