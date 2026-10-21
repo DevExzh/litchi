@@ -4290,30 +4290,68 @@ impl SourceArtifact {
                 return Ok(fingerprint);
             }
         }
-        let _workspace_reservation = self
-            .snapshot
-            .context
-            .as_ref()
-            .map(|context| {
-                context
-                    .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
-                    .map_err(map_execution_error)
-            })
-            .transpose()?;
-        let mut hasher = Sha256::new();
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source artifact fingerprint buffer",
-                source,
-            })?;
-        if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
-            return Err(overlay_unavailable(
-                "source artifact fingerprint allocation reported capacity beyond its reservation",
-            ));
+        let chunk_bytes = usize::try_from(
+            self.snapshot
+                .length
+                .min(SOURCE_PUBLICATION_CHUNK_BYTES as u64),
+        )
+        .map_err(|_| overlay_unavailable("source length does not fit this platform"))?;
+        let mut use_heap_buffer = chunk_bytes != 0 && self.snapshot.context.is_none();
+        let _workspace_reservation = if chunk_bytes == 0 {
+            None
+        } else if let Some(context) = self.snapshot.context.as_ref() {
+            // A recipient may deliberately admit only a small source. Keep
+            // the normal publication chunk as the fast path and fall back to
+            // the fixed stack window only when the context has no free memory
+            // at all; a partially available heap window remains a typed
+            // refusal so the fixed workspace policy is preserved.
+            let requested = chunk_bytes;
+            match context.reserve(Resource::Memory, requested as u64) {
+                Ok(reservation) => Some(reservation),
+                Err(ExecutionError::ResourceLimit(limit)) if limit.resource == Resource::Memory => {
+                    let used = limit.observed.saturating_sub(requested as u64);
+                    let available = limit.limit.saturating_sub(used);
+                    if available == 0 {
+                        // A source package may already retain its entire
+                        // managed memory allowance in its catalog. Keep
+                        // authentication possible with a bounded stack
+                        // window rather than bypassing the budget with a
+                        // heap allocation or refusing an exact match.
+                        None
+                    } else {
+                        return Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)));
+                    }
+                },
+                Err(error) => return Err(map_execution_error(error)),
+            }
+        } else {
+            None
+        };
+        if _workspace_reservation.is_some() {
+            use_heap_buffer = true;
         }
-        buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+        let mut hasher = Sha256::new();
+        const FINGERPRINT_STACK_BYTES: usize = 4 * 1024;
+        let mut stack_buffer = [0_u8; FINGERPRINT_STACK_BYTES];
+        let mut heap_buffer = Vec::new();
+        let buffer: &mut [u8] = if use_heap_buffer {
+            heap_buffer
+                .try_reserve_exact(chunk_bytes)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source artifact fingerprint buffer",
+                    source,
+                })?;
+            if heap_buffer.capacity() != chunk_bytes {
+                return Err(overlay_unavailable(
+                    "source artifact fingerprint allocation reported capacity beyond its reservation",
+                ));
+            }
+            heap_buffer.resize(chunk_bytes, 0);
+            heap_buffer.as_mut_slice()
+        } else {
+            let length = chunk_bytes.min(FINGERPRINT_STACK_BYTES);
+            &mut stack_buffer[..length]
+        };
         let mut offset = 0_u64;
         while offset < self.snapshot.length {
             let remaining =

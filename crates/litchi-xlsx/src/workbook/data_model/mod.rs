@@ -25,6 +25,7 @@ pub use package::{Commit, Diagnostics, Edit, Error, Patch, Snapshot, load_data_m
 
 crate::record::limit_kinds!("Data Model", DataModel {
     XmlBytes => "Data Model XML bytes",
+    DependencyBytes => "Data Model dependency XML bytes",
     RewriteBytes => "Data Model rewrite bytes",
     ExtensionBytes => "Data Model extension bytes",
     NamespaceBytes => "Data Model namespace bytes",
@@ -33,6 +34,8 @@ crate::record::limit_kinds!("Data Model", DataModel {
     TotalStringBytes => "Data Model total string bytes",
     Nodes => "Data Model XML nodes",
     Depth => "Data Model XML depth",
+    Events => "Data Model XML events",
+    FormulaBytes => "Data Model formula bytes",
     Tables => "Data Model tables",
     Relationships => "Data Model relationships",
     TimeGroupings => "Data Model time groupings",
@@ -63,6 +66,8 @@ pub(crate) const CONNECTIONS_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml";
 
 pub(crate) const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_DEPENDENCY_BYTES: usize = 256 * 1024 * 1024;
+pub(crate) const MAX_FORMULA_EVENTS: usize = 10_000_000;
 pub(crate) const MAX_REWRITE_BYTES: usize = 32 * 1024 * 1024;
 pub(crate) const MAX_EXTENSION_BYTES: usize = 4 * 1024 * 1024;
 pub(crate) const MAX_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
@@ -75,13 +80,138 @@ pub(crate) const MAX_RELATIONSHIPS: usize = 65_536;
 pub(crate) const MAX_TIME_GROUPINGS: usize = 65_536;
 pub(crate) const MAX_CALCULATED_TIME_COLUMNS: usize = 65_536;
 
+/// Resource limits used by one Data Model edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_dependency_bytes: usize,
+    max_dependency_depth: usize,
+    max_formula_events: usize,
+    max_formula_bytes: usize,
+}
+
+impl Limits {
+    /// Construct the default Data Model edit limits.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_dependency_bytes: MAX_DEPENDENCY_BYTES,
+            max_dependency_depth: MAX_DEPTH,
+            max_formula_events: MAX_FORMULA_EVENTS,
+            max_formula_bytes: MAX_STRING_BYTES,
+        }
+    }
+
+    /// Maximum aggregate XML bytes inspected while removing a Data Model.
+    #[must_use]
+    pub const fn max_dependency_bytes(self) -> usize {
+        self.max_dependency_bytes
+    }
+
+    /// Maximum XML depth inspected while removing a Data Model.
+    #[must_use]
+    pub const fn max_dependency_depth(self) -> usize {
+        self.max_dependency_depth
+    }
+
+    /// Maximum XML events inspected while checking formula dependencies.
+    #[must_use]
+    pub const fn max_formula_events(self) -> usize {
+        self.max_formula_events
+    }
+
+    /// Maximum bytes retained for one formula while checking dependencies.
+    #[must_use]
+    pub const fn max_formula_bytes(self) -> usize {
+        self.max_formula_bytes
+    }
+
+    /// Set the aggregate dependency XML byte limit.
+    pub fn with_max_dependency_bytes(mut self, value: usize) -> crate::error::Result<Self> {
+        self.max_dependency_bytes =
+            checked_limit(LimitKind::DependencyBytes, value, MAX_DEPENDENCY_BYTES)?;
+        Ok(self)
+    }
+
+    /// Set the dependency XML depth limit.
+    pub fn with_max_dependency_depth(mut self, value: usize) -> crate::error::Result<Self> {
+        self.max_dependency_depth = checked_limit(LimitKind::Depth, value, MAX_DEPTH)?;
+        Ok(self)
+    }
+
+    /// Set the formula XML event limit.
+    pub fn with_max_formula_events(mut self, value: usize) -> crate::error::Result<Self> {
+        self.max_formula_events = checked_limit(LimitKind::Events, value, MAX_FORMULA_EVENTS)?;
+        Ok(self)
+    }
+
+    /// Set the formula byte limit.
+    pub fn with_max_formula_bytes(mut self, value: usize) -> crate::error::Result<Self> {
+        self.max_formula_bytes = checked_limit(LimitKind::FormulaBytes, value, MAX_STRING_BYTES)?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn checked_limit(kind: LimitKind, value: usize, maximum: usize) -> crate::error::Result<usize> {
+    if value == 0 || value > maximum {
+        return Err(Error::InvalidLimit {
+            kind: kind.into(),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        });
+    }
+    Ok(value)
+}
+
+/// Options for one Data Model edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Bound Data Model dependency checks by `limits`.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the configured limits, if an override was supplied.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<Limits> {
+        self.limits
+    }
+}
+
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
 pub(crate) fn limit(name: &str) -> Error {
+    let (kind, maximum) = limit_bound(name);
+    Error::limit(kind, maximum.saturating_add(1), maximum)
+}
+
+pub(crate) fn limit_at_with_max(name: &str, observed: usize, maximum: usize) -> Error {
+    let (kind, _) = limit_bound(name);
+    Error::limit(kind, observed, maximum)
+}
+
+fn limit_bound(name: &str) -> (LimitKind, usize) {
     let (kind, maximum) = if name.contains("payload") {
         (LimitKind::PayloadBytes, MAX_PAYLOAD_BYTES)
+    } else if name.contains("dependency") {
+        (LimitKind::DependencyBytes, MAX_DEPENDENCY_BYTES)
+    } else if name.contains("event") {
+        (LimitKind::Events, MAX_FORMULA_EVENTS)
+    } else if name.contains("formula") {
+        (LimitKind::FormulaBytes, MAX_STRING_BYTES)
     } else if name.contains("rewrite") {
         (LimitKind::RewriteBytes, MAX_REWRITE_BYTES)
     } else if name.contains("calculatedTimeColumn") {
@@ -116,9 +246,44 @@ pub(crate) fn limit(name: &str) -> Error {
     } else {
         (LimitKind::XmlBytes, MAX_XML_BYTES)
     };
-    Error::limit(kind, maximum.saturating_add(1), maximum)
+    (kind, maximum)
 }
 
 pub(crate) fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LimitKind, MAX_DEPENDENCY_BYTES, MAX_FORMULA_EVENTS, limit_at_with_max};
+    use crate::Error;
+
+    #[test]
+    fn removal_budgets_have_typed_kinds() {
+        assert!(matches!(
+            limit_at_with_max(
+                "dependency bytes",
+                MAX_DEPENDENCY_BYTES + 1,
+                MAX_DEPENDENCY_BYTES
+            ),
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::DependencyBytes),
+                ..
+            }
+        ));
+        assert!(matches!(
+            limit_at_with_max("formula events", MAX_FORMULA_EVENTS + 1, MAX_FORMULA_EVENTS),
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::Events),
+                ..
+            }
+        ));
+        assert!(matches!(
+            limit_at_with_max("formula attribute bytes", 2, 1),
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::FormulaBytes),
+                ..
+            }
+        ));
+    }
 }

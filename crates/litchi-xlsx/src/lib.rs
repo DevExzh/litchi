@@ -331,7 +331,8 @@ pub use threaded_comments::{
     validate_timestamp, write_comments, write_persons,
 };
 pub use workbook::data_model::{
-    Definition as DataModelDefinition, Model as DataModel, OpaqueXml as DataModelOpaqueXml,
+    Definition as DataModelDefinition, EditOptions as DataModelEditOptions,
+    Limits as DataModelLimits, Model as DataModel, OpaqueXml as DataModelOpaqueXml,
     Payload as DataModelPayload, Relationship as DataModelRelationship,
     Snapshot as DataModelSnapshot, Table as DataModelTable, load_data_model, parse_data_model,
     write_data_model,

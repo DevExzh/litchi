@@ -28,7 +28,7 @@ use super::model::{
 };
 use super::{
     CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, DATA_MODEL_CONTENT_TYPE,
-    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, MAX_PAYLOAD_BYTES,
+    DATA_MODEL_EXTENSION_URI, DATA_MODEL_PART_NAME, EditOptions, Limits, MAX_PAYLOAD_BYTES,
     STRICT_CONNECTIONS_RELATIONSHIP_TYPE, invalid, limit,
 };
 
@@ -128,7 +128,12 @@ pub(crate) fn store_data_model(
     )?;
     let model = prepare_import(package, workbook_name, into_shared_model(value.clone())?)?;
     let mut candidate = package.clone();
-    publish_data_model(&mut candidate, workbook_name, Some(&model))?;
+    publish_data_model(
+        &mut candidate,
+        workbook_name,
+        Some(&model),
+        Limits::default(),
+    )?;
     *package = candidate;
     Ok(())
 }
@@ -137,6 +142,7 @@ fn publish_data_model(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: Option<&ModelView>,
+    limits: Limits,
 ) -> Result<()> {
     if let Some(value) = value {
         validate_model(package, workbook_name, value)?;
@@ -161,7 +167,9 @@ fn publish_data_model(
     }
     let removal = if value.is_none() {
         load_shared_model(package, workbook_name)?
-            .map(|model| super::removal::prepare(package, workbook_name, model.definition()))
+            .map(|model| {
+                super::removal::prepare(package, workbook_name, model.definition(), limits)
+            })
             .transpose()?
     } else {
         None
@@ -832,6 +840,7 @@ pub struct Edit {
     target: crate::record::Source,
     before: Snapshot,
     draft: Option<ModelView>,
+    limits: Limits,
 }
 
 impl crate::Package {
@@ -842,7 +851,16 @@ impl crate::Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused, and the read errors of the graph.
     pub fn edit_data_model(&self) -> Result<Edit> {
-        Edit::start(crate::record::Source::new(self, "edit_data_model")?)
+        self.edit_data_model_with_options(EditOptions::default())
+    }
+
+    /// Start a Data Model edit with caller-selected dependency and formula
+    /// audit limits.
+    pub fn edit_data_model_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::start(
+            crate::record::Source::new(self, "edit_data_model")?,
+            options.limits_value().unwrap_or_default(),
+        )
     }
 
     /// Apply an exact Data Model patch to a new package; this one is
@@ -859,12 +877,13 @@ impl crate::Package {
 }
 
 impl Edit {
-    fn start(target: crate::record::Source) -> Result<Self> {
+    fn start(target: crate::record::Source, limits: Limits) -> Result<Self> {
         let before = Snapshot::load(&target)?;
         Ok(Self {
             draft: before.model.clone(),
             target,
             before,
+            limits,
         })
     }
 
@@ -1035,7 +1054,7 @@ impl Edit {
     /// [`Self::commit`], keeping the published snapshot.
     fn publish(self) -> Result<(Commit, Snapshot)> {
         if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+            let patch = Patch::new(self.before.clone(), self.before.clone(), self.limits);
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
                 self.before,
@@ -1055,12 +1074,13 @@ impl Edit {
             &mut candidate,
             &self.before.workbook_name,
             self.draft.as_ref(),
+            self.limits,
         )?;
         let snapshot = Snapshot::load(&candidate)?;
         if !snapshot.same_semantics(self.draft.as_ref()) {
             return Err(invalid("Data Model publication changed staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(self.before, snapshot.clone(), self.limits);
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -1074,11 +1094,16 @@ impl Edit {
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
+    limits: Limits,
 }
 
 impl Patch {
-    fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+    fn new(before: Snapshot, after: Snapshot, limits: Limits) -> Self {
+        Self {
+            before,
+            after,
+            limits,
+        }
     }
 
     /// Source state required before application.
@@ -1105,6 +1130,7 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            limits: self.limits,
         }
     }
 
@@ -1125,7 +1151,12 @@ impl Patch {
         }
         if self.after.model.is_none() {
             if let Some(model) = &self.before.model {
-                super::removal::prepare(target, &self.before.workbook_name, model.definition())?;
+                super::removal::prepare(
+                    target,
+                    &self.before.workbook_name,
+                    model.definition(),
+                    self.limits,
+                )?;
             }
         }
         if self.before.source.connections_part.is_none() {

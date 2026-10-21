@@ -2125,32 +2125,65 @@ impl SourceBackedFormControlOwner {
     /// Open a deferred OPC package from a reader and retain the source-backed
     /// package for subsequent worksheet selections.
     pub fn from_reader<R: Read>(reader: R) -> OwnerResult<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader(reader)?)
+        Self::from_reader_with_options(reader, crate::OpenOptions::new())
+    }
+
+    /// Open a deferred OPC package from a reader under explicit XLSX
+    /// ingress and semantic policies.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
+        let workbook =
+            crate::SourceBackedWorkbook::from_reader_with_options(reader, options.clone())?;
+        let package = workbook
+            .try_into_source_backed_package()
+            .map_err(|_| owner_invalid("source-backed workbook package is still shared"))?;
+        Self::from_source_backed_package_with_options(package, options)
     }
 
     /// Open a deferred OPC package from a filesystem path.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> OwnerResult<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_path(path)?)
+        Self::from_path_with_options(path, crate::OpenOptions::new())
+    }
+
+    /// Open a deferred OPC package from a filesystem path under explicit XLSX
+    /// ingress and semantic policies.
+    #[cfg(any(unix, windows))]
+    pub fn from_path_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
+        let workbook = crate::SourceBackedWorkbook::open_with_options(path, options.clone())?;
+        let package = workbook
+            .try_into_source_backed_package()
+            .map_err(|_| owner_invalid("source-backed workbook package is still shared"))?;
+        Self::from_source_backed_package_with_options(package, options)
     }
 
     /// Build an owner from an already opened deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> OwnerResult<Self> {
+        Self::from_source_backed_package_with_options(package, crate::OpenOptions::new())
+    }
+
+    /// Build an owner from an already opened deferred OPC package and apply
+    /// the form-control semantic policy carried by `options`.
+    pub fn from_source_backed_package_with_options(
+        package: SourceBackedPackage,
+        options: crate::OpenOptions,
+    ) -> OwnerResult<Self> {
         package.check_execution()?;
         if package.has_encrypted_entries() {
             return Err(FormControlOwnerError::Invalid(
                 "encrypted XLSX form-control source is not admitted".into(),
             ));
         }
-        let limits = OwnerLimits::from_read_limits(package.read_limits());
+        let limits = options
+            .semantic_limits_value()
+            .form_controls_value()
+            .unwrap_or_else(|| OwnerLimits::from_read_limits(package.read_limits()));
         Ok(Self { package, limits })
-    }
-
-    /// Set a lower host policy before selecting a worksheet.
-    #[must_use]
-    pub fn with_limits(mut self, limits: OwnerLimits) -> Self {
-        self.limits = limits;
-        self
     }
 
     /// Capture one worksheet's effective form-control collection.

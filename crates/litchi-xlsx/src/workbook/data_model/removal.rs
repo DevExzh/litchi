@@ -2,8 +2,9 @@
 
 use super::codec::{Node, parse_document};
 use super::{
-    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, Definition, MAX_STRING_BYTES,
-    MAX_XML_BYTES, SML, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, STRICT_SML, X15, invalid, xml_error,
+    CONNECTIONS_CONTENT_TYPE, CONNECTIONS_RELATIONSHIP_TYPE, Definition, Limits, MAX_XML_BYTES,
+    SML, STRICT_CONNECTIONS_RELATIONSHIP_TYPE, STRICT_SML, X15, invalid, limit_at_with_max,
+    xml_error,
 };
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -76,6 +77,7 @@ pub(super) fn prepare(
     package: &OpcPackage,
     workbook: &PackURI,
     model: &Definition,
+    limits: Limits,
 ) -> Result<Plan> {
     let workbook_part = package.get_part(workbook)?;
     let mut connections = workbook_part.rels().iter().filter(|rel| {
@@ -236,11 +238,21 @@ pub(super) fn prepare(
         // Only a modeled consumer's payload is read, so only consumers are
         // decoded (ADR 0030).
         let part = package.get_part(part.partname())?;
-        bytes = bytes
-            .checked_add(part.blob().len())
-            .filter(|bytes| *bytes <= 256 * 1024 * 1024)
-            .ok_or_else(|| invalid("model removal dependency XML limit exceeded"))?;
-        check_formulas(part.blob())?;
+        bytes = bytes.checked_add(part.blob().len()).ok_or_else(|| {
+            limit_at_with_max(
+                "dependency bytes",
+                limits.max_dependency_bytes().saturating_add(1),
+                limits.max_dependency_bytes(),
+            )
+        })?;
+        if bytes > limits.max_dependency_bytes() {
+            return Err(limit_at_with_max(
+                "dependency bytes",
+                bytes,
+                limits.max_dependency_bytes(),
+            ));
+        }
+        check_formulas_with_limits(part.blob(), limits)?;
         if matches!(part.content_type(), WORKSHEET | TABLE | REVISION | EXTERNAL) {
             continue;
         }
@@ -283,7 +295,7 @@ pub(super) fn prepare(
             });
         }
     }
-    check_formulas(workbook_part.blob())?;
+    check_formulas_with_limits(workbook_part.blob(), limits)?;
     let connection_change = if removal.is_some() {
         removal
     } else if deleting.is_empty() {
@@ -517,7 +529,12 @@ fn reject_mce(node: &Node) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn check_formulas(xml: &[u8]) -> Result<()> {
+    check_formulas_with_limits(xml, Limits::default())
+}
+
+fn check_formulas_with_limits(xml: &[u8], limits: Limits) -> Result<()> {
     // Markup compatibility is recognized below on namespace values as
     // written; a binding spelled with references applies all the same
     // (record 0011).
@@ -532,9 +549,19 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
     let mut events = 0usize;
     let mut depth = 0usize;
     loop {
-        events += 1;
-        if events > 10_000_000 {
-            return Err(invalid("model removal formula event limit exceeded"));
+        events = events.checked_add(1).ok_or_else(|| {
+            limit_at_with_max(
+                "formula events",
+                limits.max_formula_events().saturating_add(1),
+                limits.max_formula_events(),
+            )
+        })?;
+        if events > limits.max_formula_events() {
+            return Err(limit_at_with_max(
+                "formula events",
+                events,
+                limits.max_formula_events(),
+            ));
         }
         let event = reader.read_event().map_err(xml_error)?;
         let namespace = match &event {
@@ -562,9 +589,11 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
                             | (b"definedName", b"refersTo")
                     )
                 {
-                    if attribute.value.len() > MAX_STRING_BYTES {
-                        return Err(invalid(
-                            "model removal formula attribute length limit exceeded",
+                    if attribute.value.len() > limits.max_formula_bytes() {
+                        return Err(limit_at_with_max(
+                            "formula bytes",
+                            attribute.value.len(),
+                            limits.max_formula_bytes(),
                         ));
                     }
                     let value = attribute
@@ -591,10 +620,20 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
         }
         match event {
             Event::Start(element) => {
-                depth = depth
-                    .checked_add(1)
-                    .filter(|depth| *depth <= super::MAX_DEPTH)
-                    .ok_or_else(|| invalid("model dependency XML depth limit exceeded"))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit_at_with_max(
+                        "depth",
+                        limits.max_dependency_depth().saturating_add(1),
+                        limits.max_dependency_depth(),
+                    )
+                })?;
+                if depth > limits.max_dependency_depth() {
+                    return Err(limit_at_with_max(
+                        "depth",
+                        depth,
+                        limits.max_dependency_depth(),
+                    ));
+                }
                 if formula.is_some() {
                     return Err(invalid("nested formula XML"));
                 }
@@ -621,13 +660,13 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
                 let text = text
                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
                     .map_err(xml_error)?;
-                append_formula(&mut formula, &text)?;
+                append_formula(&mut formula, &text, limits.max_formula_bytes())?;
             },
             Event::CData(text) if formula.is_some() => {
                 let text = text
                     .xml_content(quick_xml::XmlVersion::Implicit1_0)
                     .map_err(xml_error)?;
-                append_formula(&mut formula, &text)?;
+                append_formula(&mut formula, &text, limits.max_formula_bytes())?;
             },
             Event::Empty(_) if formula.is_some() => return Err(invalid("nested formula XML")),
             Event::DocType(_) => return Err(invalid("DTD in model dependency XML")),
@@ -638,7 +677,7 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
                 }
                 let escaped = format!("&{reference};");
                 let text = quick_xml::escape::unescape(&escaped).map_err(xml_error)?;
-                append_formula(&mut formula, &text)?;
+                append_formula(&mut formula, &text, limits.max_formula_bytes())?;
             },
             Event::End(_) => {
                 depth = depth
@@ -664,14 +703,25 @@ fn check_formulas(xml: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn append_formula(formula: &mut Option<String>, text: &str) -> Result<()> {
+fn append_formula(
+    formula: &mut Option<String>,
+    text: &str,
+    max_formula_bytes: usize,
+) -> Result<()> {
     if let Some(formula) = formula {
-        if formula
-            .len()
-            .checked_add(text.len())
-            .is_none_or(|len| len > MAX_STRING_BYTES)
-        {
-            return Err(invalid("model removal formula length limit exceeded"));
+        let length = formula.len().checked_add(text.len()).ok_or_else(|| {
+            limit_at_with_max(
+                "formula string bytes",
+                max_formula_bytes.saturating_add(1),
+                max_formula_bytes,
+            )
+        })?;
+        if length > max_formula_bytes {
+            return Err(limit_at_with_max(
+                "formula string bytes",
+                length,
+                max_formula_bytes,
+            ));
         }
         formula
             .try_reserve(text.len())

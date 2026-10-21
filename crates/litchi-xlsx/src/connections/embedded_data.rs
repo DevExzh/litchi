@@ -768,16 +768,22 @@ fn parse_with_limits(
                         .ok_or_else(|| invalid("connection ID is absent"))?
                         .parse::<u32>()
                         .map_err(invalid)?;
+                    if ids.contains(&id) {
+                        return Err(invalid("duplicate connection ID"));
+                    }
                     if ids.len() >= MAX_CONNECTIONS {
-                        return Err(invalid("duplicate or excessive connection IDs"));
+                        return Err(limit(
+                            Resource::Objects,
+                            "connections",
+                            ids.len().saturating_add(1),
+                            MAX_CONNECTIONS,
+                        ));
                     }
                     ids.try_reserve(1).map_err(|source| Error::Allocation {
                         resource: "Custom Data connection IDs",
                         source,
                     })?;
-                    if !ids.insert(id) {
-                        return Err(invalid("duplicate or excessive connection IDs"));
-                    }
+                    ids.insert(id);
                     Context::Connection(
                         id,
                         kind.map(|v| v.parse::<u32>().map_err(invalid))
@@ -827,7 +833,12 @@ fn parse_with_limits(
                     }
                     if let Some((range, value)) = embedded {
                         if slots.len() >= MAX_CONNECTIONS {
-                            return Err(invalid("embeddedDataId reference limit exceeded"));
+                            return Err(limit(
+                                Resource::Objects,
+                                "connections",
+                                slots.len().saturating_add(1),
+                                MAX_CONNECTIONS,
+                            ));
                         }
                         slots.try_reserve(1).map_err(|source| Error::Allocation {
                             resource: "Custom Data connection slots",

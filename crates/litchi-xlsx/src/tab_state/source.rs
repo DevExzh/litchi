@@ -141,6 +141,12 @@ impl EditOptions {
         self.limits = Some(limits);
         self
     }
+
+    /// Return the configured limits, if an override was supplied.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<Limits> {
+        self.limits
+    }
 }
 
 /// What a committed tab-state change replaced.

@@ -25,6 +25,9 @@ use crate::rich_values::{
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+// This is the schema's intrinsic CT_RichValueType name bound. It is part of
+// valid input, so exceeding it remains Invalid rather than a configurable
+// resource LimitKind.
 const TYPE_NAME_MAX_CHARS: usize = 255;
 
 #[derive(Clone, Debug)]
