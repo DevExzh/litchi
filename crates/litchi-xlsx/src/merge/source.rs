@@ -1,47 +1,44 @@
-//! Guarded source-backed merged-range edits for one existing worksheet.
+//! Guarded source-backed merged-range edits for one existing worksheet of a
+//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
 //!
-//! This owner keeps the merge operation deliberately narrow.  It captures the
-//! workbook catalog and one selected worksheet, validates merge semantics with
-//! the ordinary worksheet parser and merge rewriter, and publishes one
-//! worksheet-Part overlay.  The OPC package and XML representation remain
+//! [`SourceBackedWorkbook::edit_merges`] captures the workbook catalog and
+//! one selected worksheet, validates merge semantics with the ordinary
+//! worksheet parser and merge rewriter, and [`Edit::commit`] returns a
+//! [`Commit`] holding the new workbook, whose output is one worksheet-part
+//! overlay with every other member raw-copied. An exact no-op returns the
+//! source workbook; a changed edit of a signed source is refused at commit.
+//! [`SourceBackedWorkbook::apply_merges`] replays a [`Patch`] onto a workbook
+//! holding its before state. The OPC package and XML representation remain
 //! implementation details of this module.
 
 use std::io::Write;
 use std::sync::Arc;
 
-use litchi_core::{
-    ExecutionContext, ExecutionError, ReadAt, Selector as CoreSelector, SourceVersion,
-};
+use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    OpcError, OpcPackage, PackURI, Part, PartView, Relationship, Relationships,
-    SourceBackedPackage, SourceCacheLimits, SourceLimits, SourceLineage, TargetMode,
+    OpcError, PackURI, PartView, Relationship, Relationships, SourceBackedPackage, SourceLineage,
+    TargetMode,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 
-use super::source::{SourceBackedWorkbook, validate_sheet_graph};
+use crate::SourceBackedWorkbook;
 use crate::cell::{Cell, Store, Text};
-use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
+use crate::error::{MergeEditBlock, Result, allocation, invalid};
 use crate::merge;
 use crate::raw;
 use crate::source_payload::SourcePayload;
+use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-/// An owning source-backed merged-range editor for one XLSX artifact.
-///
-/// The editor retains the deferred OPC source but exposes only semantic
-/// worksheet operations.  A changed commit replaces exactly one existing
-/// worksheet payload; every other physical member is copied by the OPC owner.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
-}
-
-/// An isolated merged-range edit over one exact source worksheet.
-pub struct SourceEdit {
+/// An isolated merged-range edit over one exact source worksheet of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: Snapshot,
     staged: Vec<Rect>,
     store: Store,
@@ -59,181 +56,123 @@ pub struct Snapshot {
     source: SourceState,
 }
 
-/// Exact reversible source-bound merged-range replacement.
+/// The exact reversible source-bound merged-range record.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Record {
     before: Snapshot,
     after: Snapshot,
 }
 
-/// Successful source-backed merged-range publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
+crate::workbook::source::deferred::source_family!("merged-range", Record);
+
+impl Patch {
+    /// The exact worksheet state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        &self.0.before
+    }
+
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        &self.0.after
+    }
+
+    /// The patch with its target worksheet payload copied out of a managed
+    /// source's reservation under an explicit `maximum_bytes` bound, so a
+    /// patch made over a managed source replays onto a workbook outside that
+    /// budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns a limit or allocation error when a payload exceeds the bound.
+    pub fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        Ok(Self(Arc::new(Record::new(
+            self.0.before.clone(),
+            self.0.after.materialized(maximum_bytes)?,
+        ))))
+    }
 }
 
-/// Content-free source-backed merge publication diagnostics.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Diagnostics {
-    touched_worksheets: u8,
-}
-
-impl SourceBackedEditor {
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
+impl crate::workbook::source::deferred::Change for Record {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
     }
 
-    /// Open with an explicit bounded OPC policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
+    fn inverse(&self) -> Self {
+        Record::inverse(self)
     }
 
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        // A replay compares content, whatever source the patch was made on.
+        if !self.before.matches_source_backed(package, false)? {
+            return Err(Error::PatchConflict {
+                part: self.before.part_name().to_string(),
+            });
+        }
+        Ok(())
     }
 
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit managed execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and managed execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and managed execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from an already opened deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
         package.check_execution()?;
-        Ok(Self { package })
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        self.after.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after.part_name(),
+            self.after.source_arc()?,
+        )?;
+        Ok(())
     }
+}
 
-    /// Capture exact source-bound merge state for one selected worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Snapshot>> {
-        self.package.check_execution()?;
-        Ok(Snapshot::load_source_backed(&self.package, selector)?.map(|loaded| loaded.0))
-    }
-
-    /// Begin an isolated source-backed edit without loading unselected
-    /// worksheet payloads.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<SourceEdit>> {
-        self.package.check_execution()?;
+impl SourceBackedWorkbook {
+    /// Begin an isolated merged-range edit of one worksheet without loading
+    /// unselected worksheet payloads; `None` when the selector names no
+    /// sheet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected sheet is not a worksheet, its XML
+    /// is invalid, or the source cannot be read.
+    pub fn edit_merges<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
+        let package = self.edit_package()?;
         let Some((snapshot, store, shared_strings)) =
-            Snapshot::load_source_backed(&self.package, selector)?
+            Snapshot::load_source_backed(package, selector)?
         else {
             return Ok(None);
         };
-        Ok(Some(SourceEdit::new(
+        Ok(Some(Edit::new(
+            self.clone(),
             snapshot,
             store,
             shared_strings,
-            self.package.clone(),
+            package.clone(),
         )))
     }
 
-    /// Publish a source-checked commit to a sequential sink.
+    /// Replay a merged-range patch onto this workbook.
     ///
-    /// A changed commit emits one replacement for the selected worksheet Part.
-    /// Exact no-ops copy the complete source artifact byte-for-byte.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        if !commit.patch.before.matches_source_backed(&self.package)? {
-            return Err(Error::PatchConflict {
-                part: commit.patch.before.part_name().to_string(),
-            });
-        }
-        let target = if commit.patch.is_empty() {
-            commit.patch.before.clone()
-        } else {
-            commit.patch.after.clone()
-        };
-        target.check_execution()?;
-        if commit.patch.is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.package.write_part_overlay_shared_to_stream(
-                writer,
-                target.part_name(),
-                target.source_arc()?,
-            )?;
-        }
-        Ok(target)
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the selected worksheet does not
+    /// hold the patch's before state, and the signed-source refusal for a
+    /// changed patch on a signed source.
+    pub fn apply_merges(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
     }
 }
 
-impl SourceEdit {
+impl Edit {
     fn new(
+        workbook: SourceBackedWorkbook,
         before: Snapshot,
         store: Store,
         shared_strings: Option<Arc<[Text]>>,
         package: SourceBackedPackage,
     ) -> Self {
         Self {
+            workbook,
             staged: before.ranges.to_vec(),
             before,
             store,
@@ -286,10 +225,9 @@ impl SourceEdit {
         Ok(self)
     }
 
-    /// Whether the authored merged-range state differs from its source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.ranges.as_ref() != self.staged.as_slice()
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged = self.before.ranges.to_vec();
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
@@ -297,8 +235,8 @@ impl SourceEdit {
         self.before.check_execution()?;
         let (add, remove) = plan_changes(&self.before.ranges, &self.staged)?;
         if add.is_empty() && remove.is_empty() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            let patch = Record::new(self.before.clone(), self.before);
+            return commit_change(&self.workbook, patch);
         }
 
         let table_ranges = if add.is_empty() {
@@ -321,8 +259,7 @@ impl SourceEdit {
             self.shared_strings.as_deref(),
         )?;
         snapshot.check_execution()?;
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, true))
+        commit_change(&self.workbook, Record::new(self.before, snapshot))
     }
 }
 
@@ -364,56 +301,6 @@ impl Snapshot {
     #[must_use]
     pub const fn sheet_position(&self) -> usize {
         self.sheet_position
-    }
-
-    fn load(package: &OpcPackage, sheet_position: usize) -> Result<Self> {
-        let workbook = package.main_document_part()?;
-        require_workbook_content_type(workbook.content_type())?;
-        let workbook_xml = workbook.blob();
-        let catalog = raw::parse_catalog(workbook_xml)?;
-        let catalog_sheet = catalog
-            .sheets
-            .get(sheet_position)
-            .ok_or_else(|| invalid("merged-range worksheet position is absent"))?;
-        let worksheet_uri = workbook
-            .rels()
-            .get(&catalog_sheet.relationship_id)
-            .ok_or_else(|| invalid("selected worksheet relationship is missing"))?
-            .target_partname()?;
-        let worksheet = package.get_part(&worksheet_uri)?;
-        let sheet_relationship = require_selected_worksheet(
-            workbook.rels(),
-            catalog_sheet,
-            worksheet.partname(),
-            worksheet.content_type(),
-        )?;
-        let owner_relationship = current_owner_relationship(package.rels())
-            .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        let (store, _shared_strings, shared_strings_source) =
-            parse_owned_worksheet_store(package, workbook, worksheet.blob())?;
-        let ranges = canonical_ranges(store.merge_ranges().to_vec())?;
-        let source = SourceState::new(
-            workbook.partname().clone(),
-            workbook.content_type(),
-            SourcePayload::Owned(workbook.blob_arc()),
-            owner_relationship,
-            worksheet.partname().clone(),
-            worksheet.content_type(),
-            SourcePayload::Owned(worksheet.blob_arc()),
-            sheet_relationship,
-            worksheet.rels(),
-            workbook.rels(),
-            shared_strings_source,
-            None,
-            None,
-            None,
-        )?;
-        Ok(Self {
-            ranges: ranges.into_boxed_slice(),
-            sheet_name: copy_boxed(&catalog_sheet.name, "merged-range sheet name")?,
-            sheet_position,
-            source,
-        })
     }
 
     fn load_source_backed<'a>(
@@ -532,11 +419,17 @@ impl Snapshot {
         self.source.worksheet.bytes.detached_arc()
     }
 
-    fn materialized_source_arc(&self, maximum_bytes: usize) -> Result<Arc<Vec<u8>>> {
-        self.source
-            .worksheet
-            .bytes
-            .materialized_arc(maximum_bytes, "source-backed merge worksheet")
+    /// This snapshot with its worksheet payload copied out of any managed
+    /// reservation, under `maximum_bytes`.
+    fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        let mut snapshot = self.clone();
+        snapshot.source.worksheet.bytes = SourcePayload::Owned(
+            self.source
+                .worksheet
+                .bytes
+                .materialized_arc(maximum_bytes, "source-backed merge worksheet")?,
+        );
+        Ok(snapshot)
     }
 
     fn part_name(&self) -> &PackURI {
@@ -547,149 +440,30 @@ impl Snapshot {
         self.source.check_execution()
     }
 
-    fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
+    fn matches_source_backed(&self, package: &SourceBackedPackage, bound: bool) -> Result<bool> {
         self.source
-            .matches_source_backed(package, &self.sheet_name, self.sheet_position)
-    }
-
-    fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        self.source
-            .matches_current_source(package, &self.sheet_name, self.sheet_position)
+            .matches_source_backed(package, &self.sheet_name, self.sheet_position, bound)
     }
 }
 
-impl Patch {
+impl Record {
     const fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
-    /// Required exact source state.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Exact target state produced by the commit.
-    #[must_use]
-    pub const fn after(&self) -> &Snapshot {
-        &self.after
-    }
-
     /// Whether the patch preserves the selected source worksheet byte-for-byte.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
         }
-    }
-
-    /// Apply this exact source-bound worksheet replacement atomically.
-    ///
-    /// A managed source target returns a typed
-    /// `ManagedPartDataArcEscape` error rather than detaching its reservation.
-    /// Use [`Self::apply_materialized`] for an explicitly bounded handoff.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        self.apply_inner(package, None)
-    }
-
-    /// Apply after explicitly materializing the target worksheet under a byte bound.
-    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
-        self.apply_inner(package, Some(maximum_bytes))
-    }
-
-    fn apply_inner(&self, package: &mut OpcPackage, maximum_bytes: Option<usize>) -> Result<()> {
-        self.before.check_execution()?;
-        self.after.check_execution()?;
-        if !self.before.matches_current_source(package) {
-            return Err(Error::PatchConflict {
-                part: self.before.part_name().to_string(),
-            });
-        }
-        if self.is_empty() {
-            self.before.check_execution()?;
-            self.after.check_execution()?;
-            return Ok(());
-        }
-        if package.is_signed() {
-            return Err(Error::Signed);
-        }
-        let blob = match maximum_bytes {
-            Some(maximum) => self.after.materialized_source_arc(maximum)?,
-            None => self.after.source_arc()?,
-        };
-        self.after.check_execution()?;
-        let mut candidate = package.clone();
-        candidate
-            .get_part_mut(self.before.part_name())?
-            .set_blob_shared(blob);
-        let resulting = Snapshot::load(&candidate, self.after.sheet_position)?;
-        self.after.check_execution()?;
-        if !resulting.same_source(&self.after)
-            || resulting.ranges.as_ref() != self.after.ranges.as_ref()
-        {
-            return Err(invalid(
-                "merged-range patch readback did not match its target",
-            ));
-        }
-        *package = candidate;
-        Ok(())
-    }
-}
-
-impl Commit {
-    const fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            diagnostics: Diagnostics {
-                touched_worksheets: if changed { 1 } else { 0 },
-            },
-        }
-    }
-
-    /// Whether the authored merged-range state changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.diagnostics.touched_worksheets != 0
-    }
-
-    /// Resulting immutable source-bound state.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume this result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-impl Diagnostics {
-    /// Number of worksheet Parts replaced by this commit.
-    #[must_use]
-    pub fn touched_worksheets(self) -> usize {
-        usize::from(self.touched_worksheets)
     }
 }
 
@@ -776,13 +550,16 @@ impl SourceState {
         package: &SourceBackedPackage,
         sheet_name: &str,
         sheet_position: usize,
+        bound: bool,
     ) -> Result<bool> {
         package.check_execution()?;
-        let (Some(lineage), Some(version)) = (&self.lineage, self.version) else {
-            return Ok(false);
-        };
-        if package.source_lineage() != lineage.clone() || package.source_version()? != version {
-            return Ok(false);
+        if bound {
+            let (Some(lineage), Some(version)) = (&self.lineage, self.version) else {
+                return Ok(false);
+            };
+            if package.source_lineage() != lineage.clone() || package.source_version()? != version {
+                return Ok(false);
+            }
         }
         let workbook = package.main_document_part()?;
         if !self
@@ -833,61 +610,12 @@ impl SourceState {
             return Ok(false);
         }
         package.check_execution()?;
-        Ok(package.source_version()? == version)
-    }
-
-    fn matches_current_source(
-        &self,
-        package: &OpcPackage,
-        sheet_name: &str,
-        sheet_position: usize,
-    ) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        if !self.workbook.matches_part(workbook)
-            || !current_owner_relationship(package.rels())
-                .is_some_and(|value| self.owner_relationship.matches(value))
-        {
-            return false;
-        }
-        if !relationships_match(&self.workbook_relationships, workbook.rels()) {
-            return false;
-        }
-        if let Some(shared_strings) = self.shared_strings.as_ref()
-            && !shared_strings.matches_current_source(package, workbook)
-        {
-            return false;
-        }
-        let Ok(catalog) = raw::parse_catalog(workbook.blob()) else {
-            return false;
-        };
-        let Some(catalog_sheet) = catalog.sheets.get(sheet_position) else {
-            return false;
-        };
-        if catalog_sheet.name != sheet_name {
-            return false;
-        }
-        let Some(relationship) = workbook.rels().get(&catalog_sheet.relationship_id) else {
-            return false;
-        };
-        let Ok(uri) = relationship.target_partname() else {
-            return false;
-        };
-        let Ok(worksheet) = package.get_part(&uri) else {
-            return false;
-        };
-        let Ok(selected) = require_selected_worksheet(
-            workbook.rels(),
-            catalog_sheet,
-            worksheet.partname(),
-            worksheet.content_type(),
-        ) else {
-            return false;
-        };
-        self.sheet_relationship.matches(selected)
-            && self.worksheet.matches_part(worksheet)
-            && relationships_match(&self.worksheet_relationships, worksheet.rels())
+        // A bound check also requires that the source did not change while
+        // the closure was read.
+        Ok(!bound
+            || self
+                .version
+                .is_some_and(|version| package.source_version().ok() == Some(version)))
     }
 }
 
@@ -930,12 +658,6 @@ impl PartState {
         part.partname() == &self.uri
             && part.content_type() == self.content_type.as_ref()
             && bytes == self.bytes.as_bytes()
-    }
-
-    fn matches_part(&self, part: &dyn Part) -> bool {
-        part.partname() == &self.uri
-            && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_bytes()
     }
 }
 
@@ -1011,19 +733,6 @@ impl SharedStringsState {
         let part = package.part(&uri)?;
         let data = part.data()?;
         Ok(self.part.matches_view(&part, data.as_bytes()))
-    }
-
-    fn matches_current_source(&self, package: &OpcPackage, workbook: &dyn Part) -> bool {
-        let Some(relationship) = workbook.rels().get(self.relationship.id.as_ref()) else {
-            return false;
-        };
-        let Ok(uri) = relationship.target_partname() else {
-            return false;
-        };
-        let Ok(part) = package.get_part(&uri) else {
-            return false;
-        };
-        self.relationship.matches(relationship) && self.part.matches_part(part)
     }
 }
 
@@ -1401,26 +1110,6 @@ fn parse_worksheet_store(
     Ok((store, strings.map(Arc::from), shared_strings_source))
 }
 
-fn parse_owned_worksheet_store(
-    package: &OpcPackage,
-    workbook: &dyn Part,
-    xml: &[u8],
-) -> Result<(Store, Option<Arc<[Text]>>, Option<SharedStringsState>)> {
-    let mut strings = None;
-    let mut shared_strings_source = None;
-    let mut attempted = false;
-    let store = raw::worksheet::parse(xml, || {
-        if !attempted {
-            attempted = true;
-            let (loaded, source) = load_shared_strings_owned(package, workbook)?;
-            strings = loaded;
-            shared_strings_source = source;
-        }
-        Ok(strings.as_deref())
-    })?;
-    Ok((store, strings.map(Arc::from), shared_strings_source))
-}
-
 fn parse_worksheet_store_bytes(xml: &[u8], strings: Option<&[Text]>) -> Result<Store> {
     raw::worksheet::parse(xml, || Ok(strings))
 }
@@ -1452,47 +1141,6 @@ fn load_shared_strings(
             )));
         }
         let payload = SourcePayload::from_part_data(package, part.data()?)?;
-        let parsed = raw::strings::parse(payload.as_bytes())?;
-        let source = SharedStringsState::new(
-            relationship,
-            part.partname().clone(),
-            part.content_type(),
-            payload,
-        )?;
-        found = Some((parsed, source));
-    }
-    Ok(found.map_or((None, None), |(strings, source)| {
-        (Some(strings), Some(source))
-    }))
-}
-
-fn load_shared_strings_owned(
-    package: &OpcPackage,
-    workbook: &dyn Part,
-) -> Result<(Option<Box<[Text]>>, Option<SharedStringsState>)> {
-    let mut found = None;
-    for relationship in workbook.rels().iter().filter(|relationship| {
-        matches!(
-            relationship.reltype(),
-            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS
-        )
-    }) {
-        if found.is_some() {
-            return Err(invalid("workbook has multiple shared-string relationships"));
-        }
-        if relationship.target_mode() != TargetMode::Internal {
-            return Err(invalid("shared-string relationship cannot be external"));
-        }
-        let uri = relationship.target_partname()?;
-        let part = package.get_part(&uri)?;
-        if part.content_type() != ct::SML_SHARED_STRINGS {
-            return Err(invalid(format!(
-                "shared-string part has content type '{}', expected '{}'",
-                part.content_type(),
-                ct::SML_SHARED_STRINGS
-            )));
-        }
-        let payload = SourcePayload::Owned(part.blob_arc());
         let parsed = raw::strings::parse(payload.as_bytes())?;
         let source = SharedStringsState::new(
             relationship,

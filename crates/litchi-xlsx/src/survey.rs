@@ -1585,12 +1585,7 @@ impl Parser {
 ///
 /// Returns an error when the XML is malformed, outside the Survey namespace,
 /// exceeds a parser limit, or violates the Survey schema constraints.
-pub fn parse(xml: &[u8]) -> Result<Survey> {
-    parse_with_limits(xml, &Limits::default())
-}
-
-/// Parse a standalone Survey part with an explicit resource policy.
-pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Survey> {
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Survey> {
     if xml.len() > limits.max_part_bytes() {
         return Err(Error::limit(
             LimitKind::PartBytes,
@@ -1887,7 +1882,7 @@ pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<
             .pop()
             .ok_or_else(|| invalid("survey owner relationship is absent"))?;
         let table_part = package.get_part(&table_part_name)?;
-        let survey = parse_with_limits(part.blob(), limits)?;
+        let survey = parse(part.blob(), limits)?;
         validate_table_bindings(table_part, &survey)?;
         if !ids.insert(survey.id()) {
             return Err(invalid("survey IDs must be unique within a workbook"));
@@ -2334,19 +2329,14 @@ fn validate_row_source(value: &str) -> Result<()> {
     validate_text(Some(value), "rowSource")
 }
 
-/// Serialize one Survey part using the protocol namespace and retained
-/// extension XML.
-pub fn write(survey: &Survey) -> Result<Vec<u8>> {
-    write_with_limits(survey, &Limits::default())
-}
-
-/// Validate one Survey's typed semantic state without serializing it.
-pub fn validate(survey: &Survey) -> Result<()> {
-    validate_survey(survey)
-}
-
-/// Validate one Survey with an explicit resource policy.
-pub fn validate_with_limits(survey: &Survey, limits: &Limits) -> Result<()> {
+/// Validate one Survey's typed semantic state under `limits` without
+/// serializing it.
+///
+/// # Errors
+///
+/// Returns an error when the Survey violates its schema constraints or
+/// exceeds `limits`.
+pub fn validate(survey: &Survey, limits: &Limits) -> Result<()> {
     validate_survey_with_limits(survey, limits)
 }
 
@@ -2394,8 +2384,14 @@ fn has_namespace_declaration(attributes: &[RawAttribute], prefix: &str) -> bool 
         .any(|attribute| attribute.name.as_ref() == expected)
 }
 
-/// Serialize one Survey part with an explicit resource policy.
-pub fn write_with_limits(survey: &Survey, limits: &Limits) -> Result<Vec<u8>> {
+/// Serialize one Survey part under `limits`, using the protocol namespace
+/// and retained extension XML.
+///
+/// # Errors
+///
+/// Returns an error when the Survey is invalid or its output exceeds
+/// `limits`.
+pub fn write(survey: &Survey, limits: &Limits) -> Result<Vec<u8>> {
     validate_survey_with_limits(survey, limits)?;
     ensure_resolved_questions(survey)?;
     let output_bound = serialized_size_bound(survey)?;
@@ -4017,7 +4013,7 @@ fn replace_entry(
     if let Some(updated) = source::rewrite(proof, &previous.survey, &entry.survey, limits)? {
         package.try_replace_owned_xml_part(previous.source_xml.as_slice(), updated)?;
     } else {
-        let xml = write_with_limits(&entry.survey, limits)?;
+        let xml = write(&entry.survey, limits)?;
         package.get_part_mut(&entry.part_name)?.set_blob(xml);
     }
     Ok(())
@@ -4047,7 +4043,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     if let Some(proof) = &entry.source_proof {
         package.try_add_owned_xml_part(proof.as_ref().clone())?;
     } else {
-        let xml = write_with_limits(&entry.survey, limits)?;
+        let xml = write(&entry.survey, limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             entry.part_name.clone(),
             CONTENT_TYPE.into(),
@@ -4343,7 +4339,7 @@ mod tests {
 
     #[test]
     fn question_collection_edits_move_allocations_and_cancel_exactly() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         let original = survey.clone();
         let questions = survey.questions_mut();
         let text = questions.values()[0].text().unwrap().as_ptr();
@@ -4397,7 +4393,7 @@ mod tests {
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(XML))).unwrap();
         let before = Snapshot::load(&package.clone().into_plain_opc()).unwrap();
-        let foreign = parse(&schema_xml("<questions><question binding=\"1\"><extLst><opaque xmlns=\"urn:other\"/></extLst></question></questions>")).unwrap();
+        let foreign = parse(&schema_xml("<questions><question binding=\"1\"><extLst><opaque xmlns=\"urn:other\"/></extLst></question></questions>"), &Limits::default()).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction
             .edit(0, |survey| {
@@ -4707,16 +4703,16 @@ mod tests {
 
     #[test]
     fn xstring_output_budget_charges_encoded_growth_before_allocation() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         survey.set_title(Some("\u{1}".repeat(1024)));
         let bound = serialized_size_bound(&survey).unwrap();
-        let output =
-            write_with_limits(&survey, &Limits::default().with_max_part_bytes(bound)).unwrap();
+        let output = write(&survey, &Limits::default().with_max_part_bytes(bound)).unwrap();
         assert!(output.len() <= bound);
-        assert!(
-            write_with_limits(&survey, &Limits::default().with_max_part_bytes(bound - 1)).is_err()
+        assert!(write(&survey, &Limits::default().with_max_part_bytes(bound - 1)).is_err());
+        assert_eq!(
+            parse(&output, &Limits::default()).unwrap().title(),
+            survey.title()
         );
-        assert_eq!(parse(&output).unwrap().title(), survey.title());
         assert!(xstring(&"a".repeat(MAX_TEXT_BYTES + 1), "title").is_err());
         assert!(xstring(&"a".repeat(MAX_TEXT_BYTES * 7 + 1), "title").is_err());
 
@@ -4751,13 +4747,13 @@ mod tests {
             "😀;\t\n\r",
             "_x0000_",
         ] {
-            let mut survey = parse(XML).unwrap();
+            let mut survey = parse(XML, &Limits::default()).unwrap();
             survey.questions.values[0]
                 .set_row_source(Some(value.into()))
                 .unwrap();
-            let output = write(&survey).unwrap();
+            let output = write(&survey, &Limits::default()).unwrap();
             assert_eq!(
-                parse(&output).unwrap().questions.values[0].row_source(),
+                parse(&output, &Limits::default()).unwrap().questions.values[0].row_source(),
                 Some(value)
             );
         }
@@ -4772,7 +4768,7 @@ mod tests {
             let xml = schema_xml(&format!(
                 r#"<questions><question binding="1" rowSource="{encoded}"/></questions>"#
             ));
-            assert!(parse(&xml).is_err());
+            assert!(parse(&xml, &Limits::default()).is_err());
         }
     }
 
@@ -4783,7 +4779,7 @@ mod tests {
         let xml = format!(
             r#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:q="urn:vendor" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}" title="{encoded}" description="{encoded}" q:title="_x0041_"><surveyPr cssClass="{encoded}"/><questions><question binding="1" text="{encoded}" helpText="{encoded}" defaultValue="{encoded}" rowSource="_x003B__x0022__x005F_x0000_"/></questions></survey>"#
         );
-        let survey = parse(xml.as_bytes()).unwrap();
+        let survey = parse(xml.as_bytes(), &Limits::default()).unwrap();
         for value in [
             survey.title(),
             survey.description(),
@@ -4796,14 +4792,14 @@ mod tests {
         }
         assert_eq!(survey.questions.values[0].row_source(), Some(";\"_x0000_"));
         assert_eq!(survey.unknown_attributes[0].value.as_ref(), "_x0041_");
-        let output = write(&survey).unwrap();
-        assert_eq!(parse(&output).unwrap(), survey);
+        let output = write(&survey, &Limits::default()).unwrap();
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         assert!(String::from_utf8_lossy(&output).contains(r#"q:title="_x0041_""#));
     }
 
     #[test]
     fn xstring_authoring_preserves_controls_literal_escapes_and_attribute_whitespace() {
-        let mut survey = parse(XML).unwrap();
+        let mut survey = parse(XML, &Limits::default()).unwrap();
         let text = "_x0041_ _x005F_ _xD800_ & < > \" ' \t\n\r\0\u{1}\u{fffe}\u{ffff}😀";
         survey.set_title(Some(text.into()));
         survey.set_description(Some(text.into()));
@@ -4820,9 +4816,9 @@ mod tests {
             value: "_x0041_\t\n\r".into(),
         }]
         .into_boxed_slice();
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         assert!(output.len() <= serialized_size_bound(&survey).unwrap());
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         assert!(
             !output
                 .iter()
@@ -4837,19 +4833,21 @@ mod tests {
             let xml = schema_xml(&format!(
                 r#"<questions><question binding="1" text="{encoded}"/></questions>"#
             ));
-            assert!(parse(&xml).is_err(), "{encoded}");
+            assert!(parse(&xml, &Limits::default()).is_err(), "{encoded}");
         }
         assert!(
-            parse(&schema_xml(
-                r#"<questions><question binding="_x0031_"/></questions>"#
-            ))
+            parse(
+                &schema_xml(r#"<questions><question binding="_x0031_"/></questions>"#),
+                &Limits::default()
+            )
             .is_err()
         );
-        assert!(parse(&schema_xml(r#"<questions><question binding="1" xmlns:q="urn:vendor" q:text="_xD800_"/></questions>"#)).is_ok());
+        assert!(parse(&schema_xml(r#"<questions><question binding="1" xmlns:q="urn:vendor" q:text="_xD800_"/></questions>"#), &Limits::default()).is_ok());
         assert!(
-            parse(&schema_xml(
-                "<questions><question binding='1' text='\u{fffe}'/></questions>"
-            ))
+            parse(
+                &schema_xml("<questions><question binding='1' text='\u{fffe}'/></questions>"),
+                &Limits::default()
+            )
             .is_err()
         );
     }
@@ -4895,8 +4893,15 @@ mod tests {
         let xml = schema_xml(
             r#"<surveyPr><extLst/></surveyPr><titlePr><extLst/></titlePr><descriptionPr><extLst/></descriptionPr><questions><questionsPr><extLst/></questionsPr><question binding="1"><questionPr><extLst/></questionPr><extLst/></question></questions><extLst/>"#,
         );
-        let survey = parse(&xml).unwrap();
-        assert_eq!(parse(&write(&survey).unwrap()).unwrap(), survey);
+        let survey = parse(&xml, &Limits::default()).unwrap();
+        assert_eq!(
+            parse(
+                &write(&survey, &Limits::default()).unwrap(),
+                &Limits::default()
+            )
+            .unwrap(),
+            survey
+        );
         for namespace in [
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
             "http://purl.oclc.org/ooxml/spreadsheetml/main",
@@ -4906,12 +4911,15 @@ mod tests {
             let body = format!(
                 r#"<questions><question binding="1"/></questions><extLst xmlns="{namespace}"/>"#
             );
-            assert!(parse(&schema_xml(&body)).is_err(), "{namespace}");
+            assert!(
+                parse(&schema_xml(&body), &Limits::default()).is_err(),
+                "{namespace}"
+            );
         }
         let aliased = schema_xml(
             r#"<questions><question binding="1"/></questions><s:extLst xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"/>"#,
         );
-        assert!(parse(&aliased).is_ok());
+        assert!(parse(&aliased, &Limits::default()).is_ok());
     }
 
     #[test]
@@ -4926,34 +4934,40 @@ mod tests {
             r#"<questions><question binding="1"/></questions><extLst/><titlePr/>"#,
             r#"<questions><question binding="1"/></questions><extLst/><extLst/>"#,
         ] {
-            assert!(parse(&schema_xml(body)).is_err(), "{body}");
+            assert!(
+                parse(&schema_xml(body), &Limits::default()).is_err(),
+                "{body}"
+            );
         }
     }
 
     #[test]
     fn qualified_attributes_cannot_supply_unqualified_protocol_fields() {
         assert!(
-            parse(&schema_xml(
-                r#"<questions><question xmlns:q="urn:vendor" q:binding="1"/></questions>"#
-            ))
+            parse(
+                &schema_xml(
+                    r#"<questions><question xmlns:q="urn:vendor" q:binding="1"/></questions>"#
+                ),
+                &Limits::default()
+            )
             .is_err()
         );
         let xml = schema_xml(
             r#"<surveyPr xmlns:q="urn:vendor" q:width="invalid"/><questions><question xmlns:q="urn:vendor" q:binding="999" binding="1" q:type="invalid"/></questions>"#,
         );
-        let survey = parse(&xml).unwrap();
+        let survey = parse(&xml, &Limits::default()).unwrap();
         assert_eq!(survey.questions.values[0].binding(), Binding::new(1));
         assert_eq!(survey.questions.values[0].kind, None);
         assert_eq!(survey.properties.as_ref().unwrap().width, None);
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         assert!(String::from_utf8_lossy(&output).contains(r#"q:binding="999""#));
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
         let wrong_id = String::from_utf8(schema_xml(
             r#"<questions><question binding="1"/></questions>"#,
         ))
         .unwrap()
         .replace(r#"id="7""#, r#"xmlns:q="urn:vendor" q:id="7""#);
-        assert!(parse(wrong_id.as_bytes()).is_err());
+        assert!(parse(wrong_id.as_bytes(), &Limits::default()).is_err());
     }
 
     #[test]
@@ -4966,7 +4980,10 @@ mod tests {
             r#"<questions><question binding="1"/></questions><extLst><q:unknown/></extLst>"#,
             r#"<questions><question binding="1"/></questions><extLst><unknown xmlns:a="urn:v" xmlns:b="urn:v" a:flag="1" b:flag="2"/></extLst>"#,
         ] {
-            assert!(parse(&schema_xml(body)).is_err(), "{body}");
+            assert!(
+                parse(&schema_xml(body), &Limits::default()).is_err(),
+                "{body}"
+            );
         }
     }
 
@@ -5016,7 +5033,7 @@ mod tests {
                 r#"<questions><question binding="1"/>{question}</questions>"#
             ));
             assert!(
-                matches!(parse_with_limits(&xml, &Limits::default().with_max_questions(1)),
+                matches!(parse(&xml, &Limits::default().with_max_questions(1)),
                 Err(Error::Invalid(message)) if message.contains("too many questions"))
             );
         }
@@ -5030,7 +5047,7 @@ mod tests {
         );
         let xml = schema_xml(&body);
         let limits = Limits::default().with_max_extension_bytes(extension.len() * 2);
-        let survey = parse_with_limits(&xml, &limits).unwrap();
+        let survey = parse(&xml, &limits).unwrap();
         assert_eq!(
             survey
                 .properties
@@ -5046,7 +5063,7 @@ mod tests {
             extension.as_bytes()
         );
         assert!(
-            parse_with_limits(
+            parse(
                 &xml,
                 &limits.with_max_extension_bytes(extension.len() * 2 - 1)
             )
@@ -5055,15 +5072,13 @@ mod tests {
         let empty = schema_xml(
             r#"<surveyPr><extLst/></surveyPr><questions><question binding="1"><extLst/></question></questions>"#,
         );
-        assert!(parse_with_limits(&empty, &Limits::default().with_max_extension_bytes(18)).is_ok());
-        assert!(
-            parse_with_limits(&empty, &Limits::default().with_max_extension_bytes(17)).is_err()
-        );
+        assert!(parse(&empty, &Limits::default().with_max_extension_bytes(18)).is_ok());
+        assert!(parse(&empty, &Limits::default().with_max_extension_bytes(17)).is_err());
     }
 
     #[test]
     fn parses_complete_ct_survey_family() {
-        let survey = parse(XML).expect("survey");
+        let survey = parse(XML, &Limits::default()).expect("survey");
         assert_eq!(survey.id(), Id::new(7));
         assert_eq!(survey.title(), Some("Survey"));
         assert_eq!(
@@ -5079,15 +5094,15 @@ mod tests {
 
     #[test]
     fn enforces_survey_constraints() {
-        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" decimalPlaces="16"/></questions></survey>"#).is_err());
-        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" rowSource="&quot;unterminated"/></questions></survey>"#).is_ok());
-        assert!(parse(br#"<survey xmlns:survey="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#).is_err());
-        assert!(parse(br#"<survey xmlns="urn:not-survey" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#).is_err());
+        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" decimalPlaces="16"/></questions></survey>"#, &Limits::default()).is_err());
+        assert!(parse(br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1" rowSource="&quot;unterminated"/></questions></survey>"#, &Limits::default()).is_ok());
+        assert!(parse(br#"<survey xmlns:survey="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#, &Limits::default()).is_err());
+        assert!(parse(br#"<survey xmlns="urn:not-survey" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions></survey>"#, &Limits::default()).is_err());
     }
 
     #[test]
     fn accepts_the_survey_namespace_when_it_is_prefixed() {
-        let survey = parse(br#"<s:survey xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><s:questions><s:question binding="1"/></s:questions></s:survey>"#).expect("prefixed survey");
+        let survey = parse(br#"<s:survey xmlns:s="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="1" guid="{01234567-89ab-cdef-0123-456789abcdef}"><s:questions><s:question binding="1"/></s:questions></s:survey>"#, &Limits::default()).expect("prefixed survey");
         assert_eq!(survey.id(), Id::new(1));
     }
 
@@ -5096,16 +5111,18 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:foreign" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><s:questions><s:question xmlns="urn:child-foreign" binding="1"><s:extLst><opaque><nested/></opaque></s:extLst></s:question></s:questions></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("foreign default namespace");
-        let output = write(&survey).expect("write foreign default namespace");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("foreign default namespace");
+        let output = write(&survey, &Limits::default()).expect("write foreign default namespace");
         let text = String::from_utf8(output.clone()).expect("UTF-8 Survey XML");
         assert!(text.starts_with("<s:survey xmlns=\"urn:foreign\""));
         assert!(text.contains("<s:question xmlns=\"urn:child-foreign\""));
         assert!(text.contains("<opaque><nested/></opaque>"));
-        let reopened = parse(&output).expect("reparse foreign default namespace");
+        let reopened =
+            parse(&output, &Limits::default()).expect("reparse foreign default namespace");
         assert_eq!(reopened, survey);
 
-        let mut detached = parse(xml.as_bytes()).expect("detached source survey");
+        let mut detached =
+            parse(xml.as_bytes(), &Limits::default()).expect("detached source survey");
         detached.set_id(Id::new(8));
         let mut package = package_with_survey(XML);
         let part_name = {
@@ -5126,7 +5143,7 @@ mod tests {
         assert!(inserted_text.contains("<s:question xmlns=\"urn:child-foreign\""));
         assert!(inserted_text.contains("<opaque><nested/></opaque>"));
         assert_eq!(
-            parse(inserted).unwrap(),
+            parse(inserted, &Limits::default()).unwrap(),
             survey_with_id(&survey, Id::new(8))
         );
     }
@@ -5136,8 +5153,8 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><!--root-before--><s:surveyPr/><!--between-survey-and-title--><s:titlePr/><!--between-title-and-questions--><s:questions><!--before-questions-properties--><s:questionsPr><!--before-questions-properties-extension--><s:extLst><s:ext/></s:extLst><!--after-questions-properties-extension--></s:questionsPr><!--between-properties-and-first--><s:question binding="1"/><!--between-first-and-second--><s:question binding="1"/><!--after-second--></s:questions><!--between-questions-and-extension--><s:extLst><s:ext/></s:extLst><!--root-after-extension--></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("commented Survey");
-        let output = write(&survey).expect("write commented Survey");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("commented Survey");
+        let output = write(&survey, &Limits::default()).expect("write commented Survey");
         assert_comment_order(
             &output,
             &[
@@ -5157,7 +5174,8 @@ mod tests {
 
         let mut edited = survey.clone();
         edited.set_title(Some("edited".into()));
-        let edited_output = write(&edited).expect("write edited commented Survey");
+        let edited_output =
+            write(&edited, &Limits::default()).expect("write edited commented Survey");
         assert_comment_order(
             &edited_output,
             &[
@@ -5209,15 +5227,18 @@ mod tests {
         let xml = format!(
             r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:foreign" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><q:surveyPr xmlns:q="{NAMESPACE_STR}"><q:extLst><opaque><nested/></opaque></q:extLst></q:surveyPr><q:questions xmlns:q="{NAMESPACE_STR}"><q:questionsPr/><q:question binding="1"><q:questionPr><q:extLst><opaque/></q:extLst></q:questionPr><q:extLst><opaque><nested/></opaque></q:extLst></q:question></q:questions></s:survey>"#
         );
-        let survey = parse(xml.as_bytes()).expect("nested modeled prefixes");
-        let output = write(&survey).expect("standalone write");
+        let survey = parse(xml.as_bytes(), &Limits::default()).expect("nested modeled prefixes");
+        let output = write(&survey, &Limits::default()).expect("standalone write");
         let output_text = String::from_utf8(output.clone()).expect("UTF-8 Survey XML");
         assert!(output_text.starts_with("<s:survey xmlns=\"urn:foreign\""));
         assert!(output_text.contains("<q:surveyPr xmlns:q=\""));
         assert!(output_text.contains("<q:questions xmlns:q=\""));
         assert!(output_text.contains("<q:question binding=\"1\""));
         assert!(output_text.contains("<opaque><nested/></opaque>"));
-        assert_eq!(parse(&output).expect("reparse standalone output"), survey);
+        assert_eq!(
+            parse(&output, &Limits::default()).expect("reparse standalone output"),
+            survey
+        );
 
         let mut detached = survey.clone();
         detached.set_id(Id::new(8));
@@ -5251,7 +5272,10 @@ mod tests {
         assert!(inserted_text.contains("<q:questions xmlns:q=\""));
         assert!(inserted_text.contains("<question xmlns=\""));
         assert!(inserted_text.contains("<q:question binding=\"1\""));
-        assert_eq!(parse(inserted).unwrap().id(), Id::new(8));
+        assert_eq!(
+            parse(inserted, &Limits::default()).unwrap().id(),
+            Id::new(8)
+        );
 
         let mut source_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(xml.as_bytes())))
@@ -5294,8 +5318,8 @@ mod tests {
                 r#"<s:survey xmlns:s="{NAMESPACE_STR}" xmlns="urn:root-{suffix}" id="7" guid="{{01234567-89ab-cdef-0123-456789abcdef}}"><s:questions xmlns="urn:questions-{suffix}"><s:questionsPr xmlns="urn:questions-properties-{suffix}"><s:extLst><opaque/></s:extLst></s:questionsPr><s:question xmlns="urn:question-{suffix}" binding="1"><s:questionPr xmlns="urn:question-properties-{suffix}"><s:extLst><opaque/></s:extLst></s:questionPr><s:extLst><opaque/></s:extLst></s:question></s:questions></s:survey>"#
             )
         };
-        let first = parse(namespace_xml("a").as_bytes()).unwrap();
-        let second = parse(namespace_xml("b").as_bytes()).unwrap();
+        let first = parse(namespace_xml("a").as_bytes(), &Limits::default()).unwrap();
+        let second = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         assert_ne!(first.questions, second.questions);
         assert_ne!(first.questions.values[0], second.questions.values[0]);
         assert_ne!(first.questions.properties, second.questions.properties);
@@ -5305,7 +5329,7 @@ mod tests {
         );
 
         let commented = parse(
-            br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><!--root-before--><surveyPr><!--property--></surveyPr><!--root-after--><questions><!--questions--><questionsPr/><question binding="1"><!--question--><questionPr/></question></questions></survey>"#,
+            br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><!--root-before--><surveyPr><!--property--></surveyPr><!--root-after--><questions><!--questions--><questionsPr/><question binding="1"><!--question--><questionPr/></question></questions></survey>"#, &Limits::default(),
         )
         .unwrap();
         let mut root = commented.clone();
@@ -5322,7 +5346,7 @@ mod tests {
         assert_ne!(commented.properties, Some(properties));
 
         let mut package = as_source(&package_with_survey(namespace_xml("a").as_bytes()));
-        let replacement = parse(namespace_xml("b").as_bytes()).unwrap();
+        let replacement = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(transaction.set(0, replacement.clone()).unwrap());
         assert!(transaction.is_changed());
@@ -5339,17 +5363,17 @@ mod tests {
         let xml = schema_xml(
             r#"<questions><!--before--><question binding="1"/><!--after--></questions>"#,
         );
-        let mut survey = parse(&xml).unwrap();
+        let mut survey = parse(&xml, &Limits::default()).unwrap();
         survey
             .questions_mut()
             .set_properties(Some(ElementProperties::new()));
-        let output = write(&survey).unwrap();
+        let output = write(&survey, &Limits::default()).unwrap();
         let text = String::from_utf8(output.clone()).unwrap();
         assert_eq!(text.matches("<!--before-->").count(), 1);
         assert_eq!(text.matches("<!--after-->").count(), 1);
         assert!(text.find("<!--before-->").unwrap() < text.find("<questionsPr").unwrap());
         assert!(text.find("<questionsPr").unwrap() < text.find(" binding=\"1\"").unwrap());
-        assert_eq!(parse(&output).unwrap(), survey);
+        assert_eq!(parse(&output, &Limits::default()).unwrap(), survey);
 
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
@@ -5387,9 +5411,9 @@ mod tests {
         let remove_xml = schema_xml(
             r#"<questions><!--before--><questionsPr/><!--between--><question binding="1"/><!--after--></questions>"#,
         );
-        let mut removed = parse(&remove_xml).unwrap();
+        let mut removed = parse(&remove_xml, &Limits::default()).unwrap();
         removed.questions_mut().set_properties(None);
-        let removed_output = write(&removed).unwrap();
+        let removed_output = write(&removed, &Limits::default()).unwrap();
         let removed_text = String::from_utf8(removed_output.clone()).unwrap();
         for marker in ["<!--before-->", "<!--between-->", "<!--after-->"] {
             assert_eq!(removed_text.matches(marker).count(), 1);
@@ -5402,7 +5426,7 @@ mod tests {
             removed_text.find("<!--between-->").unwrap()
                 < removed_text.find(" binding=\"1\"").unwrap()
         );
-        assert_eq!(parse(&removed_output).unwrap(), removed);
+        assert_eq!(parse(&removed_output, &Limits::default()).unwrap(), removed);
 
         let mut remove_package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&remove_xml)))
@@ -5445,25 +5469,28 @@ mod tests {
         let xml = schema_xml(
             r#"<questions><!--slot0--><question binding="1"/><!--slot1--><question binding="1"/><!--slot2--></questions>"#,
         );
-        let mut inserted = parse(&xml).unwrap();
+        let mut inserted = parse(&xml, &Limits::default()).unwrap();
         inserted
             .questions_mut()
             .insert(0, Question::new(Binding::new(1)))
             .unwrap();
-        let inserted_output = write(&inserted).unwrap();
+        let inserted_output = write(&inserted, &Limits::default()).unwrap();
         assert_comment_order(&inserted_output, &["slot0", "slot1", "slot2"]);
         let inserted_text = String::from_utf8(inserted_output.clone()).unwrap();
         assert!(
             inserted_text.find("<!--slot0-->").unwrap()
                 < inserted_text.find("<!--slot1-->").unwrap()
         );
-        assert_eq!(parse(&inserted_output).unwrap(), inserted);
+        assert_eq!(
+            parse(&inserted_output, &Limits::default()).unwrap(),
+            inserted
+        );
 
-        let mut removed = parse(&xml).unwrap();
+        let mut removed = parse(&xml, &Limits::default()).unwrap();
         removed.questions_mut().remove(0).unwrap();
-        let removed_output = write(&removed).unwrap();
+        let removed_output = write(&removed, &Limits::default()).unwrap();
         assert_comment_order(&removed_output, &["slot0", "slot1", "slot2"]);
-        assert_eq!(parse(&removed_output).unwrap(), removed);
+        assert_eq!(parse(&removed_output, &Limits::default()).unwrap(), removed);
 
         let mut package =
             crate::package::Package::from_opc(as_source(&package_with_survey(&xml))).unwrap();
@@ -5833,9 +5860,9 @@ mod tests {
     #[test]
     fn edits_retain_unknown_extension_xml_and_namespaces() {
         let xml = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" xmlns:x="urn:survey-future" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}"><questions><question binding="1"/></questions><extLst><ext xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uri="urn:future"><x:future x:flag="1"/></ext></extLst></survey>"#;
-        let survey = parse(xml).expect("survey with extension");
+        let survey = parse(xml, &Limits::default()).expect("survey with extension");
         assert!(survey.extension_xml().unwrap().contains(&b'f'));
-        let serialized = write(&survey).expect("write extension");
+        let serialized = write(&survey, &Limits::default()).expect("write extension");
         assert!(
             serialized
                 .windows(b"x:future".len())
@@ -5947,7 +5974,7 @@ mod tests {
         assert_eq!(stale.get_part(&survey_part).unwrap().blob(), before);
 
         let limits = Limits::new().with_max_part_bytes(XML.len() - 1);
-        assert!(parse_with_limits(XML, &limits).is_err());
+        assert!(parse(XML, &limits).is_err());
     }
 
     #[test]

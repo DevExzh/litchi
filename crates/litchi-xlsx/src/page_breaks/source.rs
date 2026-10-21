@@ -27,13 +27,13 @@ crate::workbook::source::deferred::source_family!("page-break", super::Patch, ow
 impl Patch {
     /// The exact worksheet state the patch requires.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub fn before(&self) -> &Snapshot {
         self.0.before()
     }
 
     /// The exact worksheet state the patch produces.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub fn after(&self) -> &Snapshot {
         self.0.after()
     }
 }
@@ -42,7 +42,7 @@ impl From<Patch> for super::edit::Patch {
     /// Replay a source-backed page-break change onto an owning
     /// [`crate::Package`] with [`crate::Package::apply_page_breaks`].
     fn from(patch: Patch) -> Self {
-        Self(patch.0)
+        Self(std::sync::Arc::unwrap_or_clone(patch.0))
     }
 }
 

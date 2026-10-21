@@ -72,6 +72,11 @@
 /// predate the typed sheet error of record 0353a).
 pub(crate) type BoxedResult<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+// Unit tests drive the source-backed families through the integration
+// tests' drivers, which name this crate `litchi_xlsx`.
+#[cfg(test)]
+extern crate self as litchi_xlsx;
+
 pub mod active_x;
 pub mod auto_filter;
 pub mod calculation_properties;
@@ -318,11 +323,9 @@ pub use sort::{SortBy, SortCondition, SortMethod, SortState};
 pub use style::{FontChange, LocalStyle, Style, StyleKey, StyleState, Styles, StylesIter};
 pub use survey::{
     Binding as SurveyBinding, ElementProperties as SurveyElementProperties, Guid as SurveyGuid,
-    Id as SurveyId, Limits as SurveyLimits, Part as SurveyPart, Position as SurveyPosition,
-    Question as SurveyQuestion, QuestionFormat as SurveyQuestionFormat,
-    QuestionType as SurveyQuestionType, Questions as SurveyQuestions, Snapshot as SurveySnapshot,
-    Survey, load as load_surveys, parse as parse_survey, validate as validate_survey,
-    write as write_survey,
+    Id as SurveyId, Position as SurveyPosition, Question as SurveyQuestion,
+    QuestionFormat as SurveyQuestionFormat, QuestionType as SurveyQuestionType,
+    Questions as SurveyQuestions, Survey,
 };
 pub use table::{
     Table, TableColumn, TableFormula, TableStyleInfo, TableType, TotalsRowFunction,
@@ -343,8 +346,6 @@ pub use workbook::{
     ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DateSystem, DefaultsEdit,
     DurablePatch, Edit, Flavor, FormControlEdit, History, HistoryLimits, JoinError, JoinFailure,
     MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, RowEdit, SealedPatch, Selector,
-    SourceBackedMergeCommit, SourceBackedMergeDiagnostics, SourceBackedMergeEdit,
-    SourceBackedMergeEditor, SourceBackedMergePatch, SourceBackedMergeSnapshot,
     SourceBackedWorkbook, SourceCell, SourceCellView, SourceWorksheet, State, TabEdit,
     ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
     WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,

@@ -23,13 +23,13 @@ crate::workbook::source::deferred::source_family!("print-option", super::Patch);
 impl Patch {
     /// The exact worksheet state the patch requires.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub fn before(&self) -> &Snapshot {
         self.0.before()
     }
 
     /// The exact worksheet state the patch produces.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub fn after(&self) -> &Snapshot {
         self.0.after()
     }
 }

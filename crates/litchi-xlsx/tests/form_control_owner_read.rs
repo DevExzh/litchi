@@ -168,6 +168,37 @@ const FIXTURES: &[Fixture] = &[
     },
 ];
 
+/// The first worksheet's form controls of a package opened under the
+/// form-control read budget `limits` (record 0360).
+fn eager_limited_controls(
+    source: &[u8],
+    limits: OwnerLimits,
+) -> litchi_xlsx::Result<litchi_xlsx::form_control::FormControlCollection> {
+    let package = litchi_xlsx::Package::from_bytes_with_options(source, limited(limits))?;
+    package
+        .workbook_ref()
+        .sheet(0)?
+        .expect("sheet")
+        .form_controls()
+}
+
+/// The first worksheet's form controls of a source-backed workbook opened
+/// under the form-control read budget `limits`.
+fn source_limited_controls(
+    source: &[u8],
+    limits: OwnerLimits,
+) -> litchi_xlsx::Result<litchi_xlsx::form_control::FormControlCollection> {
+    SourceBackedWorkbook::from_reader_with_options(Cursor::new(source.to_vec()), limited(limits))?
+        .sheet(0)?
+        .expect("sheet")
+        .form_controls()
+}
+
+fn limited(limits: OwnerLimits) -> litchi_xlsx::OpenOptions {
+    litchi_xlsx::OpenOptions::new()
+        .semantic_limits(litchi_xlsx::SemanticLimits::default().form_controls(limits))
+}
+
 fn fixture_path(file: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/form_control_properties")
@@ -425,13 +456,7 @@ fn assert_resource_limit<T>(result: litchi_xlsx::Result<T>, label: &str) {
 }
 
 fn projection_cap_admits_eager(source: &[u8], cap: usize, label: &str) -> bool {
-    let result = litchi_xlsx::Package::from_bytes(source)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap()
-        .form_controls_with_limits(OwnerLimits::new().with_max_projection_bytes(cap));
+    let result = eager_limited_controls(source, OwnerLimits::new().with_max_projection_bytes(cap));
     match result {
         Ok(_) => true,
         Err(Error::ResourceLimit(limit)) => {
@@ -449,12 +474,7 @@ fn projection_cap_admits_eager(source: &[u8], cap: usize, label: &str) -> bool {
 }
 
 fn projection_cap_admits_source(source: &[u8], cap: usize, label: &str) -> bool {
-    let result = SourceBackedWorkbook::from_reader(Cursor::new(source.to_vec()))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap()
-        .form_controls_with_limits(OwnerLimits::new().with_max_projection_bytes(cap));
+    let result = source_limited_controls(source, OwnerLimits::new().with_max_projection_bytes(cap));
     match result {
         Ok(_) => true,
         Err(Error::ResourceLimit(limit)) => {
@@ -1985,22 +2005,19 @@ fn properties_relationship_member_presence_is_read_and_malformed_member_refused(
         Some(empty_relationships.as_slice())
     );
     assert!(vml_read.relationship_is_source_backed());
-    let limited_source = SourceBackedWorkbook::from_reader(Cursor::new(valid.clone()))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert!(
-        limited_source
-            .form_controls_with_limits(
-                OwnerLimits::new().with_max_control_properties_relationship_bytes(1)
-            )
-            .is_err()
+        source_limited_controls(
+            &valid,
+            OwnerLimits::new().with_max_control_properties_relationship_bytes(1)
+        )
+        .is_err()
     );
     assert!(
-        limited_source
-            .form_controls_with_limits(OwnerLimits::new().with_max_sidecar_relationship_bytes(1))
-            .is_err()
+        source_limited_controls(
+            &valid,
+            OwnerLimits::new().with_max_sidecar_relationship_bytes(1)
+        )
+        .is_err()
     );
     assert_eq!(
         litchi_xlsx::Package::from_bytes(&valid)
@@ -2222,23 +2239,12 @@ fn unreferenced_properties_are_deterministic_and_bounded_by_mirror_cap() {
     assert_eq!(source_a.diagnostics(), source_b.diagnostics());
 
     let capped = OwnerLimits::new().with_max_mirror_nodes(1);
-    let eager_sheet = litchi_xlsx::Package::from_bytes(&archive_a)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(capped),
+        eager_limited_controls(&archive_a, capped),
         "eager diagnostic mirror-node cap",
     );
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(archive_a))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(capped),
+        source_limited_controls(&archive_a, capped),
         "source diagnostic mirror-node cap",
     );
 }
@@ -2354,24 +2360,16 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
             xml.replacen("</x:ClientData>", &format!("{extra}</x:ClientData>"), 1)
         },
     );
-    let eager_workbook = litchi_xlsx::Package::from_bytes(&source)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source.clone())).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
 
     // The worksheet relationship namespace URI is 67 bytes in this retained
     // fixture, so leave one byte for that canonical identity while keeping
     // the projection ceiling at its normal generous default for the exact
     // diagnostic inventory below.
     let accepted = OwnerLimits::new().with_max_name_bytes(68);
-    let eager = eager_workbook.form_controls_with_limits(accepted).unwrap();
-    let source_controls = source_sheet.form_controls_with_limits(accepted).unwrap();
+    let eager = eager_limited_controls(&source, accepted).unwrap();
+    let source_set = source_limited_controls(&source, accepted).unwrap();
     let eager_view = eager.get(ControlSelector::position(0)).unwrap().unwrap();
-    let source_view = source_controls
+    let source_view = source_set
         .get(ControlSelector::position(0))
         .unwrap()
         .unwrap();
@@ -2384,26 +2382,24 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
     assert_eq!(detail_bytes, 1567);
     assert_eq!(eager_view, source_view);
     assert_eq!(eager_view.diagnostics(), source_view.diagnostics());
-    assert!(source_controls.read_set().is_some());
+    assert!(source_set.read_set().is_some());
 
     // 3643 was the old undercounting boundary: it admitted this 30-diagnostic
     // fixture even though the retained detail bytes alone total 1567.  The
     // owner must charge each detail and refuse the same bound for both
     // worksheet facades.
-    let eager_workbook = litchi_xlsx::Package::from_bytes(&source).unwrap();
-    let eager_sheet = eager_workbook.workbook_ref().sheet(0).unwrap().unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(
+        eager_limited_controls(
+            &source,
             OwnerLimits::new()
                 .with_max_name_bytes(68)
                 .with_max_projection_bytes(3643),
         ),
         "eager mirror diagnostic projection at historical boundary",
     );
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(
+        source_limited_controls(
+            &source,
             OwnerLimits::new()
                 .with_max_name_bytes(68)
                 .with_max_projection_bytes(3643),
@@ -2563,10 +2559,6 @@ fn caller_part_limit_refuses_before_form_control_source_projection() {
 #[test]
 fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let eager_workbook = litchi_xlsx::Package::from_bytes(&source).unwrap();
-    let eager_sheet = eager_workbook.workbook_ref().sheet(0).unwrap().unwrap();
-    let source_workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).unwrap();
-    let source_sheet = source_workbook.sheet(0).unwrap().unwrap();
     let cases = [
         ("controls", OwnerLimits::new().with_max_controls(0)),
         ("MCE branches", OwnerLimits::new().with_max_mce_branches(0)),
@@ -2590,11 +2582,11 @@ fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
     ];
     for (label, limits) in cases {
         assert_resource_limit(
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
             &format!("eager {label} limit"),
         );
         assert_resource_limit(
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
             &format!("source {label} limit"),
         );
     }
@@ -2604,23 +2596,12 @@ fn caller_owner_limits_are_applied_through_eager_and_source_facades() {
 fn caller_name_limit_is_typed_before_control_projection() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
     let limits = OwnerLimits::new().with_max_name_bytes(1);
-    let eager_sheet = litchi_xlsx::Package::from_bytes(&source)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        eager_sheet.form_controls_with_limits(limits),
+        eager_limited_controls(&source, limits),
         "eager authored-name limit",
     );
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     assert_resource_limit(
-        source_sheet.form_controls_with_limits(limits),
+        source_limited_controls(&source, limits),
         "source authored-name limit",
     );
 }
@@ -2637,25 +2618,14 @@ fn worksheet_control_identity_name_limit_reports_object_resource() {
         xml.replacen("name=\"Check Box 1\"", &format!("name=\"{long_name}\""), 1)
     });
     let limits = OwnerLimits::new().with_max_name_bytes(70);
-    let eager_sheet = litchi_xlsx::Package::from_bytes(&source)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     for (label, result) in [
         (
             "eager worksheet control identity name",
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
         ),
         (
             "source worksheet control identity name",
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
         ),
     ] {
         match result {
@@ -2677,17 +2647,6 @@ fn worksheet_control_identity_name_limit_reports_object_resource() {
 #[test]
 fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let eager_sheet = litchi_xlsx::Package::from_bytes(&source)
-        .unwrap()
-        .workbook_ref()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
-    let source_sheet = SourceBackedWorkbook::from_reader(Cursor::new(source))
-        .unwrap()
-        .sheet(0)
-        .unwrap()
-        .unwrap();
     let cases = [
         ("leaf depth", OwnerLimits::new().with_max_mce_depth(1)),
         ("leaf events", OwnerLimits::new().with_max_mce_events(1)),
@@ -2698,11 +2657,11 @@ fn caller_leaf_depth_event_and_opaque_caps_are_forwarded() {
     ];
     for (label, limits) in cases {
         assert_typed_limit(
-            eager_sheet.form_controls_with_limits(limits),
+            eager_limited_controls(&source, limits),
             &format!("eager lowered {label} cap"),
         );
         assert_typed_limit(
-            source_sheet.form_controls_with_limits(limits),
+            source_limited_controls(&source, limits),
             &format!("source lowered {label} cap"),
         );
     }
@@ -2803,15 +2762,14 @@ fn mirror_node_caps_refuse_without_retaining_control_shape_charges() {
         let (budget, _cancellation_source, context) = managed_owner_context(u64::MAX, u64::MAX);
         let workbook = SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(OwnedSource::new(source.clone())),
-            litchi_xlsx::OpenOptions::new()
+            limited(OwnerLimits::new().with_max_mirror_nodes(maximum))
                 .source_limits(SourceLimits::default())
                 .execution_context(context),
         )
         .unwrap();
         let sheet = workbook.sheet(0).unwrap().unwrap();
         let before_owner = managed_owner_usage(&budget);
-        let result =
-            sheet.form_controls_with_limits(OwnerLimits::new().with_max_mirror_nodes(maximum));
+        let result = sheet.form_controls();
         match result {
             Err(Error::ResourceLimit(limit)) => {
                 assert_eq!(limit.resource, Resource::Objects);

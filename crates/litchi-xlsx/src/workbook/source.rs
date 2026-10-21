@@ -552,10 +552,9 @@ impl SourceBackedWorkbook {
 
     /// Recover the validated deferred OPC package without re-indexing it.
     ///
-    /// The returned package is the one this catalog was opened from, so a
-    /// per-feature `SourceBackedEditor` (for example
-    /// [`crate::cell_values::SourceBackedEditor::from_source_backed_package`])
-    /// can adopt it without a second container index. The lazily parsed
+    /// The returned package is the one this catalog was opened from, so
+    /// [`Self::from_source_backed_package`] can adopt it again without a
+    /// second container index. The lazily parsed
     /// catalog, shared strings and styles, and every parsed worksheet value
     /// the semantic cache retains, are released.
     ///
@@ -791,25 +790,17 @@ impl SourceWorksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::source_form_controls_for_sheet(
-            &self.owner.package,
-            &self.data.part_uri,
-        )
-    }
-
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
-        if self.data.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+        let package = &self.owner.package;
+        let limits = self
+            .owner
+            .options
+            .semantic_limits
+            .form_controls_value()
+            .unwrap_or_else(|| {
+                crate::form_control::OwnerLimits::from_read_limits(package.read_limits())
             });
-        }
         crate::form_control::source_form_controls_for_sheet_with_limits(
-            &self.owner.package,
+            package,
             &self.data.part_uri,
             limits,
         )
@@ -821,18 +812,6 @@ impl SourceWorksheet {
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Retained visibility state.

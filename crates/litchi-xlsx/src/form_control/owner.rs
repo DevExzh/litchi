@@ -2376,15 +2376,6 @@ pub(crate) fn eager_form_controls_with_execution_context(
     )
 }
 
-/// Read-only host hook for an eager worksheet handle.
-pub(crate) fn eager_form_controls_for_sheet(
-    package: &OpcPackage,
-    worksheet_uri: &PackURI,
-) -> Result<FormControlCollection> {
-    eager_form_controls_for_sheet_with_limits(package, worksheet_uri, OwnerLimits::default())
-        .map_err(owner_to_xlsx)
-}
-
 pub(crate) fn eager_form_controls_for_sheet_with_limits(
     package: &OpcPackage,
     worksheet_uri: &PackURI,
@@ -2550,18 +2541,6 @@ pub(crate) fn eager_form_controls_for_sheet_with_limits_and_execution_context(
         worksheet_uri,
         limits,
         Some(execution_context),
-    )
-}
-
-/// Read-only host hook for a source-backed worksheet handle.
-pub(crate) fn source_form_controls_for_sheet(
-    package: &SourceBackedPackage,
-    worksheet_uri: &PackURI,
-) -> Result<FormControlCollection> {
-    source_form_controls_for_sheet_with_limits(
-        package,
-        worksheet_uri,
-        OwnerLimits::from_read_limits(package.read_limits()),
     )
 }
 

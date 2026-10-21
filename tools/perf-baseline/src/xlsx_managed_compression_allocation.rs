@@ -13,9 +13,9 @@ use super::{
     xlsx_spec,
 };
 use crate::allocation_metrics::{self, Sample as AllocationSample, Status as AllocationStatus};
+use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
 use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
-use litchi_xlsx::cell_values::SourceBackedEditor;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -621,9 +621,7 @@ fn verify_before_cleanup(
         return Err("allocation diagnostic semantic output hash changed".into());
     }
     let mut package = OpcPackage::from_bytes(&sink.bytes)?;
-    plan.inverse_patch
-        .inverse()
-        .apply_materialized(&mut package, plan.corpus.archive.len())?;
+    crate::xlsx_source_editors::replay_patch(&mut package, &plan.inverse_patch.inverse())?;
     let restored = PackageWriter::to_bytes(&package)?;
     if restored != plan.corpus.archive {
         return Err("allocation diagnostic inverse did not restore exact source ZIP".into());

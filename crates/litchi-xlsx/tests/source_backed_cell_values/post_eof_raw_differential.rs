@@ -142,11 +142,15 @@ fn assert_shape_contract(shape: Shape) {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!unaffected.changed(), "{} owner changed", shape.name());
-    assert!(unaffected.patch().is_empty());
-    assert_eq!(unaffected.snapshot().len(), 1);
+    assert!(
+        !unaffected.diagnostics().changed(),
+        "{} owner changed",
+        shape.name()
+    );
+    assert!(unaffected.patch().is_noop());
+    assert_eq!(unaffected.patch().after().len(), 1);
     assert_eq!(
-        unaffected.snapshot().value(0, address("A1")),
+        unaffected.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("20").unwrap()))
     );
 

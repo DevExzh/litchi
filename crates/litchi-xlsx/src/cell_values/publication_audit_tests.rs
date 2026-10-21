@@ -35,7 +35,8 @@ use litchi_opc::OpcError;
 use litchi_opc::constants::content_type as ct;
 use soapberry_zip::office::StreamingArchiveWriter;
 
-use crate::cell_values::{SheetCellValueEdit, SourceBackedEditor};
+use crate::cell_values::SheetCellValueEdit;
+use crate::cell_values::test_editors::SourceBackedEditor;
 use crate::{Address, Error, Number, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -158,7 +159,8 @@ fn plan_commit_publish_package(
         .commit()
         .expect("the commit admits the witness");
     let replacement = commit
-        .snapshot()
+        .patch()
+        .after()
         .sheets()
         .first()
         .expect("one worksheet")

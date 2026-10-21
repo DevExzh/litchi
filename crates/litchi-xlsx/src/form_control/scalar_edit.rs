@@ -397,7 +397,7 @@ impl Edit {
             let vml_source = vml_source_payload.as_bytes();
             validate_pair_input_limits(property_source, vml_source, self.before.limits)?;
             let client_data = find_client_data(vml_source, control.shape().vml_id())?;
-            let properties = super::inspect(property_source)?;
+            let properties = super::inspect(property_source, &super::Limits::default())?;
             let pair = replace_scalar_pair_with_limits(
                 &properties,
                 client_data,
@@ -584,7 +584,7 @@ pub(crate) fn ordinary_form_control_overlays(
             .as_deref()
             .ok_or_else(|| invalid("form-control VML source disappeared"))?;
         validate_pair_input_limits(property_bytes, vml_bytes, limits)?;
-        let properties = super::inspect(property_bytes)?;
+        let properties = super::inspect(property_bytes, &super::Limits::default())?;
         let client_data = find_client_data(vml_bytes, control.shape().vml_id())?;
         let pair = replace_scalar_pair_with_limits(
             &properties,
@@ -617,7 +617,10 @@ pub(crate) fn ordinary_form_control_overlays(
     let position =
         target_position.ok_or_else(|| invalid("form-control target position was not retained"))?;
     let expected_collection = collection
-        .with_replaced_properties(position, super::parse(&property_after)?)
+        .with_replaced_properties(
+            position,
+            super::parse(&property_after, &super::Limits::default())?,
+        )
         .ok_or_else(|| invalid("form-control target disappeared during ordinary edit"))?;
     Ok(vec![OrdinaryFormControlOverlay {
         position,
@@ -753,13 +756,13 @@ crate::workbook::source::deferred::source_family!("form-control", Record);
 impl Patch {
     /// The exact owner state the patch requires.
     #[must_use]
-    pub const fn before(&self) -> &FormControlSnapshot {
+    pub fn before(&self) -> &FormControlSnapshot {
         self.0.before()
     }
 
     /// The exact owner state the patch produces.
     #[must_use]
-    pub const fn after(&self) -> &FormControlSnapshot {
+    pub fn after(&self) -> &FormControlSnapshot {
         self.0.after()
     }
 }
@@ -818,7 +821,7 @@ impl crate::workbook::source::deferred::Change for Record {
         Ok(())
     }
 
-    fn write(&self, package: &SourceBackedPackage, mut writer: &mut dyn Write) -> Result<()> {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
         package.check_execution()?;
         crate::workbook::source::deferred::Change::check(self, package)?;
         let property_uri = self
@@ -894,7 +897,7 @@ impl crate::workbook::source::deferred::Change for Record {
         if let Some(error) = readback_error {
             return Err(error);
         }
-        prepared.publish_to_stream(&mut writer)?;
+        prepared.publish_to_stream(writer)?;
         Ok(())
     }
 }
@@ -1180,7 +1183,7 @@ fn validate_scalar(
     let source = control
         .source_property_bytes()
         .ok_or_else(|| invalid("form-control properties source bytes were not retained"))?;
-    let view = super::inspect(source)?;
+    let view = super::inspect(source, &super::Limits::default())?;
     // Preserve an exact source-only formula (or any other unknown source
     // scalar) when the requested value is the same typed projection.  The
     // general codec writer intentionally refuses to author source-only

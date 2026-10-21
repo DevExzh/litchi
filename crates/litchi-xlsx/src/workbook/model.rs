@@ -463,7 +463,7 @@ pub struct Workbook {
 
 /// The semantic budgets and encryption provenance of a workbook snapshot.
 #[derive(Debug, Clone, Copy)]
-struct Policy {
+pub(super) struct Policy {
     semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     encryption: PackageEncryption,
@@ -901,6 +901,7 @@ impl Workbook {
         self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: Some(Arc::clone(&self.policy)),
         })
     }
 
@@ -928,6 +929,7 @@ impl Workbook {
         Ok(data.map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: Some(Arc::clone(&self.policy)),
         }))
     }
 
@@ -942,6 +944,7 @@ impl Workbook {
         Some(Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: Some(Arc::clone(&self.policy)),
         })
     }
 
@@ -1226,6 +1229,10 @@ impl Workbook {
 pub struct Worksheet {
     pub(super) owner: Arc<Inner>,
     pub(super) data: Arc<SheetData>,
+    /// The owning package's policy, for the form-control read budget
+    /// ([`crate::SemanticLimits::form_controls`]); `None` for internal
+    /// handles that never read form controls.
+    pub(super) policy: Option<Arc<Policy>>,
 }
 
 impl Worksheet {
@@ -1281,7 +1288,15 @@ impl Worksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::eager_form_controls_for_sheet(&self.owner.package, &self.data.part_uri)
+        crate::form_control::eager_form_controls_for_sheet_with_limits(
+            &self.owner.package,
+            &self.data.part_uri,
+            self.policy
+                .as_ref()
+                .and_then(|policy| policy.semantic_limits.form_controls_value())
+                .unwrap_or_default(),
+        )
+        .map_err(crate::form_control::owner_to_xlsx)
     }
 
     /// Parse this worksheet's legacy notes; `None` without a comments part.
@@ -1316,43 +1331,12 @@ impl Worksheet {
         crate::threaded_comments::package::comments(&self.owner.package, &self.data.part_uri)
     }
 
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
-        if self.data.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
-            });
-        }
-        crate::form_control::eager_form_controls_for_sheet_with_limits(
-            &self.owner.package,
-            &self.data.part_uri,
-            limits,
-        )
-        .map_err(crate::form_control::owner_to_xlsx)
-    }
-
     /// Resolve one form control by checked position or exact authored name.
     pub fn form_control<'a>(
         &self,
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Borrow this worksheet's Office Add-in range bindings.
@@ -1933,6 +1917,7 @@ impl Inner {
             let sheet = Worksheet {
                 owner: Arc::clone(self),
                 data: Arc::clone(data),
+                policy: None,
             };
             count = count
                 .checked_add(

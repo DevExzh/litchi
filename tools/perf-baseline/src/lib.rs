@@ -58,6 +58,8 @@ mod xlsx_attribute_fixtures;
 mod xlsx_commit_metrics_tests;
 mod xlsx_managed_compression;
 pub mod xlsx_planning_guard;
+#[path = "../../../crates/litchi-xlsx/tests/support/source_editors.rs"]
+mod xlsx_source_editors;
 pub mod xml_stream_audit;
 pub mod zip_directory_spool;
 
@@ -23669,7 +23671,7 @@ fn xlsx_row_visibility_source_output(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut edit = editor.edit("Sheet1")?;
@@ -23682,7 +23684,7 @@ fn xlsx_row_visibility_source_output(
     });
     edit.apply_batch(operations)?;
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_rows() != updates.len() {
         return Err("XLSX row-visibility source output changed an unexpected row count".into());
     }
     let mut output = Vec::new();
@@ -23805,7 +23807,7 @@ fn xlsx_row_visibility_variant_refused(
     // Opening an edit is lazy. Exercise a real change before deciding whether
     // the conservative source closure refused the operation.
     let publication = (|| -> litchi_xlsx::Result<()> {
-        let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source.clone())?;
+        let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(source.clone())?;
         let mut edit = editor.edit("Sheet1")?;
         let row = RowIndex::new(0).expect("row zero is within the XLSX grid");
         if initially_hidden {
@@ -23823,13 +23825,26 @@ fn xlsx_row_visibility_variant_refused(
     Ok(publication.is_err() && output.is_empty())
 }
 
+/// `archive` with one trailing newline after its workbook part's root: the
+/// same document to a reader, a different owner closure to a source-backed
+/// replay.
+fn xlsx_foreign_content_archive(archive: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
+    let mut package = OpcPackage::from_bytes(archive)?;
+    let workbook = PackURI::new("/xl/workbook.xml")?;
+    let part = package.get_part_mut(&workbook)?;
+    let mut blob = part.blob().to_vec();
+    blob.push(b'\n');
+    part.set_blob(blob);
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
 fn xlsx_row_visibility_lifecycle_gates(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
     initially_hidden: bool,
 ) -> Result<XlsxRowVisibilityGateSummary, Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(source)?;
     let mut noop = editor.edit("Sheet1")?;
     let noop_operations = updates.iter().map(|(row, _)| {
         if initially_hidden {
@@ -23842,13 +23857,14 @@ fn xlsx_row_visibility_lifecycle_gates(
     let noop_commit = noop.commit()?;
     let mut noop_output = Vec::new();
     editor.publish_commit_to_stream(&mut noop_output, &noop_commit)?;
-    let exact_noop_verified =
-        !noop_commit.changed() && noop_commit.patch().is_empty() && noop_output == corpus.archive;
+    let exact_noop_verified = !noop_commit.diagnostics().changed()
+        && noop_commit.patch().is_noop()
+        && noop_output == corpus.archive;
     if !exact_noop_verified {
         return Err("XLSX row-visibility exact no-op gate failed".into());
     }
 
-    let source_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let source_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut staged = source_editor.edit("Sheet1")?;
@@ -23860,13 +23876,15 @@ fn xlsx_row_visibility_lifecycle_gates(
         }
     }))?;
     let commit = staged.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_rows() != updates.len() {
         return Err("XLSX row-visibility lifecycle commit gate changed an unexpected count".into());
     }
 
     let mut foreign_output = Vec::new();
-    let foreign_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
-        OwnedSource::new(corpus.archive.clone()),
+    // Source-backed replays compare content (record 0360): a foreign source
+    // is one whose owner closure differs from the patch's.
+    let foreign_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
+        OwnedSource::new(xlsx_foreign_content_archive(&corpus.archive)?),
     ))?;
     let foreign_source_refusal_verified = foreign_editor
         .publish_commit_to_stream(&mut foreign_output, &commit)
@@ -23882,15 +23900,16 @@ fn xlsx_row_visibility_lifecycle_gates(
         .get_part_mut(&worksheet)?
         .set_blob(b"<stale-row-visibility-source/>".to_vec());
     let stale_fixture = PackageWriter::to_bytes(&stale_package)?;
-    let stale_source_refusal_verified = commit.patch().apply(&mut stale_package).is_err()
-        && PackageWriter::to_bytes(&stale_package)? == stale_fixture;
+    let stale_source_refusal_verified =
+        crate::xlsx_source_editors::replay_patch(&mut stale_package, commit.patch()).is_err()
+            && PackageWriter::to_bytes(&stale_package)? == stale_fixture;
     if !stale_source_refusal_verified {
         return Err("XLSX row-visibility stale package gate failed".into());
     }
 
     let revision_source = Arc::new(PptxRevisionSource::new(corpus.archive.clone()));
     let revision_editor =
-        litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(revision_source.clone())?;
+        crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(revision_source.clone())?;
     let mut revision_edit = revision_editor.edit("Sheet1")?;
     revision_edit.apply_batch(updates.iter().map(|(row, hidden)| {
         if *hidden {
@@ -23940,7 +23959,7 @@ fn xlsx_row_visibility_lifecycle_gates(
     }
 
     let signed_bytes = xlsx_row_visibility_variant_bytes(corpus, "signed")?;
-    let signed_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let signed_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(signed_bytes),
     ))?;
     let mut signed_edit = signed_editor.edit("Sheet1")?;
@@ -23951,17 +23970,19 @@ fn xlsx_row_visibility_lifecycle_gates(
             litchi_xlsx::row_visibility::RowVisibilityEdit::unhide(*row)
         }
     }))?;
-    let signed_commit = signed_edit.commit()?;
-    let mut signed_output = Vec::new();
-    let signed_source_refusal_verified = signed_editor
-        .publish_commit_to_stream(&mut signed_output, &signed_commit)
-        .is_err()
-        && signed_output.is_empty();
+    // A changed commit over a signed source is refused before any output
+    // exists (record 0360).
+    let signed_source_refusal_verified = matches!(
+        signed_edit.commit(),
+        Err(litchi_xlsx::Error::Package(
+            OpcError::SignedSourceRequiresExplicitPolicy
+        ))
+    );
     if !signed_source_refusal_verified {
         return Err("XLSX row-visibility signed-source gate accepted output".into());
     }
 
-    let partial_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let partial_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut partial_edit = partial_editor.edit("Sheet1")?;
@@ -23982,7 +24003,7 @@ fn xlsx_row_visibility_lifecycle_gates(
         .is_err()
         && partial_sink.accepted > 0;
 
-    let zero_editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
+    let zero_editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
     let mut zero_edit = zero_editor.edit("Sheet1")?;
@@ -24626,10 +24647,10 @@ fn run_xlsx_cell_value_lifecycle_gates(
         .map(litchi_xlsx::Selector::from)
         .collect::<Vec<_>>();
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
     let noop = editor.edit_sheets(selectors.clone())?;
     let noop_commit = noop.commit()?;
-    if noop_commit.changed() || !noop_commit.patch().is_empty() {
+    if noop_commit.diagnostics().changed() || !noop_commit.patch().is_noop() {
         return Err("XLSX cell CRUD exact no-op produced a change".into());
     }
     let mut noop_output = Vec::new();
@@ -24646,7 +24667,7 @@ fn run_xlsx_cell_value_lifecycle_gates(
         .ok_or("XLSX cell CRUD corpus has no lifecycle target")?;
     for remove in [false, true] {
         let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+        let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
         let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
         let address =
             litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
@@ -24656,14 +24677,17 @@ fn run_xlsx_cell_value_lifecycle_gates(
             edit.clear(target.sheet, address)?;
         }
         let commit = edit.commit()?;
-        if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+        if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
             return Err(
                 "XLSX cell CRUD clear/remove lifecycle gate did not change one cell".into(),
             );
         }
-        let foreign_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-            OwnedSource::new(corpus.archive.clone()),
-        ))?;
+        // Source-backed replays compare content (record 0360): a foreign
+        // source is one whose owner closure differs from the patch's.
+        let foreign_editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
+                OwnedSource::new(xlsx_foreign_content_archive(&corpus.archive)?),
+            ))?;
         let mut foreign_output = Vec::new();
         if foreign_editor
             .publish_multi_commit_to_stream(&mut foreign_output, &commit)
@@ -24678,15 +24702,15 @@ fn run_xlsx_cell_value_lifecycle_gates(
         let workbook = XlsxPackage::from_bytes(&published)?;
         verify_xlsx_cell_crud_lifecycle_state(&workbook, spec, target, remove)?;
         let mut applied = OpcPackage::from_bytes(&corpus.archive)?;
-        commit.patch().apply(&mut applied)?;
+        crate::xlsx_source_editors::replay_patch(&mut applied, commit.patch())?;
         let applied_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &applied_bytes)?;
         let applied_workbook = XlsxPackage::from_bytes(&applied_bytes)?;
         verify_xlsx_cell_crud_lifecycle_state(&applied_workbook, spec, target, remove)?;
-        if commit.patch().apply(&mut applied).is_ok() {
+        if crate::xlsx_source_editors::replay_patch(&mut applied, commit.patch()).is_ok() {
             return Err("XLSX lifecycle stale source was accepted".into());
         }
-        commit.patch().inverse().apply(&mut applied)?;
+        crate::xlsx_source_editors::replay_patch(&mut applied, &commit.patch().inverse())?;
         let restored_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &restored_bytes)?;
         let restored_workbook = XlsxPackage::from_bytes(&restored_bytes)?;
@@ -24695,9 +24719,9 @@ fn run_xlsx_cell_value_lifecycle_gates(
     let partial_sink_verified = if corpus.manifest.shape
         == XlsxCellCrudShape::VendorExtension.name()
     {
-        let partial_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
-            OwnedSource::new(corpus.archive.clone()),
-        ))?;
+        let partial_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(
+            Arc::new(OwnedSource::new(corpus.archive.clone())),
+        )?;
         let mut partial_edit =
             partial_editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
         partial_edit.set(
@@ -24706,7 +24730,9 @@ fn run_xlsx_cell_value_lifecycle_gates(
             xlsx_value(target) + 1,
         )?;
         let partial_commit = partial_edit.commit()?;
-        if !partial_commit.changed() || partial_commit.diagnostics().changed_cells() != 1 {
+        if !partial_commit.diagnostics().changed()
+            || partial_commit.diagnostics().changed_cells() != 1
+        {
             return Err("XLSX vendor-extension partial-sink replay did not change one cell".into());
         }
         let mut partial_sink = PrefixFailSink {
@@ -43753,7 +43779,7 @@ fn xlsx_cell_lifecycle_source_output(
     remove: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let source = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source)?;
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source)?;
     let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(target.sheet)])?;
     let address =
         litchi_xlsx::Address::at(u32::try_from(target.row)?, u32::try_from(target.column)?)?;
@@ -43763,7 +43789,7 @@ fn xlsx_cell_lifecycle_source_output(
         edit.clear(target.sheet, address)?;
     }
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
         return Err("XLSX source cell lifecycle did not produce one change".into());
     }
     let mut output = Vec::new();
@@ -43832,7 +43858,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 .clone()
                 .expect("XLSX lifecycle source backing is present");
             let open_started = Instant::now();
-            let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(read_at)?;
+            let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(read_at)?;
             let open_duration = open_started.elapsed();
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -43857,7 +43883,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             let commit_duration = commit_started.elapsed();
             let commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
-            if !commit.changed() || commit.diagnostics().changed_cells() != 1 {
+            if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != 1 {
                 return Err("XLSX source lifecycle sample did not change one cell".into());
             }
             let diagnostics = editor.cache_diagnostics();
@@ -44101,7 +44127,7 @@ fn run_xlsx_row_visibility_edit_save(
                 .clone()
                 .expect("XLSX row-visibility source backing is present");
             let started = Instant::now();
-            let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(read_at)?;
+            let editor = crate::xlsx_source_editors::RowVisibilityEditor::from_read_at(read_at)?;
             let open_duration = started.elapsed();
             open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -44124,7 +44150,9 @@ fn run_xlsx_row_visibility_edit_save(
             let commit_duration = started.elapsed();
             commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
-            if !commit.changed() || commit.diagnostics().changed_rows() != updates.len() {
+            if !commit.diagnostics().changed()
+                || commit.diagnostics().changed_rows() != updates.len()
+            {
                 return Err("XLSX row-visibility sample changed an unexpected row count".into());
             }
             diagnostics = editor.cache_diagnostics();
@@ -44437,7 +44465,7 @@ fn run_xlsx_cell_values_edit_save(
                 let payload_budget =
                     payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
                 let (budget, context) = xlsx_cell_values_managed_context(payload_budget, maximum)?;
-                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     read_at,
                     SourceLimits::default(),
                     cache_limits,
@@ -44445,7 +44473,7 @@ fn run_xlsx_cell_values_edit_save(
                 )?;
                 (editor, Some(budget))
             } else {
-                let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
+                let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
                     read_at,
                     SourceLimits::default(),
                     cache_limits,
@@ -44565,6 +44593,8 @@ fn run_xlsx_cell_values_edit_save(
             if managed && budget_used_after_package_drop == 0 {
                 return Err("XLSX managed cell CRUD retained no payload reservation".into());
             }
+            // The workbook pins its catalog until it is dropped (record 0360).
+            drop(editor);
             let budget_used_after_handles_drop = opc_cache_budget_used(budget.as_ref());
             let budget_objects_used_after_handles_drop =
                 opc_cache_budget_objects_used(budget.as_ref());
@@ -46135,7 +46165,7 @@ fn xlsx_cell_values_output_refusal_replay(
     let (probe_budget, probe_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, successful_output_ceiling)?;
     let probe_editor =
-        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             probe_source.clone(),
             SourceLimits::default(),
             cache_limits,
@@ -46166,6 +46196,7 @@ fn xlsx_cell_values_output_refusal_replay(
         return Err("XLSX managed output refusal probe changed source identity".into());
     }
     drop(probe_commit);
+    drop(probe_editor);
     if probe_budget.used(Resource::OutputBytes) != 0 {
         return Err("XLSX managed output refusal probe charged rejected output".into());
     }
@@ -46184,7 +46215,7 @@ fn xlsx_cell_values_output_refusal_replay(
     let (refusal_budget, refusal_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, one_under_output_limit)?;
     let refusal_editor =
-        litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+        crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             refusal_source.clone(),
             SourceLimits::default(),
             cache_limits,
@@ -71133,7 +71164,7 @@ mod tests {
         let vendor_budget = super::xlsx_cell_values_payload_budget(&first, &target).unwrap();
         assert_eq!(vendor_budget, medium_budget);
 
-        let source_editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+        let source_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
             super::OwnedSource::new(first.archive.clone()),
         ))
         .unwrap();

@@ -225,13 +225,14 @@ pub(crate) trait Report {
 /// for a no-op, otherwise a deferred workbook writing the change's splice.
 pub(crate) fn publish<C: Change>(
     workbook: &SourceBackedWorkbook,
-    change: &C,
+    change: &Arc<C>,
 ) -> Result<SourceBackedWorkbook> {
     if change.is_noop() {
         return Ok(workbook.clone());
     }
     let catalog = change.catalog_xml().map(<[u8]>::to_vec);
-    let change = change.clone();
+    // The committed workbook shares the patch's record; nothing is copied.
+    let change = Arc::clone(change);
     workbook.deferred(catalog.as_deref(), move |package, writer| {
         change.write(package, writer)
     })
@@ -241,7 +242,7 @@ pub(crate) fn publish<C: Change>(
 /// state (`PatchConflict`), then publish.
 pub(crate) fn replay<C: Change>(
     workbook: &SourceBackedWorkbook,
-    change: &C,
+    change: &Arc<C>,
 ) -> Result<SourceBackedWorkbook> {
     change.check(workbook.edit_package()?)?;
     publish(workbook, change)
@@ -297,19 +298,21 @@ macro_rules! source_family {
                     "before state; [`Patch::inverse`] restores it."
                 )]
         #[derive(Clone, Debug)]
-        pub struct Patch(pub(crate) $change);
+        pub struct Patch(pub(crate) std::sync::Arc<$change>);
 
         impl Patch {
             /// Whether applying the patch changes nothing.
             #[must_use]
             pub fn is_noop(&self) -> bool {
-                crate::workbook::source::deferred::Change::is_noop(&self.0)
+                crate::workbook::source::deferred::Change::is_noop(&*self.0)
             }
 
             /// The patch that restores the before state.
             #[must_use]
             pub fn inverse(&self) -> Self {
-                Self(crate::workbook::source::deferred::Change::inverse(&self.0))
+                Self(std::sync::Arc::new(crate::workbook::source::deferred::Change::inverse(
+                    &*self.0,
+                )))
             }
         }
 
@@ -324,8 +327,9 @@ macro_rules! source_family {
             workbook: &crate::SourceBackedWorkbook,
             change: $change,
         ) -> crate::Result<Commit> {
+            let change = std::sync::Arc::new(change);
             let next = crate::workbook::source::deferred::publish(workbook, &change)?;
-            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&change);
+            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&*change);
             Ok(Commit::new(next, Patch(change), diagnostics))
         }
 
@@ -334,7 +338,7 @@ macro_rules! source_family {
             patch: &Patch,
         ) -> crate::Result<Commit> {
             let next = crate::workbook::source::deferred::replay(workbook, &patch.0)?;
-            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&patch.0);
+            let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&*patch.0);
             Ok(Commit::new(next, patch.clone(), diagnostics))
         }
     };

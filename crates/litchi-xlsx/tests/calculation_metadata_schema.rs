@@ -234,7 +234,12 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
         r#"calcCompleted=" 0 " calcOnSave=" true " concurrentCalc=" false " "#,
         r#"concurrentManualCount=" &#xA;0009 " forceFullCalc=" 1 "/>"#,
     ));
-    let parsed = parse(&xml).expect("xsd lexical forms").expect("calcPr");
+    let parsed = parse(
+        &xml,
+        &litchi_xlsx::calculation_properties::Limits::default(),
+    )
+    .expect("xsd lexical forms")
+    .expect("calcPr");
     let specified = parsed.specified();
     assert_eq!(specified.calculation_id(), Some(42));
     assert_eq!(specified.calculation_mode(), Some(Mode::Manual));
@@ -264,7 +269,11 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
 
     for attribute in ["calcId", "iterateCount", "concurrentManualCount"] {
         let invalid = workbook_xml(&format!(r#"<calcPr {attribute}=" &#x9;+1&#xD; "/>"#));
-        let error = parse(&invalid).expect_err("leading plus is not an unsignedInt lexical form");
+        let error = parse(
+            &invalid,
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
+        .expect_err("leading plus is not an unsignedInt lexical form");
         assert!(
             matches!(error, Error::Invalid(_)),
             "{attribute} returned the wrong error class: {error}"
@@ -279,9 +288,10 @@ fn complete_xsd_double_special_value_space_round_trips_through_public_setter() {
         ("-INF", f64::NEG_INFINITY),
         ("NaN", f64::NAN),
     ] {
-        let parsed = parse(&workbook_xml(&format!(
-            r#"<calcPr iterateDelta="{lexical}"/>"#
-        )))
+        let parsed = parse(
+            &workbook_xml(&format!(r#"<calcPr iterateDelta="{lexical}"/>"#)),
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
         .expect("special xsd:double lexical")
         .expect("calcPr");
         let parsed_value = parsed.specified().iteration_delta().expect("parsed delta");
@@ -378,7 +388,11 @@ fn malformed_calc_features_schema_boundaries_are_rejected() {
     ];
 
     for (label, body) in cases {
-        let error = parse_features(&workbook_xml(&body)).expect_err(label);
+        let error = parse_features(
+            &workbook_xml(&body),
+            &litchi_xlsx::calculation_properties::Limits::default(),
+        )
+        .expect_err(label);
         if label == "duplicate feature name" {
             assert!(
                 matches!(error, Error::Xml(_)),
@@ -430,14 +444,17 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
     assert!(xml.contains("\u{10000}"));
     assert!(xml.contains("\u{10ffff}"));
 
-    let parsed = parse_features(&workbook_xml(&format!(
-        concat!(
-            r#"<extLst><ext uri="{}"><xcalcf:calcFeatures>"#,
-            r#"<xcalcf:feature name="&#x9;&#xA;&#xD;"/>"#,
-            r#"</xcalcf:calcFeatures></ext></extLst>"#,
-        ),
-        CALC_FEATURES_URI
-    )))
+    let parsed = parse_features(
+        &workbook_xml(&format!(
+            concat!(
+                r#"<extLst><ext uri="{}"><xcalcf:calcFeatures>"#,
+                r#"<xcalcf:feature name="&#x9;&#xA;&#xD;"/>"#,
+                r#"</xcalcf:calcFeatures></ext></extLst>"#,
+            ),
+            CALC_FEATURES_URI
+        )),
+        &litchi_xlsx::calculation_properties::Limits::default(),
+    )
     .expect("parse xsd:string whitespace")
     .expect("calcFeatures");
     assert_eq!(parsed.get(0).unwrap().as_str(), "\t\n\r");

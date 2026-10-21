@@ -802,22 +802,10 @@ pub struct SourceDrawing<'a> {
 }
 
 impl<'a> SourceDrawing<'a> {
-    /// Scan a worksheet drawing in source order.
-    pub fn scan(source: &'a [u8]) -> Result<Self> {
-        Self::scan_with_ordinal(source, 0)
-    }
-
-    /// Scan a worksheet drawing with the caller's semantic drawing ordinal.
-    pub fn scan_with_ordinal(source: &'a [u8], drawing_ordinal: usize) -> Result<Self> {
-        Self::scan_with_limits(source, drawing_ordinal, ScanLimits::default())
-    }
-
-    /// Scan with explicit finite source/output limits.
-    pub fn scan_with_limits(
-        source: &'a [u8],
-        drawing_ordinal: usize,
-        limits: ScanLimits,
-    ) -> Result<Self> {
+    /// Scan a worksheet drawing in source order, with the caller's semantic
+    /// drawing ordinal, under finite source and output limits
+    /// ([`ScanLimits::default`] for the standard ones).
+    pub fn scan(source: &'a [u8], drawing_ordinal: usize, limits: ScanLimits) -> Result<Self> {
         Scanner::new(source, drawing_ordinal, limits)?.run()
     }
 

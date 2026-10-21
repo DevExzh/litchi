@@ -38,13 +38,9 @@ const ITEM: &[u8] = b"item";
 const EXT_LIST: &[u8] = b"extLst";
 const ARC_HEADER_BYTES: usize = 2 * size_of::<usize>();
 
-/// Parse one complete control-properties XML part.
-pub fn parse(xml: &[u8]) -> Result<Properties> {
-    parse_with_limits(xml, &Limits::default())
-}
-
-/// Parse one complete control-properties XML part under a caller policy.
-pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Properties> {
+/// Parse one complete control-properties XML part under `limits`
+/// ([`Limits::default`] for the standard finite policy).
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Properties> {
     let source = owned_source(xml, *limits)?;
     let inspected = inspect_with_limits_owned(xml, *limits, Some(source), None)?;
     Ok(inspected.properties)
@@ -82,13 +78,10 @@ pub(crate) fn parse_source_with_limits_and_context(
     Ok(inspected.properties)
 }
 
-/// Inspect a source part while retaining a borrowed source view for splices.
-pub fn inspect(xml: &[u8]) -> Result<SourceView<'_>> {
-    inspect_with_limits(xml, Limits::default())
-}
-
-/// Inspect a source part under a caller policy.
-pub fn inspect_with_limits(xml: &[u8], limits: Limits) -> Result<SourceView<'_>> {
+/// Inspect a source part under `limits` while retaining a borrowed source
+/// view for splices.
+pub fn inspect<'a>(xml: &'a [u8], limits: &Limits) -> Result<SourceView<'a>> {
+    let limits = *limits;
     let inspected = inspect_with_limits_owned(xml, limits, None, None)?;
     Ok(SourceView {
         source: xml,
@@ -160,23 +153,28 @@ impl SourceProperties<'_> {
 
 /// Values accepted by the detached/source-backed writer.
 pub trait SourceWritable {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>>;
+    /// Serialize this value under `limits`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed limit error when the output exceeds `limits`.
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>>;
 }
 
 impl SourceWritable for Properties {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         write_properties(self, limits)
     }
 }
 
 impl SourceWritable for &Properties {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         write_properties(self, limits)
     }
 }
 
 impl<'a> SourceWritable for SourceProperties<'a> {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         copy_bounded(
             self.source,
             limits.max_output_bytes(),
@@ -186,7 +184,7 @@ impl<'a> SourceWritable for SourceProperties<'a> {
 }
 
 impl<'a> SourceWritable for &SourceProperties<'a> {
-    fn write_with_limits(&self, limits: &Limits) -> Result<Vec<u8>> {
+    fn write(&self, limits: &Limits) -> Result<Vec<u8>> {
         copy_bounded(
             self.source,
             limits.max_output_bytes(),
@@ -292,14 +290,10 @@ impl<'a> SourceView<'a> {
     }
 }
 
-/// Write a detached or unchanged source-backed properties model.
-pub fn write<P: SourceWritable>(properties: P) -> Result<Vec<u8>> {
-    write_with_limits(properties, &Limits::default())
-}
-
-/// Write a detached or unchanged source-backed properties model under limits.
-pub fn write_with_limits<P: SourceWritable>(properties: P, limits: &Limits) -> Result<Vec<u8>> {
-    properties.write_with_limits(limits)
+/// Write a detached or unchanged source-backed properties model under
+/// `limits`.
+pub fn write<P: SourceWritable>(properties: P, limits: &Limits) -> Result<Vec<u8>> {
+    properties.write(limits)
 }
 
 fn write_properties(properties: &Properties, limits: &Limits) -> Result<Vec<u8>> {
@@ -352,7 +346,7 @@ fn replace_scalar_with_limits(
     value: Option<ScalarValue>,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     replace_scalar_from_parts(
         xml,
         field,
@@ -684,7 +678,7 @@ fn scalar_value_matches(
 }
 
 fn replace_items_with_limits(xml: &[u8], values: &[Item], limits: Limits) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     replace_items_from_parts(
         xml,
         values,
@@ -1165,7 +1159,7 @@ fn insert_item_with_limits(
     value: Item,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     insert_item_from_parts(
         xml,
         index,
@@ -1177,7 +1171,7 @@ fn insert_item_with_limits(
 }
 
 fn remove_item_with_limits(xml: &[u8], index: usize, limits: Limits) -> Result<Vec<u8>> {
-    let inspected = inspect_with_limits(xml, limits)?;
+    let inspected = inspect(xml, &limits)?;
     remove_item_from_parts(xml, index, limits, &inspected.properties, &inspected.layout)
 }
 
@@ -5731,7 +5725,11 @@ mod tests {
         drop(cloned);
         assert_eq!(budget.used(Resource::Memory), 0);
         assert_eq!(
-            write(parse(&xml).expect("standalone parse")).expect("standalone write"),
+            write(
+                parse(&xml, &Limits::default()).expect("standalone parse"),
+                &Limits::default()
+            )
+            .expect("standalone write"),
             xml
         );
     }
@@ -5808,7 +5806,7 @@ mod tests {
         drop(package);
         assert_eq!(properties.source_bytes(), Some(expected.as_slice()));
         assert_eq!(
-            write(&properties).expect("exact managed source write"),
+            write(&properties, &Limits::default()).expect("exact managed source write"),
             expected
         );
     }
@@ -5818,7 +5816,8 @@ mod tests {
         let xml = format!(
             "<?xml version=\"1.0\"?><formControlPr xmlns=\"{NS}\" objectType=\"CheckBox\" fmlaLink=\"#REF!\"/>"
         );
-        let properties = parse(xml.as_bytes()).expect("parse native form-control fragment");
+        let properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse native form-control fragment");
         assert_eq!(
             properties.object_type(),
             Some(&KnownOrUnknown::Known(ObjectType::CheckBox))
@@ -5830,7 +5829,7 @@ mod tests {
             Some("#REF!")
         );
         assert_eq!(
-            write(&properties).expect("exact no-op write"),
+            write(&properties, &Limits::default()).expect("exact no-op write"),
             xml.as_bytes()
         );
     }
@@ -5857,12 +5856,18 @@ mod tests {
         let retained_extension =
             &retained[extension_start..extension_start + extension.xml().len()];
         assert!(std::ptr::eq::<[u8]>(retained_extension, extension.xml()));
-        assert_eq!(write(&properties).expect("exact source write"), xml);
+        assert_eq!(
+            write(&properties, &Limits::default()).expect("exact source write"),
+            xml
+        );
 
         let cloned = properties.clone();
         drop(properties);
         assert_eq!(cloned.source_bytes(), Some(xml.as_slice()));
-        assert_eq!(write(&cloned).expect("clone source write"), xml);
+        assert_eq!(
+            write(&cloned, &Limits::default()).expect("clone source write"),
+            xml
+        );
     }
 
     #[test]
@@ -5897,11 +5902,11 @@ mod tests {
     #[test]
     fn standalone_parse_still_detaches_input_source() {
         let xml = format!("<formControlPr xmlns=\"{NS}\" objectType=\"Button\"/>").into_bytes();
-        let properties = parse(&xml).expect("standalone parse");
+        let properties = parse(&xml, &Limits::default()).expect("standalone parse");
         let retained = properties.source_bytes().expect("retained source bytes");
         assert!(!std::ptr::eq::<[u8]>(retained, xml.as_slice()));
         assert_eq!(
-            write(&properties).expect("exact detached source write"),
+            write(&properties, &Limits::default()).expect("exact detached source write"),
             xml
         );
     }
@@ -5923,11 +5928,11 @@ mod tests {
         let mut properties = Properties::new();
         properties.set_object_type(Some(ObjectType::List));
         properties.set_item_list(Some(list)).expect("set list");
-        let output = write(&properties).expect("detached item output");
+        let output = write(&properties, &Limits::default()).expect("detached item output");
         let text = String::from_utf8(output.clone()).expect("UTF-8 XML");
         assert!(text.contains("a&#x9;b&#xA;c&#xD;d"));
         assert_eq!(
-            parse(&output)
+            parse(&output, &Limits::default())
                 .expect("reparse item output")
                 .item_list()
                 .expect("item list")
@@ -5942,13 +5947,13 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType='Drop' fmlaLink=\"#REF!\" colored = 'false'/>"
         );
-        let view = inspect(xml.as_bytes()).expect("inspect source");
+        let view = inspect(xml.as_bytes(), &Limits::default()).expect("inspect source");
         let edited = view
             .replace_scalar(ScalarField::Colored, Some(ScalarValue::Boolean(true)))
             .expect("replace colored");
         assert!(String::from_utf8_lossy(&edited).contains("colored = '1'"));
         assert!(String::from_utf8_lossy(&edited).contains("fmlaLink=\"#REF!\""));
-        let reparsed = parse(&edited).expect("parse edited source");
+        let reparsed = parse(&edited, &Limits::default()).expect("parse edited source");
         assert_eq!(reparsed.colored(), Some(true));
         assert_eq!(
             reparsed.fmla_link().map(FormControlFormula::as_str),
@@ -5961,7 +5966,7 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType=\"Drop\" fmlaLink=\"A1:B2\" colored=\"0\"/>"
         );
-        let view = inspect_with_limits(xml.as_bytes(), Limits::default())
+        let view = inspect(xml.as_bytes(), &Limits::default())
             .expect("read source-only field-shape diagnostic");
         assert_eq!(
             view.properties()
@@ -5992,7 +5997,7 @@ mod tests {
         let xml = format!(
             "<formControlPr xmlns=\"{NS}\" objectType=\"Drop\"><itemLst>\n  <item val=\"A &amp; B\"/>\n  <item val='C'/>\n</itemLst></formControlPr>"
         );
-        let properties = parse(xml.as_bytes()).expect("parse item list");
+        let properties = parse(xml.as_bytes(), &Limits::default()).expect("parse item list");
         let items = properties.item_list().expect("item list").items();
         assert_eq!(
             items.iter().map(Item::value).collect::<Vec<_>>(),
@@ -6002,7 +6007,7 @@ mod tests {
         let edited = replace_items(xml.as_bytes(), &replacement).expect("replace items");
         assert!(String::from_utf8_lossy(&edited).contains("<item val=\"X\"/>"));
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse replacement")
                 .item_list()
                 .unwrap()
@@ -6037,7 +6042,7 @@ mod tests {
         assert!(text.contains("<itemLst><item val=\"one\"/></itemLst>"));
         assert!(!text.contains("<itemLst/>"));
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse expanded list")
                 .item_list()
                 .unwrap()
@@ -6059,7 +6064,7 @@ mod tests {
                 && text.contains("<item val=\"one\"/></itemLst>")
         );
         assert_eq!(
-            parse(&edited)
+            parse(&edited, &Limits::default())
                 .expect("parse expanded attributed list")
                 .item_list()
                 .unwrap()
@@ -6073,15 +6078,16 @@ mod tests {
         let xml = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\" xmlns:foo=\"urn:future\" foo:state='A&amp;B' fmlaLink=\"#REF!\"><x14:extLst><foo:future/></x14:extLst></x14:formControlPr>"
         );
-        let mut properties = parse(xml.as_bytes()).expect("parse extension source");
+        let mut properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse extension source");
         properties.set_colored(Some(true));
-        let edited = write(&properties).expect("detached edit");
+        let edited = write(&properties, &Limits::default()).expect("detached edit");
         let text = String::from_utf8_lossy(&edited);
         assert!(text.contains("foo:state='A&amp;B'"));
         assert!(text.contains("<x14:extLst>"));
         assert!(text.contains("<foo:future/>"));
         assert!(text.contains("colored=\"1\""));
-        parse(&edited).expect("parse detached extension edit");
+        parse(&edited, &Limits::default()).expect("parse detached extension edit");
     }
 
     #[test]
@@ -6089,13 +6095,14 @@ mod tests {
         let xml = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\" xmlns:c=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" objectType=\"Button\"><x14:extLst><c:ext uri=\"urn:future\"><opaque><child/></opaque></c:ext></x14:extLst></x14:formControlPr>"
         );
-        let mut properties = parse(xml.as_bytes()).expect("parse prefixed source");
+        let mut properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse prefixed source");
         properties.set_lock_text(Some(true));
-        let output = write(&properties).expect("detached source edit");
+        let output = write(&properties, &Limits::default()).expect("detached source edit");
         let text = String::from_utf8(output.clone()).expect("UTF-8 XML");
         assert!(text.contains("xmlns=\"\""));
         assert!(text.contains("<opaque><child/></opaque>"));
-        parse(&output).expect("reparse detached source edit");
+        parse(&output, &Limits::default()).expect("reparse detached source edit");
     }
 
     #[test]
@@ -6103,15 +6110,15 @@ mod tests {
         let source = format!(
             "<x14:formControlPr xmlns:x14=\"{NS}\"><x14:itemLst><x14:item val=\"a\" foreign=\"b\"/></x14:itemLst></x14:formControlPr>"
         );
-        let view = inspect(source.as_bytes()).expect("borrowed source view");
+        let view = inspect(source.as_bytes(), &Limits::default()).expect("borrowed source view");
         let source_properties = view.properties();
         assert_eq!(
-            write(&source_properties).expect("source no-op"),
+            write(&source_properties, &Limits::default()).expect("source no-op"),
             source.as_bytes()
         );
 
         let detached = (*source_properties).clone();
-        assert!(write(&detached).is_err());
+        assert!(write(&detached, &Limits::default()).is_err());
     }
 
     #[test]
@@ -6119,9 +6126,9 @@ mod tests {
         let source = format!(
             "<x:formControlPr xmlns:x=\"{NS}\" xmlns=\"urn:outer\"><x:itemLst xmlns:x14=\"urn:other\"><x:item val=\"a\"/></x:itemLst></x:formControlPr>"
         );
-        let mut properties = parse(source.as_bytes()).expect("source parse");
+        let mut properties = parse(source.as_bytes(), &Limits::default()).expect("source parse");
         properties.set_colored(Some(true));
-        let output = write(&properties).expect("detached write");
+        let output = write(&properties, &Limits::default()).expect("detached write");
         assert!(
             output
                 .windows(b"<x14_1:formControlPr".len())
@@ -6132,21 +6139,21 @@ mod tests {
                 .windows(b"<x14_1:itemLst".len())
                 .any(|window| window == b"<x14_1:itemLst")
         );
-        assert!(parse(&output).is_ok());
+        assert!(parse(&output, &Limits::default()).is_ok());
     }
 
     #[test]
     fn namespace_and_bounds_fail_closed() {
         let wrong = b"<formControlPr xmlns=\"urn:not-x14\"/>";
-        assert!(parse(wrong).is_err());
+        assert!(parse(wrong, &Limits::default()).is_err());
         let xml = format!("<formControlPr xmlns=\"{NS}\"/>");
         let limits = Limits::new().with_max_part_bytes(xml.len() - 1);
-        assert!(parse_with_limits(xml.as_bytes(), &limits).is_err());
+        assert!(parse(xml.as_bytes(), &limits).is_err());
         let mut properties = Properties::new();
         properties.set_object_type(Some(ObjectType::CheckBox));
         assert!(FormControlFormula::new("#REF!").is_err());
         properties.set_fmla_link(Some(FormControlFormula::new("A1").expect("formula")));
-        assert!(write(&properties).is_ok());
+        assert!(write(&properties, &Limits::default()).is_ok());
         properties.set_checked(Some(Checked::Checked));
     }
 
@@ -6154,7 +6161,7 @@ mod tests {
     fn source_formula_and_detached_opaque_caps_fail_closed() {
         let formula = "A".repeat(super::super::MAX_FORMULA_BYTES + 1);
         let xml = format!("<formControlPr xmlns=\"{NS}\" fmlaLink=\"{formula}\"/>");
-        assert!(parse(xml.as_bytes()).is_err());
+        assert!(parse(xml.as_bytes(), &Limits::default()).is_err());
         let opaque = vec![b'x'; super::super::MAX_OPAQUE_BYTES + 1];
         assert!(OpaqueXml::new(opaque).is_err());
         assert!(OpaqueXml::new(b"<a><b/></a>".to_vec()).is_ok());
@@ -6169,7 +6176,7 @@ mod tests {
         let xml = format!(
             r#"<formControlPr xmlns="{NS}" objectType="Drop" {root_attribute}><itemLst>{item}</itemLst><extLst/></formControlPr>"#
         );
-        let owned = parse(xml.as_bytes()).expect("parse opaque source");
+        let owned = parse(xml.as_bytes(), &Limits::default()).expect("parse opaque source");
         assert!(owned.item_list().unwrap().items()[0].has_opaque_markup());
         let item_bytes = item.len();
         let root_attribute_bytes = root_attribute.len();
@@ -6177,11 +6184,11 @@ mod tests {
         let aggregate = item_bytes + root_attribute_bytes + extension_bytes;
         assert!(aggregate > item_bytes + extension_bytes);
         let exact = Limits::new().with_max_opaque_bytes(aggregate);
-        parse_with_limits(xml.as_bytes(), &exact).expect("exact opaque aggregate");
-        inspect_with_limits(xml.as_bytes(), exact).expect("borrowed exact opaque aggregate");
+        parse(xml.as_bytes(), &exact).expect("exact opaque aggregate");
+        inspect(xml.as_bytes(), &exact).expect("borrowed exact opaque aggregate");
         let one_under = Limits::new().with_max_opaque_bytes(aggregate - 1);
-        assert!(parse_with_limits(xml.as_bytes(), &one_under).is_err());
-        assert!(inspect_with_limits(xml.as_bytes(), one_under).is_err());
+        assert!(parse(xml.as_bytes(), &one_under).is_err());
+        assert!(inspect(xml.as_bytes(), &one_under).is_err());
     }
 
     #[test]
@@ -6190,7 +6197,8 @@ mod tests {
         let xml = format!(
             r#"<formControlPr xmlns="{NS}" objectType="Drop"><itemLst extra="{value}"><item val="one"/></itemLst></formControlPr>"#
         );
-        let properties = parse(xml.as_bytes()).expect("parse itemLst attribute");
+        let properties =
+            parse(xml.as_bytes(), &Limits::default()).expect("parse itemLst attribute");
         let attributes = properties.item_list().unwrap().unknown_attributes();
         assert_eq!(attributes.len(), 1);
         assert_eq!(
@@ -6198,19 +6206,19 @@ mod tests {
             format!("extra=\"{value}\"").as_bytes()
         );
         assert_eq!(
-            write(&properties).expect("exact itemLst write"),
+            write(&properties, &Limits::default()).expect("exact itemLst write"),
             xml.as_bytes()
         );
         let mut changed = properties.clone();
         changed.set_no_three_d(Some(true));
-        let changed = write(&changed).expect("detached itemLst write");
+        let changed = write(&changed, &Limits::default()).expect("detached itemLst write");
         assert!(String::from_utf8_lossy(&changed).contains(&format!("extra=\"{value}\"")));
         let opaque = attributes[0].lexical().len();
         let exact = Limits::new().with_max_opaque_bytes(opaque);
-        parse_with_limits(xml.as_bytes(), &exact).expect("exact itemLst opaque cap");
-        inspect_with_limits(xml.as_bytes(), exact).expect("borrowed exact itemLst cap");
+        parse(xml.as_bytes(), &exact).expect("exact itemLst opaque cap");
+        inspect(xml.as_bytes(), &exact).expect("borrowed exact itemLst cap");
         assert!(
-            parse_with_limits(
+            parse(
                 xml.as_bytes(),
                 &Limits::new().with_max_opaque_bytes(opaque - 1),
             )
@@ -6230,11 +6238,11 @@ mod tests {
             ));
         }
         xml.push_str("</itemLst></formControlPr>");
-        let view = inspect(xml.as_bytes()).expect("borrowed many-item source");
+        let view = inspect(xml.as_bytes(), &Limits::default()).expect("borrowed many-item source");
         assert!(view.properties().source_bytes().is_none());
         assert_eq!(view.properties().item_list().unwrap().len(), 64);
         assert_eq!(
-            write(view.properties()).expect("borrowed exact write"),
+            write(view.properties(), &Limits::default()).expect("borrowed exact write"),
             xml.as_bytes()
         );
     }
@@ -6248,7 +6256,7 @@ mod tests {
         let mut parse_high = Limits::default().max_retained_bytes();
         while parse_low < parse_high {
             let middle = parse_low + (parse_high - parse_low) / 2;
-            if parse_with_limits(
+            if parse(
                 xml.as_bytes(),
                 &Limits::new().with_max_retained_bytes(middle),
             )
@@ -6260,41 +6268,41 @@ mod tests {
             }
         }
         let parse_required = parse_low;
-        parse_with_limits(
+        parse(
             xml.as_bytes(),
             &Limits::new().with_max_retained_bytes(parse_required),
         )
         .expect("parse exact namespace retained boundary");
         assert!(
             parse_required == 0
-                || parse_with_limits(
+                || parse(
                     xml.as_bytes(),
                     &Limits::new().with_max_retained_bytes(parse_required - 1),
                 )
                 .is_err()
         );
 
-        let mut dirty = parse(xml.as_bytes()).expect("parse namespace context");
+        let mut dirty = parse(xml.as_bytes(), &Limits::default()).expect("parse namespace context");
         dirty.set_just_last_x(Some(true));
         let mut write_low = 0usize;
         let mut write_high = Limits::default().max_retained_bytes();
         while write_low < write_high {
             let middle = write_low + (write_high - write_low) / 2;
-            if write_with_limits(&dirty, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
+            if write(&dirty, &Limits::new().with_max_retained_bytes(middle)).is_ok() {
                 write_high = middle;
             } else {
                 write_low = middle.saturating_add(1);
             }
         }
         let write_required = write_low;
-        write_with_limits(
+        write(
             &dirty,
             &Limits::new().with_max_retained_bytes(write_required),
         )
         .expect("write exact namespace retained boundary");
         assert!(
             write_required == 0
-                || write_with_limits(
+                || write(
                     &dirty,
                     &Limits::new().with_max_retained_bytes(write_required - 1),
                 )
@@ -6418,7 +6426,7 @@ mod tests {
         properties.set_fmla_link(Some(
             FormControlFormula::new("Sheet1!$A$1").expect("valid formula"),
         ));
-        assert!(write_with_limits(&properties, &Limits::new().with_max_output_bytes(1)).is_err());
+        assert!(write(&properties, &Limits::new().with_max_output_bytes(1)).is_err());
     }
 
     #[test]
@@ -6429,10 +6437,10 @@ mod tests {
         let value = Item::new("inserted").expect("item");
         let expected = insert_item(xml.as_bytes(), 1, value.clone()).expect("default item splice");
         let under = Limits::new().with_max_output_bytes(expected.len() - 1);
-        let view = inspect_with_limits(xml.as_bytes(), under).expect("inspect under output cap");
+        let view = inspect(xml.as_bytes(), &under).expect("inspect under output cap");
         assert!(view.insert_item(1, value.clone()).is_err());
         let exact = Limits::new().with_max_output_bytes(expected.len());
-        let view = inspect_with_limits(xml.as_bytes(), exact).expect("inspect exact output cap");
+        let view = inspect(xml.as_bytes(), &exact).expect("inspect exact output cap");
         assert_eq!(
             view.insert_item(1, value).expect("exact item splice"),
             expected

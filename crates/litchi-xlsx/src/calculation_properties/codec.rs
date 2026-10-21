@@ -43,23 +43,15 @@ pub(crate) struct Inspection<'a> {
     pub(super) layout: Layout,
 }
 
-/// Parse the workbook's direct `calcPr` child without executing calculations.
-pub fn parse(xml: &[u8]) -> Result<Option<Properties>> {
-    parse_with_limits(xml, &Limits::default())
-}
-
-/// Parse `calcPr` using caller-supplied resource limits.
-pub fn parse_with_limits(xml: &[u8], limits: &Limits) -> Result<Option<Properties>> {
+/// Parse the workbook's direct `calcPr` child under `limits` without
+/// executing calculations.
+pub fn parse(xml: &[u8], limits: &Limits) -> Result<Option<Properties>> {
     Ok(inspect_with_policy(xml, limits, true)?.properties)
 }
 
-/// Parse the ordered `xcalcf:calcFeatures` payload, if present.
-pub fn parse_features(xml: &[u8]) -> Result<Option<Features>> {
-    parse_features_with_limits(xml, &Limits::default())
-}
-
-/// Parse calculation features using caller-supplied resource limits.
-pub fn parse_features_with_limits(xml: &[u8], limits: &Limits) -> Result<Option<Features>> {
+/// Parse the ordered `xcalcf:calcFeatures` payload under `limits`, if
+/// present.
+pub fn parse_features(xml: &[u8], limits: &Limits) -> Result<Option<Features>> {
     Ok(inspect_with_policy(xml, limits, true)?.features)
 }
 

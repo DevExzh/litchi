@@ -276,7 +276,7 @@ fn project_svg_drawing_budget(
         let key = drawing_uri.as_str().to_ascii_lowercase();
         if !drawings.contains_key(&key) {
             let drawing = workbook.inner.package.source_xml_part(&drawing_uri)?;
-            let scanned = SourceDrawing::scan_with_limits(
+            let scanned = SourceDrawing::scan(
                 drawing.bytes(),
                 selector_drawing(intent.selector),
                 scan_limits(workbook),
@@ -2339,7 +2339,7 @@ fn capture_final_inventory<'a>(
     let worksheet_part = workbook.inner.package.get_part(worksheet_uri)?;
     let (drawing_uri, _) = resolve_drawing_for_uri(workbook, worksheet_uri, drawing_ordinal)?;
     let drawing_part = workbook.inner.package.get_part(&drawing_uri)?;
-    let source = Arc::new(SourceDrawing::scan_with_limits(
+    let source = Arc::new(SourceDrawing::scan(
         drawing_part.blob(),
         drawing_ordinal,
         scan_limits(workbook),
@@ -2609,7 +2609,7 @@ fn build_preflight_cache(
 ) -> Result<DrawingPreflight> {
     let (drawing_uri, _) = resolve_drawing(workbook, position, selector)?;
     let part = workbook.inner.package.get_part(&drawing_uri)?;
-    let scanned = SourceDrawing::scan_with_limits(
+    let scanned = SourceDrawing::scan(
         part.blob(),
         selector_drawing(selector),
         scan_limits(workbook),
@@ -2843,11 +2843,7 @@ fn new_drawing_plan_state(
         .inner
         .package
         .source_relationships_with_limits(&uri, workbook.inner.package.read_limits())?;
-    let scanned = SourceDrawing::scan_with_limits(
-        before_xml.bytes(),
-        drawing_ordinal,
-        scan_limits(workbook),
-    )?;
+    let scanned = SourceDrawing::scan(before_xml.bytes(), drawing_ordinal, scan_limits(workbook))?;
     let mut source_owners = Vec::new();
     source_owners
         .try_reserve(scanned.pictures().len())
@@ -3352,7 +3348,7 @@ fn plan_composed_detach_batch(
 ) -> Result<()> {
     let limits = scan_limits(workbook);
     let output_cap = output_limit(workbook);
-    let scanned = SourceDrawing::scan_with_limits(
+    let scanned = SourceDrawing::scan(
         state.before_xml.bytes(),
         selector_drawing(
             intents
@@ -3644,7 +3640,7 @@ fn plan_composed_replacement(
 ) -> Result<()> {
     let limits = scan_limits(workbook);
     let output_cap = output_limit(workbook);
-    let scanned = SourceDrawing::scan_with_limits(
+    let scanned = SourceDrawing::scan(
         state.before_xml.bytes(),
         selector_drawing(detach.selector),
         limits,
@@ -3824,7 +3820,7 @@ fn plan_composed_mixed_batch(
                 .ok_or_else(|| invalid("empty SVG lifecycle group"))?,
         )
         .ok_or_else(|| invalid("SVG lifecycle intent disappeared"))?;
-    let scanned = SourceDrawing::scan_with_limits(
+    let scanned = SourceDrawing::scan(
         state.before_xml.bytes(),
         selector_drawing(first.selector),
         limits,
@@ -4246,7 +4242,7 @@ fn plan_composed_attach_batch(
                 .ok_or_else(|| invalid("empty SVG lifecycle group"))?,
         )
         .ok_or_else(|| invalid("SVG lifecycle intent disappeared"))?;
-    let scanned = SourceDrawing::scan_with_limits(
+    let scanned = SourceDrawing::scan(
         state.before_xml.bytes(),
         selector_drawing(first_intent.selector),
         limits,

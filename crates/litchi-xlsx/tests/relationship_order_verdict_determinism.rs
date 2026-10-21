@@ -32,13 +32,19 @@
 //! half the time, so the loop repeats enough times that an accidental agreement
 //! across every trial is not worth considering.
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 use litchi_xlsx::Selector;
-use litchi_xlsx::cell_values::SourceBackedEditor;
 
 /// Repetitions per determinism assertion; 2^-128 accidental agreement.
 const REPEATS: usize = 128;
@@ -125,10 +131,13 @@ fn noop_patch_survives_a_reload(bytes: &[u8]) -> litchi_xlsx::Result<()> {
         .unwrap()
         .commit()
         .unwrap();
-    assert!(!commit.changed(), "the transaction stages no edit");
-    assert!(commit.patch().is_empty(), "the patch is an exact no-op");
+    assert!(
+        !commit.diagnostics().changed(),
+        "the transaction stages no edit"
+    );
+    assert!(commit.patch().is_noop(), "the patch is an exact no-op");
     let mut replay = OpcPackage::from_bytes(bytes).unwrap();
-    commit.patch().apply(&mut replay)
+    replay_patch(&mut replay, commit.patch())
 }
 
 #[test]
@@ -172,7 +181,7 @@ fn a_genuinely_different_workbook_is_still_refused() {
         .set_blob(b"<theme><changed/></theme>".to_vec());
     assert!(
         matches!(
-            commit.patch().apply(&mut altered),
+            replay_patch(&mut altered, commit.patch()),
             Err(litchi_xlsx::Error::PatchConflict { .. })
         ),
         "a changed theme part must still be a conflict"

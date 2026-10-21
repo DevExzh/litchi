@@ -306,7 +306,7 @@ pub(super) fn rewrite(
     limits: &Limits,
 ) -> Result<Option<OwnedXmlPart>> {
     if let Some(updated) = questions::rewrite(source, before, after, limits)? {
-        let projected = parse_with_limits(updated.bytes(), limits)?;
+        let projected = parse(updated.bytes(), limits)?;
         if projected == *after {
             return Ok(Some(updated));
         }
