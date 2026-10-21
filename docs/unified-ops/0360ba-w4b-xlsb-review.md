@@ -117,4 +117,40 @@ doctests. The focused comments and conditional-formatting filters also pass.
 ABBA measurements for this corrected tree remain a coordinator measurement
 step; the host was quiesced for the coordinator's isolated probes.
 
+## 4. Compact manifest replay measurement
+
+The compact manifest implementation and the stale-source replay regression
+are committed in `122bb3921b1caee1362c36d52593f9cca1dc0a38`. The expanded
+probe was built in an independent release target from that source and pinned
+to CPU 29. Its binary is 7,196,416 bytes with SHA-256
+`0458b2b71cf07aa29c13000238bf677d99849ff2e312890d9c674fc3758326f5`.
+
+The final 31-sample run is outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-compact-final-1792580640/head.json`
+(605 bytes, SHA-256
+`8649037883031697756c8d0ee198e790fce6d744eeb8f394ce9aff8f4a1d9c3d`),
+from:
+
+```text
+taskset -c 29 /home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/tgt-expanded-after-v2/release/w4b-expanded-probe 31
+```
+
+| Case | Median |
+|---|---:|
+| structural/commit | 11.2142 µs |
+| structural/commit_save | 157.5488 µs |
+| structural/forward_replay | 9.5820 µs |
+| structural/inverse_replay | 9.0640 µs |
+| history/retained128_build | 4714.8330 µs |
+
+The complete expanded case list is exactly those five cases. The retained
+128-patch heaptrack capture is
+`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-compact-final-1792580640/retained128.heaptrack.zst`
+(106,856 bytes, SHA-256
+`c5e9561984b5c52a9b281c0a4bb5a4c816cae6bb3b0d5200299ff2125a5f798a`). It
+reports 412,681 allocation calls, 2,541 temporary allocations, one leaked
+allocation (544 bytes), 508.23 KiB peak heap and 9.23 MiB peak RSS including
+heaptrack overhead. The full XLSB route ABBA remains a separate coordinator
+measurement.
+
 [0351]: 0351-api-contract.md
