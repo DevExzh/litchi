@@ -1,0 +1,90 @@
+{
+  "base": "d0e5542d0e",
+  "checks": [
+    {
+      "name": "pages-lib",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pages",
+        "--all-features",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.627150535583496,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/pages-registry-0361j/final-v1/pages-lib.log",
+        "bytes": 19712,
+        "sha256": "80debfc3fa4962b275c61086f559a033d1e65f744a055061aecd9086d45bab34"
+      }
+    },
+    {
+      "name": "ops-code",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "pages_registry_resource_failures_keep_the_limit_code"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 56.592145681381226,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/pages-registry-0361j/final-v1/ops-code.log",
+        "bytes": 897,
+        "sha256": "ddc9ecabf3a53f579fad15e7f686d589c665905d34b074f9760a8dcf7e8c40d3"
+      }
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-pages",
+        "-p",
+        "litchi-ops",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 153.28106117248535,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/pages-registry-0361j/final-v1/clippy.log",
+        "bytes": 5982,
+        "sha256": "6210da4b690e5a0d6177ab32933ebced5db2584ec98d0d3aea52a2ad7638bace"
+      }
+    }
+  ],
+  "success_implementation": {
+    "path": "crates/litchi-pages/src/package/section_text_style.rs",
+    "bytes": 32992,
+    "sha256": "77663d94ac60261cf0c17a8bef61fa6864ea8acad9a4eb159f8d7be16406bdc8",
+    "comparison": "From Run documentation through the end of the production implementation; byte-identical to base."
+  },
+  "initial_attempt": {
+    "disposition": "Test fixture incorrectly counted one inspection pass; corrected to use the codec aggregate report. Production mapping unchanged.",
+    "checks": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/pages-registry-0361j/checks.json",
+      "bytes": 352,
+      "sha256": "d6e7b7fee4dd7a6563a37ee78d4963dfc4738bcbac1d06ba42454536f152c962"
+    },
+    "log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/pages-registry-0361j/pages-lib.log",
+      "bytes": 21641,
+      "sha256": "46550322cc7da0400194276a4ee145371b31ec126d64c9fcc80da617b80391f2"
+    }
+  }
+}

@@ -696,6 +696,22 @@ mod tests {
     use super::LeafError;
     use crate::error::Code;
 
+    #[cfg(feature = "pages")]
+    #[test]
+    fn pages_registry_resource_failures_keep_the_limit_code() {
+        use litchi_pages::section::text_style::{Error, LimitKind};
+        let error = LeafError::PagesTextStyle(Error::Limit {
+            kind: LimitKind::RegistryFields,
+            observed: 2,
+            maximum: 1,
+        });
+        assert_eq!(error.code(), Code::LimitExceeded);
+        assert_eq!(
+            LeafError::PagesTextStyle(Error::InvalidSource).code(),
+            Code::InvalidInput
+        );
+    }
+
     /// Record 0361: an iWork refusal reports its kind's code; a final-element
     /// removal keeps `invalid_argument` (the PPTX precedent); a patch for
     /// another base is `invalid_input`.
