@@ -207,6 +207,7 @@ impl Edit {
 
 /// Failure modes for semantic envelope edits.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a bounded `[MS-DOC]`/`[MS-OSHARED]` invariant.
     Invalid(PackageError),

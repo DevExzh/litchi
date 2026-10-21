@@ -675,6 +675,7 @@ impl Patch {
 
 /// Errors produced by a staged smart-tag edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a DOC, MS-OSHARED, or fixed-topology invariant.
     Invalid(PackageError),

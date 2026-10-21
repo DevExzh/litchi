@@ -38,6 +38,7 @@ impl Default for Limits {
 
 /// A malformed or resource-exhausting serialized signature blob.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The source ended before a declared field boundary.
     Truncated(&'static str),

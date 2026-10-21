@@ -38,6 +38,7 @@ impl Default for Limits {
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     Ole(OleError),
     Invalid(String),

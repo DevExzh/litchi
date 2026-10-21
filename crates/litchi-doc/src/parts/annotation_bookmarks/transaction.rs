@@ -183,6 +183,7 @@ impl Edit {
 
 /// Failure modes for semantic edits.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates an MS-DOC invariant.
     Invalid(PackageError),

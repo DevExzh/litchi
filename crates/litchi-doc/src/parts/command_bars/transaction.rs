@@ -160,6 +160,7 @@ pub use litchi_core::edit::Diagnostics;
 
 /// Errors produced while staging or applying a command-bar edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a bounded command-bar invariant.
     Invalid(PackageError),
