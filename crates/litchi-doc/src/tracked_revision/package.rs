@@ -3473,8 +3473,17 @@ impl RevisionEditor {
             .put_streams_shared(replacements)
             .map_err(PackageError::from)?;
         if self.retained_render_limit != 0 {
-            let rendered =
-                crate::package::object_edit_bytes(&self.package).map_err(PackageError::from)?;
+            // The common editor now keeps this validated candidate behind its
+            // commit cache. Reuse the cache through Commit.package(), then
+            // rebase the retained editor to the published package so holding
+            // the facade handoff does not keep a second full rendered buffer
+            // alive in the common editor as well.
+            let committed = self.package.clone().commit().map_err(PackageError::from)?;
+            let rendered = committed.package().source_shared().as_ref().clone();
+            self.package = committed
+                .into_package()
+                .edit()
+                .map_err(PackageError::from)?;
             if rendered.capacity() <= self.retained_render_limit {
                 self.retained_render.0 = Some(rendered);
             }
