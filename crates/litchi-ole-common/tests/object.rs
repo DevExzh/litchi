@@ -399,6 +399,31 @@ fn no_op_editor_round_trip_is_byte_identical() {
 }
 
 #[test]
+fn cloned_package_edits_are_isolated_without_reopening_the_source() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let package = Package::open(original.clone()).expect("package should open");
+    let sibling = package.clone();
+    let mut edit = package.edit().expect("package should be editable");
+    edit.put_stream(&["WordDocument".into()], b"changed".to_vec())
+        .expect("edit should commit");
+    let committed = edit.commit().expect("changed package should commit");
+
+    assert_eq!(
+        sibling.stream(&["WordDocument".into()]),
+        Some(&b"unknown-records"[..])
+    );
+    assert_eq!(
+        committed.package().stream(&["WordDocument".into()]),
+        Some(&b"changed"[..])
+    );
+    let mut sibling_bytes = Vec::new();
+    sibling
+        .write_to(&mut sibling_bytes)
+        .expect("sibling should remain writable");
+    assert_eq!(sibling_bytes, original);
+}
+
+#[test]
 fn commit_exposes_snapshot_and_reversible_patch() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = open_editor(

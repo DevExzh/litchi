@@ -6,7 +6,7 @@ use super::discovery;
 use super::link::{self, Link};
 use super::model::{self, Limits, Objects};
 use super::patch::{Commit, Diagnostics, Patch};
-use super::snapshot::Package;
+use super::snapshot::{Package, PackageState};
 use super::target::{Target, Targets};
 use crate::ole_streams::{self, native, presentation};
 use crate::{Error, LimitKind};
@@ -94,39 +94,42 @@ fn observe_cfb_parse<T>(
 /// from are never changed.
 #[derive(Clone)]
 pub struct Edit {
-    targets: Arc<Targets>,
-    limits: Limits,
-    cfb_limits: OleFileLimits,
-    original: Arc<Vec<u8>>,
-    base_package: Arc<CapturedPackage>,
-    package: Arc<CapturedPackage>,
-    objects: Arc<Objects>,
-    changed: bool,
+    state: Arc<PackageState>,
     /// The rendered candidate already validated by the last mutating
     /// operation.  Keeping this publication behind an `Arc` lets the outer
     /// owner hand the same bytes to its source-backed reader when it commits,
     /// without rendering the candidate a second time.
     pending_render: Option<Arc<Vec<u8>>>,
-    layout: SectorLayoutPolicy,
-    validated_layout: SectorLayoutPolicy,
 }
 
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("target_count", &self.targets.len())
-            .field("object_count", &self.objects.len())
-            .field("changed", &self.changed)
+            .field("target_count", &self.state.targets.len())
+            .field("object_count", &self.state.objects.len())
+            .field("changed", &self.state.changed)
             .field(
                 "catalog_is_shared",
-                &Arc::ptr_eq(&self.base_package, &self.package),
+                &Arc::ptr_eq(&self.state.base_package, &self.state.package),
             )
             .finish()
     }
 }
 
 impl Edit {
+    fn state_mut(&mut self) -> &mut PackageState {
+        Arc::make_mut(&mut self.state)
+    }
+
+    fn package_mut(&mut self) -> &mut Arc<CapturedPackage> {
+        &mut self.state_mut().package
+    }
+
+    fn targets_mut(&mut self) -> &mut Arc<Targets> {
+        &mut self.state_mut().targets
+    }
+
     /// Opens a package with an explicit low-level CFB admission profile.
     ///
     /// Security-sensitive format owners should use this entry point when the
@@ -245,17 +248,20 @@ impl Edit {
         let targets = Arc::new(targets);
         let package = Arc::new(package);
         Self {
-            targets,
-            limits,
-            cfb_limits,
-            original,
-            base_package: Arc::clone(&package),
-            package,
-            objects: Arc::new(objects),
-            changed: false,
+            state: Arc::new(PackageState {
+                targets,
+                limits,
+                cfb_limits,
+                original: Arc::clone(&original),
+                current: original,
+                base_package: Arc::clone(&package),
+                package,
+                objects: Arc::new(objects),
+                changed: false,
+                layout: SectorLayoutPolicy::default(),
+                validated_layout: SectorLayoutPolicy::default(),
+            }),
             pending_render: None,
-            layout: SectorLayoutPolicy::default(),
-            validated_layout: SectorLayoutPolicy::default(),
         }
     }
 
@@ -266,14 +272,17 @@ impl Edit {
     /// through [`Self::commit`].
     #[must_use]
     pub(crate) fn staged(&self) -> Package {
-        self.staged_with_current(Arc::clone(&self.original))
+        if !self.state.changed {
+            return Package::from_state(Arc::clone(&self.state));
+        }
+        self.staged_with_current(Arc::clone(&self.state.original))
     }
 
     pub(crate) fn staged_with_current(&self, current: Arc<Vec<u8>>) -> Package {
         Package::new(
-            Arc::clone(&self.targets),
-            self.limits,
-            self.cfb_limits,
+            Arc::clone(&self.state.targets),
+            self.state.limits,
+            self.state.cfb_limits,
             // A Package is the immutable publication of this edit.  Its
             // source identity must therefore be the bytes it publishes,
             // rather than the editor's older base.  Keeping both handles on
@@ -286,28 +295,19 @@ impl Edit {
             // later edit: doing so would make an edit started from a prior
             // commit render against stale topology and could turn a no-op
             // follow-up into a byte-changing publication.
-            Arc::clone(&self.package),
-            Arc::clone(&self.package),
-            Arc::clone(&self.objects),
+            Arc::clone(&self.state.package),
+            Arc::clone(&self.state.package),
+            Arc::clone(&self.state.objects),
             false,
-            self.layout,
-            self.layout,
+            self.state.layout,
+            self.state.layout,
         )
     }
 
     pub(crate) fn from_package(snapshot: &Package) -> Self {
         Self {
-            targets: snapshot.targets_shared(),
-            limits: snapshot.limits(),
-            cfb_limits: snapshot.cfb_limits(),
-            original: snapshot.original(),
-            base_package: snapshot.base_package(),
-            package: snapshot.package(),
-            objects: snapshot.objects_clone(),
-            changed: snapshot.changed(),
+            state: snapshot.state_shared(),
             pending_render: None,
-            layout: snapshot.layout(),
-            validated_layout: snapshot.validated_layout(),
         }
     }
 
@@ -318,46 +318,47 @@ impl Edit {
         layout: SectorLayoutPolicy,
     ) -> Self {
         let mut edit = Self::from_package(package);
-        edit.limits = limits;
-        edit.cfb_limits = cfb_limits;
-        edit.layout = layout;
+        let state = edit.state_mut();
+        state.limits = limits;
+        state.cfb_limits = cfb_limits;
+        state.layout = layout;
         edit
     }
 
     /// Object capture bounds retained by this editor and its snapshots.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
+    pub fn limits(&self) -> Limits {
+        self.state.limits
     }
 
     /// Physical CFB bounds retained for changed candidate validation.
     #[must_use]
-    pub const fn cfb_limits(&self) -> OleFileLimits {
-        self.cfb_limits
+    pub fn cfb_limits(&self) -> OleFileLimits {
+        self.state.cfb_limits
     }
 
     /// The target catalog used by this editor.
     #[must_use]
     pub fn targets(&self) -> &Targets {
-        &self.targets
+        &self.state.targets
     }
 
     /// The current target-selected object catalog.
     #[must_use]
     pub fn objects(&self) -> &Objects {
-        &self.objects
+        &self.state.objects
     }
 
     /// Borrows an opaque package stream without copying it.
     #[must_use]
     pub fn stream(&self, path: &[String]) -> Option<&[u8]> {
-        self.package.stream(path)
+        self.state.package.stream(path)
     }
 
     /// Returns shared ownership of an opaque package stream allocation.
     #[must_use]
     pub fn stream_shared(&self, path: &[String]) -> Option<Arc<[u8]>> {
-        self.package.stream_shared(path)
+        self.state.package.stream_shared(path)
     }
 
     /// Returns shared ownership of the exact source bytes admitted by this
@@ -367,7 +368,7 @@ impl Edit {
     /// bytes remain immutable; edits publish through a separate candidate.
     #[must_use]
     pub fn source_shared(&self) -> Arc<Vec<u8>> {
-        Arc::clone(&self.original)
+        Arc::clone(&self.state.original)
     }
 
     /// Applies a fallible replacement to one selected object's standalone CFB.
@@ -381,6 +382,7 @@ impl Edit {
         F: FnOnce(&mut Vec<u8>) -> Result<(), Error>,
     {
         let mut bytes = self
+            .state
             .objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
@@ -418,34 +420,39 @@ impl Edit {
         key: &str,
         compound_file: Vec<u8>,
     ) -> Result<Option<PreparedReplacement>, Error> {
-        if compound_file.len() as u64 > self.limits.max_object_size {
+        if compound_file.len() as u64 > self.state.limits.max_object_size {
             return Err(Error::Limit {
                 kind: LimitKind::ObjectBytes,
                 observed: compound_file.len() as u64,
-                maximum: self.limits.max_object_size,
+                maximum: self.state.limits.max_object_size,
             });
         }
-        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
+        let object = self
+            .state
+            .objects
+            .get(key)
+            .ok_or_else(Error::target_not_found)?;
         if object.compound() == compound_file.as_slice() {
             return Ok(None);
         }
         let mut replacement_ole =
-            OleFile::open_with_limits(Cursor::new(compound_file), self.cfb_limits)?;
+            OleFile::open_with_limits(Cursor::new(compound_file), self.state.cfb_limits)?;
         codec::open(
             &replacement_ole,
-            self.limits
+            self.state
+                .limits
                 .max_object_storages()
-                .saturating_add(self.limits.max_object_streams()),
+                .saturating_add(self.state.limits.max_object_streams()),
         )?;
-        let replacement = CapturedPackage::capture_object(&mut replacement_ole, self.limits)?;
-        replacement.check_object_limits(self.limits)?;
+        let replacement = CapturedPackage::capture_object(&mut replacement_ole, self.state.limits)?;
+        replacement.check_object_limits(self.state.limits)?;
         Ok(Some(PreparedReplacement {
             key: key.to_owned(),
             path: object.path().to_vec(),
             before: object.compound_shared(),
             replacement,
-            source: Arc::clone(&self.original),
-            limits: self.limits,
+            source: Arc::clone(&self.state.original),
+            limits: self.state.limits,
         }))
     }
 
@@ -460,19 +467,20 @@ impl Edit {
     /// Returns an error when the prepared value does not match this editor or
     /// the candidate package fails its normal bounded publication checks.
     pub fn replace_prepared(&mut self, prepared: PreparedReplacement) -> Result<(), Error> {
-        if self.limits != prepared.limits {
+        if self.state.limits != prepared.limits {
             return Err(OleError::InvalidFormat(
                 "prepared replacement limits do not match editor".into(),
             )
             .into());
         }
-        if !Arc::ptr_eq(&self.original, &prepared.source) {
+        if !Arc::ptr_eq(&self.state.original, &prepared.source) {
             return Err(OleError::InvalidFormat(
                 "prepared replacement source does not match editor".into(),
             )
             .into());
         }
         let object = self
+            .state
             .objects
             .get(&prepared.key)
             .ok_or_else(Error::target_not_found)?;
@@ -483,10 +491,10 @@ impl Edit {
             .into());
         }
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).replace_object(
+        Arc::make_mut(candidate.package_mut()).replace_object(
             &prepared.path,
             &prepared.replacement,
-            self.limits,
+            self.state.limits,
         )?;
         *self = candidate.commit_candidate()?;
         Ok(())
@@ -516,7 +524,7 @@ impl Edit {
             return Ok(());
         }
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
+        Arc::make_mut(candidate.package_mut()).put_stream(path, data, self.state.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -539,11 +547,11 @@ impl Edit {
     ) -> Result<(), Error> {
         let mut candidate = None;
         for (index, (path, data)) in replacements.into_iter().enumerate() {
-            if index >= self.limits.max_streams {
+            if index >= self.state.limits.max_streams {
                 return Err(Error::Limit {
                     kind: LimitKind::PackageStreams,
                     observed: index.saturating_add(1) as u64,
-                    maximum: self.limits.max_streams as u64,
+                    maximum: self.state.limits.max_streams as u64,
                 });
             }
             if candidate
@@ -554,7 +562,7 @@ impl Edit {
                 continue;
             }
             let candidate = candidate.get_or_insert_with(|| self.clone());
-            Arc::make_mut(&mut candidate.package).put_stream(path, data, self.limits)?;
+            Arc::make_mut(candidate.package_mut()).put_stream(path, data, self.state.limits)?;
         }
         if let Some(candidate) = candidate {
             *self = candidate.commit_candidate()?;
@@ -570,7 +578,7 @@ impl Edit {
     /// the parent is missing, or the rendered package fails validation.
     pub fn add_stream(&mut self, path: Vec<String>, data: Vec<u8>) -> Result<(), Error> {
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).add_stream(path, data.into(), self.limits)?;
+        Arc::make_mut(candidate.package_mut()).add_stream(path, data.into(), self.state.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -591,11 +599,11 @@ impl Edit {
         self.validate_stream_path_depth(path)?;
         let path = CfbPath::try_from_slice(path, "stream removal path")
             .map_err(|_| Error::invalid_selector())?;
-        let Some(removed) = self.package.removable_stream(&path)? else {
+        let Some(removed) = self.state.package.removable_stream(&path)? else {
             return Ok(None);
         };
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).remove_stream(&path, self.limits)?;
+        Arc::make_mut(candidate.package_mut()).remove_stream(&path, self.state.limits)?;
         *self = candidate.commit_candidate()?;
         Ok(Some(removed))
     }
@@ -647,8 +655,10 @@ impl Edit {
             return Ok(Vec::new());
         }
         let mut candidate = self.clone();
-        let removed = Arc::make_mut(&mut candidate.package)
-            .remove_streams(validated.iter().map(|(path, _identity)| path), self.limits)?;
+        let removed = Arc::make_mut(candidate.package_mut()).remove_streams(
+            validated.iter().map(|(path, _identity)| path),
+            self.state.limits,
+        )?;
         let changed = removed.iter().any(Option::is_some);
         if changed {
             *self = candidate.commit_candidate()?;
@@ -657,7 +667,7 @@ impl Edit {
     }
 
     fn validate_stream_path_depth(&self, path: &[String]) -> Result<(), Error> {
-        let maximum = self.limits.max_storage_depth.saturating_add(1);
+        let maximum = self.state.limits.max_storage_depth.saturating_add(1);
         if path.len() > maximum {
             return Err(Error::Limit {
                 kind: LimitKind::SelectorDepth,
@@ -684,6 +694,7 @@ impl Edit {
         F: FnOnce(&mut Link) -> Result<(), Error>,
     {
         let object_path = self
+            .state
             .objects
             .get(key)
             .ok_or_else(Error::target_not_found)?
@@ -692,6 +703,7 @@ impl Edit {
         let mut stream_path = object_path;
         stream_path.push(link::NAME.to_string());
         let bytes = self
+            .state
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
@@ -715,6 +727,7 @@ impl Edit {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_presentation_path(key, index)?;
         let bytes = self
+            .state
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
@@ -738,6 +751,7 @@ impl Edit {
     ) -> Result<(), Error> {
         let stream_path = self.object_presentation_path(key, index)?;
         let bytes = self
+            .state
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
@@ -763,6 +777,7 @@ impl Edit {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_native_path(key)?;
         let bytes = self
+            .state
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
@@ -781,6 +796,7 @@ impl Edit {
     pub fn apply_native_patch(&mut self, key: &str, patch: &native::Patch) -> Result<(), Error> {
         let stream_path = self.object_native_path(key)?;
         let bytes = self
+            .state
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
@@ -793,7 +809,11 @@ impl Edit {
     }
 
     fn object_presentation_path(&self, key: &str, index: usize) -> Result<Vec<String>, Error> {
-        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
+        let object = self
+            .state
+            .objects
+            .get(key)
+            .ok_or_else(Error::target_not_found)?;
         object.validate_presentation_count()?;
         let mut path = object.path().to_vec();
         path.push(ole_streams::presentation_name(index)?);
@@ -801,7 +821,11 @@ impl Edit {
     }
 
     fn object_native_path(&self, key: &str) -> Result<Vec<String>, Error> {
-        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
+        let object = self
+            .state
+            .objects
+            .get(key)
+            .ok_or_else(Error::target_not_found)?;
         object.validate_presentation_count()?;
         let mut path = object.path().to_vec();
         path.push(ole_streams::NATIVE_STREAM_NAME.to_string());
@@ -815,25 +839,26 @@ impl Edit {
     /// Returns an error when the target or replacement CFB is invalid, the
     /// target already exists, or the rendered package fails validation.
     pub fn add_storage(&mut self, target: Target, compound_file: Vec<u8>) -> Result<(), Error> {
-        if compound_file.len() as u64 > self.limits.max_object_size {
+        if compound_file.len() as u64 > self.state.limits.max_object_size {
             return Err(Error::Limit {
                 kind: LimitKind::ObjectBytes,
                 observed: compound_file.len() as u64,
-                maximum: self.limits.max_object_size,
+                maximum: self.state.limits.max_object_size,
             });
         }
         let mut nested_ole =
-            OleFile::open_with_limits(Cursor::new(compound_file), self.cfb_limits)?;
+            OleFile::open_with_limits(Cursor::new(compound_file), self.state.cfb_limits)?;
         codec::open(
             &nested_ole,
-            self.limits
+            self.state
+                .limits
                 .max_object_storages()
-                .saturating_add(self.limits.max_object_streams()),
+                .saturating_add(self.state.limits.max_object_streams()),
         )?;
-        let nested = CapturedPackage::capture_object(&mut nested_ole, self.limits)?;
+        let nested = CapturedPackage::capture_object(&mut nested_ole, self.state.limits)?;
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).add_object(&target, &nested, self.limits)?;
-        Arc::make_mut(&mut candidate.targets).push(target)?;
+        Arc::make_mut(candidate.package_mut()).add_object(&target, &nested, self.state.limits)?;
+        Arc::make_mut(candidate.targets_mut()).push(target)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -845,11 +870,16 @@ impl Edit {
     /// Returns an error when the target is missing or the rendered package
     /// fails validation.
     pub fn remove_storage(&mut self, key: &str) -> Result<Arc<[u8]>, Error> {
-        let object = self.objects.get(key).ok_or_else(Error::target_not_found)?;
+        let object = self
+            .state
+            .objects
+            .get(key)
+            .ok_or_else(Error::target_not_found)?;
         let removed = object.compound_shared();
         let mut candidate = self.clone();
-        Arc::make_mut(&mut candidate.package).remove_object(object.path(), self.limits)?;
-        candidate.targets = Arc::new(candidate.targets.without(key)?);
+        Arc::make_mut(candidate.package_mut()).remove_object(object.path(), self.state.limits)?;
+        let targets = candidate.state.targets.without(key)?;
+        candidate.state_mut().targets = Arc::new(targets);
         *self = candidate.commit_candidate()?;
         Ok(removed)
     }
@@ -864,14 +894,14 @@ impl Edit {
     ///
     /// Both policies publish the same logical package: identical stream bytes,
     /// hierarchy, names and class identifiers.
-    pub const fn set_sector_layout_policy(&mut self, policy: SectorLayoutPolicy) {
-        self.layout = policy;
+    pub fn set_sector_layout_policy(&mut self, policy: SectorLayoutPolicy) {
+        self.state_mut().layout = policy;
     }
 
     /// The sector-layout policy a render will apply.
     #[must_use]
-    pub const fn sector_layout_policy(&self) -> SectorLayoutPolicy {
-        self.layout
+    pub fn sector_layout_policy(&self) -> SectorLayoutPolicy {
+        self.state.layout
     }
 
     /// Finishes the edit, returning the original bytes for a true no-op.
@@ -880,28 +910,29 @@ impl Edit {
     ///
     /// Returns an error if the edited CFB cannot be rendered.
     fn finish(&self) -> Result<Vec<u8>, Error> {
-        if self.changed {
-            if self.layout == SectorLayoutPolicy::Reuse
-                && let Some(rendered) = self.package.render_copy_through(
-                    &self.base_package,
-                    &self.original,
-                    self.limits,
-                    self.cfb_limits,
+        if self.state.changed {
+            if self.state.layout == SectorLayoutPolicy::Reuse
+                && let Some(rendered) = self.state.package.render_copy_through(
+                    &self.state.base_package,
+                    &self.state.original,
+                    self.state.limits,
+                    self.state.cfb_limits,
                 )?
             {
                 return Ok(rendered);
             }
             let rendered = self
+                .state
                 .package
-                .render_with_layout(Some(self.original.as_slice()), self.layout)?;
+                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)?;
             // Ordinary publication repeats the already validated deterministic
             // render. A caller-selected layout change needs a new physical gate.
-            if self.layout != self.validated_layout {
-                open_candidate_with_limits(rendered.as_slice(), self.cfb_limits)?;
+            if self.state.layout != self.state.validated_layout {
+                open_candidate_with_limits(rendered.as_slice(), self.state.cfb_limits)?;
             }
             Ok(rendered)
         } else {
-            Ok(self.original.as_ref().clone())
+            Ok(self.state.original.as_ref().clone())
         }
     }
 
@@ -916,9 +947,9 @@ impl Edit {
     ///
     /// Returns an error when the edited package cannot be rendered.
     pub fn commit(self) -> Result<Commit, Error> {
-        let before = Arc::clone(&self.original);
-        let after = if self.changed {
-            if self.layout == self.validated_layout
+        let before = Arc::clone(&self.state.original);
+        let after = if self.state.changed {
+            if self.state.layout == self.state.validated_layout
                 && let Some(rendered) = self.pending_render.clone()
             {
                 rendered
@@ -926,7 +957,7 @@ impl Edit {
                 Arc::new(self.finish()?)
             }
         } else {
-            Arc::clone(&self.original)
+            Arc::clone(&self.state.original)
         };
         let package = self.staged_with_current(Arc::clone(&after));
         let patch = Patch::new_shared(before, after);
@@ -935,38 +966,40 @@ impl Edit {
     }
 
     fn commit_candidate(mut self) -> Result<Self, Error> {
-        self.package.check(self.limits)?;
-        let rendered = if self.layout == SectorLayoutPolicy::Reuse {
-            self.package
+        self.state.package.check(self.state.limits)?;
+        let rendered = if self.state.layout == SectorLayoutPolicy::Reuse {
+            self.state
+                .package
                 .render_copy_through(
-                    &self.base_package,
-                    &self.original,
-                    self.limits,
-                    self.cfb_limits,
+                    &self.state.base_package,
+                    &self.state.original,
+                    self.state.limits,
+                    self.state.cfb_limits,
                 )?
                 .map_or_else(
                     || {
-                        self.package
-                            .render_with_layout(Some(self.original.as_slice()), self.layout)
+                        self.state.package.render_with_layout(
+                            Some(self.state.original.as_slice()),
+                            self.state.layout,
+                        )
                     },
                     Ok,
                 )?
         } else {
-            self.package
-                .render_with_layout(Some(self.original.as_slice()), self.layout)?
+            self.state
+                .package
+                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)?
         };
-        let mut check = open_candidate_with_limits(rendered.as_slice(), self.cfb_limits)?;
-        codec::open(&check, self.limits.max_package_directory_entries())?;
-        let mut parsed = CapturedPackage::capture(&mut check, self.limits)?;
-        parsed.reuse_stream_allocations(&self.package)?;
-        self.package = Arc::new(parsed);
-        self.objects = Arc::new(discovery::from_package(
-            &self.package,
-            &self.targets,
-            self.limits,
-        )?);
-        self.changed = true;
-        self.validated_layout = self.layout;
+        let mut check = open_candidate_with_limits(rendered.as_slice(), self.state.cfb_limits)?;
+        codec::open(&check, self.state.limits.max_package_directory_entries())?;
+        let mut parsed = CapturedPackage::capture(&mut check, self.state.limits)?;
+        parsed.reuse_stream_allocations(&self.state.package)?;
+        let objects = discovery::from_package(&parsed, &self.state.targets, self.state.limits)?;
+        let state = self.state_mut();
+        state.package = Arc::new(parsed);
+        state.objects = Arc::new(objects);
+        state.changed = true;
+        state.validated_layout = state.layout;
         self.pending_render = Some(Arc::new(rendered));
         Ok(self)
     }
