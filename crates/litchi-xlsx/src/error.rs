@@ -645,6 +645,17 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// A malformed-XML error from a parser or decoder failure.
+pub(crate) fn malformed(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+/// Formatting into an owned `String` cannot fail; this maps the formatter's
+/// error type for the writers that use `write!`.
+pub(crate) fn fmt_error(_: std::fmt::Error) -> Error {
+    invalid("formatting XML into a string failed")
+}
+
 pub(crate) fn allocation(resource: &'static str, source: TryReserveError) -> Error {
     Error::Allocation { resource, source }
 }
