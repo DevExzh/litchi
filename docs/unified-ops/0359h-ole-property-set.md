@@ -36,3 +36,24 @@ format check still reports pre-existing formatting in untouched OLE stream
 files; every Rust file changed by this slice is rustfmt-clean. No performance
 result is claimed until a clean baseline and candidate measurement is
 available.
+
+## Driver preflight
+
+The property routes use the standalone `ole_w5_probe` source at
+`fdb139197d`. The paired source is `604822b441` (owner migration complete,
+user-defined constructors still on the old boundary) → `fdb139197d` (typed
+required-limit constructors). The `h` baseline and corrected candidate were
+built in distinct absolute target directories under the capped W5 environment;
+their binary SHA-256 values are respectively
+`f5520c923c7ec1d763c96bd58e5ad837c08dcc31ee231727fa9ad17535e82e71` and
+`44b3e0427841cbb0ba3fed146f7da67926f096f05cf266ea9f40ec71f9498700`.
+The baseline uses the current owner with `legacy-property-api`; the candidate
+uses the current API. Untimed one-sample preflights passed for `read` and
+`edit` on both binaries, each preserving the six-property fixture result.
+
+The quiet acceptance pair is `A1, B1, B2, A2`, with 20 warmups and 500
+retained samples per route. Run `read` and `edit` with the `h` baseline as
+`A` and the corrected candidate as `B`; retain each leg in a distinct CSV path
+and record the source and binary hashes above. The native run remains pending;
+the preflight outputs are outside the checkout at
+`/tmp/w5-ole-preflight-20261021T164402Z`.
