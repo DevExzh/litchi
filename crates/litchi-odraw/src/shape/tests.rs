@@ -6,7 +6,7 @@
 
 use super::{Bounds, Flags, Kind, Native, Shape, parse};
 use crate::write::{self, Atom, Container as OutContainer, ShapeBuilder};
-use crate::{Error, Limit, Limits, Record, RecordKind};
+use crate::{Error, LimitKind, Limits, Record, RecordKind};
 
 fn shape(kind: Native, id: u32, child: bool) -> Vec<u8> {
     let mut body = Vec::new();
@@ -113,7 +113,7 @@ fn from_record_obeys_the_same_limits_as_parse() {
             }
         ),
         Err(Error::LimitExceeded {
-            limit: Limit::Records,
+            limit: LimitKind::Records,
             maximum: 1
         })
     ));
@@ -126,7 +126,7 @@ fn from_record_obeys_the_same_limits_as_parse() {
             }
         ),
         Err(Error::InvalidLimit {
-            limit: Limit::Depth,
+            limit: LimitKind::Depth,
             maximum: 64
         })
     ));
@@ -189,7 +189,7 @@ fn traversal_limits_are_enforced() {
     assert!(matches!(
         error,
         Error::LimitExceeded {
-            limit: Limit::Depth,
+            limit: LimitKind::Depth,
             ..
         }
     ));
@@ -217,7 +217,7 @@ fn rejects_an_unsafe_recursive_depth_limit() {
             },
         ),
         Err(Error::InvalidLimit {
-            limit: Limit::Depth,
+            limit: LimitKind::Depth,
             maximum: 64,
         })
     ));
@@ -234,7 +234,7 @@ fn metadata_records_consume_the_record_budget() {
             },
         ),
         Err(Error::LimitExceeded {
-            limit: Limit::Records,
+            limit: LimitKind::Records,
             maximum: 5,
         })
     ));

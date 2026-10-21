@@ -4,8 +4,9 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use super::LimitKind;
 use super::*;
-use crate::{Error, ImageLimit};
+use crate::Error;
 
 fn record(version: u8, instance: u16, kind: u16, body: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(8 + body.len());
@@ -200,7 +201,7 @@ fn bounds_headerless_delay_block_count_and_fuses_after_error() {
     assert!(matches!(
         blocks.next(),
         Some(Err(Error::ImageLimitExceeded {
-            limit: ImageLimit::StoreEntries,
+            limit: LimitKind::StoreEntries,
             maximum: 1,
         }))
     ));

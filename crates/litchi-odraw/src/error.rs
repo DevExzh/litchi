@@ -4,20 +4,11 @@ use crate::record::RecordKind;
 
 /// The bounded traversal resource that was exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Limit {
+pub enum LimitKind {
     /// Maximum nested-container depth.
     Depth,
     /// Maximum number of visited records.
     Records,
-}
-
-/// A bounded resource used while parsing `OfficeArt` image records.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageLimit {
-    /// Maximum size of one BLIP record body.
-    BlipBytes,
-    /// Maximum number of file blocks in one BLIP store.
-    StoreEntries,
 }
 
 /// A checked `OfficeArt` parsing or validation failure.
@@ -85,7 +76,7 @@ pub enum Error {
     /// An image record exceeded an explicit resource ceiling.
     ImageLimitExceeded {
         /// Resource whose ceiling was reached.
-        limit: ImageLimit,
+        limit: crate::image::LimitKind,
         /// Configured maximum.
         maximum: u64,
     },
@@ -115,14 +106,14 @@ pub enum Error {
     /// A caller-supplied traversal limit exceeds the implementation's safe bound.
     InvalidLimit {
         /// Resource whose requested ceiling is unsafe.
-        limit: Limit,
+        limit: LimitKind,
         /// Largest accepted ceiling.
         maximum: u32,
     },
     /// A bounded recursive traversal reached its configured ceiling.
     LimitExceeded {
         /// Resource whose limit was reached.
-        limit: Limit,
+        limit: LimitKind,
         /// Configured maximum.
         maximum: u32,
     },

@@ -18725,6 +18725,18 @@
       "features": [],
       "banned_names": [
         {
+          "name": "Limit",
+          "scope": "litchi_odraw",
+          "recursive": false,
+          "replacement": "use LimitKind (record 0362i)"
+        },
+        {
+          "name": "ImageLimit",
+          "scope": "litchi_odraw",
+          "recursive": false,
+          "replacement": "use image::LimitKind (record 0362i)"
+        },
+        {
           "name": "parse_with",
           "scope": "litchi_odraw",
           "replacement": "use parse(data, limits)"

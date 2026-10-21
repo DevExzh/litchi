@@ -1,6 +1,6 @@
 //! Checked, lazy traversal of `OfficeArt` container records.
 
-use crate::{Error, Limit, Record, RecordKind, Result};
+use crate::{Error, LimitKind, Record, RecordKind, Result};
 
 /// Resource ceilings for recursive `OfficeArt` traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,12 +175,12 @@ impl<'data> Container<'data> {
             match children.next() {
                 Some(Ok(child)) => {
                     visited = visited.checked_add(1).ok_or(Error::LimitExceeded {
-                        limit: Limit::Records,
+                        limit: LimitKind::Records,
                         maximum: limits.max_records,
                     })?;
                     if visited > limits.max_records {
                         return Err(Error::LimitExceeded {
-                            limit: Limit::Records,
+                            limit: LimitKind::Records,
                             maximum: limits.max_records,
                         });
                     }
@@ -192,7 +192,7 @@ impl<'data> Container<'data> {
                             u16::try_from(stack.len().saturating_add(1)).unwrap_or(u16::MAX);
                         if depth >= limits.max_depth {
                             return Err(Error::LimitExceeded {
-                                limit: Limit::Depth,
+                                limit: LimitKind::Depth,
                                 maximum: u32::from(limits.max_depth),
                             });
                         }
@@ -336,7 +336,7 @@ mod tests {
                 }
             ),
             Err(Error::LimitExceeded {
-                limit: Limit::Records,
+                limit: LimitKind::Records,
                 maximum: 6
             })
         ));
@@ -349,7 +349,7 @@ mod tests {
                 }
             ),
             Err(Error::LimitExceeded {
-                limit: Limit::Depth,
+                limit: LimitKind::Depth,
                 maximum: 2
             })
         ));
@@ -392,7 +392,7 @@ mod tests {
                 },
             ),
             Err(Error::LimitExceeded {
-                limit: Limit::Depth,
+                limit: LimitKind::Depth,
                 ..
             })
         ));
@@ -405,7 +405,7 @@ mod tests {
                 },
             ),
             Err(Error::LimitExceeded {
-                limit: Limit::Records,
+                limit: LimitKind::Records,
                 ..
             })
         ));

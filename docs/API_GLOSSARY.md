@@ -142,6 +142,10 @@ the shared triad. `Snapshot`/`Owned` publication is removed. Picture limits
 enter through options for owners and a required argument for raw projections;
 remaining ODraw raw/error/builder work stays open.
 
+Record 0362i names ODraw traversal resources `LimitKind` and image resources
+`image::LimitKind`. The former root names `Limit` and `ImageLimit` are deleted
+and banned; error variants and their existing observations stay unchanged.
+
 ### Migration status by wave (record 0351)
 
 Each wave flips only its own lines, so parallel waves do not edit the same

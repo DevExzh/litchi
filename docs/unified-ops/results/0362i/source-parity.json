@@ -1,0 +1,78 @@
+{
+  "base_commit": "916fc215ffbc4feda820eb9620b87cf0a2b0a6b8",
+  "normalization": "Remove imports/exports; remove relocated image-resource enum; normalize only the renamed resource type declaration, field types and resource variant qualifiers; ignore whitespace. No function bodies, branches, literal diagnostics or error variants are removed.",
+  "files": [
+    {
+      "path": "crates/litchi-odraw/src/container.rs",
+      "before_sha256": "828b6e3828997e6470377544e9a67daea3a1eb86fe2d2e3be046dba1b3a38128",
+      "after_sha256": "1b6228d908ff1c15efa9b278bce4bf6b7be01df87218875bf391a390ac603a94",
+      "normalized_sha256": "5bcb5622455ad4d211652706231e5b5e8f6e65c5f294ce7d7284792cbaa88865"
+    },
+    {
+      "path": "crates/litchi-odraw/src/error.rs",
+      "before_sha256": "55e806641c5dcf26484546e3741fd9b82a68378fb40988196e6ffe00250f119d",
+      "after_sha256": "28fe5cb46a42a4aa4863ca48049c013a730735123914de1f67bfe5a43c92f591",
+      "normalized_sha256": "2f858a8b2f44d4e64a53928bc747ae6d05da00975ad733b44c1a859f8bc9b8c8"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/codec.rs",
+      "before_sha256": "4a395dcc8ecc5ae1f524762150a333bf9a470fdde854ec3884754fa7187c2220",
+      "after_sha256": "eabd9978027f157266b0bdd911f8b4101db1185d26d581578f0fd3131690b81c",
+      "normalized_sha256": "4088078dd175b0562a03fbff5f251cf0ad71b77852ff14a4fbd52cb8a47235b5"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/file.rs",
+      "before_sha256": "7effa59d556733864c75a891891221b4b0b6d338b4abd96a2333f33581e81935",
+      "after_sha256": "b7298c1eb63948677398429eb6d3bf86acc0e1148f6d6468008c983f998e2ea5",
+      "normalized_sha256": "8a4c2a2f5dfbe8eb41b8e55845d5f555a8ac06898bd0d5b5ee76a9c9d054ce19"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/mod.rs",
+      "before_sha256": "b6cecfb6b31f92e101606880819b78b2a40de420622d05b4b45dc7d3239bd2a4",
+      "after_sha256": "4c027fdd0b98e9ebf89fd4b7a0b5059a8d0ed389b9b9c5e17935dc8f2260a04a",
+      "normalized_sha256": "332c18457e6fd96fa1015f1a59fb1ca6834b0deb5457b3274953ecd8cd865984"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/model.rs",
+      "before_sha256": "b5e9922189c132fbcaf20d1d9e0633241bbfbcdb49e83ab2894659179391366e",
+      "after_sha256": "98b6536da419e2201320e7209d730f77f06ffd45f995cffd90fc9675ebf6004a",
+      "normalized_sha256": "92d0872d70f40f648ea8fdbb08c240bb1f6fa1c7e1abbc90f75defddf386f33d"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/tests.rs",
+      "before_sha256": "1074822b1d1e53153e675985283db5a70d8f79ca25e3f998435f1893f15df1c6",
+      "after_sha256": "345ce8dffc152e3c65c61a85ed738411343c59f0ea93684d00c7e44886692bb2",
+      "normalized_sha256": "9aed56c020afb82321c87b46573abc41c42468702cdb326818a3dad7ee63384c"
+    },
+    {
+      "path": "crates/litchi-odraw/src/image/validation.rs",
+      "before_sha256": "8afe351849cdd079d9a2da5468ed276a0a6315ba502dbdbedf5241c0e2c48959",
+      "after_sha256": "e86cb816340b0f41eeefc3c789e87465baf3ef733e2c4b7475567fdcbe35003a",
+      "normalized_sha256": "34a541969e4ce3ba6e4cb6c0c1541b17d66685ec489bff832ee1d67a591260b7"
+    },
+    {
+      "path": "crates/litchi-odraw/src/lib.rs",
+      "before_sha256": "b3e236f8340e9161b292767904254aa269dc86d0e26c09d9784870453fff3d61",
+      "after_sha256": "d13e09b81cbc6eff476e7868de82e38d0a8d08087973764048594169eeb3e995",
+      "normalized_sha256": "2e7b6e0ea1ce98b991f75a4714ab537bab79f95ce40008de60797fe091395c00"
+    },
+    {
+      "path": "crates/litchi-odraw/src/shape/codec.rs",
+      "before_sha256": "cf945881c373ab593dfeb11a705b9566e340cb4d7b0704434d2abb6a84cb8bc2",
+      "after_sha256": "d6c7748a7fe9daf844e5c6cb9ccca2cae2429fd52ef7ed8c423ac45c9f28324a",
+      "normalized_sha256": "d9433fee16af17c5460e5ca84fd87c208888faee995decbf5baebd46cfcde6fc"
+    },
+    {
+      "path": "crates/litchi-odraw/src/shape/tests.rs",
+      "before_sha256": "5df5ad134443d36fb50ab3a7fd9ffa18eef621874488de73a6c0cc1d98bd3d0d",
+      "after_sha256": "bb9c8514ba102fd5031f32784961ba87fdc6545ab1cfdb6728da72cac7c3ddbf",
+      "normalized_sha256": "fcd65721d68a74d119d62c51a5151758a30fcc44852e581c375f2ba1d565119f"
+    },
+    {
+      "path": "crates/litchi-odraw/src/shape/validation.rs",
+      "before_sha256": "e9be03ccbf74397176554c3e18a9a919e6941ba641871130198c416f500797b1",
+      "after_sha256": "23ebdcb247d4f04fed77daf311ccd2083ac902088ec5adbd53f849593e9c5f10",
+      "normalized_sha256": "f81fc1ef20274d257349355b800024c516acf891d84c4300df3450ace7082370"
+    }
+  ]
+}

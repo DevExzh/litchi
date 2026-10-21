@@ -1,10 +1,11 @@
 //! `OfficeArt` image wire decoding and lazy record traversal.
 
+use super::LimitKind;
 use super::model::{
     Bitmap, Blip, Block, Compression, Context, Delay, DelayBlocks, Embedded, Entry, Kind, Limits,
     Meta, MetaHeader, Offset, Point, Rect, Store, Uid, Uids,
 };
-use crate::{Error, ImageLimit, Record, RecordKind, Result};
+use crate::{Error, Record, RecordKind, Result};
 
 #[derive(Debug, Clone, Copy)]
 enum Family {
@@ -37,7 +38,7 @@ impl<'data> Blip<'data> {
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::BlipBytes,
+                limit: LimitKind::BlipBytes,
                 maximum: u64::from(limits.max_blip_bytes),
             });
         }
@@ -514,7 +515,7 @@ impl<'data> Iterator for DelayBlocks<'data> {
             Some(Ok(_)) if self.seen >= u32::from(self.limits.max_store_entries) => {
                 self.done = true;
                 Some(Err(Error::ImageLimitExceeded {
-                    limit: ImageLimit::StoreEntries,
+                    limit: LimitKind::StoreEntries,
                     maximum: u64::from(self.limits.max_store_entries),
                 }))
             },

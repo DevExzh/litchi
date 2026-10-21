@@ -5,8 +5,9 @@
 //! `OfficeArt` framing only; DOC and PPT remain responsible for locating their
 //! host streams, and image codecs remain in `litchi-imgconv`.
 
+use super::LimitKind as ImageLimitKind;
 use super::{Blip, Block, Context, Delay, Entry, Id, Kind, Store};
-use crate::{Children, Container, Error, ImageLimit, Limit, Parser, Record, RecordKind, Result};
+use crate::{Children, Container, Error, LimitKind, Parser, Record, RecordKind, Result};
 
 const MAX_FILES: usize = 0x0fff;
 const MAX_DEPTH: usize = 64;
@@ -386,7 +387,7 @@ fn check_count(current: usize, additional: usize) -> Result<()> {
         .is_none_or(|count| count > MAX_FILES)
     {
         return Err(Error::ImageLimitExceeded {
-            limit: ImageLimit::StoreEntries,
+            limit: ImageLimitKind::StoreEntries,
             maximum: MAX_FILES as u64,
         });
     }
@@ -411,7 +412,7 @@ fn collect<'data>(
         })?;
         if visited > MAX_RECORDS {
             return Err(Error::LimitExceeded {
-                limit: Limit::Records,
+                limit: LimitKind::Records,
                 maximum: MAX_RECORDS,
             });
         }
@@ -436,7 +437,7 @@ fn collect<'data>(
                         context: "maximum image depth",
                     })?;
                 return Err(Error::LimitExceeded {
-                    limit: Limit::Depth,
+                    limit: LimitKind::Depth,
                     maximum,
                 });
             }
@@ -577,7 +578,7 @@ mod tests {
         assert!(matches!(
             get(&store, id, Some(&blip)),
             Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::BlipBytes,
+                limit: ImageLimitKind::BlipBytes,
                 maximum: 17
             })
         ));
@@ -585,7 +586,7 @@ mod tests {
         assert!(matches!(
             store.resolve(id, broad),
             Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::BlipBytes,
+                limit: ImageLimitKind::BlipBytes,
                 maximum: 17
             })
         ));
@@ -604,7 +605,7 @@ mod tests {
         assert!(matches!(
             store.resolve(id, narrow_context),
             Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::BlipBytes,
+                limit: ImageLimitKind::BlipBytes,
                 maximum: 17
             })
         ));
@@ -628,7 +629,7 @@ mod tests {
         assert!(matches!(
             scan(&data),
             Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::StoreEntries,
+                limit: ImageLimitKind::StoreEntries,
                 maximum: 4095,
             })
         ));

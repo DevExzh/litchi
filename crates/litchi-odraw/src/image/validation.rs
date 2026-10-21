@@ -1,7 +1,8 @@
 //! `OfficeArt` image invariants and cross-record validation.
 
+use super::LimitKind;
 use super::model::{Blip, Block, Context, Entry, Kind, Limits, Offset, Storage, Store};
-use crate::{Error, ImageLimit, Record, RecordKind, Result};
+use crate::{Error, Record, RecordKind, Result};
 
 impl<'data> Entry<'data> {
     /// Returns the physical storage selected by this entry.
@@ -133,7 +134,7 @@ impl<'data> Store<'data> {
         let count = record.instance();
         if count > limits.max_store_entries {
             return Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::StoreEntries,
+                limit: LimitKind::StoreEntries,
                 maximum: u64::from(limits.max_store_entries),
             });
         }

@@ -1,7 +1,7 @@
 //! `OfficeArt` shape wire traversal and typed decoding.
 
 use crate::prop::{Id, Props};
-use crate::{Container, Error, Limit, Limits, Record, RecordKind, Result};
+use crate::{Container, Error, LimitKind, Limits, Record, RecordKind, Result};
 
 use super::model::{Bounds, Flags, Kind, Shape};
 use super::validation::{
@@ -467,7 +467,7 @@ fn validate_limits(limits: Limits) -> Result<()> {
 
     if limits.max_depth > MAX_SAFE_DEPTH {
         return Err(Error::InvalidLimit {
-            limit: Limit::Depth,
+            limit: LimitKind::Depth,
             maximum: u32::from(MAX_SAFE_DEPTH),
         });
     }
