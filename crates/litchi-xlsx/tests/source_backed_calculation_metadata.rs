@@ -388,10 +388,7 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     let commit = changed_commit(&editor);
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
-    assert!(matches!(
-        replay_patch(&mut replay, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();

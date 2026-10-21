@@ -245,6 +245,30 @@ impl crate::workbook::source::deferred::Change for super::Patch {
         Ok(())
     }
 
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        let target = self.after();
+        let mut overlays = Vec::new();
+        overlays
+            .try_reserve_exact(1 + target.touched().len())
+            .map_err(|source| allocation("tab-state source overlay plan", source))?;
+        overlays.push((
+            target.workbook_part_name().clone(),
+            target.workbook_source_arc()?,
+        ));
+        for part in target.touched() {
+            overlays.push((part.part.uri.clone(), part.part.bytes.detached_arc()?));
+        }
+        package
+            .clone()
+            .write_part_overlays_shared_to_stream(writer, overlays)?;
+        Ok(())
+    }
+
     fn catalog_xml(&self) -> Option<&[u8]> {
         Some(self.after().workbook_xml())
     }

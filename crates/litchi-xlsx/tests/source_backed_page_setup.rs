@@ -259,10 +259,7 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     assert_eq!(budget.used(Resource::Memory), exact);
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
-    assert!(matches!(
-        replay_patch(&mut replay, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     assert_eq!(

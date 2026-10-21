@@ -14,9 +14,7 @@ use litchi_core::{
     SourceVersion,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{
-    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
-};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode};
 use litchi_xlsx::Error;
 use litchi_xlsx::SourceBackedWorkbook;
 use litchi_xlsx::conditional_formatting::{
@@ -500,10 +498,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
         Snapshot::load(&replay, "Sheet1").unwrap().collections(),
         expected.as_slice()
     );
-    assert!(matches!(
-        replay_patch(&mut replay, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();

@@ -63,6 +63,20 @@ impl crate::workbook::source::deferred::Change for super::Patch {
         )?;
         Ok(())
     }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
 }
 
 impl SourceBackedWorkbook {

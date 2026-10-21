@@ -12,19 +12,37 @@
 //! reopened artifact.
 
 use std::io::Write;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
 
-use litchi_opc::{SourceArtifactRestoreProof, SourceBackedPackage};
+use litchi_opc::{SourceArtifact, SourceArtifactRestoreProof, SourceBackedPackage};
 
 use super::SourceBackedWorkbook;
 use crate::error::Result;
 
 /// Writes a committed artifact from the base package to a sink.
-pub(crate) type Publish = dyn Fn(&SourceBackedPackage, &mut dyn Write) -> Result<()> + Send + Sync;
+///
+/// A publisher is held by both the deferred owner and its patch. The blanket
+/// implementation below lets those two views share the change's existing
+/// `Arc` allocation, instead of allocating one closure for every retained
+/// commit. Restore publishers use the same small, typed endpoint object.
+pub(crate) trait DeferredPublisher: Send + Sync {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()>;
+
+    /// Write after the recipient's complete before artifact was authenticated.
+    /// Families may omit their redundant semantic selector/dependency check
+    /// while retaining the same streaming writer and source fences.
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        self.write(package, writer)
+    }
+}
 
 /// The pending output of a committed workbook.
 pub(crate) struct Deferred {
-    publish: Box<Publish>,
+    publish: Arc<dyn DeferredPublisher>,
     materialized: OnceLock<SourceBackedWorkbook>,
     /// The complete deferred artifact identity, computed at most once when a
     /// replay needs to compare owners.
@@ -32,6 +50,173 @@ pub(crate) struct Deferred {
     /// The committed workbook catalog of a workbook-level change, which the
     /// infallible catalog accessors read without materializing the output.
     catalog: Option<Catalog>,
+    /// Weak owner identity used to reconstruct a deferred workbook while its
+    /// pending output is still alive. The endpoint keeps only the pending
+    /// token, avoiding one repeated owner weak pointer per retained patch.
+    owner: Weak<super::SourceInner>,
+}
+
+/// The compact exact-artifact endpoint retained by a source-backed patch.
+///
+/// A patch must retain the exact before/after publication pair, but retaining
+/// the public workbook owners would also retain each owner's parsed catalog,
+/// sheet handles and semantic caches. The endpoint keeps only the shared OPC
+/// package handle, the source artifact or publisher, and weak owner identity
+/// tokens for the same-owner fast path. `SourceBackedPackage::clone` shares
+/// its index, cache and source without retaining the XLSX facade graph.
+pub(crate) enum RestoreEndpoint {
+    Opened {
+        artifact: SourceArtifact,
+        inner: Weak<super::SourceInner>,
+    },
+    Deferred {
+        package: Arc<SourceBackedPackage>,
+        publisher: Arc<dyn DeferredPublisher>,
+        fingerprint: OnceLock<(u64, [u8; 32])>,
+        catalog: Option<Catalog>,
+        pending: Weak<Deferred>,
+    },
+}
+
+impl Clone for RestoreEndpoint {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Opened { artifact, inner } => Self::Opened {
+                artifact: artifact.clone(),
+                inner: inner.clone(),
+            },
+            Self::Deferred {
+                package,
+                publisher,
+                fingerprint,
+                catalog,
+                pending,
+            } => Self::Deferred {
+                package: Arc::clone(package),
+                publisher: Arc::clone(publisher),
+                fingerprint: clone_fingerprint(fingerprint),
+                catalog: catalog.clone(),
+                pending: pending.clone(),
+            },
+        }
+    }
+}
+
+fn clone_fingerprint(fingerprint: &OnceLock<(u64, [u8; 32])>) -> OnceLock<(u64, [u8; 32])> {
+    let cloned = OnceLock::new();
+    if let Some(value) = fingerprint.get() {
+        let _ = cloned.set(*value);
+    }
+    cloned
+}
+
+impl std::fmt::Debug for RestoreEndpoint {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RestoreEndpoint")
+            .field(
+                "kind",
+                &match self {
+                    Self::Opened { .. } => "opened",
+                    Self::Deferred { .. } => "deferred",
+                },
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl RestoreEndpoint {
+    pub(crate) fn from_workbook(workbook: &SourceBackedWorkbook) -> Self {
+        let inner = Arc::downgrade(&workbook.inner);
+        match &workbook.pending {
+            None => Self::Opened {
+                artifact: workbook.inner.package.source_artifact(),
+                inner,
+            },
+            Some(pending) => Self::Deferred {
+                package: workbook.inner.package_handle(),
+                publisher: Arc::clone(&pending.publish),
+                fingerprint: OnceLock::new(),
+                catalog: pending.catalog.clone(),
+                pending: Arc::downgrade(pending),
+            },
+        }
+    }
+
+    pub(crate) fn output_artifact(&self) -> Result<(u64, [u8; 32])> {
+        match self {
+            Self::Opened { artifact, .. } => {
+                Ok((artifact.len(), artifact.fingerprint()?.into_sha256()))
+            },
+            Self::Deferred {
+                package,
+                publisher,
+                fingerprint,
+                ..
+            } => {
+                if let Some(artifact) = fingerprint.get() {
+                    return Ok(*artifact);
+                }
+                let mut sink = Hashing(<sha2::Sha256 as sha2::Digest>::new(), 0);
+                publisher.write(package, &mut sink)?;
+                let artifact = (sink.1, sha2::Digest::finalize(sink.0).into());
+                let _ = fingerprint.set(artifact);
+                Ok(artifact)
+            },
+        }
+    }
+
+    pub(crate) fn same_owner(&self, workbook: &SourceBackedWorkbook) -> bool {
+        match self {
+            Self::Opened { inner, .. } => {
+                workbook.pending.is_none() && inner.as_ptr() == Arc::as_ptr(&workbook.inner)
+            },
+            Self::Deferred { pending, .. } => {
+                let Some(current) = &workbook.pending else {
+                    return false;
+                };
+                pending.as_ptr() == Arc::as_ptr(current)
+            },
+        }
+    }
+
+    fn owner(&self) -> Option<SourceBackedWorkbook> {
+        match self {
+            Self::Opened { inner, .. } => inner.upgrade().map(|inner| SourceBackedWorkbook {
+                inner,
+                pending: None,
+            }),
+            Self::Deferred { pending, .. } => {
+                let pending = pending.upgrade()?;
+                let inner = pending.owner.upgrade()?;
+                Some(SourceBackedWorkbook {
+                    inner,
+                    pending: Some(pending),
+                })
+            },
+        }
+    }
+
+    fn artifact(&self) -> Option<&SourceArtifact> {
+        match self {
+            Self::Opened { artifact, .. } => Some(artifact),
+            Self::Deferred { .. } => None,
+        }
+    }
+
+    fn publisher(&self) -> Option<&Arc<dyn DeferredPublisher>> {
+        match self {
+            Self::Opened { .. } => None,
+            Self::Deferred { publisher, .. } => Some(publisher),
+        }
+    }
+
+    fn catalog(&self) -> Option<&Catalog> {
+        match self {
+            Self::Opened { .. } => None,
+            Self::Deferred { catalog, .. } => catalog.as_ref(),
+        }
+    }
 }
 
 /// The catalog fields a workbook-level family can change.
@@ -62,7 +247,7 @@ impl SourceBackedWorkbook {
     pub(crate) fn deferred(
         &self,
         catalog_xml: Option<&[u8]>,
-        publish: impl Fn(&SourceBackedPackage, &mut dyn Write) -> Result<()> + Send + Sync + 'static,
+        publish: Arc<dyn DeferredPublisher>,
     ) -> Result<Self> {
         let base = self.view()?;
         let package = &base.inner.package;
@@ -88,10 +273,11 @@ impl SourceBackedWorkbook {
         Ok(Self {
             inner: Arc::clone(&base.inner),
             pending: Some(Arc::new(Deferred {
-                publish: Box::new(publish),
+                publish,
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::new(),
                 catalog,
+                owner: Arc::downgrade(&base.inner),
             })),
         })
     }
@@ -106,7 +292,7 @@ impl SourceBackedWorkbook {
             return Ok(view);
         }
         let mut bytes = Vec::new();
-        (pending.publish)(&self.inner.package, &mut bytes)?;
+        pending.publish.write(&self.inner.package, &mut bytes)?;
         let view = Self::from_read_at_with_options(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             self.inner.options.clone(),
@@ -135,7 +321,7 @@ impl SourceBackedWorkbook {
                 .write_part_overlays_shared_to_stream(&mut writer, Vec::new())?),
             Some(pending) => match pending.materialized.get() {
                 Some(view) => view.write_to(writer),
-                None => (pending.publish)(&self.inner.package, &mut writer),
+                None => pending.publish.write(&self.inner.package, &mut writer),
             },
         }
     }
@@ -196,6 +382,12 @@ impl SourceBackedWorkbook {
         Ok(&view.inner.package)
     }
 
+    pub(crate) fn edit_source(&self) -> Result<(&SourceBackedPackage, &super::SourceInner)> {
+        let view = self.view()?;
+        view.inner.package.check_execution()?;
+        Ok((&view.inner.package, &view.inner))
+    }
+
     /// Return the exact artifact this owner writes, hashing a deferred
     /// publication only when an operation needs to compare it with another
     /// owner. Ordinary commits and saves continue to stream their splice.
@@ -220,35 +412,33 @@ impl SourceBackedWorkbook {
         Ok(artifact)
     }
 
-    /// Whether two owners represent the same source or pending publication.
-    /// The pending publication is part of ownership: sharing its base source
-    /// alone does not make a changed owner equal to the opened one.
-    pub(crate) fn same_owner(&self, other: &Self) -> bool {
-        if !Arc::ptr_eq(&self.inner, &other.inner) {
-            return false;
-        }
-        match (&self.pending, &other.pending) {
-            (None, None) => true,
-            (Some(left), Some(right)) => Arc::ptr_eq(left, right),
-            (None, Some(_)) | (Some(_), None) => false,
-        }
-    }
-
-    /// Whether two owners write the same complete artifact.
-    pub(crate) fn same_artifact(&self, other: &Self) -> Result<bool> {
-        if self.same_owner(other) {
-            return Ok(true);
-        }
-        Ok(self.output_artifact()? == other.output_artifact()?)
-    }
-
     /// Build a deferred owner that restores `after`'s exact artifact over this
     /// owner. The source and output are authenticated by the OPC restore
     /// primitive or by the deferred publisher, and the recipient owner's
     /// execution context and source limits perform the replay.
-    pub(crate) fn restored(&self, before: &Self, after: &Self) -> Result<Self> {
-        if self.same_owner(before) {
-            return Ok(after.clone());
+    pub(crate) fn restored(
+        &self,
+        before: &RestoreEndpoint,
+        after: &RestoreEndpoint,
+    ) -> Result<Self> {
+        if before.same_owner(self) {
+            if let Some(owner) = after.owner() {
+                return Ok(owner);
+            }
+            // The patch may outlive the committed owner. Rebuild its deferred
+            // endpoint over this recipient's source without retaining the
+            // producer's facade graph. A pending owner is materialized only
+            // when its own current output is needed as the recipient base.
+            if let Some(publisher) = after.publisher() {
+                let expected_before = before.output_artifact()?;
+                return self.deferred_endpoint(
+                    Arc::new(RestorePublisher::Deferred {
+                        publisher: Arc::clone(publisher),
+                        expected_before,
+                    }),
+                    after.catalog().cloned(),
+                );
+            }
         }
 
         // A pending owner has an indexed base package, not the bytes it will
@@ -257,14 +447,12 @@ impl SourceBackedWorkbook {
         // This is only reached by patch replay, after same_artifact has already
         // established that the recipient and the patch base are equal.
         let recipient = self.view()?.clone();
-        let current = recipient.inner.package.clone();
         let expected_before = before.output_artifact()?;
-        let options = recipient.inner.options.clone();
-        let catalog = after_catalog(after);
+        let catalog = after.catalog().cloned();
 
-        let publish: Box<Publish> = if after.is_opened() {
-            let original = after.inner.package.source_artifact();
-            let current_artifact = current.source_artifact();
+        let publish: Arc<dyn DeferredPublisher> = if let Some(original) = after.artifact() {
+            let original = original.clone();
+            let current_artifact = recipient.inner.package.source_artifact();
             let proof = SourceArtifactRestoreProof {
                 current_len: current_artifact.len(),
                 current_sha256: current_artifact.fingerprint()?,
@@ -272,57 +460,113 @@ impl SourceBackedWorkbook {
                 original_sha256: original.fingerprint()?,
             };
             let max_output_bytes = proof.original_len.max(1);
-            Box::new(move |package, writer| {
-                Ok(package.restore_source_artifact_to_stream(
-                    &original,
-                    proof,
-                    max_output_bytes,
-                    writer,
-                )?)
+            Arc::new(RestorePublisher::SourceArtifact {
+                original,
+                proof,
+                max_output_bytes,
             })
         } else {
-            let expected_after = after.output_artifact()?;
-            let pending = Arc::clone(
+            let publisher = Arc::clone(
                 after
-                    .pending
-                    .as_ref()
+                    .publisher()
                     .expect("a non-opened owner has a deferred publication"),
             );
-            Box::new(move |package, writer| {
-                authenticate_artifact(package, expected_before, "current")?;
-                let mut authenticated = AuthenticatedWriter::new(writer);
-                (pending.publish)(package, &mut authenticated)?;
-                authenticated.finish(expected_after)
+            Arc::new(RestorePublisher::Deferred {
+                publisher,
+                expected_before,
             })
         };
 
-        let mut next = SourceBackedWorkbook::open_source_backed_package(current.clone(), options)?;
+        // `recipient` is already the exact, indexed artifact authenticated
+        // above. Reusing its owner keeps the recipient's execution context,
+        // source limits, caches and admission proof intact while avoiding a
+        // second catalog/relationship parse for every exact replay. The
+        // deferred publisher still streams through that same recipient
+        // package and checks its source freshness at write time.
+        let mut next = recipient;
         next.pending = Some(Arc::new(Deferred {
             publish,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::new(),
             catalog,
+            owner: Arc::downgrade(&next.inner),
         }));
         Ok(next)
     }
 
-    /// Whether this owner is backed directly by an opened source artifact.
-    fn is_opened(&self) -> bool {
-        self.pending.is_none()
+    fn deferred_endpoint(
+        &self,
+        publish: Arc<dyn DeferredPublisher>,
+        catalog: Option<Catalog>,
+    ) -> Result<Self> {
+        let base = self.view()?;
+        let package = &base.inner.package;
+        if package.has_signature_infrastructure() {
+            return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+        }
+        if package.has_encrypted_entries() {
+            return Err(litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+                reason: "source XML publication refuses encrypted ZIP members".into(),
+            }
+            .into());
+        }
+        Ok(Self {
+            inner: Arc::clone(&base.inner),
+            pending: Some(Arc::new(Deferred {
+                publish,
+                materialized: OnceLock::new(),
+                fingerprint: OnceLock::new(),
+                catalog,
+                owner: Arc::downgrade(&base.inner),
+            })),
+        })
     }
 }
 
-fn after_catalog(workbook: &SourceBackedWorkbook) -> Option<Catalog> {
-    if let Some(pending) = workbook.pending.as_ref()
-        && pending.materialized().is_none()
-        && let Some(catalog) = pending.catalog()
-    {
-        return Some(catalog.clone());
+/// A deferred output endpoint used by exact replay. Keeping this as an
+/// `Arc`-backed object lets the restored owner retain one typed endpoint
+/// without allocating another closure environment.
+enum RestorePublisher {
+    SourceArtifact {
+        original: SourceArtifact,
+        proof: SourceArtifactRestoreProof,
+        max_output_bytes: u64,
+    },
+    Deferred {
+        publisher: Arc<dyn DeferredPublisher>,
+        expected_before: (u64, [u8; 32]),
+    },
+}
+
+impl DeferredPublisher for RestorePublisher {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        match self {
+            Self::SourceArtifact {
+                original,
+                proof,
+                max_output_bytes,
+            } => Ok(package.restore_source_artifact_to_stream(
+                original,
+                *proof,
+                *max_output_bytes,
+                writer,
+            )?),
+            Self::Deferred {
+                publisher,
+                expected_before,
+            } => {
+                authenticate_artifact(package, *expected_before, "current")?;
+                // The exact before endpoint has already matched the
+                // recipient. A deferred Change is immutable and its splice
+                // is deterministic over those exact source bytes, so one
+                // recipient-policy publication is the authenticated after
+                // artifact. Hashing the same complete archive once before
+                // this write would duplicate the bounded splice and defeat
+                // source-backed streaming.
+                publisher.write_authenticated(package, writer)
+            },
+        }
     }
-    Some(Catalog {
-        defined_names: workbook.current().defined_names.clone(),
-        active_sheet: workbook.current().active_sheet,
-    })
 }
 
 fn authenticate_artifact(
@@ -363,55 +607,6 @@ impl Write for Hashing {
     }
 }
 
-/// Authenticates a deferred publisher's output while keeping it streamed.
-struct AuthenticatedWriter<'a> {
-    writer: &'a mut dyn Write,
-    hasher: sha2::Sha256,
-    length: u64,
-}
-
-impl<'a> AuthenticatedWriter<'a> {
-    fn new(writer: &'a mut dyn Write) -> Self {
-        Self {
-            writer,
-            hasher: <sha2::Sha256 as sha2::Digest>::new(),
-            length: 0,
-        }
-    }
-
-    fn finish(self, expected: (u64, [u8; 32])) -> Result<()> {
-        if self.length != expected.0 {
-            return Err(litchi_opc::OpcError::SourceArtifactMismatch {
-                artifact: "after",
-                field: "length",
-            }
-            .into());
-        }
-        let actual: [u8; 32] = sha2::Digest::finalize(self.hasher).into();
-        if actual != expected.1 {
-            return Err(litchi_opc::OpcError::SourceArtifactMismatch {
-                artifact: "after",
-                field: "fingerprint",
-            }
-            .into());
-        }
-        Ok(())
-    }
-}
-
-impl Write for AuthenticatedWriter<'_> {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let written = self.writer.write(bytes)?;
-        sha2::Digest::update(&mut self.hasher, &bytes[..written]);
-        self.length = self.length.saturating_add(written as u64);
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        self.writer.flush()
-    }
-}
-
 /// One source-backed family's replayable change: its detached record patch,
 /// which knows its exact before state and how the workbook's output carries
 /// its after state.
@@ -426,10 +621,34 @@ pub(crate) trait Change: Clone + Send + Sync + 'static {
     /// Check `package` again and write the after artifact: the selected
     /// parts replaced, every other member raw-copied.
     fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()>;
+    /// Write after exact artifact authentication has established this
+    /// change's complete before state. Families may omit their redundant
+    /// semantic selector/dependency check.
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        self.write(package, writer)
+    }
     /// The after workbook XML of a workbook-level change, whose catalog the
     /// committed workbook's infallible accessors read.
     fn catalog_xml(&self) -> Option<&[u8]> {
         None
+    }
+}
+
+impl<C: Change> DeferredPublisher for C {
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        Change::write(self, package, writer)
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        Change::write_authenticated(self, package, writer)
     }
 }
 
@@ -452,10 +671,10 @@ pub(crate) fn publish<C: Change>(
     }
     let catalog = change.catalog_xml().map(<[u8]>::to_vec);
     // The committed workbook shares the patch's record; nothing is copied.
-    let change = Arc::clone(change);
-    workbook.deferred(catalog.as_deref(), move |package, writer| {
-        change.write(package, writer)
-    })
+    // Coercing the existing Arc to the publisher trait object keeps the
+    // deferred owner and patch on one allocation.
+    let publisher: Arc<dyn DeferredPublisher> = change.clone();
+    workbook.deferred(catalog.as_deref(), publisher)
 }
 
 /// Replay `change` onto `workbook`: refuse a workbook without the before
@@ -521,8 +740,8 @@ macro_rules! source_family {
         pub struct Patch(
             pub(crate) std::sync::Arc<$change>,
             pub(crate) Option<(
-                crate::SourceBackedWorkbook,
-                crate::SourceBackedWorkbook,
+                crate::workbook::source::deferred::RestoreEndpoint,
+                crate::workbook::source::deferred::RestoreEndpoint,
             )>,
         );
 
@@ -563,7 +782,15 @@ macro_rules! source_family {
             let diagnostics = crate::workbook::source::deferred::Report::diagnostics(&*change);
             Ok(Commit::new(
                 next.clone(),
-                Patch(change, Some((workbook.clone(), next))),
+                Patch(
+                    change,
+                    Some((
+                        crate::workbook::source::deferred::RestoreEndpoint::from_workbook(
+                            workbook,
+                        ),
+                        crate::workbook::source::deferred::RestoreEndpoint::from_workbook(&next),
+                    )),
+                ),
                 diagnostics,
             ))
         }
@@ -572,12 +799,37 @@ macro_rules! source_family {
             workbook: &crate::SourceBackedWorkbook,
             patch: &Patch,
         ) -> crate::Result<Commit> {
-            let next = if let Some((before, after)) = &patch.1
-                && workbook.same_artifact(before)?
-            {
-                workbook.restored(before, after)?
-            } else {
-                crate::workbook::source::deferred::replay(workbook, &patch.0)?
+            let exact_base = patch.1.as_ref().and_then(|(before, after)| {
+                if before.same_owner(workbook) {
+                    return Some(Ok((before, after)));
+                }
+                // Fingerprint the producer endpoint first. If that provider
+                // advanced after commit, its exact endpoint is unavailable;
+                // the detached record below still binds replay to immutable
+                // before bytes and its selector/dependency closure.
+                let expected = match before.output_artifact() {
+                    Ok(expected) => expected,
+                    Err(crate::Error::Package(
+                        litchi_opc::OpcError::SourceChanged { .. },
+                    )) => return None,
+                    Err(error) => return Some(Err(error)),
+                };
+                let current = match workbook.output_artifact() {
+                    Ok(current) => current,
+                    // A recipient source failure is its own error and must
+                    // never be hidden by the producer fallback.
+                    Err(error) => return Some(Err(error)),
+                };
+                if current == expected {
+                    Some(Ok((before, after)))
+                } else {
+                    None
+                }
+            });
+            let next = match exact_base {
+                Some(Ok((before, after))) => workbook.restored(before, after)?,
+                Some(Err(error)) => return Err(error),
+                None => crate::workbook::source::deferred::replay(workbook, &patch.0)?,
             };
             let diagnostics =
                 crate::workbook::source::deferred::Report::diagnostics(&*patch.0);

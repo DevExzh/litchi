@@ -336,10 +336,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let commit = changed_commit(&editor);
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
-    assert!(matches!(
-        replay_patch(&mut replay, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     let published = OpcPackage::from_bytes(&output).unwrap();

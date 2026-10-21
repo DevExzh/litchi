@@ -127,6 +127,21 @@ impl crate::workbook::source::deferred::Change for Record {
         )?;
         Ok(())
     }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        self.after.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after.part_name(),
+            self.after.source_arc()?,
+        )?;
+        Ok(())
+    }
 }
 
 impl SourceBackedWorkbook {
@@ -139,9 +154,9 @@ impl SourceBackedWorkbook {
     /// Returns an error when the selected sheet is not a worksheet, its XML
     /// is invalid, or the source cannot be read.
     pub fn edit_merges<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
-        let package = self.edit_package()?;
+        let (package, source_inner) = self.edit_source()?;
         let Some((snapshot, store, shared_strings)) =
-            Snapshot::load_source_backed(package, selector)?
+            Snapshot::load_source_backed(package, source_inner, selector)?
         else {
             return Ok(None);
         };
@@ -308,6 +323,7 @@ impl Snapshot {
 
     fn load_source_backed<'a>(
         package: &SourceBackedPackage,
+        source_inner: &crate::workbook::source::SourceInner,
         selector: impl Into<Selector<'a>>,
     ) -> Result<Option<(Self, Store, Option<Arc<[Text]>>)>> {
         package.check_execution()?;
@@ -359,22 +375,29 @@ impl Snapshot {
         let ranges = canonical_ranges(ranges)?;
         let owner_relationship = current_owner_relationship(package.rels())
             .ok_or_else(|| invalid("workbook has no unique officeDocument owner"))?;
-        let source = SourceState::new(
-            workbook.partname().clone(),
-            workbook.content_type(),
-            workbook_xml,
-            owner_relationship,
-            worksheet.partname().clone(),
-            worksheet.content_type(),
-            worksheet_xml,
-            sheet_relationship,
-            worksheet.rels(),
-            workbook.rels(),
-            shared_strings_source,
-            Some(source_lineage),
-            Some(source_version),
-            package.execution_context(),
-        )?;
+        let source = if let Some(shared) = source_inner.merge_source_state(worksheet.partname()) {
+            SourceState::with_shared(shared, worksheet_xml)
+        } else {
+            let source = SourceState::new(
+                workbook.partname().clone(),
+                workbook.content_type(),
+                workbook_xml,
+                owner_relationship,
+                worksheet.partname().clone(),
+                worksheet.content_type(),
+                worksheet_xml,
+                sheet_relationship,
+                worksheet.rels(),
+                workbook.rels(),
+                shared_strings_source,
+                Some(source_lineage),
+                Some(source_version),
+                package.execution_context(),
+            )?;
+            let shared = source_inner
+                .cache_merge_source_state(worksheet.partname().clone(), Arc::clone(&source.shared));
+            SourceState::with_shared(shared, source.worksheet_bytes)
+        };
         package.check_execution()?;
         if package.source_version()? != source_version {
             return Err(invalid(
@@ -409,34 +432,33 @@ impl Snapshot {
         }
         let mut rewritten = source.clone();
         rewritten.ranges = ranges.into_boxed_slice();
-        rewritten.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        rewritten.source.worksheet_bytes = SourcePayload::Owned(Arc::new(bytes));
         rewritten.check_execution()?;
         Ok(rewritten)
     }
 
     fn source_xml(&self) -> &[u8] {
-        self.source.worksheet.bytes.as_bytes()
+        self.source.worksheet_bytes.as_bytes()
     }
 
     fn source_arc(&self) -> Result<Arc<Vec<u8>>> {
-        self.source.worksheet.bytes.detached_arc()
+        self.source.worksheet_bytes.detached_arc()
     }
 
     /// This snapshot with its worksheet payload copied out of any managed
     /// reservation, under `maximum_bytes`.
     fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
         let mut snapshot = self.clone();
-        snapshot.source.worksheet.bytes = SourcePayload::Owned(
+        snapshot.source.worksheet_bytes = SourcePayload::Owned(
             self.source
-                .worksheet
-                .bytes
+                .worksheet_bytes
                 .materialized_arc(maximum_bytes, "source-backed merge worksheet")?,
         );
         Ok(snapshot)
     }
 
     fn part_name(&self) -> &PackURI {
-        &self.source.worksheet.uri
+        &self.source.shared.worksheet_uri
     }
 
     fn check_execution(&self) -> Result<()> {
@@ -472,8 +494,19 @@ impl Record {
 
 #[derive(Clone, Debug)]
 struct SourceState {
+    shared: Arc<SourceStateShared>,
+    worksheet_bytes: SourcePayload,
+}
+
+/// Immutable source metadata shared by the before and after snapshots of one
+/// family change. The worksheet payload is the only state a rewrite replaces,
+/// so keeping it outside this Arc avoids cloning relationship vectors and
+/// catalog bindings for every retained patch.
+#[derive(Clone, Debug)]
+pub(crate) struct SourceStateShared {
     workbook: PartState,
-    worksheet: PartState,
+    worksheet_uri: PackURI,
+    worksheet_content_type: Box<str>,
     owner_relationship: SourceRelationship,
     workbook_relationships: Vec<SourceRelationship>,
     sheet_relationship: SourceRelationship,
@@ -485,6 +518,13 @@ struct SourceState {
 }
 
 impl SourceState {
+    fn with_shared(shared: Arc<SourceStateShared>, worksheet_bytes: SourcePayload) -> Self {
+        Self {
+            shared,
+            worksheet_bytes,
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn new(
         workbook_uri: PackURI,
@@ -502,50 +542,48 @@ impl SourceState {
         version: Option<SourceVersion>,
         context: Option<ExecutionContext>,
     ) -> Result<Self> {
+        let worksheet = PartState::new(
+            worksheet_uri,
+            worksheet_content_type,
+            worksheet_bytes,
+            "source-backed merge worksheet content type",
+        )?;
         Ok(Self {
-            workbook: PartState::new(
-                workbook_uri,
-                workbook_content_type,
-                workbook_bytes,
-                "source-backed merge workbook content type",
-            )?,
-            worksheet: PartState::new(
-                worksheet_uri,
-                worksheet_content_type,
-                worksheet_bytes,
-                "source-backed merge worksheet content type",
-            )?,
-            owner_relationship: SourceRelationship::capture(
-                owner_relationship,
-                "source-backed merge owner relationship",
-            )?,
-            workbook_relationships: capture_relationships(workbook_relationships)?,
-            sheet_relationship: SourceRelationship::capture(
-                sheet_relationship,
-                "source-backed merge worksheet relationship",
-            )?,
-            worksheet_relationships: capture_relationships(worksheet_relationships)?,
-            shared_strings,
-            lineage,
-            version,
-            context,
+            shared: Arc::new(SourceStateShared {
+                workbook: PartState::new(
+                    workbook_uri,
+                    workbook_content_type,
+                    workbook_bytes,
+                    "source-backed merge workbook content type",
+                )?,
+                worksheet_uri: worksheet.uri,
+                worksheet_content_type: worksheet.content_type,
+                owner_relationship: SourceRelationship::capture(
+                    owner_relationship,
+                    "source-backed merge owner relationship",
+                )?,
+                workbook_relationships: capture_relationships(workbook_relationships)?,
+                sheet_relationship: SourceRelationship::capture(
+                    sheet_relationship,
+                    "source-backed merge worksheet relationship",
+                )?,
+                worksheet_relationships: capture_relationships(worksheet_relationships)?,
+                shared_strings,
+                lineage,
+                version,
+                context,
+            }),
+            worksheet_bytes: worksheet.bytes,
         })
     }
 
     fn check_execution(&self) -> Result<()> {
-        check_execution(self.context.as_ref())
+        check_execution(self.shared.context.as_ref())
     }
 
     fn same_source(&self, other: &Self) -> bool {
-        self.workbook.same_source(&other.workbook)
-            && self.worksheet.same_source(&other.worksheet)
-            && self.owner_relationship == other.owner_relationship
-            && self.workbook_relationships == other.workbook_relationships
-            && self.sheet_relationship == other.sheet_relationship
-            && self.worksheet_relationships == other.worksheet_relationships
-            && optional_shared_strings_same(&self.shared_strings, &other.shared_strings)
-            && optional_same(&self.lineage, &other.lineage)
-            && optional_same(&self.version, &other.version)
+        (Arc::ptr_eq(&self.shared, &other.shared) || self.shared.same_source(&other.shared))
+            && self.worksheet_bytes == other.worksheet_bytes
     }
 
     fn matches_source_backed(
@@ -557,7 +595,7 @@ impl SourceState {
     ) -> Result<bool> {
         package.check_execution()?;
         if bound {
-            let (Some(lineage), Some(version)) = (&self.lineage, self.version) else {
+            let (Some(lineage), Some(version)) = (&self.shared.lineage, self.shared.version) else {
                 return Ok(false);
             };
             if package.source_lineage() != lineage.clone() || package.source_version()? != version {
@@ -566,17 +604,18 @@ impl SourceState {
         }
         let workbook = package.main_document_part()?;
         if !self
+            .shared
             .workbook
             .matches_view(&workbook, workbook.data()?.as_bytes())
             || !current_owner_relationship(package.rels())
-                .is_some_and(|value| self.owner_relationship.matches(value))
+                .is_some_and(|value| self.shared.owner_relationship.matches(value))
         {
             return Ok(false);
         }
-        if !relationships_match(&self.workbook_relationships, workbook.rels()) {
+        if !relationships_match(&self.shared.workbook_relationships, workbook.rels()) {
             return Ok(false);
         }
-        if let Some(shared_strings) = self.shared_strings.as_ref()
+        if let Some(shared_strings) = self.shared.shared_strings.as_ref()
             && !shared_strings.matches_source_backed(package, &workbook)?
         {
             return Ok(false);
@@ -592,7 +631,7 @@ impl SourceState {
         };
         if catalog_sheet.name != sheet_name
             || sheet_part.kind != WorksheetKind::Worksheet
-            || sheet_part.uri != self.worksheet.uri
+            || sheet_part.uri != self.shared.worksheet_uri
         {
             return Ok(false);
         }
@@ -604,11 +643,11 @@ impl SourceState {
             worksheet.content_type(),
         )?;
         let worksheet_xml = worksheet.data()?;
-        if !self.sheet_relationship.matches(relationship)
-            || !self
-                .worksheet
-                .matches_view(&worksheet, worksheet_xml.as_bytes())
-            || !relationships_match(&self.worksheet_relationships, worksheet.rels())
+        if !self.shared.sheet_relationship.matches(relationship)
+            || worksheet.partname() != &self.shared.worksheet_uri
+            || worksheet.content_type() != self.shared.worksheet_content_type.as_ref()
+            || worksheet_xml.as_bytes() != self.worksheet_bytes.as_bytes()
+            || !relationships_match(&self.shared.worksheet_relationships, worksheet.rels())
         {
             return Ok(false);
         }
@@ -617,8 +656,24 @@ impl SourceState {
         // the closure was read.
         Ok(!bound
             || self
+                .shared
                 .version
                 .is_some_and(|version| package.source_version().ok() == Some(version)))
+    }
+}
+
+impl SourceStateShared {
+    fn same_source(&self, other: &Self) -> bool {
+        self.workbook.same_source(&other.workbook)
+            && self.worksheet_uri == other.worksheet_uri
+            && self.worksheet_content_type == other.worksheet_content_type
+            && self.owner_relationship == other.owner_relationship
+            && self.workbook_relationships == other.workbook_relationships
+            && self.sheet_relationship == other.sheet_relationship
+            && self.worksheet_relationships == other.worksheet_relationships
+            && optional_shared_strings_same(&self.shared_strings, &other.shared_strings)
+            && optional_same(&self.lineage, &other.lineage)
+            && optional_same(&self.version, &other.version)
     }
 }
 

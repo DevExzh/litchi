@@ -415,7 +415,7 @@ fn source_merge_patch_rejects_shared_strings_payload_and_relationship_drift() {
 }
 
 #[test]
-fn source_merge_managed_inverse_requires_bounded_materialization() {
+fn source_merge_managed_inverse_uses_recipient_policy() {
     let source_bytes = fixture(&ordinary_sheet());
     let worksheet_bytes = part_bytes(&source_bytes, SHEET).len();
     let budget = Budget::root(
@@ -443,12 +443,19 @@ fn source_merge_managed_inverse_requires_bounded_materialization() {
     let commit = edit.commit().unwrap();
     let mut package = OpcPackage::from_bytes(&source_bytes).unwrap();
     replay_patch(&mut package, commit.patch()).unwrap();
-    assert!(matches!(
-        replay_patch(&mut package, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    let forward_bytes = PackageWriter::to_bytes(&package).unwrap();
+    replay_patch(&mut package, &commit.patch().inverse()).unwrap();
+    assert_eq!(
+        package_part_bytes(&package, SHEET),
+        part_bytes(&source_bytes, SHEET)
+    );
+
+    // The exact restore already uses the unmanaged recipient policy. The
+    // explicit materialized route remains available for callers that want a
+    // detached semantic patch from the managed producer.
+    let mut materialized_package = OpcPackage::from_bytes(&forward_bytes).unwrap();
     replay_patch(
-        &mut package,
+        &mut materialized_package,
         &commit
             .patch()
             .inverse()
@@ -457,7 +464,7 @@ fn source_merge_managed_inverse_requires_bounded_materialization() {
     )
     .unwrap();
     assert_eq!(
-        package_part_bytes(&package, SHEET),
+        package_part_bytes(&materialized_package, SHEET),
         part_bytes(&source_bytes, SHEET)
     );
     cancellation_source.cancel();
@@ -728,6 +735,116 @@ fn source_merge_rejects_stale_and_foreign_lineage_before_output() {
     // bytes holds the before state.
     let second = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(second.apply_merges(commit.patch()).is_ok());
+}
+
+#[test]
+fn source_merge_exact_replay_uses_independent_recipient_policy() {
+    let bytes = fixture(&ordinary_sheet());
+    let producer =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = producer.edit_merges("Sheet1").unwrap().unwrap();
+    edit.merge("A2:B2").unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch().clone();
+    let expected_forward = commit.package().to_bytes().unwrap();
+    // Keep the before owner alive while dropping the committed owner. This
+    // exercises the exact-pair fast path's owner-dropped reconstruction and
+    // its authenticated deferred publisher.
+    drop(commit);
+    let reconstructed = producer.apply_merges(&patch).unwrap();
+    assert_eq!(
+        reconstructed.package().to_bytes().unwrap(),
+        expected_forward
+    );
+
+    let limits = litchi_xlsx::SourceLimits::builder()
+        .max_input_bytes(bytes.len() as u64 + 64 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let budget = Budget::root(
+        "xlsx-source-merge-independent-recipient-test",
+        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(64 * 1024).unwrap(),
+        0,
+    )
+    .unwrap();
+    let recipient = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(limits)
+            .execution_context(ExecutionContext::new(
+                budget,
+                cancellation,
+                execution_limits,
+            )),
+    )
+    .unwrap();
+
+    let applied = recipient.apply_merges(&patch).unwrap();
+    let mut output = Vec::new();
+    applied.package().write_to(&mut output).unwrap();
+    assert_eq!(output, expected_forward);
+
+    let restored = applied.package().apply_merges(&patch.inverse()).unwrap();
+    assert_eq!(restored.package().to_bytes().unwrap(), bytes);
+    cancellation_source.cancel();
+}
+
+#[test]
+fn source_merge_exact_restore_refuses_recipient_change_during_output() {
+    let bytes = fixture(&ordinary_sheet());
+    let producer =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = producer.edit_merges("Sheet1").unwrap().unwrap();
+    edit.merge("A2:B2").unwrap();
+    let commit = edit.commit().unwrap();
+
+    let recipient_source = Arc::new(VersionedSource::new(bytes));
+    let recipient = SourceBackedWorkbook::from_read_at(recipient_source.clone()).unwrap();
+    let applied = recipient.apply_merges(commit.patch()).unwrap();
+    let result = applied.package().write_to(MutatingWriter {
+        source: recipient_source,
+        mutated: false,
+    });
+    assert!(matches!(
+        result,
+        Err(Error::Package(OpcError::IncompleteOutput { source, .. }))
+            if matches!(source.as_ref(), OpcError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn source_merge_replay_composes_with_unrelated_member_changes() {
+    let bytes = fixture(&ordinary_sheet());
+    let producer =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = producer.edit_merges("Sheet1").unwrap().unwrap();
+    edit.merge("A2:B2").unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut unrelated = OpcPackage::from_bytes(&bytes).unwrap();
+    unrelated
+        .get_part_mut(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .set_blob(b"recipient-only payload".to_vec());
+    let unrelated_bytes = PackageWriter::to_bytes(&unrelated).unwrap();
+    let recipient =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(unrelated_bytes)))
+            .unwrap();
+    let applied = recipient.apply_merges(commit.patch()).unwrap();
+    let output = applied.package().to_bytes().unwrap();
+    assert_eq!(part_bytes(&output, UNUSED), b"recipient-only payload");
+    assert!(
+        String::from_utf8(part_bytes(&output, SHEET))
+            .unwrap()
+            .contains(r#"ref="A2:B2""#)
+    );
 }
 
 #[test]

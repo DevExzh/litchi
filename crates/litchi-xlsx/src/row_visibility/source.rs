@@ -111,6 +111,18 @@ impl crate::workbook::source::deferred::Change for Record {
     fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
         crate::workbook::source::deferred::Change::write(self.inner(), package, writer)
     }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        crate::workbook::source::deferred::Change::write_authenticated(
+            self.inner(),
+            package,
+            writer,
+        )
+    }
 }
 
 impl SourceBackedWorkbook {

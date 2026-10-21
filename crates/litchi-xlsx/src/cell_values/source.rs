@@ -329,6 +329,17 @@ impl crate::workbook::source::deferred::Change for Record {
         package.clone().write_topology_to_stream(writer, plan)?;
         Ok(())
     }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        let plan = self.after().topology_plan_from(self.before())?;
+        package.clone().write_topology_to_stream(writer, plan)?;
+        Ok(())
+    }
 }
 
 impl crate::workbook::source::deferred::Report for Record {

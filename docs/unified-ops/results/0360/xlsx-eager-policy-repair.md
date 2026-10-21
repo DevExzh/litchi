@@ -66,6 +66,22 @@ The compact-policy change and its retained physical-limit regression passed
 the post-hold validation above. No native ABBA was run in this validation
 window; the recorded v5 binaries remain diagnostic only.
 
+The same validation also covers the deferred source-family replay repair in
+the W4 tree. `RestoreEndpoint` retains an exact opened artifact or a compact
+deferred publisher pair, authenticates the recipient's immutable before
+artifact, and streams the after artifact through the recipient's own source
+limits and execution context. The source families provide authenticated
+overlay writers so an already authenticated replay does not perform a second
+whole-archive publication prepass. Their merge source metadata is shared per
+owner while rewritten worksheet bytes remain separate. The focused source
+family integration set (auto-filter, calculation metadata, cell values,
+conditional formatting, data validation, defined names, source file,
+hyperlinks, merge, page-breaks, page-margins, page-setup, print options, row
+visibility, selected payloads, sheet protection, and tab state) passed 210/210
+tests with encryption enabled. The owning-facade page-break conversion keeps
+its explicit materialization refusal; source-backed page-break replay uses the
+same authenticated recipient path as the other families.
+
 The recorded v5 binaries predate this final claim-string edit and are retained
 only as diagnostic receipts. A new native ABBA is required after the repair and
 with the committed driver; no timing was run concurrently with the

@@ -112,8 +112,18 @@ impl SourceSheetData {
     }
 }
 
-struct SourceInner {
+pub(crate) struct SourceInner {
     package: SourceBackedPackage,
+    /// One shared package handle for exact replay endpoints. Keeping this
+    /// lazy leaves ordinary read-only opens allocation-free while letting a
+    /// retained patch refer to one package owner per source lineage instead
+    /// of embedding a full `SourceBackedPackage` value in every endpoint.
+    package_handle: OnceLock<Arc<SourceBackedPackage>>,
+    /// Immutable merge-family source closures keyed by worksheet URI. Source
+    /// backed edits repeatedly reopen one worksheet from the same immutable
+    /// owner; sharing its workbook and relationship metadata keeps retained
+    /// patch history compact without sharing rewritten worksheet bytes.
+    merge_source_states: Mutex<HashMap<PackURI, Arc<crate::merge::source::SourceStateShared>>>,
     execution: Option<ExecutionContext>,
     // Keep the mandatory workbook payload pinned for managed facades. Besides
     // avoiding a second root extraction, this makes an exact managed budget
@@ -421,6 +431,8 @@ impl SourceBackedWorkbook {
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
+                package_handle: OnceLock::new(),
+                merge_source_states: Mutex::new(HashMap::new()),
                 execution,
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
@@ -1465,6 +1477,36 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
+        Arc::clone(
+            self.package_handle
+                .get_or_init(|| Arc::new(self.package.clone())),
+        )
+    }
+
+    pub(crate) fn merge_source_state(
+        &self,
+        worksheet_uri: &PackURI,
+    ) -> Option<Arc<crate::merge::source::SourceStateShared>> {
+        self.merge_source_states
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(worksheet_uri)
+            .cloned()
+    }
+
+    pub(crate) fn cache_merge_source_state(
+        &self,
+        worksheet_uri: PackURI,
+        state: Arc<crate::merge::source::SourceStateShared>,
+    ) -> Arc<crate::merge::source::SourceStateShared> {
+        let mut states = self
+            .merge_source_states
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(states.entry(worksheet_uri).or_insert(state))
+    }
+
     fn execution_check(&self) -> Result<()> {
         // The package owns the execution context used by managed source
         // caches. Always check it first so compatibility facades built around

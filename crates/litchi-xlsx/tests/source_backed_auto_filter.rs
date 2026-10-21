@@ -331,7 +331,7 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
 }
 
 #[test]
-fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
+fn managed_snapshot_changed_publication_and_exact_inverse_are_bounded() {
     let source_bytes = ordinary_fixture(false);
     let exact = part_len(&source_bytes, MAIN) + part_len(&source_bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact);
@@ -354,10 +354,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     let commit = changed_commit(&editor);
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
-    assert!(matches!(
-        replay_patch(&mut replay, &commit.patch().inverse()),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     let published = OpcPackage::from_bytes(&output).unwrap();

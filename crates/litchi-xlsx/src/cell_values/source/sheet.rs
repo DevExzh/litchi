@@ -132,6 +132,15 @@ impl crate::workbook::source::deferred::Change for SheetRecord {
         crate::workbook::source::deferred::Change::check(self, package)?;
         write_record(package, self, writer)
     }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        write_record(package, self, writer)
+    }
 }
 
 /// Write `record`'s one-worksheet topology publication over `package`.
