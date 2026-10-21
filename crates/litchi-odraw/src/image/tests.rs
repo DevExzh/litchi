@@ -186,6 +186,44 @@ fn detects_store_count_mismatch_on_iteration() {
 }
 
 #[test]
+fn store_retains_origin_and_caller_policy_intersection() {
+    let child = record(0, 0, 0xF01E, &[]);
+    let bytes = record(0x0F, 1, 0xF001, &child);
+    let origin = crate::Limits {
+        max_record_bytes: u32::try_from(bytes.len()).unwrap(),
+        max_depth: 2,
+        max_records: 3,
+    };
+    let record = crate::Record::parse(&bytes, 0, origin).unwrap().0;
+
+    let caller = Limits {
+        records: crate::Limits {
+            max_record_bytes: u32::MAX,
+            max_depth: u16::MAX,
+            max_records: u32::MAX,
+        },
+        ..Limits::default()
+    };
+    let store = Store::from_record(record, caller).expect("origin policy admits store");
+    assert_eq!(store.limits().records, origin);
+
+    let strict_caller = Limits {
+        records: crate::Limits {
+            max_record_bytes: u32::try_from(bytes.len()).unwrap(),
+            max_depth: 1,
+            max_records: 1,
+        },
+        ..Limits::default()
+    };
+    let permissive_origin = crate::Record::parse(&bytes, 0, crate::Limits::default())
+        .unwrap()
+        .0;
+    let store =
+        Store::from_record(permissive_origin, strict_caller).expect("caller policy admits store");
+    assert_eq!(store.limits().records, strict_caller.records);
+}
+
+#[test]
 fn bounds_headerless_delay_block_count_and_fuses_after_error() {
     let png = record(0, 0x6E0, 0xF01E, &png_body(false, b"x"));
     let mut bytes = png.clone();

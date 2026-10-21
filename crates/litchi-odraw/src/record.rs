@@ -208,12 +208,9 @@ impl From<RecordKind> for u16 {
 /// A checked, zero-copy view of one `OfficeArt` record.
 #[derive(Clone)]
 pub struct Record<'data> {
-    kind: RecordKind,
-    raw_kind: u16,
-    version: u8,
-    instance: u16,
-    len: u32,
     data: &'data [u8],
+    raw_kind: u16,
+    ver_inst: u16,
     limits: crate::Limits,
 }
 
@@ -221,11 +218,11 @@ impl core::fmt::Debug for Record<'_> {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter
             .debug_struct("Record")
-            .field("kind", &self.kind)
+            .field("kind", &self.kind())
             .field("raw_kind", &self.raw_kind)
-            .field("version", &self.version)
-            .field("instance", &self.instance)
-            .field("len", &self.len)
+            .field("version", &self.version())
+            .field("instance", &self.instance())
+            .field("len", &self.len())
             .finish_non_exhaustive()
     }
 }
@@ -250,12 +247,9 @@ impl<'data> Record<'data> {
             });
         }
         Ok(Self {
-            kind,
-            raw_kind: kind.raw(),
-            version: version & 0x0F,
-            instance: instance & 0x0FFF,
-            len,
             data,
+            raw_kind: kind.raw(),
+            ver_inst: u16::from(version & 0x0F) | ((instance & 0x0FFF) << 4),
             limits,
         })
     }
@@ -313,12 +307,9 @@ impl<'data> Record<'data> {
 
         Ok((
             Self {
-                kind: RecordKind::from_raw(raw_kind),
-                raw_kind,
-                version: (ver_inst & 0x000F) as u8,
-                instance: (ver_inst >> 4) & 0x0FFF,
-                len,
                 data: body,
+                raw_kind,
+                ver_inst,
                 limits,
             },
             consumed,
@@ -328,7 +319,7 @@ impl<'data> Record<'data> {
     /// Returns the semantic record kind.
     #[must_use]
     pub const fn kind(&self) -> RecordKind {
-        self.kind
+        RecordKind::from_raw(self.raw_kind)
     }
 
     /// Returns the exact record-kind value read from the wire.
@@ -340,25 +331,28 @@ impl<'data> Record<'data> {
     /// Returns the four-bit record version.
     #[must_use]
     pub const fn version(&self) -> u8 {
-        self.version
+        (self.ver_inst & 0x000F) as u8
     }
 
     /// Returns the twelve-bit record instance.
     #[must_use]
     pub const fn instance(&self) -> u16 {
-        self.instance
+        (self.ver_inst >> 4) & 0x0FFF
     }
 
     /// Returns the declared body length.
     #[must_use]
     pub const fn len(&self) -> u32 {
-        self.len
+        // `parse` and the test-only constructor both reject lengths that do
+        // not fit in the wire's u32 `recLen`; the borrowed body therefore
+        // remains a lossless source for this derived accessor.
+        self.data.len() as u32
     }
 
     /// Returns whether the record body is empty.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.len == 0
+        self.data.is_empty()
     }
 
     /// Returns the borrowed body bytes.
@@ -373,16 +367,23 @@ impl<'data> Record<'data> {
         self.limits
     }
 
+    /// Rebinds this borrowed view to a narrower caller policy after the
+    /// record's wire admission has already succeeded.
+    pub(crate) const fn with_limits(mut self, limits: crate::Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
     /// Returns whether this record can contain child records.
     #[must_use]
     pub const fn is_container(&self) -> bool {
-        self.version == 0x0F
+        self.version() == 0x0F
     }
 
     /// Returns whether this record kind can contain text.
     #[must_use]
     pub const fn can_contain_text(&self) -> bool {
-        self.kind.can_contain_text()
+        self.kind().can_contain_text()
     }
 
     /// Returns the body offset when this record borrows from `parent`.
@@ -402,6 +403,7 @@ mod tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::*;
+    use core::mem::size_of;
 
     #[test]
     fn parses_without_copying() {
@@ -467,5 +469,25 @@ mod tests {
                 .0
                 .is_container()
         );
+    }
+
+    #[test]
+    fn compact_layout_and_policy_are_lossless() {
+        assert!(size_of::<Record<'static>>() <= 32);
+        let limits = crate::Limits {
+            max_record_bytes: 17,
+            max_depth: 3,
+            max_records: 11,
+        };
+        let bytes = [0x35, 0x12, 0x34, 0x12, 3, 0, 0, 0, 1, 2, 3];
+        let (record, consumed) = Record::parse(&bytes, 0, limits).expect("valid record");
+
+        assert_eq!(record.kind(), RecordKind::Unknown(0x1234));
+        assert_eq!(record.raw_kind(), 0x1234);
+        assert_eq!(record.version(), 5);
+        assert_eq!(record.instance(), 0x123);
+        assert_eq!(record.len(), 3);
+        assert_eq!(record.limits(), limits);
+        assert_eq!(consumed, bytes.len());
     }
 }

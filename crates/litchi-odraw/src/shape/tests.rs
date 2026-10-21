@@ -257,7 +257,6 @@ fn from_record_applies_narrower_framing_limits_to_children() {
             max_record_bytes: record_len - 1,
             max_depth: 64,
             max_records: 1_000,
-            ..Limits::default()
         },
     )
     .expect_err("the root exceeds the narrower framing policy");

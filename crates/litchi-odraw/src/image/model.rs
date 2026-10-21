@@ -521,6 +521,47 @@ impl<'data> Blip<'data> {
             Self::Emf(_) | Self::Wmf(_) | Self::Pict(_) | Self::Opaque(_) => None,
         }
     }
+
+    /// Rebinds this validated BLIP to the narrower raw policy of a caller
+    /// that is taking ownership of the view.  The payload and decoded fields
+    /// remain borrowed; only the policy carried by their shared record view
+    /// changes.
+    pub(super) fn with_record_limits(self, limits: crate::Limits) -> Self {
+        match self {
+            Self::Emf(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Emf(meta)
+            },
+            Self::Wmf(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Wmf(meta)
+            },
+            Self::Pict(mut meta) => {
+                meta.record = meta.record.with_limits(limits);
+                Self::Pict(meta)
+            },
+            Self::Jpeg(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Jpeg(bitmap)
+            },
+            Self::Png(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Png(bitmap)
+            },
+            Self::Dib(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Dib(bitmap)
+            },
+            Self::Tiff(mut bitmap) => {
+                bitmap.record = bitmap.record.with_limits(limits);
+                Self::Tiff(bitmap)
+            },
+            Self::Opaque(mut opaque) => {
+                opaque.record = opaque.record.with_limits(limits);
+                Self::Opaque(opaque)
+            },
+        }
+    }
 }
 
 /// A checked one-based index into a `BStore` container.
@@ -745,7 +786,9 @@ pub enum Block<'data> {
 pub struct Store<'data> {
     pub(super) record: Record<'data>,
     pub(super) count: u16,
-    pub(super) limits: Limits,
+    pub(super) max_blip_bytes: u32,
+    pub(super) max_store_entries: u16,
+    pub(super) max_files: u32,
 }
 
 /// Lazy, count-validating `BStore` iterator.

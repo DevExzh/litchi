@@ -36,7 +36,8 @@ impl<'data> Blip<'data> {
     /// Returns an error if `record` exceeds `limits`, is not a BLIP record, or
     /// fails BLIP validation.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
-        check_record_bytes(&record, limits)?;
+        let effective_records = record.limits().constrained_by(limits.records);
+        check_record_bytes(&record, effective_records)?;
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
                 limit: LimitKind::BlipBytes,
@@ -44,6 +45,7 @@ impl<'data> Blip<'data> {
                 maximum: u64::from(limits.max_blip_bytes),
             });
         }
+        let record = record.with_limits(effective_records);
         if !record.kind().is_blip() {
             return Err(Error::NotImageRecord {
                 raw_kind: record.raw_kind(),
@@ -189,7 +191,7 @@ impl<'data> Entry<'data> {
     /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
     /// fails FBSE validation.
     pub fn parse(record: Record<'data>, limits: Limits) -> Result<Self> {
-        check_record_bytes(&record, limits)?;
+        check_record_bytes(&record, limits.records)?;
         if record.kind() != RecordKind::Bse {
             return Err(Error::NotImageRecord {
                 raw_kind: record.raw_kind(),
@@ -345,12 +347,13 @@ impl<'data> Store<'data> {
     /// Iterates file blocks lazily and validates the exact declared count.
     #[must_use]
     pub fn iter(&self) -> super::model::Blocks<'data> {
+        let limits = self.limits();
         super::model::Blocks {
-            records: crate::Children::new(self.record.data(), self.limits.record_limits()),
+            records: crate::Children::new(self.record.data(), limits.record_limits()),
             expected: self.count,
             seen: 0,
             done: false,
-            limits: self.limits,
+            limits,
         }
     }
 
@@ -400,16 +403,21 @@ impl<'data> Store<'data> {
     /// Returns the image and traversal policy retained by this store.
     #[must_use]
     pub const fn limits(&self) -> Limits {
-        self.limits
+        Limits {
+            records: self.record.limits(),
+            max_blip_bytes: self.max_blip_bytes,
+            max_store_entries: self.max_store_entries,
+            max_files: self.max_files,
+        }
     }
 }
 
-fn check_record_bytes(record: &Record<'_>, limits: Limits) -> Result<()> {
-    if record.len() > limits.records.max_record_bytes {
+fn check_record_bytes(record: &Record<'_>, limits: crate::Limits) -> Result<()> {
+    if record.len() > limits.max_record_bytes {
         return Err(Error::ImageLimitExceeded {
             limit: LimitKind::RecordBytes,
             observed: u64::from(record.len()),
-            maximum: u64::from(limits.records.max_record_bytes),
+            maximum: u64::from(limits.max_record_bytes),
         });
     }
     Ok(())

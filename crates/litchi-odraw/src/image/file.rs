@@ -7,13 +7,12 @@
 
 use super::LimitKind as ImageLimitKind;
 use super::{Blip, Block, Context, Delay, Entry, Id, Kind, Limits, Store};
-use crate::{Children, Container, Error, Parser, Record, RecordKind, Result};
+use crate::{Container, Error, Parser, Record, RecordKind, Result};
 
 /// One validated `OfficeArt` image file.
 #[derive(Debug)]
 pub struct File<'data> {
     source: Source<'data>,
-    kind: Kind,
     name: Option<String>,
     index: usize,
 }
@@ -22,12 +21,14 @@ pub struct File<'data> {
 enum Source<'data> {
     View {
         blip: Blip<'data>,
-        limits: Limits,
+        max_blip_bytes: u32,
     },
     Owned {
         record: Vec<u8>,
         data_start: usize,
-        limits: Limits,
+        raw_limits: crate::Limits,
+        max_blip_bytes: u32,
+        kind: Kind,
     },
 }
 
@@ -35,10 +36,13 @@ impl<'data> File<'data> {
     /// Wraps an already validated BLIP without copying its file data.
     #[must_use]
     pub fn new(blip: Blip<'data>, name: Option<String>, index: usize, limits: Limits) -> Self {
-        let kind = blip.kind();
+        let raw_limits = blip.record().limits().constrained_by(limits.records);
+        let blip = blip.with_record_limits(raw_limits);
         Self {
-            source: Source::View { blip, limits },
-            kind,
+            source: Source::View {
+                blip,
+                max_blip_bytes: limits.max_blip_bytes,
+            },
             name,
             index,
         }
@@ -53,20 +57,35 @@ impl<'data> File<'data> {
     pub fn blip(&self) -> Result<Blip<'_>> {
         match &self.source {
             Source::View { blip, .. } => Ok(blip.clone()),
-            Source::Owned { record, limits, .. } => Blip::parse(record, *limits),
+            Source::Owned {
+                record,
+                raw_limits,
+                max_blip_bytes,
+                ..
+            } => Blip::parse(
+                record,
+                Limits {
+                    records: *raw_limits,
+                    max_blip_bytes: *max_blip_bytes,
+                    ..Limits::default()
+                },
+            ),
         }
     }
 
     /// Returns the native `OfficeArt` image kind.
     #[must_use]
     pub const fn kind(&self) -> Kind {
-        self.kind
+        match &self.source {
+            Source::View { blip, .. } => blip.kind(),
+            Source::Owned { kind, .. } => *kind,
+        }
     }
 
     /// Returns the conventional extension for the native image bytes.
     #[must_use]
     pub const fn extension(&self) -> &'static str {
-        self.kind.extension()
+        self.kind().extension()
     }
 
     /// Returns the optional producer-supplied filename hint.
@@ -123,13 +142,25 @@ impl<'data> File<'data> {
     /// encoded, or `Error::ArithmeticOverflow` when the owned data range
     /// underflows.
     pub fn into_owned(self) -> Result<File<'static>> {
-        let (record, data_start, limits) = match self.source {
+        let kind = self.kind();
+        let (record, data_start, raw_limits, max_blip_bytes) = match self.source {
             Source::Owned {
                 record,
                 data_start,
-                limits,
-            } => (record, data_start, limits),
-            Source::View { blip, limits } => {
+                raw_limits,
+                max_blip_bytes,
+                ..
+            } => (record, data_start, raw_limits, max_blip_bytes),
+            Source::View {
+                blip,
+                max_blip_bytes,
+            } => {
+                let raw_limits = blip.record().limits();
+                let limits = Limits {
+                    records: raw_limits,
+                    max_blip_bytes,
+                    ..Limits::default()
+                };
                 let data_len = blip.data().len();
                 let mut record = Vec::new();
                 super::write::copy(&mut record, &blip, limits).map_err(|_err| {
@@ -144,16 +175,17 @@ impl<'data> File<'data> {
                         .ok_or(Error::ArithmeticOverflow {
                             context: "owned BLIP data range",
                         })?;
-                (record, data_start, limits)
+                (record, data_start, raw_limits, max_blip_bytes)
             },
         };
         Ok(File {
             source: Source::Owned {
                 record,
                 data_start,
-                limits,
+                raw_limits,
+                max_blip_bytes,
+                kind,
             },
-            kind: self.kind,
             name: self.name,
             index: self.index,
         })
@@ -431,10 +463,10 @@ fn collect<'data>(
     files: &mut Vec<File<'data>>,
     limits: Limits,
 ) -> Result<()> {
-    let mut stack = vec![Children::new(data, limits.record_limits())];
+    let mut stack = vec![crate::container::Frame::new(data)];
     let mut visited = 0u32;
-    while let Some(records) = stack.last_mut() {
-        let Some(result) = records.next() else {
+    while let Some(frame) = stack.last_mut() {
+        let Some(result) = frame.next(limits.record_limits()) else {
             stack.pop();
             continue;
         };
@@ -475,7 +507,7 @@ fn collect<'data>(
                     maximum: u64::from(limits.records.max_depth),
                 });
             }
-            stack.push(Children::new(record.data(), limits.record_limits()));
+            stack.push(crate::container::Frame::new(record.data()));
         }
     }
     Ok(())
@@ -560,9 +592,10 @@ mod tests {
             source: Source::Owned {
                 record: bytes,
                 data_start: 25,
-                limits,
+                raw_limits: limits.records,
+                max_blip_bytes: limits.max_blip_bytes,
+                kind: Kind::Png,
             },
-            kind: Kind::Png,
             name: None,
             index: 0,
         };
@@ -574,6 +607,68 @@ mod tests {
                 maximum: 19,
             })
         ));
+    }
+
+    #[test]
+    fn file_view_and_detached_owner_retain_the_intersected_raw_policy() {
+        let bytes = png_blip(b"png");
+        let body_len = u32::try_from(bytes.len() - 8).expect("body length fits");
+        let origin = crate::Limits {
+            max_record_bytes: body_len,
+            max_depth: 2,
+            max_records: 3,
+        };
+        let blip = Blip::parse(
+            &bytes,
+            Limits {
+                records: origin,
+                max_blip_bytes: body_len,
+                ..Limits::default()
+            },
+        )
+        .expect("origin policy admits BLIP");
+        let strict_caller = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len,
+                max_depth: 1,
+                max_records: 1,
+            },
+            max_blip_bytes: body_len,
+            ..Limits::default()
+        };
+        let file = File::new(blip, None, 0, strict_caller);
+        assert_eq!(
+            file.blip().expect("view BLIP").record().limits(),
+            strict_caller.records
+        );
+        let detached = file.into_owned().expect("detached BLIP");
+        assert_eq!(
+            detached.blip().expect("owned BLIP").record().limits(),
+            strict_caller.records
+        );
+
+        let permissive_caller = Limits {
+            records: crate::Limits::default(),
+            max_blip_bytes: body_len,
+            ..Limits::default()
+        };
+        let blip = Blip::parse(
+            &bytes,
+            Limits {
+                records: origin,
+                max_blip_bytes: body_len,
+                ..Limits::default()
+            },
+        )
+        .expect("origin policy admits BLIP");
+        let file = File::new(blip, None, 0, permissive_caller);
+        assert_eq!(
+            file.blip()
+                .expect("origin-restricted BLIP")
+                .record()
+                .limits(),
+            origin
+        );
     }
 
     #[test]
@@ -716,8 +811,10 @@ mod tests {
 
     #[test]
     fn recursive_scan_caps_the_semantic_collection() {
-        let mut limits = Limits::default();
-        limits.max_files = 0x0fff;
+        let limits = Limits {
+            max_files: 0x0fff,
+            ..Limits::default()
+        };
         let data = png_blip(b"x").repeat(usize::try_from(limits.max_files).unwrap() + 1);
         assert!(matches!(
             scan(&data, limits),

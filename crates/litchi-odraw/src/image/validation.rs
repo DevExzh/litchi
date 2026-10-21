@@ -122,11 +122,12 @@ impl<'data> Store<'data> {
     /// does not match `recInstance`, and `Error::ImageLimitExceeded` when the
     /// entry count exceeds `limits.max_store_entries`.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
-        if record.len() > limits.records.max_record_bytes {
+        let effective_records = record.limits().constrained_by(limits.records);
+        if record.len() > effective_records.max_record_bytes {
             return Err(Error::ImageLimitExceeded {
                 limit: LimitKind::RecordBytes,
                 observed: u64::from(record.len()),
-                maximum: u64::from(limits.records.max_record_bytes),
+                maximum: u64::from(effective_records.max_record_bytes),
             });
         }
         if record.kind() != RecordKind::BStoreContainer
@@ -146,7 +147,7 @@ impl<'data> Store<'data> {
             });
         }
         let mut actual = 0u16;
-        for child in crate::Children::new(record.data(), limits.record_limits()) {
+        for child in crate::Children::new(record.data(), effective_records) {
             child?;
             actual = actual.checked_add(1).ok_or(Error::MalformedImage {
                 reason: "BStore file-block count exceeds 4095",
@@ -157,10 +158,17 @@ impl<'data> Store<'data> {
                 reason: "BStore file-block count does not match recInstance",
             });
         }
+        // A caller may validate an already admitted record under a different
+        // policy. Rebind the borrowed view after admission to the exact
+        // intersection: neither the origin admission nor the caller's
+        // narrower dimensions may be weakened by the compact Store state.
+        let record = record.with_limits(effective_records);
         Ok(Self {
             record,
             count,
-            limits,
+            max_blip_bytes: limits.max_blip_bytes,
+            max_store_entries: limits.max_store_entries,
+            max_files: limits.max_files,
         })
     }
 }
