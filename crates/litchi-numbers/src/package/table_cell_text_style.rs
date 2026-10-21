@@ -43,7 +43,7 @@ use super::table_topology::{
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::At;
 
-structure::structural_family!("cell-text-style");
+structure::structural_family!("cell-text-style", Wire(litchi_iwa_common::LimitKind));
 
 /// `TSWP.ParagraphStyleArchive`.
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
@@ -165,8 +165,29 @@ fn from_topology(error: topology::Error) -> Error {
 }
 
 fn from_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
-    let _ = error;
-    Error::InvalidSource
+    match error {
+        litchi_iwa_text_wire::CharStyleError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Wire(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_text_wire::CharStyleError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn style_wire_limits(working: &Working<'_>) -> Result<litchi_iwa_common::WireLimits, Error> {
+    let maximum = working.archive_limits().max_message_bytes();
+    litchi_iwa_common::WireLimits::default()
+        .with_input_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES))
+        .and_then(|limits| {
+            limits.with_output_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES))
+        })
+        .map_err(|_| Error::InvalidSource)
 }
 
 /// One immutable edit that sets the character properties of cells of one
@@ -370,6 +391,7 @@ fn current_style(
 
 /// The character properties the style `style` and its parent chain set.
 fn effective(working: &Working<'_>, style: u64) -> Result<CharacterProperties, Error> {
+    let wire = style_wire_limits(working)?;
     let mut properties = CharacterProperties::new();
     let mut current = Some(style);
     for _ in 0..MAX_STYLE_DEPTH {
@@ -385,10 +407,11 @@ fn effective(working: &Working<'_>, style: u64) -> Result<CharacterProperties, E
             break;
         };
         properties.inherit(
-            &litchi_iwa_text_wire::character_style_properties(&message.data).map_err(from_style)?,
+            &litchi_iwa_text_wire::character_style_properties(&message.data, wire)
+                .map_err(from_style)?,
         );
-        current =
-            litchi_iwa_text_wire::character_style_parent(&message.data).map_err(from_style)?;
+        current = litchi_iwa_text_wire::character_style_parent(&message.data, wire)
+            .map_err(from_style)?;
     }
     Ok(properties)
 }
@@ -459,6 +482,7 @@ fn publish(
     cells: &[(At, CharacterProperties)],
 ) -> Result<structure::Published, Error> {
     let mut working = Working::new(source)?;
+    let wire = style_wire_limits(&working)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     let (_, model) = topology::message(&working, target.model, &[6_001]).map_err(Error::from)?;
     let store = single_bytes(model, 4)?
@@ -505,7 +529,9 @@ fn publish(
                 Some(current),
                 stylesheet,
                 properties,
-            );
+                wire,
+            )
+            .map_err(from_style)?;
             let template = working.object(current)?;
             let object = structure::new_object(
                 identifier,
@@ -520,9 +546,13 @@ fn publish(
             let (sheet_index, sheet_data) =
                 topology::message(&working, stylesheet, &[STYLESHEET_MESSAGE_TYPE])
                     .map_err(Error::from)?;
-            let sheet_data =
-                litchi_iwa_text_wire::stylesheet_with_style(sheet_data, identifier, Some(current))
-                    .map_err(from_style)?;
+            let sheet_data = litchi_iwa_text_wire::stylesheet_with_style(
+                sheet_data,
+                identifier,
+                Some(current),
+                wire,
+            )
+            .map_err(from_style)?;
             // Some native stylesheets carry field-local references their
             // aggregate list does not repeat; the core refuses to transition
             // such a header, so the payload is then replaced with the
@@ -728,5 +758,35 @@ impl Package {
             .index();
         let table = topology::table_position(self, sheet, table).map_err(from_topology)?;
         Ok((sheet, table))
+    }
+}
+
+#[cfg(test)]
+mod wire_error_tests {
+    use super::{Error, LimitKind, from_style};
+
+    #[test]
+    fn character_style_resource_errors_survive_the_owner_boundary() {
+        let error = from_style(litchi_iwa_text_wire::CharStyleError::Limit {
+            kind: litchi_iwa_common::LimitKind::RewriteWork,
+            observed: 11,
+            maximum: 10,
+        });
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Wire(litchi_iwa_common::LimitKind::RewriteWork),
+                observed: 11,
+                maximum: 10,
+            }
+        ));
+        assert!(matches!(
+            from_style(litchi_iwa_text_wire::CharStyleError::Allocation { amount: 42 }),
+            Error::Allocation { amount: 42 }
+        ));
+        assert!(matches!(
+            from_style(litchi_iwa_text_wire::CharStyleError::Invalid),
+            Error::InvalidSource
+        ));
     }
 }

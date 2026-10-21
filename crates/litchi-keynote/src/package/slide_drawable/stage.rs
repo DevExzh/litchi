@@ -669,8 +669,8 @@ pub(super) fn set_text_style(
     let sheet_member = workspace
         .component_of(stylesheet)
         .ok_or(Error::InvalidSource)?;
-    let map_style = |_error| Error::InvalidSource;
-    let previous = litchi_iwa_text_wire::styles_in_span(&payload, text_len, range.clone())
+    let map_style = |error: litchi_iwa_text_wire::CharStyleError| lift(error.into());
+    let previous = litchi_iwa_text_wire::styles_in_span(&payload, text_len, range.clone(), wire)
         .map_err(map_style)?;
     let properties = character_properties(style);
     // Versions of an existing character style of the stylesheet.
@@ -700,7 +700,8 @@ pub(super) fn set_text_style(
         }
         let identifier = workspace.allocate().map_err(lift)?;
         let data =
-            litchi_iwa_text_wire::character_style_variation(*parent, stylesheet, &properties);
+            litchi_iwa_text_wire::character_style_variation(*parent, stylesheet, &properties, wire)
+                .map_err(map_style)?;
         let mut references = Vec::with_capacity(2);
         references.extend(*parent);
         references.push(stylesheet);
@@ -733,7 +734,7 @@ pub(super) fn set_text_style(
             .object_references
             .clone();
         let sheet_data =
-            litchi_iwa_text_wire::stylesheet_with_style(sheet_payload, identifier, *parent)
+            litchi_iwa_text_wire::stylesheet_with_style(sheet_payload, identifier, *parent, wire)
                 .map_err(map_style)?;
         let mut sheet_after = sheet_refs.clone();
         sheet_after.push(identifier);
@@ -762,16 +763,22 @@ pub(super) fn set_text_style(
         }
         created.push((*parent, identifier));
     }
-    let restyled = litchi_iwa_text_wire::restyle_span(&payload, text_len, range, |style| {
-        created
-            .iter()
-            .find(|(parent, _)| *parent == style)
-            .map(|(_, created)| *created)
-    })
+    let restyled = litchi_iwa_text_wire::restyle_span(
+        &payload,
+        text_len,
+        range,
+        |style| {
+            created
+                .iter()
+                .find(|(parent, _)| *parent == style)
+                .map(|(_, created)| *created)
+        },
+        wire,
+    )
     .map_err(map_style)?;
     // The storage now references the new styles and no longer the styles
     // the span covered completely.
-    let runs = litchi_iwa_text_wire::char_style_runs(&restyled).map_err(map_style)?;
+    let runs = litchi_iwa_text_wire::char_style_runs(&restyled, wire).map_err(map_style)?;
     let still: BTreeSet<u64> = runs.iter().filter_map(|run| run.style).collect();
     let mut storage_after: Vec<u64> = storage_refs_before
         .iter()

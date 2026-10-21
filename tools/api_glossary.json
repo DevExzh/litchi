@@ -12175,7 +12175,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi_iwa_text_wire",
-          "replacement": "raw text-wire calls take required limits on their canonical names (record 0361g)",
+          "replacement": "raw text-wire and character-style calls take required limits on their canonical names (records 0361g and 0361h)",
           "match": "suffix"
         },
         {

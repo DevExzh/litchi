@@ -93,6 +93,24 @@ impl From<litchi_iwa_common::Error> for StructureError {
     }
 }
 
+impl From<litchi_iwa_text_wire::CharStyleError> for StructureError {
+    fn from(error: litchi_iwa_text_wire::CharStyleError) -> Self {
+        match error {
+            litchi_iwa_text_wire::CharStyleError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::from(litchi_iwa_common::Error::LimitExceeded {
+                kind,
+                observed,
+                limit: maximum,
+            }),
+            litchi_iwa_text_wire::CharStyleError::Allocation { amount } => Self::Allocation(amount),
+            _ => Self::Malformed,
+        }
+    }
+}
+
 impl From<litchi_iwa_core::Error> for StructureError {
     fn from(error: litchi_iwa_core::Error) -> Self {
         match error {
@@ -239,6 +257,31 @@ pub(super) mod test_support {
     use std::path::{Path, PathBuf};
 
     use crate::Package;
+
+    #[test]
+    fn character_style_resource_errors_survive_the_owner_boundary() {
+        use super::{StructureError, StructureLimit};
+        assert_eq!(
+            StructureError::from(litchi_iwa_text_wire::CharStyleError::Limit {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed: 11,
+                maximum: 10,
+            }),
+            StructureError::Limit {
+                kind: StructureLimit::Work,
+                observed: 11,
+                maximum: 10,
+            }
+        );
+        assert_eq!(
+            StructureError::from(litchi_iwa_text_wire::CharStyleError::Allocation { amount: 42 }),
+            StructureError::Allocation(42)
+        );
+        assert_eq!(
+            StructureError::from(litchi_iwa_text_wire::CharStyleError::Invalid),
+            StructureError::Malformed
+        );
+    }
 
     /// Every Keynote package of the tracked corpus that opens.
     pub(in crate::package) fn corpus() -> Vec<(PathBuf, Package)> {
