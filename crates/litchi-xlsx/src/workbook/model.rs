@@ -458,7 +458,12 @@ pub struct Workbook {
     pub(super) inner: Arc<Inner>,
     /// The policies of this snapshot that do not belong to its state;
     /// snapshots derived from it by edits share them.
-    policy: Arc<Policy>,
+    ///
+    /// The ordinary strict package path keeps this absent and reads its
+    /// semantic defaults from `Inner::options`.  An override (or encrypted
+    /// provenance) installs the shared policy lazily; this keeps the common
+    /// eager open path allocation-free for policy state.
+    policy: Option<Arc<Policy>>,
 }
 
 /// The semantic budgets and encryption provenance of a workbook snapshot.
@@ -487,17 +492,25 @@ impl Workbook {
 
     /// The semantic budgets of this snapshot.
     pub(crate) fn semantic_limits(&self) -> &crate::SemanticLimits {
-        &self.policy.semantic_limits
+        self.policy
+            .as_deref()
+            .map_or(&self.inner.options.semantic_limits, |policy| {
+                &policy.semantic_limits
+            })
     }
 
     /// This snapshot under the semantic budgets `limits`; the state is
     /// shared.
     pub(crate) fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
-        let mut policy = *self.policy;
+        let mut policy = self.policy.as_deref().copied().unwrap_or_else(|| Policy {
+            semantic_limits: self.inner.options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption: PackageEncryption::plain(),
+        });
         policy.semantic_limits = limits;
         Self {
             inner: Arc::clone(&self.inner),
-            policy: Arc::new(policy),
+            policy: Some(Arc::new(policy)),
         }
     }
 
@@ -528,17 +541,19 @@ impl Workbook {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let mut workbook = Self::open_package(package, None, options)?;
-        workbook.policy = Arc::new(Policy {
+        workbook.policy = Some(Arc::new(Policy {
             encryption,
-            ..*workbook.policy
-        });
+            semantic_limits: workbook.semantic_limits().to_owned(),
+        }));
         Ok(workbook)
     }
 
     /// Encryption provenance retained from the owning package.
     #[cfg(feature = "encryption")]
     pub(crate) fn encryption_state(&self) -> PackageEncryption {
-        self.policy.encryption
+        self.policy
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
     }
 
     pub(crate) fn from_package_with_styles(
@@ -662,6 +677,18 @@ impl Workbook {
         });
         let sheet_name_order = sheet_name_order.into_boxed_slice();
 
+        let policy = source
+            .and_then(|source| source.policy.as_ref().map(Arc::clone))
+            .or_else(|| {
+                let semantic_limits = options.semantic_limits;
+                (semantic_limits != crate::SemanticLimits::default()).then(|| {
+                    Arc::new(Policy {
+                        semantic_limits,
+                        #[cfg(feature = "encryption")]
+                        encryption: PackageEncryption::plain(),
+                    })
+                })
+            });
         Ok(Self {
             inner: Arc::new(Inner {
                 package,
@@ -692,18 +719,9 @@ impl Workbook {
                 format_cache,
                 chart_inventories,
                 tolerance,
-                options: options.clone(),
+                options,
             }),
-            policy: source.map_or_else(
-                || {
-                    Arc::new(Policy {
-                        semantic_limits: options.semantic_limits,
-                        #[cfg(feature = "encryption")]
-                        encryption: PackageEncryption::plain(),
-                    })
-                },
-                |source| Arc::clone(&source.policy),
-            ),
+            policy,
         })
     }
 
@@ -901,7 +919,7 @@ impl Workbook {
         self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
-            policy: Some(Arc::clone(&self.policy)),
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -929,7 +947,7 @@ impl Workbook {
         Ok(data.map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
-            policy: Some(Arc::clone(&self.policy)),
+            policy: self.policy.as_ref().map(Arc::clone),
         }))
     }
 
@@ -944,7 +962,7 @@ impl Workbook {
         Some(Worksheet {
             owner: Arc::clone(&self.inner),
             data,
-            policy: Some(Arc::clone(&self.policy)),
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -1080,7 +1098,7 @@ impl Workbook {
     pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
         crate::calculation_properties::Snapshot::load_with_limits(
             &self.inner.package,
-            &self.policy.semantic_limits.calculation_properties_value(),
+            &self.semantic_limits().calculation_properties_value(),
         )
     }
 
@@ -1112,7 +1130,7 @@ impl Workbook {
         let values = self.inner.surveys.get_or_try_init(|| {
             crate::survey::load_with_limits(
                 &self.inner.package,
-                &self.policy.semantic_limits.survey_value(),
+                &self.semantic_limits().survey_value(),
             )
             .map(Vec::into_boxed_slice)
         })?;
@@ -1186,10 +1204,15 @@ impl Workbook {
 
     pub(crate) fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        self.policy
-            .encryption
-            .ordinary_output()
-            .map_err(|source| Error::EncryptionPolicy { operation, source })?;
+        self.policy.as_deref().map_or_else(
+            || Ok(()),
+            |policy| {
+                policy
+                    .encryption
+                    .ordinary_output()
+                    .map_err(|source| Error::EncryptionPolicy { operation, source })
+            },
+        )?;
         #[cfg(not(feature = "encryption"))]
         let _ = operation;
         Ok(())
@@ -1202,7 +1225,8 @@ impl Workbook {
     #[cfg(feature = "encryption")]
     pub(crate) fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
         self.policy
-            .encryption
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
             .require_retained_mode()
             .map_err(|source| Error::EncryptionPolicy { operation, source })
     }
@@ -1277,7 +1301,10 @@ impl Worksheet {
             &self.data.part_uri,
             self.policy
                 .as_ref()
-                .and_then(|policy| policy.semantic_limits.form_controls_value())
+                .map_or_else(
+                    || self.owner.options.semantic_limits.form_controls_value(),
+                    |policy| policy.semantic_limits.form_controls_value(),
+                )
                 .unwrap_or_default(),
         )
         .map_err(crate::form_control::owner_to_xlsx)
