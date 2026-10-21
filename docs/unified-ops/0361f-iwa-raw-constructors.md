@@ -143,3 +143,12 @@ peak or retained bytes. These are allocation results, not native latency
 acceptance. [The verified receipt](results/0361f/evidence.json) records the
 complete build, source manifests, toolchain, dependencies and measurements.
 Regenerate it with `constructor-collect.py /outside/0361f --out OUTPUT`.
+
+Both `matched-v3/native-a1` and `native-a2` terminated with exit 1 when the
+host guard observed an unrelated Python test process. The first attempt
+stopped during warmup; the second stopped within its first ABBA block.
+Neither produced a complete qualified block. Their original manifests retain
+the last recorded `running` status because the runner raised on interference;
+the process exits, logs, blocked host snapshots and every partial sample are
+retained in the receipt. Neither process is still running. Native latency
+remains unqualified, and these incomplete samples are not acceptance evidence.
