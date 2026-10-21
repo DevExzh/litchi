@@ -124,14 +124,120 @@ Protected release binaries are outside the repository:
 - W4 candidate: `xlsx_merge_history_alloc-candidate-fee2cdf-v2`, SHA-256
   `7201da75e2a91abb80e5fa9727c488d00349da254e4c95f61e693305dd8df539`.
 
-Both builds exited successfully. No timing or allocator comparison has been
-claimed for this pair yet; it requires a separate quiet grant.
+Both builds exited successfully. The allocator comparison below is a byte and
+call-count attribution run, not a wall-time measurement; native timing still
+requires a separate quiet grant.
 
 The 2a-to-fee common replay allocation difference is localized rather than
 hidden in the aggregate. Forward apply allocation fell from 1,009,920 to
 51,200 bytes, while inverse apply rose from 1,359,872 to 55,034,496 bytes.
 Publication-forward allocation fell from 55,652,224 to 54,911,872 bytes, and
-publication-inverse stayed at 319,488 bytes. Thus the candidate's lower call
-count and lower retained peak do not justify accepting the inverse allocation
-route; its exact artifact restoration path still needs the reproducible
-pre-W4 comparison or a further repair.
+publication-inverse stayed at 319,488 bytes. Thus the 2a-to-fee route's lower
+call count and lower retained peak did not justify accepting its inverse
+allocation path by itself. The reproducible pre-W4 comparison below resolves
+the aggregate attribution; the inverse apply cost remains separately reported.
+
+## Reproducible pre-W4 source-family and compact pair
+
+The same provenance discipline was applied to the complete source-family
+orchestrator. The base is the exact pre-W4 commit
+`e63a1fe3534bcaaae2ce367339f7f8275877baef`; the final candidate is this
+worktree at `6800ddc682f29bbcf1f56f83b2725728241aeae`. The base perf lock has
+SHA-256
+`0e1810824db584d171c16b45930776812a6e44c36e62c3e1e5b52e49a86da1cd`; the
+candidate lock has SHA-256
+`5f3e7d34cd8b07fb12d10f29fc41c2c42146907fd2b0e6bc8528b9eb772fc79c`.
+The lock difference is the expected revision graph: the pre-W4 lock retains
+`litchi-core` on `litchi-odraw` and `litchi-biff`/`litchi-ograph` on `litchi-ops`,
+while the candidate removes those edges and adds `sha2 0.11` to the
+`litchi-xlsx` dependency graph. Neither main child selects a Cargo feature beyond
+the features declared by the manifest dependencies.
+
+The e63 checkout has the six-line temporary manifest overlay used by the
+shared retained-history adapter. Its working `tools/perf-baseline/Cargo.toml`
+has SHA-256
+`d89eff26ca16ebb28e4b153ef790eed57379a0ad1516775dd8046de2e1ecc545`, and the
+overlay diff has SHA-256
+`8bed42293a1145a59b4570688ae984fdc635f4858ca6ec0308bfcabad2b`. The adapter
+source remains `3929b1fbdaf4771d0667bc8a79cf0e274b72eebca6c064cb4a64d9c900c8f1b5`.
+That adapter is not compiled into either main source-family child; the overlay
+is retained so the archived checkout and all related build recipes share one
+manifest. The candidate manifest has SHA-256
+`d3146586bf1325679a73202d9dafa61573a492cc2750668b5b408b7ab010febe`.
+The e63 perf harness already contains all six eager/source case names used by
+the final driver, so no synthetic source-family compatibility adapter or old
+binary was reused; only the retained-history allocator adapter uses the
+temporary overlay.
+
+The exact release commands were, with the W4 environment shim and distinct
+target directories:
+
+```sh
+source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
+export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-target-main-v1
+cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline
+cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin xlsx_merge_source_abba
+
+source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
+export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-w4-alloc-target-v2
+cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin litchi-perf-baseline
+cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
+  --bin xlsx_source_family_abba --bin xlsx_merge_source_abba
+```
+
+The protected binary identities are:
+
+- e63 main child: `e0245be90b20afc18c1a13554fc92a1fdde27a7e0e6ee9c781bcfcbba5f78cbf`;
+- final main child: `b2eab1f7fe0a281c3b040c4404d4071ba3e45181d9dbd0def4e7987f5f4811ba`;
+- e63 merge child: `9d746102c663324b06b93530de3e93094c6af303993eab83e5328183fa9ec176`;
+- final merge child: `41604f16ec4516f06a66b4ab9a4ccd002d621a55ed7cf0f2783ab41b47067d0d`;
+- final source-family driver: `bc61708b336e36138aa459bed8ef170f4beb6e21427436ea5c3377896df142e4`.
+
+The driver source is SHA-256
+`165de1ef06c37811f49e6ec66bb85a42a72ff33cac9b35b80646922589e1b7e0`; its
+merge-child source is
+`604805876dae86480eef0a0ea7a90cecd588bff2452bfe354ce9a8fd629cea71`.
+Preflight with the final driver, e63 base children, and final children
+completed with 24 family cases and four compact children. Its receipt is
+outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-preflight-head-v2/preflight.json`.
+
+The e63 and final allocator reports use the same fixture hashes and exact
+128/128 forward and inverse checks. In the comparable common replay interval,
+allocated bytes changed from 115,486,976 (e63) to 110,317,056 (final),
+allocation calls from 107,776 to 23,552, and post-interval peak live bytes
+from 866,252 to 672,471. The aggregate therefore improves by 4.48%; the
+earlier 2a-to-fee +89% figure was not a real regression of this workload.
+It came from comparing the W4 adapter's two different deferred implementations
+under a mismatched common route. The phase split explains the discrepancy:
+apply bytes rise from 6,493,952 to 55,085,696, almost entirely in inverse
+authentication, while publication bytes fall from 109,259,648 to 55,231,360,
+almost entirely because inverse publication no longer rematerializes the
+artifact. The total common route is lower and exact, but the inverse apply
+allocation remains a separately reported cost for any later wall-time review.
+
+The complete allocation JSON pair is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-allocation-v1/`.
+The base and candidate JSON SHA-256 values are
+`9fbaff2f43b8115834e7c12bd8be33306a1f2f33d9ada5bb34145b02296ee0f0` and
+`083fa101f3a8a88360fc8114a28046090ce1528c3388fcbc15a23472371ce018`,
+respectively.
+No native timing is claimed from this attribution run.
+
+The prepared native protocol is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-v1.commands`.
+Its SHA-256 is
+`0cbd1b1f6533906bdaba108f7bd3dde8b550b97f3338f3ecfcb48f03fdda1328`. It uses
+only the protected binaries above and the final source-family driver.
+The focused timing legs select `page_margin` and `row_visibility`, use two
+warmups and 64 measured child samples, and retain every ABBA leg and route
+checkpoint. The batch size is chosen to put the source and medium-row legs
+above 150 ms of measured child work; the receipt must report each leg's actual
+duration before any performance claim. A separate page-margin run enables
+`--compact` with 20 observations for compact forward/inverse, stale, foreign,
+and exact-overlay checks. The full six-family `--samples 64 --compact` command
+is retained in the same runbook for a later grant when the coordinator wants
+the complete matrix. No native timing has been started.
