@@ -1331,6 +1331,39 @@ impl OpcPackage {
         self.source_relationships_with_limits(owner, SourceLimits::default())
     }
 
+    /// Serialize one typed relationship graph under required output limits.
+    /// The canonical bytes do not retain producer spelling or grant source
+    /// replacement authority. Physical member presence is a separate property
+    /// of the package; even an absent member has an empty canonical graph.
+    pub fn authored_relationships_xml(
+        &self,
+        owner: &PackURI,
+        limits: SourceLimits,
+    ) -> Result<Arc<Vec<u8>>> {
+        let (owner, relationships) = if owner.as_str() == "/" {
+            (owner, self.rels())
+        } else {
+            let part = self.get_part(owner)?;
+            (part.partname(), part.rels())
+        };
+        OwnedXmlPart::check_derived_capture_member_name(owner, limits)?;
+        let name = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        check_relationship_capture_limits(relationships, limits)?;
+        let canonical = relationships.plan_canonical(limits)?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            canonical.event_count() as u64,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            canonical.final_len() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        OwnedXmlPart::check_capture_size(&name, canonical.final_len(), limits)?;
+        Ok(Arc::new(canonical.materialize(limits)?))
+    }
+
     /// Capture source-bound relationship XML under an explicit bounded read
     /// policy. Relationship counts and field lengths are checked before
     /// semantic binding clones; retained XML and canonical output are checked
