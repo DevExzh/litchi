@@ -299,11 +299,19 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     .as_ref()
                     .ok_or("read section was not prepared")?;
                 let mut output_bytes = 0;
+                #[cfg(feature = "w5-counting-allocator")]
+                let mut last_properties = None;
                 for _ in 0..batch {
                     let properties = user_properties(section, corpus.user_limits)?;
                     black_box((properties.link_base()?, properties.hyperlinks()?));
                     output_bytes = section_size(section);
+                    #[cfg(feature = "w5-counting-allocator")]
+                    {
+                        last_properties = Some(properties);
+                    }
                 }
+                #[cfg(feature = "w5-counting-allocator")]
+                black_box(&last_properties);
                 output_bytes
             },
             "edit" => {
@@ -364,13 +372,21 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     .as_ref()
                     .ok_or("XLS cell expected output was not prepared")?;
                 let mut output_bytes = 0;
+                #[cfg(feature = "w5-counting-allocator")]
+                let mut last_output = None;
                 for _ in 0..batch {
                     let output = xls_cells_once(source)?.to_bytes()?;
                     if output != *expected {
                         return Err("XLS cell output differs from preflight".into());
                     }
                     output_bytes = output.len();
+                    #[cfg(feature = "w5-counting-allocator")]
+                    {
+                        last_output = Some(output);
+                    }
                 }
+                #[cfg(feature = "w5-counting-allocator")]
+                black_box(&last_output);
                 let elapsed = started.elapsed().as_nanos();
                 #[cfg(feature = "w5-counting-allocator")]
                 if iteration >= warmup {
