@@ -2828,7 +2828,7 @@ fn assert_uid_map_route(package: &[u8], index: usize) {
 }
 
 fn raw_field(payload: &[u8], field_number: u32) -> RawWireField<'_> {
-    let mut fields = RawWireFields::new(payload);
+    let mut fields = RawWireFields::new(payload, litchi_iwa_common::wire::RawWireLimits::default());
     loop {
         let field = fields
             .next()
@@ -2874,7 +2874,7 @@ fn assert_unknown_wire_fields(payload: &[u8], varint_field: u32, varint_value: u
 }
 
 fn unknown_raw_fields(payload: &[u8], field_numbers: &[u32]) -> Vec<Vec<u8>> {
-    let mut fields = RawWireFields::new(payload);
+    let mut fields = RawWireFields::new(payload, litchi_iwa_common::wire::RawWireLimits::default());
     let mut result = Vec::new();
     loop {
         let field = fields

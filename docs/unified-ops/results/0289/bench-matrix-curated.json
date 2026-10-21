@@ -2818,6 +2818,10 @@
   {
    "record": "0354",
    "reason": "a before/after parse-only ABBA of import's CSV tokenizer (a private function, not a leaf-vs-unified pair); record 0354 §1.3 gives the medians"
+  },
+  {
+   "record": "0362b",
+   "reason": "the first slice records validation counts and the byte-identical raw-wire constructor body hash; it contains no paired timing samples. Later constructor migrations remain required work."
   }
  ]
 }

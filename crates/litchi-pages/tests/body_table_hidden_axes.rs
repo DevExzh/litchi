@@ -211,7 +211,7 @@ fn append_message_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Te
 }
 
 fn raw_wire_fields(source: &[u8]) -> TestResult<Vec<RawWireField<'_>>> {
-    let mut scanner = RawWireFields::new(source);
+    let mut scanner = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     let mut fields = Vec::new();
     while let Some(field) = scanner.next()? {
         fields.push(field);

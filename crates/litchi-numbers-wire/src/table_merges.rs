@@ -384,7 +384,7 @@ impl Decoder {
             remaining_nesting,
             remaining_work.max(1),
         )?;
-        let mut fields = RawWireFields::with_limits(source, raw_limits);
+        let mut fields = RawWireFields::new(source, raw_limits);
         loop {
             let before_fields = fields.fields();
             let before_work = fields.work();

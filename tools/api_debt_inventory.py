@@ -12,7 +12,7 @@ gate sees. Each row names one public item that a migration wave must change:
   *Transaction or exposing rollback/is_changed/snapshot (items 15-16);
 - commit_snapshot, into_workbook, is_changed, rollback, transaction_type;
 - unsafe_edit: an `UnsafeEdit` error variant (item 17);
-- with_limits: a public `*_with_limits` entry point (items 18-19).
+- with_limits: a public `with_limits` or `*_with_limits` entry point (items 18-19).
 
 Build the input with, per crate (sequentially; RUSTC_BOOTSTRAP=1):
   cargo rustdoc -p <crate> --lib --all-features -- -Zunstable-options \
@@ -122,7 +122,7 @@ def rows(document, crate: str):
             elif receiver == "&mut self" and crate != "litchi_iwa" and not draft and (
                     owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES):
                 yield "mut_draft", text, receiver, "Builder draft or Edit verb; no Mutable* type"
-            if name.endswith("_with_limits"):
+            if name == "with_limits" or name.endswith("_with_limits"):
                 yield "with_limits", text, receiver, "OpenOptions / EditOptions, or required limits (raw)"
             if name == "rollback":
                 yield "rollback", text, receiver, "delete: drop the Edit; Edit::reset in place"

@@ -851,13 +851,8 @@ pub struct RawWireFields<'source> {
 }
 
 impl<'source> RawWireFields<'source> {
-    /// Begin a scan under [`RawWireLimits::default`].
-    pub fn new(source: &'source [u8]) -> Self {
-        Self::with_limits(source, RawWireLimits::default())
-    }
-
     /// Begin a scan under an explicit finite resource profile.
-    pub const fn with_limits(source: &'source [u8], limits: RawWireLimits) -> Self {
+    pub const fn new(source: &'source [u8], limits: RawWireLimits) -> Self {
         Self {
             source,
             offset: 0,
@@ -3805,7 +3800,7 @@ mod tests {
         ]
         .concat();
 
-        let mut fields = RawWireFields::new(&source);
+        let mut fields = RawWireFields::new(&source, RawWireLimits::default());
         let first = fields.next().unwrap().unwrap();
         let second = fields.next().unwrap().unwrap();
         let third = fields.next().unwrap().unwrap();
@@ -3845,7 +3840,7 @@ mod tests {
         let payload = [varint_field(91, 1), nested].concat();
         let source = group_field(90, &payload);
         let mut visited = Vec::new();
-        let mut fields = RawWireFields::new(&source);
+        let mut fields = RawWireFields::new(&source, RawWireLimits::default());
         let outer = fields
             .next_with(|field| {
                 visited.push((field.number(), field.wire_type(), field.depth()));
@@ -3869,7 +3864,7 @@ mod tests {
     fn raw_wire_fields_enforce_input_field_depth_and_work_limits() {
         let source = [varint_field(1, 1), varint_field(2, 2)].concat();
         let fields_limit = RawWireLimits::default().with_fields(1).unwrap();
-        let mut fields = RawWireFields::with_limits(&source, fields_limit);
+        let mut fields = RawWireFields::new(&source, fields_limit);
         assert!(fields.next().unwrap().is_some());
         assert!(matches!(
             fields.next(),
@@ -3883,7 +3878,7 @@ mod tests {
         let nested = group_field(90, &group_field(91, &[]));
         let depth_limit = RawWireLimits::default().with_depth(1).unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&nested, depth_limit).next(),
+            RawWireFields::new(&nested, depth_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::Nesting,
                 observed: 2,
@@ -3898,7 +3893,7 @@ mod tests {
             .with_work(one_field.len() - 1)
             .unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&one_field, work_limit).next(),
+            RawWireFields::new(&one_field, work_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::RewriteWork,
                 ..
@@ -3907,7 +3902,7 @@ mod tests {
 
         let input_limit = RawWireLimits::default().with_input_bytes(1).unwrap();
         assert!(matches!(
-            RawWireFields::with_limits(&one_field, input_limit).next(),
+            RawWireFields::new(&one_field, input_limit).next(),
             Err(Error::LimitExceeded {
                 kind: LimitKind::InputBytes,
                 observed: 2,
@@ -3920,7 +3915,7 @@ mod tests {
     fn raw_wire_fields_reject_unbalanced_or_mismatched_groups() {
         let start_only = crate::varint::encode_varint((90_u64 << 3) | 3);
         assert!(matches!(
-            RawWireFields::new(&start_only).next(),
+            RawWireFields::new(&start_only, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("not terminated")
         ));
 
@@ -3930,13 +3925,13 @@ mod tests {
         ]
         .concat();
         assert!(matches!(
-            RawWireFields::new(&mismatched).next(),
+            RawWireFields::new(&mismatched, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("does not match")
         ));
 
         let end_only = crate::varint::encode_varint((90_u64 << 3) | 4);
         assert!(matches!(
-            RawWireFields::new(&end_only).next(),
+            RawWireFields::new(&end_only, RawWireLimits::default()).next(),
             Err(Error::InvalidFormat(message)) if message.contains("unexpected")
         ));
     }
@@ -3948,7 +3943,7 @@ mod tests {
             crate::varint::encode_varint((91_u64 << 3) | 4),
         ]
         .concat();
-        let mut parser_failed = RawWireFields::new(&malformed_group);
+        let mut parser_failed = RawWireFields::new(&malformed_group, RawWireLimits::default());
         let parser_error = parser_failed.next().unwrap_err();
         let parser_fields = parser_failed.fields();
         let parser_work = parser_failed.work();
@@ -3957,7 +3952,7 @@ mod tests {
         assert_eq!(parser_failed.work(), parser_work);
 
         let source = varint_field(1, 1);
-        let mut visitor_failed = RawWireFields::new(&source);
+        let mut visitor_failed = RawWireFields::new(&source, RawWireLimits::default());
         let mut calls = 0usize;
         let visitor_error = visitor_failed
             .next_with(|_| {

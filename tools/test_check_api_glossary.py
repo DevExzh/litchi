@@ -12,6 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from tools import check_api_glossary as gate
+from tools import api_debt_inventory as inventory
 
 
 SOURCE = r'''
@@ -103,6 +104,7 @@ pub mod shared {
     pub type Commit = std::time::Duration;
     pub use std::time::Instant as Diagnostics;
 }
+pub fn with_limits() {}
 pub fn open_with_limits() {}
 pub fn open_with_options() {}
 pub struct MutableDraft;
@@ -183,6 +185,12 @@ class RustdocTests(unittest.TestCase):
     def check(self, *names, scope="fixture", families=()):
         return gate.violations(self.document, profile(
             banned_names=[ban(n, scope) for n in names], families=list(families)))
+
+    def test_inventory_catches_exact_and_suffixed_limit_twins(self):
+        limits = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
+                  if kind == "with_limits"}
+        self.assertEqual(limits, {"fixture::with_limits", "fixture::open_with_limits"})
+        self.assertTrue(self.check("with_limits"))
 
     def test_empty_rules_pass_real_graph_with_cycles(self):
         self.assertEqual(self.check(), [])

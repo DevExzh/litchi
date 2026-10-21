@@ -392,8 +392,7 @@ fn scan_archive_info(
     requirements.add_traversal(source.len())?;
     let mut message_count = 0usize;
     let mut identifier_seen = false;
-    let mut fields =
-        RawWireFields::with_limits(source, raw_limits(limits, HeaderKind::ArchiveInfo)?);
+    let mut fields = RawWireFields::new(source, raw_limits(limits, HeaderKind::ArchiveInfo)?);
     while let Some(field) = fields
         .next()
         .map_err(|error| super::map_wire_error(error, HeaderKind::ArchiveInfo))?
@@ -458,8 +457,7 @@ fn scan_message_lengths(
 ) -> Result<MessageLengthRequirements> {
     let mut lengths = MessageLengthRequirements::default();
     requirements.add_traversal(source.len())?;
-    let mut fields =
-        RawWireFields::with_limits(source, raw_limits(limits, HeaderKind::ArchiveInfo)?);
+    let mut fields = RawWireFields::new(source, raw_limits(limits, HeaderKind::ArchiveInfo)?);
     while let Some(field) = fields
         .next()
         .map_err(|error| super::map_wire_error(error, HeaderKind::ArchiveInfo))?
@@ -473,7 +471,7 @@ fn scan_message_lengths(
                 "ArchiveInfo contains an ambiguous MessageInfo field",
             ));
         }
-        let mut message_fields = RawWireFields::with_limits(
+        let mut message_fields = RawWireFields::new(
             field.payload(),
             raw_limits(limits, HeaderKind::MessageInfo)?,
         );
@@ -543,8 +541,7 @@ fn scan_message_info(
     let mut type_seen = false;
     let mut length_seen = false;
     requirements.add_traversal(source.len())?;
-    let mut fields =
-        RawWireFields::with_limits(source, raw_limits(limits, HeaderKind::MessageInfo)?);
+    let mut fields = RawWireFields::new(source, raw_limits(limits, HeaderKind::MessageInfo)?);
     while let Some(field) = fields
         .next()
         .map_err(|error| super::map_wire_error(error, HeaderKind::MessageInfo))?
@@ -636,8 +633,7 @@ fn scan_field_info(
 ) -> Result<()> {
     let mut path_seen = false;
     requirements.add_traversal(source.len())?;
-    let mut fields =
-        RawWireFields::with_limits(source, raw_limits(limits, HeaderKind::MessageInfo)?);
+    let mut fields = RawWireFields::new(source, raw_limits(limits, HeaderKind::MessageInfo)?);
     while let Some(field) = fields
         .next()
         .map_err(|error| super::map_wire_error(error, HeaderKind::MessageInfo))?
@@ -702,8 +698,7 @@ fn scan_field_path(
     requirements.add_retained(size_of::<FieldPath>())?;
     requirements.add_allocation()?;
     requirements.add_traversal(source.len())?;
-    let mut fields =
-        RawWireFields::with_limits(source, raw_limits(limits, HeaderKind::MessageInfo)?);
+    let mut fields = RawWireFields::new(source, raw_limits(limits, HeaderKind::MessageInfo)?);
     while let Some(field) = fields
         .next()
         .map_err(|error| super::map_wire_error(error, HeaderKind::MessageInfo))?

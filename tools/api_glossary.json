@@ -12082,6 +12082,11 @@
           "scope": "litchi_iwa_common",
           "replacement": "limits come from an OpenOptions (owners) or a required limits argument (codec and value constructors); record 0351 §2.5 rule 3, record 0361a",
           "match": "suffix"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_iwa_common",
+          "replacement": "raw wire scans require RawWireLimits in RawWireFields::new (record 0362b)"
         }
       ],
       "families": []

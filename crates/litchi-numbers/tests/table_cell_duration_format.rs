@@ -202,7 +202,7 @@ fn assert_rejected_or_owner(source: &[u8]) -> TestResult {
 }
 
 fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     while let Some(field) = fields.next()? {
         if field.number() == number {
             return Ok(field.raw().to_vec());
@@ -212,7 +212,7 @@ fn raw_field_record(source: &[u8], number: u32) -> TestResult<Vec<u8>> {
 }
 
 fn raw_field_numbers(source: &[u8]) -> TestResult<Vec<u32>> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     let mut numbers = Vec::new();
     while let Some(field) = fields.next()? {
         numbers.push(field.number());
@@ -221,7 +221,7 @@ fn raw_field_numbers(source: &[u8]) -> TestResult<Vec<u32>> {
 }
 
 fn raw_varint_field(source: &[u8], number: u32) -> TestResult<u32> {
-    let mut fields = RawWireFields::new(source);
+    let mut fields = RawWireFields::new(source, litchi_iwa_common::wire::RawWireLimits::default());
     while let Some(field) = fields.next()? {
         if field.number() != number || field.wire_type() != 0 {
             continue;
@@ -238,12 +238,18 @@ fn raw_varint_field(source: &[u8], number: u32) -> TestResult<u32> {
 
 fn raw_format_payload_by_key(source: &[u8], key: u32) -> TestResult<Vec<u8>> {
     let list_payload = fixture::format_list_payload(source)?;
-    let mut list_fields = RawWireFields::new(&list_payload);
+    let mut list_fields = RawWireFields::new(
+        &list_payload,
+        litchi_iwa_common::wire::RawWireLimits::default(),
+    );
     while let Some(entry_field) = list_fields.next()? {
         if entry_field.number() != 3 {
             continue;
         }
-        let mut entry_fields = RawWireFields::new(entry_field.payload());
+        let mut entry_fields = RawWireFields::new(
+            entry_field.payload(),
+            litchi_iwa_common::wire::RawWireLimits::default(),
+        );
         let mut matching_key = false;
         while let Some(field) = entry_fields.next()? {
             if field.number() == 1 {

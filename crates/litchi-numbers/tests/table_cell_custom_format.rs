@@ -1131,7 +1131,8 @@ fn custom_registry_source_has_field8_shape_for_hostile_entry_and_document_root_r
         fixture::CustomCorruption::Field8CustomEntry,
     )?;
     let payload = fixture::format_list_payload(&field8)?;
-    let mut fields = RawWireFields::new(&payload);
+    let mut fields =
+        RawWireFields::new(&payload, litchi_iwa_common::wire::RawWireLimits::default());
     let mut saw_field8 = false;
     while let Some(field) = fields.next()? {
         if field.number() != 3 {

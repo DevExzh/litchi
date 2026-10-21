@@ -717,7 +717,7 @@ where
             work,
         )
         .map_err(map_common_error)?;
-        let mut parser = RawWireFields::with_limits(remaining, limits);
+        let mut parser = RawWireFields::new(remaining, limits);
         let before_fields = parser.fields();
         let before_work = parser.work();
         let field = parser

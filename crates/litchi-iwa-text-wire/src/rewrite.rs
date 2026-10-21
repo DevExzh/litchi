@@ -842,7 +842,7 @@ impl<'source> RawFields<'source> {
         )
         .map_err(map_common_wire_error)?;
         Ok(Self {
-            inner: CommonRawWireFields::with_limits(source, raw_limits),
+            inner: CommonRawWireFields::new(source, raw_limits),
         })
     }
 

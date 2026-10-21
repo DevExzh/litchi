@@ -132,6 +132,9 @@ Gate rules added by record 0351 (`tools/api_glossary.json`, §11): affix bans
 `into_snapshot`, the `Mutable` prefix and the `_with_limits` suffix are banned
 in every profile whose crate already has none; each wave adds the bans for its
 crates when it removes the last use.
+Record 0362b also inventories the exact name `with_limits`; each migrated
+profile bans that name alongside the suffix. Raw and record constructors take
+their limits as a required argument.
 
 ### Migration status by wave (record 0351)
 

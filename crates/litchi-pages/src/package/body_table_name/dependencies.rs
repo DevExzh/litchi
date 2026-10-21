@@ -314,7 +314,7 @@ fn pivot_owner_identifier(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut pivot = None;
     let mut max_depth = 0usize;
     while let Some(field) = fields.next().map_err(map_raw_wire_error)? {

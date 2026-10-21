@@ -393,7 +393,7 @@ impl Decoder {
         }
         let raw_limits =
             RawWireLimits::new(source.len().max(1), remaining_fields, 0, remaining_work)?;
-        let mut fields = RawWireFields::with_limits(source, raw_limits);
+        let mut fields = RawWireFields::new(source, raw_limits);
         loop {
             let before_fields = fields.fields();
             let before_work = fields.work();

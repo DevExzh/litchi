@@ -1678,7 +1678,7 @@ fn validate_aggregate_tracker_shape(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut seen = [false; 3];
     while let Some(field) = fields.next().map_err(map_wire_error)? {
         budget
@@ -1738,7 +1738,7 @@ fn validate_owner_id_map(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut entries = 0usize;
     let mut matched = false;
     let mut unregistered = false;
@@ -1802,7 +1802,7 @@ fn validate_owner_id_map_entry(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut internal_id = None;
     let mut uid = None;
     let mut max_depth = 0usize;
@@ -1855,7 +1855,7 @@ fn parse_cfuuid_words(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut words = [None; 4];
     let mut max_depth = 0usize;
     while let Some(field) = fields.next().map_err(map_wire_error)? {
@@ -1918,7 +1918,7 @@ fn validate_empty_formula_owner_dependencies(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut dependency_fields = [false; 17];
     let mut max_depth = 0usize;
     while let Some(field) = fields.next().map_err(map_wire_error)? {
@@ -1979,7 +1979,7 @@ fn validate_empty_dependency_children(
     budget
         .charge_payload_work(source.len())
         .map_err(map_lock_error)?;
-    let mut fields = RawWireFields::with_limits(source, limits);
+    let mut fields = RawWireFields::new(source, limits);
     let mut seen = [false; 8];
     let mut max_depth = 0usize;
     while let Some(field) = fields.next().map_err(map_wire_error)? {
