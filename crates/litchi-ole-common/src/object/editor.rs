@@ -318,10 +318,15 @@ impl Edit {
         layout: SectorLayoutPolicy,
     ) -> Self {
         let mut edit = Self::from_package(package);
-        let state = edit.state_mut();
-        state.limits = limits;
-        state.cfb_limits = cfb_limits;
-        state.layout = layout;
+        if edit.state.limits != limits
+            || edit.state.cfb_limits != cfb_limits
+            || edit.state.layout != layout
+        {
+            let state = edit.state_mut();
+            state.limits = limits;
+            state.cfb_limits = cfb_limits;
+            state.layout = layout;
+        }
         edit
     }
 
@@ -959,7 +964,11 @@ impl Edit {
         } else {
             Arc::clone(&self.state.original)
         };
-        let package = self.staged_with_current(Arc::clone(&after));
+        let package = if self.state.changed {
+            self.staged_with_current(Arc::clone(&after))
+        } else {
+            Package::from_state(Arc::clone(&self.state))
+        };
         let patch = Patch::new_shared(before, after);
         let diagnostics = Diagnostics::new(!patch.is_noop());
         Ok(Commit::new(package, patch, diagnostics))
