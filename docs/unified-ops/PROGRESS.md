@@ -932,6 +932,8 @@ Work packages, in waves of up to four agents:
 
 - Merged `w5-legacy` 0359a: `doc::body_text` and `xls::cell_values` crate-private behind `Package::edit`, their extra capabilities (compose/join, three-way, history, durable apply, transfer) now `Package` routes; DOC `source_backed::paragraph`, XLS `source_backed::{cells, comments, sheet_visibility}` and RTF `source_backed::tail_append` are deferred families (byte-identical, 0.44–1.00× the old publishers); `parts::{dofr, saved_selection}`; DOC paragraph `bold`/`italic` join the body run, so a 1k DOC batch with a raised limit is 0.91–1.04× the leaf (was 6.0× and 15.7 GB). Noted for W8: XLS/RTF source-backed patches also replay only onto their own owner.
 
+- Merged `w7-iwork` 0361a: the six `litchi-iwa-common::wire` operations take required `WireLimits` (`WireLimits::DEFAULT`; ~1,700 call sites, limits unchanged); `litchi-iwa-structured` conformed (`SemanticLimits` builder, `Error::Limit`/`InvalidLimit`, own glossary profile; unused in the workspace but kept per ADR 0028 for four capabilities only it has). iWork open routes within budget (callgrind ≤ +0.12%).
+
 ## Coordinator status (2026-10-19): code work for the definition of done complete
 The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
