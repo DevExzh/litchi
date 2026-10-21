@@ -2,7 +2,7 @@
 
 - Status: implemented on `uo2/w7-iwork`, cut from `feat/unified-ops-api` at
   `7f36f7b909`, merged with trunk `f8899dd2cb` (records 0356b, 0357b, 0358,
-  0358a).
+  0358a) and `720390ef28` (record 0359).
 - Date: 2026-10-20.
 - Input: owner decision [0350](0350-owner-api-debt-decision.md) items
   14–19; contract [0351](0351-api-contract.md) §2, §4.3, §5 (wave W7);
@@ -282,6 +282,30 @@ On the tree merged with trunk `f8899dd2cb`; every command exited 0.
 (it lacked `litchi-sheet-text` and `quick-xml` for `litchi-ops`, so
 `cargo build --locked` of the harness failed); it is refreshed with
 `cargo metadata --offline` (12 added lines, no version change).
+
+### 9.1 After the trunk merge `720390ef28` (record 0359)
+
+Merge `cee98f7b28` (conflicts only in the bench-matrix tool's parser list
+and its generated Markdown, regenerated). Re-run, each exit 0: fmt; the
+all-features clippy above and the four litchi-ops feature sets; leaf,
+litchi-iwa, facade and cli tests (5,369 passed); the chunked litchi-ops
+suite (2,642 passed, 7 ignored); goldens in both feature sets (unchanged);
+pyo3 `run_tests.sh`; docs; perf-baseline `--locked`; the full glossary
+gate (47 profiles, 3,207 bans, 492 families, 73 immutable owners, family
+methods in 30 profiles); boundaries; non-iWork gate; the tool unit tests;
+the OfficeCLI delta/corpus, bench-matrix and feature-matrix (31 ok)
+checks.
+
+### 9.2 Commits
+
+| Commit | Content |
+|---|---|
+| `9810d38be5` | leaf triad, single-operation families, options ingress, aliases, gate registration |
+| `23f46568c6` | `check_iwork_leaf_public_api` per-crate semantic module |
+| `e0632a4240` | `litchi-iwa`: `Package`, drafts, no deprecated items, `media::OpenOptions` |
+| `a587b2b3d5` | refusal taxonomy, `Limit`, litchi-ops classification by kind |
+| `624c8092ba` | classification test, `UnverifiedAxisChange`, harness lock |
+| `5a960f58f1` | this record, evidence, bench matrix, glossary W7 line |
 
 ## 10. Gaps and follow-ups
 
