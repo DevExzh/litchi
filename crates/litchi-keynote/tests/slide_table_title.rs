@@ -260,7 +260,7 @@ fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> T
 }
 
 fn unknown_value(payload: &[u8]) -> TestResult<u64> {
-    let fields = WireView::parse(payload)?;
+    let fields = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let field = fields
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)

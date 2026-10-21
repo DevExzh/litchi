@@ -27,7 +27,7 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, encode_varint_into,
     varint::encoded_len,
-    wire::{WireField, WireView, parse_wire_fields_with_limits},
+    wire::{WireField, WireView, parse_wire_fields},
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
@@ -1322,20 +1322,19 @@ fn chart_graph(
         return Err(Error::InvalidSource);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = parse_wire_fields_with_limits(chart_data, limits).map_err(map_wire_error)?;
+    let outer = parse_wire_fields(chart_data, limits).map_err(map_wire_error)?;
     let super_payload = unique_length_delimited_field(&outer, chart_data, DRAWABLE_SUPER_FIELD)?
         .ok_or(Error::InvalidSource)?;
     let chart_payload = unique_length_delimited_field(&outer, chart_data, CHART_EXTENSION_FIELD)?
         .ok_or(Error::InvalidSource)?;
-    let drawable = parse_wire_fields_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let drawable = parse_wire_fields(super_payload, limits).map_err(map_wire_error)?;
     let parent = required_reference_field(&drawable, super_payload, DRAWABLE_PARENT_FIELD, limits)?;
     let title_identifier =
         required_reference_field(&drawable, super_payload, DRAWABLE_TITLE_FIELD, limits)?;
     if parent != record.slide_identifier || title_identifier == 0 {
         return Err(Error::InvalidSource);
     }
-    let chart_fields =
-        parse_wire_fields_with_limits(chart_payload, limits).map_err(map_wire_error)?;
+    let chart_fields = parse_wire_fields(chart_payload, limits).map_err(map_wire_error)?;
     if let Some(mediator_payload) =
         unique_length_delimited_field(&chart_fields, chart_payload, CHART_MEDIATOR_FIELD)?
     {
@@ -1630,7 +1629,7 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut references = Vec::new();
     references
         .try_reserve(fields.len())
@@ -1759,7 +1758,7 @@ impl ChartGraphScanBudget {
 
     fn parse(&mut self, payload: &[u8]) -> Result<Vec<WireField>, Error> {
         self.charge(payload.len())?;
-        let fields = parse_wire_fields_with_limits(payload, self.limits).map_err(map_wire_error)?;
+        let fields = parse_wire_fields(payload, self.limits).map_err(map_wire_error)?;
         self.charge(fields.len())?;
         Ok(fields)
     }
@@ -2980,7 +2979,7 @@ fn validate_canonical_object_length_prefixes(
 }
 
 fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, Error> {
-    let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
+    let fields = parse_wire_fields(data, limits).map_err(map_wire_error)?;
     let mut extension_field = None;
     let mut extension_count = 0usize;
     for field in &fields {

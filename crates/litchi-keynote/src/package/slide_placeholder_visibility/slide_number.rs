@@ -130,7 +130,7 @@ pub(super) fn validate_node_references(
     let scan_work = payload.len().checked_mul(2).ok_or(Error::InvalidSource)?;
     budget.charge_work(scan_work)?;
     charge_reference_metadata_scan(node, message_index, budget)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let relevant_count = view
         .fields()
         .filter(|field| matches!(field.number(), 1 | 3 | 9))
@@ -202,8 +202,7 @@ pub(super) fn validate_global_ownership(
                     continue;
                 }
                 budget.charge_work(message.data.len())?;
-                let view =
-                    WireView::parse_with_limits(&message.data, limits).map_err(map_wire_error)?;
+                let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
                 let mut slide_number = None;
                 for field in view.fields() {
                     field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -272,7 +271,7 @@ fn visit_storage_dependencies(
 ) -> Result<(), Error> {
     const ATTRIBUTE_TABLE_FIELDS: [u32; 10] = [5, 7, 8, 11, 12, 15, 16, 17, 18, 21];
 
-    let storage = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let storage = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in storage.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if matches!(field.wire_type(), 3 | 4) {
@@ -291,7 +290,7 @@ fn visit_storage_dependencies(
         if field.wire_type() != 2 {
             return Err(Error::InvalidSource);
         }
-        let table = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let table = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         for entry in table.fields() {
             entry.validate_canonical_framing().map_err(map_wire_error)?;
             if matches!(entry.wire_type(), 3 | 4) {
@@ -303,8 +302,7 @@ fn visit_storage_dependencies(
             if entry.wire_type() != 2 {
                 return Err(Error::InvalidSource);
             }
-            let members =
-                WireView::parse_with_limits(entry.payload(), limits).map_err(map_wire_error)?;
+            let members = WireView::parse(entry.payload(), limits).map_err(map_wire_error)?;
             for member in members.fields() {
                 member
                     .validate_canonical_framing()
@@ -454,8 +452,7 @@ pub(super) fn validate_storage(
     if table.wire_type() != 2 || storage_projection.attachment_table() != Some(table.payload()) {
         return Err(Error::InvalidSource);
     }
-    let table_view =
-        WireView::parse_with_limits(table.payload(), limits).map_err(map_wire_error)?;
+    let table_view = WireView::parse(table.payload(), limits).map_err(map_wire_error)?;
     let mut entry = None;
     for field in table_view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -472,8 +469,8 @@ pub(super) fn validate_storage(
     if attachment_entry_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let entry_view = WireView::parse_with_limits(attachment_entry_field.payload(), limits)
-        .map_err(map_wire_error)?;
+    let entry_view =
+        WireView::parse(attachment_entry_field.payload(), limits).map_err(map_wire_error)?;
     let mut character_index = None;
     let mut attachment_identifier = None;
     for field in entry_view.fields() {
@@ -563,8 +560,7 @@ pub(super) fn validate_storage(
     if super_field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let super_view =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut attachment_kind = None;
     for field in super_view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;

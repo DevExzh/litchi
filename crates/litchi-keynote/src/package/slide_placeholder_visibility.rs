@@ -1070,7 +1070,7 @@ fn validate_rooted_placeholder_locality(
         if info.object_references.contains(&placeholder_identifier) {
             return Err(Error::InvalidSource);
         }
-        let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+        let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
         for field in view.fields() {
             field.validate_canonical_framing().map_err(map_wire_error)?;
             if matches!(field.wire_type(), 3 | 4) {
@@ -1101,7 +1101,7 @@ fn visibility_snapshot(
     node_slide_number_visible: bool,
     limits: WireLimits,
 ) -> Result<Option<(u64, State)>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let role_field = match kind {
         Kind::Title => TITLE_REFERENCE_FIELD,
         Kind::Body => BODY_REFERENCE_FIELD,
@@ -1181,7 +1181,7 @@ fn strict_reference_with_zero(
     if field.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+    let view = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut external = None;
@@ -1402,7 +1402,7 @@ fn validate_placeholder_reference_closure(
     if drawable.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(drawable.payload(), limits).map_err(map_wire_error)?;
+    let view = WireView::parse(drawable.payload(), limits).map_err(map_wire_error)?;
     let dependency_count = view
         .fields()
         .filter(|field| matches!(field.number(), 6 | 9 | 10 | 11))
@@ -1742,7 +1742,7 @@ fn validate_mutation_payload(
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let slide = WireView::parse_with_limits(slide_payload, limits).map_err(map_wire_error)?;
+    let slide = WireView::parse(slide_payload, limits).map_err(map_wire_error)?;
     let field_count = slide.fields().count();
     let mut builds = HashSet::new();
     builds
@@ -2048,8 +2048,7 @@ fn validate_style_visibility(
     budget.charge_work(payload.len())?;
     reject_groups(payload, limits)?;
     if let Some(properties) = nested_unique_field(payload, &[11], limits)? {
-        let view =
-            WireView::parse_with_limits(properties.payload(), limits).map_err(map_wire_error)?;
+        let view = WireView::parse(properties.payload(), limits).map_err(map_wire_error)?;
         for field in view.fields() {
             field.validate_canonical_framing().map_err(map_wire_error)?;
             let selected_override = match kind {
@@ -2084,7 +2083,7 @@ fn validate_build_dependency(
             .get(index)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let field_count = view.fields().count();
     let payload_work = field_count
         .checked_mul(2)
@@ -2117,7 +2116,7 @@ fn validate_build_dependency(
 }
 
 fn reject_groups(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
         if matches!(field.wire_type(), 3 | 4) {
@@ -2135,7 +2134,7 @@ fn nested_unique_field<'a>(
     let Some((&number, rest)) = path.split_first() else {
         return Err(Error::InvalidSource);
     };
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut found = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;

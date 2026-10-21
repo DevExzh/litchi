@@ -451,12 +451,15 @@ fn assert_invalid_metadata_source(source: &[u8]) -> TestResult<()> {
 }
 
 fn lock_field(payload: &[u8]) -> TestResult<Option<bool>> {
-    let outer = WireView::parse(payload)?;
+    let outer = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = outer
         .fields()
         .find(|field| field.number() == 1)
         .ok_or("missing table-info super")?;
-    let drawable = WireView::parse(super_field.payload())?;
+    let drawable = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let Some(field) = drawable.fields().find(|field| field.number() == 5) else {
         return Ok(None);
     };
@@ -472,11 +475,16 @@ fn lock_field(payload: &[u8]) -> TestResult<Option<bool>> {
 }
 
 fn has_unknown_table_info_field(payload: &[u8]) -> TestResult<bool> {
-    Ok(WireView::parse(payload)?.fields().any(|field| {
-        field.number() == UNKNOWN_TABLE_INFO_FIELD
-            && decode_varint_from_bytes(field.payload())
-                .is_ok_and(|(value, width)| value == 0xfeed_beef && width == field.payload().len())
-    }))
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .any(|field| {
+                field.number() == UNKNOWN_TABLE_INFO_FIELD
+                    && decode_varint_from_bytes(field.payload()).is_ok_and(|(value, width)| {
+                        value == 0xfeed_beef && width == field.payload().len()
+                    })
+            }),
+    )
 }
 
 fn sentinel_payload(package: &[u8]) -> TestResult<Vec<u8>> {

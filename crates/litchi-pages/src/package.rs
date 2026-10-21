@@ -1934,7 +1934,7 @@ fn footnote_table_entries(
 ) -> PackageResult<Vec<NativeFootnoteReference>> {
     let wire_limits = storage_wire_limits(limits)?;
     let context = format!("Pages body object {body_identifier}");
-    let body_view = WireView::parse_with_limits(body_payload, wire_limits).map_err(|error| {
+    let body_view = WireView::parse(body_payload, wire_limits).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })?;
     let Some(table_field) =
@@ -1942,12 +1942,11 @@ fn footnote_table_entries(
     else {
         return Ok(Vec::new());
     };
-    let table_view =
-        WireView::parse_with_limits(table_field.payload(), wire_limits).map_err(|error| {
-            PackageError::InvalidFormat(format!(
-                "{context} footnote table has invalid protobuf wire data: {error}"
-            ))
-        })?;
+    let table_view = WireView::parse(table_field.payload(), wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "{context} footnote table has invalid protobuf wire data: {error}"
+        ))
+    })?;
     let boundary_options = pages_body_options(limits)?;
     let mut entries = Vec::new();
     for field in table_view
@@ -2186,7 +2185,7 @@ fn footnote_marker_identifier(
 ) -> PackageResult<NonZeroU64> {
     let wire_limits = storage_wire_limits(limits)?;
     let context = format!("Pages footnote storage object {storage_identifier}");
-    let view = WireView::parse_with_limits(storage_payload, wire_limits).map_err(|error| {
+    let view = WireView::parse(storage_payload, wire_limits).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })?;
     let kind = unique_wire_field(&view, STORAGE_KIND_FIELD, 0, true, &context)?
@@ -2201,12 +2200,11 @@ fn footnote_marker_identifier(
         unique_wire_field(&view, TABLE_ATTACHMENT_FIELD, 2, true, &context)?.ok_or_else(|| {
             PackageError::InvalidFormat(format!("{context} has no marker attachment table"))
         })?;
-    let table_view =
-        WireView::parse_with_limits(table.payload(), wire_limits).map_err(|error| {
-            PackageError::InvalidFormat(format!(
-                "{context} marker attachment table has invalid protobuf wire data: {error}"
-            ))
-        })?;
+    let table_view = WireView::parse(table.payload(), wire_limits).map_err(|error| {
+        PackageError::InvalidFormat(format!(
+            "{context} marker attachment table has invalid protobuf wire data: {error}"
+        ))
+    })?;
     let boundary_options = pages_body_options(limits)?;
     let mut marker = None;
     for field in table_view
@@ -2438,7 +2436,7 @@ fn preflight_section_table_entry(
 }
 
 fn parse_wire<'a>(payload: &'a [u8], context: &str) -> PackageResult<WireView<'a>> {
-    WireView::parse(payload).map_err(|error| {
+    WireView::parse(payload, WireLimits::DEFAULT).map_err(|error| {
         PackageError::InvalidFormat(format!("{context} has invalid protobuf wire data: {error}"))
     })
 }

@@ -247,11 +247,13 @@ fn metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn metadata_root_field(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn data_metadata_map_payload(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {

@@ -1476,7 +1476,7 @@ fn rewrite_custom_mark_wire(
     after: Option<&str>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 3) {
         if selected.is_some() || field.wire_type() != 2 {

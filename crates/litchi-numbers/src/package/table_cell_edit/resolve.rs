@@ -619,8 +619,9 @@ fn validate_model_owners(
     payload: &[u8],
     path: Path,
 ) -> Result<ModelOwnerMarkers, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut category_reference = None;
     let mut filter_reference = None;
     let mut haunted = None;
@@ -800,8 +801,9 @@ fn validate_model_owners(
 }
 
 fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner = None;
     for field in view.fields() {
         if field.wire_type() != 2 || field.validate_canonical_framing().is_err() {
@@ -822,7 +824,9 @@ fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool,
 }
 
 fn parse_single_uuid_owner(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let owner = fields.next()?;
     if fields.next().is_some()
@@ -873,8 +877,9 @@ fn validate_inert_filter_payload(
     kind: DependencyKind,
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut seen = [false; 4];
     for field in view.fields() {
         field
@@ -927,8 +932,9 @@ fn validate_inert_hidden_states_owner(
     payload: &[u8],
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner_uid = false;
     let mut hidden_states = 0usize;
     for field in view.fields() {
@@ -958,8 +964,9 @@ fn validate_inert_hidden_states_owner(
 }
 
 fn validate_inert_hidden_states(source: &Package, payload: &[u8], path: Path) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut uid = false;
     let mut column = false;
     let mut row = false;
@@ -997,8 +1004,9 @@ fn validate_inert_hidden_extent(
     expected_direction: u64,
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut uid = false;
     let mut direction = false;
     let mut import_flag = false;
@@ -1052,7 +1060,9 @@ fn validate_inert_hidden_extent(
 }
 
 fn inert_merge_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1076,7 +1086,10 @@ fn inert_merge_owner(source: &[u8]) -> bool {
     {
         return false;
     }
-    let Ok(store_view) = litchi_iwa_common::wire::WireView::parse(store.payload()) else {
+    let Ok(store_view) = litchi_iwa_common::wire::WireView::parse(
+        store.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    ) else {
         return false;
     };
     let mut store_fields = store_view.fields();
@@ -1097,7 +1110,9 @@ fn inert_merge_owner(source: &[u8]) -> bool {
 }
 
 fn inert_single_uuid_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1112,7 +1127,9 @@ fn inert_single_uuid_owner(source: &[u8]) -> bool {
 }
 
 fn inert_sort_order(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1133,7 +1150,9 @@ fn inert_sort_order(source: &[u8]) -> bool {
 }
 
 fn parse_sort_rule_tracker(source: &[u8]) -> Option<u64> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let reference = fields.next()?;
     if reference.number() != 1
@@ -1157,7 +1176,9 @@ fn require_owner_marker(
 }
 
 fn parse_spill_owner(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let owner = fields.next()?;
     if fields.next().is_some()
@@ -1179,7 +1200,9 @@ fn parse_uuid(source: &[u8]) -> Option<UuidKey> {
 }
 
 fn parse_cfuuid(source: &[u8]) -> Option<UuidKey> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let first = fields.next()?;
     if first.number() == 1 {
@@ -1211,7 +1234,9 @@ fn parse_cfuuid(source: &[u8]) -> Option<UuidKey> {
 }
 
 fn parse_varint_fields<const N: usize>(source: &[u8], expected: [u32; N]) -> Option<[u64; N]> {
-    let view = litchi_iwa_common::wire::WireView::parse(source).ok()?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
     let mut fields = view.fields();
     let first = fields.next()?;
     parse_varint_field_iter(first, fields, expected)
@@ -1249,8 +1274,9 @@ fn parse_owner_id_map(
     budget: &mut ResolutionBudget,
     path: Path,
 ) -> Result<(Vec<OwnerIdentity>, usize), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(source)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let count = view.fields().try_fold(0usize, |count, field| {
         if field.number() != 1
             || field.wire_type() != 2
@@ -1263,8 +1289,11 @@ fn parse_owner_id_map(
     let mut identities = budget.reserve_scratch(count, LimitKind::References)?;
     let mut fields = count;
     for field in view.fields() {
-        let entry = litchi_iwa_common::wire::WireView::parse(field.payload())
-            .map_err(|_error| Error::InvalidSource { path })?;
+        let entry = litchi_iwa_common::wire::WireView::parse(
+            field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_error| Error::InvalidSource { path })?;
         let mut entry_fields = entry.fields();
         let internal_field = entry_fields.next().ok_or(Error::InvalidSource { path })?;
         let uid_field = entry_fields.next().ok_or(Error::InvalidSource { path })?;
@@ -1314,14 +1343,16 @@ fn reject_unresolved_owner_markers(markers: ModelOwnerMarkers, path: Path) -> Re
 }
 
 fn spill_sizes_active(payload: &[u8], path: Path) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| {
-        Error::Refused(
-            crate::package::table_cells::Refusal::UnsupportedDependency {
-                path,
-                kind: DependencyKind::Spill,
-            },
-        )
-    })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| {
+            Error::Refused(
+                crate::package::table_cells::Refusal::UnsupportedDependency {
+                    path,
+                    kind: DependencyKind::Spill,
+                },
+            )
+        })?;
     let mut active = false;
     for field in view.fields() {
         if field.number() != 1
@@ -1541,8 +1572,9 @@ fn validate_selected_cell_dependency_wire(
     records: &[SelectedCellRecord],
     path: Path,
 ) -> Result<usize, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut count = 0usize;
     for (field, record) in view.fields().zip(records.iter()) {
         if field.number() != 1
@@ -1565,8 +1597,9 @@ fn selected_cell_record_wire(
     record: SelectedCellRecord,
     path: Path,
 ) -> Result<bool, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut column = false;
     let mut row = false;
     let mut edges = false;
@@ -1588,7 +1621,9 @@ fn selected_cell_record_wire(
 }
 
 fn selected_expanded_edges_wire(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     view.fields().all(|field| {
@@ -1653,7 +1688,9 @@ fn selected_spanning_dependencies(
     else {
         return false;
     };
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut total = false;
@@ -1687,12 +1724,14 @@ fn selected_spanning_dependencies(
 }
 
 fn empty_message(payload: &[u8]) -> bool {
-    litchi_iwa_common::wire::WireView::parse(payload)
+    litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
         .is_ok_and(|view| view.fields().next().is_none())
 }
 
 fn empty_volatile_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut seen = [false; 7];
@@ -1714,7 +1753,9 @@ fn empty_volatile_dependencies(payload: &[u8]) -> bool {
 }
 
 fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1729,7 +1770,9 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
 }
 
 fn empty_spanning_dependencies(payload: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(payload) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut total = false;
@@ -1838,7 +1881,9 @@ fn resolve_sort_rule_tracker(
 }
 
 fn inert_hidden_state_owner(source: &[u8]) -> bool {
-    let Ok(view) = litchi_iwa_common::wire::WireView::parse(source) else {
+    let Ok(view) =
+        litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+    else {
         return false;
     };
     let mut fields = view.fields();
@@ -1884,8 +1929,9 @@ fn resolve_merge_map(
     require_declared(model_object, model_message, id, &[4, 13], path)?;
     let (resolved, index, payload) =
         resolve_exact_message(source, id, &DATA_LIST_MESSAGE_TYPES, path)?;
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut active = false;
     let mut field_count = 0usize;
     for field in view.fields() {
@@ -3112,8 +3158,9 @@ fn resolve_rich_payload(
     if resolved.messages.len() != 1 {
         return Err(Error::InvalidSource { path });
     }
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut storage = None;
     let mut cell_id = false;
     for field in view.fields() {
@@ -4221,8 +4268,9 @@ fn validate_selected_cell_tile_wire(
     records: &[SelectedCellRecord],
     path: Path,
 ) -> Result<(), Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(payload)
-        .map_err(|_error| Error::InvalidSource { path })?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource { path })?;
     let mut owner = false;
     let mut column = false;
     let mut row = false;

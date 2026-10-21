@@ -1006,12 +1006,12 @@ fn changed_appearance_cows_shared_style_preserves_unknowns_and_locality() -> Tes
     assert_ne!(source, target);
     let model = model_payload(&target, FIRST_MODEL_IDENTIFIER)?;
     assert!(
-        WireView::parse(&model)?
+        WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == UNKNOWN_MODEL_FIELD)
     );
     assert!(style_payloads(&target)?.iter().any(|payload| {
-        WireView::parse(payload)
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map(|view| view.fields().any(|field| field.number() == 90))
             .unwrap_or(false)
     }));
@@ -1091,6 +1091,7 @@ fn malformed_unknown_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() 
             ..tsp::Reference::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let cases = [
         ("duplicate known", duplicate_known),

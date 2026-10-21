@@ -864,7 +864,7 @@ fn classify_cell(cell: &BncCell) -> Result<Option<u32>, Error> {
 
 fn format_type(source: &[u8], package: &Package, budget: &mut core::Budget) -> Result<u32, Error> {
     let limits = budget.residual(package).map_err(map_core_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut selected = None;
     for field in view.fields() {
         budget.fields(1).map_err(map_core_error)?;
@@ -2024,7 +2024,8 @@ fn field_bytes<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>,
 }
 
 fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8], CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == 5) {
         if field.wire_type() != 2 {
@@ -2033,7 +2034,8 @@ fn tile_cell(source: &[u8], row: u32, column: u32) -> Result<&[u8], CellWireErro
         let payload = field
             .canonical_payload()
             .map_err(|_| CellWireError::Invalid)?;
-        let row_view = WireView::parse(payload).map_err(|_| CellWireError::Invalid)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| CellWireError::Invalid)?;
         let Some(row_index) = field_varint(&row_view, 1)? else {
             return Err(CellWireError::Invalid);
         };
@@ -2057,7 +2059,8 @@ fn patch_tile_cell(
     column: u32,
     replacement: &[u8],
 ) -> Result<Vec<u8>, CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let mut output = Vec::new();
     output
         .try_reserve(source.len().saturating_add(replacement.len()))
@@ -2074,7 +2077,8 @@ fn patch_tile_cell(
         let payload = field
             .canonical_payload()
             .map_err(|_| CellWireError::Invalid)?;
-        let row_view = WireView::parse(payload).map_err(|_| CellWireError::Invalid)?;
+        let row_view = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| CellWireError::Invalid)?;
         let row_index = field_varint(&row_view, 1)?
             .ok_or(CellWireError::Invalid)
             .and_then(|value| u32::try_from(value).map_err(|_| CellWireError::Invalid))?;
@@ -2086,8 +2090,13 @@ fn patch_tile_cell(
             return Err(CellWireError::Invalid);
         }
         let patched_row = patch_row_cell(payload, column, replacement)?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut output, 5, &patched_row)
-            .map_err(|_| CellWireError::Invalid)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut output,
+            5,
+            &patched_row,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_| CellWireError::Invalid)?;
         selected = true;
     }
     if !selected {
@@ -2188,7 +2197,8 @@ fn patch_row_cell(
     column: u32,
     replacement: &[u8],
 ) -> Result<Vec<u8>, CellWireError> {
-    let view = WireView::parse(source).map_err(|_| CellWireError::Invalid)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| CellWireError::Invalid)?;
     let cell_count = field_varint(&view, 2)?.ok_or(CellWireError::Invalid)?;
     let buffer = field_bytes(&view, 6)?.ok_or(CellWireError::Invalid)?;
     let (patched_buffer, patched_offsets) =
@@ -2204,16 +2214,26 @@ fn patch_row_cell(
             if replaced {
                 return Err(CellWireError::Invalid);
             }
-            litchi_iwa_common::wire::append_length_delimited_field(&mut output, 6, &patched_buffer)
-                .map_err(|_| CellWireError::Invalid)?;
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut output,
+                6,
+                &patched_buffer,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(|_| CellWireError::Invalid)?;
             replaced = true;
         } else if field.number() == 7 {
             if let Some(offsets) = patched_offsets.as_deref() {
                 if offsets_replaced {
                     return Err(CellWireError::Invalid);
                 }
-                litchi_iwa_common::wire::append_length_delimited_field(&mut output, 7, offsets)
-                    .map_err(|_| CellWireError::Invalid)?;
+                litchi_iwa_common::wire::append_length_delimited_field(
+                    &mut output,
+                    7,
+                    offsets,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(|_| CellWireError::Invalid)?;
                 offsets_replaced = true;
             } else {
                 output.extend_from_slice(field.raw());

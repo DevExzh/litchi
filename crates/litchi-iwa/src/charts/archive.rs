@@ -8,14 +8,12 @@ use std::collections::{HashMap, HashSet};
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{encode_varint_to_buffer, encoded_len};
-use litchi_iwa_common::wire::parse_wire_fields_with_limits;
+use litchi_iwa_common::wire::parse_wire_fields;
 use litchi_iwa_protos::chart_grid_creation_codec::EncodeOutput;
 use prost::{Message, bytes::Buf};
 
 use crate::protobuf::{tsch, tsp};
-use crate::wire::{
-    WireField, append_length_delimited_field, append_varint_field, parse_wire_fields,
-};
+use crate::wire::{WireField, append_length_delimited_field, append_varint_field};
 use crate::{Error, Result};
 
 const DRAWABLE_SUPER_FIELD: u32 = 1;
@@ -114,7 +112,8 @@ impl IWorkChartArchive {
         match (existing_index, reference_lines) {
             (Some(index), Some(reference_lines)) => {
                 let current = next_chart_opaque_fields[index].as_slice();
-                let current_fields = parse_wire_fields(current)?;
+                let current_fields =
+                    parse_wire_fields(current, litchi_iwa_common::WireLimits::DEFAULT)?;
                 let [current_field] = current_fields.as_slice() else {
                     return Err(Error::InvalidFormat(
                         "stored chart extension is not exactly one wire field".to_owned(),
@@ -140,7 +139,8 @@ impl IWorkChartArchive {
             },
             (Some(index), None) => {
                 let current = next_chart_opaque_fields[index].as_slice();
-                let current_fields = parse_wire_fields(current)?;
+                let current_fields =
+                    parse_wire_fields(current, litchi_iwa_common::WireLimits::DEFAULT)?;
                 let [current_field] = current_fields.as_slice() else {
                     return Err(Error::InvalidFormat(
                         "stored chart extension is not exactly one wire field".to_owned(),
@@ -169,7 +169,7 @@ impl IWorkChartArchive {
                 let index = next_chart_opaque_fields
                     .iter()
                     .position(|field| {
-                        parse_wire_fields(field)
+                        parse_wire_fields(field, litchi_iwa_common::WireLimits::DEFAULT)
                             .ok()
                             .and_then(|fields| fields.first().map(|field| field.number()))
                             .is_some_and(|number| number > CHART_REFERENCE_LINES_EXTENSION_FIELD)
@@ -316,12 +316,14 @@ impl IWorkChartArchive {
     }
 
     fn decode_with_chart_grid(data: &[u8], include_chart_grid: bool) -> Result<Self> {
-        let fields = parse_wire_fields(data)?;
+        let fields = parse_wire_fields(data, litchi_iwa_common::WireLimits::DEFAULT)?;
         let chart_field = unique_field(&fields, CHART_EXTENSION_FIELD)?;
         let chart_data = chart_field
             .map(|field| length_delimited_payload(data, field))
             .transpose()?;
-        let chart_fields = chart_data.map(parse_wire_fields).transpose()?;
+        let chart_fields = chart_data
+            .map(|chart_data| parse_wire_fields(chart_data, WireLimits::DEFAULT))
+            .transpose()?;
         let chart = match (chart_data, chart_fields.as_deref(), include_chart_grid) {
             (Some(chart_data), Some(_chart_fields), true) => {
                 Some(tsch::ChartArchive::decode(chart_data)?)
@@ -419,7 +421,7 @@ fn insert_length_delimited_field(
     field_number: u32,
     payload: &[u8],
 ) -> Result<()> {
-    let insertion = parse_wire_fields(output)?
+    let insertion = parse_wire_fields(output, litchi_iwa_common::WireLimits::DEFAULT)?
         .into_iter()
         .find(|field| field.number() > field_number)
         .map_or(output.len(), WireField::start);
@@ -590,7 +592,7 @@ fn reference_lines_from_opaque_fields(
     else {
         return Ok(None);
     };
-    let fields = parse_wire_fields(encoded)?;
+    let fields = parse_wire_fields(encoded, litchi_iwa_common::WireLimits::DEFAULT)?;
     let field = unique_field(&fields, CHART_REFERENCE_LINES_EXTENSION_FIELD)?.ok_or_else(|| {
         Error::InvalidFormat(
             "chart reference-line extension disappeared during decoding".to_owned(),
@@ -882,7 +884,7 @@ fn validate_reference_line_wire_message(
     schema: &[ReferenceLineWireFieldSpec],
 ) -> Result<()> {
     let limits = WireLimits::default().with_fields(MAX_REFERENCE_LINE_GRAPH_FIELDS)?;
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     validate_reference_line_wire_fields(data, &fields, schema)?;
     validate_reference_line_wire_nested_fields(data, &fields, schema)
 }
@@ -910,8 +912,8 @@ fn merge_reference_line_wire_message(
     schema: &[ReferenceLineWireFieldSpec],
 ) -> Result<Vec<u8>> {
     let limits = WireLimits::default().with_fields(MAX_REFERENCE_LINE_GRAPH_FIELDS)?;
-    let existing_fields = parse_wire_fields_with_limits(existing, limits)?;
-    let replacement_fields = parse_wire_fields_with_limits(replacement, limits)?;
+    let existing_fields = parse_wire_fields(existing, limits)?;
+    let replacement_fields = parse_wire_fields(replacement, limits)?;
     validate_reference_line_wire_fields(existing, &existing_fields, schema)?;
     validate_reference_line_wire_fields(replacement, &replacement_fields, schema)?;
     validate_reference_line_wire_nested_fields(existing, &existing_fields, schema)?;
@@ -1104,7 +1106,7 @@ fn append_reference_line_wire_bytes(
 /// chart extension path.
 fn preflight_reference_line_graph(data: &[u8]) -> Result<()> {
     let limits = WireLimits::default().with_fields(MAX_REFERENCE_LINE_GRAPH_FIELDS)?;
-    let fields = parse_wire_fields_with_limits(data, limits)?;
+    let fields = parse_wire_fields(data, limits)?;
     let mut axes = 0usize;
     let mut entries = 0usize;
     for field in fields {
@@ -1120,7 +1122,7 @@ fn preflight_reference_line_graph(data: &[u8]) -> Result<()> {
             )));
         }
         let axis_payload = length_delimited_payload(data, &field)?;
-        let axis_fields = parse_wire_fields_with_limits(axis_payload, limits)?;
+        let axis_fields = parse_wire_fields(axis_payload, limits)?;
         for axis_field in axis_fields {
             if axis_field.number() != 2 {
                 continue;
@@ -1131,7 +1133,7 @@ fn preflight_reference_line_graph(data: &[u8]) -> Result<()> {
                 })?;
             } else {
                 let sparse_payload = length_delimited_payload(axis_payload, &axis_field)?;
-                let sparse_fields = parse_wire_fields_with_limits(sparse_payload, limits)?;
+                let sparse_fields = parse_wire_fields(sparse_payload, limits)?;
                 entries = entries
                     .checked_add(
                         sparse_fields
@@ -1161,7 +1163,7 @@ fn unique_opaque_field(fields: &[Vec<u8>], field_number: u32) -> Result<Option<&
 fn unique_opaque_field_index(fields: &[Vec<u8>], field_number: u32) -> Result<Option<usize>> {
     let mut result = None;
     for (index, encoded) in fields.iter().enumerate() {
-        let parsed = parse_wire_fields(encoded)?;
+        let parsed = parse_wire_fields(encoded, litchi_iwa_common::WireLimits::DEFAULT)?;
         let [field] = parsed.as_slice() else {
             return Err(Error::InvalidFormat(
                 "stored chart extension is not exactly one wire field".to_owned(),
@@ -1797,7 +1799,8 @@ mod tests {
         let canonical =
             encoded_chart_extension_payload(CHART_REFERENCE_LINES_EXTENSION_FIELD, &payload)
                 .unwrap();
-        let canonical_fields = parse_wire_fields(&canonical).unwrap();
+        let canonical_fields =
+            parse_wire_fields(&canonical, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let [field] = canonical_fields.as_slice() else {
             panic!("encoded reference-line extension must have one field");
         };
@@ -1862,7 +1865,7 @@ mod tests {
             style_uuid,
         );
         let canonical = graph.encode_to_vec();
-        let fields = parse_wire_fields(&canonical).unwrap();
+        let fields = parse_wire_fields(&canonical, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let non_style_axis = length_delimited_payload(
             &canonical,
             fields.iter().find(|field| field.number() == 1).unwrap(),
@@ -1873,7 +1876,8 @@ mod tests {
             fields.iter().find(|field| field.number() == 2).unwrap(),
         )
         .unwrap();
-        let non_style_axis_fields = parse_wire_fields(non_style_axis).unwrap();
+        let non_style_axis_fields =
+            parse_wire_fields(non_style_axis, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let item = length_delimited_payload(
             non_style_axis,
             non_style_axis_fields
@@ -1882,7 +1886,7 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let item_fields = parse_wire_fields(item).unwrap();
+        let item_fields = parse_wire_fields(item, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let mut reference_payload = length_delimited_payload(
             item,
             item_fields
@@ -1917,7 +1921,8 @@ mod tests {
         append_length_delimited_field(&mut non_style_axis_with_unknown, 2, &item_with_unknown)
             .unwrap();
 
-        let style_axis_fields = parse_wire_fields(style_axis).unwrap();
+        let style_axis_fields =
+            parse_wire_fields(style_axis, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let sparse = length_delimited_payload(
             style_axis,
             style_axis_fields
@@ -1926,7 +1931,8 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let sparse_fields = parse_wire_fields(sparse).unwrap();
+        let sparse_fields =
+            parse_wire_fields(sparse, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let entry = length_delimited_payload(
             sparse,
             sparse_fields
@@ -1935,7 +1941,8 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let entry_fields = parse_wire_fields(entry).unwrap();
+        let entry_fields =
+            parse_wire_fields(entry, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
         let sparse_reference = length_delimited_payload(
             entry,
             entry_fields

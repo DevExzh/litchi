@@ -385,7 +385,12 @@ fn table_model(
     .encode_to_vec();
     if with_unknowns {
         append_varint_field(&mut payload, 99, 0xfeed_beef)?;
-        append_length_delimited_field(&mut payload, 100, b"physical-sort-unknown")?;
+        append_length_delimited_field(
+            &mut payload,
+            100,
+            b"physical-sort-unknown",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -885,7 +890,12 @@ fn rewrite_model_wire(package: &[u8], field: u32, payload: &[u8]) -> TestResult<
             .ok_or("missing table model")?;
         let message = model.messages.first().ok_or("missing model message")?;
         let mut bytes = message.data.clone();
-        append_length_delimited_field(&mut bytes, field, payload)?;
+        append_length_delimited_field(
+            &mut bytes,
+            field,
+            payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             0,
             RawMessage {
@@ -956,14 +966,24 @@ fn rewrite_repeated_child_wire(
 
 fn valid_cfuuid_owner_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &[1u8; 16])?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &[1u8; 16],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn valid_sort_tracker_payload() -> TestResult<Vec<u8>> {
     let mut payload = Vec::new();
     let reference = reference(FORMULAS).encode_to_vec();
-    append_length_delimited_field(&mut payload, 1, &reference)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &reference,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -974,7 +994,12 @@ fn valid_uuid_owner_payload() -> TestResult<Vec<u8>> {
     }
     .encode_to_vec();
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &uuid)?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &uuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -1791,7 +1816,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 100, b"opaque optional format state")?;
+            append_length_delimited_field(
+                bytes,
+                100,
+                b"opaque optional format state",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -1809,7 +1839,12 @@ fn aggregate_only_optional_format_routes_are_validated_and_preserved() -> TestRe
         OPTIONAL_CUSTOM_FORMATS,
         TABLE_DATA_LIST_MESSAGE_TYPE,
         |bytes| {
-            append_length_delimited_field(bytes, 4, &reference(TILE).encode_to_vec())?;
+            append_length_delimited_field(
+                bytes,
+                4,
+                &reference(TILE).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(())
         },
     )?;
@@ -2413,21 +2448,36 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "tile root",
             rewrite_object_wire(&source, TILE, TILE_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque tile state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque tile state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "tile row",
             rewrite_repeated_child_wire(&source, TILE, TILE_MESSAGE_TYPE, 5, 0, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque row state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque row state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
         (
             "row-header bucket root",
             rewrite_object_wire(&source, ROW_HEADERS, HEADER_BUCKET_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque bucket state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque bucket state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2440,7 +2490,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 2,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque header state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque header state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,
@@ -2448,7 +2503,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
         (
             "UID-map root",
             rewrite_object_wire(&source, UID_MAP, COLUMN_ROW_UID_MAP_MESSAGE_TYPE, |bytes| {
-                append_length_delimited_field(bytes, 100, b"opaque UID state")?;
+                append_length_delimited_field(
+                    bytes,
+                    100,
+                    b"opaque UID state",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 Ok(())
             })?,
         ),
@@ -2461,7 +2521,12 @@ fn unknown_mutable_physical_fields_are_rejected_atomically() -> TestResult {
                 4,
                 0,
                 |bytes| {
-                    append_length_delimited_field(bytes, 100, b"opaque UUID state")?;
+                    append_length_delimited_field(
+                        bytes,
+                        100,
+                        b"opaque UUID state",
+                        litchi_iwa_common::WireLimits::DEFAULT,
+                    )?;
                     Ok(())
                 },
             )?,

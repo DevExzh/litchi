@@ -594,7 +594,12 @@ fn text_converted_live_generic_number_payload_is_preserved_with_locality() -> Te
 
     let mut generic_payload = fixture::format_payload_by_key(&source, fixture::SECOND_FORMAT_KEY)?;
     append_varint_field(&mut generic_payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut generic_payload, 47, b"converted generic extension")?;
+    append_length_delimited_field(
+        &mut generic_payload,
+        47,
+        b"converted generic extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile = fixture::rewrite_format_payload_by_key(
         &source,
         fixture::SECOND_FORMAT_KEY,
@@ -789,7 +794,12 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"text extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"text extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile =
         fixture::rewrite_format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY, &payload)?;
     let root_before = fixture::format_list_payload(&hostile)?;
@@ -812,7 +822,7 @@ fn text_rewrite_preserves_unknown_format_wire_and_member_locality() -> TestResul
     );
     for field_number in [46, 47] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"

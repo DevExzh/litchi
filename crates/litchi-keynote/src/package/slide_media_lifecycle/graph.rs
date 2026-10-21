@@ -1128,13 +1128,8 @@ fn append_length_delimited(
     if output.capacity().saturating_sub(output.len()) < required {
         budget.charge_allocations(required)?;
     }
-    litchi_iwa_common::wire::append_length_delimited_field_with_limits(
-        output,
-        field_number,
-        payload,
-        limits,
-    )
-    .map_err(map_wire_error)
+    litchi_iwa_common::wire::append_length_delimited_field(output, field_number, payload, limits)
+        .map_err(map_wire_error)
 }
 
 fn copy_boxed(value: &str, budget: &mut LifecycleBudget) -> Result<Box<str>, Error> {
@@ -1169,7 +1164,7 @@ fn parse_view<'source>(
     // accounting internally.  Precharge the conservative source-width upper
     // bound before entering it so hostile nesting cannot allocate first.
     budget.charge_allocations(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.charge_wire_fields(view.len())?;
     Ok(view)
 }

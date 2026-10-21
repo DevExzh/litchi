@@ -482,7 +482,7 @@ fn changed_presence_preserves_unknowns_deletes_previews_and_inverts_exactly() ->
         b"untouched-sentinel"
     );
     let changed_model = model_payload(&commit.package().exact_bytes(), FIRST_MODEL_IDENTIFIER)?;
-    let unknown = WireView::parse(&changed_model)?
+    let unknown = WireView::parse(&changed_model, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
         .ok_or("unknown model field was dropped")?;

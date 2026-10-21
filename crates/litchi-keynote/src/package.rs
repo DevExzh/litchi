@@ -75,7 +75,7 @@ use std::time::Duration;
 use litchi_iwa_archive::{ComponentCatalog, Limits as ArchiveLimits, SourceCatalog};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
@@ -1349,7 +1349,7 @@ impl Package {
             "Keynote slide",
         )?;
         let wire_limits = self.semantic_wire_limits()?;
-        let view = WireView::parse_with_limits(payload, wire_limits).map_err(|error| {
+        let view = WireView::parse(payload, wire_limits).map_err(|error| {
             map_wire_preflight_error(error, "Keynote slide", SemanticPath::Slide { index })
         })?;
         let mut name = None;
@@ -1982,7 +1982,7 @@ fn preflight_document(payload: &[u8], wire_limits: WireLimits) -> ReadResult<()>
     let mut show_fields = 0usize;
     let mut show_identifier_fields = 0usize;
     let mut super_fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 2) => {
@@ -2335,7 +2335,7 @@ fn preflight_show(
     let mut root_slide_node_fields = 0usize;
     let mut slides = 0usize;
     let maximum = budget.limits.max_slides();
-    let result = preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    let result = preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], UI_STATE_FIELD) => {
@@ -2511,7 +2511,7 @@ fn validate_reference_payload(
     limits: WireLimits,
     context: &'static str,
 ) -> litchi_iwa_common::Result<u64> {
-    let view = WireView::parse_with_limits(payload, limits)?;
+    let view = WireView::parse(payload, limits)?;
     let mut identifier_fields = 0usize;
     let mut deprecated_type_fields = 0usize;
     let mut deprecated_external_fields = 0usize;
@@ -2540,7 +2540,7 @@ fn validate_reference_payload(
 }
 
 fn validate_size(payload: &[u8], limits: WireLimits) -> litchi_iwa_common::Result<()> {
-    let view = WireView::parse_with_limits(payload, limits)?;
+    let view = WireView::parse(payload, limits)?;
     let mut width_fields = 0usize;
     let mut height_fields = 0usize;
     for field in view.fields() {
@@ -2580,7 +2580,7 @@ fn preflight_slide<'source>(
     let mut database_duration = None;
     let mut animation_duration = None;
 
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -2799,7 +2799,7 @@ fn preflight_movie(
     path: SemanticPath,
 ) -> ReadResult<MoviePreflight> {
     let mut movie = MoviePreflight::default();
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -3149,7 +3149,7 @@ fn preflight_build<'source>(
     let mut database_duration = None;
     let mut animation_effect = None;
     let mut animation_duration = None;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 2) => {
@@ -3234,7 +3234,7 @@ fn decode_slide_node_projection(
 ) -> ReadResult<(u64, bool)> {
     let is_skipped = strict_slide_node_skipped(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide node", path))?;
     let mut slide_fields = 0usize;
     let mut slide_identifier = None;
@@ -3468,7 +3468,7 @@ fn decode_slide_repeated_references(
     context: &'static str,
     path: SemanticPath,
 ) -> ReadResult<Vec<u64>> {
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote slide", path))?;
     let mut references = Vec::new();
     references
@@ -3524,7 +3524,7 @@ fn decode_shape_storage_reference(
     let mut shape_super_fields = 0usize;
     let mut shape_drawable_super_fields = 0usize;
     let mut owned_storage_fields = 0usize;
-    preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
+    preflight_wire_tree(payload, wire_limits, |visit| {
         let field = visit.field();
         match (visit.path(), field.number()) {
             ([], 1) => {
@@ -3560,16 +3560,15 @@ fn decode_shape_storage_reference(
             "Keynote shape base archive is missing or duplicated".to_owned(),
         ));
     }
-    let view = WireView::parse_with_limits(payload, wire_limits)
+    let view = WireView::parse(payload, wire_limits)
         .map_err(|error| map_wire_preflight_error(error, "Keynote drawable shape", path))?;
     let mut storage_reference = None;
     for field in view.fields() {
         match field.number() {
             1 => {
-                let shape =
-                    WireView::parse_with_limits(field.payload(), wire_limits).map_err(|error| {
-                        map_wire_preflight_error(error, "Keynote shape base archive", path)
-                    })?;
+                let shape = WireView::parse(field.payload(), wire_limits).map_err(|error| {
+                    map_wire_preflight_error(error, "Keynote shape base archive", path)
+                })?;
                 let drawable = shape
                     .fields()
                     .find(|field| field.number() == 1)
@@ -3579,7 +3578,7 @@ fn decode_shape_storage_reference(
                                 .to_owned(),
                         )
                     })?;
-                WireView::parse_with_limits(drawable.payload(), wire_limits).map_err(|error| {
+                WireView::parse(drawable.payload(), wire_limits).map_err(|error| {
                     map_wire_preflight_error(error, "Keynote shape drawable archive", path)
                 })?;
             },
@@ -4239,7 +4238,7 @@ fn strict_slide_node_skipped(data: &[u8], limits: WireLimits) -> litchi_iwa_comm
     let mut has_builds_fields = 0usize;
     let mut has_transition_fields = 0usize;
     let mut skipped = false;
-    preflight_wire_tree_with_limits(data, limits, |visit| {
+    preflight_wire_tree(data, limits, |visit| {
         let field = visit.field();
         if !visit.path().is_empty() {
             return Ok(WireDescent::Skip);

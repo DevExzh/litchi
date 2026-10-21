@@ -835,7 +835,7 @@ impl ValueAxisBudget {
 
         let wire_capacity = header.max(1);
         // One field vector for the outer ArchiveInfo and one for its nested
-        // MessageInfo are grown by parse_wire_fields_with_limits.
+        // MessageInfo are grown by parse_wire_fields.
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         footprint.add_vector::<WireField>(wire_capacity, true)?;
         // rewritten_message, rewritten_header, and canonical/header copies.
@@ -2415,7 +2415,7 @@ impl super::chart_axis_support::AxisSupportBudget for ValueAxisBudget {
             .ok_or(AxisSupportError::InvalidSource)?;
         self.input(payload).map_err(map_budget_error)?;
         self.work(payload).map_err(map_budget_error)?;
-        // parse_wire_fields_with_limits grows this vector one element at a
+        // parse_wire_fields grows this vector one element at a
         // time. Charge a conservative event per payload-sized capacity while
         // retaining the exposed WireField byte shape.
         self.allocations(payload.max(1), bytes, bytes)

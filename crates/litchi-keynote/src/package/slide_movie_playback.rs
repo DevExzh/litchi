@@ -1341,7 +1341,7 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut values = Vec::new();
     values
         .try_reserve_exact(fields.len())
@@ -1366,7 +1366,7 @@ fn repeated_references(
 }
 
 fn movie_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_field = fields
         .fields()
         .filter(|field| field.number() == MOVIE_SUPER_FIELD)
@@ -1374,8 +1374,7 @@ fn movie_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     if super_field.len() != 1 || super_field[0].wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let nested =
-        WireView::parse_with_limits(super_field[0].payload(), limits).map_err(map_wire_error)?;
+    let nested = WireView::parse(super_field[0].payload(), limits).map_err(map_wire_error)?;
     let parent = nested
         .fields()
         .filter(|field| field.number() == DRAWABLE_PARENT_FIELD)
@@ -1391,7 +1390,7 @@ fn strict_reference_payload(
     limits: WireLimits,
     _context: &'static str,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;
@@ -1419,7 +1418,7 @@ fn strict_reference_payload(
 }
 
 fn movie_data_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut count = 0usize;
     for field in fields.fields().filter(|field| field.number() == 14) {
         if field.wire_type() != 2 {

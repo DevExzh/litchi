@@ -350,8 +350,13 @@ mod tests {
     fn reference(identifier: u64, marker: &[u8]) -> Vec<u8> {
         let mut output = Vec::new();
         append_varint_field(&mut output, 1, identifier).expect("reference identifier");
-        append_length_delimited_field(&mut output, UNKNOWN_REFERENCE_FIELD, marker)
-            .expect("reference marker");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_REFERENCE_FIELD,
+            marker,
+            WireLimits::DEFAULT,
+        )
+        .expect("reference marker");
         output
     }
 
@@ -366,36 +371,63 @@ mod tests {
     fn uuid(lower: u64, upper: u64) -> Vec<u8> {
         let mut output = Vec::new();
         append_varint_field(&mut output, UUID_LOWER_FIELD, lower).expect("uuid lower");
-        append_length_delimited_field(&mut output, UNKNOWN_REFERENCE_FIELD, b"uuid-unknown")
-            .expect("uuid marker");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_REFERENCE_FIELD,
+            b"uuid-unknown",
+            WireLimits::DEFAULT,
+        )
+        .expect("uuid marker");
         append_varint_field(&mut output, UUID_UPPER_FIELD, upper).expect("uuid upper");
         output
     }
 
     fn comment_payload(author: u64, replies: &[u64]) -> Vec<u8> {
         let mut output = Vec::new();
-        append_length_delimited_field(&mut output, TEXT_FIELD, b"adapter comment")
-            .expect("comment text");
+        append_length_delimited_field(
+            &mut output,
+            TEXT_FIELD,
+            b"adapter comment",
+            WireLimits::DEFAULT,
+        )
+        .expect("comment text");
         append_length_delimited_field(
             &mut output,
             CREATION_DATE_FIELD,
             &date(0x0102_0304_0506_0708),
+            WireLimits::DEFAULT,
         )
         .expect("comment date");
-        append_length_delimited_field(&mut output, AUTHOR_FIELD, &reference(author, b"author"))
-            .expect("comment author");
+        append_length_delimited_field(
+            &mut output,
+            AUTHOR_FIELD,
+            &reference(author, b"author"),
+            WireLimits::DEFAULT,
+        )
+        .expect("comment author");
         for &reply in replies {
-            append_length_delimited_field(&mut output, REPLIES_FIELD, &reference(reply, b"reply"))
-                .expect("comment reply");
+            append_length_delimited_field(
+                &mut output,
+                REPLIES_FIELD,
+                &reference(reply, b"reply"),
+                WireLimits::DEFAULT,
+            )
+            .expect("comment reply");
         }
         append_length_delimited_field(
             &mut output,
             STORAGE_UUID_FIELD,
             &uuid(0x1122_3344_5566_7788, 0x99aa_bbcc_ddee_ff00),
+            WireLimits::DEFAULT,
         )
         .expect("comment uuid");
-        append_length_delimited_field(&mut output, UNKNOWN_ROOT_FIELD, b"root-unknown")
-            .expect("unknown root field");
+        append_length_delimited_field(
+            &mut output,
+            UNKNOWN_ROOT_FIELD,
+            b"root-unknown",
+            WireLimits::DEFAULT,
+        )
+        .expect("unknown root field");
         output
     }
 

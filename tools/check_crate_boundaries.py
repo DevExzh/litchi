@@ -4543,7 +4543,7 @@ KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS = {
     "aggregate transaction budget": ("TitleBudget",),
     "strict Buffa projections": ("numbers_table_title_codec", "table_info_codec"),
     "raw-preserving rewrite": (
-        "patch_nested_fields_batched_with_limits",
+        "patch_nested_fields_batched",
         "NestedFieldReplacement",
     ),
     "exact artifacts and inverse": ("ExactArtifacts", "inverse"),
@@ -71218,7 +71218,7 @@ IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_FUNCTIONS = frozenset(
     {"read_formula_owner_dependencies", "read_formula_category_names"}
 )
 IWA_NUMBERS_WIRE_FORMULA_NAMES_REQUIRED_MARKERS = (
-    "preflight_wire_tree_with_limits",
+    "preflight_wire_tree",
     "group_node_category_codec",
     "WireDescent",
     "read_formula_owner_dependencies",

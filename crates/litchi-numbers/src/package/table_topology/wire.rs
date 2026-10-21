@@ -18,7 +18,8 @@ pub(in crate::package) struct Field<'a> {
 
 /// The fields of `data`, in order.
 pub(in crate::package) fn fields(data: &[u8]) -> FaultResult<Vec<Field<'_>>> {
-    let view = parse_wire_view(data).map_err(|error| map_wire(&error))?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|error| map_wire(&error))?;
     let mut output = Vec::new();
     reserve(&mut output, view.len())?;
     for field in view.fields() {

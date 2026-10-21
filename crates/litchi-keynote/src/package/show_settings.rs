@@ -1327,7 +1327,7 @@ fn rewrite_show_payload(
     after: Settings,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output_length = 0usize;
     let mut output_fields = view.len();
     let mut seen_scalars = 0u32;
@@ -1469,7 +1469,7 @@ fn rewrite_show_payload(
     reason = "semantic equality intentionally treats positive and negative zero as the same setting"
 )]
 fn inspect_size_payload(source: &[u8], limits: WireLimits) -> Result<usize, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field_work = view
         .len()
         .checked_mul(2)
@@ -1505,7 +1505,7 @@ fn rewrite_size_payload(
     after: Size,
     limits: WireLimits,
 ) -> Result<(Vec<u8>, usize), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field_work = view
         .len()
         .checked_mul(2)

@@ -56,8 +56,13 @@ mod value_axis {
         if unknown {
             // Deliberately place an opaque field after the scalar.  A source
             // preserving rewrite must retain it and its original order.
-            append_length_delimited_field(&mut nested, 4_777, b"nested bound extension")
-                .expect("small test field fits");
+            append_length_delimited_field(
+                &mut nested,
+                4_777,
+                b"nested bound extension",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .expect("small test field fits");
         }
         nested
     }
@@ -83,6 +88,7 @@ mod value_axis {
                 &mut generated,
                 VALUE_MAXIMUM_FIELD,
                 &encoded_bound(maximum.value(), unknown_nested),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("small bound fits");
         }
@@ -91,6 +97,7 @@ mod value_axis {
                 &mut generated,
                 VALUE_MINIMUM_FIELD,
                 &encoded_bound(minimum.value(), unknown_nested),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("small bound fits");
         }
@@ -103,7 +110,7 @@ mod value_axis {
         unknown_nested: bool,
     ) -> TestResult<Vec<u8>> {
         let original = message_payload(source, VALUE_NON_STYLES[0], AXIS_NON_STYLE_MESSAGE_TYPE)?;
-        let extension = WireView::parse(&original)?
+        let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing generated axis extension"))?;
@@ -124,19 +131,21 @@ mod value_axis {
         nested: u32,
         unknown: u32,
     ) -> TestResult<Vec<Vec<u8>>> {
-        let outer = WireView::parse(payload)?
+        let outer = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == outer)
             .ok_or_else(|| io::Error::other("missing synthetic outer field"))?;
-        let nested = WireView::parse(outer.payload())?
+        let nested = WireView::parse(outer.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == nested)
             .ok_or_else(|| io::Error::other("missing synthetic nested field"))?;
-        Ok(WireView::parse(nested.payload())?
-            .fields()
-            .filter(|field| field.number() == unknown)
-            .map(|field| field.raw().to_vec())
-            .collect())
+        Ok(
+            WireView::parse(nested.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .filter(|field| field.number() == unknown)
+                .map(|field| field.raw().to_vec())
+                .collect(),
+        )
     }
 
     fn without_previews(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -154,7 +163,7 @@ mod value_axis {
 
     fn with_shared_primary_value_axis(source: &[u8]) -> TestResult<Vec<u8>> {
         let original = message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-        let chart_extension = WireView::parse(&original)?
+        let chart_extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing synthetic chart extension"))?;
@@ -643,7 +652,7 @@ mod value_axis {
         let source = synthetic_metadata_package(true)?;
 
         let chart = message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-        let drawable = WireView::parse(&chart)?
+        let drawable = WireView::parse(&chart, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
             .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -847,7 +856,7 @@ mod value_axis {
         let baseline = ValueAxisSettings::automatic();
         let base = with_value_axis_settings(&source, baseline, false)?;
         let original = message_payload(&base, VALUE_NON_STYLES[0], AXIS_NON_STYLE_MESSAGE_TYPE)?;
-        let extension = WireView::parse(&original)?
+        let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
             .ok_or_else(|| io::Error::other("missing generated axis extension"))?;
@@ -861,24 +870,44 @@ mod value_axis {
             }),
             ("wrong-major-wire", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MAJOR_FIELD, b"wrong")?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAJOR_FIELD,
+                    b"wrong",
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("truncated-bound", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MINIMUM_FIELD, &[0x09, 1, 2])?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MINIMUM_FIELD,
+                    &[0x09, 1, 2],
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("missing-bound-scalar", {
                 let mut generated = extension.payload().to_vec();
-                append_length_delimited_field(&mut generated, VALUE_MAXIMUM_FIELD, &[])?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAXIMUM_FIELD,
+                    &[],
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("duplicate-bound-scalar", {
                 let mut generated = extension.payload().to_vec();
                 let mut nested = fixed64_field(1, 1.0_f64.to_bits());
                 nested.extend_from_slice(&fixed64_field(1, 2.0_f64.to_bits()));
-                append_length_delimited_field(&mut generated, VALUE_MAXIMUM_FIELD, &nested)?;
+                append_length_delimited_field(
+                    &mut generated,
+                    VALUE_MAXIMUM_FIELD,
+                    &nested,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 generated
             }),
             ("nonfinite-bound", {
@@ -887,6 +916,7 @@ mod value_axis {
                     &mut generated,
                     VALUE_MAXIMUM_FIELD,
                     &fixed64_field(1, f64::NAN.to_bits()),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 generated
             }),
@@ -896,11 +926,13 @@ mod value_axis {
                     &mut generated,
                     VALUE_MAXIMUM_FIELD,
                     &encoded_bound(1.0, false),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 append_length_delimited_field(
                     &mut generated,
                     VALUE_MINIMUM_FIELD,
                     &encoded_bound(2.0, false),
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
                 generated
             }),

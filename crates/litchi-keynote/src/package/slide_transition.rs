@@ -24,7 +24,7 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     wire::{
         NestedFieldEdit, NestedFieldReplacement, WireDescent, WireFieldView, WireView,
-        patch_nested_fields_batched_with_limits, preflight_wire_tree_with_limits,
+        patch_nested_fields_batched, preflight_wire_tree,
     },
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
@@ -833,7 +833,7 @@ fn validate_reference_metadata(
 
 fn strict_show_slide_references(source: &[u8], limits: WireLimits) -> Result<Vec<u64>, Error> {
     let tree = strict_nested_payload(source, SHOW_SLIDE_TREE_FIELD, limits)?;
-    let view = WireView::parse_with_limits(tree, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(tree, limits).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == SLIDE_TREE_SLIDES_FIELD)
@@ -889,7 +889,7 @@ fn strict_nested_payload(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<&[u8], Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut matches = view.fields().filter(|field| field.number() == field_number);
     let field = matches.next().ok_or(Error::InvalidSource)?;
     if matches.next().is_some() || field.wire_type() != 2 {
@@ -899,7 +899,7 @@ fn strict_nested_payload(
 }
 
 fn strict_reference(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut external = None;
@@ -966,7 +966,7 @@ const fn canonical_varint_len(mut value: u64) -> usize {
 }
 
 fn reject_top_level_groups(source: &[u8], limits: WireLimits) -> Result<(), Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     if view
         .fields()
         .any(|field| matches!(field.wire_type(), 3 | 4))
@@ -1043,7 +1043,7 @@ fn preflight_selected_transition_payload(source: &[u8], limits: WireLimits) -> R
     // archive byte ceiling while still bypassing the configured work budget
     // for the most expensive part of this read path.
     ensure_transition_preflight_work(source.len(), limits)?;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         if matches!(visit.field().wire_type(), 3 | 4) {
             return Err(litchi_iwa_common::Error::InvalidFormat(
                 "group-bearing transition payload".to_owned(),
@@ -1637,10 +1637,10 @@ fn verify_selected_object(
 }
 
 fn node_payload_preserved_except_marker(source: &[u8], candidate: &[u8], desired: bool) -> bool {
-    let Ok(source_view) = WireView::parse(source) else {
+    let Ok(source_view) = WireView::parse(source, WireLimits::DEFAULT) else {
         return false;
     };
-    let Ok(candidate_view) = WireView::parse(candidate) else {
+    let Ok(candidate_view) = WireView::parse(candidate, WireLimits::DEFAULT) else {
         return false;
     };
     let source_other = source_view
@@ -1655,7 +1655,7 @@ fn node_payload_preserved_except_marker(source: &[u8], candidate: &[u8], desired
 }
 
 fn strict_node_marker_wire(source: &[u8]) -> Result<bool, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut matches = view
         .fields()
         .filter(|field| field.number() == NODE_HAS_TRANSITION_FIELD);
@@ -2041,8 +2041,7 @@ fn rewrite_transition_envelope(
             NestedFieldReplacement::Fixed32(custom.travel_distance().map(f32::to_bits)),
         ),
     ];
-    let data =
-        patch_nested_fields_batched_with_limits(source, &edits, limits).map_err(map_wire_error)?;
+    let data = patch_nested_fields_batched(source, &edits, limits).map_err(map_wire_error)?;
     check_output(&data, limits)?;
     Ok(data)
 }
@@ -2058,8 +2057,7 @@ fn rewrite_node_transition_flag(
         true,
         NestedFieldReplacement::Varint(Some(u64::from(value))),
     );
-    let output =
-        patch_nested_fields_batched_with_limits(source, &[edit], limits).map_err(map_wire_error)?;
+    let output = patch_nested_fields_batched(source, &[edit], limits).map_err(map_wire_error)?;
     check_output(&output, limits)?;
     Ok(output)
 }

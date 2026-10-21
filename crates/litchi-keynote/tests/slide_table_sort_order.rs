@@ -172,6 +172,7 @@ fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult
                     &mut rewritten,
                     SORT_RULES_FIELD,
                     if index == 0 { first.as_slice() } else { rule },
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             }
             payload = rewritten;
@@ -212,7 +213,12 @@ fn table_model(
         append_varint_field(&mut payload, UNKNOWN_MODEL_FIELD, UNKNOWN_MODEL_VALUE)?;
     }
     if let Some(sort) = sort {
-        append_length_delimited_field(&mut payload, SORT_ORDER_FIELD, sort)?;
+        append_length_delimited_field(
+            &mut payload,
+            SORT_ORDER_FIELD,
+            sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -459,13 +465,23 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, 900)?;
-    append_length_delimited_field(&mut payload, 3, &component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn append_field_bytes(source: &[u8], field: u32, payload: &[u8]) -> TestResult<Vec<u8>> {
     let mut output = source.to_vec();
-    append_length_delimited_field(&mut output, field, payload)?;
+    append_length_delimited_field(
+        &mut output,
+        field,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(output)
 }
 
@@ -675,10 +691,20 @@ fn duplicate_slide_name_package() -> TestResult<Vec<u8>> {
 fn model_with_sort(source: &[u8], sort: &[u8], tracker: Option<&[u8]>) -> TestResult<Vec<u8>> {
     rewrite_model(source, |model| {
         let mut data = rewrite_repeated_length_delimited_fields(model, SORT_ORDER_FIELD, &[])?;
-        append_length_delimited_field(&mut data, SORT_ORDER_FIELD, sort)?;
+        append_length_delimited_field(
+            &mut data,
+            SORT_ORDER_FIELD,
+            sort,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         if let Some(tracker) = tracker {
             data = rewrite_repeated_length_delimited_fields(&data, SORT_TRACKER_FIELD, &[])?;
-            append_length_delimited_field(&mut data, SORT_TRACKER_FIELD, tracker)?;
+            append_length_delimited_field(
+                &mut data,
+                SORT_TRACKER_FIELD,
+                tracker,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *model = data;
         Ok(())
@@ -1209,8 +1235,18 @@ fn malformed_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() -> TestR
         false,
     )?;
     let duplicate = rewrite_model(&fixture, |model| {
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &valid)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &valid)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &valid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &valid,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let wrong_wire = rewrite_model(&fixture, |model| {
@@ -1220,7 +1256,12 @@ fn malformed_duplicate_wrong_wire_and_noncanonical_fields_fail_closed() -> TestR
     let mut noncanonical_payload = valid.clone();
     append_overlong_varint_field(&mut noncanonical_payload, SORT_TYPE_FIELD, 0);
     let noncanonical = rewrite_model(&fixture, |model| {
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &noncanonical_payload)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &noncanonical_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     for malformed in [duplicate, wrong_wire, noncanonical] {
@@ -1240,7 +1281,12 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
     let duplicate_type = rewrite_model(&fixture, |model| {
         let mut malformed = valid.clone();
         append_varint_field(&mut malformed, SORT_TYPE_FIELD, 0)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let duplicate_column = rewrite_model(&fixture, |model| {
@@ -1249,8 +1295,18 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
         append_varint_field(&mut rule, RULE_COLUMN_FIELD, 1)?;
         let mut malformed =
             rewrite_repeated_length_delimited_fields(&valid, SORT_RULES_FIELD, &[])?;
-        append_length_delimited_field(&mut malformed, SORT_RULES_FIELD, &rule)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            &mut malformed,
+            SORT_RULES_FIELD,
+            &rule,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let duplicate_direction = rewrite_model(&fixture, |model| {
@@ -1259,14 +1315,29 @@ fn malformed_nested_duplicate_fields_and_unknown_enum_fail_closed() -> TestResul
         append_varint_field(&mut rule, RULE_DIRECTION_FIELD, 0)?;
         let mut malformed =
             rewrite_repeated_length_delimited_fields(&valid, SORT_RULES_FIELD, &[])?;
-        append_length_delimited_field(&mut malformed, SORT_RULES_FIELD, &rule)?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            &mut malformed,
+            SORT_RULES_FIELD,
+            &rule,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let unknown_scope = rewrite_model(&fixture, |model| {
         let malformed =
             litchi_iwa_common::wire::patch_varint_field(&valid, SORT_TYPE_FIELD, true, Some(99))?;
-        append_length_delimited_field(model, SORT_ORDER_FIELD, &malformed)?;
+        append_length_delimited_field(
+            model,
+            SORT_ORDER_FIELD,
+            &malformed,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     for malformed in [
@@ -1313,7 +1384,12 @@ fn model_graph_alias_and_missing_routes_are_atomic() -> TestResult {
     let duplicate_z_order = rewrite_slide(&fixture, |slide| {
         let mut duplicate = slide.clone();
         let reference_bytes = reference(TABLE_INFOS[0]).encode_to_vec();
-        append_length_delimited_field(&mut duplicate, 42, &reference_bytes)?;
+        append_length_delimited_field(
+            &mut duplicate,
+            42,
+            &reference_bytes,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         *slide = duplicate;
         Ok(())
     })?;
@@ -1580,7 +1656,12 @@ fn extra_foreign_and_malformed_reference_routes_fail_atomically() -> TestResult 
         push_varint(&mut rewritten, first.len() as u64);
         rewritten.extend_from_slice(first);
         for reference in references.into_iter().skip(1) {
-            append_length_delimited_field(&mut rewritten, 42, reference)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                42,
+                reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *slide = rewritten;
         Ok(())
@@ -1593,9 +1674,19 @@ fn extra_foreign_and_malformed_reference_routes_fail_atomically() -> TestResult 
         }
         // The identifier 100 is encoded overlong inside an otherwise valid
         // Reference message (e4 00 instead of the canonical 64).
-        append_length_delimited_field(&mut rewritten, 42, &[0x08, 0xe4, 0x00])?;
+        append_length_delimited_field(
+            &mut rewritten,
+            42,
+            &[0x08, 0xe4, 0x00],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         for reference in references.into_iter().skip(1) {
-            append_length_delimited_field(&mut rewritten, 42, reference)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                42,
+                reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         *slide = rewritten;
         Ok(())

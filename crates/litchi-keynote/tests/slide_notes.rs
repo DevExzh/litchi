@@ -397,11 +397,13 @@ fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResu
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_send_sync<T: Send + Sync>(_: &T) {}
@@ -439,7 +441,12 @@ fn notes_snapshot_strictly_rejects_malformed_known_table_and_keeps_source_immuta
         // Field 9 is a recognized object-attribute table. Its malformed
         // child must be rejected by the strict schema pass even though the
         // lazy text projection itself only needs field 3.
-        litchi_iwa_common::wire::append_length_delimited_field(&mut data, 9, &[0x0a])?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut data,
+            9,
+            &[0x0a],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         object.replace_message_preserving_header(
             index,
             RawMessage {
@@ -815,6 +822,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 &mut data,
                 27,
                 &reference(NOTE_OBJECT).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message_preserving_header(index, RawMessage { type_: 5, data })?;
             Ok(())
@@ -857,6 +865,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 &mut data,
                 1,
                 &reference(NOTE_STORAGE).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message_preserving_header(
                 index,

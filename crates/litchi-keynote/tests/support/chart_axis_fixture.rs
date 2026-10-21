@@ -135,11 +135,17 @@ pub(crate) fn chart_payload(
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         GENERATED_EXTENSION_FIELD,
         &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -157,7 +163,12 @@ pub(crate) fn axis_payload(state: AxisState<'_>, axis: Axis, unknown: bool) -> T
         append_varint_field(&mut generated, visible_field, u64::from(visible))?;
     }
     if let Some(title) = state.title {
-        append_length_delimited_field(&mut generated, title_field, title)?;
+        append_length_delimited_field(
+            &mut generated,
+            title_field,
+            title,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut payload = tsch::ChartAxisNonStyleArchive {
         super_: Some(tss::StyleArchive {
@@ -166,11 +177,21 @@ pub(crate) fn axis_payload(state: AxisState<'_>, axis: Axis, unknown: bool) -> T
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
     append_varint_field(&mut payload, SUPPORTS_SECONDARY_FEATURE_FIELD, 1)?;
     if unknown {
-        append_length_delimited_field(&mut payload, UNKNOWN_OUTER_FIELD, b"opaque axis bytes")?;
+        append_length_delimited_field(
+            &mut payload,
+            UNKNOWN_OUTER_FIELD,
+            b"opaque axis bytes",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -191,10 +212,20 @@ pub(crate) fn axis_style_payload(unknown: bool) -> TestResult<Vec<u8>> {
     if unknown {
         append_varint_field(&mut generated, UNKNOWN_GENERATED_FIELD, 91)?;
     }
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
     if unknown {
-        append_length_delimited_field(&mut payload, UNKNOWN_OUTER_FIELD, b"opaque axis style")?;
+        append_length_delimited_field(
+            &mut payload,
+            UNKNOWN_OUTER_FIELD,
+            b"opaque axis style",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -202,7 +233,12 @@ pub(crate) fn axis_style_payload(unknown: bool) -> TestResult<Vec<u8>> {
 pub(crate) fn chart_non_style_payload(title: &str) -> TestResult<Vec<u8>> {
     let mut generated = Vec::new();
     append_varint_field(&mut generated, 21, 1)?;
-    append_length_delimited_field(&mut generated, 23, title.as_bytes())?;
+    append_length_delimited_field(
+        &mut generated,
+        23,
+        title.as_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = tsch::ChartNonStyleArchive {
         super_: Some(tss::StyleArchive {
             stylesheet: Some(reference(81)),
@@ -210,7 +246,12 @@ pub(crate) fn chart_non_style_payload(title: &str) -> TestResult<Vec<u8>> {
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -453,7 +494,12 @@ pub(crate) fn axis_payload_without_extension(unknown: bool) -> TestResult<Vec<u8
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
     append_varint_field(&mut payload, SUPPORTS_SECONDARY_FEATURE_FIELD, 1)?;
     if unknown {
-        append_length_delimited_field(&mut payload, UNKNOWN_OUTER_FIELD, b"opaque axis bytes")?;
+        append_length_delimited_field(
+            &mut payload,
+            UNKNOWN_OUTER_FIELD,
+            b"opaque axis bytes",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -491,6 +537,7 @@ pub(crate) fn metadata_component_payload(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -505,12 +552,27 @@ pub(crate) fn metadata_payload(last_identifier: u64, include_foreign: bool) -> T
     let unrelated = metadata_component_payload(UNRELATED_COMPONENT, "Unrelated", 7, &[901])?;
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     if include_foreign {
         let foreign =
             metadata_component_payload(FOREIGN_COMPONENT, "Foreign", 8, &[FOREIGN_OBJECT])?;
-        append_length_delimited_field(&mut payload, 3, &foreign)?;
+        append_length_delimited_field(
+            &mut payload,
+            3,
+            &foreign,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     append_varint_field(&mut payload, 8, 10)?;
     let versioned = tsp::ComponentInfo {
@@ -522,11 +584,17 @@ pub(crate) fn metadata_payload(last_identifier: u64, include_foreign: bool) -> T
         ..tsp::ComponentInfo::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -643,11 +711,11 @@ pub(crate) fn message_payload(package: &[u8], identifier: u64, type_: u32) -> Te
 }
 
 pub(crate) fn nested_field_raw(payload: &[u8], outer: u32, nested: u32) -> TestResult<Vec<u8>> {
-    let extension = WireView::parse(payload)?
+    let extension = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == outer)
         .ok_or_else(|| io::Error::other("missing synthetic nested extension"))?;
-    WireView::parse(extension.payload())?
+    WireView::parse(extension.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == nested)
         .map(|field| field.raw().to_vec())
@@ -655,11 +723,13 @@ pub(crate) fn nested_field_raw(payload: &[u8], outer: u32, nested: u32) -> TestR
 }
 
 pub(crate) fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 pub(crate) fn with_document_message_payload(
@@ -864,7 +934,7 @@ pub(crate) fn with_metadata(
 }
 
 pub(crate) fn append_duplicate_field(payload: &[u8], number: u32) -> TestResult<Vec<u8>> {
-    let duplicate = WireView::parse(payload)?
+    let duplicate = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == number)
         .map(|field| field.raw().to_vec())
@@ -879,7 +949,7 @@ pub(crate) fn replace_first_field(
     number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let fields = WireView::parse(payload)?;
+    let fields = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len() + replacement.len());
     let mut replaced = false;
     for field in fields.fields() {
@@ -932,7 +1002,7 @@ pub(crate) fn with_axis_extension_variant(
     variant: AxisWireVariant,
 ) -> TestResult<Vec<u8>> {
     let original = message_payload(source, CATEGORY_NON_STYLES[0], AXIS_NON_STYLE_MESSAGE_TYPE)?;
-    let extension = WireView::parse(&original)?
+    let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing generated axis extension"))?;
@@ -955,7 +1025,12 @@ pub(crate) fn with_axis_extension_variant(
         AxisWireVariant::InvalidUtf8 => {
             let mut generated = Vec::new();
             append_varint_field(&mut generated, 13, 1)?;
-            append_length_delimited_field(&mut generated, 15, &[0xff])?;
+            append_length_delimited_field(
+                &mut generated,
+                15,
+                &[0xff],
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             length_delimited_field_with_key_width(GENERATED_EXTENSION_FIELD, &generated, 3)
         },
     };
@@ -977,7 +1052,7 @@ pub(crate) fn with_chart_axis_variant(
     variant: ChartAxisVariant,
 ) -> TestResult<Vec<u8>> {
     let original = message_payload(source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let chart_extension = WireView::parse(&original)?
+    let chart_extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing chart extension"))?;
@@ -1006,6 +1081,7 @@ pub(crate) fn with_chart_axis_variant(
                 &mut chart_payload,
                 16,
                 &reference(CATEGORY_NON_STYLES[0]).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         },
         ChartAxisVariant::AliasedRoles => {

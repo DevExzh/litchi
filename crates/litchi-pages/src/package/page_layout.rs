@@ -657,8 +657,7 @@ pub(super) fn view_state_location(package: &Package) -> Result<Option<ViewStateL
     let (document_message_index, document_message) =
         unique_message(document_object, DOCUMENT_MESSAGE_TYPE)?;
     validate_selected_metadata(document_object, document_message_index)?;
-    let document_view =
-        WireView::parse_with_limits(&document_message.data, limits).map_err(map_wire_error)?;
+    let document_view = WireView::parse(&document_message.data, limits).map_err(map_wire_error)?;
     if singular_reference(&document_view, DOCUMENT_DEPRECATED_LAYOUT_FIELD, limits)?.is_some()
         || singular_reference(&document_view, DOCUMENT_DEPRECATED_VIEW_STATE_FIELD, limits)?
             .is_some()
@@ -667,8 +666,7 @@ pub(super) fn view_state_location(package: &Package) -> Result<Option<ViewStateL
     }
     let super_payload =
         singular_bytes(&document_view, DOCUMENT_SUPER_FIELD, true)?.ok_or(Error::InvalidSource)?;
-    let shared_document =
-        WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let shared_document = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let Some(view_state_identifier) =
         singular_reference(&shared_document, SHARED_DOCUMENT_VIEW_STATE_FIELD, limits)?
     else {
@@ -690,7 +688,7 @@ pub(super) fn view_state_location(package: &Package) -> Result<Option<ViewStateL
     let (view_state_message_index, view_state_message) =
         unique_message(view_state, SHARED_VIEW_STATE_MESSAGE_TYPE)?;
     let view_state_payload =
-        WireView::parse_with_limits(&view_state_message.data, limits).map_err(map_wire_error)?;
+        WireView::parse(&view_state_message.data, limits).map_err(map_wire_error)?;
     let view_state_root_identifier =
         singular_reference(&view_state_payload, SHARED_VIEW_STATE_ROOT_FIELD, limits)?
             .ok_or(Error::InvalidSource)?;
@@ -780,7 +778,7 @@ fn strict_view_state_root(
     payload: &[u8],
     limits: WireLimits,
 ) -> Result<(Option<u64>, Option<u64>), Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut layout = None;
     let mut ui = None;
     for field in view.fields() {
@@ -799,7 +797,7 @@ fn strict_view_state_root(
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut external_seen = false;
@@ -1010,7 +1008,7 @@ fn rewrite_layout_payload(
     after: Layout,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output_length = source.len();
     let mut output_fields = view.len();
     let mut selected_lengths = [None; 11];

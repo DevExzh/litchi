@@ -708,8 +708,11 @@ fn empty_author_storage(source: &Package, path: Path) -> Result<Option<MessageRo
                 if message.type_ != ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE {
                     continue;
                 }
-                let fields = litchi_iwa_common::wire::WireView::parse(message.data.as_slice())
-                    .map_err(|_| Error::InvalidSource { path })?;
+                let fields = litchi_iwa_common::wire::WireView::parse(
+                    message.data.as_slice(),
+                    WireLimits::DEFAULT,
+                )
+                .map_err(|_| Error::InvalidSource { path })?;
                 if fields.fields().any(|field| field.number() == 1) {
                     return Err(Error::Refused(
                         crate::package::comments::Refusal::UnsupportedDependency { path },
@@ -858,8 +861,13 @@ fn append_author_storage(
 
 fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, GENERATED_AUTHOR_NAME.as_bytes())
-        .map_err(|_| Error::InvalidSource { path })?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        GENERATED_AUTHOR_NAME.as_bytes(),
+        WireLimits::DEFAULT,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     append_varint_field(&mut payload, 4, 0).map_err(|_| Error::InvalidSource { path })?;
     let mut object = ArchiveObject::new(
         identifier,
@@ -885,7 +893,7 @@ fn author_storage_object(
 ) -> Result<ArchiveObject, Error> {
     let reference = canonical_reference(author_identifier, path)?;
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &reference)
+    append_length_delimited_field(&mut payload, 1, &reference, WireLimits::DEFAULT)
         .map_err(|_| Error::InvalidSource { path })?;
     let mut object = ArchiveObject::new(
         identifier,
@@ -937,10 +945,10 @@ fn append_comment_entry(
     append_varint_field(&mut entry, 1, u64::from(key))
         .map_err(|_| Error::InvalidSource { path })?;
     append_varint_field(&mut entry, 2, 1).map_err(|_| Error::InvalidSource { path })?;
-    append_length_delimited_field(&mut entry, 10, &reference)
+    append_length_delimited_field(&mut entry, 10, &reference, WireLimits::DEFAULT)
         .map_err(|_| Error::InvalidSource { path })?;
     let mut output = list.to_vec();
-    append_length_delimited_field(&mut output, 3, &entry)
+    append_length_delimited_field(&mut output, 3, &entry, WireLimits::DEFAULT)
         .map_err(|_| Error::InvalidSource { path })?;
     litchi_iwa_common::wire::patch_varint_field(
         &output,
@@ -1264,11 +1272,12 @@ fn replace_tile(
 }
 
 fn extract_tile_cell(source: &[u8], row: u32, column: u32, path: Path) -> Result<Vec<u8>, Error> {
-    let view = litchi_iwa_common::wire::WireView::parse(source)
+    let view = litchi_iwa_common::wire::WireView::parse(source, WireLimits::DEFAULT)
         .map_err(|_| Error::InvalidSource { path })?;
     for field in view.fields().filter(|field| field.number() == 5) {
-        let row_view = litchi_iwa_common::wire::WireView::parse(field.payload())
-            .map_err(|_| Error::InvalidSource { path })?;
+        let row_view =
+            litchi_iwa_common::wire::WireView::parse(field.payload(), WireLimits::DEFAULT)
+                .map_err(|_| Error::InvalidSource { path })?;
         let row_index = row_view
             .fields()
             .find(|field| field.number() == 1)

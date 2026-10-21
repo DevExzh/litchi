@@ -200,7 +200,12 @@ fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
 // output and rejects groups, while these fixtures intentionally retain them.
 fn append_message_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> TestResult {
     let mut field = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut field, number, payload)?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut field,
+        number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     output.extend_from_slice(&field);
     Ok(())
 }
@@ -2549,7 +2554,7 @@ fn wrong_active_uuid(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn duplicate_hidden_owner_field(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    let owner = WireView::parse(&payload)?
+    let owner = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 70)
         .ok_or("missing hidden-state owner")?
@@ -2924,10 +2929,13 @@ fn filtered_and_pivot_states_are_preserved_or_refused_fail_closed() -> TestResul
     let source_model_payload = model_payload_from_package(&source, 0)?;
     let source_info_payload = info_payload(&source, 0)?;
     let source_owner_payload = hidden_owner_payload_from_package(&source, 0)?;
-    let filtered_rows = WireView::parse(&source_model_payload)?
-        .fields()
-        .find(|field| field.number() == 40)
-        .ok_or("filtered-row count field 40 is missing")?;
+    let filtered_rows = WireView::parse(
+        &source_model_payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 40)
+    .ok_or("filtered-row count field 40 is missing")?;
     assert_eq!(decode_varint_from_bytes(filtered_rows.payload())?.0, 1);
     assert!(before.contains(AxisIndex::row(1)));
     assert!(before.contains(AxisIndex::column(2)));
@@ -3273,7 +3281,7 @@ fn pivot_owner_is_distinct_from_merge_owner_and_bool_values_are_strict() -> Test
 
 fn model_count_field(package: &[u8], index: usize, number: u32) -> TestResult<Option<u64>> {
     let payload = model_payload_from_package(package, index)?;
-    WireView::parse(&payload)?
+    WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == number)
         .map(|field| decode_varint_from_bytes(field.payload()).map(|(value, _)| value))
@@ -3361,7 +3369,7 @@ fn unknown_model_info_and_nested_owner_wire_fields_survive_rewrite() -> TestResu
     let target = commit.package().exact_bytes();
 
     let model_payload = model_payload_from_package(&target, 0)?;
-    let model = WireView::parse(&model_payload)?;
+    let model = WireView::parse(&model_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let model_unknown = model
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
@@ -3376,7 +3384,7 @@ fn unknown_model_info_and_nested_owner_wire_fields_survive_rewrite() -> TestResu
             .any(|field| field.number() == UNKNOWN_LENGTH_FIELD)
     );
     let info_payload = info_payload(&target, 0)?;
-    let info = WireView::parse(&info_payload)?;
+    let info = WireView::parse(&info_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let info_unknown = info
         .fields()
         .find(|field| field.number() == UNKNOWN_INFO_FIELD)
@@ -3460,7 +3468,8 @@ fn selected_object_retains_noncanonical_header_while_payload_framing_changes_loc
 {
     let source = with_noncanonical_model_header(&normal_package()?, 0)?;
     let source_header = object_header_bytes(&source, table_model(0))?;
-    let source_header_view = WireView::parse(&source_header)?;
+    let source_header_view =
+        WireView::parse(&source_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         source_header_view
             .fields()
@@ -3487,7 +3496,8 @@ fn selected_object_retains_noncanonical_header_while_payload_framing_changes_loc
         .commit()?;
     let target = commit.package().exact_bytes();
     let target_header = object_header_bytes(&target, table_model(0))?;
-    let target_header_view = WireView::parse(&target_header)?;
+    let target_header_view =
+        WireView::parse(&target_header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let retained = target_header_view
         .fields()
         .find(|field| field.number() == UNKNOWN_LENGTH_FIELD)
@@ -4771,12 +4781,14 @@ fn info_payload(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
 
 fn hidden_owner_payload_from_package(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     let payload = model_payload_from_package(package, index)?;
-    Ok(WireView::parse(&payload)?
-        .fields()
-        .find(|field| field.number() == 70)
-        .ok_or("missing hidden-state owner")?
-        .payload()
-        .to_vec())
+    Ok(
+        WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .find(|field| field.number() == 70)
+            .ok_or("missing hidden-state owner")?
+            .payload()
+            .to_vec(),
+    )
 }
 
 fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -4899,12 +4911,15 @@ fn selectors_read_rows_columns_and_absence_without_collapsing_names() -> TestRes
     // view map (field 6).  Keep this assertion independent of the focused
     // hidden-axis reader so a fixture typo cannot mask an ownership bug.
     assert!(
-        !WireView::parse(&info_payload(&source, 0)?)?
-            .fields()
-            .any(|field| field.number() == 6)
+        !WireView::parse(
+            &info_payload(&source, 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 6)
     );
     let model_payload = model_payload_from_package(&source, 0)?;
-    let model_wire = WireView::parse(&model_payload)?;
+    let model_wire = WireView::parse(&model_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(model_wire.fields().any(|field| field.number() == 46));
     let owner_field = model_wire
         .fields()
@@ -5424,7 +5439,10 @@ fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> Te
             );
         }
         let target_model_payload = model_payload_from_package(&target, 0)?;
-        let model = WireView::parse(&target_model_payload)?;
+        let model = WireView::parse(
+            &target_model_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         let owner_payload = model
             .fields()
             .find(|field| field.number() == 70)
@@ -5813,18 +5831,21 @@ fn set_clear_reset_and_noop_preserve_exact_source_and_presence() -> TestResult {
         HiddenAxes::empty()
     );
     assert!(
-        WireView::parse(&model_payload_from_package(
-            &clear.package().exact_bytes(),
-            0
-        )?)?
+        WireView::parse(
+            &model_payload_from_package(&clear.package().exact_bytes(), 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
         .fields()
         .any(|field| field.number() == 70),
         "clearing user-hidden axes must retain the native owner presence"
     );
     assert!(
-        WireView::parse(&info_payload(&clear.package().exact_bytes(), 0)?)?
-            .fields()
-            .any(|field| field.number() == 8),
+        WireView::parse(
+            &info_payload(&clear.package().exact_bytes(), 0)?,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 8),
         "clearing user-hidden axes must retain the active-state UUID presence"
     );
 

@@ -764,7 +764,7 @@ fn count_slide_media(
     let payload = unique_payload(&object.messages, SLIDE_MESSAGE_TYPE)?;
     budget.charge_wire_work(payload.len().max(1))?;
     budget.charge_allocations(payload.len())?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     let mut count = 0usize;
     for field in view
@@ -835,7 +835,7 @@ fn decode_movie_info(
 }
 
 fn reference_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)?;
     let mut identifier = None;
     for field in view.fields() {
         field
@@ -1077,8 +1077,7 @@ fn map_witness<'source>(
     wire_limits: WireLimits,
     budget: &mut LifecycleBudget,
 ) -> Result<Option<media_codec::DataMetadataMapSource<'source>>, Error> {
-    let view =
-        WireView::parse_with_limits(payload, wire_limits).map_err(|_| Error::InvalidSource)?;
+    let view = WireView::parse(payload, wire_limits).map_err(|_| Error::InvalidSource)?;
     let mut map_identifier = None;
     for field in view
         .fields()

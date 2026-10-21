@@ -157,8 +157,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     let model_component = component_payload(2, "CalculationEngine", MODELS);
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -442,7 +452,7 @@ fn rewrite_table_info_super(
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let payload = table_info_payload(package, identifier)?;
-    let fields = WireView::parse(&payload)?;
+    let fields = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = fields
         .fields()
         .find(|field| field.number() == TABLE_SUPER_FIELD)
@@ -452,7 +462,12 @@ fn rewrite_table_info_super(
     let mut rewritten = Vec::with_capacity(payload.len() + super_payload.len());
     for field in fields.fields() {
         if field.number() == TABLE_SUPER_FIELD {
-            append_length_delimited_field(&mut rewritten, TABLE_SUPER_FIELD, &super_payload)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                TABLE_SUPER_FIELD,
+                &super_payload,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             rewritten.extend_from_slice(field.raw());
         }
@@ -462,12 +477,15 @@ fn rewrite_table_info_super(
 
 fn lock_field(package: &[u8], identifier: u64) -> TestResult<Option<bool>> {
     let payload = table_info_payload(package, identifier)?;
-    let outer = WireView::parse(&payload)?;
+    let outer = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = outer
         .fields()
         .find(|field| field.number() == TABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing table-info super field"))?;
-    let drawable = WireView::parse(super_field.payload())?;
+    let drawable = WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let Some(field) = drawable
         .fields()
         .find(|field| field.number() == DRAWABLE_LOCKED_FIELD)
@@ -486,14 +504,17 @@ fn lock_field(package: &[u8], identifier: u64) -> TestResult<Option<bool>> {
 }
 
 fn has_unknown_table_info_field(package: &[u8], identifier: u64) -> TestResult<bool> {
-    Ok(WireView::parse(&table_info_payload(package, identifier)?)?
-        .fields()
-        .any(|field| {
-            field.number() == UNKNOWN_TABLE_INFO_FIELD
-                && decode_varint_from_bytes(field.payload()).is_ok_and(|(value, width)| {
-                    value == UNKNOWN_TABLE_INFO_VALUE && width == field.payload().len()
-                })
-        }))
+    Ok(WireView::parse(
+        &table_info_payload(package, identifier)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .any(|field| {
+        field.number() == UNKNOWN_TABLE_INFO_FIELD
+            && decode_varint_from_bytes(field.payload()).is_ok_and(|(value, width)| {
+                value == UNKNOWN_TABLE_INFO_VALUE && width == field.payload().len()
+            })
+    }))
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
@@ -876,7 +897,12 @@ fn malformed_lock_wire_and_role_routes_fail_closed_without_source_mutation() -> 
         Ok(())
     })?;
     let wrong_wire = rewrite_table_info_super(&source, TABLE_INFOS[0], |super_payload| {
-        append_length_delimited_field(super_payload, DRAWABLE_LOCKED_FIELD, &[1])?;
+        append_length_delimited_field(
+            super_payload,
+            DRAWABLE_LOCKED_FIELD,
+            &[1],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok(())
     })?;
     let noncanonical = rewrite_table_info_super(&source, TABLE_INFOS[0], |super_payload| {

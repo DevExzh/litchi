@@ -263,7 +263,7 @@ impl WireScanBudget {
             });
         }
         self.work = observed_work;
-        let view = WireView::parse_with_limits(payload, self.limits).map_err(map_wire_error)?;
+        let view = WireView::parse(payload, self.limits).map_err(map_wire_error)?;
         let observed_fields = self.fields.saturating_add(view.len());
         if observed_fields > self.limits.max_fields() {
             return Err(Error::Limit {
@@ -1459,7 +1459,7 @@ fn prove_slide_text_caches_absent(package: &Package, slide_identifier: u64) -> R
     let payload = unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
         .map_err(map_read_error)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     if view.fields().any(|field| matches!(field.number(), 37 | 38)) {
         return Err(Error::Refused(Refusal::DependentContent));
     }

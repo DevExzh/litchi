@@ -221,8 +221,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -247,7 +257,12 @@ fn bucket_payload(headers: &[(u32, f32)], with_unknowns: bool) -> TestResult<Vec
     append_varint_field(&mut payload, 1, 1)?;
     for &(index, size) in headers {
         let header = bucket_header(index, size, with_unknowns)?;
-        append_length_delimited_field(&mut payload, 2, &header)?;
+        append_length_delimited_field(
+            &mut payload,
+            2,
+            &header,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknowns {
         append_varint_field(&mut payload, UNKNOWN_BUCKET_FIELD, UNKNOWN_BUCKET_VALUE)?;
@@ -965,11 +980,13 @@ fn exact_no_op_is_source_bound_and_apply_is_idempotent() -> TestResult {
 }
 
 fn non_name_fields(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() != 8)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() != 8)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn contains_raw(payload: &[u8], raw: &[u8]) -> bool {
@@ -1160,7 +1177,7 @@ fn malformed_field8_wire_is_rejected_without_mutation() -> TestResult {
     }
 
     let payload = model_member_payload(&source, MODELS[0])?;
-    let without_name = WireView::parse(&payload)?
+    let without_name = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .filter(|field| field.number() != 8)
         .flat_map(|field| field.raw().iter().copied())

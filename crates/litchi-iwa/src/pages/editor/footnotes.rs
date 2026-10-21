@@ -7,7 +7,7 @@ use std::str;
 use litchi_iwa_common::{
     LimitKind, WireLimits,
     varint::{decode_varint_from_bytes, encoded_len as varint_len},
-    wire::{WireDescent, WireFieldView, WirePreflight, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WireFieldView, WirePreflight, WireView, preflight_wire_tree},
 };
 use litchi_iwa_protos::pages_body_codec;
 use litchi_iwa_protos::pages_footnote_codec;
@@ -306,14 +306,14 @@ impl FootnoteGraphBudget {
         F: FnMut(litchi_iwa_common::wire::WireVisit<'_, '_>) -> Result<WireDescent>,
     {
         let limits = self.remaining_limits()?;
-        let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+        let report = preflight_wire_tree(source, limits, |visit| {
             descent(visit).map_err(|error| match error {
                 Error::IwaCommon(error) => error,
                 Error::InvalidFormat(message) => litchi_iwa_common::Error::InvalidFormat(message),
                 other => litchi_iwa_common::Error::InvalidFormat(other.to_string()),
             })
         })?;
-        let view = WireView::parse_with_limits(source, limits)?;
+        let view = WireView::parse(source, limits)?;
         self.charge_input(report.scanned_bytes())?;
         self.charge_fields(view.len())?;
         let scan_work = source.len().checked_add(view.len()).ok_or_else(|| {

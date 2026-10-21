@@ -678,9 +678,9 @@ fn read_style(package: &Package, identifier: u64) -> Result<StyleState, Error> {
         .ok_or(Error::InvalidSource)?;
     let raw = exactly_one_payload(object, SLIDE_STYLE_MESSAGE_TYPE)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &raw, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     let parent = optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?;
     let variation = optional_bool(&super_view, STYLE_VARIATION_FIELD)?;
     let stylesheet =
@@ -743,8 +743,7 @@ fn gradient_wire_has_only_semantic_fields(
     gradient: codec::GradientSnapshot<'_>,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let gradient_view =
-        WireView::parse_with_limits(gradient.raw, limits).map_err(map_wire_error)?;
+    let gradient_view = WireView::parse(gradient.raw, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &gradient_view,
         &[
@@ -759,7 +758,7 @@ fn gradient_wire_has_only_semantic_fields(
     }
 
     let angle = required_bytes(&gradient_view, gradient.raw, GRADIENT_ANGLE_FIELD)?;
-    let angle_view = WireView::parse_with_limits(angle, limits).map_err(map_wire_error)?;
+    let angle_view = WireView::parse(angle, limits).map_err(map_wire_error)?;
     if !has_exact_field_numbers(&angle_view, &[ANGLE_RADIANS_FIELD]) {
         return Ok(false);
     }
@@ -772,7 +771,7 @@ fn gradient_wire_has_only_semantic_fields(
             return Err(Error::InvalidSource);
         }
         let stop = field.payload();
-        let stop_view = WireView::parse_with_limits(stop, limits).map_err(map_wire_error)?;
+        let stop_view = WireView::parse(stop, limits).map_err(map_wire_error)?;
         if !has_exact_field_numbers(
             &stop_view,
             &[STOP_COLOR_FIELD, STOP_POSITION_FIELD, STOP_MIDPOINT_FIELD],
@@ -780,7 +779,7 @@ fn gradient_wire_has_only_semantic_fields(
             return Ok(false);
         }
         let color = required_bytes(&stop_view, stop, STOP_COLOR_FIELD)?;
-        let color_view = WireView::parse_with_limits(color, limits).map_err(map_wire_error)?;
+        let color_view = WireView::parse(color, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(
             &color_view,
             &[
@@ -1168,8 +1167,7 @@ fn next_object_identifier(package: &Package) -> Result<u64, Error> {
                 if message.type_ != PACKAGE_METADATA_MESSAGE_TYPE {
                     continue;
                 }
-                let view =
-                    WireView::parse_with_limits(&message.data, limits).map_err(map_wire_error)?;
+                let view = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
                 if let Some(last) = optional_varint(&view, 1)? {
                     maximum = maximum.max(last);
                 }
@@ -1185,7 +1183,7 @@ fn next_object_identifier(package: &Package) -> Result<u64, Error> {
 /// partially-saved native packages, so allocation must also account for
 /// registry records and cross-component references.
 fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1215,7 +1213,7 @@ fn metadata_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Err
 }
 
 fn metadata_component_identifier_max(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1246,7 +1244,7 @@ fn metadata_component_identifier_max(source: &[u8], limits: WireLimits) -> Resul
 }
 
 fn metadata_external_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
@@ -1258,13 +1256,13 @@ fn metadata_external_identifier(source: &[u8], limits: WireLimits) -> Result<u64
 }
 
 fn metadata_data_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut maximum = 0_u64;
     for field in view.fields() {
         match field.number() {
             1 => maximum = maximum.max(metadata_field_varint(&field)?),
             2 => {
-                let nested = WireView::parse_with_limits(metadata_field_bytes(&field)?, limits)
+                let nested = WireView::parse(metadata_field_bytes(&field)?, limits)
                     .map_err(map_wire_error)?;
                 for nested_field in nested.fields().filter(|field| field.number() == 1) {
                     maximum = maximum.max(metadata_field_varint(&nested_field)?);
@@ -1277,7 +1275,7 @@ fn metadata_data_reference_identifier(source: &[u8], limits: WireLimits) -> Resu
 }
 
 fn metadata_uuid_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1287,7 +1285,7 @@ fn metadata_uuid_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Er
 }
 
 fn metadata_data_info_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -1297,7 +1295,7 @@ fn metadata_data_info_identifier(source: &[u8], limits: WireLimits) -> Result<u6
 }
 
 fn metadata_reference_identifier(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     view.fields()
         .filter(|field| field.number() == 1)
         .map(|field| metadata_field_varint(&field))
@@ -2012,7 +2010,7 @@ fn patch_slide_style(
     validate_rewrite_metadata(object, index)?;
     validate_slide_style_metadata_for_rewrite(object, index, old_style)?;
     let data = object.messages[index].data.clone();
-    let slide_view = WireView::parse_with_limits(&data, wire_limits).map_err(map_wire_error)?;
+    let slide_view = WireView::parse(&data, wire_limits).map_err(map_wire_error)?;
     if slide_view
         .fields()
         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2266,12 +2264,11 @@ fn style_is_collapsible(package: &Package, selection: &Selection) -> Result<bool
         return Ok(false);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(&style.raw, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(&style.raw, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, &style.raw, STYLE_SUPER_FIELD)?;
     let properties = style.properties.as_deref().ok_or(Error::InvalidSource)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
-    let properties_view =
-        WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
+    let properties_view = WireView::parse(properties, limits).map_err(map_wire_error)?;
     // Unknown fields and any additional native property mean that culling the
     // variation would silently discard producer-authored state.
     Ok(has_exact_field_numbers(
@@ -2299,7 +2296,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
     validate_rewrite_metadata(stylesheet, index)?;
     let payload = stylesheet.messages[index].data.clone();
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(&payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(&payload, limits).map_err(map_wire_error)?;
     if optional_bool(&view, STYLESHEET_CAN_CULL_FIELD)? != Some(true) {
         return Ok(false);
     }
@@ -2321,8 +2318,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(false);
                 }
@@ -2346,8 +2342,7 @@ fn stylesheet_allows_culling(package: &Package, selection: &Selection) -> Result
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(false);
                 }
@@ -2423,7 +2418,7 @@ fn versioned_styles_reference(
     target: u64,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             VERSIONED_STYLES_FIELD => {
@@ -2437,8 +2432,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD])
                     || required_reference_field_from_slice(
                         entry,
@@ -2451,8 +2445,7 @@ fn versioned_styles_reference(
             },
             VERSIONED_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2615,7 +2608,7 @@ fn stylesheet_payload_references_target(
     target: u64,
     limits: WireLimits,
 ) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         match field.number() {
             STYLESHEET_STYLES_FIELD => {
@@ -2629,8 +2622,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_IDENTIFIER_MAP_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[1, IDENTIFIED_STYLE_REFERENCE_FIELD]) {
                     return Ok(true);
                 }
@@ -2654,8 +2646,7 @@ fn stylesheet_payload_references_target(
             },
             STYLESHEET_CHILDREN_FIELD => {
                 let entry = field.canonical_payload().map_err(map_wire_error)?;
-                let entry_view =
-                    WireView::parse_with_limits(entry, limits).map_err(map_wire_error)?;
+                let entry_view = WireView::parse(entry, limits).map_err(map_wire_error)?;
                 if !has_exact_field_numbers(&entry_view, &[CHILD_PARENT_FIELD, CHILDREN_FIELD]) {
                     return Ok(true);
                 }
@@ -2720,8 +2711,8 @@ fn style_is_exclusive(package: &Package, selection: &Selection) -> Result<bool, 
                     return Ok(false);
                 }
                 if message.type_ == SLIDE_MESSAGE_TYPE {
-                    let slide_view = WireView::parse_with_limits(&message.data, wire_limits)
-                        .map_err(map_wire_error)?;
+                    let slide_view =
+                        WireView::parse(&message.data, wire_limits).map_err(map_wire_error)?;
                     if slide_view
                         .fields()
                         .any(|field| !matches!(field.number(), 1..=7 | 10..=31 | 34..=45))
@@ -2813,7 +2804,7 @@ fn style_is_exclusive(package: &Package, selection: &Selection) -> Result<bool, 
 }
 
 fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(
         &outer,
         &[
@@ -2825,7 +2816,7 @@ fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Resu
         return Ok(false);
     }
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     if !has_only_field_numbers(&super_view, &[1, 2, 3, 4, 5]) {
         return Ok(false);
     }
@@ -2837,7 +2828,7 @@ fn other_style_payload_allows_culling(source: &[u8], limits: WireLimits) -> Resu
         }
     }
     if let Some(properties) = optional_bytes(&outer, source, STYLE_PROPERTIES_FIELD)? {
-        let properties = WireView::parse_with_limits(properties, limits).map_err(map_wire_error)?;
+        let properties = WireView::parse(properties, limits).map_err(map_wire_error)?;
         if !has_only_field_numbers(&properties, &[1, 2, 3, 4, 5, 6, 7]) {
             return Ok(false);
         }
@@ -3046,7 +3037,7 @@ fn validate_rewrite_metadata(object: &ArchiveObject, message_index: usize) -> Re
 
 fn required_reference_field(package: &Package, source: &[u8], number: u32) -> Result<u64, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
@@ -3056,13 +3047,13 @@ fn required_reference_field_from_slice(
     number: u32,
     limits: WireLimits,
 ) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let payload = required_bytes(&view, source, number)?;
     required_reference_payload(payload, limits)
 }
 
 fn required_reference_payload(source: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let field = unique_field(&view, 1)?;
     let field = field.ok_or(Error::InvalidSource)?;
     if field.wire_type() != 0 {
@@ -3077,7 +3068,7 @@ fn required_reference_payload(source: &[u8], limits: WireLimits) -> Result<u64, 
 }
 
 fn reference_payload_allows_removal(source: &[u8], limits: WireLimits) -> Result<bool, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     required_reference_payload(source, limits)?;
     if !has_only_field_numbers(&view, &[1, 2, 3]) {
         return Ok(false);
@@ -3105,7 +3096,7 @@ fn optional_reference_from_payload(
     number: u32,
 ) -> Result<Option<u64>, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let Some(payload) = optional_bytes(&view, source, number)? else {
         return Ok(None);
     };
@@ -3114,9 +3105,9 @@ fn optional_reference_from_payload(
 
 fn parse_style_metadata(package: &Package, source: &[u8]) -> Result<StyleState, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let outer = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let outer = WireView::parse(source, limits).map_err(map_wire_error)?;
     let super_payload = required_bytes(&outer, source, STYLE_SUPER_FIELD)?;
-    let super_view = WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
+    let super_view = WireView::parse(super_payload, limits).map_err(map_wire_error)?;
     Ok(StyleState {
         raw: source.to_vec(),
         parent: optional_reference(&super_view, super_payload, STYLE_PARENT_FIELD, limits)?,
@@ -3141,7 +3132,7 @@ fn required_bytes_from_slice(
     number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
         .map(|payload| payload.map(ToOwned::to_owned))?
         .ok_or(Error::InvalidSource)
@@ -3167,7 +3158,7 @@ fn optional_bytes_in_payload(
     number: u32,
     limits: WireLimits,
 ) -> Result<Option<&[u8]>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     optional_bytes(&view, source, number)
 }
 
@@ -3252,7 +3243,7 @@ fn rewrite_reference_field(
     identifier: u64,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let replacement = match optional_bytes(&view, source, number)? {
         Some(reference) => rewrite_reference_identifier(reference, identifier, limits)?,
         None => encode_reference(identifier),
@@ -3261,8 +3252,13 @@ fn rewrite_reference_field(
 }
 
 fn append_length(output: &mut Vec<u8>, number: u32, payload: &[u8]) -> Result<(), Error> {
-    litchi_iwa_common::wire::append_length_delimited_field(output, number, payload)
-        .map_err(map_wire_error)
+    litchi_iwa_common::wire::append_length_delimited_field(
+        output,
+        number,
+        payload,
+        WireLimits::DEFAULT,
+    )
+    .map_err(map_wire_error)
 }
 
 fn append_varint(output: &mut Vec<u8>, number: u32, value: u64) -> Result<(), Error> {
@@ -3275,7 +3271,7 @@ fn rewrite_length_field(
     replacement: Option<&[u8]>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3307,7 +3303,7 @@ fn rewrite_varint_field(
     replacement: Option<u64>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut seen = false;
     for field in view.fields() {
@@ -3339,7 +3335,7 @@ fn repeated_payloads(
     number: u32,
     limits: WireLimits,
 ) -> Result<Vec<Vec<u8>>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut payloads = Vec::new();
     for field in view.fields().filter(|field| field.number() == number) {
         if field.wire_type() != 2 {
@@ -3357,7 +3353,7 @@ fn rewrite_repeated_length_field(
     replacements: &[Vec<u8>],
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut output = Vec::new();
     let mut selected = 0usize;
     for field in view.fields() {

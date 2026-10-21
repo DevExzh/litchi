@@ -506,7 +506,7 @@ fn validate_reference_role_disjointness(
     )?;
     budget.charge_work(show_payload.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let show = WireView::parse_with_limits(show_payload, bounded_limits).map_err(map_wire_error)?;
+    let show = WireView::parse(show_payload, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(show.len())?;
     let mut slide_tree_payload = None;
     for field in show.fields() {
@@ -538,7 +538,7 @@ fn reject_selected_identifier_in_reference_fields(
 ) -> Result<(), Error> {
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     let outer_fields = view.len();
     budget.charge_fields(outer_fields)?;
     for field in view.fields() {
@@ -680,7 +680,7 @@ fn strict_optional_reference(
 ) -> Result<Option<ReferenceFacts>, Error> {
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     let outer_fields = view.len();
     budget.charge_fields(outer_fields)?;
     let mut selected = None;
@@ -709,7 +709,7 @@ fn strict_reference(
 ) -> Result<ReferenceFacts, Error> {
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let field_count = view.len();
     let mut identifier = None;

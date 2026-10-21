@@ -212,7 +212,10 @@ fn append_root_reference_bytes(source: &[u8], nested: &[u8]) -> TestResult<Vec<u
             else {
                 continue;
             };
-            let view = WireView::parse(&object.messages[index].data)?;
+            let view = WireView::parse(
+                &object.messages[index].data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut rewritten = Vec::new();
             let mut changed = false;
             for field in view.fields() {
@@ -291,7 +294,10 @@ fn append_external_soundtrack_reference(source: &[u8]) -> TestResult<Vec<u8>> {
             }) else {
                 continue;
             };
-            let view = WireView::parse(&object.messages[index].data)?;
+            let view = WireView::parse(
+                &object.messages[index].data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut rewritten = Vec::new();
             let mut changed = false;
             for field in view.fields() {

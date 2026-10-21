@@ -1353,7 +1353,12 @@ fn duration_unknown_wire_fields_and_nested_groups_survive_source_rewrite() -> Te
     let mut payload = raw_format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let nested_before = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"duration extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"duration extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -1473,6 +1478,7 @@ fn duration_malformed_format_entries_fail_closed_and_remain_atomic() -> TestResu
         &mut wrong_wire,
         1,
         &fixture::NATIVE_DURATION_FORMAT_TYPE.to_le_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     for (field, value) in [(7, 1), (15, 4), (16, 32), (40, 1)] {
         append_varint_field(&mut wrong_wire, field, value)?;
@@ -1481,7 +1487,12 @@ fn duration_malformed_format_entries_fail_closed_and_remain_atomic() -> TestResu
 
     let mut wrong_boolean_wire = native_payload(1, 4, 32, true)?;
     // A length-delimited field 40 is not a protobuf boolean varint.
-    append_length_delimited_field(&mut wrong_boolean_wire, 40, &[1])?;
+    append_length_delimited_field(
+        &mut wrong_boolean_wire,
+        40,
+        &[1],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_boolean_wire)?)?;
 
     // Native 268 with an overlong terminating zero is refused by the strict

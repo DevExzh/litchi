@@ -455,7 +455,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -470,7 +470,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -494,7 +494,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn fields_except_settings(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse_with_limits(payload, WireLimits::default())?
+    Ok(WireView::parse(payload, WireLimits::default())?
         .fields()
         .filter(|field| !SETTINGS_FIELDS.contains(&field.number()))
         .map(|field| field.raw().to_vec())
@@ -957,11 +957,11 @@ fn malformed_selected_fields_fail_closed_before_publication() -> TestResult {
         assert_malformed_fails_closed(duplicate, &second)?;
 
         let mut wrong_wire = canonical_payload.clone();
-        append_length_delimited_field(&mut wrong_wire, field, &[])?;
+        append_length_delimited_field(&mut wrong_wire, field, &[], WireLimits::DEFAULT)?;
         assert_malformed_fails_closed(wrong_wire, &second)?;
     }
     let mut duplicate_name = canonical_payload.clone();
-    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate")?;
+    append_length_delimited_field(&mut duplicate_name, 26, b"duplicate", WireLimits::DEFAULT)?;
     assert_malformed_fails_closed(duplicate_name, &second)?;
     let mut wrong_name_wire = canonical_payload.clone();
     append_varint_field(&mut wrong_name_wire, 26, 1)?;

@@ -1290,7 +1290,7 @@ fn decode_header(
     );
     let snapshot = header_codec::decode_table_header_settings(payload, options)
         .map_err(map_header_codec_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len().checked_mul(4).ok_or(Error::InvalidSource)?)?;
     Ok(snapshot)
@@ -1310,7 +1310,7 @@ fn decode_table_info(
     );
     let snapshot = table_info_codec::decode_table_info(payload, options)
         .map_err(map_table_info_codec_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len().checked_mul(4).ok_or(Error::InvalidSource)?)?;
     Ok(snapshot)
@@ -1455,7 +1455,7 @@ fn repeated_references(
     limits: WireLimits,
     budget: &mut HeaderBudget,
 ) -> Result<Vec<u64>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len())?;
     for field in view.fields() {
@@ -1481,7 +1481,7 @@ fn repeated_references(
 }
 
 fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in fields.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
     }
@@ -1492,8 +1492,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     if super_fields.len() != 1 || super_fields[0].wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_fields[0].payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_fields[0].payload(), limits).map_err(map_wire_error)?;
     for field in drawable.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
     }
@@ -1508,7 +1507,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -2358,7 +2357,7 @@ mod tests {
 }
 
 fn parse_all_fields<'a>(payload: &'a [u8], limits: WireLimits) -> Result<WireView<'a>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
     }

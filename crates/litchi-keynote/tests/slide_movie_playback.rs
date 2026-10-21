@@ -101,8 +101,13 @@ fn movie_payload(movie: usize, full_playback: bool) -> Vec<u8> {
         value.end_time = Some(7.0);
     }
     let mut payload = value.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)
-        .expect("unknown playback field");
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("unknown playback field");
     payload
 }
 
@@ -145,8 +150,13 @@ fn audio_payload() -> Vec<u8> {
         ..Default::default()
     };
     let mut payload = value.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)
-        .expect("unknown playback field");
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("unknown playback field");
     payload
 }
 
@@ -175,7 +185,12 @@ fn metadata_component_payload(
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -214,11 +229,31 @@ fn metadata_payload(last_identifier: u64) -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -416,7 +451,12 @@ fn append_fixed32(payload: &mut Vec<u8>, field: u32, value: f32) {
 }
 
 fn append_unknown_extensions(payload: &mut Vec<u8>) -> TestResult<()> {
-    append_length_delimited_field(payload, 4_090, b"unknown overlong/group carrier")?;
+    append_length_delimited_field(
+        payload,
+        4_090,
+        b"unknown overlong/group carrier",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // Unknown scalar values retain their non-canonical varint framing.
     payload.extend_from_slice(&[0xd0, 0x05, 0x96, 0x81, 0x00]);
     Ok(())

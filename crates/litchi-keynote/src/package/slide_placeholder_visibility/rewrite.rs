@@ -179,7 +179,7 @@ pub(super) fn rewrite_visibility_payload(
     if before == after {
         return Err(Error::Verification);
     }
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let role_number = match kind {
         super::Kind::Title => TITLE_REFERENCE_FIELD,
         super::Kind::Body => BODY_REFERENCE_FIELD,
@@ -325,8 +325,8 @@ pub(super) fn visibility_payload_delta_matches(
         })
         .ok_or(Error::InvalidSource)?;
     budget.charge_work(work)?;
-    let source_view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
-    let target_view = WireView::parse_with_limits(target, limits).map_err(map_wire_error)?;
+    let source_view = WireView::parse(source, limits).map_err(map_wire_error)?;
+    let target_view = WireView::parse(target, limits).map_err(map_wire_error)?;
     let role_number = match kind {
         super::Kind::Title => TITLE_REFERENCE_FIELD,
         super::Kind::Body => BODY_REFERENCE_FIELD,

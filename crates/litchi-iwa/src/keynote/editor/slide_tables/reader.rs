@@ -347,7 +347,7 @@ fn precharge_drawable_references(
     budget: &mut SelectorBudget,
 ) -> Result<usize> {
     let limits = wire_limits(package, source)?;
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|error| map_common_wire_error(error, "Keynote slide drawables"))?;
     let references = view
         .fields()

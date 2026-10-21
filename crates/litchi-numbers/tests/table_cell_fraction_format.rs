@@ -828,7 +828,12 @@ fn fraction_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     let mut payload = fixture::format_payload_by_key(&source, fixture::FIRST_FORMAT_KEY)?;
     let original_nested_extension = fixture::unknown_field_record(&payload, 94)?;
     append_varint_field(&mut payload, 46, 0x80_03)?;
-    append_length_delimited_field(&mut payload, 47, b"fraction extension")?;
+    append_length_delimited_field(
+        &mut payload,
+        47,
+        b"fraction extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&encode_varint((48_u64 << 3) | 5));
     payload.extend_from_slice(&[0x11, 0x22, 0x33, 0x44]);
     payload.extend_from_slice(&encode_varint((49_u64 << 3) | 1));
@@ -854,7 +859,7 @@ fn fraction_unknown_wire_bytes_and_nested_extensions_survive_rewrite() -> TestRe
     );
     for field_number in [46, 47, 48, 49] {
         assert!(
-            WireView::parse(&target_nested)?
+            WireView::parse(&target_nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == field_number),
             "unknown field {field_number} was not retained"
@@ -952,6 +957,7 @@ fn fraction_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
         &mut wrong_wire,
         1,
         &fixture::NATIVE_FRACTION_FORMAT_TYPE.to_le_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut wrong_wire, 11, 8)?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_wire)?)?;
@@ -962,7 +968,12 @@ fn fraction_malformed_wire_and_graph_inputs_fail_closed_and_remain_atomic() -> T
         1,
         u64::from(fixture::NATIVE_FRACTION_FORMAT_TYPE),
     )?;
-    append_length_delimited_field(&mut wrong_wire_accuracy, 11, &[0x08])?;
+    append_length_delimited_field(
+        &mut wrong_wire_accuracy,
+        11,
+        &[0x08],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     assert_rejected_or_owner(&rewrite_payload(&source, &wrong_wire_accuracy)?)?;
 
     // Field 20 is a native replacement marker. Canonical false is accepted

@@ -423,6 +423,7 @@ fn add_sheet(source: &Package, name: &str) -> Result<(structure::Published, Vec<
             &mut data,
             TREE_OBJECT_FIELD,
             &references::reference_payload(sheet)?,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )
         .map_err(|error| structure::map_wire(&error))?;
         let node_object = structure::new_object(

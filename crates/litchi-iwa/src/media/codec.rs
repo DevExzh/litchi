@@ -8,7 +8,7 @@ use std::path::{Component, Path};
 use crate::HostPackage;
 use crate::{Error, Result};
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encode_varint_into, encoded_len};
-use litchi_iwa_common::wire::{WireField, parse_wire_fields_with_limits};
+use litchi_iwa_common::wire::{WireField, parse_wire_fields};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_index::ObjectId;
 use litchi_iwa_protos::package_metadata_codec::{
@@ -750,10 +750,7 @@ fn strict_wire_fields(data: &[u8]) -> Result<Vec<WireField>> {
     // keys, length prefixes, or varint payloads would silently change bytes
     // that this codec does not own. Known fields validate their selected
     // framing/value at the point where they are decoded below.
-    Ok(parse_wire_fields_with_limits(
-        data,
-        metadata_wire_limits(data.len())?,
-    )?)
+    Ok(parse_wire_fields(data, metadata_wire_limits(data.len())?)?)
 }
 
 fn decode_package_metadata_payload(metadata: &[u8]) -> Result<PackageMetadataSnapshot> {

@@ -166,7 +166,7 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
     // Interleave an unknown field between the two repeated text records so a
     // changed splice must preserve both the record ordering and raw unknown
     // bytes rather than normalize the complete message.
-    let encoded_view = WireView::parse(&encoded_body)?;
+    let encoded_view = WireView::parse(&encoded_body, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut body_payload = Vec::with_capacity(encoded_body.len().saturating_add(8));
     let mut text_fields = 0usize;
     for field in encoded_view.fields() {
@@ -344,8 +344,18 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
         .position(|message| message.type_ == STORAGE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing synthetic body message"))?;
     let mut payload = body.messages[message_index].data.clone();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &[])?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &[],
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     body.replace_message(
         message_index,
         RawMessage {
@@ -546,7 +556,7 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(header)?;
+    let view = WireView::parse(header, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(header.len());
     let mut message_index = 0usize;
     for field in view.fields() {
@@ -561,7 +571,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
         }
         output.extend_from_slice(field.key());
         output.extend_from_slice(b"<message-info>");
-        let message = WireView::parse(field.payload())?;
+        let message = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let effective_length = message
             .fields()
             .enumerate()
@@ -585,26 +595,32 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 }
 
 fn body_fields_except_text_and_sections(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| !matches!(field.number(), 3 | 17))
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| !matches!(field.number(), 3 | 17))
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn text_field_raw(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == 3)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == 3)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn field_numbers(payload: &[u8]) -> TestResult<Vec<u32>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .map(litchi_iwa_common::wire::WireFieldView::number)
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(litchi_iwa_common::wire::WireFieldView::number)
+            .collect(),
+    )
 }
 
 fn section_snapshot(package: &Package) -> TestResult<Vec<(Option<String>, String)>> {
@@ -847,7 +863,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     );
     assert_eq!(field_numbers(&target_body)?, field_numbers(&source_body)?);
     assert!(
-        WireView::parse(&target_body)?
+        WireView::parse(&target_body, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );
@@ -856,7 +872,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
         normalize_message_length(&source_header, 1)?
     );
     assert!(
-        WireView::parse(&target_header)?
+        WireView::parse(&target_header, litchi_iwa_common::WireLimits::DEFAULT)?
             .fields()
             .any(|field| field.number() == 99)
     );

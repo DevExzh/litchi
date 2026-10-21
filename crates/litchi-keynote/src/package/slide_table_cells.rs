@@ -19,7 +19,7 @@ use litchi_iwa_common::table::model::{Cell, Dimensions};
 use litchi_iwa_common::table::read::{
     CellComment, Comment, CommentAuthor, CommentReply, TableRead,
 };
-use litchi_iwa_common::wire::{WireDescent, WireView, preflight_wire_tree_with_limits};
+use litchi_iwa_common::wire::{WireDescent, WireView, preflight_wire_tree};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::numbers_table_cell_storage_codec as storage;
@@ -1600,7 +1600,7 @@ fn preflight_rich_text_payload(
     }
     let mut storage_identifier = None;
     let mut has_cell_owner = false;
-    let report = preflight_wire_tree_with_limits(source, limits, |visit| {
+    let report = preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {
@@ -1636,7 +1636,7 @@ fn parse_local_reference(
     source: &[u8],
     limits: WireLimits,
 ) -> Result<u64, litchi_iwa_common::Error> {
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|_| litchi_iwa_common::Error::InvalidFormat("invalid local reference".into()))?;
     let mut identifier = None;
     for field in view.fields() {

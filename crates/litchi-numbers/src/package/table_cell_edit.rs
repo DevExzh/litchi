@@ -6615,7 +6615,8 @@ mod tests {
                 else {
                     return false;
                 };
-                let Ok(view) = WireView::parse(payload) else {
+                let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+                else {
                     return false;
                 };
                 let mut owner = None;

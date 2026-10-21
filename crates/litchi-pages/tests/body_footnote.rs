@@ -222,16 +222,19 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
                 uuid_entry(SECOND_STORAGE_IDENTIFIER, 2),
             ],
         )?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(2, "ViewState", VIEW_STATE_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_length_delimited_field(
         &mut payload,
         3,
         &metadata_component(3, "Unrelated", UNRELATED_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_unknown(&mut payload, UNKNOWN_ROOT_FIELD, 0xfeed_beef)?;
     Ok(payload)
@@ -479,7 +482,12 @@ fn append_versioned_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         ..tsp::ComponentInfo::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 11, &component)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_object_payload(
         source,
         METADATA_MEMBER,
@@ -536,7 +544,12 @@ fn duplicate_body_table(source: &[u8]) -> TestResult<Vec<u8>> {
             .clone()
             .ok_or_else(|| io::Error::other("body footnote table is missing"))?;
         let mut payload = body.encode_to_vec();
-        append_length_delimited_field(&mut payload, 16, &table.encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            16,
+            &table.encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         Ok((STORAGE_MESSAGE_TYPE, payload))
     })
 }
@@ -547,6 +560,7 @@ fn add_ambiguous_document_component(source: &[u8]) -> TestResult<Vec<u8>> {
         &mut payload,
         3,
         &metadata_component(DOCUMENT_IDENTIFIER, "Document", DOCUMENT_SAVE_TOKEN, &[])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     rewrite_object_payload(
         source,
@@ -771,7 +785,7 @@ fn assert_unchanged(package: &Package, source: &[u8]) -> TestResult {
 
 fn assert_metadata_unknowns(bytes: &[u8]) -> TestResult {
     let payload = metadata_payload_from_bytes(bytes)?;
-    let view = WireView::parse(&payload)?;
+    let view = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     assert!(
         view.fields()
             .any(|field| field.number() == UNKNOWN_ROOT_FIELD)
@@ -779,7 +793,7 @@ fn assert_metadata_unknowns(bytes: &[u8]) -> TestResult {
     for field in view.fields().filter(|field| field.number() == 3) {
         let nested = field.payload();
         assert!(
-            WireView::parse(nested)?
+            WireView::parse(nested, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|nested_field| nested_field.number() == UNKNOWN_COMPONENT_FIELD)
         );
@@ -813,7 +827,7 @@ fn assert_graph_unknowns(bytes: &[u8]) -> TestResult {
             .first()
             .ok_or_else(|| io::Error::other("graph message is missing"))?;
         assert!(
-            WireView::parse(&message.data)?
+            WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|field| field.number() == UNKNOWN_PAYLOAD_FIELD)
         );

@@ -737,7 +737,7 @@ fn strict_payload_pagination(
     payload: &[u8],
     limits: WireLimits,
 ) -> Result<section::Pagination, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut start = None;
     let mut numbering = None;
     let mut page = None;
@@ -795,7 +795,7 @@ fn rewrite_pagination_payload(
     if strict_payload_pagination(source, limits)? != before {
         return Err(Error::InvalidSource);
     }
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let fields = [
         SECTION_START_FIELD,
         PAGE_NUMBERING_FIELD,

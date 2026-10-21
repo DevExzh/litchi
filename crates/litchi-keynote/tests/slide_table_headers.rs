@@ -189,7 +189,12 @@ fn table_model(
         append_varint_field(&mut payload, UNKNOWN_MODEL_FIELD, UNKNOWN_MODEL_VALUE)?;
     }
     if with_tracker {
-        append_length_delimited_field(&mut payload, TABLE_MODEL_FIELD_TRACKER, TRACKER_BYTES)?;
+        append_length_delimited_field(
+            &mut payload,
+            TABLE_MODEL_FIELD_TRACKER,
+            TRACKER_BYTES,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     Ok(payload)
 }
@@ -277,8 +282,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -537,7 +552,12 @@ fn append_model_message_field(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let mut raw = Vec::new();
-    append_length_delimited_field(&mut raw, field_number, payload)?;
+    append_length_delimited_field(
+        &mut raw,
+        field_number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_raw(package, &raw)
 }
 
@@ -627,6 +647,7 @@ fn with_malformed_category_owner(package: &[u8], missing_group_uid: bool) -> Tes
                 upper: 62,
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     append_varint_field(&mut group, 6, 0)?;
@@ -640,9 +661,15 @@ fn with_malformed_category_owner(package: &[u8], missing_group_uid: bool) -> Tes
                 upper: 64,
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -656,6 +683,7 @@ fn with_invalid_group_owner_index(package: &[u8], duplicate: bool) -> TestResult
             upper: 66,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut group, 6, 0)?;
     append_varint_field(&mut group, 14, 8)?;
@@ -677,8 +705,14 @@ fn with_invalid_group_owner_index(package: &[u8], duplicate: bool) -> TestResult
             upper: 68,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -695,9 +729,15 @@ fn with_invalid_group_coordinate(package: &[u8]) -> TestResult<Vec<u8>> {
             upper: 72,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     append_varint_field(&mut group, 6, 0)?;
-    append_length_delimited_field(&mut group, 7, &coordinate)?;
+    append_length_delimited_field(
+        &mut group,
+        7,
+        &coordinate,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut owner = Vec::new();
     append_length_delimited_field(
         &mut owner,
@@ -707,8 +747,14 @@ fn with_invalid_group_coordinate(package: &[u8]) -> TestResult<Vec<u8>> {
             upper: 74,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
-    append_length_delimited_field(&mut owner, 2, &group)?;
+    append_length_delimited_field(
+        &mut owner,
+        2,
+        &group,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_model_message_field(package, 81, &owner)
 }
 
@@ -723,7 +769,12 @@ fn with_pivot_owner(package: &[u8]) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-model message"))?;
         let mut payload = model.messages[message_index].data.clone();
-        append_length_delimited_field(&mut payload, 85, &reference(PIVOT_OWNER).encode_to_vec())?;
+        append_length_delimited_field(
+            &mut payload,
+            85,
+            &reference(PIVOT_OWNER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
@@ -766,7 +817,12 @@ fn with_opaque_category_reference(package: &[u8]) -> TestResult<Vec<u8>> {
         let mut reference_payload = reference(CATEGORY_OWNER).encode_to_vec();
         append_varint_field(&mut reference_payload, 4, 1)?;
         let mut payload = model.messages[message_index].data.clone();
-        append_length_delimited_field(&mut payload, 86, &reference_payload)?;
+        append_length_delimited_field(
+            &mut payload,
+            86,
+            &reference_payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         model.replace_message_preserving_header(
             message_index,
             RawMessage {
@@ -1001,7 +1057,7 @@ fn field_info_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn unknown_model_value(payload: &[u8]) -> TestResult<u64> {
-    let field = WireView::parse(payload)?
+    let field = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
         .ok_or_else(|| io::Error::other("missing unknown model field"))?;
@@ -1018,10 +1074,13 @@ fn model_field_payloads(package: &[u8], field: u32) -> TestResult<Vec<Vec<u8>>> 
 }
 
 fn field_numbers(package: &[u8], field: u32) -> TestResult<usize> {
-    Ok(WireView::parse(&model_payload(package, MODELS[0])?)?
-        .fields()
-        .filter(|candidate| candidate.number() == field)
-        .count())
+    Ok(WireView::parse(
+        &model_payload(package, MODELS[0])?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|candidate| candidate.number() == field)
+    .count())
 }
 
 fn assert_rejected_atomically(source: &[u8]) -> TestResult {

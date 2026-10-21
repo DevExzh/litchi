@@ -503,7 +503,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
             .position(|message| message.type_ == PLACEHOLDER_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing placeholder message"))?;
         let source = object.messages[index].data.as_slice();
-        let placeholder = WireView::parse(source)?;
+        let placeholder = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_placeholder = Vec::with_capacity(source.len() + 8);
         let mut selected_super = false;
         for field in placeholder.fields() {
@@ -515,7 +515,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 return Err(io::Error::other("ambiguous placeholder super field").into());
             }
             let source_shape = field.canonical_payload()?;
-            let shape = WireView::parse(source_shape)?;
+            let shape = WireView::parse(source_shape, litchi_iwa_common::WireLimits::DEFAULT)?;
             let mut rewritten_shape = Vec::with_capacity(source_shape.len() + 8);
             let mut selected_storage = false;
             for shape_field in shape.fields() {
@@ -532,6 +532,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                     &mut rewritten_shape,
                     4,
                     &owned_storage,
+                    litchi_iwa_common::WireLimits::DEFAULT,
                 )?;
             }
             if !selected_storage {
@@ -541,6 +542,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 &mut rewritten_placeholder,
                 1,
                 &rewritten_shape,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
         if !selected_super {
@@ -656,11 +658,13 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn assert_document_changed_previews_removed_and_other_entries_preserved(
@@ -1506,6 +1510,7 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
             &mut data,
             6,
             &reference(BODY_OWNER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         object.replace_message_preserving_header(
             index,
@@ -1604,6 +1609,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 &mut data,
                 5,
                 &reference(TITLE_OWNER).encode_to_vec(),
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             object.replace_message_preserving_header(
                 index,

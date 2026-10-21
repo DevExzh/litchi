@@ -1085,8 +1085,8 @@ fn repeated_references(
     field_number: u32,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
-        .map_err(map_wire_error)?;
+    let fields =
+        litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut references = Vec::new();
     references
         .try_reserve(fields.len())
@@ -1114,8 +1114,8 @@ fn unique_length_delimited_payload(
     field_number: u32,
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<Option<&[u8]>, Error> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
-        .map_err(map_wire_error)?;
+    let fields =
+        litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in fields
         .fields()

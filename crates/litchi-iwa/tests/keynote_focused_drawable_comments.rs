@@ -219,7 +219,9 @@ fn annotation_author_storage_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
                 if message.type_ != 213 {
                     continue;
                 }
-                for field in WireView::parse(&message.data)?.fields() {
+                for field in
+                    WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)?.fields()
+                {
                     if field.number() != 1 {
                         continue;
                     }

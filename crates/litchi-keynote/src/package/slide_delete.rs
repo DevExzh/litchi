@@ -7,7 +7,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{WireView, append_length_delimited_field_with_limits},
+    wire::{WireView, append_length_delimited_field},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
@@ -1266,7 +1266,7 @@ fn one_message(object: &ArchiveObject, type_: u32) -> Result<(usize, &[u8]), Err
 }
 
 fn strict_flat_slide(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut selected = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -1368,7 +1368,7 @@ fn validate_selected_reference_metadata(
 }
 
 fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Result<Vec<u8>, Error> {
-    let show = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let show = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut found_tree = false;
     let mut output = Vec::new();
     output
@@ -1385,7 +1385,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
             return Err(Error::InvalidSource);
         }
         found_tree = true;
-        let tree = WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let tree = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         let mut retained = Vec::new();
         let mut removed = 0usize;
         for child in tree.fields() {
@@ -1414,8 +1414,7 @@ fn remove_show_node(payload: &[u8], identifier: u64, limits: WireLimits) -> Resu
         if removed != 1 {
             return Err(Error::InvalidSource);
         }
-        append_length_delimited_field_with_limits(&mut output, 3, &retained, limits)
-            .map_err(map_wire_error)?;
+        append_length_delimited_field(&mut output, 3, &retained, limits).map_err(map_wire_error)?;
     }
     if !found_tree {
         return Err(Error::InvalidSource);

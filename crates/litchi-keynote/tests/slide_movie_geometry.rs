@@ -125,7 +125,12 @@ fn component_info(id: u64, locator: &str, token: u64, ids: &[u64]) -> R<Vec<u8>>
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut value, 4_002, b"component geometry extension")?;
+    append_length_delimited_field(
+        &mut value,
+        4_002,
+        b"component geometry extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(value)
 }
 
@@ -146,11 +151,31 @@ fn metadata() -> R<Vec<u8>> {
     .encode_to_vec();
     let mut value = Vec::new();
     append_varint_field(&mut value, 1, 1_000)?;
-    append_length_delimited_field(&mut value, 3, &current)?;
-    append_length_delimited_field(&mut value, 3, &other)?;
+    append_length_delimited_field(
+        &mut value,
+        3,
+        &current,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut value,
+        3,
+        &other,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut value, 8, 10)?;
-    append_length_delimited_field(&mut value, 11, &versioned)?;
-    append_length_delimited_field(&mut value, 4_001, b"metadata geometry extension")?;
+    append_length_delimited_field(
+        &mut value,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut value,
+        4_001,
+        b"metadata geometry extension",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(value)
 }
 
@@ -405,7 +430,12 @@ fn with_movie_data_id(source: &[u8], id: u64, data_identifier: u64) -> R<Vec<u8>
 fn with_duplicate_movie_data(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut payload = movie_payload_at(source, id)?;
     let data = tsp::DataReference { identifier: 2_002 }.encode_to_vec();
-    append_length_delimited_field(&mut payload, 14, &data)?;
+    append_length_delimited_field(
+        &mut payload,
+        14,
+        &data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     with_movie(source, id, payload)
 }
 
@@ -520,12 +550,16 @@ fn with_locked_movie(source: &[u8], id: u64) -> R<Vec<u8>> {
 
 fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let payload = movie_payload_at(source, id)?;
-    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let root =
+        litchi_iwa_common::wire::WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("movie super"))?;
-    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let geometry_field = drawable
         .fields()
         .find(|field| field.number() == 1)
@@ -536,7 +570,12 @@ fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let mut drawable_output = Vec::new();
     for field in drawable.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut drawable_output, 1, &geometry)?;
+            append_length_delimited_field(
+                &mut drawable_output,
+                1,
+                &geometry,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             drawable_output.extend_from_slice(field.raw());
         }
@@ -544,7 +583,12 @@ fn with_geometry_extra(source: &[u8], id: u64, extra: &[u8]) -> R<Vec<u8>> {
     let mut output = Vec::new();
     for field in root.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+            append_length_delimited_field(
+                &mut output,
+                1,
+                &drawable_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             output.extend_from_slice(field.raw());
         }
@@ -574,12 +618,16 @@ fn with_noncanonical_super_key(source: &[u8], id: u64) -> R<Vec<u8>> {
 
 fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let payload = movie_payload_at(source, id)?;
-    let root = litchi_iwa_common::wire::WireView::parse(&payload)?;
+    let root =
+        litchi_iwa_common::wire::WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("movie super"))?;
-    let drawable = litchi_iwa_common::wire::WireView::parse(super_field.payload())?;
+    let drawable = litchi_iwa_common::wire::WireView::parse(
+        super_field.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let parent_field = drawable
         .fields()
         .find(|field| field.number() == 2)
@@ -594,7 +642,12 @@ fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut drawable_output = Vec::new();
     for field in drawable.fields() {
         if field.number() == 2 {
-            append_length_delimited_field(&mut drawable_output, 2, &reference)?;
+            append_length_delimited_field(
+                &mut drawable_output,
+                2,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             drawable_output.extend_from_slice(field.raw());
         }
@@ -602,7 +655,12 @@ fn with_noncanonical_parent_key(source: &[u8], id: u64) -> R<Vec<u8>> {
     let mut output = Vec::new();
     for field in root.fields() {
         if field.number() == 1 {
-            append_length_delimited_field(&mut output, 1, &drawable_output)?;
+            append_length_delimited_field(
+                &mut output,
+                1,
+                &drawable_output,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         } else {
             output.extend_from_slice(field.raw());
         }
@@ -640,7 +698,8 @@ fn rewrite_noncanonical_length(payload: &[u8], path: &[u32]) -> R<Vec<u8>> {
     let field_number = *path
         .first()
         .ok_or_else(|| io::Error::other("empty wire path"))?;
-    let view = litchi_iwa_common::wire::WireView::parse(payload)?;
+    let view =
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(payload.len().saturating_add(1));
     let mut matched = 0usize;
     for field in view.fields() {
@@ -656,7 +715,12 @@ fn rewrite_noncanonical_length(payload: &[u8], path: &[u32]) -> R<Vec<u8>> {
             append_noncanonical_length_field(&mut output, field_number, field.payload())?;
         } else {
             let nested = rewrite_noncanonical_length(field.payload(), &path[1..])?;
-            append_length_delimited_field(&mut output, field_number, &nested)?;
+            append_length_delimited_field(
+                &mut output,
+                field_number,
+                &nested,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
     }
     if matched != 1 {
@@ -794,7 +858,12 @@ fn key(payload: &mut Vec<u8>, field: u32, wire: u8) {
     payload.push(value as u8);
 }
 fn unknowns(payload: &mut Vec<u8>) -> R<()> {
-    append_length_delimited_field(payload, UNKNOWN, UNKNOWN_BYTES)?;
+    append_length_delimited_field(
+        payload,
+        UNKNOWN,
+        UNKNOWN_BYTES,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     payload.extend_from_slice(&[0xd0, 0x05, 0x96, 0x81, 0x00]);
     key(payload, 4_092, 3);
     key(payload, 1, 2);
@@ -964,7 +1033,12 @@ fn malformed_duplicate_wrong_wire_partial_and_nonfinite_geometry_reject() -> R<(
     }
     .encode_to_vec();
     let mut duplicate = original.clone();
-    append_length_delimited_field(&mut duplicate, 1, &nested)?;
+    append_length_delimited_field(
+        &mut duplicate,
+        1,
+        &nested,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     reject(&with_movie(&source, MOVIES[0], duplicate)?)?;
     let mut wrong = original.clone();
     append_varint_field(&mut wrong, 1, 7)?;

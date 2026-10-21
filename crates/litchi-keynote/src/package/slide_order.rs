@@ -654,7 +654,7 @@ impl Package {
 }
 
 fn flat_slide_identifier(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut slide_identifier = None;
     let mut depth_fields = 0usize;
     for field in view.fields() {
@@ -813,14 +813,13 @@ fn permute_slide_reference_records(
     if intent.source.get() >= slide_count || intent.destination.get() >= slide_count {
         return Err(Error::InvalidSource);
     }
-    let show_view = WireView::parse_with_limits(show, limits).map_err(map_wire_error)?;
+    let show_view = WireView::parse(show, limits).map_err(map_wire_error)?;
     let mut slide_trees = show_view.fields().filter(|field| field.number() == 3);
     let slide_tree = slide_trees.next().ok_or(Error::InvalidSource)?;
     if slide_trees.next().is_some() || slide_tree.wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let tree_view =
-        WireView::parse_with_limits(slide_tree.payload(), limits).map_err(map_wire_error)?;
+    let tree_view = WireView::parse(slide_tree.payload(), limits).map_err(map_wire_error)?;
     let work = show_view
         .len()
         .checked_add(tree_view.len())

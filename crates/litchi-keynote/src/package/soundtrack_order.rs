@@ -14,7 +14,7 @@ use litchi_iwa_archive::{Limits, SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree_with_limits},
+    wire::{WireDescent, WirePreflight, WireView, preflight_wire_tree},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::keynote_soundtrack_settings_codec as soundtrack_codec;
@@ -285,9 +285,8 @@ fn preflight_wire_message(
     budget: &TransactionBudget,
 ) -> Result<WirePreflight, Error> {
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let report =
-        preflight_wire_tree_with_limits(source, bounded_limits, |_visit| Ok(WireDescent::Skip))
-            .map_err(map_wire_error)?;
+    let report = preflight_wire_tree(source, bounded_limits, |_visit| Ok(WireDescent::Skip))
+        .map_err(map_wire_error)?;
     ensure_wire_preflight_budget(report, budget)?;
     budget.require_depth(1)?;
     Ok(report)
@@ -305,7 +304,7 @@ fn preflight_soundtrack_payload(
     budget: &TransactionBudget,
 ) -> Result<WirePreflight, Error> {
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let report = preflight_wire_tree_with_limits(source, bounded_limits, |visit| {
+    let report = preflight_wire_tree(source, bounded_limits, |visit| {
         let field = visit.field();
         if field.wire_type() == 3 || field.wire_type() == 4 {
             return Err(litchi_iwa_common::Error::InvalidFormat(
@@ -940,8 +939,8 @@ fn validate_soundtrack_media_references(
 ) -> Result<(), Error> {
     preflight_soundtrack_payload(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut observed = 0usize;
     for field in view.fields() {
@@ -1701,7 +1700,7 @@ fn validate_reference_role_disjointness(
     )?;
     budget.charge_work(show_payload.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let show = WireView::parse_with_limits(show_payload, bounded_limits).map_err(map_wire_error)?;
+    let show = WireView::parse(show_payload, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(show.len())?;
     let mut slide_tree_payload = None;
     for field in show.fields() {
@@ -1734,7 +1733,7 @@ fn reject_selected_identifier_in_reference_fields(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     for field in view.fields() {
         if !reference_fields.contains(&field.number()) {
@@ -2395,7 +2394,7 @@ fn strict_optional_reference(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut result = None;
     for field in view.fields() {
@@ -2423,7 +2422,7 @@ fn strict_reference(
     preflight_wire_message(source, limits, budget)?;
     budget.charge_work(source.len())?;
     let bounded_limits = remaining_wire_limits(limits, budget)?;
-    let view = WireView::parse_with_limits(source, bounded_limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, bounded_limits).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     let mut identifier = None;
     let mut deprecated_type = None;
@@ -2516,8 +2515,8 @@ fn permute_payload(
     // the actual rewrite work.
     preflight_soundtrack_payload(source, limits, budget)?;
     budget.charge_work(source.len())?;
-    let view = WireView::parse_with_limits(source, remaining_wire_limits(limits, budget)?)
-        .map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, remaining_wire_limits(limits, budget)?).map_err(map_wire_error)?;
     budget.charge_fields(view.len())?;
     budget.charge_work(
         source

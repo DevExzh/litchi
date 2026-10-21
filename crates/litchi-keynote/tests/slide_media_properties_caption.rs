@@ -176,14 +176,29 @@ fn metadata_payload() -> Vec<u8> {
     let mut payload = Vec::new();
     litchi_iwa_common::wire::append_varint_field(&mut payload, 1, 1_000)
         .expect("metadata last identifier must encode");
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 3, &document)
-        .expect("document component must encode");
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 3, &unrelated)
-        .expect("unrelated component must encode");
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("document component must encode");
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("unrelated component must encode");
     litchi_iwa_common::wire::append_varint_field(&mut payload, 8, 10)
         .expect("metadata token must encode");
-    litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 11, &versioned)
-        .expect("versioned component must encode");
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("versioned component must encode");
     payload
 }
 
@@ -193,14 +208,25 @@ fn caption_theme_payload() -> Vec<u8> {
         &mut presets,
         1,
         &reference(PARAGRAPH_STYLE).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )
     .expect("theme preset must encode");
     let mut theme_super = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut theme_super, 210, &presets)
-        .expect("theme super must encode");
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut theme_super,
+        210,
+        &presets,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("theme super must encode");
     let mut theme = Vec::new();
-    litchi_iwa_common::wire::append_length_delimited_field(&mut theme, 1, &theme_super)
-        .expect("theme must encode");
+    litchi_iwa_common::wire::append_length_delimited_field(
+        &mut theme,
+        1,
+        &theme_super,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("theme must encode");
     theme
 }
 

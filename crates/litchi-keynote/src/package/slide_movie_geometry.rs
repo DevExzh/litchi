@@ -2354,7 +2354,7 @@ fn repeated_references(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields
         .fields()
         .filter(|field| field.number() == field_number)
@@ -2383,7 +2383,7 @@ fn movie_parent(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.work(payload.len())?;
     let mut super_fields = fields
         .fields()
@@ -2399,8 +2399,7 @@ fn movie_parent(
     super_field
         .validate_canonical_framing()
         .map_err(map_wire_error)?;
-    let nested =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let nested = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut parent = nested
         .fields()
         .filter(|field| field.number() == DRAWABLE_PARENT_FIELD);
@@ -2422,7 +2421,7 @@ fn strict_reference_payload(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -2450,7 +2449,7 @@ fn validate_movie_wire_framing(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<(), Error> {
-    let root = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let root = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.work(payload.len())?;
     for field in root.fields() {
         if matches!(field.number(), 1 | 14 | 15 | 20 | 21) {
@@ -2459,8 +2458,7 @@ fn validate_movie_wire_framing(
         if field.number() != 1 || field.wire_type() != 2 {
             continue;
         }
-        let drawable =
-            WireView::parse_with_limits(field.payload(), limits).map_err(map_wire_error)?;
+        let drawable = WireView::parse(field.payload(), limits).map_err(map_wire_error)?;
         for drawable_field in drawable.fields() {
             if drawable_field.number() != 1 || drawable_field.wire_type() != 2 {
                 continue;
@@ -2468,17 +2466,16 @@ fn validate_movie_wire_framing(
             drawable_field
                 .validate_canonical_framing()
                 .map_err(map_wire_error)?;
-            let geometry = WireView::parse_with_limits(drawable_field.payload(), limits)
-                .map_err(map_wire_error)?;
+            let geometry =
+                WireView::parse(drawable_field.payload(), limits).map_err(map_wire_error)?;
             for geometry_field in geometry.fields() {
                 if matches!(geometry_field.number(), 1 | 2) {
                     geometry_field
                         .validate_canonical_framing()
                         .map_err(map_wire_error)?;
                     if geometry_field.wire_type() == 2 {
-                        let coordinates =
-                            WireView::parse_with_limits(geometry_field.payload(), limits)
-                                .map_err(map_wire_error)?;
+                        let coordinates = WireView::parse(geometry_field.payload(), limits)
+                            .map_err(map_wire_error)?;
                         for coordinate in coordinates.fields() {
                             coordinate
                                 .validate_canonical_framing()
@@ -2749,7 +2746,7 @@ fn build_target_identifier(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(fields.len())?;
     budget.work(payload.len())?;
     let mut target = None;
@@ -2771,7 +2768,7 @@ fn movie_archive_references(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<Vec<MovieArchiveReference>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.work(payload.len())?;
     budget.allocations(1)?;
     let mut super_fields = fields
@@ -2788,8 +2785,7 @@ fn movie_archive_references(
     super_field
         .validate_canonical_framing()
         .map_err(map_wire_error)?;
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(3)
@@ -2847,7 +2843,7 @@ fn movie_data_references(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut GeometryBudget,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut result = Vec::new();
     budget.allocations(1)?;
     budget.work(payload.len())?;
@@ -2987,7 +2983,7 @@ fn validate_movie_metadata(
         )?;
     }
     let limits = budget.residual(package)?;
-    let components = WireView::parse_with_limits(metadata, limits)
+    let components = WireView::parse(metadata, limits)
         .map_err(map_wire_error)?
         .fields()
         .filter(|field| matches!(field.number(), 3 | 11))

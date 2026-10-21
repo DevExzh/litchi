@@ -151,13 +151,13 @@ fn decode_table_entries(
 ) -> Result<Vec<TableEntry>> {
     budget.charge_work(source.len().saturating_mul(8))?;
     let limits = wire_limits(package, source)?;
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|error| invalid_wire("Pages body storage", error))?;
     let table = unique_field(&view, TABLE_ATTACHMENT_FIELD, 2)?;
     let Some(table) = table else {
         return Ok(Vec::new());
     };
-    let table_view = WireView::parse_with_limits(table.payload(), limits)
+    let table_view = WireView::parse(table.payload(), limits)
         .map_err(|error| invalid_wire("Pages body table attachments", error))?;
     let mut entries = Vec::new();
     for field in table_view
@@ -167,7 +167,7 @@ fn decode_table_entries(
         budget.charge_items(1)?;
         budget.charge_work(field.raw().len().saturating_mul(8))?;
         validate_field(field, 2)?;
-        let entry = WireView::parse_with_limits(field.payload(), limits)
+        let entry = WireView::parse(field.payload(), limits)
             .map_err(|error| invalid_wire("Pages body table entry", error))?;
         let character_index = unique_field(&entry, TABLE_ENTRY_CHARACTER_INDEX_FIELD, 0)?
             .ok_or_else(|| invalid_source("Pages body table entry has no character index"))?;
@@ -196,7 +196,7 @@ fn decode_table_entries(
 
 fn parse_drawable_id(package: &HostPackage, source: &[u8]) -> Result<NonZeroU64> {
     let limits = wire_limits(package, source)?;
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|error| invalid_wire("Pages drawable attachment", error))?;
     let drawable = unique_field(&view, DRAWABLE_FIELD, 2)?
         .ok_or_else(|| invalid_source("Pages drawable attachment has no drawable"))?;
@@ -204,7 +204,7 @@ fn parse_drawable_id(package: &HostPackage, source: &[u8]) -> Result<NonZeroU64>
 }
 
 fn parse_local_reference(source: &[u8], limits: WireLimits) -> Result<NonZeroU64> {
-    let view = WireView::parse_with_limits(source, limits)
+    let view = WireView::parse(source, limits)
         .map_err(|error| invalid_wire("Pages local reference", error))?;
     let mut identifier = None;
     let mut external = None;
@@ -632,12 +632,14 @@ mod tests {
                 &mut entry,
                 TABLE_ENTRY_OBJECT_FIELD,
                 &attachment,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("test attachment reference fits the wire format");
             litchi_iwa_common::wire::append_length_delimited_field(
                 &mut table,
                 TABLE_ENTRY_FIELD,
                 &entry,
+                litchi_iwa_common::WireLimits::DEFAULT,
             )
             .expect("test table entry fits the wire format");
         }
@@ -646,6 +648,7 @@ mod tests {
             &mut body,
             TABLE_ATTACHMENT_FIELD,
             &table,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )
         .expect("test table attachment payload fits the wire format");
 

@@ -220,8 +220,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
     );
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, METADATA_OBJECT)?;
-    append_length_delimited_field(&mut payload, 3, &document_component)?;
-    append_length_delimited_field(&mut payload, 3, &model_component)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &model_component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -246,7 +256,12 @@ fn bucket_payload(headers: &[(u32, f32)], with_unknowns: bool) -> TestResult<Vec
     append_varint_field(&mut payload, 1, 1)?;
     for &(index, size) in headers {
         let header = bucket_header(index, size, with_unknowns)?;
-        append_length_delimited_field(&mut payload, 2, &header)?;
+        append_length_delimited_field(
+            &mut payload,
+            2,
+            &header,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if with_unknowns {
         append_varint_field(&mut payload, UNKNOWN_BUCKET_FIELD, UNKNOWN_BUCKET_VALUE)?;
@@ -562,7 +577,7 @@ fn replace_first_length_delimited_field(
     number: u32,
     replacement: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let fields = WireView::parse(payload)?;
+    let fields = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten = Vec::new();
     let mut replaced = false;
     for field in fields.fields() {
@@ -570,7 +585,12 @@ fn replace_first_length_delimited_field(
             if field.wire_type() != 2 {
                 return Err(io::Error::other("target field is not length-delimited").into());
             }
-            append_length_delimited_field(&mut rewritten, number, replacement)?;
+            append_length_delimited_field(
+                &mut rewritten,
+                number,
+                replacement,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             replaced = true;
         } else {
             rewritten.extend_from_slice(field.raw());
@@ -584,20 +604,28 @@ fn replace_first_length_delimited_field(
 
 fn append_duplicate_row_bucket_route(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let model = model_member_payload(package, identifier)?;
-    let store = WireView::parse(&model)?
+    let store = WireView::parse(&model, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == MODEL_STORAGE_FIELD)
         .ok_or_else(|| io::Error::other("missing data-store field"))?;
-    let row_headers = WireView::parse(store.payload())?
+    let row_headers = WireView::parse(store.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 1)
         .ok_or_else(|| io::Error::other("missing row-headers field"))?;
-    let bucket = WireView::parse(row_headers.payload())?
-        .fields()
-        .find(|field| field.number() == 2)
-        .ok_or_else(|| io::Error::other("missing row bucket route"))?;
+    let bucket = WireView::parse(
+        row_headers.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .find(|field| field.number() == 2)
+    .ok_or_else(|| io::Error::other("missing row bucket route"))?;
     let mut duplicate_row_headers = row_headers.payload().to_vec();
-    append_length_delimited_field(&mut duplicate_row_headers, 2, bucket.payload())?;
+    append_length_delimited_field(
+        &mut duplicate_row_headers,
+        2,
+        bucket.payload(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let rewritten_store =
         replace_first_length_delimited_field(store.payload(), 1, &duplicate_row_headers)?;
     let rewritten_model =
@@ -650,14 +678,19 @@ fn rewrite_bucket_payload(
 
 fn append_duplicate_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let original = bucket_payload_bytes(package, identifier)?;
-    let header = WireView::parse(&original)?
+    let header = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 2)
         .ok_or_else(|| io::Error::other("missing header"))?
         .payload()
         .to_vec();
     let mut duplicate = original;
-    append_length_delimited_field(&mut duplicate, 2, &header)?;
+    append_length_delimited_field(
+        &mut duplicate,
+        2,
+        &header,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     rewrite_bucket_payload(package, identifier, duplicate)
 }
 
@@ -1093,7 +1126,7 @@ fn unknown_model_bucket_and_header_fields_survive_rewrite() -> TestResult {
         .commit()?;
     let target = exact_bytes(commit.package())?;
     let target_model = model_member_payload(&target, MODELS[0])?;
-    let model = WireView::parse(&target_model)?;
+    let model = WireView::parse(&target_model, litchi_iwa_common::WireLimits::DEFAULT)?;
     let model_unknown = model
         .fields()
         .find(|field| field.number() == UNKNOWN_MODEL_FIELD)
@@ -1103,7 +1136,7 @@ fn unknown_model_bucket_and_header_fields_survive_rewrite() -> TestResult {
         UNKNOWN_MODEL_VALUE
     );
     let target_bucket = bucket_payload_bytes(&target, ROW_BUCKETS[0])?;
-    let bucket = WireView::parse(&target_bucket)?;
+    let bucket = WireView::parse(&target_bucket, litchi_iwa_common::WireLimits::DEFAULT)?;
     let bucket_unknown = bucket
         .fields()
         .find(|field| field.number() == UNKNOWN_BUCKET_FIELD)
@@ -1116,7 +1149,7 @@ fn unknown_model_bucket_and_header_fields_survive_rewrite() -> TestResult {
         .fields()
         .find(|field| field.number() == 2)
         .ok_or_else(|| io::Error::other("header was dropped"))?;
-    let header_unknown = WireView::parse(header.payload())?
+    let header_unknown = WireView::parse(header.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == UNKNOWN_HEADER_FIELD)
         .ok_or_else(|| io::Error::other("header unknown field was dropped"))?;

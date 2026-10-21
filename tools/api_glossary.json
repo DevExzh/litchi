@@ -12026,9 +12026,68 @@
           "scope": "litchi_iwa_common::table::model",
           "replacement": "use Area; grid coordinates are not selectors (ADR 0034 §8, record 0352)",
           "recursive": false
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_common",
+          "replacement": "limits come from an OpenOptions (owners) or a required limits argument (codec and value constructors); record 0351 §2.5 rule 3, record 0361a",
+          "match": "suffix"
         }
       ],
       "families": []
+    },
+    {
+      "id": "iwa-structured",
+      "package": "litchi-iwa-structured",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_structured",
+          "replacement": "limits come from an OpenOptions (owners) or a required limits argument (codec and value constructors); record 0351 §2.5 rule 3, record 0361a",
+          "match": "suffix"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use SemanticLimits (glossary §4, record 0361a)"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use Error::InvalidLimit { kind, value, maximum } (glossary §4, record 0361a)"
+        },
+        {
+          "name": "try_new",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use SemanticLimits::builder() with checked max_<dimension> setters (glossary §4, record 0361a)"
+        },
+        {
+          "name": "TooManyTables",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use Error::Limit { kind: LimitKind::Tables, .. } (glossary §5, record 0361a)"
+        },
+        {
+          "name": "TooManySlides",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use Error::Limit { kind: LimitKind::Slides, .. } (record 0361a)"
+        },
+        {
+          "name": "TooManySections",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use Error::Limit { kind: LimitKind::Sections, .. } (record 0361a)"
+        },
+        {
+          "name": "TextTooLarge",
+          "scope": "litchi_iwa_structured",
+          "replacement": "use Error::Limit { kind: LimitKind::TextBytes, .. } (record 0361a)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa_structured::StructuredData"
+      ]
     },
     {
       "id": "iwa",

@@ -145,7 +145,7 @@ pub fn reference_payload(identifier: u64) -> Vec<u8> {
 ///
 /// [`WriteError::Invalid`] for a payload other than one non-zero identifier.
 pub fn reference_identifier(payload: &[u8]) -> Result<u64> {
-    let view = parse_wire_view(payload).map_err(wire)?;
+    let view = parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT).map_err(wire)?;
     if view
         .fields()
         .any(|field| field.number() != 1 || field.wire_type() != 0)
@@ -201,7 +201,7 @@ pub fn drawable_parent(info: &[u8]) -> Result<Option<u64>> {
 }
 
 fn strip_fields(data: &[u8], excluded: &[u32]) -> Result<Vec<u8>> {
-    let view = parse_wire_view(data).map_err(wire)?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT).map_err(wire)?;
     let mut output = Vec::with_capacity(data.len());
     for field in view.fields() {
         if !excluded.contains(&field.number()) {
@@ -212,7 +212,7 @@ fn strip_fields(data: &[u8], excluded: &[u32]) -> Result<Vec<u8>> {
 }
 
 fn has_field(data: &[u8], number: u32) -> Result<bool> {
-    let view = parse_wire_view(data).map_err(wire)?;
+    let view = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT).map_err(wire)?;
     Ok(view.fields().any(|field| field.number() == number))
 }
 
@@ -469,8 +469,18 @@ pub fn info_payload(template: &[u8], parent: u64, model: u64, frame: Frame) -> R
             })?;
         } else {
             let mut geometry = Vec::new();
-            append_length_delimited_field(&mut geometry, 1, &position)?;
-            append_length_delimited_field(&mut geometry, 2, &size)?;
+            append_length_delimited_field(
+                &mut geometry,
+                1,
+                &position,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
+            append_length_delimited_field(
+                &mut geometry,
+                2,
+                &size,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             drawable = put_bytes(&drawable, 1, &geometry).map_err(Fault)?;
         }
         Ok::<_, Fault>(drawable)
@@ -495,7 +505,13 @@ fn packed(output: &mut Vec<u8>, number: u32, values: impl Iterator<Item = u64>) 
     if payload.is_empty() {
         return Ok(());
     }
-    append_length_delimited_field(output, number, &payload).map_err(wire)
+    append_length_delimited_field(
+        output,
+        number,
+        &payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)
 }
 
 /// An emptied copy of one storage object's payload for a table of `rows` ×
@@ -536,13 +552,25 @@ pub fn empty_storage(
             let mut output = Vec::new();
             for index in 0..columns {
                 let uuid = encode_uuid(column_base + u64::from(index), column_upper)?;
-                append_length_delimited_field(&mut output, 1, &uuid).map_err(wire)?;
+                append_length_delimited_field(
+                    &mut output,
+                    1,
+                    &uuid,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(wire)?;
             }
             packed(&mut output, 2, (0..columns).map(u64::from))?;
             packed(&mut output, 3, (0..columns).map(u64::from))?;
             for index in 0..rows {
                 let uuid = encode_uuid(row_base + u64::from(index), row_upper)?;
-                append_length_delimited_field(&mut output, 4, &uuid).map_err(wire)?;
+                append_length_delimited_field(
+                    &mut output,
+                    4,
+                    &uuid,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )
+                .map_err(wire)?;
             }
             packed(&mut output, 5, (0..rows).map(u64::from))?;
             packed(&mut output, 6, (0..rows).map(u64::from))?;
@@ -643,7 +671,13 @@ impl OwnerGeometry {
             for (number, value) in (1_u32..).zip(range) {
                 append_varint_field(&mut record, number, value).map_err(wire)?;
             }
-            append_length_delimited_field(&mut output, field, &record).map_err(wire)?;
+            append_length_delimited_field(
+                &mut output,
+                field,
+                &record,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )
+            .map_err(wire)?;
         }
         Ok(output)
     }
@@ -662,26 +696,78 @@ pub fn owner_payload(
     geometry: OwnerGeometry,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    append_length_delimited_field(&mut output, 1, &encode_uuid(uid.0, uid.1)?).map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        1,
+        &encode_uuid(uid.0, uid.1)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     append_varint_field(&mut output, 2, u64::from(internal)).map_err(wire)?;
     append_varint_field(&mut output, 3, TABLE_FORMULA_OWNER_KIND).map_err(wire)?;
-    append_length_delimited_field(&mut output, 4, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 5, &[]).map_err(wire)?;
+    append_length_delimited_field(&mut output, 4, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(&mut output, 5, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
     let mut volatile = Vec::new();
     for field in [1, 2, 3, 4, 5, 7] {
-        append_length_delimited_field(&mut volatile, field, &[]).map_err(wire)?;
+        append_length_delimited_field(
+            &mut volatile,
+            field,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(wire)?;
     }
-    append_length_delimited_field(&mut output, 6, &volatile).map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        6,
+        &volatile,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     let spanning = geometry.spanning()?;
-    append_length_delimited_field(&mut output, 7, &spanning).map_err(wire)?;
-    append_length_delimited_field(&mut output, 8, &spanning).map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        7,
+        &spanning,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        8,
+        &spanning,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     let mut whole = Vec::new();
-    append_length_delimited_field(&mut whole, 1, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 9, &whole).map_err(wire)?;
-    append_length_delimited_field(&mut output, 10, &[]).map_err(wire)?;
-    append_length_delimited_field(&mut output, 11, &reference_payload(info)).map_err(wire)?;
+    append_length_delimited_field(&mut whole, 1, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        9,
+        &whole,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
+    append_length_delimited_field(&mut output, 10, &[], litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(wire)?;
+    append_length_delimited_field(
+        &mut output,
+        11,
+        &reference_payload(info),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     for field in [13, 14, 15, 16] {
-        append_length_delimited_field(&mut output, field, &[]).map_err(wire)?;
+        append_length_delimited_field(
+            &mut output,
+            field,
+            &[],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(wire)?;
     }
     Ok(output)
 }
@@ -709,7 +795,13 @@ pub fn engine_payload(
     }
     let mut entry = Vec::new();
     append_varint_field(&mut entry, 1, u64::from(internal)).map_err(wire)?;
-    append_length_delimited_field(&mut entry, 2, &cfuuid).map_err(wire)?;
+    append_length_delimited_field(
+        &mut entry,
+        2,
+        &cfuuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(wire)?;
     transform_length_delimited_field(engine, 2, |tracker| {
         let mut tracker =
             append_repeated_length_delimited_field(tracker, 6, &reference_payload(owner))?;
@@ -719,7 +811,12 @@ pub fn engine_payload(
             })?;
         } else {
             let mut map = Vec::new();
-            append_length_delimited_field(&mut map, 1, &entry)?;
+            append_length_delimited_field(
+                &mut map,
+                1,
+                &entry,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             tracker = put_bytes(&tracker, 3, &map).map_err(Fault)?;
         }
         Ok::<_, Fault>(tracker)
@@ -732,7 +829,7 @@ pub fn engine_payload(
 /// asked, so a coincidental non-reference record cannot add a declaration.
 #[must_use]
 pub fn references_identifier(data: &[u8], identifier: u64) -> bool {
-    let Ok(view) = parse_wire_view(data) else {
+    let Ok(view) = parse_wire_view(data, litchi_iwa_common::WireLimits::DEFAULT) else {
         return false;
     };
     view.fields().any(|field| {
@@ -769,8 +866,20 @@ mod tests {
         let payload = reference_payload(300);
         assert_eq!(reference_identifier(&payload), Ok(300));
         let mut data = Vec::new();
-        append_length_delimited_field(&mut data, 3, &payload).unwrap();
-        append_length_delimited_field(&mut data, 3, &reference_payload(7)).unwrap();
+        append_length_delimited_field(
+            &mut data,
+            3,
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut data,
+            3,
+            &reference_payload(7),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
         assert_eq!(references(&data, 3), Ok(vec![300, 7]));
         assert_eq!(single_reference(&data, 3), Err(WriteError::Invalid));
         assert!(references_identifier(&data, 7));
@@ -780,17 +889,65 @@ mod tests {
     #[test]
     fn info_takes_the_frame_parent_and_model() {
         let mut geometry = Vec::new();
-        append_length_delimited_field(&mut geometry, 1, &point(1.0, 2.0).unwrap()).unwrap();
-        append_length_delimited_field(&mut geometry, 2, &point(3.0, 4.0).unwrap()).unwrap();
+        append_length_delimited_field(
+            &mut geometry,
+            1,
+            &point(1.0, 2.0).unwrap(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut geometry,
+            2,
+            &point(3.0, 4.0).unwrap(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
         append_varint_field(&mut geometry, 3, 3).unwrap();
         let mut drawable = Vec::new();
-        append_length_delimited_field(&mut drawable, 1, &geometry).unwrap();
-        append_length_delimited_field(&mut drawable, 2, &reference_payload(5)).unwrap();
-        append_length_delimited_field(&mut drawable, 10, &reference_payload(6)).unwrap();
+        append_length_delimited_field(
+            &mut drawable,
+            1,
+            &geometry,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut drawable,
+            2,
+            &reference_payload(5),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut drawable,
+            10,
+            &reference_payload(6),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
         let mut info = Vec::new();
-        append_length_delimited_field(&mut info, 1, &drawable).unwrap();
-        append_length_delimited_field(&mut info, 2, &reference_payload(9)).unwrap();
-        append_length_delimited_field(&mut info, 4, &reference_payload(10)).unwrap();
+        append_length_delimited_field(
+            &mut info,
+            1,
+            &drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut info,
+            2,
+            &reference_payload(9),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
+        append_length_delimited_field(
+            &mut info,
+            4,
+            &reference_payload(10),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .unwrap();
         let frame = Frame {
             x: 10.0,
             y: 20.0,

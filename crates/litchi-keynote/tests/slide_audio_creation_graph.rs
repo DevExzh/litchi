@@ -252,7 +252,7 @@ fn reference_ids(references: &[tsp::Reference]) -> Vec<u64> {
 
 fn strip_fields(payload: &[u8], excluded: &[u32]) -> TestResult<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len());
-    for field in WireView::parse(payload)?.fields() {
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !excluded.contains(&field.number()) {
             output.extend_from_slice(field.raw());
         }

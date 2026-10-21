@@ -23,9 +23,7 @@ use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_table_title_codec, table_info_codec};
@@ -939,8 +937,8 @@ fn rewrite_title(
         .with_output_bytes(output_bound)
         .and_then(|limits| limits.with_rewrite_work(original.len().saturating_mul(8).max(1)))
         .map_err(map_wire_error)?;
-    let rewritten = patch_nested_fields_batched_with_limits(original, &edits, limits)
-        .map_err(map_wire_error)?;
+    let rewritten =
+        patch_nested_fields_batched(original, &edits, limits).map_err(map_wire_error)?;
     let verified = decode_title(&rewritten, source, budget)?;
     if Settings::new(
         verified.table_name_enabled(),
@@ -1271,7 +1269,7 @@ fn repeated_references(
     field_number: u32,
     limits: WireLimits,
 ) -> Result<Vec<u64>, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut result = Vec::new();
     result
         .try_reserve_exact(
@@ -1297,7 +1295,7 @@ fn repeated_references(
 }
 
 fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let super_fields = fields
         .fields()
         .filter(|field| field.number() == TABLE_SUPER_FIELD)
@@ -1305,8 +1303,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     if super_fields.len() != 1 || super_fields[0].wire_type() != 2 {
         return Err(Error::InvalidSource);
     }
-    let drawable =
-        WireView::parse_with_limits(super_fields[0].payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_fields[0].payload(), limits).map_err(map_wire_error)?;
     let parents = drawable
         .fields()
         .filter(|field| field.number() == DRAWABLE_PARENT_FIELD)
@@ -1318,7 +1315,7 @@ fn table_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
 }
 
 fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_key().map_err(map_wire_error)?;

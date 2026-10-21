@@ -89,13 +89,13 @@ fn synthetic_package() -> HostPackage {
 }
 
 fn nested_field_bytes(metadata: &[u8], field_number: u32) -> Vec<u8> {
-    let outer = parse_wire_fields(metadata).unwrap();
+    let outer = parse_wire_fields(metadata, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
     let data_info = outer
         .iter()
         .find(|field| field.number() == 4)
         .map(|field| field_payload(metadata, field).unwrap())
         .unwrap();
-    let nested = parse_wire_fields(data_info).unwrap();
+    let nested = parse_wire_fields(data_info, litchi_iwa_common::WireLimits::DEFAULT).unwrap();
     let field = nested
         .iter()
         .find(|field| field.number() == field_number)
@@ -361,7 +361,7 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
     let before_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let before = &before_archive.object(2).unwrap().messages[0].data;
     let attributes_before = nested_field_bytes(before, 10);
-    let outer_unknown_before = parse_wire_fields(before)
+    let outer_unknown_before = parse_wire_fields(before, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -379,7 +379,7 @@ fn replaces_asset_and_preserves_unknown_metadata_fields() {
     let after_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let after = &after_archive.object(2).unwrap().messages[0].data;
     assert_eq!(nested_field_bytes(after, 10), attributes_before);
-    let outer_unknown_after = parse_wire_fields(after)
+    let outer_unknown_after = parse_wire_fields(after, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -417,7 +417,7 @@ fn removes_only_unreferenced_assets_transactionally() {
         .unwrap();
     let before_archive = package.archive(PACKAGE_METADATA_ENTRY).unwrap();
     let before = &before_archive.object(2).unwrap().messages[0].data;
-    let outer_unknown_before = parse_wire_fields(before)
+    let outer_unknown_before = parse_wire_fields(before, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -432,7 +432,7 @@ fn removes_only_unreferenced_assets_transactionally() {
 
     let after_archive = editor.package().archive(PACKAGE_METADATA_ENTRY).unwrap();
     let after = &after_archive.object(2).unwrap().messages[0].data;
-    let outer_unknown_after = parse_wire_fields(after)
+    let outer_unknown_after = parse_wire_fields(after, litchi_iwa_common::WireLimits::DEFAULT)
         .unwrap()
         .into_iter()
         .find(|field| field.number() == 100)
@@ -478,9 +478,9 @@ fn inserts_and_removes_unreferenced_asset_without_metadata_drift() {
 
 #[test]
 fn wire_parser_rejects_truncation_and_groups() {
-    assert!(parse_wire_fields(&[0x12, 0x05, 1]).is_err());
-    assert!(parse_wire_fields(&[0x0b]).is_err());
-    assert!(parse_wire_fields(&[0x80]).is_err());
+    assert!(parse_wire_fields(&[0x12, 0x05, 1], litchi_iwa_common::WireLimits::DEFAULT).is_err());
+    assert!(parse_wire_fields(&[0x0b], litchi_iwa_common::WireLimits::DEFAULT).is_err());
+    assert!(parse_wire_fields(&[0x80], litchi_iwa_common::WireLimits::DEFAULT).is_err());
 }
 
 #[test]

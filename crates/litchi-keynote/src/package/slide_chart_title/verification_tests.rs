@@ -50,7 +50,7 @@ fn native_chart_title_package_with_stylesheet_registration() -> (Vec<u8>, Packag
                 ..tsp::Reference::default()
             }
             .encode_to_vec();
-            let has_reference = WireView::parse(payload)
+            let has_reference = WireView::parse(payload, WireLimits::DEFAULT)
                 .expect("stylesheet payload")
                 .fields()
                 .filter(|field| field.number() == STYLESHEET_STYLES_FIELD)
@@ -58,8 +58,13 @@ fn native_chart_title_package_with_stylesheet_registration() -> (Vec<u8>, Packag
                 .filter_map(|payload| tsp::Reference::decode(payload).ok())
                 .any(|candidate| candidate.identifier == selection.non_style_identifier);
             if !has_reference {
-                append_length_delimited_field(payload, STYLESHEET_STYLES_FIELD, &reference)
-                    .expect("stylesheet wire registration");
+                append_length_delimited_field(
+                    payload,
+                    STYLESHEET_STYLES_FIELD,
+                    &reference,
+                    WireLimits::DEFAULT,
+                )
+                .expect("stylesheet wire registration");
             }
         });
         let info = &mut object.archive_info.message_infos[message_index];
@@ -171,7 +176,7 @@ fn message_index(object: &ArchiveObject, message_type: u32) -> usize {
 }
 
 fn replace_first_wire_field(payload: &[u8], number: u32, replacement: &[u8]) -> Vec<u8> {
-    let view = WireView::parse(payload).expect("wire payload");
+    let view = WireView::parse(payload, WireLimits::DEFAULT).expect("wire payload");
     let mut output = Vec::with_capacity(payload.len() + replacement.len());
     let mut replaced = false;
     for field in view.fields() {
@@ -272,7 +277,7 @@ fn assert_budgeted_rejects(source: &[u8]) {
 }
 
 fn append_nonzero_mediator(payload: &mut Vec<u8>) {
-    let outer = WireView::parse(payload).expect("chart payload");
+    let outer = WireView::parse(payload, WireLimits::DEFAULT).expect("chart payload");
     let chart = outer
         .fields()
         .find(|field| field.number() == CHART_EXTENSION_FIELD)
@@ -284,9 +289,14 @@ fn append_nonzero_mediator(payload: &mut Vec<u8>) {
     .encode_to_vec();
     let mut chart_payload = chart.payload().to_vec();
     let mut mediator = Vec::new();
-    append_length_delimited_field(&mut mediator, CHART_MEDIATOR_FIELD, &reference)
-        .expect("mediator field");
-    if WireView::parse(&chart_payload)
+    append_length_delimited_field(
+        &mut mediator,
+        CHART_MEDIATOR_FIELD,
+        &reference,
+        WireLimits::DEFAULT,
+    )
+    .expect("mediator field");
+    if WireView::parse(&chart_payload, WireLimits::DEFAULT)
         .expect("chart extension payload")
         .fields()
         .any(|field| field.number() == CHART_MEDIATOR_FIELD)
@@ -296,8 +306,13 @@ fn append_nonzero_mediator(payload: &mut Vec<u8>) {
         chart_payload.extend_from_slice(&mediator);
     }
     let mut replacement = Vec::new();
-    append_length_delimited_field(&mut replacement, CHART_EXTENSION_FIELD, &chart_payload)
-        .expect("chart extension replacement");
+    append_length_delimited_field(
+        &mut replacement,
+        CHART_EXTENSION_FIELD,
+        &chart_payload,
+        WireLimits::DEFAULT,
+    )
+    .expect("chart extension replacement");
     *payload = replace_first_wire_field(payload, CHART_EXTENSION_FIELD, &replacement);
 }
 
@@ -478,7 +493,7 @@ fn chart_title_rejects_malformed_stylesheet_registration_wire_membership() {
             &package,
             selection.non_style_identifier,
             |payload| {
-                let view = WireView::parse(payload).expect("stylesheet wire");
+                let view = WireView::parse(payload, WireLimits::DEFAULT).expect("stylesheet wire");
                 let mut output = Vec::new();
                 let mut matched = false;
                 for field in view.fields() {

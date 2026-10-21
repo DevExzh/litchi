@@ -125,7 +125,7 @@ fn canonical_node(slide_identifier: u64, is_skipped: bool) -> TestResult<Vec<u8>
 }
 
 fn replace_field_four(source: &[u8], replacement: Option<&[u8]>) -> TestResult<Vec<u8>> {
-    let view = WireView::parse(source)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut output = Vec::with_capacity(source.len().saturating_add(3));
     for field in view.fields() {
         if field.number() == 4 {
@@ -265,11 +265,13 @@ fn decompressed_document(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn fields_except_skip(data: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(data)?
-        .fields()
-        .filter(|field| field.number() != 4)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() != 4)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 #[test]
@@ -375,13 +377,13 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
         fields_except_skip(&after_node)?,
         fields_except_skip(&before_node)?
     );
-    let unknown_before = WireView::parse(&before_node)?
+    let unknown_before = WireView::parse(&before_node, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 99)
         .ok_or_else(|| io::Error::other("source node has no unknown sentinel"))?
         .raw()
         .to_vec();
-    let unknown_after = WireView::parse(&after_node)?
+    let unknown_after = WireView::parse(&after_node, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 99)
         .ok_or_else(|| io::Error::other("target node has no unknown sentinel"))?

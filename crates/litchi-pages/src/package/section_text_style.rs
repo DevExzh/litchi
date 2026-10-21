@@ -448,14 +448,18 @@ fn unique_message(object: &ArchiveObject, message_type: u32) -> Result<usize, Er
 
 fn reference_field(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
     let view =
-        litchi_iwa_common::wire::WireView::parse(payload).map_err(|_error| Error::InvalidSource)?;
+        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_error| Error::InvalidSource)?;
     let mut found = None;
     for field in view.fields() {
         if field.number() != number {
             continue;
         }
-        let inner = litchi_iwa_common::wire::WireView::parse(field.payload())
-            .map_err(|_error| Error::InvalidSource)?;
+        let inner = litchi_iwa_common::wire::WireView::parse(
+            field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .map_err(|_error| Error::InvalidSource)?;
         for reference in inner.fields() {
             if reference.number() == 1 {
                 let (value, _) =

@@ -722,7 +722,7 @@ fn section_name_at(package: &Package, position: Position) -> Result<Option<&str>
 }
 
 fn strict_payload_name(payload: &[u8], limits: WireLimits) -> Result<Option<&str>, Error> {
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut name = None;
     for field in view
         .fields()
@@ -743,7 +743,7 @@ fn rewrite_name_payload(
     after: Option<&str>,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut existing_raw_length = 0usize;
     let mut found = false;
     for field in view

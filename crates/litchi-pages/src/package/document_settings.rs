@@ -813,7 +813,7 @@ fn rewrite_settings_payload(
     after: Settings,
     limits: WireLimits,
 ) -> Result<Vec<u8>, Error> {
-    let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
     let mut selected_lengths = [None; 10];
     for field in view.fields() {
         let Some(index) = SETTINGS_FIELDS

@@ -185,7 +185,7 @@ fn append_unknown_model_group(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn model_field_varint(package: &[u8], field_number: u32) -> TestResult<u64> {
     let payload = model_payload(package, FIRST_MODEL_IDENTIFIER)?;
-    let field = WireView::parse(&payload)?
+    let field = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == field_number)
         .ok_or("missing model field")?;

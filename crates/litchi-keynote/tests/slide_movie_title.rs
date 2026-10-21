@@ -126,8 +126,13 @@ fn title_info_payload(movie: usize, parent: u64) -> Vec<u8> {
         child_info_kind: Some(2),
     };
     let mut payload = info.encode_to_vec();
-    append_length_delimited_field(&mut payload, COMPONENT_UNKNOWN, UNKNOWN_MARKER)
-        .expect("title unknown field");
+    append_length_delimited_field(
+        &mut payload,
+        COMPONENT_UNKNOWN,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .expect("title unknown field");
     payload
 }
 
@@ -139,17 +144,37 @@ fn storage_payload(text: &str) -> TestResult<Vec<u8>> {
         ..Default::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, STORAGE_UNKNOWN, STORAGE_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        STORAGE_UNKNOWN,
+        STORAGE_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn title_theme_payload() -> TestResult<Vec<u8>> {
     let mut presets = Vec::new();
-    append_length_delimited_field(&mut presets, 1, &reference(PARAGRAPH_STYLE).encode_to_vec())?;
+    append_length_delimited_field(
+        &mut presets,
+        1,
+        &reference(PARAGRAPH_STYLE).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut theme_super = Vec::new();
-    append_length_delimited_field(&mut theme_super, 210, &presets)?;
+    append_length_delimited_field(
+        &mut theme_super,
+        210,
+        &presets,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut theme = Vec::new();
-    append_length_delimited_field(&mut theme, 1, &theme_super)?;
+    append_length_delimited_field(
+        &mut theme,
+        1,
+        &theme_super,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(theme)
 }
 
@@ -179,7 +204,12 @@ fn metadata_component_payload(
     }
     .encode_to_vec();
     let mut payload = component;
-    append_length_delimited_field(&mut payload, COMPONENT_UNKNOWN, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        COMPONENT_UNKNOWN,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -225,11 +255,31 @@ fn metadata_payload(last_identifier: u64) -> TestResult<Vec<u8>> {
     .encode_to_vec();
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, last_identifier)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
-    append_length_delimited_field(&mut payload, ROOT_UNKNOWN, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        ROOT_UNKNOWN,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -443,11 +493,13 @@ fn decoded_metadata(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
 }
 
 fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(payload)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(
+        WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .filter(|field| field.number() == number)
+            .map(|field| field.raw().to_vec())
+            .collect(),
+    )
 }
 
 fn metadata_component_raw_payload(
@@ -456,7 +508,7 @@ fn metadata_component_raw_payload(
     versioned: bool,
 ) -> TestResult<Vec<u8>> {
     let field_number = if versioned { 11 } else { 3 };
-    for field in WireView::parse(metadata)?.fields() {
+    for field in WireView::parse(metadata, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if field.number() != field_number || field.wire_type() != 2 {
             continue;
         }
@@ -546,7 +598,7 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
     let number = *path.first().ok_or_else(|| io::Error::other("empty path"))?;
     let mut output = Vec::with_capacity(payload.len() + 8);
     let mut found = false;
-    for field in WireView::parse(payload)?.fields() {
+    for field in WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)?.fields() {
         if !found && field.number() == number {
             if path.len() == 1 {
                 output.extend_from_slice(field.raw());
@@ -557,7 +609,12 @@ fn append_nested_duplicate(payload: &[u8], path: &[u32]) -> TestResult<Vec<u8>> 
                     return Err(io::Error::other("nested field is not length-delimited").into());
                 }
                 let nested = append_nested_duplicate(field.payload(), &path[1..])?;
-                append_length_delimited_field(&mut output, number, &nested)?;
+                append_length_delimited_field(
+                    &mut output,
+                    number,
+                    &nested,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
                 found = true;
             }
         } else {
@@ -1017,7 +1074,7 @@ fn aliases_and_reserved_metadata_ids_fail_closed_or_skip_safely() -> TestResult<
     ));
     assert_eq!(exact_bytes(&package)?, alias);
     let mut metadata = metadata_stream(&source)?;
-    let field = WireView::parse(&metadata)?
+    let field = WireView::parse(&metadata, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("missing metadata component"))?

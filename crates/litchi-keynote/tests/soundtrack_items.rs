@@ -496,7 +496,10 @@ fn append_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
             }) else {
                 continue;
             };
-            let view = WireView::parse(&object.messages[index].data)?;
+            let view = WireView::parse(
+                &object.messages[index].data,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             let mut rewritten = Vec::new();
             let mut changed = false;
             for field in view.fields() {

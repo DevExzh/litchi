@@ -774,11 +774,17 @@ fn chart_payload(chart: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsch::ChartArchive::default()
     };
     let mut payload = Vec::new();
-    append_length_delimited_field(&mut payload, 1, &drawable.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         GENERATED_EXTENSION_FIELD,
         &chart_data.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -811,6 +817,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 Axis::Value => 16,
             },
             title,
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     let bounds = state.settings.bounds();
@@ -822,6 +829,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 number_archive: Some(minimum.value()),
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if let Some(maximum) = bounds.maximum() {
@@ -832,6 +840,7 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
                 number_archive: Some(maximum.value()),
             }
             .encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if let Some(major) = state.settings.steps().major() {
@@ -856,13 +865,19 @@ fn axis_payload(state: ValueAxisState, axis: Axis) -> Result<Vec<u8>, Box<dyn st
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
     append_varint_field(&mut payload, SUPPORTS_SECONDARY_FEATURE_FIELD, 1)?;
     append_length_delimited_field(
         &mut payload,
         UNKNOWN_OUTER_FIELD,
         b"opaque value-axis bytes",
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -880,16 +895,31 @@ fn axis_style_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsch::generated::ChartAxisStyleArchive::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, SUPPORTS_PRIMARY_FEATURE_FIELD, 1)?;
-    append_length_delimited_field(&mut payload, UNKNOWN_OUTER_FIELD, b"opaque axis style")?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_OUTER_FIELD,
+        b"opaque axis style",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
 fn chart_non_style_payload(title: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut generated = Vec::new();
     append_varint_field(&mut generated, 21, 1)?;
-    append_length_delimited_field(&mut generated, 23, title.as_bytes())?;
+    append_length_delimited_field(
+        &mut generated,
+        23,
+        title.as_bytes(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let mut payload = tsch::ChartNonStyleArchive {
         super_: Some(tss::StyleArchive {
             stylesheet: Some(reference(81)),
@@ -897,7 +927,12 @@ fn chart_non_style_payload(title: &str) -> Result<Vec<u8>, Box<dyn std::error::E
         }),
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, GENERATED_EXTENSION_FIELD, &generated)?;
+    append_length_delimited_field(
+        &mut payload,
+        GENERATED_EXTENSION_FIELD,
+        &generated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     Ok(payload)
 }
 
@@ -969,6 +1004,7 @@ fn metadata_component_payload(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }
@@ -983,8 +1019,18 @@ fn metadata_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let unrelated = metadata_component_payload(UNRELATED_COMPONENT, "Unrelated", 7, &[901])?;
     let mut payload = Vec::new();
     append_varint_field(&mut payload, 1, 2_000)?;
-    append_length_delimited_field(&mut payload, 3, &document)?;
-    append_length_delimited_field(&mut payload, 3, &unrelated)?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &document,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &unrelated,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_varint_field(&mut payload, 8, 10)?;
     let versioned = tsp::ComponentInfo {
         identifier: DOCUMENT_COMPONENT,
@@ -995,11 +1041,17 @@ fn metadata_payload() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         ..tsp::ComponentInfo::default()
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut payload, 11, &versioned)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     append_length_delimited_field(
         &mut payload,
         METADATA_UNKNOWN_FIELD,
         METADATA_UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     Ok(payload)
 }

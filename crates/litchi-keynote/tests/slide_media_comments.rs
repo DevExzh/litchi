@@ -456,7 +456,12 @@ fn with_unknown_archive_info_field(
         .get(header_start..header_end)
         .ok_or_else(|| io::Error::other("archive object header range is invalid"))?
         .to_vec();
-    append_length_delimited_field(&mut header, field_number, payload)?;
+    append_length_delimited_field(
+        &mut header,
+        field_number,
+        payload,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
 
     let mut modified = Vec::with_capacity(bytes.len().saturating_add(header.len()));
     modified.extend_from_slice(&bytes[..header_offset]);
@@ -498,7 +503,7 @@ fn with_native_movie_comment_reference_mutation(
     let (_, archive) = native_component_containing_object(source, NATIVE_COMMENT_MOVIE)?;
     let movie_payload =
         native_object_message(&archive, NATIVE_COMMENT_MOVIE, NATIVE_MOVIE_MESSAGE_TYPE)?.to_vec();
-    let root = WireView::parse(&movie_payload)?;
+    let root = WireView::parse(&movie_payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_root = Vec::with_capacity(movie_payload.len().saturating_add(8));
     let mut changed = false;
     for root_field in root.fields() {
@@ -506,7 +511,8 @@ fn with_native_movie_comment_reference_mutation(
             rewritten_root.extend_from_slice(root_field.raw());
             continue;
         }
-        let drawable = WireView::parse(root_field.payload())?;
+        let drawable =
+            WireView::parse(root_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable =
             Vec::with_capacity(root_field.payload().len().saturating_add(8));
         for drawable_field in drawable.fields() {
@@ -524,16 +530,27 @@ fn with_native_movie_comment_reference_mutation(
                         &mut reference,
                         99,
                         UNKNOWN_COMMENT_REFERENCE_MARKER,
+                        litchi_iwa_common::WireLimits::DEFAULT,
                     )?;
                 },
                 MovieCommentReferenceMutation::DeprecatedType => {
                     append_varint_field(&mut reference, 2, 1)?;
                 },
             }
-            append_length_delimited_field(&mut rewritten_drawable, 6, &reference)?;
+            append_length_delimited_field(
+                &mut rewritten_drawable,
+                6,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             changed = true;
         }
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if !changed {
         return Err(io::Error::other("native movie has no comment field").into());
@@ -557,7 +574,7 @@ fn with_native_shared_movie_comment(
         .position(|message| message.type_ == NATIVE_MOVIE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("native movie has no movie payload"))?;
     let payload = movie_object.messages[message_index].data.clone();
-    let root = WireView::parse(&payload)?;
+    let root = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut rewritten_root = Vec::with_capacity(payload.len().saturating_add(16));
     let mut drawable_count = 0usize;
     for root_field in root.fields() {
@@ -568,7 +585,8 @@ fn with_native_shared_movie_comment(
         drawable_count = drawable_count
             .checked_add(1)
             .ok_or_else(|| io::Error::other("native movie drawable count overflow"))?;
-        let drawable = WireView::parse(root_field.payload())?;
+        let drawable =
+            WireView::parse(root_field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?;
         let mut rewritten_drawable =
             Vec::with_capacity(root_field.payload().len().saturating_add(8));
         let mut comment_count = 0usize;
@@ -588,8 +606,18 @@ fn with_native_shared_movie_comment(
             ..Default::default()
         }
         .encode_to_vec();
-        append_length_delimited_field(&mut rewritten_drawable, 6, &reference)?;
-        append_length_delimited_field(&mut rewritten_root, 1, &rewritten_drawable)?;
+        append_length_delimited_field(
+            &mut rewritten_drawable,
+            6,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut rewritten_root,
+            1,
+            &rewritten_drawable,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if drawable_count != 1 {
         return Err(io::Error::other("native movie must have one drawable envelope").into());
@@ -990,9 +1018,15 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     if unknown_fields {
-        append_length_delimited_field(&mut root_payload, 199, UNKNOWN_COMMENT_MARKER)?;
+        append_length_delimited_field(
+            &mut root_payload,
+            199,
+            UNKNOWN_COMMENT_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     root_object.replace_message(
         root_index,
@@ -1017,7 +1051,12 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
     }
     .encode_to_vec();
     if unknown_fields {
-        append_length_delimited_field(&mut reply_payload, 199, UNKNOWN_COMMENT_MARKER)?;
+        append_length_delimited_field(
+            &mut reply_payload,
+            199,
+            UNKNOWN_COMMENT_MARKER,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     let mut reply = ArchiveObject::new(
         SYNTHETIC_REPLY_ID,
@@ -1050,6 +1089,7 @@ fn with_native_comment_cycle(source: &[u8]) -> TestResult<Vec<u8>> {
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     replace_native_comment_payload(&source, root, payload)
 }
@@ -1081,6 +1121,7 @@ fn with_native_unknown_root_reply_reference(source: &[u8]) -> TestResult<Vec<u8>
             ..Default::default()
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     replace_native_comment_payload(&source, root, payload)
 }

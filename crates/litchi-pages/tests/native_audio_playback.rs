@@ -192,7 +192,7 @@ fn assert_media_asset_untouched(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn unknown_playback_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
-    let root = WireView::parse(source)?;
+    let root = WireView::parse(source, WireLimits::DEFAULT)?;
     let super_field = root
         .fields()
         .find(|field| field.number() == 1)
@@ -203,7 +203,7 @@ fn unknown_playback_wire(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
         .map(|field| field.raw().to_vec())
         .collect::<Vec<_>>();
     records.extend(
-        WireView::parse(super_field.payload())?
+        WireView::parse(super_field.payload(), WireLimits::DEFAULT)?
             .fields()
             .map(|field| field.raw().to_vec()),
     );

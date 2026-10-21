@@ -38,7 +38,8 @@ pub(in crate::package) fn validate_dependencies(
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    let model_view = WireView::parse(&model.data).map_err(map_wire_error)?;
+    let model_view = WireView::parse(&model.data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(map_wire_error)?;
     let header_counts_changed =
         before.header_rows != after.header_rows || before.header_columns != after.header_columns;
     let section_counts_changed = header_counts_changed || before.footer_rows != after.footer_rows;
@@ -152,7 +153,7 @@ pub(in crate::package) fn validate_dependencies(
         } else {
             &sheet.data
         };
-        if WireView::parse(payload)
+        if WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
             .map_err(map_wire_error)?
             .fields()
             .any(|field| field.number() == 4)
@@ -191,7 +192,8 @@ fn table_info_has_count_dependency(
         .ok_or(Error::InvalidSource {
             path: Path::Package,
         })?;
-    let view = WireView::parse(&message.data).map_err(map_wire_error)?;
+    let view = WireView::parse(&message.data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(map_wire_error)?;
     let mut seen = [false; 7];
     let mut header_active = false;
     let mut section_active = false;
@@ -261,7 +263,8 @@ fn table_info_has_count_dependency(
 pub(in crate::package) fn deprecated_category_grouping_active(
     source: &[u8],
 ) -> Result<bool, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut active = false;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -280,7 +283,8 @@ pub(in crate::package) fn deprecated_category_grouping_active(
 }
 
 fn group_by_enabled(source: &[u8]) -> Result<Option<bool>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view =
+        WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut enabled = None;
     for field in view.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;

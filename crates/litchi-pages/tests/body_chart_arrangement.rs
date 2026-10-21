@@ -106,7 +106,12 @@ fn chart_payload(
     };
     let mut payload = drawable.encode_to_vec();
     // TSCH.ChartArchive is a proto2 extension of TSCH.ChartDrawableArchive.
-    append_length_delimited_field(&mut payload, 10_000, &chart.encode_to_vec())?;
+    append_length_delimited_field(
+        &mut payload,
+        10_000,
+        &chart.encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     // This future field is deliberately outside the selected Arrange
     // projection and must survive a changed publication byte-for-byte.
     append_varint_field(&mut payload, UNKNOWN_CHART_FIELD, UNKNOWN_CHART_VALUE)?;
@@ -392,12 +397,16 @@ fn zorder_payload_from_package(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn has_varint_field(data: &[u8], number: u32, value: u64) -> TestResult<bool> {
-    Ok(WireView::parse(data)?.fields().any(|field| {
-        field.number() == number
-            && field.wire_type() == 0
-            && litchi_iwa_common::decode_varint_from_bytes(field.payload())
-                .is_ok_and(|(decoded, _)| decoded == value)
-    }))
+    Ok(
+        WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .any(|field| {
+                field.number() == number
+                    && field.wire_type() == 0
+                    && litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                        .is_ok_and(|(decoded, _)| decoded == value)
+            }),
+    )
 }
 
 fn rewrite_document_archive(
@@ -735,6 +744,7 @@ fn malformed_zorder_alias_is_rejected_without_publication() -> TestResult {
             &mut message.data,
             1,
             &reference(CHART_IDENTIFIERS[0]).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         Ok(())
     })?;

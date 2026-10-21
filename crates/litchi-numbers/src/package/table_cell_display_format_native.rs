@@ -3215,7 +3215,8 @@ fn custom_wire_view<'source>(
     budget.charge_wire_bytes(source.len(), path)?;
     budget.charge_wire_work(source.len(), path)?;
     budget.charge_wire_nesting(depth, path)?;
-    let view = WireView::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| Error::InvalidSource { path })?;
     budget.charge_wire_fields(view.len(), path)?;
     Ok(view)
 }
@@ -6218,7 +6219,11 @@ mod tests {
             .is_err()
         );
 
-        let noncanonical = WireView::parse(&[0xf8, 0x01, 0x80, 0x00]).expect("wire view");
+        let noncanonical = WireView::parse(
+            &[0xf8, 0x01, 0x80, 0x00],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )
+        .expect("wire view");
         assert!(parse_optional_varint(&noncanonical, 31, Path::Package).is_err());
     }
 

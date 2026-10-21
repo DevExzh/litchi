@@ -101,7 +101,7 @@ fn fixed64_field(number: u32, value: u64) -> Vec<u8> {
 
 fn adversarial_reference(identifier_value: u64, sentinel: u64) -> TestResult<Vec<u8>> {
     let canonical = reference(identifier_value).encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let identifier_field = view
         .fields()
         .find(|field| field.number() == 1)
@@ -178,7 +178,7 @@ fn raw_show(topology: Topology, noncanonical_mode: bool) -> TestResult<Vec<u8>> 
         ..Default::default()
     }
     .encode_to_vec();
-    let view = WireView::parse(&canonical)?;
+    let view = WireView::parse(&canonical, litchi_iwa_common::WireLimits::DEFAULT)?;
     let mut show = Vec::with_capacity(canonical.len().saturating_add(tree.len()));
     for field in view.fields() {
         match field.number() {
@@ -388,15 +388,17 @@ fn slide_tree_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    let show_view = WireView::parse(&show.data)?;
+    let show_view = WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?;
     let tree = show_view
         .fields()
         .find(|field| field.number() == 3)
         .ok_or_else(|| io::Error::other("missing synthetic slide tree"))?;
-    Ok(WireView::parse(tree.payload())?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(tree.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
@@ -406,10 +408,12 @@ fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
         .ok_or_else(|| io::Error::other("missing synthetic show"))?;
-    Ok(WireView::parse(&show.data)?
-        .fields()
-        .map(|field| (field.number(), field.raw().to_vec()))
-        .collect())
+    Ok(
+        WireView::parse(&show.data, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .map(|field| (field.number(), field.raw().to_vec()))
+            .collect(),
+    )
 }
 
 fn show_message_range(stream: &[u8]) -> TestResult<std::ops::Range<usize>> {

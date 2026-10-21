@@ -449,6 +449,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
             &mut root,
             20,
             &reference(ZORDER_IDENTIFIER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if mode == MODE_DUPLICATE_BODY_REFERENCE && with_body {
@@ -456,6 +457,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
             &mut root,
             4,
             &reference(BODY_STORAGE_IDENTIFIER).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     if mode == MODE_WRONG_ORDER_WIRE {
@@ -540,7 +542,12 @@ fn order_payload(native_order: &[u64], descriptor: &[u8], mode: u8) -> BuildResu
         if position == 0 && mode == MODE_EXTERNAL_REFERENCE {
             append_varint_field(&mut nested, 3, 1)?;
         }
-        append_length_delimited_field(&mut payload, 1, &nested)?;
+        append_length_delimited_field(
+            &mut payload,
+            1,
+            &nested,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     if mode == MODE_DUPLICATE_ORDER_REFERENCE {
         let duplicate = native_order
@@ -548,7 +555,12 @@ fn order_payload(native_order: &[u64], descriptor: &[u8], mode: u8) -> BuildResu
             .copied()
             .map(reference_bytes)
             .unwrap_or_default();
-        append_length_delimited_field(&mut payload, 1, &duplicate)?;
+        append_length_delimited_field(
+            &mut payload,
+            1,
+            &duplicate,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     append_varint_field(&mut payload, 77, descriptor_value(descriptor, 24))?;
     Ok(payload)

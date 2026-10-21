@@ -1467,6 +1467,7 @@ fn duplicate_movie_reference_is_refused_without_mutating_source() -> TestResult 
             identifier: fixture::CONTENT_DATA,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let hostile = fixture::with_movie_payload(&source, fixture::MOVIES[0], malformed)?;
     let package = Package::from_bytes(&hostile)?;
@@ -1931,7 +1932,12 @@ fn duplicate_build_chunk_uuid_fields_refuse_lifecycle_atomically() -> TestResult
         upper: 0x0123_4567_89ab_cdef,
     }
     .encode_to_vec();
-    append_length_delimited_field(&mut malformed, 8, &contradictory_uuid)?;
+    append_length_delimited_field(
+        &mut malformed,
+        8,
+        &contradictory_uuid,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let hostile = replace_native_component_object_payload(
         &source,
         native_selected_chunk_for_movie(&source, NATIVE_MOVIE_A)?.0,
@@ -2214,7 +2220,12 @@ fn lifecycle_invalidates_materialized_node_cache_and_restores_exact_source() -> 
     node.has_explicit_builds_cache_version = Some(2);
     node.has_explicit_builds_is_up_to_date = Some(true);
     let mut payload = node.encode_to_vec();
-    append_length_delimited_field(&mut payload, 199, b"opaque node witness")?;
+    append_length_delimited_field(
+        &mut payload,
+        199,
+        b"opaque node witness",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     let source =
         replace_native_component_object_payload(NATIVE_SOURCE, NATIVE_SLIDE_NODE, 4, payload)?;
     let package = Package::from_bytes(&source)?;

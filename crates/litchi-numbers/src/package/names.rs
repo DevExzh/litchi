@@ -21,7 +21,7 @@ use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
     wire::{
-        WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree_with_limits,
+        WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree,
         transform_length_delimited_field,
     },
 };
@@ -1747,7 +1747,7 @@ fn require_declared_reference(
 }
 
 fn repeated_length_payloads(source: &[u8], field_number: u32) -> Result<Vec<&[u8]>, Error> {
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let count = view
         .fields()
         .filter(|field| field.number() == field_number)
@@ -1789,7 +1789,7 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
     // opaque `CellCoordSetArchive`; we only need presence for the volatile-name
     // dependency guard, while the enclosing dependency codec has already
     // validated the owner payload and this nested message's framing.
-    let view = WireView::parse(source).map_err(map_wire_error)?;
+    let view = WireView::parse(source, WireLimits::DEFAULT).map_err(map_wire_error)?;
     let mut seen = false;
     let mut present = false;
     for field in view.fields() {
@@ -1804,7 +1804,8 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
         // `column_entries` is field 1 of the nested CellCoordSetArchive. An
         // empty envelope is semantically empty in the generated model, so
         // merely seeing the outer optional field is not sufficient.
-        let nested = WireView::parse(field.payload()).map_err(map_wire_error)?;
+        let nested =
+            WireView::parse(field.payload(), WireLimits::DEFAULT).map_err(map_wire_error)?;
         let mut has_column_entry = false;
         for nested_field in nested.fields() {
             if nested_field.number() != 1 {
@@ -1816,7 +1817,7 @@ fn volatile_sheet_table_name_cells_present(source: &[u8]) -> Result<bool, Error>
             nested_field
                 .validate_canonical_framing()
                 .map_err(map_wire_error)?;
-            WireView::parse(nested_field.payload()).map_err(map_wire_error)?;
+            WireView::parse(nested_field.payload(), WireLimits::DEFAULT).map_err(map_wire_error)?;
             has_column_entry = true;
         }
         present = has_column_entry;
@@ -1864,7 +1865,7 @@ pub(super) fn preflight_sheet_payload(
         .and_then(|limits| limits.with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS)))
         .and_then(|limits| limits.with_nesting(2))
         .map_err(map_wire_error)?;
-    preflight_wire_tree_with_limits(source, wire_limits, |visit| {
+    preflight_wire_tree(source, wire_limits, |visit| {
         let is_drawable = match message_type {
             SHEET_MESSAGE_TYPE => visit.path().is_empty() && visit.field().number() == 2,
             FORM_BASED_SHEET_MESSAGE_TYPE => {
@@ -1947,7 +1948,7 @@ fn local_reference_identifier_common(source: &[u8]) -> litchi_iwa_common::Result
         .with_input_bytes(source.len().clamp(1, WireLimits::MAX_INPUT_BYTES))?
         .with_fields(source.len().clamp(1, WireLimits::MAX_FIELDS))?
         .with_nesting(1)?;
-    preflight_wire_tree_with_limits(source, limits, |visit| {
+    preflight_wire_tree(source, limits, |visit| {
         let field = visit.field();
         match field.number() {
             1 => {

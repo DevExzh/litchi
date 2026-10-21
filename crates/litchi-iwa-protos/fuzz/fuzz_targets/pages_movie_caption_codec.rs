@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_protos::pages_movie_caption_codec::{
-    CaptionInfoWrite, DecodeError, DecodeOptions, decode_caption_info,
-    rewrite_caption_info, rewrite_caption_info_with_report,
+    CaptionInfoWrite, DecodeError, DecodeOptions, decode_caption_info, rewrite_caption_info,
+    rewrite_caption_info_with_report,
 };
 
 // Keep the source and every strict/rewrite pass within one finite profile.
@@ -120,7 +120,13 @@ fn exercise_source(source: &[u8], data: &[u8]) {
     // source must remain unchanged on both success and refusal.
     let replacement = replacement_identifier(data, parent);
     let remap = [(parent, replacement)];
-    exercise_rewrite(source, &remap, snapshot, decode_options, replacement != parent);
+    exercise_rewrite(
+        source,
+        &remap,
+        snapshot,
+        decode_options,
+        replacement != parent,
+    );
     assert_eq!(source, before.as_slice(), "rewrite modified its source");
 
     // Keep the convenience alias on the same semantic path as the reporting
@@ -150,11 +156,8 @@ fn exercise_rewrite(
     expected_change: bool,
 ) -> bool {
     let before = source.to_vec();
-    let result = rewrite_caption_info_with_report(
-        source,
-        CaptionInfoWrite::new(remap),
-        decode_options,
-    );
+    let result =
+        rewrite_caption_info_with_report(source, CaptionInfoWrite::new(remap), decode_options);
     assert_eq!(source, before.as_slice(), "rewrite modified its source");
 
     let Ok((output, report)) = result else {
@@ -198,24 +201,28 @@ fn exercise_known_malformed() {
         &[0x1a, 0x01, 0x01],
         // Non-canonical bool scalar in the selected shape-info envelope.
         &[
-            0x0a, 0x22, 0x0a, 0x10, 0x0a, 0x07, 0x12, 0x05, 0x08, 0x0b, 0xd0, 0x05,
-            0x07, 0x12, 0x05, 0x08, 0x16, 0xd0, 0x05, 0x07, 0x12, 0x05, 0x08, 0x21,
-            0xd0, 0x05, 0x07, 0x22, 0x05, 0x08, 0x2c, 0xd0, 0x05, 0x07, 0x30, 0x02,
-            0x12, 0x05, 0x08, 0x37, 0xd0, 0x05, 0x07, 0x18, 0x01,
+            0x0a, 0x22, 0x0a, 0x10, 0x0a, 0x07, 0x12, 0x05, 0x08, 0x0b, 0xd0, 0x05, 0x07, 0x12,
+            0x05, 0x08, 0x16, 0xd0, 0x05, 0x07, 0x12, 0x05, 0x08, 0x21, 0xd0, 0x05, 0x07, 0x22,
+            0x05, 0x08, 0x2c, 0xd0, 0x05, 0x07, 0x30, 0x02, 0x12, 0x05, 0x08, 0x37, 0xd0, 0x05,
+            0x07, 0x18, 0x01,
         ],
         // Duplicate singular childInfoKind.
         &[
-            0x0a, 0x22, 0x0a, 0x10, 0x0a, 0x07, 0x12, 0x05, 0x08, 0x0b, 0xd0, 0x05,
-            0x07, 0x12, 0x05, 0x08, 0x16, 0xd0, 0x05, 0x07, 0x12, 0x05, 0x08, 0x21,
-            0xd0, 0x05, 0x07, 0x22, 0x05, 0x08, 0x2c, 0xd0, 0x05, 0x07, 0x30, 0x01,
-            0x12, 0x05, 0x08, 0x37, 0xd0, 0x05, 0x07, 0x18, 0x01, 0x18, 0x02,
+            0x0a, 0x22, 0x0a, 0x10, 0x0a, 0x07, 0x12, 0x05, 0x08, 0x0b, 0xd0, 0x05, 0x07, 0x12,
+            0x05, 0x08, 0x16, 0xd0, 0x05, 0x07, 0x12, 0x05, 0x08, 0x21, 0xd0, 0x05, 0x07, 0x22,
+            0x05, 0x08, 0x2c, 0xd0, 0x05, 0x07, 0x30, 0x01, 0x12, 0x05, 0x08, 0x37, 0xd0, 0x05,
+            0x07, 0x18, 0x01, 0x18, 0x02,
         ],
     ];
     for recipe in recipes {
         let source = recipe.to_vec();
         let before = source.clone();
         assert!(decode_caption_info(&source, options(&source)).is_err());
-        assert_eq!(source, before.as_slice(), "malformed decode modified source");
+        assert_eq!(
+            source,
+            before.as_slice(),
+            "malformed decode modified source"
+        );
         let remap = [(1_u64, 2_u64)];
         let rewritten = rewrite_caption_info_with_report(
             &source,
@@ -223,7 +230,11 @@ fn exercise_known_malformed() {
             options(&source),
         );
         assert!(rewritten.is_err());
-        assert_eq!(source, before.as_slice(), "malformed rewrite modified source");
+        assert_eq!(
+            source,
+            before.as_slice(),
+            "malformed rewrite modified source"
+        );
     }
 }
 
@@ -235,28 +246,36 @@ fn exercise_limit_guards() {
         MAX_WORK_BYTES,
         MAX_RECURSION,
     );
-    assert!(decode_caption_info(&source, bytes)
-        .expect_err("byte limit was not enforced")
-        .message_byte_limit_values()
-        .is_some());
+    assert!(
+        decode_caption_info(&source, bytes)
+            .expect_err("byte limit was not enforced")
+            .message_byte_limit_values()
+            .is_some()
+    );
 
     let fields = DecodeOptions::new(source.len(), 1, MAX_WORK_BYTES, MAX_RECURSION);
-    assert!(decode_caption_info(&source, fields)
-        .expect_err("field limit was not enforced")
-        .field_limit_values()
-        .is_some());
+    assert!(
+        decode_caption_info(&source, fields)
+            .expect_err("field limit was not enforced")
+            .field_limit_values()
+            .is_some()
+    );
 
     let work = DecodeOptions::new(source.len(), MAX_FIELDS, source.len(), MAX_RECURSION);
-    assert!(decode_caption_info(&source, work)
-        .expect_err("work limit was not enforced")
-        .work_limit_values()
-        .is_some());
+    assert!(
+        decode_caption_info(&source, work)
+            .expect_err("work limit was not enforced")
+            .work_limit_values()
+            .is_some()
+    );
 
     let nesting = DecodeOptions::new(source.len(), MAX_FIELDS, MAX_WORK_BYTES, 0);
-    assert!(decode_caption_info(&source, nesting)
-        .expect_err("recursion limit was not enforced")
-        .recursion_limit_values()
-        .is_some());
+    assert!(
+        decode_caption_info(&source, nesting)
+            .expect_err("recursion limit was not enforced")
+            .recursion_limit_values()
+            .is_some()
+    );
 
     let output = DecodeOptions::new(source.len(), MAX_FIELDS, MAX_WORK_BYTES, MAX_RECURSION)
         .with_max_output_bytes(1);

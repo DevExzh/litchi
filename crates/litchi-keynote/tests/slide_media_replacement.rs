@@ -66,7 +66,12 @@ fn synthetic_live_video_source(with_content: bool) -> TestResult<Vec<u8>> {
         movie.movie_data = None;
     }
     let mut payload = movie.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     with_movie_payload(&source, MOVIES[0], payload)
 }
 
@@ -76,7 +81,12 @@ fn synthetic_file_without_content_source() -> TestResult<Vec<u8>> {
     let mut movie = tsd::MovieArchive::decode(payload.as_slice())?;
     movie.movie_data = None;
     let mut payload = movie.encode_to_vec();
-    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+    append_length_delimited_field(
+        &mut payload,
+        UNKNOWN_FIELD,
+        UNKNOWN_MARKER,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
     with_movie_payload(&source, MOVIES[0], payload)
 }
 
@@ -561,6 +571,7 @@ fn malformed_movie_reference_is_refused_without_mutating_source() -> TestResult 
             identifier: CONTENT_DATA,
         }
         .encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
     )?;
     let hostile = with_movie_payload(&source, MOVIES[0], malformed)?;
     let package = Package::from_bytes(&hostile)?;
@@ -760,18 +771,38 @@ fn neutral_map_reader_preserves_unselected_extensions_during_replacement() -> Te
         }
         .encode_to_vec();
         if extension_depth == 2 {
-            append_length_delimited_field(&mut reference, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+            append_length_delimited_field(
+                &mut reference,
+                UNKNOWN_FIELD,
+                UNKNOWN_MARKER,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         let mut entry = Vec::new();
         append_varint_field(&mut entry, 1, POSTER_DATA)?;
-        append_length_delimited_field(&mut entry, 2, &reference)?;
+        append_length_delimited_field(
+            &mut entry,
+            2,
+            &reference,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
         if extension_depth == 1 {
-            append_length_delimited_field(&mut entry, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+            append_length_delimited_field(
+                &mut entry,
+                UNKNOWN_FIELD,
+                UNKNOWN_MARKER,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         let mut map = Vec::new();
-        append_length_delimited_field(&mut map, 1, &entry)?;
+        append_length_delimited_field(&mut map, 1, &entry, litchi_iwa_common::WireLimits::DEFAULT)?;
         if extension_depth == 0 {
-            append_length_delimited_field(&mut map, UNKNOWN_FIELD, UNKNOWN_MARKER)?;
+            append_length_delimited_field(
+                &mut map,
+                UNKNOWN_FIELD,
+                UNKNOWN_MARKER,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
         }
         let mut archive = Archive::parse(&document_stream(&source)?)?;
         archive.insert_object(ArchiveObject::new(

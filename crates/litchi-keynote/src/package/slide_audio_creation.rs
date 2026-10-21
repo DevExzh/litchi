@@ -1190,7 +1190,7 @@ fn stylesheet_style_identifiers(
     expected_count: usize,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u64>, SlideAudioCreationError> {
-    let fields = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let fields = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let count = fields.fields().filter(|field| field.number() == 1).count();
     if count != expected_count || count == 0 {
@@ -1338,7 +1338,7 @@ pub(super) fn references_in_field(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<Vec<u64>, SlideAudioCreationError> {
-    let view = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;
@@ -1370,7 +1370,7 @@ pub(super) fn reference_identifier(
     limits: WireLimits,
     budget: &mut CreationBudget,
 ) -> Result<u64, SlideAudioCreationError> {
-    let view = litchi_iwa_common::wire::WireView::parse_with_limits(payload, limits)
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_wire_fields(view.len())?;
     budget.charge_work(payload.len().max(1))?;

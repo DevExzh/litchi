@@ -11,7 +11,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
 use litchi_iwa_common::{
     WireLimits,
-    wire::{NestedFieldEdit, NestedFieldReplacement, patch_nested_fields_batched_with_limits},
+    wire::{NestedFieldEdit, NestedFieldReplacement, patch_nested_fields_batched},
 };
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::numbers_table_title_codec::{self, DecodeLimit, TableTitleSettingsSnapshot};
@@ -661,8 +661,8 @@ fn rewrite_title(
     budget
         .charge_output_bytes(package_bound)
         .map_err(map_lock_error)?;
-    let rewritten = patch_nested_fields_batched_with_limits(&message.data, &edits, limits)
-        .map_err(map_wire_error)?;
+    let rewritten =
+        patch_nested_fields_batched(&message.data, &edits, limits).map_err(map_wire_error)?;
     let verified = decode_snapshot(&rewritten, &mut budget)?;
     if Settings::new(
         verified.table_name_enabled(),

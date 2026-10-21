@@ -1185,7 +1185,7 @@ fn prove_exclusive_payload_owners(
 
 fn validate_slide_note_reference_shape(package: &Package, payload: &[u8]) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in view.fields().filter(|field| field.number() == 27) {
         validate_exact_reference_shape(
             package,
@@ -1197,7 +1197,7 @@ fn validate_slide_note_reference_shape(package: &Package, payload: &[u8]) -> Res
 
 fn validate_exact_note_payload_shape(package: &Package, payload: &[u8]) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     if view.len() != 1 {
         return Err(Error::Refused(Refusal::DependentContent));
     }
@@ -1210,7 +1210,7 @@ fn validate_exact_note_payload_shape(package: &Package, payload: &[u8]) -> Resul
 
 fn validate_exact_reference_shape(package: &Package, payload: &[u8]) -> Result<(), Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     for field in view.fields() {
         if !matches!(field.number(), 1..=3) || field.wire_type() != 0 {
             return Err(Error::Refused(Refusal::DependentContent));

@@ -1,0 +1,9 @@
+== 1-base 21:55:32 load 8.09
+== 2-after 21:57:58 load 5.58
+== 3-after 22:00:32 load 3.26
+== 4-base 22:03:06 load 5.34
+== 5-base 22:05:36 load 13.48
+== 6-after 22:08:12 load 6.57
+== 7-after 22:10:48 load 4.56
+== 8-base 22:13:27 load 4.38
+done

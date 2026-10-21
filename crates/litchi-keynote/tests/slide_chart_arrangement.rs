@@ -70,7 +70,7 @@ fn with_drawable_arrangement(
     unknown: bool,
 ) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing synthetic chart drawable"))?;
@@ -95,6 +95,7 @@ fn with_drawable_arrangement(
             &mut drawable_payload,
             UNKNOWN_DRAWABLE_BYTES_FIELD,
             b"opaque drawable arrange metadata",
+            litchi_iwa_common::WireLimits::DEFAULT,
         )?;
     }
     let replacement = chart_fixture::length_delimited_field_with_key_width(
@@ -130,7 +131,7 @@ fn synthetic_package_with_states(
 fn with_unknown_title_group(source: &[u8]) -> TestResult<Vec<u8>> {
     let original =
         chart_fixture::message_payload(source, CHART_NON_STYLES[0], CHART_NON_STYLE_MESSAGE_TYPE)?;
-    let extension = WireView::parse(&original)?
+    let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_CHART_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing synthetic chart title extension"))?;
@@ -233,7 +234,7 @@ fn assert_previews_preserved(before: &[u8], after: &[u8]) -> TestResult<()> {
 
 fn drawable_payload(package: &[u8], chart: usize) -> TestResult<Vec<u8>> {
     let payload = chart_fixture::message_payload(package, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let field = WireView::parse(&payload)?
+    let field = WireView::parse(&payload, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -241,11 +242,14 @@ fn drawable_payload(package: &[u8], chart: usize) -> TestResult<Vec<u8>> {
 }
 
 fn raw_drawable_fields(package: &[u8], chart: usize, number: u32) -> TestResult<Vec<Vec<u8>>> {
-    Ok(WireView::parse(&drawable_payload(package, chart)?)?
-        .fields()
-        .filter(|field| field.number() == number)
-        .map(|field| field.raw().to_vec())
-        .collect())
+    Ok(WireView::parse(
+        &drawable_payload(package, chart)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == number)
+    .map(|field| field.raw().to_vec())
+    .collect())
 }
 
 fn with_drawable_wire(
@@ -254,7 +258,7 @@ fn with_drawable_wire(
     rewrite: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[chart], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -311,7 +315,12 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
         }),
         "wrong-locked-wire" => with_drawable_wire(&source, 0, |drawable| {
             let mut output = drawable.to_vec();
-            append_length_delimited_field(&mut output, DRAWABLE_LOCKED_FIELD, b"not a bool")?;
+            append_length_delimited_field(
+                &mut output,
+                DRAWABLE_LOCKED_FIELD,
+                b"not a bool",
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
             Ok(output)
         }),
         "wrong-aspect-ratio-wire" => with_drawable_wire(&source, 0, |drawable| {
@@ -320,6 +329,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
                 &mut output,
                 DRAWABLE_ASPECT_RATIO_LOCKED_FIELD,
                 b"not a bool",
+                litchi_iwa_common::WireLimits::DEFAULT,
             )?;
             Ok(output)
         }),
@@ -352,7 +362,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
         },
         "duplicate-outer" => {
             let original = chart_fixture::message_payload(&source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-            let field = WireView::parse(&original)?
+            let field = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
                 .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -368,7 +378,7 @@ fn malformed_arrangement_source(kind: &str) -> TestResult<Vec<u8>> {
 
 fn with_shared_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-    let extension = WireView::parse(&original)?
+    let extension = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == GENERATED_CHART_EXTENSION_FIELD)
         .ok_or_else(|| io::Error::other("missing chart extension"))?;
@@ -389,7 +399,7 @@ fn with_shared_non_style(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_shared_title(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[1], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;
@@ -407,7 +417,7 @@ fn with_shared_title(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
     let original = chart_fixture::message_payload(source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let drawable = WireView::parse(&original)?
+    let drawable = WireView::parse(&original, litchi_iwa_common::WireLimits::DEFAULT)?
         .fields()
         .find(|field| field.number() == DRAWABLE_SUPER_FIELD)
         .ok_or_else(|| io::Error::other("missing chart drawable"))?;

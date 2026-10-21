@@ -1562,7 +1562,7 @@ fn strict_annotation_author_error(object_id: u64, error: impl std::fmt::Display)
 /// common parser's typed allocation error instead of turning an exhausted
 /// candidate-local vector into a generic malformed-message error.
 fn annotation_wire_fields(object_id: u64, source: &[u8]) -> Result<Vec<crate::wire::WireField>> {
-    match litchi_iwa_common::wire::parse_wire_fields_with_limits(
+    match litchi_iwa_common::wire::parse_wire_fields(
         source,
         litchi_iwa_common::WireLimits::default(),
     ) {

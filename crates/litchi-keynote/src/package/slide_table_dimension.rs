@@ -23,9 +23,7 @@ use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
     varint::encoded_len,
-    wire::{
-        NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched_with_limits,
-    },
+    wire::{NestedFieldEdit, NestedFieldReplacement, WireView, patch_nested_fields_batched},
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
@@ -1954,7 +1952,7 @@ fn repeated_references(
     budget: &mut DimensionBudget,
 ) -> Result<Vec<u64>, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields
         .fields()
         .filter(|field| field.number() == number)
@@ -1983,7 +1981,7 @@ fn table_parent(
     budget: &mut DimensionBudget,
 ) -> Result<u64, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut parent = None;
     for field in fields.fields() {
         if field.number() == TABLE_SUPER_FIELD {
@@ -2000,7 +1998,7 @@ fn table_parent(
         return Err(Error::InvalidSource);
     }
     budget.wire_bytes(parent.payload().len())?;
-    let drawable = WireView::parse_with_limits(parent.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(parent.payload(), limits).map_err(map_wire_error)?;
     let mut parent_field = None;
     for field in drawable.fields() {
         if field.number() == DRAWABLE_PARENT_FIELD {
@@ -2025,7 +2023,7 @@ fn strict_reference(
     budget: &mut DimensionBudget,
 ) -> Result<u64, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     for field in fields.fields() {
         field.validate_canonical_framing().map_err(map_wire_error)?;
@@ -2072,7 +2070,7 @@ fn decode_table_info(
     );
     let snapshot =
         table_info_codec::decode_table_info(payload, options).map_err(map_table_info_error)?;
-    let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
     budget.fields(view.fields().count())?;
     budget.work(payload.len())?;
     Ok(snapshot)
@@ -2084,7 +2082,7 @@ fn parse_model_defaults(
     budget: &mut DimensionBudget,
 ) -> Result<(f64, f64), Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut row = None;
     let mut column = None;
     for field in fields.fields() {
@@ -2136,7 +2134,7 @@ fn parse_table_geometry(
     budget: &mut DimensionBudget,
 ) -> Result<Geometry, Error> {
     budget.wire_bytes(payload.len())?;
-    let root = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let root = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let mut super_field = None;
     for field in root.fields() {
         if field.number() == TABLE_SUPER_FIELD {
@@ -2151,8 +2149,7 @@ fn parse_table_geometry(
         return Err(Error::InvalidSource);
     }
     budget.wire_bytes(super_field.payload().len())?;
-    let drawable =
-        WireView::parse_with_limits(super_field.payload(), limits).map_err(map_wire_error)?;
+    let drawable = WireView::parse(super_field.payload(), limits).map_err(map_wire_error)?;
     let mut geometry = None;
     for field in drawable.fields() {
         if field.number() == DRAWABLE_GEOMETRY_FIELD {
@@ -2167,8 +2164,7 @@ fn parse_table_geometry(
         return Err(Error::InvalidSource);
     }
     budget.wire_bytes(geometry.payload().len())?;
-    let geometry =
-        WireView::parse_with_limits(geometry.payload(), limits).map_err(map_wire_error)?;
+    let geometry = WireView::parse(geometry.payload(), limits).map_err(map_wire_error)?;
     let mut size = None;
     for field in geometry.fields() {
         if field.number() == GEOMETRY_SIZE_FIELD {
@@ -2183,7 +2179,7 @@ fn parse_table_geometry(
         return Err(Error::InvalidSource);
     }
     budget.wire_bytes(size.payload().len())?;
-    let size = WireView::parse_with_limits(size.payload(), limits).map_err(map_wire_error)?;
+    let size = WireView::parse(size.payload(), limits).map_err(map_wire_error)?;
     let mut width = None;
     let mut height = None;
     for field in size.fields() {
@@ -2284,7 +2280,7 @@ fn storage_references(
     budget: &mut DimensionBudget,
 ) -> Result<Vec<u64>, Error> {
     budget.wire_bytes(payload.len())?;
-    let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
     let count = fields.fields().filter(|field| field.number() == 2).count();
     budget.fields(fields.fields().count())?;
     budget.work(payload.len())?;
@@ -3083,7 +3079,7 @@ fn rewrite_dimension(
         ),
     ];
     let rewritten_geometry =
-        patch_nested_fields_batched_with_limits(table_info_payload, &geometry_edits, limits)
+        patch_nested_fields_batched(table_info_payload, &geometry_edits, limits)
             .map_err(map_wire_error)?;
     budget.wire_bytes(table_info_payload.len())?;
     budget.wire_output(rewritten_geometry.len())?;

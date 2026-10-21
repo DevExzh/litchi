@@ -36,7 +36,12 @@ fn order_payload(order: &[u64]) -> TestResult<Vec<u8>> {
             99,
             u64::try_from(index)?.saturating_add(700),
         )?;
-        litchi_iwa_common::wire::append_length_delimited_field(&mut payload, 1, &nested)?;
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut payload,
+            1,
+            &nested,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
     }
     // The root unknown field must remain byte-for-byte untouched by a reorder.
     litchi_iwa_common::wire::append_varint_field(&mut payload, 77, 0xfeed)?;
@@ -164,7 +169,7 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
     );
 
     let rewritten = zorder_payload_from_package(commit.package())?;
-    let view = WireView::parse(&rewritten)?;
+    let view = WireView::parse(&rewritten, litchi_iwa_common::WireLimits::DEFAULT)?;
     let (snapshot, _report) =
         litchi_iwa_protos::pages_drawable_order_codec::decode_drawable_order_with_report(
             &rewritten,
@@ -184,7 +189,7 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
     );
     for field in view.fields().filter(|field| field.number() == 1) {
         assert!(
-            WireView::parse(field.payload())?
+            WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)?
                 .fields()
                 .any(|nested| nested.number() == 99)
         );
