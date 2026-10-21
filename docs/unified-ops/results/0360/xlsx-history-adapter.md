@@ -300,6 +300,6 @@ normalization, per-revision stability, fresh directories, and rejection of the
 removed preflight alias.
 
 The corrected adapter source SHA-256 is
-9e96a0d0d02c769ffc7aa3f6cf80d059fa446cca69d231109c03397442e29781. It has
+96d3d7a34da55fe3abfde4e502d5d23ff20c5d7e775dbb85d82df10a949b3ac4. It has
 passed `python3 -m py_compile` and the focused fake-report tests. No native
 timing has been run with the corrected adapter.

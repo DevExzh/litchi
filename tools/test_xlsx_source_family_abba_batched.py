@@ -123,6 +123,7 @@ class XlsxSourceFamilyAdapterTests(unittest.TestCase):
             "scoped_patch_probe", "snappy-probe-v1", "ole_w5_probe",
         ):
             self.assertTrue(ADAPTER.is_heavy_process(executable, executable))
+        self.assertTrue(ADAPTER.is_heavy_process("python3", "python3 /tmp/snappy-probe.py"))
         self.assertFalse(ADAPTER.is_heavy_process("python3", "python3 adapter.py"))
 
 

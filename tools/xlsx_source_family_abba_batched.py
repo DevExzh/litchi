@@ -258,6 +258,15 @@ def is_heavy_process(executable: str, command: str) -> bool:
         return True
     if executable.startswith(("litchi-perf-", "xlsx_", "snappy-")):
         return True
+    # A probe may be a script launched by a generic interpreter.  Inspect
+    # token basenames for those protected probe names without treating this
+    # adapter's own xlsx_ filename as a child process.
+    for token in command.split():
+        basename = Path(token.strip("'\"")).name
+        if basename.startswith(("litchi-perf-", "snappy-")) or basename in {
+            "scoped_patch_probe", "ole_w5_probe",
+        }:
+            return True
     return bool(HEAVY_PROCESS_WORD.search(command))
 
 
