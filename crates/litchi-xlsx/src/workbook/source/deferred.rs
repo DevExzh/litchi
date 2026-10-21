@@ -16,7 +16,7 @@ use std::sync::{Arc, OnceLock, Weak};
 
 use litchi_opc::{SourceArtifact, SourceArtifactRestoreProof, SourceBackedPackage};
 
-use super::SourceBackedWorkbook;
+use super::{SourceBackedWorkbook, SourceCatalogProof};
 use crate::error::Result;
 
 /// Writes a committed artifact from the base package to a sink.
@@ -289,21 +289,37 @@ impl SourceBackedWorkbook {
             return Ok(view);
         }
         // A committed workbook either carries the catalog captured while its
-        // change was authored, or changes only non-workbook parts. In both
-        // cases the immutable defined-name records are unchanged. Keep the
-        // existing Arc when the output is reopened so a long edit/replay
-        // history does not allocate one catalog per materialized owner.
-        let shared_defined_names = pending
-            .catalog
-            .as_ref()
-            .map(|catalog| Arc::clone(&catalog.defined_names))
-            .unwrap_or_else(|| Arc::clone(&self.inner.defined_names));
+        // change was authored, or changes only non-workbook parts. Reuse one
+        // immutable proof whenever the output keeps the same catalog. The
+        // proof carries the lineage's policy Arc as well as its names: a
+        // OnceLock local to each reopened SourceInner would otherwise create
+        // one fresh policy allocation for every materialized history step.
+        let lineage_limits = self.inner.source_limits();
+        let shared_catalog = match pending.catalog.as_ref() {
+            None => self.inner.catalog_proof(),
+            Some(catalog)
+                if Arc::ptr_eq(&catalog.defined_names, &self.inner.defined_names)
+                    || catalog.defined_names.as_ref() == self.inner.defined_names.as_ref() =>
+            {
+                self.inner.catalog_proof()
+            },
+            Some(catalog) => Arc::new(SourceCatalogProof {
+                defined_names: Arc::clone(&catalog.defined_names),
+                limits: Arc::clone(&lineage_limits),
+            }),
+        };
         let mut bytes = Vec::new();
         pending.publish.write(&self.inner.package, &mut bytes)?;
-        let view = Self::from_read_at_with_options_and_shared_names(
+        // A facade built around an externally supplied package may have
+        // options whose source profile differs from that package's admitted
+        // profile. Materialization follows the package lineage, so preserve
+        // the retained policy while carrying the other facade options over.
+        let mut options = self.inner.options.clone();
+        options.source_limits = *lineage_limits;
+        let view = Self::from_read_at_with_options_and_shared_catalog(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
-            self.inner.options.clone(),
-            Some(shared_defined_names),
+            options,
+            Some(shared_catalog),
         )?;
         Ok(pending.materialized.get_or_init(|| view))
     }

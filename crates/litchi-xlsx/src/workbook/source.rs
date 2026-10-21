@@ -30,7 +30,7 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceLimits,
     VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
@@ -112,6 +112,12 @@ impl SourceSheetData {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct SourceCatalogProof {
+    pub(crate) defined_names: Arc<[raw::DefinedName]>,
+    pub(crate) limits: Arc<SourceLimits>,
+}
+
 pub(crate) struct SourceInner {
     package: SourceBackedPackage,
     /// One shared package handle for exact replay endpoints. Keeping this
@@ -155,6 +161,14 @@ pub(crate) struct SourceInner {
     /// Defined names parsed with the mandatory workbook catalog at open.
     /// Source-backed snapshots share this immutable catalog.
     defined_names: Arc<[raw::DefinedName]>,
+    /// Lazily shared ingress policy for source-backed snapshots. Keeping this
+    /// on the immutable lineage avoids copying all policy fields into every
+    /// retained before/after snapshot while leaving ordinary opens lazy.
+    source_limits: OnceLock<Arc<SourceLimits>>,
+    /// The immutable catalog proof shared by tab-state snapshots in this
+    /// source lineage. It groups the unchanged defined-name catalog and its
+    /// ingress policy behind one retained handle.
+    catalog_proof: OnceLock<Arc<SourceCatalogProof>>,
     /// Weighted clean-value cache of parsed worksheet values.
     values: values::ValueCache,
     /// Number of differential formats in the styles part, parsed once for
@@ -298,13 +312,13 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_options_and_shared_names(source, options, None)
+        Self::from_read_at_with_options_and_shared_catalog(source, options, None)
     }
 
-    fn from_read_at_with_options_and_shared_names(
+    fn from_read_at_with_options_and_shared_catalog(
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
-        shared_defined_names: Option<Arc<[raw::DefinedName]>>,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
     ) -> Result<Self> {
         let limits = options.source_limits;
         let cache_limits = options.cache_limits.unwrap_or_default();
@@ -323,7 +337,7 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::open_source_backed_package_with_shared_names(package, options, shared_defined_names)
+        Self::open_source_backed_package_with_shared_catalog(package, options, shared_catalog)
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -369,17 +383,24 @@ impl SourceBackedWorkbook {
         package: SourceBackedPackage,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_source_backed_package_with_shared_names(package, options, None)
+        Self::open_source_backed_package_with_shared_catalog(package, options, None)
     }
 
-    fn open_source_backed_package_with_shared_names(
+    fn open_source_backed_package_with_shared_catalog(
         package: SourceBackedPackage,
         options: crate::OpenOptions,
-        shared_defined_names: Option<Arc<[raw::DefinedName]>>,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
     ) -> Result<Self> {
         let execution = options.execution_context.clone();
         let leniency = options.leniency;
         check_execution(execution.as_ref())?;
+        if let Some(shared) = shared_catalog.as_ref()
+            && package.read_limits() != *shared.limits
+        {
+            return Err(invalid(
+                "reopened workbook changed its source-backed policy",
+            ));
+        }
         let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
         let workbook = package.main_document_part()?;
         let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
@@ -405,14 +426,14 @@ impl SourceBackedWorkbook {
         check_execution(execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
-        let defined_names = match shared_defined_names {
+        let defined_names = match shared_catalog.as_ref() {
             Some(shared) => {
-                if catalog.defined_names.as_slice() != shared.as_ref() {
+                if catalog.defined_names.as_slice() != shared.defined_names.as_ref() {
                     return Err(invalid(
                         "reopened workbook changed its defined-name catalog",
                     ));
                 }
-                shared
+                Arc::clone(&shared.defined_names)
             },
             None => Arc::from(catalog.defined_names.into_boxed_slice()),
         };
@@ -455,6 +476,13 @@ impl SourceBackedWorkbook {
         package.source_version()?;
         check_execution(execution.as_ref())?;
 
+        let source_limits = OnceLock::new();
+        let catalog_proof = OnceLock::new();
+        if let Some(shared) = shared_catalog {
+            let _ = source_limits.set(Arc::clone(&shared.limits));
+            let _ = catalog_proof.set(shared);
+        }
+
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
@@ -480,6 +508,8 @@ impl SourceBackedWorkbook {
                 sheet_name_order,
                 tolerance,
                 defined_names,
+                source_limits,
+                catalog_proof,
                 values: values::ValueCache::new(),
                 differential_format_count: OnceLock::new(),
                 options,
@@ -527,8 +557,8 @@ impl SourceBackedWorkbook {
         }
     }
 
-    pub(crate) fn shared_defined_names(&self) -> Arc<[raw::DefinedName]> {
-        Arc::clone(&self.current().defined_names)
+    pub(crate) fn shared_catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        self.current().catalog_proof()
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.
@@ -1510,6 +1540,22 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    pub(crate) fn source_limits(&self) -> Arc<SourceLimits> {
+        Arc::clone(
+            self.source_limits
+                .get_or_init(|| Arc::new(self.package.read_limits())),
+        )
+    }
+
+    pub(crate) fn catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        Arc::clone(self.catalog_proof.get_or_init(|| {
+            Arc::new(SourceCatalogProof {
+                defined_names: Arc::clone(&self.defined_names),
+                limits: self.source_limits(),
+            })
+        }))
+    }
+
     pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
         Arc::clone(
             self.package_handle

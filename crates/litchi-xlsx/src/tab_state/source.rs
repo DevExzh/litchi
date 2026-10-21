@@ -273,7 +273,8 @@ impl crate::workbook::source::deferred::Change for super::Patch {
         &self,
         package: &SourceBackedPackage,
     ) -> Option<crate::workbook::source::deferred::Catalog> {
-        (package.read_limits() == self.after().limits).then(|| self.after().deferred_catalog())
+        (package.read_limits() == *self.after().catalog.limits)
+            .then(|| self.after().deferred_catalog())
     }
 
     fn catalog_xml(&self) -> Option<&[u8]> {
@@ -296,9 +297,9 @@ impl SourceBackedWorkbook {
     /// Begin an isolated tab-state edit with explicit XML audit limits.
     pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
         let package = self.edit_package()?;
-        let shared_names = self.shared_defined_names();
+        let shared_catalog = self.shared_catalog_proof();
         let before =
-            Snapshot::load_source_backed_with_names(package, Arc::new(()), Some(shared_names))?;
+            Snapshot::load_source_backed_with_catalog(package, Arc::new(()), shared_catalog)?;
         Edit::new(self.clone(), before, options.limits.unwrap_or_default())
     }
 

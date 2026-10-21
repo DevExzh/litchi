@@ -101,8 +101,11 @@ impl SourceBackedWorkbook {
     /// be read.
     pub fn edit_defined_names(&self) -> Result<Edit> {
         let package = self.edit_package()?;
-        let shared_names = self.shared_defined_names();
-        let before = Snapshot::load_source_backed_with_names(package, Some(shared_names))?;
+        let shared_catalog = self.shared_catalog_proof();
+        let before = Snapshot::load_source_backed_with_names(
+            package,
+            Some(shared_catalog.defined_names.clone()),
+        )?;
         Ok(Edit::new(self.clone(), before))
     }
 

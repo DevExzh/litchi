@@ -5,12 +5,12 @@ use std::sync::Arc;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     OpcPackage, PackURI, Part, PartView, Relationship, Relationships, SourceBackedPackage,
-    SourceLimits, TargetMode,
+    TargetMode,
 };
 
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
 use crate::source_payload::SourcePayload;
-use crate::workbook::source::validate_sheet_graph;
+use crate::workbook::source::{SourceCatalogProof, validate_sheet_graph};
 use crate::{Visibility, WorksheetKind, raw};
 
 const CHARTSHEET_REL: &str =
@@ -56,10 +56,10 @@ impl Tab {
 pub struct Snapshot {
     tabs: Arc<[Tab]>,
     active: usize,
-    /// Immutable catalog records shared by the snapshot, deferred catalog,
-    /// and exact restore endpoint. A tab-state edit does not change names.
-    defined_names: Arc<[raw::DefinedName]>,
-    pub(super) limits: SourceLimits,
+    /// Immutable catalog records and ingress policy shared by the snapshot,
+    /// deferred catalog, and exact restore endpoint. A tab-state edit does
+    /// not change names or the source policy.
+    pub(super) catalog: Arc<SourceCatalogProof>,
     pub(super) source: SourceState,
     origin: Option<Arc<()>>,
 }
@@ -70,33 +70,30 @@ impl Snapshot {
         Self::load_owned_with_touched(package, &[])
     }
 
-    pub(super) fn load_source_backed_with_names(
+    pub(super) fn load_source_backed_with_catalog(
         package: &SourceBackedPackage,
         origin: Arc<()>,
-        shared_names: Option<Arc<[raw::DefinedName]>>,
+        shared_catalog: Arc<SourceCatalogProof>,
     ) -> Result<Self> {
         package.check_execution()?;
         let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let catalog = raw::parse_catalog(workbook_bytes.as_bytes(), &package.read_limits())?;
+        let limits = package.read_limits();
+        if limits != *shared_catalog.limits {
+            return Err(invalid("tab-state source limits changed during snapshot"));
+        }
+        let catalog = raw::parse_catalog(workbook_bytes.as_bytes(), &limits)?;
         let graph = capture_source_graph(package, &workbook, &catalog.sheets)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
-        let defined_names = match shared_names {
-            Some(shared) => {
-                if catalog.defined_names.as_slice() != shared.as_ref() {
-                    return Err(invalid("tab-state source catalog changed during snapshot"));
-                }
-                shared
-            },
-            None => Arc::from(catalog.defined_names.into_boxed_slice()),
-        };
+        if catalog.defined_names.as_slice() != shared_catalog.defined_names.as_ref() {
+            return Err(invalid("tab-state source catalog changed during snapshot"));
+        }
         let snapshot = Self {
             tabs,
             active,
-            defined_names,
-            limits: package.read_limits(),
+            catalog: shared_catalog,
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -120,16 +117,19 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_bytes = workbook.blob_arc();
-        let catalog = raw::parse_catalog(workbook_bytes.as_slice(), &package.read_limits())?;
+        let limits = Arc::new(package.read_limits());
+        let catalog = raw::parse_catalog(workbook_bytes.as_slice(), limits.as_ref())?;
         let graph = capture_owned_graph(package, workbook, &catalog.sheets)?;
         let touched = capture_owned_touched(package, &graph, positions)?;
         let (tabs, active) = semantic_tabs(&catalog)?;
-        let defined_names = Arc::from(catalog.defined_names.into_boxed_slice());
+        let catalog = Arc::new(SourceCatalogProof {
+            defined_names: Arc::from(catalog.defined_names.into_boxed_slice()),
+            limits,
+        });
         Ok(Self {
             tabs,
             active,
-            defined_names,
-            limits: package.read_limits(),
+            catalog,
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -165,7 +165,7 @@ impl Snapshot {
         workbook: Vec<u8>,
         touched: Vec<(usize, Vec<u8>)>,
     ) -> Result<Self> {
-        let catalog = raw::parse_catalog(&workbook, &before.limits)?;
+        let catalog = raw::parse_catalog(&workbook, before.catalog.limits.as_ref())?;
         let (tabs, active) = semantic_tabs(&catalog)?;
         if catalog.sheets.len() != before.source.graph.sheets.len()
             || catalog
@@ -182,15 +182,13 @@ impl Snapshot {
                 "tab-state rewrite changed workbook sheet topology or relationships",
             ));
         }
-        if catalog.defined_names.as_slice() != before.defined_names.as_ref() {
+        if catalog.defined_names.as_slice() != before.catalog.defined_names.as_ref() {
             return Err(invalid(
                 "tab-state rewrite changed the defined-name catalog",
             ));
         }
         // Tab-state rewrites leave the defined-name XML untouched. Reuse the
         // source catalog rather than retaining a second deep copy per patch.
-        let defined_names = Arc::clone(&before.defined_names);
-
         let mut rewritten_parts = Vec::new();
         rewritten_parts
             .try_reserve_exact(before.source.touched.len())
@@ -215,8 +213,7 @@ impl Snapshot {
         Ok(Self {
             tabs,
             active,
-            defined_names,
-            limits: before.limits,
+            catalog: Arc::clone(&before.catalog),
             source: SourceState {
                 workbook: PartState::new(
                     before.source.workbook.uri.clone(),
@@ -251,7 +248,7 @@ impl Snapshot {
 
     pub(super) fn deferred_catalog(&self) -> crate::workbook::source::deferred::Catalog {
         crate::workbook::source::deferred::Catalog {
-            defined_names: self.defined_names.clone(),
+            defined_names: self.catalog.defined_names.clone(),
             active_sheet: (!self.tabs.is_empty()).then_some(self.active),
         }
     }
