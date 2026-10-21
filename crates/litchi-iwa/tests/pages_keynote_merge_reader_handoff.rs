@@ -46,13 +46,13 @@ fn model_with_merge_owner(message: &RawMessage) -> Option<tst::TableModelArchive
 }
 
 fn first_merge_tile_identifier(source: &[u8]) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 let Some(model) = model_with_merge_owner(message) else {
@@ -74,7 +74,7 @@ fn first_merge_tile_identifier(source: &[u8]) -> TestResult<u64> {
 /// Replace the selected table's BNC payload with an invalid wire fragment.
 /// The model, merge owner, ZIP envelope, and all metadata remain intact.
 fn malformed_merge_tile(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let tile_identifier = first_merge_tile_identifier(source)?;
     let mut replacement = None;
 
@@ -82,8 +82,8 @@ fn malformed_merge_tile(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some(object) = archive
             .objects
             .iter_mut()
@@ -102,10 +102,12 @@ fn malformed_merge_tile(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: vec![0xff],
             },
+            Default::default(),
         )?;
         replacement = Some((
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                .to_vec(),
         ));
         break;
     }
@@ -135,7 +137,7 @@ fn first_merge_formula_mut(
 /// object identity.  This is a terminal selected-graph error: a host adapter
 /// must return it instead of recovering through its old raw archive route.
 fn malformed_merge_formula(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = true;
 
@@ -143,8 +145,8 @@ fn malformed_merge_formula(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -172,6 +174,7 @@ fn malformed_merge_formula(source: &[u8]) -> TestResult<Vec<u8>> {
                         type_: message.type_,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 mutate = false;
                 changed = true;
@@ -184,7 +187,8 @@ fn malformed_merge_formula(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }

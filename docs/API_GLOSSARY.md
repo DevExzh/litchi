@@ -478,6 +478,15 @@ must expose `is_noop` and `inverse`. A member that is another crate's type
 family type) is checked by that crate: rustdoc does not list a dependency's
 inherent methods.
 
+The physical iWork substrate and archive profiles (`iwa-core` and
+`iwa-archive`, record 0361d) also enforce the raw-operation limit vocabulary.
+Archive parse, mutation, serialization and catalog ingress require limits on
+their canonical methods; Snappy decoding and encoding require `SnappyLimits`.
+There are no default-limits overloads or `*_with_limits` aliases. The physical
+archive policy is `litchi_iwa_core::Limits`; its former `ArchiveLimits` and
+`ResourceLimits` aliases are removed. The archive's catalogs and frozen source
+projections are registered as immutable owners.
+
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,
 `Diagnostics`, `Error` and `LimitKind` directly; nested or private names and

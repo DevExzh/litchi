@@ -416,6 +416,7 @@ mod tests {
                 type_: 101,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = crate::HostPackage::new();
@@ -441,6 +442,7 @@ mod tests {
                 type_: 101,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = crate::HostPackage::new();

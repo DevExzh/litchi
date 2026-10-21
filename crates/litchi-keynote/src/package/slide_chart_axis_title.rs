@@ -316,7 +316,10 @@ impl AxisTitleBudget {
         let mut work = 0usize;
         let mut references = 0usize;
         for component in package.state.source.components().iter() {
-            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            let archive_bytes = component
+                .archive()
+                .encoded_len(Default::default())
+                .map_err(map_core_error)?;
             work = work
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(archive_bytes))
@@ -433,16 +436,10 @@ impl AxisTitleBudget {
         snappy_limits: litchi_iwa_core::SnappyLimits,
     ) -> Result<(), Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
-        let compressed = SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
-        if compressed > snappy_limits.max_compressed_stream() {
-            return Err(Error::Limit {
-                kind: LimitKind::EntryBytes,
-                observed: usize_to_u64(compressed),
-                maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
-            });
-        }
+        let compressed =
+            SnappyStream::maximum_compressed_len(encoded, snappy_limits).map_err(map_core_error)?;
         self.charge_output(
             encoded
                 .checked_add(compressed)
@@ -794,7 +791,7 @@ fn candidate_reopen_envelope(
             .filter(|(name, _archive)| *name == component.name())
             .map_or(component.archive(), |(_name, archive)| archive);
         let bytes = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         if bytes > physical_limits.max_iwa_stream_bytes() {
             return Err(Error::InvalidSource);
@@ -1576,17 +1573,15 @@ fn rewrite_chart_axis_title(
         .ok_or(Error::InvalidSource)?;
     let decompressed_bound = parsed_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_native_decompress_parse(
         entry.data().len(),
         decompressed_bound,
         parsed_component.archive().objects.len(),
     )?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     chart_axis_support::validate_canonical_object_length_prefixes_with_budget(
         stream.as_bytes(),
         &archive,
@@ -1623,7 +1618,7 @@ fn rewrite_chart_axis_title(
     archive
         .object_mut(selection.axis_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.axis_message_index,
             RawMessage {
                 type_: CHART_AXIS_MESSAGE_TYPE,
@@ -1633,10 +1628,8 @@ fn rewrite_chart_axis_title(
         )
         .map_err(map_core_error)?;
     budget.charge_archive_snappy_plan(&archive, archive_limits, snappy_limits)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(|_error| Error::InvalidSource)?;
     let edit = EntryEdit::new(

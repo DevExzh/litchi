@@ -33,6 +33,7 @@ pub(super) fn set_table_dimensions(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

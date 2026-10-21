@@ -114,11 +114,7 @@ impl SemanticProjection {
     ///
     /// Unrelated members are inspected structurally by ZIP ingress but their
     /// payloads are never decompressed or retained by this projection.
-    pub fn from_bytes_with_limits(
-        bytes: &[u8],
-        limits: Limits,
-        profile: SemanticProfile,
-    ) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits, profile: SemanticProfile) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let archive = ZipArchive::new_with_limits(bytes, validated_limits)?;
         if is_encrypted(&archive) {
@@ -257,14 +253,14 @@ fn read_components(
         {
             continue;
         }
-        let decompressed = SnappyStream::decompress_with_limits(&compressed, snappy_limits)
+        let decompressed = SnappyStream::decompress(&compressed, snappy_limits)
             .map_err(|error| limits.map_iwa_decode_error(error, total_iwa_bytes))?;
         let decompressed_bytes =
             u64::try_from(decompressed.as_bytes().len()).map_err(|_error| {
                 Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
             })?;
         total_iwa_bytes = limits.charge_iwa_total_bytes(total_iwa_bytes, decompressed_bytes)?;
-        let parsed = Archive::parse_with_limits(decompressed.as_bytes(), core_limits)?;
+        let parsed = Archive::parse(decompressed.as_bytes(), core_limits)?;
         total_objects = total_objects
             .checked_add(parsed.objects.len())
             .ok_or_else(|| semantic_object_limit(usize::MAX))?;
@@ -394,7 +390,7 @@ fn is_exact_portable_raw_name(raw_name: &[u8]) -> bool {
 fn semantic_component_limits(
     limits: Limits,
     retained_objects: usize,
-) -> Result<litchi_iwa_core::ArchiveLimits> {
+) -> Result<litchi_iwa_core::Limits> {
     let remaining = MAX_SEMANTIC_IWA_OBJECTS.saturating_sub(retained_objects);
     if remaining == 0 {
         return Err(semantic_object_limit(MAX_SEMANTIC_IWA_OBJECTS + 1));
@@ -431,7 +427,14 @@ fn semantic_iwa_snappy_limits(limits: Limits, total_iwa_bytes: u64) -> Result<Sn
     })?;
     let base = limits.snappy_limits()?;
     let stream = base.max_decompressed_stream().min(remaining);
-    SnappyLimits::new(base.max_uncompressed_chunk().min(stream), stream).map_err(Error::Iwa)
+    SnappyLimits::new(base.max_uncompressed_chunk().min(stream), stream)?
+        .with_input_limits(
+            base.max_compressed_chunk(),
+            SnappyStream::MAX_COMPRESSED_STREAM,
+            base.max_frames(),
+        )?
+        .with_compressed_stream_bytes(base.max_compressed_stream())
+        .map_err(Error::Iwa)
 }
 
 fn selected_metadata<'a>(
@@ -560,6 +563,24 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn aggregate_decoder_preserves_the_encoded_entry_ceiling() -> Result<()> {
+        let limits = Limits::new(1_000, 10, 4, 100, 100)?;
+        let profile = semantic_iwa_snappy_limits(limits, 90)?;
+        assert_eq!(profile.max_decompressed_stream(), 10);
+        assert_eq!(profile.max_compressed_stream(), 4);
+        let compressed = SnappyStream::compress(&[42], Default::default())?;
+        assert!(matches!(
+            SnappyStream::decompress(&compressed, profile),
+            Err(litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                maximum: 4,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
     fn iwa(identifier: u64) -> Result<Vec<u8>> {
         let archive = Archive {
             objects: vec![ArchiveObject::new(
@@ -568,9 +589,13 @@ mod tests {
                     type_: 6_000,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &archive.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     fn iwa_with_payload(identifier: u64, payload_bytes: usize) -> Result<(Vec<u8>, u64)> {
@@ -581,13 +606,17 @@ mod tests {
                     type_: 6_000,
                     data: vec![0; payload_bytes],
                 }],
+                Default::default(),
             )?],
         };
-        let decompressed = archive.to_bytes()?;
+        let decompressed = archive.to_bytes(Default::default())?;
         let bytes = u64::try_from(decompressed.len()).map_err(|_error| {
             Error::InvalidBundle("test IWA stream length does not fit u64".to_owned())
         })?;
-        Ok((SnappyStream::compress(&decompressed)?, bytes))
+        Ok((
+            SnappyStream::compress(&decompressed, Default::default())?,
+            bytes,
+        ))
     }
 
     fn zip(entries: &[(&str, &[u8])]) -> Result<Vec<u8>> {
@@ -649,7 +678,7 @@ mod tests {
     fn assert_metadata_collision_is_unread(bytes: &[u8]) {
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 bytes,
                 Limits::default(),
                 SemanticProfile::Metadata,
@@ -678,11 +707,8 @@ mod tests {
         make_method_opaque(&mut bytes, b"Data/opaque.bin");
 
         crate::zip::reset_test_entry_read_count();
-        let projection = SemanticProjection::from_bytes_with_limits(
-            &bytes,
-            Limits::default(),
-            SemanticProfile::Metadata,
-        )?;
+        let projection =
+            SemanticProjection::from_bytes(&bytes, Limits::default(), SemanticProfile::Metadata)?;
 
         assert_eq!(crate::zip::test_entry_read_count(), 5);
         assert_eq!(projection.components().len(), 2);
@@ -710,7 +736,7 @@ mod tests {
         ])?;
 
         crate::zip::reset_test_entry_read_count();
-        let projection = SemanticProjection::from_bytes_with_limits(
+        let projection = SemanticProjection::from_bytes(
             &bytes,
             Limits::default(),
             SemanticProfile::ComponentsOnly,
@@ -788,7 +814,7 @@ mod tests {
 
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 &bytes,
                 Limits::default(),
                 SemanticProfile::Metadata,
@@ -809,7 +835,7 @@ mod tests {
         ])?;
 
         crate::zip::reset_test_entry_read_count();
-        let projection = SemanticProjection::from_bytes_with_limits(
+        let projection = SemanticProjection::from_bytes(
             &bytes,
             Limits::default(),
             SemanticProfile::ComponentsOnly,
@@ -831,11 +857,8 @@ mod tests {
             "/../../test-data/iwork/numbers/basic.numbers"
         ))?;
 
-        let projection = SemanticProjection::from_bytes_with_limits(
-            &bytes,
-            Limits::default(),
-            SemanticProfile::Metadata,
-        )?;
+        let projection =
+            SemanticProjection::from_bytes(&bytes, Limits::default(), SemanticProfile::Metadata)?;
 
         assert!(projection.components().len() >= 30);
         assert!(projection.components().get("Index/Document.iwa").is_some());
@@ -859,7 +882,7 @@ mod tests {
 
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 &bytes,
                 Limits::default(),
                 SemanticProfile::Metadata,
@@ -890,11 +913,8 @@ mod tests {
         ])?;
 
         crate::zip::reset_test_entry_read_count();
-        let projection = SemanticProjection::from_bytes_with_limits(
-            &outer,
-            Limits::default(),
-            SemanticProfile::Metadata,
-        )?;
+        let projection =
+            SemanticProjection::from_bytes(&outer, Limits::default(), SemanticProfile::Metadata)?;
 
         assert_eq!(crate::zip::test_entry_read_count(), 3);
         assert_eq!(projection.components().len(), 1);
@@ -944,13 +964,9 @@ mod tests {
 
         let exact = Limits::new(input_bytes, 2, max_entry_bytes, exact_total, max_iwa_bytes)?;
         assert_eq!(
-            SemanticProjection::from_bytes_with_limits(
-                &bytes,
-                exact,
-                SemanticProfile::ComponentsOnly,
-            )?
-            .components()
-            .len(),
+            SemanticProjection::from_bytes(&bytes, exact, SemanticProfile::ComponentsOnly,)?
+                .components()
+                .len(),
             2
         );
 
@@ -965,7 +981,7 @@ mod tests {
             max_iwa_bytes,
         )?;
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 &bytes,
                 one_over,
                 SemanticProfile::ComponentsOnly,
@@ -980,7 +996,7 @@ mod tests {
         let exhausted = Limits::new(input_bytes, 2, max_entry_bytes, alpha_bytes, max_iwa_bytes)?;
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 &bytes,
                 exhausted,
                 SemanticProfile::ComponentsOnly,
@@ -1002,7 +1018,7 @@ mod tests {
         let nested = zip(&[("Document.iwa", &document), ("Tables.iwa", &table)])?;
         let outer = zip(&[("legacy.pages/Index.zip", nested.as_slice())])?;
 
-        let projection = SemanticProjection::from_bytes_with_limits(
+        let projection = SemanticProjection::from_bytes(
             &outer,
             Limits::default(),
             SemanticProfile::ComponentsOnly,
@@ -1023,7 +1039,7 @@ mod tests {
 
             crate::zip::reset_test_entry_read_count();
             assert!(matches!(
-                SemanticProjection::from_bytes_with_limits(
+                SemanticProjection::from_bytes(
                     &outer,
                     Limits::default(),
                     SemanticProfile::ComponentsOnly,
@@ -1040,7 +1056,7 @@ mod tests {
         let outer = zip(&[("legacy.pages/Index.zip", nested.as_slice())])?;
         crate::zip::reset_test_entry_read_count();
         assert!(matches!(
-            SemanticProjection::from_bytes_with_limits(
+            SemanticProjection::from_bytes(
                 &outer,
                 Limits::default(),
                 SemanticProfile::ComponentsOnly,

@@ -26,7 +26,7 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::{WireLimits, media::Type as MediaType, wire::WireView};
 use litchi_iwa_core::{
-    Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyLimits, SnappyStream,
+    Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyLimits, SnappyStream,
 };
 use litchi_iwa_protos::{keynote_media_codec, package_metadata_media_codec as metadata_codec};
 use sha1::{Digest, Sha1};
@@ -1807,7 +1807,7 @@ fn validated_media_record_with_facts(
 fn metadata_archive_inventory_work(archive: &Archive) -> Result<usize, Error> {
     let mut work = archive.objects.len();
     for (object_index, object) in archive.objects.iter().enumerate() {
-        // `encoded_len_with_limits` checks duplicate object identifiers by
+        // `encoded_len` checks duplicate object identifiers by
         // scanning the preceding prefix. Account for that bounded lookup as
         // well as the object/header/message inventory it traverses.
         work = work
@@ -1888,7 +1888,7 @@ fn metadata_stream_profile(
     let inventory_work = metadata_archive_inventory_work(metadata_archive)?;
     budget.wire_work(inventory_work)?;
     let stream_capacity = metadata_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     if stream_capacity == 0 {
         return Err(Error::InvalidSource);
@@ -1960,7 +1960,7 @@ fn metadata_facts_for_ids(
     }
     budget.entry_bytes(entry.data().len())?;
     budget.input_bytes(entry.data().len())?;
-    let (stream_capacity, snappy_limits, _archive_limits) =
+    let (stream_capacity, snappy_limits, archive_limits) =
         metadata_stream_profile(package, catalog, budget)?;
     // Account for the decoded-stream pass, canonical framing pass, and the
     // archive/message census below before allocating or traversing them.
@@ -1972,13 +1972,13 @@ fn metadata_facts_for_ids(
     budget.wire_work(stream_work)?;
     budget.entry_bytes(stream_capacity)?;
     budget.allocation(stream_capacity)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(|_| Error::InvalidSource)?;
     if stream.as_bytes().len() != stream_capacity {
         return Err(Error::InvalidSource);
     }
     metadata_archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut payload = None;
     for object in &metadata_archive.objects {
@@ -2183,18 +2183,18 @@ fn rewrite_metadata_entry(
     budget.wire_work(stream_work)?;
     budget.entry_bytes(stream_capacity)?;
     budget.allocation(stream_capacity)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(|_| Error::InvalidSource)?;
     if stream.as_bytes().len() != stream_capacity {
         return Err(Error::InvalidSource);
     }
     // Parsing an Archive owns each message payload independently of the
     // decoded Snappy stream. Reserve the full source bound before that copy.
     budget.allocation(stream_capacity)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut location = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
@@ -2243,7 +2243,7 @@ fn rewrite_metadata_entry(
         .get_mut(object_index)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2253,21 +2253,23 @@ fn rewrite_metadata_entry(
         )
         .map_err(|_| Error::InvalidSource)?;
     let serialized_capacity = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     budget.wire_work(serialized_capacity)?;
     budget.allocation(serialized_capacity)?;
     let serialized = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     if serialized.len() != serialized_capacity {
         return Err(Error::Verification);
     }
     let compressed_capacity =
-        SnappyStream::maximum_compressed_len(serialized.len()).map_err(|_| Error::InvalidSource)?;
+        SnappyStream::maximum_compressed_len(serialized.len(), Default::default())
+            .map_err(|_| Error::InvalidSource)?;
     budget.wire_work(compressed_capacity)?;
     budget.allocation(compressed_capacity)?;
-    let compressed = SnappyStream::compress(&serialized).map_err(|_| Error::InvalidSource)?;
+    let compressed = SnappyStream::compress(&serialized, Default::default())
+        .map_err(|_| Error::InvalidSource)?;
     if compressed.len() > compressed_capacity {
         return Err(Error::Verification);
     }

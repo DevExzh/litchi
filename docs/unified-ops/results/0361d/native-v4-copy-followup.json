@@ -1,0 +1,149 @@
+{
+  "baseline_commit": "e63a1fe3534bcaaae2ce367339f7f8275877baef",
+  "cpu": 0,
+  "blocks": 9,
+  "target_ms": 1000,
+  "source_sha256": "9bcfddea884b2b295f395cb4cb2fc62e88dc107ce8cf196a4129dfccb83a728b",
+  "runner_sha256": "51403a56cea89ef76546a8022611390856e03d64520b5e65dd4b304a3f4b0c46",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "locks": {
+    "before": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1",
+    "after": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1"
+  },
+  "binaries": {
+    "before": {
+      "timed": {
+        "bytes": 875864,
+        "sha256": "5f40b5c419e6e5f0c6132736128522d02f56c59f9a101fda0b6ef229f23c7cf6"
+      },
+      "allocations": {
+        "bytes": 918032,
+        "sha256": "e066d50391d1315230177b1baa830224ce755e619533dbb6d6bb0935bdda39d1"
+      }
+    },
+    "after": {
+      "timed": {
+        "bytes": 877800,
+        "sha256": "4491ad2494c510915a055f378a71d6423c312824d9f9578d871e82303fdae599"
+      },
+      "allocations": {
+        "bytes": 920128,
+        "sha256": "e5dbbc5c9968e512d0f36de4220cdf2c84f07dd29ae71cdcfdab6d8c832171fb"
+      }
+    }
+  },
+  "status": "Accepted large-copy qualification: mixed paired blocks, median 1.002398; initial v4 comparison retained, no new performance exception.",
+  "rows": [
+    {
+      "route": "copy-large",
+      "after_before": [
+        0.9944127848494196,
+        1.0204284835899389,
+        1.0393417355215049,
+        0.9997293573058958,
+        1.002398280556227,
+        1.0137113583221633,
+        0.9935121601505251,
+        1.0066591785411225,
+        0.9968871682184512
+      ],
+      "allocations": {
+        "before": {
+          "route": "copy-large",
+          "iterations": 1,
+          "ns": 87071,
+          "checksum": "6ab774d661b9c606207d44e2031721165b0ad08a4cc75ec392000c948c57de57",
+          "bytes": 4194420,
+          "bound": 4895616,
+          "peak": 4194420,
+          "retained": 0,
+          "allocated": 4194420,
+          "allocations": 1
+        },
+        "after": {
+          "route": "copy-large",
+          "iterations": 1,
+          "ns": 70160,
+          "checksum": "6ab774d661b9c606207d44e2031721165b0ad08a4cc75ec392000c948c57de57",
+          "bytes": 4194420,
+          "bound": 4895616,
+          "peak": 4194420,
+          "retained": 0,
+          "allocated": 4194420,
+          "allocations": 1
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 962364781,
+      "eligible": true,
+      "median_after_before": 1.002398280556227
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4-copy-followup/measurements.json",
+      "bytes": 141006,
+      "sha256": "f38954d9d45a0cd7fe168e0d0e0b9cdcab25016b36be21ec8a202140071bb931"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4-copy-followup/samples.jsonl",
+      "bytes": 24384,
+      "sha256": "8a17426aab88a273d3e53fddf80213762797afcd609001c9882e8cb1f4b8518d"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4-copy-followup.log",
+      "bytes": 196,
+      "sha256": "09c267aa6e47b88bc04cf3f2c0bee9cdd61c4aa4055f41f673b84617f6da8cf1"
+    }
+  ],
+  "build_artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/source-digests.json",
+      "bytes": 59186,
+      "sha256": "baa5273285bfbfd5ed8b37116836876281bb87be61ea38e430285e77dd2ddbf7"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/build-timed.log",
+      "bytes": 4047,
+      "sha256": "8f216daf765ce760af0d6f22240a6ab4c0075fcd6c98822f3cde92da12ec54f4"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/before/build-allocations.log",
+      "bytes": 259,
+      "sha256": "ca92ef2ff6e0ea9e9a75630052ef16f32a58cc66503e416d8c355eb99df0a55e"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/source-digests.json",
+      "bytes": 59186,
+      "sha256": "dcbfbe2d20f914a64512e1c08c30f29b439c0e5627760809c962fcdf1b9de3eb"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/build-timed.log",
+      "bytes": 4038,
+      "sha256": "f803ed4ed4387c1766bc23cc0c1c117013abe5bcd837a94b436f932efaddf322"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4/after/build-allocations.log",
+      "bytes": 258,
+      "sha256": "984d3395010601d58fc8d5170ec66e56065bbb1bada373b2319d262f43b3484d"
+    }
+  ],
+  "command": [
+    "taskset",
+    "-c",
+    "0",
+    "python3",
+    "docs/unified-ops/results/0361d/snappy-probe.py",
+    "run",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4",
+    "--results-dir",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4-copy-followup",
+    "--blocks",
+    "9",
+    "--target-ms",
+    "1000",
+    "--route",
+    "copy-large"
+  ],
+  "allocation_metric_scope": "Incremental operation peak/retained bytes over live fixture and warm result; separately instrumented binaries, not RSS."
+}

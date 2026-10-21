@@ -1251,7 +1251,7 @@ fn validate_archive_headers(
             }
         }
         object
-            .validate_with_limits(limits)
+            .validate(limits)
             .map_err(|_| NativeReplyError::Archive)?;
     }
     Ok(identifiers)
@@ -1276,7 +1276,7 @@ fn storage_fact_index(
 }
 
 /// Charge the parsed-archive envelope before any helper that allocates a
-/// registry or walks ArchiveInfo.  `Archive::validate_with_limits` and the
+/// registry or walks ArchiveInfo.  `Archive::validate` and the
 /// ID index in `validate_archive_headers` do not expose a report, so their
 /// object/message/payload envelope is conservatively reserved here while the
 /// exact codec reports are charged by their callers.
@@ -2000,7 +2000,7 @@ fn replace_with_reference_transition(
     archive
         .object_mut(route.identifier)
         .ok_or(NativeReplyError::InvalidSource)?
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             route.message_index,
             RawMessage {
                 type_: message_type,
@@ -2217,7 +2217,7 @@ fn archive_reference_presence(
     };
     for object in &archive.objects {
         object
-            .inspect_references_with_policy_and_limits(
+            .inspect_references_with_policy(
                 &mut search,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,
@@ -2267,7 +2267,7 @@ fn validate_known_archive_metadata(
     let mut probe = MetadataProbe;
     for object in &archive.objects {
         object
-            .inspect_references_with_policy_and_limits(
+            .inspect_references_with_policy(
                 &mut probe,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,
@@ -2855,7 +2855,7 @@ pub(super) fn rewrite_native_comment_reply(
     let old_root_can_cull = old_entry.ref_count == 1 && !root_referenced;
     if old_root_can_cull {
         candidate
-            .remove_object_checked_with_limits(root_identifier, request.limits)
+            .remove_object_checked(root_identifier, request.limits)
             .map_err(|_| NativeReplyError::Archive)?;
     }
     if let Some(old_reply) = old_reply_identifier {
@@ -2866,7 +2866,7 @@ pub(super) fn rewrite_native_comment_reply(
         };
         if !old_reply_still_referenced {
             candidate
-                .remove_object_checked_with_limits(old_reply, request.limits)
+                .remove_object_checked(old_reply, request.limits)
                 .map_err(|_| NativeReplyError::Archive)?;
         }
     }
@@ -2923,10 +2923,10 @@ pub(super) fn rewrite_native_comment_reply(
     // source and candidate encoded bounds first, then charge the complete
     // output/scratch envelope before requesting either Vec.
     let candidate_encoded_len = candidate
-        .encoded_len_with_limits(request.limits)
+        .encoded_len(request.limits)
         .map_err(|_| NativeReplyError::Archive)?;
     let source_encoded_len = source
-        .encoded_len_with_limits(request.limits)
+        .encoded_len(request.limits)
         .map_err(|_| NativeReplyError::Archive)?;
     let serialization_scratch = candidate_encoded_len
         .checked_add(source_encoded_len)
@@ -2944,13 +2944,13 @@ pub(super) fn rewrite_native_comment_reply(
         })
         .map_err(|_| NativeReplyError::Limit)?;
     let member_bytes = candidate
-        .to_bytes_with_limits(request.limits)
+        .to_bytes(request.limits)
         .map_err(|_| NativeReplyError::Archive)?;
     if member_bytes.len() > candidate_encoded_len {
         return Err(NativeReplyError::Archive);
     }
     let source_bytes = source
-        .to_bytes_with_limits(request.limits)
+        .to_bytes(request.limits)
         .map_err(|_| NativeReplyError::Archive)?;
     if source_bytes.len() > source_encoded_len {
         return Err(NativeReplyError::Archive);

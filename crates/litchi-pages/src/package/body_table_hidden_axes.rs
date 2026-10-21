@@ -4253,9 +4253,8 @@ fn reopen(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;
@@ -4575,7 +4574,7 @@ fn same_creation_model_object(
     creation: &ArchiveObject,
     selected_message: usize,
     added_object_ids: &[u64],
-    archive_limits: litchi_iwa_core::ArchiveLimits,
+    archive_limits: litchi_iwa_core::Limits,
     budget: &mut table_lock::WireBudget,
 ) -> Result<bool, Error> {
     if added_object_ids.len() != OWNER_CREATION_OBJECTS
@@ -4648,7 +4647,7 @@ fn same_creation_model_object(
     ];
     let mut restored = creation.clone();
     restored
-        .replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
             selected_message,
             original.messages[selected_message].clone(),
             ObjectReferenceTransition {
@@ -4677,7 +4676,7 @@ fn same_object_except_message(
     before: &ArchiveObject,
     after: &ArchiveObject,
     selected_message: usize,
-    archive_limits: litchi_iwa_core::ArchiveLimits,
+    archive_limits: litchi_iwa_core::Limits,
     budget: &mut table_lock::WireBudget,
 ) -> Result<bool, Error> {
     if before.archive_info.identifier != after.archive_info.identifier
@@ -4757,7 +4756,7 @@ fn same_object_except_message(
         .map_err(map_lock_error)?;
     let mut restored = after.clone();
     restored
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selected_message,
             before.messages[selected_message].clone(),
             archive_limits,

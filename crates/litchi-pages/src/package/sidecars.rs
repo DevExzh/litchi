@@ -88,6 +88,6 @@ pub(crate) fn rewrite(
     }
     let limits = package.state.source.limits();
     let output = catalog.reassemble_with_changes_to_bytes(&insertions, &edits, &[], limits)?;
-    let source = SourceCatalog::from_shared_bytes_with_limits(output.into(), limits)?;
+    let source = SourceCatalog::from_shared_bytes(output.into(), limits)?;
     Package::from_source_catalog(source)
 }

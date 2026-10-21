@@ -335,6 +335,7 @@ impl ChartSeriesStyleSlot {
                     type_: SERIES_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

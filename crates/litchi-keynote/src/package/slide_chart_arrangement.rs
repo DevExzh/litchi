@@ -1312,8 +1312,7 @@ fn rewrite_chart_arrangement(
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.input(entry.data().len())?;
     budget.work(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.output(stream.as_bytes().len())?;
     budget.work(stream.as_bytes().len())?;
     budget.allocations(1)?;
@@ -1321,8 +1320,7 @@ fn rewrite_chart_arrangement(
     budget.scratch(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let (message_index, message_data) = {
         let object = archive
@@ -1348,7 +1346,7 @@ fn rewrite_chart_arrangement(
     archive
         .object_mut(selection.chart_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
@@ -1358,17 +1356,10 @@ fn rewrite_chart_arrangement(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: usize_to_u64(compressed_bound),
-            maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let maximum_entry =
         usize::try_from(physical_limits.max_entry_bytes()).map_err(|_| Error::InvalidSource)?;
     if encoded_bound > maximum_entry || compressed_bound > maximum_entry {
@@ -1398,15 +1389,13 @@ fn rewrite_chart_arrangement(
     budget.allocations(1)?;
     budget.retained(encoded_bound)?;
     budget.scratch(encoded_bound)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.work(compressed_bound)?;
     budget.allocations(1)?;
     budget.retained(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(
         selection.slide_component_name.as_str(),
         compressed.as_slice(),

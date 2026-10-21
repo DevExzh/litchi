@@ -768,9 +768,9 @@ fn exercise_operation_limit() {
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) {
     let before =
-        Catalog::from_bytes(source).unwrap_or_else(|error| panic!("source catalog: {error}"));
+        Catalog::from_bytes(source, Default::default()).unwrap_or_else(|error| panic!("source catalog: {error}"));
     let after =
-        Catalog::from_bytes(target).unwrap_or_else(|error| panic!("target catalog: {error}"));
+        Catalog::from_bytes(target, Default::default()).unwrap_or_else(|error| panic!("target catalog: {error}"));
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after

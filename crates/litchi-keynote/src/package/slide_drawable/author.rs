@@ -366,7 +366,7 @@ fn native_object(
     object_references: &[u64],
     data_references: &[u64],
 ) -> Result<ArchiveObject, StructureError> {
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: message_type,
@@ -421,7 +421,7 @@ pub(super) fn attach(
     }
     workspace
         .object_mut(slide)?
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE,

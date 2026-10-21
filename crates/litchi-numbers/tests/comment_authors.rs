@@ -107,7 +107,7 @@ fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
         .set_table_cell_comment(0, 0, added, "second")?
         .into_package();
     let source = bytes(&package)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     // The two authors, and the storages of the native and the new comment.
     let mut authors = Vec::new();
     let mut storages = Vec::new();
@@ -116,8 +116,8 @@ fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             let identifier = object.archive_info.identifier.unwrap_or(0);
             match object.messages[0].type_ {
@@ -191,7 +191,10 @@ fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
         .iter()
         .find(|member| member.name() == "Index/Metadata.iwa")
         .ok_or("metadata")?;
-    let mut registry = Archive::parse(SnappyStream::decompress(metadata.data())?.as_bytes())?;
+    let mut registry = Archive::parse(
+        SnappyStream::decompress(metadata.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     for object in &mut registry.objects {
         for message in &mut object.messages {
             if message.type_ != 11_006 {
@@ -232,7 +235,10 @@ fn two_authors(rename: bool) -> TestResult<(Package, At, At)> {
     let compressed: Vec<(String, Vec<u8>)> = edits
         .into_iter()
         .map(|(name, archive)| -> TestResult<(String, Vec<u8>)> {
-            Ok((name, SnappyStream::compress(&archive.to_bytes()?)?))
+            Ok((
+                name,
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
+            ))
         })
         .collect::<TestResult<_>>()?;
     let entries: Vec<EntryEdit<'_>> = compressed

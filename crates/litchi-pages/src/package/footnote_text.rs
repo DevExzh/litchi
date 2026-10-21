@@ -536,11 +536,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
@@ -1013,9 +1011,8 @@ fn rewrite_package_footnote(
         .package()
         .reassemble_to_bytes(&edits, physical_limits)
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;
     let _ = changed_component_count(source, &candidate)?;
@@ -1247,7 +1244,7 @@ fn rewrite_component(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -1255,8 +1252,7 @@ fn rewrite_component(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let rewrite_limits =
         storage_rewrite_limits(source_catalog.limits()).map_err(map_storage_wire_limits_error)?;
 
@@ -1281,7 +1277,7 @@ fn rewrite_component(
         archive
             .object_mut(native_footnote.storage_identifier.get())
             .ok_or(Error::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1319,7 +1315,7 @@ fn rewrite_component(
         archive
             .object_mut(native_footnote.reference_identifier.get())
             .ok_or(Error::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1330,10 +1326,8 @@ fn rewrite_component(
             .map_err(map_core_error)?;
     }
 
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    SnappyStream::compress(&rewritten_archive).map_err(map_core_error)
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)
 }
 
 /// Compare source and candidate logical members while allowing only decoded
@@ -2289,11 +2283,11 @@ mod tests {
 
     #[test]
     fn borrowed_locations_keep_first_ordered_match_and_isolate_unrelated_ids() {
-        let first = ArchiveObject::new(7, Vec::new())
+        let first = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("first object: {error}"));
-        let duplicate = ArchiveObject::new(7, Vec::new())
+        let duplicate = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("duplicate object: {error}"));
-        let unrelated = ArchiveObject::new(8, Vec::new())
+        let unrelated = ArchiveObject::new(8, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("unrelated object: {error}"));
         let mut objects = HashMap::new();
         objects

@@ -1445,6 +1445,7 @@ mod tests {
                         type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1485,6 +1486,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1528,6 +1530,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1568,6 +1571,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1611,6 +1615,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1677,6 +1682,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1758,6 +1764,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })

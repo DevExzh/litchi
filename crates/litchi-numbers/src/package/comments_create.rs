@@ -470,7 +470,7 @@ impl<'a> Archives<'a> {
                 .ok_or(Error::Refused(
                     crate::package::comments::Refusal::UnsupportedSource,
                 ))?;
-            let stream = SnappyStream::decompress_with_limits(
+            let stream = SnappyStream::decompress(
                 entry.data(),
                 self.physical
                     .limits()
@@ -478,10 +478,10 @@ impl<'a> Archives<'a> {
                     .map_err(|_| Error::InvalidSource { path })?,
             )
             .map_err(|_| Error::InvalidSource { path })?;
-            let archive = Archive::parse_with_limits(stream.as_bytes(), self.limits)
+            let archive = Archive::parse(stream.as_bytes(), self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
             archive
-                .validate_canonical_object_framing(stream.as_bytes())
+                .validate_canonical_object_framing(stream.as_bytes(), self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
             let count = archive.objects.len();
             self.parsed.insert(component_index, (archive, count));
@@ -517,10 +517,10 @@ impl<'a> Archives<'a> {
                     .sort_by_key(|object| object.archive_info.identifier.unwrap_or_default());
             }
             let bytes = archive
-                .to_bytes_with_limits(self.limits)
+                .to_bytes(self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
-            let compressed =
-                SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })?;
+            let compressed = SnappyStream::compress(&bytes, Default::default())
+                .map_err(|_| Error::InvalidSource { path })?;
             let name = self
                 .source
                 .state
@@ -781,7 +781,7 @@ fn append_author_storage(
         // carry the same list in the aggregate and one FieldInfo.
         if info.object_references.is_empty() && info.field_infos.is_empty() {
             object
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     route.message_index,
                     RawMessage {
                         type_: route.message_type,
@@ -808,7 +808,7 @@ fn append_author_storage(
         let mut after = present.clone();
         after.push(identifier);
         object
-            .replace_message_transitioning_object_references_preserving_header_with_limits(
+            .replace_message_transitioning_object_references_preserving_header(
                 route.message_index,
                 RawMessage {
                     type_: route.message_type,
@@ -833,7 +833,7 @@ fn append_author_storage(
         return Err(Error::InvalidSource { path });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             route.message_index,
             RawMessage {
                 type_: route.message_type,
@@ -875,6 +875,7 @@ fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
             data: payload,
         }],
+        Default::default(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let info = object
@@ -901,6 +902,7 @@ fn author_storage_object(
             type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
             data: payload,
         }],
+        Default::default(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let info = object
@@ -981,8 +983,12 @@ fn comment_list_object(
     storage_identifier: u64,
     path: Path,
 ) -> Result<ArchiveObject, Error> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_: 6_005, data }])
-        .map_err(|_| Error::InvalidSource { path })?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_: 6_005, data }],
+        Default::default(),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     let info = object
         .archive_info
         .message_infos
@@ -1050,7 +1056,7 @@ fn attach_comment_list_to_model(
         })
         .collect::<Vec<_>>();
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             route.message_index,
             RawMessage {
                 type_: route.message_type,
@@ -1125,6 +1131,7 @@ fn storage_object(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let info = object
@@ -1138,7 +1145,7 @@ fn storage_object(
     field.object_references = vec![author];
     info.field_infos.push(field);
     object
-        .validate_with_limits(limits)
+        .validate(limits)
         .map_err(|_| Error::InvalidSource { path })?;
     Ok(object)
 }
@@ -1180,7 +1187,7 @@ fn replace_list_with_transition(
         })
         .collect::<Vec<_>>();
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             route.message_index,
             RawMessage {
                 type_: route.message_type,
@@ -1259,7 +1266,7 @@ fn replace_tile(
         .objects
         .get_mut(route.object_index)
         .ok_or(Error::InvalidSource { path })?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: route.message_type,
@@ -1378,7 +1385,7 @@ pub(super) fn pack_metadata(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -1386,13 +1393,13 @@ pub(super) fn pack_metadata(
             .map_err(|_| Error::InvalidSource { path })?,
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), limits)
-        .map_err(|_| Error::InvalidSource { path })?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::InvalidSource { path })?;
     archive
         .objects
         .get_mut(route.object_index)
         .ok_or(Error::InvalidSource { path })?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: metadata::MESSAGE_TYPE,
@@ -1402,7 +1409,7 @@ pub(super) fn pack_metadata(
         )
         .map_err(|_| Error::InvalidSource { path })?;
     let bytes = archive
-        .to_bytes_with_limits(limits)
+        .to_bytes(limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })
+    SnappyStream::compress(&bytes, Default::default()).map_err(|_| Error::InvalidSource { path })
 }

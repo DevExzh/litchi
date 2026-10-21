@@ -672,7 +672,7 @@ fn rewrite_title(
         return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.model_message_index,
             RawMessage {
                 type_: target.model_message_type,
@@ -720,7 +720,7 @@ fn rewrite_title(
         .charge_payload_work(output.len())
         .map_err(map_lock_error)?;
     let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
+        SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
             .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&candidate_source)
@@ -881,9 +881,8 @@ fn require_style_object(
 }
 
 fn reopen_target(source: &Package, target: Arc<[u8]>) -> Result<Package, Error> {
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(map_package_error)
 }
 

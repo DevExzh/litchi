@@ -521,7 +521,7 @@ pub(crate) fn clone_body_table_attachment(
     let cloned_attachment = clone_pages_drawable_graph_object(attachment_object, &remap)?;
     staged.update_archive(&attachment_archive_name, |archive| {
         archive
-            .insert_object(cloned_attachment)
+            .insert_object(cloned_attachment, Default::default())
             .map_err(Error::from)
     })?;
 

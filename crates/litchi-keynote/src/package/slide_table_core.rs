@@ -3925,7 +3925,7 @@ fn validate_mutable_root_aliases(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -4400,7 +4400,7 @@ fn validate_exclusive_model_reference(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -5125,14 +5125,12 @@ pub(crate) fn component_archive(
         .archive()
         .effective_archive_limits()
         .map_err(|_| Error::Archive)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(|_| Error::Archive)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(|_| Error::Archive)?;
     budget.preflight_decoded_archive(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let archive =
-        Archive::parse_with_limits(stream.as_bytes(), limits).map_err(|_| Error::Archive)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::Archive)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), limits)
         .map_err(|_| Error::Archive)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
@@ -5254,7 +5252,7 @@ pub(crate) fn verify_locality(
             budget.retained(clone_cost)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.model_message_index,
                     candidate_message.clone(),
                     limits,
@@ -5525,11 +5523,7 @@ fn verify_physical_object_delta(
         {
             if source_message.data != candidate_message.data {
                 expected
-                    .replace_message_preserving_header_with_limits(
-                        index,
-                        candidate_message.clone(),
-                        limits,
-                    )
+                    .replace_message_preserving_header(index, candidate_message.clone(), limits)
                     .map_err(|_| Error::Verification)?;
             }
         }
@@ -5564,7 +5558,7 @@ fn verify_physical_object_delta(
 /// Return the exact serialized object framing implied by its source-preserved
 /// ArchiveInfo header and current message payloads.
 ///
-/// `Archive::encoded_len_with_limits` follows the same retained-header rule
+/// `Archive::encoded_len` follows the same retained-header rule
 /// used by publication, including the canonical object-length varint.
 /// Subtracting the checked payload total therefore exposes the exact framed
 /// header length without accessing ArchiveObject's private raw-header fields.
@@ -5587,7 +5581,7 @@ fn physical_object_framing(
         .map_err(|_| Error::Allocation(1))?;
     archive.objects.push(object);
     let encoded_length = archive
-        .encoded_len_with_limits(limits)
+        .encoded_len(limits)
         .map_err(|_| Error::Verification)?;
     let header_length = encoded_length
         .checked_sub(payload_length)
@@ -7346,7 +7340,7 @@ fn validate_global_inbound_references(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -7583,6 +7577,7 @@ mod tests {
                 type_: TILE_MESSAGE_TYPE,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(has_exact_mutable_message_shape(&tile, &[TILE_MESSAGE_TYPE]));
@@ -7593,6 +7588,7 @@ mod tests {
                 type_: HEADER_BUCKET_MESSAGE_TYPE,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(!has_exact_mutable_message_shape(
@@ -7612,6 +7608,7 @@ mod tests {
                     data: Vec::new(),
                 },
             ],
+            Default::default(),
         )
         .expect("canonical test object");
         assert!(!has_exact_mutable_message_shape(

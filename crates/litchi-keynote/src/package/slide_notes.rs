@@ -900,13 +900,12 @@ fn rewrite_notes(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let object = archive
         .object(expected_storage_identifier)
@@ -938,7 +937,7 @@ fn rewrite_notes(
     archive
         .object_mut(expected_storage_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: STORAGE_MESSAGE_TYPE,
@@ -947,10 +946,9 @@ fn rewrite_notes(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let archive_bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+    let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
     let output = catalog
         .package()
         .reassemble_to_bytes(

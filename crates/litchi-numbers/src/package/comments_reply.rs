@@ -1067,7 +1067,7 @@ fn reject_cross_member_references(
                 found: false,
             };
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut probe,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -1440,9 +1440,13 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             amount: edit_count,
             path,
         })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     for member_edit in &native.member_edits {
         let maximum_compressed =
-            SnappyStream::maximum_compressed_len(member_edit.member_bytes.len())
+            SnappyStream::maximum_compressed_len(member_edit.member_bytes.len(), snappy_limits)
                 .map_err(|_| Error::InvalidSource { path })?;
         budget
             .charge_compressed_bytes(maximum_compressed, BudgetPath::Package)
@@ -1457,8 +1461,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 )
             })
             .map_err(|error| map_budget_error(error, path))?;
-        let bytes =
-            SnappyStream::compress(&member_edit.member_bytes).map_err(|_| Error::Verification)?;
+        let bytes = SnappyStream::compress(&member_edit.member_bytes, snappy_limits)
+            .map_err(|_| Error::Verification)?;
         if bytes.len() > maximum_compressed {
             return Err(Error::Verification);
         }
@@ -1582,9 +1586,9 @@ fn pack_reply_metadata(
         .and_then(|_| budget.charge_scratch_bytes(entry.data().len(), BudgetPath::Package))
         .and_then(|_| budget.charge_transaction_work(entry.data().len(), BudgetPath::Package))
         .map_err(|error| map_budget_error(error, path))?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     let message_count = archive
         .objects
@@ -1603,9 +1607,9 @@ fn pack_reply_metadata(
         .ok_or(Error::InvalidSource { path })?;
     message.data = payload;
     let estimated = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let maximum_compressed = SnappyStream::maximum_compressed_len(estimated)
+    let maximum_compressed = SnappyStream::maximum_compressed_len(estimated, snappy_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     budget
         .charge_output(estimated, BudgetPath::Package)
@@ -1619,12 +1623,13 @@ fn pack_reply_metadata(
         })
         .map_err(|error| map_budget_error(error, path))?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     if bytes.len() > estimated {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })?;
+    let compressed =
+        SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource { path })?;
     if compressed.len() > maximum_compressed
         || compressed.len() > snappy_limits.max_compressed_stream()
     {

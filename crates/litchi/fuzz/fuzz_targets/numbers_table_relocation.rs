@@ -161,9 +161,9 @@ fn native_fixture() -> &'static [u8] {
                         fixture_sheet(DESTINATION_SHEET_ID, DESTINATION_SHEET, &[]),
                     ],
                 }
-                .to_bytes()
+                .to_bytes(Default::default())
                 .unwrap_or_else(|error| panic!("Numbers relocation document fixture: {error}")),
-            )
+             Default::default(),)
             .unwrap_or_else(|error| panic!("Numbers relocation document compression: {error}"));
 
             let tables_component = SnappyStream::compress(
@@ -178,9 +178,9 @@ fn native_fixture() -> &'static [u8] {
                         fixture_sidecars(),
                     ],
                 }
-                .to_bytes()
+                .to_bytes(Default::default())
                 .unwrap_or_else(|error| panic!("Numbers relocation table fixture: {error}")),
-            )
+             Default::default(),)
             .unwrap_or_else(|error| panic!("Numbers relocation table compression: {error}"));
 
             to_bytes(
@@ -214,7 +214,7 @@ fn fixture_object(identifier: u64, message_type: u32, data: Vec<u8>) -> ArchiveO
             type_: message_type,
             data,
         }],
-    )
+     Default::default(),)
     .unwrap_or_else(|error| panic!("Numbers relocation fixture object: {error}"))
 }
 
@@ -290,7 +290,7 @@ fn fixture_sidecars() -> ArchiveObject {
         .encode_to_vec(),
     })
     .collect();
-    ArchiveObject::new(SIDECAR_ID, messages)
+    ArchiveObject::new(SIDECAR_ID, messages, Default::default())
         .unwrap_or_else(|error| panic!("Numbers relocation fixture sidecars: {error}"))
 }
 

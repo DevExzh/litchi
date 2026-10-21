@@ -695,6 +695,7 @@ fn cell_style_variation(
             type_: CELL_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = CELL_STYLE_MESSAGE_VERSION.to_vec();
@@ -763,7 +764,7 @@ fn replace_supported_style(
                 "iWork cell style {style_id} must have exactly one CellStyle payload"
             )));
         };
-        object.replace_message(*index, replacement_message)?;
+        object.replace_message(*index, replacement_message, Default::default())?;
         object.archive_info.message_infos[*index].data_references = replacement_data_references;
         Ok(())
     })?;
@@ -857,6 +858,7 @@ fn insert_style_entry(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         storage::add_message_object_reference(object, index, style_id, style_id);
         Ok(())

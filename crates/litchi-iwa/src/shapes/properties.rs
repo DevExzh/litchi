@@ -107,6 +107,7 @@ pub(crate) fn set_shape_properties(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

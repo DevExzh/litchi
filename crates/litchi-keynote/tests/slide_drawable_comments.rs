@@ -50,17 +50,17 @@ fn source_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut locations = BTreeMap::<u64, (String, usize)>::new();
     let mut roots = Vec::<(u64, Vec<u64>)>::new();
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -116,8 +116,8 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
         let Some(component_targets) = targets.get(entry.name()) else {
             continue;
         };
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let mut archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let mut archive = Archive::parse(&stream, Default::default())?;
         for (identifier, message_index) in component_targets {
             let object = archive
                 .object_mut(*identifier)
@@ -139,11 +139,12 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_,
                     data: payload,
                 },
+                Default::default(),
             )?;
         }
         replacements.insert(
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?,
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
         );
     }
 
@@ -164,14 +165,14 @@ fn with_unknown_comment_extensions(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
     let mut spans = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -194,16 +195,16 @@ fn unknown_comment_extension_spans(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         if let Some(object) = archive.objects.iter().find(|object| {
@@ -226,8 +227,8 @@ fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .find(|entry| entry.name() == component)
         .ok_or_else(|| io::Error::other("comment component disappeared"))?;
-    let bytes = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&bytes)?;
+    let bytes = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&bytes, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("comment object disappeared"))?;
@@ -263,9 +264,12 @@ fn with_unknown_comment_header(source: &[u8]) -> TestResult<Vec<u8>> {
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&modified)?.to_bytes()?, modified);
+    assert_eq!(
+        Archive::parse(&modified, Default::default())?.to_bytes(Default::default())?,
+        modified
+    );
 
-    let replacement = SnappyStream::compress(&modified)?;
+    let replacement = SnappyStream::compress(&modified, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -1020,14 +1024,14 @@ struct CommentSignature {
 
 fn comment_signatures(source: &[u8]) -> TestResult<Vec<CommentSignature>> {
     let mut signatures = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1150,14 +1154,14 @@ enum HostileMutation {
 fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<Vec<u8>> {
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1188,12 +1192,12 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
         .ok_or_else(|| io::Error::other("fixture has no comment storage"))?;
 
     let mut replacement = None;
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let mut parsed = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let mut parsed = Archive::parse(&stream, Default::default())?;
         let object = parsed
             .object_mut(identifier)
             .ok_or_else(|| io::Error::other("comment object disappeared"))?;
@@ -1228,11 +1232,14 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
                 .object_references
                 .push(referenced_identifier);
         }
-        replacement = Some(SnappyStream::compress(&parsed.to_bytes()?)?);
+        replacement = Some(SnappyStream::compress(
+            &parsed.to_bytes(Default::default())?,
+            Default::default(),
+        )?);
         break;
     }
     let replacement = replacement.ok_or_else(|| io::Error::other("comment component missing"))?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {

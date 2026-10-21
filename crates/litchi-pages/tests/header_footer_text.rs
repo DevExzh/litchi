@@ -79,11 +79,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn add_graph_metadata(object: &mut ArchiveObject, references: &[u64], fields: &[(&[u32], &[u64])]) {
@@ -367,12 +371,15 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_bytes(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("metadata member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .objects
         .first()
@@ -411,7 +418,7 @@ fn component(metadata: &tsp::PackageMetadata, identifier: u64) -> TestResult<&ts
 }
 
 fn member_bytes(bytes: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?
@@ -420,12 +427,15 @@ fn member_bytes(bytes: &[u8], member: &str) -> TestResult<Vec<u8>> {
 }
 
 fn object_payload(bytes: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(identifier)
         .and_then(|object| object.messages.first())
@@ -434,7 +444,7 @@ fn object_payload(bytes: &[u8], member: &str, identifier: u64) -> TestResult<Vec
 }
 
 fn has_member(bytes: &[u8], member: &str) -> TestResult<bool> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .any(|entry| entry.name() == member))
 }
@@ -444,14 +454,18 @@ fn rewrite_member(
     member: &str,
     edit: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("member is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     edit(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member, compressed.as_slice())],
         Limits::default(),
@@ -475,14 +489,18 @@ fn rewrite_object_payload(
             .first()
             .ok_or_else(|| io::Error::other("message is missing"))?;
         let (type_, data) = edit(message.type_, message.data.clone())?;
-        object.replace_message_preserving_header(0, RawMessage { type_, data })?;
+        object.replace_message_preserving_header(
+            0,
+            RawMessage { type_, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn remove_member(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[member],
             Limits::default(),
@@ -517,12 +535,15 @@ fn assert_alias_text(package: &Package, expected: &str) -> TestResult {
 }
 
 fn assert_unknown_storage_fields(bytes: &[u8], identifier: u64) -> TestResult {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("storage object is missing"))?;
@@ -698,12 +719,15 @@ fn add_metadata_storage_owner(source: &[u8], kind: MetadataOwnerKind) -> TestRes
 }
 
 fn duplicate_root_body_identifier(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let duplicate = archive
         .objects
         .iter()
@@ -845,7 +869,7 @@ fn cross_component_storage(source: &[u8]) -> TestResult<Vec<u8>> {
         STORAGE_MESSAGE_TYPE,
         storage_payload(SHARED_TEXT)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&changed)?;
+    let catalog = Catalog::from_bytes(&changed, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -1003,7 +1027,7 @@ fn no_op_and_patch_conflict_are_exact_and_atomic() -> TestResult {
     let mut edit = package.edit_header_footer_text(selector(0, Template::First, Kind::Header))?;
     edit.set("conflict")?;
     let changed = edit.commit()?;
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(SENTINEL_MEMBER, b"tampered")],
         Limits::default(),
     )?;

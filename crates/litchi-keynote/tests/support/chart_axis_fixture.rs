@@ -84,6 +84,7 @@ pub(crate) fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<A
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -256,7 +257,10 @@ pub(crate) fn chart_non_style_payload(title: &str) -> TestResult<Vec<u8>> {
 }
 
 pub(crate) fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 pub(crate) fn chart_object_references(chart: usize) -> Vec<u64> {
@@ -611,7 +615,7 @@ pub(crate) fn synthetic_metadata_package(include_foreign: bool) -> TestResult<Ve
     } else {
         None
     };
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -633,52 +637,58 @@ pub(crate) fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 pub(crate) fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 pub(crate) fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic metadata component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 pub(crate) fn component_stream(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing synthetic component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 pub(crate) fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 pub(crate) fn replace_metadata_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            METADATA_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                METADATA_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 pub(crate) fn replace_component_stream(
@@ -686,18 +696,21 @@ pub(crate) fn replace_component_stream(
     member: &str,
     archive: Archive,
 ) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            member,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                member,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 pub(crate) fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(identifier)
         .and_then(|object| {
@@ -738,7 +751,7 @@ pub(crate) fn with_document_message_payload(
     type_: u32,
     data: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -768,15 +781,18 @@ pub(crate) fn with_chart_payload(
 }
 
 pub(crate) fn with_axis_role_alias(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let axis = archive
         .object_mut(CATEGORY_NON_STYLES[0])
         .ok_or_else(|| io::Error::other("missing category axis"))?;
     let data = axis.messages[0].data.clone();
-    axis.push_message(RawMessage {
-        type_: AXIS_STYLE_MESSAGE_TYPE,
-        data,
-    })?;
+    axis.push_message(
+        RawMessage {
+            type_: AXIS_STYLE_MESSAGE_TYPE,
+            data,
+        },
+        Default::default(),
+    )?;
     replace_document_stream(source, archive)
 }
 
@@ -785,7 +801,10 @@ pub(crate) fn with_foreign_inbound(
     target: u64,
     mode: ForeignInbound,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&component_stream(source, FOREIGN_MEMBER)?)?;
+    let mut archive = Archive::parse(
+        &component_stream(source, FOREIGN_MEMBER)?,
+        Default::default(),
+    )?;
     let foreign = archive
         .object_mut(FOREIGN_OBJECT)
         .ok_or_else(|| io::Error::other("missing foreign object"))?;
@@ -830,7 +849,7 @@ pub(crate) fn with_stylesheet_registration(source: &[u8], target: u64) -> TestRe
         Vec::new(),
         vec![target],
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -876,7 +895,7 @@ pub(crate) fn with_native_stylesheet_layout(source: &[u8]) -> TestResult<Vec<u8>
         });
     })?;
 
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     let mut moved = Vec::new();
     for identifier in moved_identifiers {
         let position = document
@@ -894,7 +913,7 @@ pub(crate) fn with_native_stylesheet_layout(source: &[u8]) -> TestResult<Vec<u8>
         vec![VALUE_NON_STYLES[0]],
     )?);
     let stylesheet = component(moved)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -918,7 +937,7 @@ pub(crate) fn with_metadata(
     source: &[u8],
     rewrite: impl FnOnce(&mut tsp::PackageMetadata),
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(METADATA_OBJECT)
         .ok_or_else(|| io::Error::other("missing metadata object"))?;
@@ -1130,8 +1149,8 @@ pub(crate) fn assert_axis_rejected_atomically(source: &[u8], axis: Axis) -> Test
 }
 
 pub(crate) fn assert_locality(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(before)?;
-    let target = Catalog::from_bytes(after)?;
+    let source = Catalog::from_bytes(before, Default::default())?;
+    let target = Catalog::from_bytes(after, Default::default())?;
     let source_document = source
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)

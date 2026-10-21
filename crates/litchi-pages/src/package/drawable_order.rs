@@ -514,11 +514,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target),
-            self.state.source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), self.state.source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         let (candidate_location, candidate_order) = read_order(&candidate)?;
@@ -873,7 +871,7 @@ fn rewrite_order(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         catalog
             .limits()
@@ -881,8 +879,7 @@ fn rewrite_order(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let object = archive
         .objects
@@ -936,7 +933,7 @@ fn rewrite_order(
         .objects
         .get_mut(location.object_index)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             location.message_index,
             RawMessage {
                 type_: DRAWABLE_ORDER_MESSAGE_TYPE,
@@ -945,10 +942,9 @@ fn rewrite_order(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let archive_bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+    let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
     let mut deleted_previews = Vec::new();
     deleted_previews
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
@@ -971,9 +967,8 @@ fn rewrite_order(
             catalog.limits(),
         )
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 

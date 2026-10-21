@@ -294,7 +294,7 @@ impl Default for Package {
 pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<Vec<u8>> {
     let profile = Profile::default();
     let limits = profile.archive();
-    let catalog = SourceCatalog::from_bytes_with_limits(source, limits)?;
+    let catalog = SourceCatalog::from_bytes(source, limits)?;
     let package = catalog.package();
     let member = |name: &str| {
         package
@@ -342,7 +342,7 @@ pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<
     })?;
 
     let metadata = member(PACKAGE_METADATA)?;
-    let stream = SnappyStream::decompress_with_limits(&metadata, limits.snappy_limits()?)
+    let stream = SnappyStream::decompress(&metadata, limits.snappy_limits()?)
         .map_err(|error| crate::Error::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
     let mut decoded = stream.into_bytes();
     let needle = old_version.as_bytes();
@@ -357,7 +357,7 @@ pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<
         ));
     };
     decoded[*offset..*offset + needle.len()].copy_from_slice(version.as_bytes());
-    let metadata = SnappyStream::compress(&decoded)
+    let metadata = SnappyStream::compress(&decoded, Default::default())
         .map_err(|error| crate::Error::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
 
     let edits = [

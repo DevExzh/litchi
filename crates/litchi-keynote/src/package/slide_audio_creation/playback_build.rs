@@ -98,7 +98,7 @@ fn prepare_start_builds(
 
     let build_payload = build.into_bytes();
     let chunk_payload = chunk.into_bytes();
-    let mut build_object = ArchiveObject::new_with_limits(
+    let mut build_object = ArchiveObject::new(
         ids.build,
         vec![RawMessage {
             type_: BUILD_MESSAGE_TYPE,
@@ -108,7 +108,7 @@ fn prepare_start_builds(
     )
     .map_err(map_archive_error)?;
     set_object_reference(&mut build_object, ids.drawable, budget)?;
-    let mut chunk_object = ArchiveObject::new_with_limits(
+    let mut chunk_object = ArchiveObject::new(
         ids.chunk,
         vec![RawMessage {
             type_: BUILD_CHUNK_MESSAGE_TYPE,

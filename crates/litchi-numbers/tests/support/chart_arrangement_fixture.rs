@@ -174,7 +174,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     let info = object
         .archive_info
         .message_infos
@@ -486,7 +490,10 @@ fn chart_objects(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(deprecated)]
@@ -742,12 +749,12 @@ pub(crate) fn fixture() -> TestResult<Vec<u8>> {
 }
 
 pub(crate) fn component_stream(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing fixture member {member}")))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 pub(crate) fn rewrite_component(
@@ -755,10 +762,11 @@ pub(crate) fn rewrite_component(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&component_stream(source, member)?)?;
+    let mut archive = Archive::parse(&component_stream(source, member)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(Catalog::from_bytes(source, Default::default())?
         .reassemble_to_bytes(&[EntryEdit::new(member, &compressed)], Limits::default())?)
 }
 
@@ -768,7 +776,7 @@ pub(crate) fn object_message(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(source, member)?)?;
+    let archive = Archive::parse(&component_stream(source, member)?, Default::default())?;
     archive
         .object(identifier)
         .and_then(|object| {
@@ -1061,7 +1069,7 @@ pub(crate) fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>>
             .first()
             .cloned()
             .ok_or_else(|| io::Error::other("chart message is missing"))?;
-        object.push_message(message)?;
+        object.push_message(message, Default::default())?;
         Ok(())
     })
 }

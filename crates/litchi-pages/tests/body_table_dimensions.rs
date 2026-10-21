@@ -67,7 +67,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -303,7 +307,8 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         objects.push(object(identifier, 2_022, vec![0x08, 0x01], &[])?);
     }
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -320,18 +325,19 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -341,24 +347,29 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn split_row_bucket_component(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let document_entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut document = Archive::parse(SnappyStream::decompress(document_entry.data())?.as_bytes())?;
+    let mut document = Archive::parse(
+        SnappyStream::decompress(document_entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let bucket_index = document
         .objects
         .iter()
         .position(|object| object.archive_info.identifier == Some(ROW_BUCKET_IDENTIFIER))
         .ok_or("missing row bucket")?;
     let bucket = document.objects.remove(bucket_index);
-    let document_payload = SnappyStream::compress(&document.to_bytes()?)?;
+    let document_payload =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     let bucket_payload = SnappyStream::compress(
         &Archive {
             objects: vec![bucket],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut entries = Vec::new();
     for entry in catalog.iter() {
@@ -382,7 +393,7 @@ fn split_row_bucket_component(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(package)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(package, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &PREVIEWS,
             Limits::default(),
@@ -407,14 +418,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -469,7 +484,7 @@ fn remove_bucket(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn sentinel(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == "Data/sentinel.bin")
@@ -551,7 +566,9 @@ fn no_op_is_exact_and_reset_restores_default() -> TestResult {
     );
     assert_eq!(sentinel(&reset_bytes)?, b"untouched-sentinel");
     assert_eq!(
-        Catalog::from_bytes(&reset_bytes)?.iter().count(),
+        Catalog::from_bytes(&reset_bytes, Default::default())?
+            .iter()
+            .count(),
         2,
         "a changed transaction invalidates the three preview members"
     );

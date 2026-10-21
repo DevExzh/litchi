@@ -58,11 +58,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(
@@ -277,6 +281,7 @@ fn package_bytes_with_iwa_framing(
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let mut document_objects = vec![object(1, 1, document.encode_to_vec())?, show_object];
     for (index, identifier) in NODE_IDS.into_iter().enumerate() {
@@ -318,7 +323,7 @@ fn package_bytes_with_iwa_framing(
 }
 
 fn component_with_noncanonical_object_prefix(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    let canonical = Archive { objects }.to_bytes()?;
+    let canonical = Archive { objects }.to_bytes(Default::default())?;
     let (header_length, prefix_length) = litchi_iwa_common::decode_varint_from_bytes(&canonical)?;
     if prefix_length != 1 || header_length >= 0x80 {
         return Err(io::Error::other("fixture expected a one-byte object prefix").into());
@@ -327,12 +332,12 @@ fn component_with_noncanonical_object_prefix(objects: Vec<ArchiveObject>) -> Tes
     noncanonical.push(u8::try_from(header_length)? | 0x80);
     noncanonical.push(0);
     noncanonical.extend_from_slice(&canonical[prefix_length..]);
-    Archive::parse(&noncanonical)?;
-    Ok(SnappyStream::compress(&noncanonical)?)
+    Archive::parse(&noncanonical, Default::default())?;
+    Ok(SnappyStream::compress(&noncanonical, Default::default())?)
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -366,12 +371,12 @@ fn names(package: &Package) -> TestResult<Vec<String>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn slide_reference_records(package: &[u8]) -> TestResult<Vec<Vec<u8>>> {
@@ -383,7 +388,7 @@ fn slide_reference_records(package: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 
 fn slide_tree_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let show = archive
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
@@ -403,7 +408,7 @@ fn slide_tree_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
 
 fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let show = archive
         .object(2)
         .and_then(|object| object.messages.iter().find(|message| message.type_ == 2))
@@ -417,7 +422,7 @@ fn show_records(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
 }
 
 fn show_message_range(stream: &[u8]) -> TestResult<std::ops::Range<usize>> {
-    let archive = Archive::parse(stream)?;
+    let archive = Archive::parse(stream, Default::default())?;
     let object = archive
         .object(2)
         .ok_or_else(|| io::Error::other("missing synthetic show object"))?;
@@ -642,8 +647,8 @@ fn rewrite_permutates_complete_reference_records_and_only_one_component() -> Tes
     }
     assert_eq!(document_stream(after_bytes)?.len(), before_stream.len());
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(after_bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after_bytes, Default::default())?;
     let mut changed_entries = 0usize;
     for (before_entry, after_entry) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before_entry.name(), after_entry.name());

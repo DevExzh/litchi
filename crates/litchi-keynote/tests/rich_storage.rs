@@ -55,6 +55,7 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -182,6 +183,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 data: false_text.clone(),
             },
         ],
+        Default::default(),
     )?;
     let mut title_messages = vec![RawMessage {
         type_: 7,
@@ -197,7 +199,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
             .encode_to_vec(),
         });
     }
-    let title_object = ArchiveObject::new(5, title_messages)?;
+    let title_object = ArchiveObject::new(5, title_messages, Default::default())?;
 
     let body_payload = tswp::StorageArchive {
         text: BODY.iter().map(|fragment| (*fragment).to_owned()).collect(),
@@ -228,7 +230,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
             data: vec![0x18, 0x01],
         });
     }
-    let body_storage = ArchiveObject::new(11, body_messages)?;
+    let body_storage = ArchiveObject::new(11, body_messages, Default::default())?;
 
     let node_payload = if matches!(malformed, Malformation::MissingSlideNodeFlag) {
         litchi_iwa_common::wire::patch_varint_field(&node.encode_to_vec(), 6, true, None)?
@@ -288,6 +290,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 1,
                 data: document_payload,
             }],
+            Default::default(),
         )?,
         show_object,
         ArchiveObject::new(
@@ -296,6 +299,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 4,
                 data: node_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             4,
@@ -303,6 +307,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 5,
                 data: slide_payload,
             }],
+            Default::default(),
         )?,
         title_object,
         ArchiveObject::new(
@@ -311,6 +316,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 7,
                 data: body_owner_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             7,
@@ -318,6 +324,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 2_011,
                 data: shape_payload,
             }],
+            Default::default(),
         )?,
         ArchiveObject::new(
             8,
@@ -325,6 +332,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 15,
                 data: speaker_note_payload,
             }],
+            Default::default(),
         )?,
         storage(10, TITLE)?,
         body_storage,
@@ -336,6 +344,7 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 999,
                 data: false_text,
             }],
+            Default::default(),
         )?,
     ];
     if matches!(
@@ -354,10 +363,12 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                 type_: 8,
                 data: payload,
             }],
+            Default::default(),
         )?);
     }
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     if matches!(malformed, Malformation::DuplicateObjectIdentity) {
         let duplicate = Archive {
             objects: vec![ArchiveObject::new(
@@ -366,9 +377,11 @@ fn synthetic_package(malformed: Malformation) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )?],
         };
-        let duplicate_compressed = SnappyStream::compress(&duplicate.to_bytes()?)?;
+        let duplicate_compressed =
+            SnappyStream::compress(&duplicate.to_bytes(Default::default())?, Default::default())?;
         return Ok(litchi_iwa_archive::package::to_bytes(
             [
                 ("Index/Document.iwa", compressed.as_slice()),
@@ -708,7 +721,7 @@ fn native_storage_messages_match_the_prost_oracle() -> TestResult<()> {
     let path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/keynote/basic.key");
     let bytes = std::fs::read(path)?;
-    let catalog = ComponentCatalog::from_bytes(&bytes)?;
+    let catalog = ComponentCatalog::from_bytes(&bytes, Default::default())?;
     let mut checked = 0usize;
     for component in catalog.iter() {
         for object in &component.archive().objects {

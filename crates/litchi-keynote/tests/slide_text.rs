@@ -67,6 +67,7 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -96,6 +97,7 @@ fn storage(identifier: u64, fragments: &[&str]) -> TestResult<ArchiveObject> {
                 data: format!("after-storage-{identifier}").into_bytes(),
             },
         ],
+        Default::default(),
     )?)
 }
 
@@ -103,8 +105,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -137,9 +139,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn slide(
@@ -305,6 +307,7 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-title-storage".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     title_storage_object.archive_info.message_infos[1].object_references =
         dependent_title_content.then_some(500).into_iter().collect();
@@ -358,6 +361,7 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: PRIVATE_MARKER.to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
         TITLE_STORAGE,
@@ -370,9 +374,11 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: b"unrelated-iwa-component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -388,12 +394,12 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -401,10 +407,11 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -413,7 +420,7 @@ fn rewrite_document(
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -424,9 +431,9 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -454,6 +461,7 @@ fn with_title_storage_topology(
                 data: placeholder_storage_topology(owned_storage, deprecated_storage)
                     .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let mut references = Vec::with_capacity(2);
         if let Some(identifier) = owned_storage {
@@ -487,6 +495,7 @@ fn with_placeholder_kind(package: &[u8], owner: u64, kind: Option<i32>) -> TestR
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -554,6 +563,7 @@ fn with_owned_storage_reference_unknown(package: &[u8], owner: u64) -> TestResul
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: rewritten_placeholder,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -584,6 +594,7 @@ fn with_unrelated_placeholder(
                     data: b"after-unrelated-placeholder".to_vec(),
                 },
             ],
+            Default::default(),
         )?;
         let mut references = Vec::with_capacity(2);
         if let Some(identifier) = owned_storage {
@@ -616,6 +627,7 @@ fn with_unrelated_placeholder(
                 type_: SLIDE_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         slide.archive_info.message_infos[index]
             .object_references
@@ -626,7 +638,7 @@ fn with_unrelated_placeholder(
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -640,7 +652,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -671,8 +683,8 @@ fn assert_document_changed_previews_removed_and_other_entries_preserved(
     before: &[u8],
     after: &[u8],
 ) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(
@@ -712,7 +724,7 @@ fn assert_document_changed_previews_removed_and_other_entries_preserved(
 }
 
 fn assert_root_previews_absent(package: &[u8]) -> TestResult<()> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     for member in PREVIEW_MEMBERS {
         assert!(catalog.iter().all(|entry| entry.name() != member));
     }
@@ -720,8 +732,8 @@ fn assert_root_previews_absent(package: &[u8]) -> TestResult<()> {
 }
 
 fn assert_root_previews_restored(before: &[u8], restored: &[u8]) -> TestResult<()> {
-    let before = Catalog::from_bytes(before)?;
-    let restored = Catalog::from_bytes(restored)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let restored = Catalog::from_bytes(restored, Default::default())?;
     for member in PREVIEW_MEMBERS {
         let source = before
             .iter()
@@ -743,7 +755,7 @@ fn assert_root_previews_restored(before: &[u8], restored: &[u8]) -> TestResult<(
 
 fn assert_first_slide_node_cache_invalidated(package: &[u8]) -> TestResult<()> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -778,14 +790,14 @@ fn assert_first_slide_node_cache_invalidated(package: &[u8]) -> TestResult<()> {
 
 fn assert_first_slide_node_restored(before: &[u8], restored: &[u8]) -> TestResult<()> {
     let before_stream = document_stream(before)?;
-    let before_archive = Archive::parse(&before_stream)?;
+    let before_archive = Archive::parse(&before_stream, Default::default())?;
     let before = before_archive
         .objects
         .iter()
         .find(|object| object.messages.iter().any(|message| message.type_ == 4))
         .ok_or_else(|| io::Error::other("source slide node is missing"))?;
     let restored_stream = document_stream(restored)?;
-    let restored_archive = Archive::parse(&restored_stream)?;
+    let restored_archive = Archive::parse(&restored_stream, Default::default())?;
     let restored = restored_archive
         .objects
         .iter()
@@ -1330,7 +1342,7 @@ fn changed_text_preserves_unknowns_scope_siblings_and_exact_inverse() -> TestRes
         Some(TITLE.to_owned())
     );
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let equivalent_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1413,6 +1425,7 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
                 type_: SLIDE_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1518,6 +1531,7 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1617,6 +1631,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: SLIDE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1630,7 +1645,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
             let object = archive
                 .object_mut(TITLE_OWNER)
                 .ok_or_else(|| io::Error::other("missing title owner"))?;
-            object.push_message(object.messages[0].clone())?;
+            object.push_message(object.messages[0].clone(), Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -1643,6 +1658,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: PLACEHOLDER_MESSAGE_TYPE,
                     data: Vec::new(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1662,7 +1678,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 .find(|message| message.type_ == STORAGE_MESSAGE_TYPE)
                 .ok_or_else(|| io::Error::other("missing storage message"))?
                 .clone();
-            object.push_message(duplicate)?;
+            object.push_message(duplicate, Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -1680,6 +1696,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1698,6 +1715,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x01, 0xff],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1716,6 +1734,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x18, 0x01],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1741,6 +1760,7 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: placeholder(TITLE_STORAGE).encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![TITLE_STORAGE];
         Ok(())
@@ -1780,6 +1800,7 @@ fn exact_noop_commit_and_apply_do_not_require_mutation_ownership() -> TestResult
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data: placeholder(TITLE_STORAGE).encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![TITLE_STORAGE];
         Ok(())

@@ -706,7 +706,7 @@ impl Package {
 
     fn from_source_with_options(source: Arc<[u8]>, options: Profile) -> ReadResult<Self> {
         let limits = options.archive();
-        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+        let source_catalog = SourceCatalog::from_shared_bytes(source, limits)?;
         Self::from_source_catalog(source_catalog, options)
     }
 

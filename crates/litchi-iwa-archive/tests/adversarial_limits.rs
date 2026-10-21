@@ -70,13 +70,13 @@ fn declared_nested_index_size_wins_over_corrupt_deflate_for_every_ingress_api()
 
     assert_nested_input_limit(
         "physical catalog",
-        Catalog::from_bytes_with_limits(&bytes, limits),
+        Catalog::from_bytes(&bytes, limits),
         nested,
         input,
     );
     assert_nested_input_limit(
         "component catalog",
-        ComponentCatalog::from_bytes_with_limits(&bytes, limits),
+        ComponentCatalog::from_bytes(&bytes, limits),
         nested,
         input,
     );

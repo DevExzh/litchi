@@ -6666,15 +6666,15 @@ mod tests {
     }
 
     fn archive_object(identifier: u64, messages: Vec<RawMessage>) -> super::Result<ArchiveObject> {
-        ArchiveObject::new(identifier, messages)
+        ArchiveObject::new(identifier, messages, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     fn compatibility_package(objects: Vec<ArchiveObject>) -> super::Result<Vec<u8>> {
         let archive = Archive { objects }
-            .to_bytes()
+            .to_bytes(Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let stream = SnappyStream::compress(&archive)
+        let stream = SnappyStream::compress(&archive, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         Ok(litchi_iwa_archive::package::to_bytes(
             [("Index/Document.iwa", stream.as_slice())],

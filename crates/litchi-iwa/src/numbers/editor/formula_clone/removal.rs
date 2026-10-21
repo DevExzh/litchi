@@ -105,6 +105,7 @@ pub(in crate::numbers::editor) fn remove_table_formula_graph_for_contexts(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut engine_object.archive_info.message_infos[engine_message_index];
         info.object_references
@@ -215,6 +216,7 @@ fn prune_global_cell_dependencies(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
         }
         for tile_id in tile_ids {
@@ -248,6 +250,7 @@ fn prune_global_cell_dependencies(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
         }
         Ok(())

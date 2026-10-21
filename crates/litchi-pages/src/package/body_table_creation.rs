@@ -538,7 +538,7 @@ fn fresh(
     data: Vec<u8>,
     references: Vec<u64>,
 ) -> Result<ArchiveObject, Error> {
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: message_type,

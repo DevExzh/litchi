@@ -51,7 +51,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> SeedResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn object_with_references(
@@ -231,7 +231,7 @@ fn metadata_payload() -> SeedResult<Vec<u8>> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> SeedResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?)
 }
 
 fn build() -> SeedResult<Vec<u8>> {

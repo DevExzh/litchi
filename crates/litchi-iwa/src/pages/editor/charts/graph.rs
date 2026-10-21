@@ -628,6 +628,7 @@ pub(super) fn chart_attachment_object(
             type_: DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
             data: attachment.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -682,6 +683,7 @@ pub(super) fn set_chart_attachment_position(
                 type_: DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

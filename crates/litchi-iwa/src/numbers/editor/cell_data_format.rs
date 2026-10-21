@@ -1308,6 +1308,7 @@ fn ensure_current_format_table(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         if !object.archive_info.message_infos[index]
             .object_references
@@ -1365,6 +1366,7 @@ fn append_format_entry(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

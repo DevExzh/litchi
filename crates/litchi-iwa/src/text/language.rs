@@ -271,6 +271,7 @@ where
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -450,6 +451,7 @@ mod tests {
                         type_: original.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -496,13 +498,13 @@ mod tests {
         .encode_to_vec();
         package
             .update_archive(&archive_name, |archive| {
-                archive
-                    .object_mut(storage_id)
-                    .unwrap()
-                    .push_message(RawMessage {
+                archive.object_mut(storage_id).unwrap().push_message(
+                    RawMessage {
                         type_: 2_022,
                         data: style_data.clone(),
-                    })?;
+                    },
+                    Default::default(),
+                )?;
                 Ok(())
             })
             .unwrap();
@@ -549,6 +551,7 @@ mod tests {
                         type_: original.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })

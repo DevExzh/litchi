@@ -130,7 +130,7 @@ fn fresh_poster(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn members(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -640,7 +640,7 @@ fn semantic_selector_and_invalid_inputs_are_atomic() -> TestResult {
 fn entry_limit_refusal_does_not_mutate_the_source() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     let (movie, poster) = source_assets(&source)?;
-    let largest = Catalog::from_bytes(NATIVE_SOURCE)?
+    let largest = Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
         .iter()
         .map(|entry| entry.data().len())
         .max()

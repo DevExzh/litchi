@@ -378,6 +378,7 @@ where
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = object
             .archive_info

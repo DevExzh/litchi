@@ -107,7 +107,7 @@ impl Draft {
         let mut staged = self.package.clone();
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -409,6 +409,7 @@ fn numbers_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

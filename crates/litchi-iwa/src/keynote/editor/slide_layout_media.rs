@@ -89,7 +89,7 @@ pub(super) fn materialize(
 
     package.update_archive(&slide_archive_name, |archive| {
         for object in cloned.drain(..) {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;

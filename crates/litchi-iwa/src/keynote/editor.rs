@@ -4014,7 +4014,7 @@ impl Draft {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
 
@@ -4359,20 +4359,28 @@ impl Draft {
 
         let mut staged = self.package().clone();
         staged.update_archive(&archive_name, |archive| {
-            archive.insert_object(ArchiveObject::new(
-                build_id,
-                vec![RawMessage {
-                    type_: BUILD_MESSAGE_TYPE,
-                    data: build.encode_to_vec(),
-                }],
-            )?)?;
-            archive.insert_object(ArchiveObject::new(
-                chunk_id,
-                vec![RawMessage {
-                    type_: BUILD_CHUNK_MESSAGE_TYPE,
-                    data: chunk.encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    build_id,
+                    vec![RawMessage {
+                        type_: BUILD_MESSAGE_TYPE,
+                        data: build.encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    chunk_id,
+                    vec![RawMessage {
+                        type_: BUILD_CHUNK_MESSAGE_TYPE,
+                        data: chunk.encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })?;
         patch_slide_build_references(
@@ -4688,7 +4696,7 @@ impl Draft {
         })?;
         let new_node = clone_slide_node(source_node, new_node_id, source_slide_id, new_slide_id)?;
         staged.update_archive(&node_archive_name, |archive| {
-            archive.insert_object(new_node)?;
+            archive.insert_object(new_node, Default::default())?;
             Ok(())
         })?;
 
@@ -4739,6 +4747,7 @@ impl Draft {
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             let references =
                 &mut object.archive_info.message_infos[message_index].object_references;

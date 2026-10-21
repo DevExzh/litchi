@@ -1701,6 +1701,7 @@ mod tests {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )?)
     }
 
@@ -1737,7 +1738,8 @@ mod tests {
             &Archive {
                 objects: vec![document, sheet],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
 
         let mut table_objects = Vec::with_capacity(table_count.saturating_mul(2).saturating_add(1));
@@ -1794,12 +1796,14 @@ mod tests {
                 .encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )?);
         let table_component = SnappyStream::compress(
             &Archive {
                 objects: table_objects,
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
         Ok(litchi_iwa_archive::package::to_bytes(
             [
@@ -1830,7 +1834,7 @@ mod tests {
         let reopen = reopen_cost(&package)?;
         budget.charge_references(reopen.references)?;
         budget.charge_transaction_work(reopen.work)?;
-        let catalog = Catalog::from_bytes(&bytes)?;
+        let catalog = Catalog::from_bytes(&bytes, Default::default())?;
         let selected_compressed_len = catalog
             .iter()
             .find(|entry| entry.name() == "Index/Tables.iwa")

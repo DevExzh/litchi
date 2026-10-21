@@ -187,8 +187,8 @@ fn error_is_redacted<E: std::fmt::Debug + std::fmt::Display>(error: &E) {
 }
 
 fn assert_document_only_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(before)?;
-    let target = Catalog::from_bytes(after)?;
+    let source = Catalog::from_bytes(before, Default::default())?;
+    let target = Catalog::from_bytes(after, Default::default())?;
     assert_eq!(source.len(), target.len());
     let mut changed = 0;
     for source_entry in source.iter() {
@@ -211,8 +211,8 @@ fn assert_document_only_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
 }
 
 fn assert_previews_preserved(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(before)?;
-    let target = Catalog::from_bytes(after)?;
+    let source = Catalog::from_bytes(before, Default::default())?;
+    let target = Catalog::from_bytes(after, Default::default())?;
     for preview in PREVIEWS {
         let source_data = source
             .iter()
@@ -274,7 +274,7 @@ fn with_drawable_wire(
 }
 
 fn empty_slide_source(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(chart_fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing synthetic slide"))?;
@@ -434,7 +434,7 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&chart_fixture::document_stream(source)?, Default::default())?;
     let chart = archive
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
@@ -445,22 +445,29 @@ fn with_duplicate_chart_message(source: &[u8]) -> TestResult<Vec<u8>> {
         .ok_or_else(|| io::Error::other("missing synthetic chart message"))?
         .data
         .clone();
-    chart.push_message(RawMessage {
-        type_: CHART_MESSAGE_TYPE,
-        data,
-    })?;
+    chart.push_message(
+        RawMessage {
+            type_: CHART_MESSAGE_TYPE,
+            data,
+        },
+        Default::default(),
+    )?;
     chart_fixture::replace_document_stream(source, archive)
 }
 
 fn with_foreign_chart_owner(source: &[u8]) -> TestResult<Vec<u8>> {
     let chart_payload = chart_fixture::message_payload(source, CHARTS[0], CHART_MESSAGE_TYPE)?;
-    let mut archive = Archive::parse(&chart_fixture::component_stream(source, FOREIGN_MEMBER)?)?;
+    let mut archive = Archive::parse(
+        &chart_fixture::component_stream(source, FOREIGN_MEMBER)?,
+        Default::default(),
+    )?;
     archive.objects.push(litchi_iwa_core::ArchiveObject::new(
         901,
         vec![RawMessage {
             type_: CHART_MESSAGE_TYPE,
             data: chart_payload,
         }],
+        Default::default(),
     )?);
     chart_fixture::replace_component_stream(source, FOREIGN_MEMBER, archive)
 }
@@ -1019,7 +1026,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
 fn arrangement_semantic_limits_fail_before_publication_and_output_limits_are_atomic()
 -> TestResult<()> {
     let unpadded = base_source()?;
-    let catalog = Catalog::from_bytes(&unpadded)?;
+    let catalog = Catalog::from_bytes(&unpadded, Default::default())?;
     // Give graph verification headroom so this case reaches the independent
     // output ceiling instead of an earlier aggregate retained-byte refusal.
     let padding = [0u8; 16 * 1024];

@@ -51,11 +51,15 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
 fn package_bytes(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         ArchiveLimits::default(),
@@ -143,6 +147,7 @@ fn duplicate_sheet_payload_ownership_is_rejected_before_projection() -> TestResu
                     data: form,
                 },
             ],
+            Default::default(),
         )?,
     ])?;
     assert!(matches!(

@@ -194,15 +194,15 @@ fn read_fixture_override(environment: &str, fixture: &[u8]) -> TestResult<Vec<u8
 
 fn native_component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -334,15 +334,15 @@ fn native_component_stream_containing_object(
     source: &[u8],
     identifier: u64,
 ) -> TestResult<(String, Vec<u8>)> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -375,7 +375,7 @@ fn replace_native_component_archive(
     component_name: &str,
     archive: Archive,
 ) -> TestResult<Vec<u8>> {
-    let bytes = archive.to_bytes()?;
+    let bytes = archive.to_bytes(Default::default())?;
     replace_native_component_stream(source, component_name, &bytes)
 }
 
@@ -420,6 +420,7 @@ fn replace_native_object_payload(
             type_: message_type,
             data: payload,
         },
+        Default::default(),
     )?;
     replace_native_component_archive(source, &component_name, archive)
 }
@@ -431,7 +432,7 @@ fn with_unknown_archive_info_field(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let (component_name, bytes) = native_component_stream_containing_object(source, identifier)?;
-    let archive = Archive::parse(&bytes)?;
+    let archive = Archive::parse(&bytes, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other(format!("missing archive object {identifier}")))?;
@@ -468,8 +469,8 @@ fn with_unknown_archive_info_field(
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    let reparsed = Archive::parse(&modified)?;
-    assert_eq!(reparsed.to_bytes()?, modified);
+    let reparsed = Archive::parse(&modified, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, modified);
     replace_native_component_stream(source, &component_name, &modified)
 }
 
@@ -478,8 +479,8 @@ fn replace_native_component_stream(
     component_name: &str,
     bytes: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(bytes)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement = SnappyStream::compress(bytes, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -637,6 +638,7 @@ fn with_native_shared_movie_comment(
             type_: NATIVE_MOVIE_MESSAGE_TYPE,
             data: rewritten_root,
         },
+        Default::default(),
     )?;
     replace_native_component_archive(source, &component_name, archive)
 }
@@ -702,6 +704,7 @@ fn with_native_unselected_comment_reply(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: payload,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0]
         .object_references
@@ -711,7 +714,7 @@ fn with_native_unselected_comment_reply(
             .object_references
             .push(reply_identifier);
     }
-    archive.insert_object(object)?;
+    archive.insert_object(object, Default::default())?;
     replace_native_component_archive(source, &component_name, archive)
 }
 
@@ -1034,6 +1037,7 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: root_payload,
         },
+        Default::default(),
     )?;
     root_object.archive_info.message_infos[root_index]
         .object_references
@@ -1064,11 +1068,12 @@ fn with_native_reply_graph(source: &[u8], unknown_fields: bool) -> TestResult<Ve
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: reply_payload,
         }],
+        Default::default(),
     )?;
     reply.archive_info.message_infos[0]
         .object_references
         .push(author);
-    archive.insert_object(reply)?;
+    archive.insert_object(reply, Default::default())?;
     replace_native_component_archive(source, &component_name, archive)
 }
 

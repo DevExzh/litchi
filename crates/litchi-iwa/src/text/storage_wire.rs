@@ -137,7 +137,7 @@ where
     F: FnOnce(&mut Archive) -> Result<()>,
 {
     update(&mut archive)?;
-    archive.validate()?;
+    archive.validate(Default::default())?;
     package.replace_archive(archive_name, &archive)?;
     Ok(())
 }
@@ -310,9 +310,10 @@ mod tests {
                 type_: 2_001,
                 data: crate::protobuf::tswp::StorageArchive::default().encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
-        let unrecognized = ArchiveObject::new(42, Vec::new()).unwrap();
+        let unrecognized = ArchiveObject::new(42, Vec::new(), Default::default()).unwrap();
         let mut package = HostPackage::new();
         package
             .replace_archive(
@@ -347,6 +348,7 @@ mod tests {
                 type_: 2_022,
                 data: style.encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -374,6 +376,7 @@ mod tests {
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -401,6 +404,7 @@ mod tests {
                 type_: 2_001,
                 data: crate::protobuf::tswp::StorageArchive::default().encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();

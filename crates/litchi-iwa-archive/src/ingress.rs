@@ -404,7 +404,7 @@ impl std::fmt::Debug for CandidateIngressPlan<'_> {
 impl<'data> CandidateIngressPlan<'data> {
     /// Validate the ZIP envelope and produce physical facts without retaining
     /// a central-directory map, member names, or decoded payloads.
-    pub fn from_bytes_with_limits(data: &'data [u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(data: &'data [u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         limits.check_input_size(
             u64::try_from(data.len()).map_err(|_error| {
@@ -548,11 +548,6 @@ impl<'data> CandidateIngressPlan<'data> {
         })
     }
 
-    /// Validate one source with the default physical limits.
-    pub fn from_bytes(data: &'data [u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(data, Limits::default())
-    }
-
     /// Borrow the aggregate ZIP facts.
     #[must_use]
     pub const fn requirements(&self) -> CandidateIngressRequirements {
@@ -615,7 +610,7 @@ impl<'data> CandidateIngressPlan<'data> {
     pub fn preflight_snappy_stream(&self, compressed: &[u8]) -> Result<SnappyIngressRequirements> {
         let limits = self.limits.snappy_limits()?;
         let decoded_bytes =
-            SnappyStream::decompressed_len_with_limits(compressed, limits).map_err(Error::Iwa)?;
+            SnappyStream::decompressed_len(compressed, limits).map_err(Error::Iwa)?;
         Ok(SnappyIngressRequirements {
             compressed_bytes: compressed.len(),
             decoded_bytes,
@@ -647,8 +642,7 @@ impl<'data> CandidateIngressPlan<'data> {
 
     /// Preflight a decoded IWA stream without constructing generated values.
     pub fn preflight_archive_stream(&self, decoded: &[u8]) -> Result<ArchiveIngressRequirements> {
-        Archive::preflight_with_limits(decoded, self.limits.effective_archive_limits()?)
-            .map_err(Error::Iwa)
+        Archive::preflight(decoded, self.limits.effective_archive_limits()?).map_err(Error::Iwa)
     }
 
     /// Admit archive/header storage before parsing the decoded IWA stream.
@@ -899,11 +893,8 @@ impl SourceCatalog {
     /// Build the allocation-free physical candidate plan used by a caller's
     /// aggregate transaction ledger.
     #[doc(hidden)]
-    pub fn __candidate_ingress_with_limits(
-        bytes: &[u8],
-        limits: Limits,
-    ) -> Result<CandidateIngressPlan<'_>> {
-        CandidateIngressPlan::from_bytes_with_limits(bytes, limits)
+    pub fn __candidate_ingress(bytes: &[u8], limits: Limits) -> Result<CandidateIngressPlan<'_>> {
+        CandidateIngressPlan::from_bytes(bytes, limits)
     }
 }
 
@@ -926,9 +917,11 @@ mod tests {
                     type_: 6000,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        let stream = SnappyStream::compress(&archive.to_bytes()?)?;
+        let stream =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         let mut writer = StreamingArchiveWriter::new();
         writer.write_stored("Index/Document.iwa", &stream)?;
         writer.write_deflated("Metadata/Properties.plist", b"properties")?;
@@ -938,7 +931,7 @@ mod tests {
     #[test]
     fn candidate_plan_reports_targets_without_allocating_a_reader_index() -> crate::Result<()> {
         let bytes = package()?;
-        let plan = CandidateIngressPlan::from_bytes_with_limits(&bytes, Limits::default())?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Limits::default())?;
         let entries = plan.entries().collect::<crate::Result<Vec<_>>>()?;
         assert_eq!(entries.len(), 2);
         assert!(entries.iter().any(|entry| {
@@ -956,7 +949,7 @@ mod tests {
     #[test]
     fn candidate_phases_charge_before_decode() -> crate::Result<()> {
         let bytes = package()?;
-        let plan = CandidateIngressPlan::from_bytes(&bytes)?;
+        let plan = CandidateIngressPlan::from_bytes(&bytes, Default::default())?;
         let mut phases = Vec::new();
         plan.admit_zip_directory(&mut |charge: CandidateIngressCharge| {
             phases.push(charge.phase());
@@ -981,7 +974,7 @@ mod tests {
             })
             .map_err(|_| crate::Error::InvalidBundle("Snappy admission failed".to_owned()))?;
         assert!(requirements.decoded_bytes() > 0);
-        let decoded = SnappyStream::decompress(&snappy)?;
+        let decoded = SnappyStream::decompress(&snappy, Default::default())?;
         plan.admit_archive_stream(decoded.as_bytes(), &mut |charge: CandidateIngressCharge| {
             phases.push(charge.phase());
             Ok::<_, ()>(())
@@ -1010,7 +1003,7 @@ mod tests {
             Limits::MAX_IWA_STREAM_BYTES,
         )?;
         assert!(matches!(
-            CandidateIngressPlan::from_bytes_with_limits(&bytes, limits),
+            CandidateIngressPlan::from_bytes(&bytes, limits),
             Err(crate::Error::Limit {
                 kind: crate::LimitKind::EntryBytes,
                 ..
@@ -1022,7 +1015,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_is_admitted_before_reader_and_indexes() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let edit = EntryEdit::new("Metadata/Properties.plist", b"edited properties");
         let mut phases = Vec::new();
         let requirements = catalog
@@ -1054,7 +1047,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_rejection_happens_before_prepare() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let edit = EntryEdit::new("Metadata/Properties.plist", b"edited properties");
         let result = catalog.__admit_reassembly_preparation(
             &[],
@@ -1073,7 +1066,7 @@ mod tests {
     #[test]
     fn reassembly_preparation_covers_insertions_and_deletions() -> crate::Result<()> {
         let bytes = package()?;
-        let catalog = SourceCatalog::from_bytes(&bytes)?;
+        let catalog = SourceCatalog::from_bytes(&bytes, Default::default())?;
         let insertions = [EntryInsertion::new("Metadata/New.plist", b"new properties")];
         let edits: [EntryEdit<'_>; 0] = [];
         let deleted_names = ["Metadata/Properties.plist"];

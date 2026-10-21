@@ -506,6 +506,7 @@ impl AxisNonStyleSlot {
                     type_: AXIS_NON_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

@@ -118,13 +118,13 @@ fn fresh_poster(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_from_source(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing PackageMetadata member"))?;
-    let decoded = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decoded)?;
+    let decoded = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decoded, Default::default())?;
     let mut payloads = archive.objects.iter().flat_map(|object| {
         object.messages.iter().filter_map(|message| {
             (message.type_ == METADATA_MESSAGE_TYPE).then_some(message.data.as_slice())
@@ -152,7 +152,7 @@ fn data_identifier(package: &Package, bytes: &[u8]) -> TestResult<u64> {
 }
 
 fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -161,7 +161,7 @@ fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn rewrite_member(source: &[u8], name: &str, replacement: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, replacement)], Limits::default())?)
 }
 
@@ -170,21 +170,23 @@ fn rewrite_archive_member(
     name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let decoded = SnappyStream::decompress(&member_bytes(source, name)?)?.into_bytes();
-    let mut archive = Archive::parse(&decoded)?;
+    let decoded =
+        SnappyStream::decompress(&member_bytes(source, name)?, Default::default())?.into_bytes();
+    let mut archive = Archive::parse(&decoded, Default::default())?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     rewrite_member(source, name, &replacement)
 }
 
 fn fresh_object_identifier(source: &[u8]) -> TestResult<u64> {
     let mut maximum = 0u64;
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let decoded = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decoded)?;
+        let decoded = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decoded, Default::default())?;
         for object in archive.objects {
             let identifier = object
                 .archive_info
@@ -266,12 +268,12 @@ fn map_payload(data_identifiers: &[u64], metadata_identifier: u64) -> Vec<u8> {
 }
 
 fn map_payload_from_source(source: &[u8], map_identifier: u64) -> TestResult<Vec<u8>> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let decoded = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decoded)?;
+        let decoded = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decoded, Default::default())?;
         for object in archive.objects {
             if object.archive_info.identifier != Some(map_identifier) {
                 continue;
@@ -299,20 +301,28 @@ fn with_opaque_map(
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
     let source = rewrite_archive_member(source, DOCUMENT_MEMBER, |archive| {
-        archive.insert_object(ArchiveObject::new(
-            map_identifier,
-            vec![RawMessage {
-                type_: DATA_METADATA_MAP_MESSAGE_TYPE,
-                data: payload.to_vec(),
-            }],
-        )?)?;
-        archive.insert_object(ArchiveObject::new(
-            metadata_identifier,
-            vec![RawMessage {
-                type_: DATA_METADATA_MESSAGE_TYPE,
-                data: Vec::new(),
-            }],
-        )?)?;
+        archive.insert_object(
+            ArchiveObject::new(
+                map_identifier,
+                vec![RawMessage {
+                    type_: DATA_METADATA_MAP_MESSAGE_TYPE,
+                    data: payload.to_vec(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
+        archive.insert_object(
+            ArchiveObject::new(
+                metadata_identifier,
+                vec![RawMessage {
+                    type_: DATA_METADATA_MESSAGE_TYPE,
+                    data: Vec::new(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })?;
     let mut metadata = metadata_from_source(&source)?;

@@ -133,6 +133,7 @@ fn replace_slide_drawable_order(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

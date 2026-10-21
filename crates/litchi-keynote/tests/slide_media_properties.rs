@@ -93,14 +93,14 @@ fn export_candidate(name: &str, bytes: &[u8]) -> TestResult {
 }
 
 fn catalog_entries(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
 }
 
 fn without_materialized_member(source: &[u8], member_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     if !catalog.iter().any(|entry| entry.name() == member_name) {
         return Err(io::Error::other(format!(
             "native fixture is missing materialized member {member_name}"
@@ -112,12 +112,15 @@ fn without_materialized_member(source: &[u8], member_name: &str) -> TestResult<V
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        archives.push((entry.name().to_owned(), Archive::parse(&stream)?));
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        archives.push((
+            entry.name().to_owned(),
+            Archive::parse(&stream, Default::default())?,
+        ));
     }
     Ok(archives)
 }
@@ -271,8 +274,9 @@ fn duplicate_first_audio_owned_drawable(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn replace_component(source: &[u8], name: &str, archive: &Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -493,10 +497,13 @@ fn without_movie_data_reference(source: &[u8], movie: usize, poster: bool) -> Te
 
 fn add_opaque_message_to_second_audio(source: &[u8]) -> TestResult<Vec<u8>> {
     mutate_movie_header(source, 1, |object, _message_index| {
-        object.push_message(RawMessage {
-            type_: OPAQUE_AUDIO_MESSAGE_TYPE,
-            data: OPAQUE_AUDIO_MESSAGE.to_vec(),
-        })?;
+        object.push_message(
+            RawMessage {
+                type_: OPAQUE_AUDIO_MESSAGE_TYPE,
+                data: OPAQUE_AUDIO_MESSAGE.to_vec(),
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -664,12 +671,12 @@ fn mutate_drawable_wrong_wire(source: &[u8], field_number: u32) -> TestResult<Ve
 
 fn archive_payloads(source: &[u8]) -> TestResult<BTreeMap<(String, u64, u32), Vec<u8>>> {
     let mut payloads = BTreeMap::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default())?;
         for object in archive.objects {
             let Some(identifier) = object.archive_info.identifier else {
                 continue;

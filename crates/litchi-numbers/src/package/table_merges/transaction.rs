@@ -482,13 +482,13 @@ fn rewrite(
     let cached_object_count = cached_archive.objects.len();
     let cached_message_count = archive_message_count(cached_archive)?;
     let cached_encoded_len = cached_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(super::map_core_error)?;
     budget.charge_objects(cached_object_count)?;
     budget.charge_messages(cached_message_count)?;
     budget.charge_work(entry.data().len())?;
     budget.charge_work(cached_encoded_len)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits
             .snappy_limits()
@@ -498,10 +498,10 @@ fn rewrite(
     if stream.as_bytes().len() != cached_encoded_len {
         return Err(TableMergesError::InvalidSource);
     }
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(super::map_core_error)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(super::map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(super::map_core_error)?;
     if archive.objects.len() != cached_object_count
         || archive_message_count(&archive)? != cached_message_count
@@ -554,7 +554,7 @@ fn rewrite(
     super::super::table_headers::resolve::validate_message_metadata(object, target.message_index)
         .map_err(map_header_error)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -564,12 +564,12 @@ fn rewrite(
         )
         .map_err(super::map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(super::map_core_error)?;
     budget.charge_work(encoded_bound)?;
     budget.charge_scratch(encoded_bound)?;
     let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(super::map_core_error)?;
     if rewritten.len() > encoded_bound {
         return Err(TableMergesError::Verification);
@@ -577,18 +577,12 @@ fn rewrite(
     let snappy_limits = physical_limits
         .snappy_limits()
         .map_err(super::map_archive_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(super::map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(TableMergesError::Limit {
-            kind: TableMergesLimitKind::EntryBytes,
-            observed: usize_as_u64(compressed_bound),
-            maximum: usize_as_u64(snappy_limits.max_compressed_stream()),
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(super::map_core_error)?;
     budget.charge_work(compressed_bound)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(super::map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, snappy_limits).map_err(super::map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(TableMergesError::Verification);
     }
@@ -722,7 +716,7 @@ fn candidate_inventory(
         stream_bytes = stream_bytes
             .checked_add(
                 archive
-                    .encoded_len_with_limits(archive_limits)
+                    .encoded_len(archive_limits)
                     .map_err(super::map_core_error)?,
             )
             .ok_or(TableMergesError::InvalidSource)?;

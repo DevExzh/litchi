@@ -726,7 +726,7 @@ fn rewrite_slide_order(source: &Package, intent: Intent, after: &[u64]) -> Resul
         return Err(Error::InvalidSource);
     }
 
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -787,7 +787,8 @@ fn rewrite_slide_order(source: &Package, intent: Intent, after: &[u64]) -> Resul
     }
     let mut rewritten_stream = stream.into_bytes();
     rewritten_stream[message_start..message_end].copy_from_slice(&rewritten);
-    let compressed = SnappyStream::compress(&rewritten_stream).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_stream, Default::default()).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(

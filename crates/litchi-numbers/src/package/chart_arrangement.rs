@@ -1917,20 +1917,13 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
     )?;
     let original = message.data.as_slice();
     let source_encoded_len = source_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let encoded_bound =
         rewritten_archive_bound(source_encoded_len, original.len(), rewritten.len())?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(|_| Error::InvalidSource)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(|_| Error::InvalidSource)?;
     let (snappy_allocations, snappy_scratch) = snappy_compression_requirements(encoded_bound)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::OutputBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
     budget.preflight_output(encoded_bound)?;
     budget.preflight_output(compressed_bound)?;
     budget.preflight_work(encoded_bound.saturating_add(compressed_bound))?;
@@ -1943,7 +1936,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
     let total_allocations = clone_allocations
         .checked_add(header_allocations)
         .and_then(|amount| amount.checked_add(serialization_allocations))
-        // `Archive::to_bytes_with_limits` creates the final decompressed
+        // `Archive::to_bytes` creates the final decompressed
         // archive buffer, followed by Snappy's output buffer and one
         // temporary compressed buffer per write chunk.
         .and_then(|amount| amount.checked_add(1))
@@ -1975,7 +1968,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .objects
         .get_mut(selection.object_index)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
@@ -1985,11 +1978,12 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         )
         .map_err(|_| Error::InvalidSource)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource)?;
+    let compressed =
+        SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),
@@ -2177,7 +2171,7 @@ pub(super) fn verify_locality(
         }
         let mut expected = source_object.clone();
         expected
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 selection.message_index,
                 RawMessage {
                     type_: CHART_MESSAGE_TYPE,
@@ -2461,10 +2455,13 @@ fn snappy_compression_requirements(input_len: usize) -> Result<(usize, usize), E
     let chunk_output = if input_len == 0 {
         0
     } else {
-        SnappyStream::maximum_compressed_len(input_len.min(SnappyStream::WRITE_CHUNK_SIZE))
-            .map_err(|_| Error::InvalidSource)?
-            .checked_sub(4)
-            .ok_or(Error::InvalidSource)?
+        SnappyStream::maximum_compressed_len(
+            input_len.min(SnappyStream::WRITE_CHUNK_SIZE),
+            Default::default(),
+        )
+        .map_err(|_| Error::InvalidSource)?
+        .checked_sub(4)
+        .ok_or(Error::InvalidSource)?
     };
     let encoder_workspace = usize::from(input_len != 0)
         .checked_mul(SNAPPY_ENCODER_WORKSPACE_BYTES)

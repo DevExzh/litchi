@@ -4485,8 +4485,7 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
     core.parent.mkdir(parents=True, exist_ok=True)
     core.write_text(
         "impl ArchiveObject {\n"
-        "    pub fn clone_with_identity_remap(&self) { self.clone_with_identity_remap_with_limits(); }\n"
-        "    pub fn clone_with_identity_remap_with_limits(&self) {\n"
+        "    pub fn clone_with_identity_remap(&self, limits: Limits) {\n"
         "        let _ = (archive_info, messages, original_header, original_canonical_header, remap);\n"
         "    }\n"
         "}\n",
@@ -4739,8 +4738,8 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "None => None }; let _ = (storage_ids, author_ids); continue; "
             "super::comment_clone::rewrite_comment_payload(message, object_remap, budget); }\n"
             "fn private_graph(comment_graph: Option<&CommentGraphPlan>) { if comment_graph.is_none() { return Err(UnsupportedComment); } }\n"
-            "fn clone_object() { let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?; source.clone_with_identity_remap_with_limits(new_identifier, object_remap, replacements, limits); }\n"
-            "fn replace_slide_message_with_lifecycle_refs() { let limits = reserve_core_header_work(object, removed.len(), limits, budget)?; object.replace_message_pruning_object_references_preserving_header_with_limits(limits); let limits = reserve_core_header_work(object, growth, limits, budget)?; object.replace_message_transitioning_object_references_preserving_header_with_limits(limits); }\n"
+            "fn clone_object() { let limits = reserve_core_header_work(source, object_remap.len(), limits, budget)?; source.clone_with_identity_remap(new_identifier, object_remap, replacements, limits); }\n"
+            "fn replace_slide_message_with_lifecycle_refs() { let limits = reserve_core_header_work(object, removed.len(), limits, budget)?; object.replace_message_pruning_object_references_preserving_header(limits); let limits = reserve_core_header_work(object, growth, limits, budget)?; object.replace_message_transitioning_object_references_preserving_header(limits); }\n"
             "fn reserve_core_header_inspection_work(source: &ArchiveObject, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { reserve_core_header_work_inner(source, 0, limits, budget, false); }\n"
             "fn reserve_core_header_work(source: &ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget) { reserve_core_header_work_inner(source, additional_references, limits, budget, true); }\n"
             "fn reserve_core_header_work_inner(source: &ArchiveObject, additional_references: usize, limits: ArchiveObjectLimits, budget: &mut MediaLifecycleBudget, rewrite: bool) { let bytes = source.header_length; let events = additional_references; budget.charge_allocation_plan(bytes, events); budget.charge_wire_work(bytes); let _ = (limits, rewrite); }\n"
@@ -5599,7 +5598,7 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
         + "fn strict_codec() { numbers_table_sort_order_codec; decode_table_model_sort_order_with_report; prepare_table_model_sort_order_rewrite; }\n"
         + "fn prepared() { PreparedTableSortOrderRewrite; execution_requirements; report(); execute; }\n"
         + "fn fields() { TABLE_MODEL_MESSAGE_TYPE; sort_order; }\n"
-        + "fn rewrite() { replace_message_preserving_header_with_limits; }\n"
+        + "fn rewrite() { replace_message_preserving_header; }\n"
         + "fn shared_graph() { select_table(); same_target(); verify_locality(); Budget; }\n"
         + "fn transaction() { residual; budget; ExactArtifacts; inverse; is_noop; prepare_reassembly; candidate; reopen; validate; same_content; let deleted_previews: usize = 0; }\n"
         + "impl Package {\n"
@@ -20717,7 +20716,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    let payload = object.messages[0].data.clone();\n"
                 "    budget.charge_codec_report(());\n"
                 "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
-                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(payload);\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -20832,7 +20831,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    let payload = object.messages[0].data.clone();\n"
                 "    budget.charge_codec_report(());\n"
                 "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
-                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(payload);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(payload);\n"
                 "}\n"
             )
             owner.write_text(
@@ -26683,7 +26682,7 @@ fn rewrite_movie_title_operation(
                 "    validate_selected_message_metadata();\n"
                 "    budget.charge_codec_report(());\n"
                 "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
-                "    object.replace_message_transitioning_object_references_preserving_header_with_limits(message);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(message);\n"
                 "}\n"
                 "#[cfg(test)]\n"
                 "pub fn test_only_raw(native_resource_id: Option<u64>) {\n"

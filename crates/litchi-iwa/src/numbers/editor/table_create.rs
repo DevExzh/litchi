@@ -173,7 +173,9 @@ pub(super) fn create_empty_table_graph(
 
     let source = package.clone();
     for (archive_name, object) in objects {
-        package.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
+        package.update_archive(&archive_name, |archive| {
+            Ok(archive.insert_object(object, Default::default())?)
+        })?;
     }
     register_cloned_numbers_objects(package, &source, &locations, &remap)?;
     let parent_archive = locations
@@ -288,8 +290,8 @@ mod tests {
     ) -> HostPackage {
         let archive = Archive {
             objects: vec![
-                ArchiveObject::new(3, info_messages).unwrap(),
-                ArchiveObject::new(10, model_messages).unwrap(),
+                ArchiveObject::new(3, info_messages, Default::default()).unwrap(),
+                ArchiveObject::new(10, model_messages, Default::default()).unwrap(),
             ],
         };
         let mut package = HostPackage::new();

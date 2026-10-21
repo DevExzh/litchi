@@ -102,7 +102,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -423,13 +427,15 @@ fn synthetic_package(locked: bool, with_unknowns: bool, with_tracker: bool) -> T
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -440,7 +446,8 @@ fn synthetic_package(locked: bool, with_unknowns: bool, with_tracker: bool) -> T
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let mut members: Vec<(&str, &[u8])> = vec![
@@ -467,7 +474,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("missing package member {name}")))?
@@ -478,7 +485,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn member_archive(package: &[u8], name: &str) -> TestResult<Archive> {
     let bytes = member_bytes(package, name)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&bytes)?.as_bytes(),
+        SnappyStream::decompress(&bytes, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -509,10 +517,11 @@ fn replace_member_archive(
     name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut archive = member_archive(package, name)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &replacement)], Limits::default())?)
 }
 
@@ -532,6 +541,7 @@ fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> T
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -591,6 +601,7 @@ fn with_header_name_manager(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: document.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = &mut root.archive_info.message_infos[message_index];
         info.object_references.push(CALCULATION_ENGINE);
@@ -781,6 +792,7 @@ fn with_pivot_owner(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         let info = &mut model.archive_info.message_infos[message_index];
         info.object_references.push(PIVOT_OWNER);
@@ -829,6 +841,7 @@ fn with_opaque_category_reference(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         let info = &mut model.archive_info.message_infos[message_index];
         info.object_references.push(CATEGORY_OWNER);
@@ -857,6 +870,7 @@ fn with_table_info_cache(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: info.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let message_info = &mut info_object.archive_info.message_infos[message_index];
         message_info.object_references.push(TABLE_INFO_CACHE);
@@ -890,6 +904,7 @@ fn replace_table_info(
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: info.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -916,6 +931,7 @@ fn replace_slide(
                 type_: SLIDE_MESSAGE_TYPE,
                 data: slide.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -932,7 +948,11 @@ fn set_model_message_type(package: &[u8], type_: u32) -> TestResult<Vec<u8>> {
             .position(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-model message"))?;
         let data = object.messages[message_index].data.clone();
-        object.replace_message_preserving_header(message_index, RawMessage { type_, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }

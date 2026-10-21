@@ -162,6 +162,7 @@ pub(crate) fn set_package_last_object_identifier(
                     type_: PACKAGE_METADATA_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             return Ok(());
         }
@@ -180,6 +181,7 @@ pub(crate) fn set_package_last_object_identifier(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -426,6 +428,7 @@ pub(crate) fn clone_component_registration(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -515,6 +518,7 @@ pub(crate) fn add_component_registration(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -573,6 +577,7 @@ pub(crate) fn remove_component_registration(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -645,6 +650,7 @@ pub(crate) fn advance_package_save_token_for_components(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -806,6 +812,7 @@ fn add_component_external_reference_value(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -875,6 +882,7 @@ pub(crate) fn remove_component_external_references_to_object(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -986,6 +994,7 @@ fn remove_component_external_reference_value(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1389,6 +1398,7 @@ pub(crate) fn add_component_object_uuids(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1457,6 +1467,7 @@ pub(crate) fn remove_component_object_uuids(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1545,7 +1556,7 @@ mod tests {
             .replace_archive(
                 PACKAGE_METADATA_ENTRY,
                 &Archive {
-                    objects: vec![ArchiveObject::new(10, messages).unwrap()],
+                    objects: vec![ArchiveObject::new(10, messages, Default::default()).unwrap()],
                 },
             )
             .unwrap();
@@ -2196,6 +2207,7 @@ mod tests {
                                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                                 data: metadata.encode_to_vec(),
                             }],
+                            Default::default(),
                         )
                         .unwrap(),
                     ],
@@ -2234,6 +2246,7 @@ mod tests {
                                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                                 data: original.clone(),
                             }],
+                            Default::default(),
                         )
                         .unwrap(),
                     ],
@@ -2472,6 +2485,7 @@ mod tests {
                                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                                 data: original.clone(),
                             }],
+                            Default::default(),
                         )
                         .unwrap(),
                     ],

@@ -115,6 +115,7 @@ pub(super) fn rename_at_location(
                 type_: location.message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

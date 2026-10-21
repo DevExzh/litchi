@@ -624,6 +624,7 @@ fn replace_registry(
                 type_: location.message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

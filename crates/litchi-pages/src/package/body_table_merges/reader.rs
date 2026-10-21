@@ -120,7 +120,7 @@ impl MergeReader {
     /// or the component object inventory is malformed.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
         let limits = archive_limits(options)?;
-        let source = SourceCatalog::from_bytes_with_limits(bytes, limits)
+        let source = SourceCatalog::from_bytes(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
     }
@@ -156,7 +156,7 @@ impl MergeReader {
         bytes: Arc<[u8]>,
         limits: Limits,
     ) -> Result<Self, Error> {
-        let source = SourceCatalog::from_shared_bytes_with_limits(bytes, limits)
+        let source = SourceCatalog::from_shared_bytes(bytes, limits)
             .map_err(|error| map_lock_error(table_lock::map_archive_error(error)))?;
         Self::from_components_with_limits(source.into_components(), limits)
     }

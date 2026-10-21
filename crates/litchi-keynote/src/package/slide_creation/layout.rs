@@ -699,6 +699,7 @@ fn prepare_slide_number(
             type_: SLIDE_NUMBER_ATTACHMENT_MESSAGE_TYPE,
             data: payload,
         }],
+        Default::default(),
     )
     .map_err(crate::package::structure::StructureError::from)
     .lift()?;

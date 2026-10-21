@@ -529,11 +529,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target),
-            catalog.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), catalog.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         verify_candidate(
@@ -735,9 +733,8 @@ fn rewrite_document_settings(
     drop(edits);
     drop(deleted_previews);
     drop(compressed);
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     verify_candidate(source, &candidate, after, None, 0)?;
     Ok((candidate, touched_components))
@@ -770,7 +767,7 @@ fn rewrite_settings_component(
             return Err(Error::Verification);
         }
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: SETTINGS_MESSAGE_TYPE,

@@ -130,6 +130,7 @@ fn synthetic_package(root: tp::DocumentArchive, storages: &[&[&str]]) -> TestRes
             type_: 10_000,
             data: root.encode_to_vec(),
         }],
+        Default::default(),
     )?];
     for (offset, fragments) in storages.iter().enumerate() {
         objects.push(ArchiveObject::new(
@@ -142,9 +143,13 @@ fn synthetic_package(root: tp::DocumentArchive, storages: &[&[&str]]) -> TestRes
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )?);
     }
-    let stream = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let stream = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", stream.as_slice())],
         ArchiveLimits::default(),
@@ -159,10 +164,14 @@ fn fallback_package(messages: Vec<RawMessage>) -> TestResult<Vec<u8>> {
                 type_: 10_000,
                 data: tp::DocumentArchive::default().encode_to_vec(),
             }],
+            Default::default(),
         )?,
-        ArchiveObject::new(42, messages)?,
+        ArchiveObject::new(42, messages, Default::default())?,
     ];
-    let stream = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let stream = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", stream.as_slice())],
         ArchiveLimits::default(),
@@ -173,9 +182,10 @@ fn cross_component_duplicate_package() -> TestResult<Vec<u8>> {
     let component = |messages| -> TestResult<Vec<u8>> {
         Ok(SnappyStream::compress(
             &Archive {
-                objects: vec![ArchiveObject::new(1, messages)?],
+                objects: vec![ArchiveObject::new(1, messages, Default::default())?],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?)
     };
     let document = component(vec![RawMessage {
@@ -342,7 +352,7 @@ fn other_iwork_families_are_typed_before_document_publication() {
 #[test]
 fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
     let source = std::fs::read(fixture("pages/basic.pages"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let properties = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Canonical report</string><key>fileFormatVersion</key><string>99</string></dict></plist>"#;
     let build = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><array><string>old-build</string><string>canonical-build</string></array></plist>"#;
     let malformed = b"not a plist";
@@ -458,7 +468,7 @@ fn captured_directory_survives_source_removal_and_limits_are_inclusive() -> Test
 #[test]
 fn canonical_properties_hard_limit_is_exact() -> TestResult {
     let source = std::fs::read(fixture("pages/basic.pages"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let prefix = br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>Title</key><string>Limit</string></dict></plist>"#;
     let mut exact = prefix.to_vec();
     exact.resize(MAX_DOCUMENT_PROPERTIES_BYTES, b' ');

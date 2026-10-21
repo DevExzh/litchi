@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let source = fs::read(&input)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut rebuilt = Vec::<(String, Vec<u8>)>::new();
     for entry in catalog.iter().filter(|entry| {
         #[allow(
@@ -55,9 +55,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
             .into());
         }
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
-        let encoded = archive.to_bytes()?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
+        let encoded = archive.to_bytes(Default::default())?;
         if encoded != decompressed.as_bytes() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -65,7 +65,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
             .into());
         }
-        rebuilt.push((entry.name().to_owned(), SnappyStream::compress(&encoded)?));
+        rebuilt.push((
+            entry.name().to_owned(),
+            SnappyStream::compress(&encoded, Default::default())?,
+        ));
     }
 
     let edits = rebuilt

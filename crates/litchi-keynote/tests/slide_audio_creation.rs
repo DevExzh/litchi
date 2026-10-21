@@ -56,7 +56,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn members(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -250,7 +250,7 @@ fn source_selector_is_semantic_and_out_of_range_is_atomic() -> TestResult {
 
 #[test]
 fn oversized_audio_reports_entry_limit_without_changing_source() -> TestResult {
-    let largest = Catalog::from_bytes(NATIVE_SOURCE)?
+    let largest = Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
         .iter()
         .map(|entry| entry.data().len())
         .max()

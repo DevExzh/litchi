@@ -436,7 +436,7 @@ fn replace_message(
     let object = working.object_mut(identifier)?;
     let message_type = object.messages.get(index).ok_or(Fault::Invalid)?.type_;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,

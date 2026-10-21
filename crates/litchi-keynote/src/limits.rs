@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-use litchi_iwa_core::ArchiveLimits as IwaArchiveLimits;
+use litchi_iwa_core::Limits as IwaArchiveLimits;
 
 /// Hard ceiling for native IWA objects indexed by one Keynote package.
 pub(crate) const MAX_OBJECTS: usize = 1_000_000;

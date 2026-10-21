@@ -71,7 +71,7 @@ impl Draft {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
 

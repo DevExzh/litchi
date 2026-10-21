@@ -10,7 +10,7 @@
 use std::mem::size_of;
 
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage};
 use litchi_iwa_protos::keynote_media_lifecycle_codec as lifecycle_codec;
 
 use super::budget::LifecycleBudget;
@@ -244,7 +244,7 @@ fn rewrite_node_cache(
         .object_mut(node_identifier)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -297,7 +297,7 @@ fn clone_component_with_budget(
     // hiding linear metadata work behind an infallible `Clone` implementation.
     budget.charge_wire_work(object_count.checked_mul(128).ok_or(Error::InvalidSource)?)?;
     let encoded_bytes = source
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_archive_error)?;
     let mut messages = 0usize;
     let mut message_infos = 0usize;

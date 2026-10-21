@@ -716,7 +716,7 @@ fn rewrite_merges(
     archive
         .object_mut(selection.target.model.identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.target.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -726,10 +726,10 @@ fn rewrite_merges(
         )
         .map_err(map_native_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_native_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_native_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+        .map_err(map_native_error)?;
     budget
         .output(
             encoded_bound
@@ -750,13 +750,12 @@ fn rewrite_merges(
     budget
         .retained(compressed_bound)
         .map_err(super::map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_native_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_native_error)?;
     if bytes.len() != encoded_bound {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_native_error)?;
+    let compressed =
+        SnappyStream::compress(&bytes, Default::default()).map_err(map_native_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

@@ -105,6 +105,7 @@ pub(super) fn new_number_attachment_object(
             type_: NUMBER_ATTACHMENT_MESSAGE_TYPE,
             data: attachment.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -191,6 +192,7 @@ pub(super) fn patch_number_attachment_settings(
                 type_: NUMBER_ATTACHMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

@@ -59,6 +59,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -173,7 +174,10 @@ fn storage_payload(text: &str, unknown: bool) -> TestResult<Vec<u8>> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -600,7 +604,7 @@ fn synthetic_metadata_package_with_captions(
     collision_identifier: Option<u64>,
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions(captions)?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -612,7 +616,7 @@ fn synthetic_metadata_package_with_captions(
         11_006,
         metadata_payload(last_identifier, collision_identifier)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -630,7 +634,7 @@ fn synthetic_metadata_package_with_one_byte_standin() -> TestResult<Vec<u8>> {
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     let chart = document
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
@@ -655,7 +659,7 @@ fn synthetic_cross_component_metadata_package(
     external_references: &[tsp::ComponentExternalReference],
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions(captions)?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -669,7 +673,7 @@ fn synthetic_cross_component_metadata_package(
         11_006,
         metadata_payload_with_foreign_dependencies(METADATA_LAST_IDENTIFIER, external_references)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -687,7 +691,7 @@ fn synthetic_external_caption_package(
     external_references: &[tsp::ComponentExternalReference],
 ) -> TestResult<Vec<u8>> {
     let source = synthetic_package_with_captions([Some("North"), Some("South")])?;
-    let mut document = Archive::parse(&document_stream(&source)?)?;
+    let mut document = Archive::parse(&document_stream(&source)?, Default::default())?;
     document
         .objects
         .push(object(80, 10, caption_theme_payload()?)?);
@@ -731,7 +735,7 @@ fn synthetic_external_caption_package(
             external_references,
         )?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| {
@@ -776,7 +780,7 @@ impl PackageMetrics {
 }
 
 fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut metrics = PackageMetrics {
         total_uncompressed_bytes: 0,
         total_iwa_stream_bytes: 0,
@@ -798,13 +802,13 @@ fn package_metrics(package: &[u8]) -> TestResult<PackageMetrics> {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
         metrics.total_iwa_stream_bytes = metrics
             .total_iwa_stream_bytes
             .checked_add(u64::try_from(stream.as_bytes().len())?)
             .ok_or_else(|| io::Error::other("synthetic IWA stream total overflow"))?;
         metrics.max_iwa_stream_bytes = metrics.max_iwa_stream_bytes.max(stream.as_bytes().len());
-        let archive = Archive::parse(stream.as_bytes())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         metrics.total_objects = metrics
             .total_objects
             .checked_add(archive.objects.len())
@@ -916,25 +920,25 @@ fn assert_caption_limit(result: Result<Vec<u8>, ChartCaptionError>, label: &str)
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic metadata component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(package)?
+    Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())
@@ -942,8 +946,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn assert_member_unchanged(source: &[u8], target: &[u8], name: &str) -> TestResult<()> {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let source_entry = source_catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -966,7 +970,7 @@ fn assert_member_unchanged(source: &[u8], target: &[u8], name: &str) -> TestResu
 }
 
 fn without_member(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .filter(|entry| entry.name() != name)
@@ -979,16 +983,16 @@ fn without_member(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn stylesheet_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_STYLESHEET_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic stylesheet component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_message_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&metadata_stream(package)?)?;
+    let archive = Archive::parse(&metadata_stream(package)?, Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -1338,7 +1342,7 @@ fn with_metadata_reserved_identifier(
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -1351,30 +1355,36 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 }
 
 fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_stylesheet_archive(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&stylesheet_stream(source)?)?;
+    let mut archive = Archive::parse(&stylesheet_stream(source)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_STYLESHEET_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_STYLESHEET_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn push_varint(value: u64, output: &mut Vec<u8>) {
@@ -1401,7 +1411,7 @@ fn object_header_location(stream: &[u8], identifier: u64) -> TestResult<(usize, 
         let header = stream
             .get(header_start..header_end)
             .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-        let info = ArchiveInfo::decode(header)?;
+        let info = ArchiveInfo::decode(header, Default::default())?;
         if info.identifier == Some(identifier) {
             return Ok((object_start, prefix_length, header_length));
         }
@@ -1457,20 +1467,22 @@ fn with_unknown_archive_header(package: &[u8], identifier: u64) -> TestResult<Ve
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream[header_end..]);
     stream = rewritten;
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(package, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -1481,30 +1493,35 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(package)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(package, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn replace_metadata_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            METADATA_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                METADATA_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let object = archive
         .objects
         .iter_mut()
@@ -1525,7 +1542,7 @@ fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u
 }
 
 fn duplicate_metadata_object(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let mut duplicate = archive
         .objects
         .iter()
@@ -1548,7 +1565,7 @@ fn shared_metadata_graph_source() -> TestResult<Vec<u8>> {
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second = archive
         .object_mut(CAPTION_INFOS[1])
         .ok_or_else(|| io::Error::other("missing second caption info"))?;
@@ -1645,7 +1662,7 @@ fn with_document_message_payload(
     type_: u32,
     data: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
@@ -1664,7 +1681,7 @@ fn with_document_message_type(
     type_: u32,
     replacement_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic document object"))?;
@@ -1678,7 +1695,7 @@ fn with_document_message_type(
 }
 
 fn with_unrelated_caption_owner(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(NON_STYLES[1])
         .ok_or_else(|| io::Error::other("missing unrelated chart object"))?;
@@ -1732,8 +1749,8 @@ fn existing_caption_replacement_is_exact_reversible_and_local() -> TestResult<()
     assert!(commit.diagnostics().full_reparse_performed());
 
     let target = exact_bytes(commit.package())?;
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(
         source_catalog
             .iter()
@@ -1845,7 +1862,7 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     ));
 
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let message = archive
         .object_mut(NON_STYLES[1])
         .and_then(|object| object.messages.first_mut())
@@ -1864,7 +1881,7 @@ fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
 #[test]
 fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second = archive
         .object_mut(CAPTION_INFOS[1])
         .ok_or_else(|| io::Error::other("missing second caption info"))?;
@@ -1881,7 +1898,7 @@ fn shared_storage_and_wrong_parent_are_rejected_atomically() -> TestResult<()> {
     ));
     assert_eq!(exact_bytes(&shared)?, shared_bytes);
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CAPTION_INFOS[0])
         .ok_or_else(|| io::Error::other("missing first caption info"))?
@@ -1927,7 +1944,7 @@ fn patch_conflict_and_debug_output_are_content_redacted() -> TestResult<()> {
 #[test]
 fn malformed_caption_edge_and_storage_wire_are_refused() -> TestResult<()> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CHARTS[0])
         .ok_or_else(|| io::Error::other("missing chart"))?
@@ -1939,7 +1956,7 @@ fn malformed_caption_edge_and_storage_wire_are_refused() -> TestResult<()> {
         Err(ChartCaptionError::InvalidSource)
     ));
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(STORAGES[0])
         .ok_or_else(|| io::Error::other("missing storage"))?
@@ -2106,7 +2123,7 @@ fn metadata_creation_from_canonical_standin_updates_graph_registry_and_inverse()
             .any(|entry| entry.identifier == 1_004)
     );
 
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     assert_eq!(
         document
             .object(CAPTION_INFOS[0])
@@ -2127,8 +2144,8 @@ fn metadata_creation_from_canonical_standin_updates_graph_registry_and_inverse()
     );
     assert_eq!(chart_reference_identifier(&target)?, Some(1_002));
 
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(
         source_catalog
             .iter()
@@ -2234,7 +2251,7 @@ fn metadata_removal_allocates_fresh_standin_and_retains_old_graph() -> TestResul
             .iter()
             .any(|entry| entry.identifier == 1_001)
     );
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     for (identifier, type_) in [
         (CAPTION_INFOS[0], CAPTION_INFO_MESSAGE_TYPE),
         (STORAGES[0], STORAGE_MESSAGE_TYPE),
@@ -2256,14 +2273,14 @@ fn metadata_removal_allocates_fresh_standin_and_retains_old_graph() -> TestResul
     );
     assert_eq!(chart_reference_identifier(&target)?, Some(1_001));
 
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert!(
         target_catalog
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/sentinel.bin")
             .map(|entry| entry.data()),
@@ -2324,7 +2341,7 @@ fn metadata_owned_identifiers_beyond_watermark_are_not_reused() -> TestResult<()
             .commit()?;
         let target = exact_bytes(commit.package())?;
         assert_eq!(chart_reference_identifier(&target)?, Some(reserved + 2));
-        let document = Archive::parse(&document_stream(&target)?)?;
+        let document = Archive::parse(&document_stream(&target)?, Default::default())?;
         assert!(document.object(reserved).is_none());
         for identifier in reserved + 1..=reserved + 4 {
             assert!(document.object(identifier).is_some());
@@ -2348,7 +2365,7 @@ fn extra_or_wrong_type_root_and_theme_candidates_fail_atomically() -> TestResult
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let document_payload = archive
         .object(1)
         .and_then(|object| object.messages.first())
@@ -2370,7 +2387,7 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
         METADATA_LAST_IDENTIFIER,
         None,
     )?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .object_mut(CAPTION_INFOS[0])
         .ok_or_else(|| io::Error::other("missing stand-in"))?
@@ -2394,7 +2411,7 @@ fn canonical_standin_and_shared_or_aliased_graphs_are_rejected() -> TestResult<(
     ));
     assert_graph_change_rejected(&shared)?;
 
-    let mut alias_archive = Archive::parse(&document_stream(&source)?)?;
+    let mut alias_archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second_chart = alias_archive
         .object_mut(CHARTS[1])
         .ok_or_else(|| io::Error::other("missing second chart"))?;

@@ -992,14 +992,19 @@ fn validate_component_framing(package: &Package, component_name: &str) -> Result
         return Err(Error::InvalidSource);
     }
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            physical_limits
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -1382,7 +1387,7 @@ fn rewrite_transition(
             .archive()
             .effective_archive_limits()
             .map_err(map_archive_error)?;
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             source
                 .state
@@ -1392,8 +1397,8 @@ fn rewrite_transition(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         if archive.object(selection.slide_identifier).is_some() {
             let object = archive
                 .object(selection.slide_identifier)
@@ -1411,7 +1416,7 @@ fn rewrite_transition(
             archive
                 .object_mut(selection.slide_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     index,
                     RawMessage {
                         type_: SLIDE_MESSAGE_TYPE,
@@ -1445,7 +1450,7 @@ fn rewrite_transition(
                 archive
                     .object_mut(selection.node_identifier)
                     .ok_or(Error::InvalidSource)?
-                    .replace_message_preserving_header_with_limits(
+                    .replace_message_preserving_header(
                         index,
                         RawMessage {
                             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -1460,12 +1465,11 @@ fn rewrite_transition(
         if archive.object(selection.slide_identifier).is_none() && !node_changed {
             continue;
         }
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
         drop(stream);
-        let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
         drop(bytes);
         compressed_components.push((name, compressed));
     }

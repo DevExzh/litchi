@@ -106,6 +106,7 @@ pub(super) fn replace_movie_playback_settings(
                 type_: MOVIE_ARCHIVE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

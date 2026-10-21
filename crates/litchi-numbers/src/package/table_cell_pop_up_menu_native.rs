@@ -460,8 +460,9 @@ fn rewrite_native_popup_menu_transition(
     // before the first clone/output allocation; the exact codec reports are
     // charged by their prepared plans where available.
     let maximum_archive_bytes = input.limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|_| NativePopUpError::Limit)?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+            .map_err(|_| NativePopUpError::Limit)?;
     budget
         .charge_allocations(12, input.path)
         .map_err(|_| NativePopUpError::Limit)?;
@@ -544,7 +545,7 @@ fn rewrite_native_popup_menu_transition(
             if candidate.object(identifier).is_some() {
                 return Err(NativePopUpError::InvalidSource);
             }
-            let object = ArchiveObject::new_with_limits(
+            let object = ArchiveObject::new(
                 identifier,
                 vec![RawMessage {
                     type_: POPUP_MODEL_TYPE,
@@ -667,7 +668,7 @@ pub(super) fn rewrite_native_popup_menu(
     let transition = rewrite_native_popup_menu_transition(input, budget, false)?;
     let archive_bytes = transition
         .candidate
-        .to_bytes_with_limits(input.limits)
+        .to_bytes(input.limits)
         .map_err(|_| NativePopUpError::Archive)?;
     let member_edits =
         NativeControlOutput::single(input.component_index, input.member_name, archive_bytes)?;
@@ -1186,10 +1187,10 @@ fn split_popup_candidate(
             .try_fold(0usize, |total, (source, candidate)| {
                 let source_len = source
                     .archive
-                    .encoded_len_with_limits(input.limits)
+                    .encoded_len(input.limits)
                     .map_err(|_| NativePopUpError::Archive)?;
                 let candidate_len = candidate
-                    .encoded_len_with_limits(input.limits)
+                    .encoded_len(input.limits)
                     .map_err(|_| NativePopUpError::Archive)?;
                 total
                     .checked_add(source_len)
@@ -1244,20 +1245,20 @@ fn split_popup_candidate(
             continue;
         }
         // Recheck the preflighted encoded lengths immediately before each
-        // serialization.  `to_bytes_with_limits` derives its output length
+        // serialization.  `to_bytes` derives its output length
         // from the current object metadata, so retaining these values here
         // proves that the two temporary Vecs below are still covered by the
         // aggregate preflight and that no late header-length change can evade
         // the source/candidate scratch and work charges.
         let expected_candidate_len = per_member[member_index]
-            .encoded_len_with_limits(input.limits)
+            .encoded_len(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
         let expected_source_len = member
             .archive
-            .encoded_len_with_limits(input.limits)
+            .encoded_len(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
         let bytes = per_member[member_index]
-            .to_bytes_with_limits(input.limits)
+            .to_bytes(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
         if bytes.len() != expected_candidate_len {
             return Err(NativePopUpError::InvalidSource);
@@ -1270,7 +1271,7 @@ fn split_popup_candidate(
         // describe actual byte changes, never merely private provenance.
         let source_bytes = member
             .archive
-            .to_bytes_with_limits(input.limits)
+            .to_bytes(input.limits)
             .map_err(|_| NativePopUpError::Archive)?;
         if source_bytes.len() != expected_source_len {
             return Err(NativePopUpError::InvalidSource);
@@ -2447,7 +2448,7 @@ pub(super) fn replace_message_preserving_header(
         .ok_or(NativePopUpError::InvalidSource)?
         .type_;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: message_type,
@@ -2742,7 +2743,7 @@ pub(super) fn replace_control_message_with_transition(
         fields: transitions.as_slice(),
     };
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: message_type,
@@ -2868,7 +2869,7 @@ pub(super) fn archive_has_popup_reference_strict(
     };
     for object in &archive.objects {
         object
-            .inspect_references_with_policy_and_limits(
+            .inspect_references_with_policy(
                 &mut visitor,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,

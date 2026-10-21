@@ -150,7 +150,7 @@ impl Draft {
         )?;
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -439,6 +439,7 @@ fn pages_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();
@@ -459,7 +460,7 @@ pub(super) fn create_drawable_z_order(
         &[],
     )?;
     package.update_archive(archive_name, |archive| {
-        archive.insert_object(z_order)?;
+        archive.insert_object(z_order, Default::default())?;
         let root = archive.object_mut(DOCUMENT_OBJECT_ID).ok_or_else(|| {
             Error::InvalidFormat("Pages document root object is missing".to_owned())
         })?;
@@ -504,6 +505,7 @@ pub(super) fn create_drawable_z_order(
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         update_reference_list(
             &mut root.archive_info.message_infos[message_index].object_references,

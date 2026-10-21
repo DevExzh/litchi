@@ -118,6 +118,7 @@ pub(super) fn rewrite_slide_media_roots(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[index];
         info.object_references

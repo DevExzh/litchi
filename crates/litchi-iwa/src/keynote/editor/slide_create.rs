@@ -142,7 +142,7 @@ impl Draft {
             })
             .transpose()?;
         if let Some(attachment) = attachment {
-            new_archive.insert_object(attachment)?;
+            new_archive.insert_object(attachment, Default::default())?;
         }
 
         let mut staged = self.package().clone();
@@ -165,7 +165,7 @@ impl Draft {
             })?;
         let new_node = clone_slide_node(source_node, new_node_id, resolved.slide_id, new_slide_id)?;
         staged.update_archive(&node_archive_name, |archive| {
-            archive.insert_object(new_node)?;
+            archive.insert_object(new_node, Default::default())?;
             Ok(())
         })?;
         insert_slide_node(

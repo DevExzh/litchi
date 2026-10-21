@@ -97,7 +97,7 @@ fn bounded_path_ingress_retains_an_independent_immutable_source() {
 fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() {
     use litchi_iwa_archive::{ComponentCatalog, Limits};
 
-    let records = ComponentCatalog::from_bytes(NATIVE)
+    let records = ComponentCatalog::from_bytes(NATIVE, Default::default())
         .unwrap()
         .into_iter()
         .map(|component| {

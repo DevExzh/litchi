@@ -69,6 +69,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -84,7 +85,10 @@ fn add_model_archive_metadata(object: &mut ArchiveObject, style_identifier: u64)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn table_model(identifier: u64) -> tst::TableModelArchive {
@@ -214,6 +218,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -316,13 +321,13 @@ fn metadata_entry() -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("metadata member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     archive
         .objects
         .iter()
@@ -379,13 +384,13 @@ fn object_messages(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<Vec<(u32, Vec<u8>)>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -403,13 +408,13 @@ fn object_references(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<Vec<Vec<u64>>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -428,13 +433,13 @@ fn object_message_metadata(
     member_name: &str,
     identifier: u64,
 ) -> TestResult<litchi_iwa_core::MessageInfo> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .objects
         .iter()
@@ -457,13 +462,13 @@ fn rewrite_object_message<F>(
 where
     F: FnOnce(&mut RawMessage) -> TestResult,
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other(format!("object {identifier} is missing")))?;
@@ -476,8 +481,9 @@ where
         data: message.data.clone(),
     };
     rewrite(&mut replacement)?;
-    object.replace_message_preserving_header(0, replacement)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    object.replace_message_preserving_header(0, replacement, Default::default())?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member_name,
@@ -508,13 +514,13 @@ fn rewrite_object_archive_info<F>(
 where
     F: FnOnce(&mut litchi_iwa_core::MessageInfo) -> TestResult,
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("member {member_name} is missing")))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other(format!("object {identifier} is missing")))?;
@@ -524,7 +530,8 @@ where
         .first_mut()
         .ok_or_else(|| io::Error::other(format!("object {identifier} has no metadata")))?;
     rewrite(info)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member_name,
@@ -1074,8 +1081,8 @@ fn custom_appearance() -> Appearance {
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let after = target
@@ -1103,13 +1110,13 @@ fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("Document member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let info = archive
         .object_mut(FIRST_INFO_ID)
         .ok_or_else(|| io::Error::other("first table info is missing"))?;
@@ -1121,8 +1128,10 @@ fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8
             type_: TABLE_INFO_TYPE,
             data: decoded.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -1134,7 +1143,7 @@ fn rewrite_document_table_info(source: &[u8], locked: bool) -> TestResult<Vec<u8
 
 fn remove_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[METADATA_MEMBER],
             Limits::default(),

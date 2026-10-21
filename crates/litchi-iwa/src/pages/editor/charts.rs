@@ -189,7 +189,7 @@ impl Draft {
         }
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -455,7 +455,7 @@ impl Draft {
                     clone_pages_drawable_graph_object(source_object, &remap)?
                 };
                 staged.update_archive(&group.archive_name, |archive| {
-                    Ok(archive.insert_object(cloned)?)
+                    Ok(archive.insert_object(cloned, Default::default())?)
                 })?;
             }
         }
@@ -806,6 +806,7 @@ fn update_chart_payload(
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -838,6 +839,7 @@ fn update_chart_payload_with_grid(
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

@@ -1292,8 +1292,9 @@ fn rewrite_native_appearance(
         .snappy_limits()
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(
         component_indices.len().saturating_mul(4).saturating_add(8),
         path,
@@ -1362,12 +1363,12 @@ fn rewrite_native_appearance(
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.charge_transaction_work(entry.data().len(), path)?;
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+        let stream = SnappyStream::decompress(entry.data(), snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         if component_index == target.native.component_index {
             replace_model_in_archive(
@@ -1403,10 +1404,10 @@ fn rewrite_native_appearance(
             )?;
         }
         let bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let compressed =
-            SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+        let compressed = SnappyStream::compress(&bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
         edits.push(NativeEdit {
             name,
             data: compressed,
@@ -2307,14 +2308,15 @@ fn rewrite_metadata_entry(
         .effective_archive_limits()
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(4, path)?;
     budget.charge_transaction_work(
         maximum_archive_bytes.saturating_add(maximum_compressed_bytes),
         path,
     )?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -2322,10 +2324,10 @@ fn rewrite_metadata_entry(
             .map_err(|error| map_archive_error(error, path))?,
     )
     .map_err(|error| map_core_error(error, path))?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     let object = archive
         .objects
@@ -2339,7 +2341,7 @@ fn rewrite_metadata_entry(
         return Err(Error::InvalidSource { path });
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: super::metadata::MESSAGE_TYPE,
@@ -2349,9 +2351,10 @@ fn rewrite_metadata_entry(
         )
         .map_err(|error| map_core_error(error, path))?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|error| map_core_error(error, path))?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+    let compressed = SnappyStream::compress(&bytes, Default::default())
+        .map_err(|error| map_core_error(error, path))?;
     Ok(NativeEdit {
         name: super::metadata::ENTRY_NAME.to_owned(),
         data: compressed,
@@ -2443,7 +2446,7 @@ fn append_style_object(
     {
         return Err(Error::InvalidSource { path });
     }
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: TABLE_STYLE_MESSAGE_TYPE,
@@ -2596,7 +2599,7 @@ fn replace_message_with_reference_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             message,
             ObjectReferenceTransition {

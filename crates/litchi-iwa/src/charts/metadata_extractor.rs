@@ -631,8 +631,12 @@ mod tests {
     }
 
     fn chart_object(identifier: u64, type_: u32, data: Vec<u8>) -> ArchiveObject {
-        ArchiveObject::new(identifier, vec![RawMessage { type_, data }])
-            .expect("synthetic chart object")
+        ArchiveObject::new(
+            identifier,
+            vec![RawMessage { type_, data }],
+            Default::default(),
+        )
+        .expect("synthetic chart object")
     }
 
     fn legacy_chart(row_name: &str) -> Vec<u8> {

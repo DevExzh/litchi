@@ -926,7 +926,7 @@ pub(super) fn clone_object(
     budget.charge_allocations(output_bytes)?;
     budget.charge_output(output_bytes)?;
     source
-        .clone_with_identity_remap_with_limits(new_identifier, object_remap, &replacements, limits)
+        .clone_with_identity_remap(new_identifier, object_remap, &replacements, limits)
         .map_err(map_archive_error)
 }
 
@@ -1659,7 +1659,7 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         }
         let limits = reserve_core_header_work(object, removed.len(), limits, budget)?;
         return object
-            .replace_message_pruning_object_references_preserving_header_with_limits(
+            .replace_message_pruning_object_references_preserving_header(
                 index,
                 RawMessage {
                     type_: super::SLIDE_MESSAGE_TYPE,
@@ -1737,7 +1737,7 @@ pub(super) fn replace_slide_message_with_lifecycle_refs(
         })?;
     let limits = reserve_core_header_work(object, growth, limits, budget)?;
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: super::SLIDE_MESSAGE_TYPE,
@@ -1835,7 +1835,7 @@ pub(super) fn strict_reference_census(
 ) -> Result<usize, Error> {
     let mut visitor = ReferenceOccurrenceCounter;
     let occurrences = source
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             limits,
@@ -1848,7 +1848,7 @@ pub(super) fn strict_reference_census(
 /// Reserve the source-sized core header arena needed by a read-only reference
 /// census.  The decoded limits are identical to the mutation reservation, but
 /// the shared lifecycle ledger only admits the canonical source, preflight,
-/// and neutral decode arenas that `inspect_references_with_policy_and_limits`
+/// and neutral decode arenas that `inspect_references_with_policy`
 /// can hold concurrently.  A removal scan must not consume four rewrite
 /// arenas for every unrelated surviving object.
 pub(super) fn reserve_core_header_inspection_work(

@@ -158,6 +158,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -439,7 +440,7 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         });
     }
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     if let Some(index) = control_index
         && matches!(mode, FixtureMode::Mixed)
     {
@@ -560,7 +561,10 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
@@ -719,7 +723,7 @@ fn split_component_fixture() -> TestResult<Vec<u8>> {
     let format_member = compressed(vec![format_sidecar])?;
     let control_member = compressed(vec![control_sidecar])?;
     let popup_member = compressed(vec![popup])?;
-    let view_member = Catalog::from_bytes(&source)?
+    let view_member = Catalog::from_bytes(&source, Default::default())?
         .iter()
         .find(|entry| entry.name() == VIEW_STATE_MEMBER)
         .ok_or_else(|| io::Error::other("ViewState member is missing"))?
@@ -864,7 +868,7 @@ fn object_with_messages_with_identifier(
                 .ok_or_else(|| io::Error::other("sidecar message is missing"))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let mut object = ArchiveObject::new(identifier, messages)?;
+    let mut object = ArchiveObject::new(identifier, messages, Default::default())?;
     object.archive_info = source.archive_info.clone();
     object.archive_info.identifier = Some(identifier);
     object.archive_info.message_infos = indices
@@ -981,13 +985,14 @@ fn split_metadata_payload() -> TestResult<Vec<u8>> {
 }
 
 fn member_archive(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -996,14 +1001,18 @@ fn rewrite_member(
     member: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member,
@@ -1119,7 +1128,7 @@ fn rewrite_control_info(
     source: &[u8],
     mut rewrite: impl FnMut(&mut litchi_iwa_core::MessageInfo) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let split = catalog.iter().any(|entry| entry.name() == CONTROL_MEMBER);
     let (member, object_identifier) = if split {
         (CONTROL_MEMBER, CONTROL_LIST_ID)
@@ -1266,8 +1275,8 @@ fn assert_control_metadata_exact(source: &[u8]) -> TestResult {
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let other = after
@@ -1454,8 +1463,8 @@ fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]
             "split scalar edit did not touch required member {required}"
         );
     }
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,
@@ -1482,11 +1491,14 @@ fn assert_split_scalar_locality(source: &[u8], target: &[u8], changed: &[String]
 
 fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
     let mut identifiers = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         identifiers.extend(
             archive
                 .objects
@@ -1500,21 +1512,28 @@ fn split_popup_model_ids(source: &[u8]) -> TestResult<Vec<u64>> {
 
 fn split_max_iwa_stream_bytes(source: &[u8]) -> TestResult<usize> {
     let mut maximum = 0;
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        maximum = maximum.max(SnappyStream::decompress(entry.data())?.as_bytes().len());
+        maximum = maximum.max(
+            SnappyStream::decompress(entry.data(), Default::default())?
+                .as_bytes()
+                .len(),
+        );
     }
     Ok(maximum)
 }
 
 fn split_popup_model_member(source: &[u8], identifier: u64) -> TestResult<&'static str> {
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.objects.iter().any(|object| {
             object.archive_info.identifier == Some(identifier)
                 && object.messages.iter().any(|message| message.type_ == 6_206)
@@ -1698,8 +1717,8 @@ fn assert_split_popup_locality(
             "split popup reuse unexpectedly rewrote the popup model member",
         );
     }
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,
@@ -1785,8 +1804,8 @@ fn rewrite_split_list(
 }
 
 fn assert_previews_invalidated(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(before.iter().any(|entry| entry.name() == name));
         assert!(after.iter().all(|entry| entry.name() != name));
@@ -2110,7 +2129,7 @@ fn with_physical_alias(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_physical_alias_for_member(source: &[u8], member: &str, alias: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let aliased = catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -2404,7 +2423,7 @@ fn with_split_model_reference_corruption(
 
 fn without_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[METADATA_MEMBER],
             Limits::default(),
@@ -3537,11 +3556,12 @@ fn split_popup_native_aggregate_only_metadata_mutates_and_reopens() -> TestResul
 #[test]
 fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> TestResult {
     let source_with_previews = split_component_fixture()?;
-    let source = Catalog::from_bytes(&source_with_previews)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
+    let source = Catalog::from_bytes(&source_with_previews, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
     let desired = CellControl::PopUpMenu(serialization_growth_menu()?);
     let unrestricted = Package::from_bytes(&source)?;
     let unrestricted_commit = unrestricted

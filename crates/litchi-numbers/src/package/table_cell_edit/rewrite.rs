@@ -1659,12 +1659,10 @@ fn rewrite_component<'a>(
     if entry.is_opaque() || entry.metadata().local().compression_method() != 0 {
         return Err(RewriteError::UnsupportedSource);
     }
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let source_decoded_bytes = stream.as_bytes().len();
     let source_allocation_bytes = archive_allocation_cost(&archive)?;
@@ -1714,13 +1712,12 @@ fn rewrite_component<'a>(
             });
         }
     }
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let allocation_bytes = archive_allocation_cost(&archive)?;
     let references_count = archive_reference_count(&archive)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     let decoded_bytes = rewritten.len();
     let peak_scratch_bytes = checked_add(source_decoded_bytes, source_allocation_bytes)?
         .max(checked_add(allocation_bytes, decoded_bytes)?)
@@ -1778,7 +1775,7 @@ fn replace_classic_message(
     };
     if let Some(delta) = replacement.references {
         object
-            .replace_message_transitioning_object_references_preserving_header_with_limits(
+            .replace_message_transitioning_object_references_preserving_header(
                 replacement.message_index,
                 message,
                 ObjectReferenceTransition {
@@ -1791,11 +1788,7 @@ fn replace_classic_message(
             .map_err(map_core_error)?;
     } else {
         object
-            .replace_message_preserving_header_with_limits(
-                replacement.message_index,
-                message,
-                limits,
-            )
+            .replace_message_preserving_header(replacement.message_index, message, limits)
             .map_err(map_core_error)?;
     }
     Ok(())
@@ -1826,12 +1819,10 @@ fn rewrite_staged_component<'a>(
     if entry.is_opaque() || entry.metadata().local().compression_method() != 0 {
         return Err(RewriteError::UnsupportedSource);
     }
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let source_decoded_bytes = stream.as_bytes().len();
     let source_allocation_bytes = archive_allocation_cost(&archive)?;
@@ -2056,17 +2047,16 @@ fn rewrite_staged_component<'a>(
         }
     }
     archive
-        .append_objects_with_limits(edit.new_objects, archive_limits)
+        .append_objects(edit.new_objects, archive_limits)
         .map_err(map_core_error)?;
     published_messages.sort_unstable_by_key(message_evidence_key);
     published_objects.sort_unstable_by_key(object_evidence_key);
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let allocation_bytes = archive_allocation_cost(&archive)?;
     let references = archive_reference_count(&archive)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     let decoded_bytes = rewritten.len();
     let peak_scratch_bytes = checked_add(source_decoded_bytes, source_allocation_bytes)?
         .max(checked_add(allocation_bytes, decoded_bytes)?)
@@ -2129,7 +2119,7 @@ fn apply_message_edit(
     };
     let Some(delta) = &edit.references else {
         object
-            .replace_message_preserving_header_with_limits(edit.message_index, replacement, limits)
+            .replace_message_preserving_header(edit.message_index, replacement, limits)
             .map_err(map_core_error)?;
         return Ok(());
     };
@@ -2148,7 +2138,7 @@ fn apply_message_edit(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             edit.message_index,
             replacement,
             ObjectReferenceTransition {
@@ -2802,6 +2792,7 @@ mod tests {
                 type_: 7,
                 data: vec![0xaa],
             }],
+            Default::default(),
         )
         .expect("test object is valid");
         let info = &mut object.archive_info.message_infos[0];
@@ -2874,6 +2865,7 @@ mod tests {
                 type_: 2001,
                 data: vec![0xaa],
             }],
+            Default::default(),
         )
         .expect("test object is valid");
         let info = &mut object.archive_info.message_infos[0];

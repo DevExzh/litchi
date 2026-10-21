@@ -626,9 +626,9 @@ pub(super) fn parse_member(package: &Package, name: &str) -> Result<Archive, Err
     let archive_limits = limits
         .effective_archive_limits()
         .map_err(|error| map_archive(&error))?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
-    archive.validate_canonical_object_framing(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), snappy)?;
+    let archive = Archive::parse(stream.as_bytes(), archive_limits)?;
+    archive.validate_canonical_object_framing(stream.as_bytes(), archive_limits)?;
     Ok(archive)
 }
 
@@ -779,7 +779,7 @@ fn publish(
             })?;
             let data =
                 litchi_iwa_text_wire::character_style_variation(parent, stylesheet, properties);
-            let mut object = ArchiveObject::new_with_limits(
+            let mut object = ArchiveObject::new(
                 identifier,
                 vec![RawMessage {
                     type_: CHARACTER_STYLE_MESSAGE_TYPE,
@@ -794,7 +794,7 @@ fn publish(
                 .ok_or(Error::InvalidSource)?;
             info.versions.clone_from(&versions);
             info.object_references = parent.into_iter().chain([stylesheet]).collect();
-            sheet_archive.insert_object_with_limits(object, archive_limits)?;
+            sheet_archive.insert_object(object, archive_limits)?;
             // The stylesheet lists the new style.
             let sheet = sheet_archive
                 .object_mut(stylesheet)
@@ -813,22 +813,21 @@ fn publish(
             // A native header whose field-local references the aggregate
             // list does not repeat cannot be transitioned; its payload is
             // then replaced with the header kept as it is.
-            let declared = sheet
-                .replace_message_transitioning_object_references_preserving_header_with_limits(
-                    sheet_index,
-                    RawMessage {
-                        type_: STYLESHEET_MESSAGE_TYPE,
-                        data: sheet_data.clone(),
-                    },
-                    litchi_iwa_core::archive::ObjectReferenceTransition {
-                        aggregate_before: &before,
-                        aggregate_after: &after,
-                        fields: &[],
-                    },
-                    archive_limits,
-                );
+            let declared = sheet.replace_message_transitioning_object_references_preserving_header(
+                sheet_index,
+                RawMessage {
+                    type_: STYLESHEET_MESSAGE_TYPE,
+                    data: sheet_data.clone(),
+                },
+                litchi_iwa_core::archive::ObjectReferenceTransition {
+                    aggregate_before: &before,
+                    aggregate_after: &after,
+                    fields: &[],
+                },
+                archive_limits,
+            );
             if declared.is_err() {
-                sheet.replace_message_preserving_header_with_limits(
+                sheet.replace_message_preserving_header(
                     sheet_index,
                     RawMessage {
                         type_: STYLESHEET_MESSAGE_TYPE,
@@ -871,7 +870,7 @@ fn publish(
     {
         let archive = storage_archive.as_mut().unwrap_or(&mut sheet_archive);
         let object = archive.object_mut(storage).ok_or(Error::InvalidSource)?;
-        object.replace_message_transitioning_object_references_preserving_header_with_limits(
+        object.replace_message_transitioning_object_references_preserving_header(
             storage_index,
             RawMessage {
                 type_: STORAGE_MESSAGE_TYPE,
@@ -923,7 +922,7 @@ fn publish(
     metadata_archive
         .object_mut(metadata_object)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             metadata_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -935,8 +934,11 @@ fn publish(
     // Reassemble once and reopen.
     let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
     let mut encode = |name: &str, archive: &Archive| -> Result<(), Error> {
-        let bytes = archive.to_bytes_with_limits(archive_limits)?;
-        encoded.push((name.to_owned(), SnappyStream::compress(&bytes)?));
+        let bytes = archive.to_bytes(archive_limits)?;
+        encoded.push((
+            name.to_owned(),
+            SnappyStream::compress(&bytes, Default::default())?,
+        ));
         Ok(())
     };
     encode(&sheet_member, &sheet_archive)?;

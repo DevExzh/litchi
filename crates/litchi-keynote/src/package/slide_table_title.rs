@@ -878,11 +878,9 @@ fn rewrite_title(
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .object(selection.model_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -950,7 +948,7 @@ fn rewrite_title(
     archive
         .object_mut(selection.model_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -960,22 +958,20 @@ fn rewrite_title(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+        .map_err(map_core_error)?;
     budget.output(
         encoded_bound
             .checked_add(compressed_bound)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_bound {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -1530,7 +1526,7 @@ fn verify_locality(
                 .ok_or(Error::Verification)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.model_message_index,
                     candidate_message.clone(),
                     archive_limits,
@@ -1604,9 +1600,8 @@ fn component_archive(package: &Package, name: &str) -> Result<Archive, Error> {
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
-    Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
+    Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)
 }
 
 fn resolve_slide_position(

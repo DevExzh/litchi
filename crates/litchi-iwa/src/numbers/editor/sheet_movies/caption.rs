@@ -420,7 +420,7 @@ fn insert_sheet_movie_caption(
     )?;
     package.update_archive(archive_name, |archive| {
         for object in objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         replace_sheet_movie_caption_reference(
             archive,
@@ -442,7 +442,7 @@ fn insert_sheet_movie_caption_standin(
 ) -> Result<()> {
     let standin = standin_caption_object(standin_id)?;
     package.update_archive(archive_name, |archive| {
-        archive.insert_object(standin)?;
+        archive.insert_object(standin, Default::default())?;
         replace_sheet_movie_caption_reference(
             archive,
             drawable_object_id,
@@ -498,6 +498,7 @@ fn replace_sheet_movie_caption_reference(
             type_: MOVIE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     replace_object_reference(
         &mut object.archive_info.message_infos[*message_index].object_references,

@@ -219,7 +219,9 @@ pub(crate) fn duplicate_attached_table_graph_in_package(
     }
 
     for (archive_name, object) in objects {
-        staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
+        staged.update_archive(&archive_name, |archive| {
+            Ok(archive.insert_object(object, Default::default())?)
+        })?;
     }
     register_cloned_numbers_objects(staged, source, &locations, &remap)?;
 

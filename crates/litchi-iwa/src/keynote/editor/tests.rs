@@ -469,6 +469,7 @@ fn slide_custom_timing_curve_updates_preserve_deep_unknown_path_wire() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -520,6 +521,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -553,6 +555,7 @@ fn slide_rotate_action_rejects_missing_and_duplicate_native_parameters() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -673,6 +676,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -708,6 +712,7 @@ fn slide_scale_and_opacity_reject_malformed_native_parameters() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -900,6 +905,7 @@ fn slide_emphasis_actions_reject_missing_duplicate_and_cross_effect_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1054,6 +1060,7 @@ fn slide_keyboard_build_rejects_missing_duplicate_and_cross_effect_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1317,6 +1324,7 @@ fn slide_object_build_accepts_omitted_native_left_to_right_default_losslessly() 
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1386,6 +1394,7 @@ fn slide_object_build_rejects_duplicate_wrong_wire_and_cross_effect_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1506,6 +1515,7 @@ fn slide_raw_custom_build_parameters_reject_duplicate_and_wrong_wire_types() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1665,6 +1675,7 @@ fn slide_move_updates_preserve_deep_unknown_path_wire() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1733,6 +1744,7 @@ fn slide_move_rejects_missing_duplicate_and_invalid_native_path_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1775,6 +1787,7 @@ fn unsupported_action_timing_updates_preserve_opaque_native_parameters() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1892,6 +1905,7 @@ fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1917,24 +1931,27 @@ fn build_updates_preserve_unknown_wire_and_normalize_native_merge_payloads() {
             let build = archive.object_mut(created.object_id).unwrap();
             let mut message = build.messages[0].clone();
             message.data.extend_from_slice(&build_suffix);
-            build.replace_message(0, message)?;
-            build.push_message(RawMessage {
-                type_: 0,
-                data: kn::BuildAttributesArchive {
-                    animation_attributes: Some(kn::AnimationAttributesArchive {
-                        effect: Some("apple:appear".to_owned()),
+            build.replace_message(0, message, Default::default())?;
+            build.push_message(
+                RawMessage {
+                    type_: 0,
+                    data: kn::BuildAttributesArchive {
+                        animation_attributes: Some(kn::AnimationAttributesArchive {
+                            effect: Some("apple:appear".to_owned()),
+                            ..Default::default()
+                        }),
                         ..Default::default()
-                    }),
-                    ..Default::default()
-                }
-                .encode_to_vec(),
-            })?;
+                    }
+                    .encode_to_vec(),
+                },
+                Default::default(),
+            )?;
             build.archive_info.should_merge = Some(true);
 
             let chunk = archive.object_mut(created.chunks[0].object_id).unwrap();
             let mut message = chunk.messages[0].clone();
             message.data.extend_from_slice(&chunk_suffix);
-            chunk.replace_message(0, message)?;
+            chunk.replace_message(0, message, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -2069,7 +2086,9 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
             let object = archive.object_mut(18).unwrap();
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 99, 990);
-            Ok(object.replace_message(0, message).map(|_| ())?)
+            Ok(object
+                .replace_message(0, message, Default::default())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -2077,7 +2096,7 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
         .package()
         .archive("Index/Slide-4.iwa")
         .unwrap()
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
     editor
         .set_slide_text_storage(0, 17, "Temporary 東京")
@@ -2090,7 +2109,7 @@ fn slide_text_storage_updates_preserve_unknown_wire_and_restore_exactly() {
             .package()
             .archive("Index/Slide-4.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap(),
         baseline
     );
@@ -2110,6 +2129,7 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
                     type_: 5,
                     data: slide.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -2133,15 +2153,19 @@ fn ambiguous_slide_text_ownership_fails_transactionally() {
                     type_: 5,
                     data: slide.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            Ok(archive.insert_object(object(
-                19,
-                2011,
-                tswp::ShapeInfoArchive {
-                    owned_storage: Some(reference(18)),
-                    ..Default::default()
-                },
-            ))?)
+            Ok(archive.insert_object(
+                object(
+                    19,
+                    2011,
+                    tswp::ShapeInfoArchive {
+                        owned_storage: Some(reference(18)),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -2398,7 +2422,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
                 let object = archive.object_mut(identifier).unwrap();
                 let mut message = object.messages[0].clone();
                 append_unknown_varint(&mut message.data, 99, identifier);
-                object.replace_message(0, message)?;
+                object.replace_message(0, message, Default::default())?;
             }
             Ok(())
         })
@@ -2439,7 +2463,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
             owner.archive_info.message_infos[0]
                 .object_references
                 .push(17);
-            Ok(archive.insert_object(owner)?)
+            Ok(archive.insert_object(owner, Default::default())?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -2461,6 +2485,7 @@ fn text_box_graph_crud_preserves_unknowns_and_rejects_external_owners() {
                     type_: 5,
                     data: slide.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -2528,6 +2553,7 @@ fn transition_custom_parameters_reader_rejects_malformed_wire() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -2620,6 +2646,7 @@ fn transition_animation_parameters_reader_rejects_malformed_wire() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -3497,7 +3524,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
             let source = archive.object(73).unwrap();
             let duplicate =
                 clone_object_metadata(source, 76, source.messages.clone(), &HashMap::new(), false)?;
-            archive.insert_object(duplicate)?;
+            archive.insert_object(duplicate, Default::default())?;
             let slide = archive.object_mut(4).unwrap();
             let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
             decoded.owned_drawables.push(reference(76));
@@ -3508,6 +3535,7 @@ fn slide_layout_update_rejects_ambiguous_live_videos_transactionally() {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide.archive_info.message_infos[0]
                 .object_references
@@ -3542,7 +3570,7 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
             let source = archive.object(74).unwrap();
             let duplicate =
                 clone_object_metadata(source, 78, source.messages.clone(), &HashMap::new(), false)?;
-            archive.insert_object(duplicate)?;
+            archive.insert_object(duplicate, Default::default())?;
             let slide = archive.object_mut(4).unwrap();
             let mut decoded = kn::SlideArchive::decode(slide.messages[0].data.as_slice())?;
             decoded.owned_drawables.push(reference(78));
@@ -3553,6 +3581,7 @@ fn slide_layout_update_rejects_ambiguous_materialized_images_transactionally() {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide.archive_info.message_infos[0]
                 .object_references
@@ -3598,6 +3627,7 @@ fn slide_layout_update_hides_a_retained_placeholder_missing_from_the_layout() {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3637,6 +3667,7 @@ fn slide_layout_update_rejects_ambiguous_wire_fields_transactionally() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3665,6 +3696,7 @@ fn current_slide_layout_rejects_missing_theme_mapping() {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3686,15 +3718,19 @@ fn current_slide_layout_rejects_multiple_theme_mappings() {
                     type_: TEST_THEME_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(object(
-                37,
-                TEST_SLIDE_NODE_MESSAGE_TYPE,
-                kn::SlideNodeArchive {
-                    slide: Some(reference(31)),
-                    ..Default::default()
-                },
-            ))?;
+            archive.insert_object(
+                object(
+                    37,
+                    TEST_SLIDE_NODE_MESSAGE_TYPE,
+                    kn::SlideNodeArchive {
+                        slide: Some(reference(31)),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -3770,6 +3806,7 @@ fn duplicate_slide_tree_references_fail_transactionally() {
                     type_: object.messages[0].type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3883,13 +3920,17 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
         .update_archive("Index/Slide-4.iwa", |archive| {
             let placeholder = archive.object(5).unwrap().messages[0].data.as_slice();
             let shape = repeated_length_delimited_payloads(placeholder, 1)?[0].to_vec();
-            archive.insert_object(ArchiveObject::new(
-                17,
-                vec![RawMessage {
-                    type_: 2011,
-                    data: shape,
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    17,
+                    vec![RawMessage {
+                        type_: 2011,
+                        data: shape,
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
 
             let storage = archive.object_mut(7).unwrap();
             let mut value = tswp::StorageArchive::decode(storage.messages[0].data.as_slice())?;
@@ -3900,6 +3941,7 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
                     type_: 2001,
                     data: value.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             for object in &mut archive.objects {
@@ -3927,6 +3969,7 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -3952,6 +3995,7 @@ fn cloned_slide_payloads_preserve_deep_unknown_fields_exactly() {
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4044,6 +4088,7 @@ fn cloned_slide_rejects_duplicate_reference_identifiers_transactionally() {
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4104,6 +4149,7 @@ fn test_package_with_text_box() -> HostPackage {
                     type_: 5,
                     data: slide.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide_object.archive_info.message_infos[0]
                 .object_references
@@ -4139,17 +4185,20 @@ fn test_package_with_text_box() -> HostPackage {
             shape.archive_info.message_infos[0]
                 .object_references
                 .extend([4, 21, 22, 18]);
-            archive.insert_object(shape)?;
-            archive.insert_object(object(21, 3097, Vec::new()))?;
-            archive.insert_object(object(22, 3097, Vec::new()))?;
-            Ok(archive.insert_object(object(
-                18,
-                2001,
-                StorageArchive {
-                    text: vec!["Independent text box".to_owned()],
-                    ..Default::default()
-                },
-            ))?)
+            archive.insert_object(shape, Default::default())?;
+            archive.insert_object(object(21, 3097, Vec::new()), Default::default())?;
+            archive.insert_object(object(22, 3097, Vec::new()), Default::default())?;
+            Ok(archive.insert_object(
+                object(
+                    18,
+                    2001,
+                    StorageArchive {
+                        text: vec!["Independent text box".to_owned()],
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?)
         })
         .unwrap();
     package
@@ -4183,6 +4232,7 @@ fn test_package_with_unknown_slide_tree() -> HostPackage {
                     type_: object.messages[0].type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4213,6 +4263,7 @@ fn object<T: Message>(identifier: u64, type_: u32, value: T) -> ArchiveObject {
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )
     .unwrap()
 }
@@ -4392,6 +4443,7 @@ fn test_package_with_slide_background() -> HostPackage {
                         type_: TEST_SLIDE_MESSAGE_TYPE,
                         data: native.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 slide.archive_info.message_infos[0]
                     .object_references
@@ -4440,6 +4492,7 @@ fn test_package_with_slide_background() -> HostPackage {
             type_: 9,
             data: style_data,
         }],
+        Default::default(),
     )
     .unwrap();
     style_object.archive_info.message_infos[0]
@@ -4481,24 +4534,31 @@ fn test_package_with_theme() -> HostPackage {
                     type_: 2,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(object(
-                29,
-                10,
-                kn::ThemeArchive {
-                    templates: vec![reference(30)],
-                    default_template_slide_node: Some(reference(30)),
-                    ..Default::default()
-                },
-            ))?;
-            archive.insert_object(object(
-                30,
-                4,
-                kn::SlideNodeArchive {
-                    slide: Some(reference(31)),
-                    ..Default::default()
-                },
-            ))?;
+            archive.insert_object(
+                object(
+                    29,
+                    10,
+                    kn::ThemeArchive {
+                        templates: vec![reference(30)],
+                        default_template_slide_node: Some(reference(30)),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    30,
+                    4,
+                    kn::SlideNodeArchive {
+                        slide: Some(reference(31)),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4580,6 +4640,7 @@ fn test_package_with_current_layout() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide.archive_info.message_infos[0]
                 .object_references
@@ -4603,6 +4664,7 @@ fn test_package_with_two_layouts() -> HostPackage {
                     type_: TEST_THEME_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let source_node = archive.object_mut(30).unwrap();
@@ -4615,6 +4677,7 @@ fn test_package_with_two_layouts() -> HostPackage {
                     type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let live_node = archive.object_mut(3).unwrap();
@@ -4626,16 +4689,20 @@ fn test_package_with_two_layouts() -> HostPackage {
                     type_: TEST_SLIDE_NODE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(object(
-                37,
-                TEST_SLIDE_NODE_MESSAGE_TYPE,
-                kn::SlideNodeArchive {
-                    slide: Some(reference(38)),
-                    template_slide_id: Some(test_uuid(3, 4)),
-                    ..Default::default()
-                },
-            ))?;
+            archive.insert_object(
+                object(
+                    37,
+                    TEST_SLIDE_NODE_MESSAGE_TYPE,
+                    kn::SlideNodeArchive {
+                        slide: Some(reference(38)),
+                        template_slide_id: Some(test_uuid(3, 4)),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4650,6 +4717,7 @@ fn test_package_with_two_layouts() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             set_test_placeholder_presentation(archive.object_mut(32).unwrap(), 100.0, 51, 2)?;
             set_test_placeholder_presentation(archive.object_mut(33).unwrap(), 200.0, 52, 3)?;
@@ -4667,6 +4735,7 @@ fn test_package_with_two_layouts() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide.archive_info.message_infos[0].object_references = vec![50, 31];
             set_test_placeholder_presentation(archive.object_mut(5).unwrap(), 100.0, 51, 2)?;
@@ -4725,6 +4794,7 @@ fn test_package_with_image_layout() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let mut image = object(
@@ -4764,28 +4834,37 @@ fn test_package_with_image_layout() -> HostPackage {
             );
             image.archive_info.message_infos[0].object_references = vec![72, 71, 60, 73];
             image.archive_info.message_infos[0].data_references = vec![1_001, 1_002];
-            archive.insert_object(image)?;
-            archive.insert_object(object(
-                71,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
-            archive.insert_object(object(
-                72,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
-            archive.insert_object(object(
-                73,
-                3_006,
-                tsd::MaskArchive {
-                    super_: tsd::DrawableArchive {
-                        parent: Some(reference(70)),
+            archive.insert_object(image, Default::default())?;
+            archive.insert_object(
+                object(
+                    71,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    72,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    73,
+                    3_006,
+                    tsd::MaskArchive {
+                        super_: tsd::DrawableArchive {
+                            parent: Some(reference(70)),
+                            ..Default::default()
+                        },
                         ..Default::default()
                     },
-                    ..Default::default()
-                },
-            ))?;
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4807,6 +4886,7 @@ fn test_package_with_live_video_layout() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let mut movie = object(
@@ -4845,20 +4925,27 @@ fn test_package_with_live_video_layout() -> HostPackage {
                     type_: TEST_MOVIE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             movie.archive_info.message_infos[0].object_references = vec![72, 71, 60];
             movie.archive_info.message_infos[0].data_references = vec![2_001];
-            archive.insert_object(movie)?;
-            archive.insert_object(object(
-                71,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
-            archive.insert_object(object(
-                72,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
+            archive.insert_object(movie, Default::default())?;
+            archive.insert_object(
+                object(
+                    71,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    72,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4884,6 +4971,7 @@ fn test_package_with_file_movie_layout(flags: u32) -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let mut movie = object(
@@ -4922,17 +5010,23 @@ fn test_package_with_file_movie_layout(flags: u32) -> HostPackage {
             );
             movie.archive_info.message_infos[0].object_references = vec![72, 71, 60];
             movie.archive_info.message_infos[0].data_references = vec![2_001, 2_002];
-            archive.insert_object(movie)?;
-            archive.insert_object(object(
-                71,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
-            archive.insert_object(object(
-                72,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
+            archive.insert_object(movie, Default::default())?;
+            archive.insert_object(
+                object(
+                    71,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    72,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4991,6 +5085,7 @@ fn test_package_with_slide_movie() -> HostPackage {
                     type_: TEST_SLIDE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             slide.archive_info.message_infos[0]
                 .object_references
@@ -5037,17 +5132,23 @@ fn test_package_with_slide_movie() -> HostPackage {
             movie.archive_info.message_infos[0].object_references = vec![71, 72, 50];
             movie.archive_info.message_infos[0].data_references =
                 vec![video.data_identifier.get(), poster.data_identifier.get()];
-            archive.insert_object(movie)?;
-            archive.insert_object(object(
-                71,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
-            archive.insert_object(object(
-                72,
-                STANDIN_CAPTION_MESSAGE_TYPE,
-                tsd::StandinCaptionArchive::default(),
-            ))?;
+            archive.insert_object(movie, Default::default())?;
+            archive.insert_object(
+                object(
+                    71,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
+            archive.insert_object(
+                object(
+                    72,
+                    STANDIN_CAPTION_MESSAGE_TYPE,
+                    tsd::StandinCaptionArchive::default(),
+                ),
+                Default::default(),
+            )?;
             let mut build = object(
                 73,
                 BUILD_MESSAGE_TYPE,
@@ -5073,7 +5174,7 @@ fn test_package_with_slide_movie() -> HostPackage {
             build.archive_info.message_infos[0]
                 .object_references
                 .push(70);
-            archive.insert_object(build)?;
+            archive.insert_object(build, Default::default())?;
             let build_uuid = test_uuid(7_001, 7_002);
             let mut chunk = object(
                 74,
@@ -5095,7 +5196,7 @@ fn test_package_with_slide_movie() -> HostPackage {
             chunk.archive_info.message_infos[0]
                 .object_references
                 .push(73);
-            Ok(archive.insert_object(chunk)?)
+            Ok(archive.insert_object(chunk, Default::default())?)
         })
         .unwrap();
     crate::data_reference_registry::add_component_data_reference(
@@ -5141,6 +5242,7 @@ fn set_test_placeholder_presentation(
             type_: TEST_PLACEHOLDER_MESSAGE_TYPE,
             data: test_placeholder(storage, x, style, kind).encode_to_vec(),
         },
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].object_references = vec![style];
     Ok(())

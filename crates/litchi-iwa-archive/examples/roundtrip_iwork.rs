@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let limits = Limits::default();
     let source = support::read_package(Path::new(&input), limits)?;
-    let catalog = Catalog::from_shared_bytes(source)?;
+    let catalog = Catalog::from_shared_bytes(source, Default::default())?;
     let component_capacity = catalog.len();
     let mut entries = Vec::new();
     entries
@@ -52,9 +52,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )]
         let is_iwa = name.ends_with(".iwa");
         if is_iwa {
-            let decompressed = SnappyStream::decompress(&data)?;
-            let archive = Archive::parse(decompressed.as_bytes())?;
-            data = SnappyStream::compress(&archive.to_bytes()?)?;
+            let decompressed = SnappyStream::decompress(&data, Default::default())?;
+            let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
+            data =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             archive_count = archive_count.checked_add(1).ok_or_else(|| {
                 Error::InvalidBundle("round-trip IWA component count overflows usize".to_owned())
             })?;

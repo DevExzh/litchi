@@ -96,7 +96,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -623,19 +627,22 @@ fn synthetic_package(locked: bool, with_unknown_group: bool) -> TestResult<Vec<u
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let stylesheet_component = SnappyStream::compress(
         &Archive {
             objects: stylesheet_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -646,7 +653,8 @@ fn synthetic_package(locked: bool, with_unknown_group: bool) -> TestResult<Vec<u
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let mut members: Vec<(&str, &[u8])> = vec![
@@ -674,7 +682,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("missing member {name}")))?
@@ -684,7 +692,8 @@ fn member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 
 fn member_archive(source: &[u8], name: &str) -> TestResult<Archive> {
     Ok(Archive::parse(
-        SnappyStream::decompress(&member_bytes(source, name)?)?.as_bytes(),
+        SnappyStream::decompress(&member_bytes(source, name)?, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -693,10 +702,11 @@ fn replace_member_archive(
     name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut archive = member_archive(source, name)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &replacement)], Limits::default())?)
 }
 
@@ -722,7 +732,7 @@ where
             data: message.data.clone(),
         };
         rewrite(&mut replacement)?;
-        object.replace_message_preserving_header(0, replacement)?;
+        object.replace_message_preserving_header(0, replacement, Default::default())?;
         Ok(())
     })
 }
@@ -866,7 +876,7 @@ fn assert_rejected_atomically_at(source: &[u8], table: usize, label: &str) -> Te
 }
 
 fn member_names(source: &[u8]) -> TestResult<Vec<String>> {
-    let mut names = Catalog::from_bytes(source)?
+    let mut names = Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect::<Vec<_>>();
@@ -1126,7 +1136,7 @@ fn changed_appearance_cows_shared_style_and_preserves_locality() -> TestResult {
     assert_unaffected_members_exact(&source, &target, &[DOCUMENT_MEMBER, SENTINEL_MEMBER])?;
     for preview in PREVIEWS {
         assert!(
-            Catalog::from_bytes(&target)?
+            Catalog::from_bytes(&target, Default::default())?
                 .iter()
                 .all(|entry| entry.name() != preview)
         );
@@ -1169,7 +1179,7 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
         .edit_slide_table_appearance(0usize, 0usize)?
         .set(custom_appearance())
         .commit()?;
-    let unrelated = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let unrelated = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(SENTINEL_MEMBER, b"a different sentinel")],
         Limits::default(),
     )?;
@@ -1517,6 +1527,7 @@ fn inbound_roles_are_classified_by_the_exact_referencing_message() -> TestResult
                     data: style_payload(FOREIGN_INBOUND_ID, None, [None; 7], false)?,
                 },
             ],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0]
             .object_references
@@ -1624,11 +1635,8 @@ fn surviving_style_uuid_ownership_accepts_unregistered_registry_and_rejects_conf
 #[test]
 fn missing_stylesheet_metadata_and_foreign_inbound_are_atomic() -> TestResult {
     let source = synthetic_package(false, false)?;
-    let missing_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let missing_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[METADATA_MEMBER], Limits::default())?;
     assert_rejected_atomically(&missing_metadata, "missing PackageMetadata")?;
 
     let missing_style = replace_member_archive(&source, STYLESHEET_MEMBER, |archive| {

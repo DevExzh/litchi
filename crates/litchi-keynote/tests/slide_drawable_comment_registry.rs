@@ -137,15 +137,15 @@ fn drawable_semantics(package: &Package) -> TestResult<Vec<DrawableSemantic>> {
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -155,8 +155,9 @@ fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
 }
 
 fn replace_component(source: &[u8], component_name: &str, archive: Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -320,6 +321,7 @@ fn rewrite_document_root(
             type_: DOCUMENT_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     replace_component(source, DOCUMENT_COMPONENT, archive)
 }
@@ -476,8 +478,9 @@ fn with_detached_registry(source: &[u8]) -> TestResult<(Vec<u8>, u64)> {
         new_identifier,
         &[(*identifier, new_identifier)],
         &source_object.messages,
+        Default::default(),
     )?;
-    archive.insert_object(clone)?;
+    archive.insert_object(clone, Default::default())?;
     Ok((
         replace_component(source, component_name, archive)?,
         new_identifier,
@@ -786,6 +789,7 @@ fn rewrite_storage_payload(
             type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
     replace_component(source, component_name, archive)
 }

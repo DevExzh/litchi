@@ -59,6 +59,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -156,7 +157,10 @@ fn storage_payload(text: &str) -> Vec<u8> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
@@ -401,7 +405,7 @@ fn synthetic_metadata_package_with_captions(
         11_006,
         metadata_payload_with_last_identifier(last_identifier)?,
     )?])?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -425,13 +429,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_message_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing metadata member"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     archive
         .objects
         .iter()
@@ -447,9 +451,10 @@ fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u
         &Archive {
             objects: vec![object(METADATA_OBJECT, 11_006, payload)?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -521,17 +526,18 @@ fn with_duplicate_current_metadata_component(source: &[u8]) -> TestResult<Vec<u8
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -589,7 +595,7 @@ fn with_movie_build(
     build_references: Vec<u64>,
     slide_builds: &[u64],
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("missing synthetic slide"))?;
@@ -634,7 +640,7 @@ fn assert_movie_caption_edit_rejected(source: &[u8]) -> TestResult<()> {
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .objects
         .iter()
@@ -671,7 +677,7 @@ fn with_document_message_payload(
     type_: u32,
     payload: Vec<u8>,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .objects
         .iter_mut()
@@ -919,7 +925,7 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
     assert!(no_op.patch().is_noop());
     assert_eq!(exact_bytes(no_op.package())?, source);
 
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let no_metadata_source = litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -945,7 +951,7 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
     assert_eq!(exact_bytes(&no_metadata_package)?, no_metadata_source);
 
     let metadata_create_source = synthetic_package_with_captions([None, Some("South")])?;
-    let metadata_create_catalog = Catalog::from_bytes(&metadata_create_source)?;
+    let metadata_create_catalog = Catalog::from_bytes(&metadata_create_source, Default::default())?;
     let no_metadata_create_source = litchi_iwa_archive::package::to_bytes(
         metadata_create_catalog
             .iter()
@@ -974,7 +980,7 @@ fn no_op_is_exact_and_changed_without_metadata_fails_closed() -> TestResult<()> 
         [Some("North"), Some("South")],
         METADATA_LAST_IDENTIFIER,
     )?;
-    let metadata_clear_catalog = Catalog::from_bytes(&metadata_clear_source)?;
+    let metadata_clear_catalog = Catalog::from_bytes(&metadata_clear_source, Default::default())?;
     let no_metadata_clear_source = litchi_iwa_archive::package::to_bytes(
         metadata_clear_catalog
             .iter()
@@ -1107,7 +1113,7 @@ fn canonical_movie_standin_creation_updates_metadata_and_inverse_exactly() -> Te
         );
     }
 
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     assert_eq!(
         document
             .object(CAPTIONS[0])
@@ -1136,17 +1142,17 @@ fn canonical_movie_standin_creation_updates_metadata_and_inverse_exactly() -> Te
         before_title_identifier
     );
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
     for name in ["Data/sentinel.bin", "Data/movie.mov", "Data/poster.png"] {
         assert_eq!(
-            Catalog::from_bytes(&source)?
+            Catalog::from_bytes(&source, Default::default())?
                 .iter()
                 .find(|entry| entry.name() == name)
                 .map(|entry| entry.data()),
-            Catalog::from_bytes(&target)?
+            Catalog::from_bytes(&target, Default::default())?
                 .iter()
                 .find(|entry| entry.name() == name)
                 .map(|entry| entry.data())
@@ -1227,7 +1233,7 @@ fn active_movie_caption_removal_allocates_fresh_standin_and_inverse_exactly() ->
             "caption removal lost UUID registration {identifier}"
         );
     }
-    let document = Archive::parse(&document_stream(&target)?)?;
+    let document = Archive::parse(&document_stream(&target)?, Default::default())?;
     for (identifier, type_) in [
         (CAPTIONS[0], CAPTION_INFO_MESSAGE_TYPE),
         (STORAGES[0], STORAGE_MESSAGE_TYPE),
@@ -1266,7 +1272,7 @@ fn active_movie_caption_removal_allocates_fresh_standin_and_inverse_exactly() ->
         )?
     );
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
@@ -1282,7 +1288,7 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     let source =
         synthetic_metadata_package_with_captions([Some("North"), None], METADATA_LAST_IDENTIFIER)?;
 
-    let mut alias_archive = Archive::parse(&document_stream(&source)?)?;
+    let mut alias_archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let first_movie = alias_archive
         .object_mut(MOVIES[0])
         .ok_or_else(|| io::Error::other("missing first movie"))?;
@@ -1304,7 +1310,7 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     assert_eq!(exact_bytes(&package)?, aliased);
 
     let malformed_standin = {
-        let mut archive = Archive::parse(&document_stream(&source)?)?;
+        let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
         archive
             .object_mut(CAPTIONS[1])
             .ok_or_else(|| io::Error::other("missing stand-in"))?
@@ -1378,7 +1384,7 @@ fn movie_caption_graph_aliases_collisions_and_metadata_fail_atomically() -> Test
     }
     assert_eq!(movie_caption_identifier(&target, MOVIES[1])?, Some(1_003));
     assert!(
-        Archive::parse(&document_stream(&target)?)?
+        Archive::parse(&document_stream(&target)?, Default::default())?
             .object(METADATA_LAST_IDENTIFIER + 1)
             .is_none()
     );
@@ -1509,7 +1515,7 @@ fn malformed_movie_edge_and_caption_storage_are_refused_atomically() -> TestResu
         },
     }
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .objects
         .iter_mut()
@@ -1530,7 +1536,7 @@ fn malformed_movie_edge_and_caption_storage_are_refused_atomically() -> TestResu
 #[test]
 fn shared_caption_storage_is_rejected_without_mutation() -> TestResult<()> {
     let source = synthetic_package_with_captions([Some("North"), Some("South")])?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let second = archive
         .objects
         .iter_mut()
@@ -1696,7 +1702,7 @@ fn movie_parent_drawable_ownership_and_title_alias_fail_closed() -> TestResult<(
 #[test]
 fn aggregate_and_field_info_caption_owners_fail_closed() -> TestResult<()> {
     let source = synthetic_package()?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .objects
         .iter_mut()
@@ -1711,7 +1717,7 @@ fn aggregate_and_field_info_caption_owners_fail_closed() -> TestResult<()> {
     assert!(package.slide_movie_caption(0usize, 0usize).is_err());
     assert_eq!(exact_bytes(&package)?, aggregate);
 
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     archive
         .objects
         .iter_mut()

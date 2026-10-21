@@ -10,7 +10,7 @@ use std::error::Error as StdError;
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::EntryEdit};
 use litchi_iwa_core::{
-    Archive, ArchiveLimits as CoreArchiveLimits, FieldInfo, FieldPath, RawMessage, SnappyStream,
+    Archive, FieldInfo, FieldPath, Limits as CoreArchiveLimits, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{tp, tst};
 use litchi_pages::{
@@ -121,7 +121,7 @@ fn assert_catalog(source: &[u8], expected: &[ExpectedTable], label: &str) -> Tes
 }
 
 fn remove_root_body_payload_keep_data_reference(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source, Default::default())?;
     let mut replacements = Vec::<(String, Vec<u8>)>::new();
     let mut roots = 0usize;
 
@@ -129,8 +129,8 @@ fn remove_root_body_payload_keep_data_reference(source: &[u8]) -> TestResult<Vec
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some((object_index, message_index)) =
             archive
                 .objects
@@ -189,10 +189,12 @@ fn remove_root_body_payload_keep_data_reference(source: &[u8]) -> TestResult<Vec
                 type_: 10_000,
                 data,
             },
+            Default::default(),
         )?;
         replacements.push((
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                .to_vec(),
         ));
     }
     assert_eq!(roots, 1, "expected one Pages document root");
@@ -208,7 +210,7 @@ fn rewrite_table_models(
     rename_second_to: Option<&str>,
     append_to_first: Option<&[u8]>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source, Default::default())?;
     let mut replacements = Vec::<(String, Vec<u8>)>::new();
     let mut model_count = 0usize;
 
@@ -216,8 +218,8 @@ fn rewrite_table_models(
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let mut message_index = 0usize;
@@ -245,6 +247,7 @@ fn rewrite_table_models(
                     object.replace_message_preserving_header(
                         message_index,
                         RawMessage { type_: 6_001, data },
+                        Default::default(),
                     )?;
                     changed = true;
                 }
@@ -254,7 +257,8 @@ fn rewrite_table_models(
         if changed {
             replacements.push((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
         }
     }
@@ -268,7 +272,7 @@ fn rewrite_table_models(
 }
 
 fn add_root_body_data_reference(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(source, Default::default())?;
     let mut replacements = Vec::<(String, Vec<u8>)>::new();
     let mut roots = 0usize;
 
@@ -276,8 +280,8 @@ fn add_root_body_data_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(message_index) = object
@@ -316,7 +320,8 @@ fn add_root_body_data_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacements.push((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
         }
     }

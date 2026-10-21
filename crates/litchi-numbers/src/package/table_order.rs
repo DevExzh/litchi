@@ -382,7 +382,7 @@ fn replace_order(
     let message_type = object.messages[index].type_;
     let data = references::rewrite(&object.messages[index].data, path, after)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,

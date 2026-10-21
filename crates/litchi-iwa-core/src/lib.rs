@@ -25,9 +25,3 @@ pub use archive::{
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;
 pub use snappy::{SnappyLimits, SnappyStream};
-
-/// The archive/resource limit profile used by IWA parsers.
-pub type ArchiveLimits = Limits;
-
-/// The archive/resource limit profile under its shorter generic name.
-pub type ResourceLimits = Limits;

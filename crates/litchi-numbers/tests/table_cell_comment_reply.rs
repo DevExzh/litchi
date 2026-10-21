@@ -484,7 +484,7 @@ fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
 }
 
 fn member_data(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -495,17 +495,21 @@ fn member_data(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 
 fn member_archive(source: &[u8], name: &str) -> TestResult<Archive> {
     Ok(Archive::parse(
-        SnappyStream::decompress(&member_data(source, name)?)?.as_bytes(),
+        SnappyStream::decompress(&member_data(source, name)?, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn reply_member_name(source: &[u8], identifier: u64) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.object(identifier).is_some() {
             return Ok(entry.name().to_owned());
         }
@@ -514,12 +518,15 @@ fn reply_member_name(source: &[u8], identifier: u64) -> TestResult<String> {
 }
 
 fn object_exists(source: &[u8], identifier: u64) -> TestResult<bool> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         if archive.object(identifier).is_some() {
             return Ok(true);
         }
@@ -532,14 +539,18 @@ fn rewrite_member(
     name: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("member {name} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             name,

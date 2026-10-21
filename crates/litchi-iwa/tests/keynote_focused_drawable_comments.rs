@@ -84,13 +84,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_COMPONENT)
         .ok_or_else(|| io::Error::other("missing PackageMetadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     archive
         .objects
         .iter()
@@ -667,7 +667,7 @@ fn assert_metadata_watermark(source: &[u8]) -> TestResult<()> {
 fn archive_snapshots(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
     fixtures::component_archives(source)?
         .into_iter()
-        .map(|(name, archive)| Ok((name, archive.to_bytes()?)))
+        .map(|(name, archive)| Ok((name, archive.to_bytes(Default::default())?)))
         .collect::<TestResult<BTreeMap<_, _>>>()
 }
 

@@ -842,6 +842,7 @@ fn update_package_metadata(
                 type_: old.type_,
                 data: patched,
             },
+            Default::default(),
         )?;
         Ok(())
     })

@@ -360,6 +360,7 @@ pub(crate) fn shape_style_variation_object(
             type_: SHAPE_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     object.archive_info.message_infos[0]
@@ -415,6 +416,7 @@ pub(crate) fn patch_shape_style_reference(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[*index];
         let mut replaced = 0usize;
@@ -472,6 +474,7 @@ pub(crate) fn insert_style_variation(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[*index];
         if info.object_references.contains(&new_style_id) {
@@ -480,7 +483,7 @@ pub(crate) fn insert_style_variation(
             )));
         }
         info.object_references.push(new_style_id);
-        archive.insert_object(new_style)?;
+        archive.insert_object(new_style, Default::default())?;
         Ok(())
     })
 }
@@ -525,7 +528,7 @@ pub(crate) fn replace_style_variation(
                 "iWork style {style_id} must have exactly one ShapeStyle payload"
             )));
         };
-        object.replace_message(*index, message)?;
+        object.replace_message(*index, message, Default::default())?;
         object.archive_info.message_infos[*index].data_references = replacement_data_references;
         Ok(())
     })
@@ -638,6 +641,7 @@ pub(crate) fn remove_style_variation(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut stylesheet.archive_info.message_infos[*index];
         let reference_count = info

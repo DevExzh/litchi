@@ -78,7 +78,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -141,7 +145,7 @@ fn chart_object(
             data: payload,
         }]
     };
-    let mut object = ArchiveObject::new(identifier, messages)?;
+    let mut object = ArchiveObject::new(identifier, messages, Default::default())?;
     for info in &mut object.archive_info.message_infos {
         info.object_references.push(parent);
         // Keep unrelated source metadata in the physical object header.  The
@@ -299,7 +303,8 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let foreign_archive = if foreign_objects.is_empty() {
         None
@@ -308,7 +313,8 @@ fn synthetic_package(options: FixtureOptions) -> TestResult<Vec<u8>> {
             &Archive {
                 objects: foreign_objects,
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?)
     };
 
@@ -341,7 +347,7 @@ fn exact_bytes(package: &Package) -> Vec<u8> {
 }
 
 fn member_bytes(package_bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package_bytes)?;
+    let catalog = Catalog::from_bytes(package_bytes, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -353,7 +359,8 @@ fn member_bytes(package_bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn document_archive(package_bytes: &[u8], member: &str) -> TestResult<Archive> {
     let compressed = member_bytes(package_bytes, member)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&compressed)?.as_bytes(),
+        SnappyStream::decompress(&compressed, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -413,14 +420,18 @@ fn rewrite_document_archive(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -658,7 +669,7 @@ fn changed_chart_reopens_and_stale_or_foreign_patches_conflict() -> TestResult {
     );
 
     let foreign_bytes = {
-        let catalog = Catalog::from_bytes(&source_bytes)?;
+        let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
         catalog.reassemble_to_bytes(
             &[EntryEdit::new(SENTINEL_MEMBER, b"foreign source")],
             Limits::default(),
@@ -672,7 +683,7 @@ fn changed_chart_reopens_and_stale_or_foreign_patches_conflict() -> TestResult {
     assert_eq!(exact_bytes(&foreign), foreign_bytes);
 
     let tampered_bytes = {
-        let catalog = Catalog::from_bytes(&source_bytes)?;
+        let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
         catalog.reassemble_to_bytes(
             &[EntryEdit::new(UNRELATED_MEMBER, b"tampered unrelated")],
             Limits::default(),

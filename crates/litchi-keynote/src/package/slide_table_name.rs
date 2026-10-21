@@ -631,8 +631,8 @@ fn rewrite_name(
     budget
         .physical(entry.data().len())
         .map_err(map_core_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_native_error)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_native_error)?;
     budget.allocations(1).map_err(map_core_error)?;
     budget
         .retained(stream.as_bytes().len())
@@ -652,8 +652,8 @@ fn rewrite_name(
     budget
         .scratch(stream.as_bytes().len())
         .map_err(map_core_error)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(map_core_native_error)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_native_error)?;
     let original_source = archive
         .object(selection.target.model.identifier)
         .ok_or(Error::InvalidSource)?
@@ -713,7 +713,7 @@ fn rewrite_name(
     archive
         .object_mut(selection.target.model.identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.target.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -723,10 +723,10 @@ fn rewrite_name(
         )
         .map_err(map_core_native_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_native_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_native_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+        .map_err(map_core_native_error)?;
     budget
         .output(
             encoded_bound
@@ -742,12 +742,13 @@ fn rewrite_name(
         .map_err(map_core_error)?;
     budget.retained(compressed_bound).map_err(map_core_error)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(map_core_native_error)?;
     if bytes.len() != encoded_bound {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_native_error)?;
+    let compressed =
+        SnappyStream::compress(&bytes, Default::default()).map_err(map_core_native_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

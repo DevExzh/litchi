@@ -618,13 +618,14 @@ fn set_drawable_comment_in_package(
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )?;
         if let Some(author_id) = author_id {
             object.archive_info.message_infos[0]
                 .object_references
                 .push(author_id);
         }
-        Ok(archive.insert_object(object)?)
+        Ok(archive.insert_object(object, Default::default())?)
     })?;
     add_object_uuid_for_entry(&mut staged, &location.archive_name, storage_id)?;
     *package = staged;
@@ -1049,6 +1050,7 @@ fn replace_drawable_comment_reference(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         update_reference_metadata(
             &mut object.archive_info.message_infos[location.message_index],
@@ -1224,6 +1226,7 @@ fn update_comment_storage_text(
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1285,13 +1288,16 @@ fn clone_comment_storage(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     clone.archive_info.should_merge = source.archive_info.should_merge;
     clone.archive_info.message_infos[0] = source.archive_info.message_infos[0].clone();
     clone.archive_info.message_infos[0].length = u32::try_from(clone.messages[0].data.len())
         .map_err(|_| Error::Archive("comment payload exceeds the u32 format limit".to_owned()))?;
     let mut staged = package.clone();
-    staged.update_archive(archive_name, |archive| Ok(archive.insert_object(clone)?))?;
+    staged.update_archive(archive_name, |archive| {
+        Ok(archive.insert_object(clone, Default::default())?)
+    })?;
     add_object_uuid_for_entry(&mut staged, archive_name, new_storage_id)?;
     *package = staged;
     Ok(())
@@ -1320,11 +1326,14 @@ pub(crate) fn clone_comment_storage_exact(
         )));
     }
     validate_comment_storage_payload(old_storage_id, source.messages[0].data.as_slice())?;
-    let mut clone = ArchiveObject::new(new_storage_id, source.messages.clone())?;
+    let mut clone =
+        ArchiveObject::new(new_storage_id, source.messages.clone(), Default::default())?;
     clone.archive_info.should_merge = source.archive_info.should_merge;
     clone.archive_info.message_infos = source.archive_info.message_infos.clone();
     let mut staged = package.clone();
-    staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(clone)?))?;
+    staged.update_archive(&archive_name, |archive| {
+        Ok(archive.insert_object(clone, Default::default())?)
+    })?;
     add_object_uuid_for_entry(&mut staged, &archive_name, new_storage_id)?;
     *package = staged;
     Ok(archive_name)
@@ -1353,13 +1362,14 @@ pub(crate) fn insert_comment_storage(
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )?;
         if let Some(author_id) = author_id {
             object.archive_info.message_infos[0]
                 .object_references
                 .push(author_id);
         }
-        Ok(archive.insert_object(object)?)
+        Ok(archive.insert_object(object, Default::default())?)
     })?;
     add_object_uuid_for_entry(&mut staged, archive_name, storage_id)?;
     *package = staged;
@@ -1478,6 +1488,7 @@ pub(crate) fn update_comment_reply_reference(
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         update_reference_metadata(
             &mut object.archive_info.message_infos[index],
@@ -2244,6 +2255,7 @@ fn generated_annotation_author_object(
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
             data: author.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].field_infos = [4, 3]
         .into_iter()
@@ -2373,9 +2385,13 @@ fn ensure_generated_annotation_author(
                     type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
         }
-        Ok(archive.insert_object(generated_annotation_author_object(author_id, &generated)?)?)
+        Ok(archive.insert_object(
+            generated_annotation_author_object(author_id, &generated)?,
+            Default::default(),
+        )?)
     })?;
     add_object_uuid_for_entry(&mut staged, &location.archive_name, author_id)?;
     *package = staged;
@@ -2505,6 +2521,7 @@ pub(crate) fn remove_generated_annotation_author_if_unused(
                 type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         archive.remove_object(author_id).ok_or_else(|| {
             Error::InvalidFormat(format!("annotation author object {author_id} is missing"))
@@ -2625,7 +2642,7 @@ fn comment_object_is_referenced(
                 identifier,
                 referenced: false,
             };
-            object.inspect_references_with_policy_and_limits(
+            object.inspect_references_with_policy(
                 &mut archive_visitor,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 archive_limits,

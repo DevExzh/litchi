@@ -1796,6 +1796,7 @@ mod tests {
                         type_: PACKAGE_METADATA_MESSAGE_TYPE,
                         data: metadata,
                     }],
+                    Default::default(),
                 )
                 .expect("metadata object"),
             ],
@@ -1807,6 +1808,7 @@ mod tests {
                 type_: 999,
                 data: vec![1],
             }],
+            Default::default(),
         )
         .expect("root object");
         root.archive_info.message_infos[0].object_references = vec![60, 60];
@@ -1817,6 +1819,7 @@ mod tests {
                 type_: 999,
                 data: vec![1],
             }],
+            Default::default(),
         )
         .expect("middle object");
         middle.archive_info.message_infos[0].object_references = vec![70];
@@ -1827,6 +1830,7 @@ mod tests {
                 type_: 999,
                 data: vec![1],
             }],
+            Default::default(),
         )
         .expect("reachable leaf object");
         reachable_leaf.archive_info.message_infos[0].data_references = vec![7];
@@ -1837,6 +1841,7 @@ mod tests {
                 type_: 999,
                 data: vec![1],
             }],
+            Default::default(),
         )
         .expect("unreachable leaf object");
         unreachable_leaf.archive_info.message_infos[0].data_references = vec![8];

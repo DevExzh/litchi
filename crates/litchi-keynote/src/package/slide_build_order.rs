@@ -1462,7 +1462,7 @@ fn rewrite_build_order(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -1471,10 +1471,9 @@ fn rewrite_build_order(
     )
     .map_err(map_core_error)?;
     let stream_bytes = stream.as_bytes();
-    let mut archive =
-        Archive::parse_with_limits(stream_bytes, archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream_bytes, archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream_bytes)
+        .validate_canonical_object_framing(stream_bytes, Default::default())
         .map_err(map_core_error)?;
     let object = archive
         .object_mut(before.slide_identifier)
@@ -1498,12 +1497,11 @@ fn rewrite_build_order(
         data: rewritten,
     };
     object
-        .replace_message_preserving_header_with_limits(message_index, replacement, archive_limits)
+        .replace_message_preserving_header(message_index, replacement, archive_limits)
         .map_err(map_core_error)?;
-    let serialized = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&serialized).map_err(map_core_error)?;
+    let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&serialized, Default::default()).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(
@@ -1819,11 +1817,15 @@ mod tests {
         Ok(ArchiveObject::new(
             identifier,
             vec![RawMessage { type_, data }],
+            Default::default(),
         )?)
     }
 
     fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-        Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     #[allow(
@@ -2073,13 +2075,13 @@ mod tests {
     }
 
     fn slide_reference_records(package_bytes: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
-        let catalog = Catalog::from_bytes(package_bytes)?;
+        let catalog = Catalog::from_bytes(package_bytes, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == SLIDE_MEMBER)
             .ok_or_else(|| io::Error::other("fixture slide member missing"))?;
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let slide = archive
             .object(4)
             .and_then(|object| object.messages.iter().find(|message| message.type_ == 5))

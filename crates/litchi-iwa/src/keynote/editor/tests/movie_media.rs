@@ -289,6 +289,7 @@ mod cases {
                     type_: MOVIE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             object.archive_info.message_infos[message_index]
                 .data_references
@@ -328,6 +329,7 @@ mod cases {
                     type_: MOVIE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             object.archive_info.message_infos[message_index]
                 .data_references

@@ -1,0 +1,2 @@
+crate	category	path	detail	target
+litchi-iwa-archive	edit_type	litchi_iwa_archive::package::EntryEdit		rename to the focused module's Edit

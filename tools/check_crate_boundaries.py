@@ -849,7 +849,7 @@ KEYNOTE_CHART_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
         "replacement_identifier",
         "validate_selected_message_metadata",
         "rewrite_chart_caption_with_report",
-        "replace_message_transitioning_object_references_preserving_header_with_limits",
+        "replace_message_transitioning_object_references_preserving_header",
     }
 )
 KEYNOTE_CHART_CAPTION_SAVE_TOKEN_REWRITE_MARKERS = frozenset(
@@ -1499,7 +1499,7 @@ KEYNOTE_MOVIE_CAPTION_REFERENCE_TRANSITION_MARKERS = frozenset(
         "replacement_identifier",
         "validate_selected_message_metadata",
         "rewrite_movie_caption_with_report",
-        "replace_message_transitioning_object_references_preserving_header_with_limits",
+        "replace_message_transitioning_object_references_preserving_header",
     }
 )
 KEYNOTE_MOVIE_CAPTION_SAVE_TOKEN_REWRITE_MARKERS = frozenset(
@@ -3450,7 +3450,6 @@ KEYNOTE_SLIDE_MEDIA_DATA_CODEC_MARKERS = {
 KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa-core/src")
 KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_METHODS = (
     "clone_with_identity_remap",
-    "clone_with_identity_remap_with_limits",
 )
 KEYNOTE_SLIDE_MEDIA_DATA_CORE_CLONE_FORBIDDEN_IMPORTS = re.compile(
     r"(?<![A-Za-z0-9_])(?:buffa|prost|prost_types|litchi_iwa_protos|"
@@ -4722,7 +4721,7 @@ KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS = {
         "sort_order",
     ),
     "raw-preserving rewrite": (
-        "replace_message_preserving_header_with_limits",
+        "replace_message_preserving_header",
     ),
     "exact artifacts and inverse": (
         "ExactArtifacts",
@@ -18490,7 +18489,7 @@ PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_CREATION_MARKERS = (
     re.compile(r"\bNewIds\b"),
     re.compile(r"\ballocate_ids\b"),
     re.compile(r"\bowner_to_proto\b"),
-    re.compile(r"\binsert_object_with_limits\b"),
+    re.compile(r"\binsert_object\b"),
 )
 # The focused Pages adapter must continue consuming the shared compatibility
 # helper for Numbers and Keynote.  This is a retirement boundary, not a
@@ -59333,7 +59332,7 @@ def audit_keynote_slide_media_data_core_boundary_source_topology(
                 definitions[method].append((path, code))
 
     # The audit is dormant for fixtures that predate the clone migration.  A
-    # partially introduced pair, however, must not leave a second owner.
+    # physical helper, once introduced, must not leave a second owner.
     if not any(definitions.values()):
         return []
     for method, entries in definitions.items():
@@ -59387,8 +59386,7 @@ def audit_keynote_slide_media_data_core_boundary_source_topology(
         *KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES,
     )
     clone_name = re.compile(
-        r"(?<![A-Za-z0-9_])(?:r#)?(?:clone_with_identity_remap_with_limits|"
-        r"clone_with_identity_remap)(?![A-Za-z0-9_])"
+        r"(?<![A-Za-z0-9_])(?:r#)?clone_with_identity_remap(?![A-Za-z0-9_])"
     )
     for relative in public_paths:
         path = root / relative
@@ -60784,9 +60782,9 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
             all_core_calls = [
                 (call, name)
                 for name in (
-                    "clone_with_identity_remap_with_limits",
-                    "replace_message_pruning_object_references_preserving_header_with_limits",
-                    "replace_message_transitioning_object_references_preserving_header_with_limits",
+                    "clone_with_identity_remap",
+                    "replace_message_pruning_object_references_preserving_header",
+                    "replace_message_transitioning_object_references_preserving_header",
                 )
                 for call, _arguments in graph_call_records(body, name)
             ]
@@ -60828,18 +60826,18 @@ def audit_keynote_slide_media_lifecycle_transaction_source_topology(
         require_core_reservation(
             graph_function_body("clone_object"),
             "clone core publication",
-            "clone_with_identity_remap_with_limits",
+            "clone_with_identity_remap",
         )
         header_body = graph_function_body("replace_slide_message_with_lifecycle_refs")
         require_core_reservation(
             header_body,
             "prune core publication",
-            "replace_message_pruning_object_references_preserving_header_with_limits",
+            "replace_message_pruning_object_references_preserving_header",
         )
         require_core_reservation(
             header_body,
             "transition core publication",
-            "replace_message_transitioning_object_references_preserving_header_with_limits",
+            "replace_message_transitioning_object_references_preserving_header",
         )
 
     budget_code = child_sources_by_name.get("budget", "")
@@ -73840,7 +73838,7 @@ def _audit_table_merge_transaction_source_topology(
             # table UUID instead of ambient randomness (record 0300).
             ("rewrite_table_merges", "rewrite_table_merges_derived"),
             (
-                "replace_message_preserving_header_with_limits",
+                "replace_message_preserving_header",
                 "rewrite_model",
                 "rewrite_merges",
             ),

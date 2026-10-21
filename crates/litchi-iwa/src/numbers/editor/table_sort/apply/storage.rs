@@ -163,6 +163,7 @@ pub(super) fn reorder_body_table_tile_rows(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -299,6 +300,7 @@ pub(super) fn reorder_body_row_headers(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -349,6 +351,7 @@ pub(super) fn reorder_row_uids(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

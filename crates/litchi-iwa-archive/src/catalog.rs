@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use litchi_core::ReadAt;
-use litchi_iwa_core::{Archive, ArchiveLimits, SnappyLimits, SnappyStream};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits, SnappyLimits, SnappyStream};
 
 use crate::package::{
     Catalog, LogicalEntryLimits, SourceProvenance, preflight_semantic_iwa_entries,
@@ -162,23 +162,13 @@ impl ComponentCatalog {
         }
     }
 
-    /// Parse a ZIP bundle from memory using the default physical limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the ZIP, nested `Index.zip`, Snappy stream, or IWA
-    /// framing is malformed, encrypted, or exceeds a resource ceiling.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
     /// Parse a ZIP bundle from memory under explicit physical limits.
     ///
     /// # Errors
     ///
     /// Returns an error when the limits are invalid, input exceeds a ceiling,
     /// or the ZIP/IWA stream is malformed or encrypted.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
         let validated_limits = limits.validate()?;
         let archive = ZipArchive::new_with_limits(bytes, validated_limits)?;
         let components = parse_iwa_components(&archive, validated_limits)?.into_boxed_slice();
@@ -638,7 +628,13 @@ fn semantic_component_budgets(
     let snappy_limits = SnappyLimits::new(
         base_snappy.max_uncompressed_chunk().min(max_stream_bytes),
         max_stream_bytes,
-    )?;
+    )?
+    .with_input_limits(
+        base_snappy.max_compressed_chunk(),
+        SnappyStream::MAX_COMPRESSED_STREAM,
+        base_snappy.max_frames(),
+    )?
+    .with_compressed_stream_bytes(base_snappy.max_compressed_stream())?;
 
     let remaining_objects = MAX_SEMANTIC_IWA_OBJECTS.saturating_sub(semantic_iwa_objects);
     if remaining_objects == 0 {
@@ -664,12 +660,12 @@ fn parse_semantic_component(
     }
     let (snappy_limits, archive_limits) =
         semantic_component_budgets(limits, decompressed_iwa_bytes, semantic_iwa_objects)?;
-    let decompressed = SnappyStream::decompress_with_limits(compressed_data, snappy_limits)
+    let decompressed = SnappyStream::decompress(compressed_data, snappy_limits)
         .map_err(|error| limits.map_iwa_decode_error(error, decompressed_iwa_bytes))?;
     let decompressed_bytes = u64::try_from(decompressed.as_bytes().len()).map_err(|_error| {
         crate::Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
     })?;
-    let archive = Archive::parse_with_limits(decompressed.as_bytes(), archive_limits)?;
+    let archive = Archive::parse(decompressed.as_bytes(), archive_limits)?;
     Ok(Some((Component::new(name, archive), decompressed_bytes)))
 }
 
@@ -712,26 +708,16 @@ pub struct OwnedSourceCatalog {
 }
 
 impl SourceCatalog {
-    /// Parse borrowed package bytes using the default physical limits.
+    /// Parse borrowed package bytes under caller-selected physical limits.
     ///
     /// The source is copied exactly once into immutable shared storage.
     ///
     /// # Errors
     ///
-    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
-    /// decoding, or a configured physical ceiling fails.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
-    }
-
-    /// Parse borrowed package bytes under caller-selected physical limits.
-    ///
-    /// # Errors
-    ///
     /// Returns an error when the source or any package component is malformed,
     /// encrypted, ambiguous, or over budget.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
-        let package = Catalog::from_bytes_with_limits(bytes, limits)?;
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
+        let package = Catalog::from_bytes(bytes, limits)?;
         Self::from_package(package, limits)
     }
 
@@ -740,7 +726,7 @@ impl SourceCatalog {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal for a selected physical member whose declared shape violates
     /// the logical-entry profile.
     #[doc(hidden)]
@@ -754,16 +740,6 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
-    /// Parse an already-owned immutable package source without copying it.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
-    /// decoding, or a configured physical ceiling fails.
-    pub fn from_shared_bytes(source: Arc<[u8]>) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(source, Limits::default())
-    }
-
     /// Parse an already-owned immutable package source under explicit limits.
     ///
     /// The exact [`Arc`] allocation remains authoritative for the lifetime of
@@ -773,23 +749,17 @@ impl SourceCatalog {
     ///
     /// Returns an error when the source or any package component is malformed,
     /// encrypted, ambiguous, or over budget.
-    pub fn from_shared_bytes_with_limits(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
-        let package = Catalog::from_shared_bytes_with_limits(source, limits)?;
+    pub fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_shared_bytes(source, limits)?;
         Self::from_package(package, limits)
     }
 
-    /// Parse an owned package vector without copying its payload allocation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when ZIP ingress, legacy normalization, Snappy/IWA
-    /// decoding, or a configured physical ceiling fails.
     /// Parse shared package bytes while applying a fixed logical-member
     /// admission profile before any ZIP payload is decoded.
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal for a selected physical member whose declared shape
     /// violates the logical-entry profile.
     #[doc(hidden)]
@@ -806,24 +776,14 @@ impl SourceCatalog {
         Self::from_package(package, limits)
     }
 
-    /// Snapshot an immutable positional source using the default limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the source changes during the bounded read or the
-    /// resulting package cannot be decoded.
-    pub fn from_read_at(source: &dyn ReadAt) -> Result<Self> {
-        Self::from_read_at_with_limits(source, Limits::default())
-    }
-
     /// Snapshot an immutable positional source under explicit limits.
     ///
     /// # Errors
     ///
     /// Returns an error when the source changes during the bounded read or the
     /// resulting package cannot be decoded.
-    pub fn from_read_at_with_limits(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
-        let package = Catalog::from_read_at_with_limits(source, limits)?;
+    pub fn from_read_at(source: &dyn ReadAt, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_read_at(source, limits)?;
         Self::from_package(package, limits)
     }
 
@@ -912,7 +872,7 @@ impl SourceCatalog {
 #[cfg(feature = "internal-iwork-source")]
 impl OwnedSourceCatalog {
     #[doc(hidden)]
-    pub fn __from_owned_bytes_with_limits(source: Vec<u8>, limits: Limits) -> Result<Self> {
+    pub fn __from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
         let package = Catalog::from_owned_bytes_with_limits(source, limits)?;
         Ok(Self {
             inner: SourceCatalog::from_package(package, limits)?,
@@ -920,7 +880,7 @@ impl OwnedSourceCatalog {
     }
 
     #[doc(hidden)]
-    pub fn __from_source_owner_with_limits(
+    pub fn __from_source_owner(
         source: crate::package::SharedBytes,
         limits: Limits,
     ) -> Result<Self> {
@@ -957,13 +917,11 @@ pub(crate) fn parse_component(
         return Ok(None);
     }
 
-    let decompressed =
-        SnappyStream::decompress_with_limits(compressed_data, limits.snappy_limits()?)?;
+    let decompressed = SnappyStream::decompress(compressed_data, limits.snappy_limits()?)?;
     let decompressed_bytes = u64::try_from(decompressed.as_bytes().len()).map_err(|_error| {
         crate::Error::InvalidBundle("decompressed IWA stream length does not fit u64".to_owned())
     })?;
-    let archive =
-        Archive::parse_with_limits(decompressed.as_bytes(), limits.effective_archive_limits()?)?;
+    let archive = Archive::parse(decompressed.as_bytes(), limits.effective_archive_limits()?)?;
     Ok(Some((Component::new(name, archive), decompressed_bytes)))
 }
 
@@ -976,6 +934,24 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn aggregate_decoder_preserves_the_encoded_entry_ceiling() -> Result<()> {
+        let limits = Limits::new(1_000, 10, 4, 100, 100)?;
+        let (profile, _) = semantic_component_budgets(limits, 90, 0)?;
+        assert_eq!(profile.max_decompressed_stream(), 10);
+        assert_eq!(profile.max_compressed_stream(), 4);
+        let compressed = SnappyStream::compress(&[42], Default::default())?;
+        assert!(matches!(
+            SnappyStream::decompress(&compressed, profile),
+            Err(litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                maximum: 4,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
     fn iwa_bytes(identifier: u64, message_type: u32) -> Result<Vec<u8>> {
         let archive = Archive {
             objects: vec![ArchiveObject::new(
@@ -984,9 +960,13 @@ mod tests {
                     type_: message_type,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         };
-        Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &archive.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     fn iwa_bytes_with_payload(
@@ -1001,13 +981,17 @@ mod tests {
                     type_: message_type,
                     data: vec![0; payload_bytes],
                 }],
+                Default::default(),
             )?],
         };
-        let decompressed = archive.to_bytes()?;
+        let decompressed = archive.to_bytes(Default::default())?;
         let decompressed_bytes = u64::try_from(decompressed.len()).map_err(|_error| {
             crate::Error::InvalidBundle("test IWA stream length does not fit u64".to_owned())
         })?;
-        Ok((SnappyStream::compress(&decompressed)?, decompressed_bytes))
+        Ok((
+            SnappyStream::compress(&decompressed, Default::default())?,
+            decompressed_bytes,
+        ))
     }
 
     fn iwa_bytes_with_objects(first: u64, object_count: usize) -> Result<Vec<u8>> {
@@ -1030,9 +1014,13 @@ mod tests {
                     type_: 6_000,
                     data: vec![1],
                 }],
+                Default::default(),
             )?);
         }
-        Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+        Ok(SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?)
     }
 
     fn indexed_catalog() -> Result<ComponentCatalog> {
@@ -1040,7 +1028,7 @@ mod tests {
         writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, 6001)?)?;
         writer.write_stored("Index/Charlie.iwa", &iwa_bytes(3, 6002)?)?;
-        ComponentCatalog::from_bytes(&writer.finish_to_bytes()?)
+        ComponentCatalog::from_bytes(&writer.finish_to_bytes()?, Default::default())
     }
 
     #[cfg(feature = "internal-iwork-source")]
@@ -1179,7 +1167,7 @@ mod tests {
         writer.write_stored("Index/OperationStorage.iwa", b"bvxn opaque data")?;
         let bytes = writer.finish_to_bytes()?;
 
-        let catalog = ComponentCatalog::from_bytes(&bytes)?;
+        let catalog = ComponentCatalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(catalog.len(), 1);
         assert!(!catalog.is_empty());
         assert_eq!(
@@ -1245,14 +1233,9 @@ mod tests {
             exact_total,
             max_iwa_stream_bytes,
         )?;
+        assert_eq!(ComponentCatalog::from_bytes(&bytes, exact)?.len(), 2);
         assert_eq!(
-            ComponentCatalog::from_bytes_with_limits(&bytes, exact)?.len(),
-            2
-        );
-        assert_eq!(
-            SourceCatalog::from_bytes_with_limits(&bytes, exact)?
-                .components()
-                .len(),
+            SourceCatalog::from_bytes(&bytes, exact)?.components().len(),
             2
         );
 
@@ -1264,8 +1247,8 @@ mod tests {
             max_iwa_stream_bytes,
         )?;
         for result in [
-            ComponentCatalog::from_bytes_with_limits(&bytes, exceeded).map(|_catalog| ()),
-            SourceCatalog::from_bytes_with_limits(&bytes, exceeded).map(|_catalog| ()),
+            ComponentCatalog::from_bytes(&bytes, exceeded).map(|_catalog| ()),
+            SourceCatalog::from_bytes(&bytes, exceeded).map(|_catalog| ()),
         ] {
             let Err(error) = result else {
                 return Err(crate::Error::InvalidBundle(
@@ -1290,7 +1273,7 @@ mod tests {
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let bytes = writer.finish_to_bytes()?;
 
-        let component = ComponentCatalog::from_bytes(&bytes)?
+        let component = ComponentCatalog::from_bytes(&bytes, Default::default())?
             .into_iter()
             .next()
             .ok_or_else(|| {
@@ -1312,13 +1295,16 @@ mod tests {
         let mut outer = StreamingArchiveWriter::new();
         outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
         let outer_bytes = outer.finish_to_bytes()?;
-        assert_eq!(ComponentCatalog::from_bytes(&outer_bytes)?.len(), 1);
+        assert_eq!(
+            ComponentCatalog::from_bytes(&outer_bytes, Default::default())?.len(),
+            1
+        );
 
         let mut encrypted = StreamingArchiveWriter::new();
         encrypted.write_stored(".iwpv2", b"metadata")?;
         encrypted.write_stored("Index/Document.iwa", b"ciphertext")?;
         let encrypted_bytes = encrypted.finish_to_bytes()?;
-        let result = ComponentCatalog::from_bytes(&encrypted_bytes);
+        let result = ComponentCatalog::from_bytes(&encrypted_bytes, Default::default());
         assert!(matches!(result, Err(crate::Error::Encrypted)));
         Ok(())
     }
@@ -1335,7 +1321,7 @@ mod tests {
         let outer_bytes = outer.finish_to_bytes()?;
 
         assert!(matches!(
-            ComponentCatalog::from_bytes(&outer_bytes),
+            ComponentCatalog::from_bytes(&outer_bytes, Default::default()),
             Err(crate::Error::InvalidBundle(message)) if message.contains("mixes direct IWA")
         ));
         Ok(())
@@ -1344,7 +1330,7 @@ mod tests {
     #[test]
     fn rejects_input_above_profile() -> Result<()> {
         let limits = Limits::new(1, 10, 100, 100, 100)?;
-        let result = ComponentCatalog::from_bytes_with_limits(b"not a zip", limits);
+        let result = ComponentCatalog::from_bytes(b"not a zip", limits);
         assert!(matches!(result, Err(crate::Error::Limit { .. })));
         Ok(())
     }
@@ -1357,7 +1343,7 @@ mod tests {
         let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
 
         crate::zip::reset_test_parse_count();
-        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source))?;
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source), Default::default())?;
 
         assert!(Arc::ptr_eq(&source, &catalog.shared_source()));
         assert_eq!(crate::zip::test_parse_count(), 1);
@@ -1383,7 +1369,7 @@ mod tests {
         let bytes = writer.finish_to_bytes()?;
         let original_pointer = bytes.as_ptr();
 
-        let catalog = OwnedSourceCatalog::__from_owned_bytes_with_limits(bytes, Limits::default())?;
+        let catalog = OwnedSourceCatalog::__from_owned_bytes(bytes, Limits::default())?;
         let owner = catalog.__source_owner();
 
         assert_eq!(owner.as_ref().as_ptr(), original_pointer);
@@ -1422,7 +1408,7 @@ mod tests {
         assert_eq!(semantic.source_provenance(), SourceProvenance::SemanticZip);
 
         crate::zip::reset_test_entry_read_count();
-        let generic = SourceCatalog::from_bytes(&bytes)?;
+        let generic = SourceCatalog::from_bytes(&bytes, Default::default())?;
         assert_eq!(crate::zip::test_entry_read_count(), 7);
         assert_eq!(generic.package().len(), 7);
         assert_eq!(generic.components().len(), 2);
@@ -1440,7 +1426,7 @@ mod tests {
         })?;
         let limits = Limits::new(source_len, 7, source_len, source_len, 1_024 * 1_024)?;
 
-        let catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+        let catalog = SourceCatalog::from_shared_bytes(source, limits)?;
 
         assert_eq!(catalog.limits(), limits);
         Ok(())
@@ -1453,7 +1439,7 @@ mod tests {
         writer.write_stored("Metadata/DocumentIdentifier", b"physical-source")?;
         let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
         let source_lifetime = Arc::downgrade(&source);
-        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source))?;
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source), Default::default())?;
 
         drop(source);
         assert!(source_lifetime.upgrade().is_some());
@@ -1481,7 +1467,7 @@ mod tests {
         let source: Arc<[u8]> = outer.finish_to_bytes()?.into();
 
         crate::zip::reset_test_parse_count();
-        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source))?;
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source), Default::default())?;
 
         assert!(Arc::ptr_eq(&source, &catalog.shared_source()));
         assert_eq!(crate::zip::test_parse_count(), 2);
@@ -1512,8 +1498,8 @@ mod tests {
         writer.write_stored("Index/OperationStorage.iwa", b"bvxn opaque data")?;
         let bytes = writer.finish_to_bytes()?;
 
-        let source = SourceCatalog::from_bytes(&bytes)?;
-        let components = ComponentCatalog::from_bytes(&bytes)?;
+        let source = SourceCatalog::from_bytes(&bytes, Default::default())?;
+        let components = ComponentCatalog::from_bytes(&bytes, Default::default())?;
         let source_projection = source
             .components()
             .iter()

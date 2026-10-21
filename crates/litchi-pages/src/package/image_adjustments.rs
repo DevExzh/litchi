@@ -884,11 +884,9 @@ impl Package {
         if !self.state.source.source_is_exact() {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            patch.artifacts.target(),
-            self.state.source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(patch.artifacts.target(), self.state.source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
         candidate.validate().map_err(|_| Error::Verification)?;
@@ -1752,24 +1750,17 @@ fn rewrite_image(
     let source_archive = component.archive();
     let rewritten = rewrite_adjustments(original, after, budget)?;
     let encoded_len = source_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let replacement_bound = rewritten_archive_bound(encoded_len, original.len(), rewritten.len())?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(replacement_bound).map_err(map_core_error)?;
     let snappy_limits = source
         .state
         .source
         .limits()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::OutputBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(replacement_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let entry = source
         .state
         .source
@@ -1817,7 +1808,7 @@ fn rewrite_image(
     archive
         .object_mut(target.drawable_identifier.get())
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: IMAGE_MESSAGE_TYPE,
@@ -1826,12 +1817,10 @@ fn rewrite_image(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     if compressed.len() as u64 > source.state.source.limits().max_entry_bytes() {
         return Err(Error::Limit {
@@ -1862,9 +1851,8 @@ fn rewrite_image(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(catalog).map_err(|_| Error::Verification)
 }
 
@@ -2041,7 +2029,7 @@ fn package_reopen_requirements(
             .ok_or(Error::InvalidSource)?;
         let encoded_len = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (archive_allocations, archive_retained) =
             archive_clone_requirements(component.archive(), encoded_len)?;
@@ -2288,7 +2276,7 @@ fn verify_locality(
         budget.retained(retained)?;
         let mut expected = before_object.clone();
         expected
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 target.message_index,
                 RawMessage {
                     type_: candidate_message.type_,
@@ -2696,6 +2684,7 @@ mod tests {
                 type_: IMAGE_MESSAGE_TYPE,
                 data: payload.clone(),
             }],
+            Default::default(),
         )
         .unwrap();
         object.header_length = 11;
@@ -2752,6 +2741,7 @@ mod tests {
                 type_: ATTACHMENT_MESSAGE_TYPE,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let identifier = NonZeroU64::new(7).unwrap();

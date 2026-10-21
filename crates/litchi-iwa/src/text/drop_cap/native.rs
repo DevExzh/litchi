@@ -198,7 +198,7 @@ pub(super) fn variation_object(
             "generated iWork Drop Cap variation failed canonical validation".to_owned(),
         ));
     }
-    let mut object = ArchiveObject::new(identifier, vec![location.message])?;
+    let mut object = ArchiveObject::new(identifier, vec![location.message], Default::default())?;
     object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     object.archive_info.message_infos[0]
         .object_references
@@ -274,7 +274,7 @@ pub(super) fn replace_variation(
                 "iWork Drop Cap style {style_id} anchored metadata type changed unexpectedly"
             )));
         }
-        object.replace_message(location.message_index, message)?;
+        object.replace_message(location.message_index, message, Default::default())?;
         Ok(())
     })
 }
@@ -527,6 +527,7 @@ mod tests {
                 },
                 original_message,
             ],
+            Default::default(),
         )
         .unwrap();
         let archive = crate::archive::Archive {

@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use litchi_iwa_cache::WeightedCache;
 pub use litchi_iwa_cache::{GetOrInsertError, ParseError};
-use litchi_iwa_core::{Archive, ArchiveLimits};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 use litchi_iwa_package::{Entry, EntryStore, Error as EntryStoreError, Patch};
 
 /// Package entries plus an index and bounded parsed-component cache.
@@ -277,7 +277,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
 
-    use litchi_iwa_core::{Archive, ArchiveLimits};
+    use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
     use litchi_iwa_package::{Entry, EntryChangeKind};
 
     use super::{EntryStoreError, PackageState};

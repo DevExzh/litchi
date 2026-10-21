@@ -975,7 +975,7 @@ impl Package {
         budget.charge(LimitKind::OutputBytes, patch.target_bytes.len())?;
         budget.charge(LimitKind::RetainedBytes, patch.target_bytes.len())?;
         budget.charge(LimitKind::Allocations, 1)?;
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
+        let candidate_source = SourceCatalog::from_shared_bytes(
             Arc::clone(&patch.target_bytes),
             self.state.source.limits(),
         )
@@ -1655,7 +1655,7 @@ fn rewrite_metadata_archive(
         .object_mut(object_identifier)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             location.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -1665,18 +1665,17 @@ fn rewrite_metadata_archive(
         )
         .map_err(map_core_error)?;
     let encoded_length = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let maximum_compressed =
-        SnappyStream::maximum_compressed_len(encoded_length).map_err(map_core_error)?;
+        SnappyStream::maximum_compressed_len(encoded_length, Default::default())
+            .map_err(map_core_error)?;
     budget.charge_archive_output(encoded_length, maximum_compressed)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_length {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > maximum_compressed {
         return Err(Error::Verification);
     }
@@ -2047,7 +2046,7 @@ fn insert_lifecycle(
         .object_mut(body_identifier.get())
         .ok_or(Error::InvalidSource)?;
     body_object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             body_message_index,
             RawMessage {
                 type_: body_message.type_,
@@ -2064,7 +2063,7 @@ fn insert_lifecycle(
     let objects = graph_objects(graph_write, &payloads, archive_limits, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
     archive
-        .append_objects_with_limits(objects.to_vec(), archive_limits)
+        .append_objects(objects.to_vec(), archive_limits)
         .map_err(map_core_error)?;
     let body_compressed = compress_archive(archive, archive_limits, &mut budget)?;
 
@@ -2088,9 +2087,8 @@ fn insert_lifecycle(
     let previews = preview_names(source);
     let output = reassemble_candidate(source_catalog, &edits, &previews, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source_catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     let expected = Footnote::with_custom_mark(
         position,
@@ -2153,7 +2151,7 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
         .object_mut(graph.body_identifier.get())
         .ok_or(Error::InvalidSource)?;
     body_object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             body_message_index,
             RawMessage {
                 type_: body_message.type_,
@@ -2192,9 +2190,8 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, Error
     let previews = preview_names(source);
     let output = reassemble_candidate(source_catalog, &edits, &previews, &mut budget)?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source_catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 
@@ -2296,7 +2293,7 @@ fn editable_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -2311,7 +2308,7 @@ fn editable_archive(
     budget.charge(LimitKind::RetainedBytes, stream.as_bytes().len())?;
     budget.charge(LimitKind::ScratchBytes, stream.as_bytes().len())?;
     budget.charge(LimitKind::Allocations, 1)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
     Ok((archive, limits))
 }
 
@@ -2320,16 +2317,13 @@ fn compress_archive(
     limits: litchi_iwa_core::Limits,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
-    let encoded_length = archive
-        .encoded_len_with_limits(limits)
-        .map_err(map_core_error)?;
+    let encoded_length = archive.encoded_len(limits).map_err(map_core_error)?;
     let maximum_compressed =
-        SnappyStream::maximum_compressed_len(encoded_length).map_err(map_core_error)?;
+        SnappyStream::maximum_compressed_len(encoded_length, Default::default())
+            .map_err(map_core_error)?;
     budget.charge_archive_output(encoded_length, maximum_compressed)?;
-    let bytes = archive
-        .to_bytes_with_limits(limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > maximum_compressed {
         return Err(Error::Verification);
     }
@@ -2860,7 +2854,7 @@ fn graph_objects(
 ) -> Result<[ArchiveObject; 3], Error> {
     budget.charge(LimitKind::Entries, 3)?;
     budget.charge(LimitKind::Allocations, 3)?;
-    let mut reference = ArchiveObject::new_with_limits(
+    let mut reference = ArchiveObject::new(
         write.reference_identifier().get(),
         vec![RawMessage {
             type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
@@ -2882,7 +2876,7 @@ fn graph_objects(
     reference.archive_info.message_infos[0].versions = vec![1, 0, 5];
     reference.archive_info.message_infos[0].object_references =
         vec![write.storage_identifier().get()];
-    let mut storage = ArchiveObject::new_with_limits(
+    let mut storage = ArchiveObject::new(
         write.storage_identifier().get(),
         vec![RawMessage {
             type_: 2_001,
@@ -2893,7 +2887,7 @@ fn graph_objects(
     .map_err(map_core_error)?;
     storage.archive_info.message_infos[0].versions = vec![1, 0, 5];
     storage.archive_info.message_infos[0].object_references = storage_references;
-    let mut marker = ArchiveObject::new_with_limits(
+    let mut marker = ArchiveObject::new(
         write.marker_identifier().get(),
         vec![RawMessage {
             type_: TEXTUAL_ATTACHMENT_MESSAGE_TYPE,

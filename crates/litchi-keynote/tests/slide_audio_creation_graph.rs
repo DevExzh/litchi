@@ -83,15 +83,15 @@ fn options() -> TestResult<Options> {
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -261,7 +261,7 @@ fn strip_fields(payload: &[u8], excluded: &[u32]) -> TestResult<Vec<u8>> {
 }
 
 fn catalog_member(source: &[u8], name: &str) -> TestResult<Option<Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec()))
@@ -276,8 +276,9 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
 /// Replace one decoded IWA member while retaining the source ZIP's physical
 /// ordering, names, extras, comments, and untouched member records.
 fn replace_component(source: &[u8], name: &str, archive: &Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry_name = catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -843,7 +844,7 @@ fn fresh_audio_matches_native_graph_and_preserves_unrelated_source_payloads() ->
         );
     }
 
-    let source_catalog = Catalog::from_bytes(NATIVE_SOURCE)?;
+    let source_catalog = Catalog::from_bytes(NATIVE_SOURCE, Default::default())?;
     let deleted_previews = source_catalog
         .iter()
         .filter(|entry| entry.name().starts_with("preview"))
@@ -1156,6 +1157,7 @@ fn audio_position_validates_build_payload_before_admitting_its_header_edge() -> 
             type_: BUILD_MESSAGE_TYPE,
             data: build.encode_to_vec(),
         },
+        Default::default(),
     )?;
     let forged = replace_component(&candidate, &component, &forged_archive)?;
     let forged_package = Package::from_bytes(&forged)?;

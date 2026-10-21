@@ -49,6 +49,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -124,7 +125,10 @@ fn movie_payload(movie: usize) -> Vec<u8> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
@@ -309,17 +313,18 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -337,7 +342,7 @@ fn replace_document_stream(source: &[u8], archive: Archive) -> TestResult<Vec<u8
 }
 
 fn caption_info_location(source: &[u8], movie_identifier: u64) -> TestResult<u64> {
-    let archive = Archive::parse(&document_stream(source)?)?;
+    let archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .objects
         .iter()
@@ -360,7 +365,7 @@ fn mutate_caption_info(
     edit: impl FnOnce(&mut Archive, u64, usize) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let caption_identifier = caption_info_location(source, movie_identifier)?;
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let index = archive
         .object(caption_identifier)
         .ok_or_else(|| io::Error::other("caption info object is missing"))?
@@ -407,7 +412,7 @@ fn with_wrong_caption_parent(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn with_wrong_caption_style_type(source: &[u8]) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(source)?)?;
+    let archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let caption_identifier = caption_info_location(source, MOVIES[0])?;
     let caption = archive
         .object(caption_identifier)
@@ -429,7 +434,7 @@ fn with_wrong_caption_style_type(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn mutate_style_type(source: &[u8], style_identifier: u64) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let style = archive
         .object_mut(style_identifier)
         .ok_or_else(|| io::Error::other("caption style object is missing"))?;
@@ -459,7 +464,7 @@ fn with_wrong_caption_info_type(source: &[u8]) -> TestResult<Vec<u8>> {
 /// MovieArchive header records them as private witnesses in addition to its
 /// public `style` edge.  Native duplicate acceptance relies on that metadata.
 fn add_private_style_witnesses(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let movie_payload = archive
         .object(MOVIES[0])
         .ok_or_else(|| io::Error::other("movie object is missing"))?
@@ -512,7 +517,7 @@ fn add_private_style_witnesses(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn movie_style_witnesses(source: &[u8]) -> TestResult<(Vec<u64>, Vec<u64>)> {
-    let archive = Archive::parse(&document_stream(source)?)?;
+    let archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let movie = archive
         .object(MOVIES[0])
         .ok_or_else(|| io::Error::other("movie object is missing"))?;

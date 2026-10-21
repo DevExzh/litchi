@@ -811,6 +811,7 @@ mod tests {
                 .into_iter()
                 .map(|(type_, data)| RawMessage { type_, data })
                 .collect(),
+            Default::default(),
         )
         .expect("synthetic object")
     }
@@ -1325,6 +1326,7 @@ mod tests {
                         type_: DOCUMENT_MESSAGE_TYPE,
                         data: document.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })

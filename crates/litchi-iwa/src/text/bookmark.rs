@@ -78,7 +78,7 @@ pub(crate) fn add_text_bookmark(
         },
     )?;
     staged.update_archive(&archive_name, |archive| {
-        Ok(archive.insert_object(bookmark_object)?)
+        Ok(archive.insert_object(bookmark_object, Default::default())?)
     })?;
     set_package_last_object_identifier(&mut staged, identifier)?;
     let verified = roundtrip(&staged)?;

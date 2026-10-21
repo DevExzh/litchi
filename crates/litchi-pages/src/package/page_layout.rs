@@ -542,11 +542,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target),
-            source_catalog.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), source_catalog.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         verify_candidate(
@@ -903,9 +901,8 @@ fn rewrite_page_layout(
     drop(edits);
     drop(deleted_previews);
     drop(compressed);
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source_catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), source_catalog.limits())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     verify_candidate(source, &candidate, after, None, 0)?;
     Ok((candidate, touched_components))
@@ -933,7 +930,7 @@ fn rewrite_document_component(
             return Err(Error::Verification);
         }
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: DOCUMENT_MESSAGE_TYPE,
@@ -989,7 +986,7 @@ pub(super) fn invalidate_view_state_in_archive(
         return Err(Error::Verification);
     }
     object
-        .replace_message_pruning_object_references_preserving_header_with_limits(
+        .replace_message_pruning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: VIEW_STATE_ROOT_MESSAGE_TYPE,
@@ -1194,12 +1191,12 @@ pub(super) fn editable_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source.limits().snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     Ok((archive, limits))
 }
@@ -1208,11 +1205,9 @@ pub(super) fn compress_archive(
     archive: Archive,
     limits: litchi_iwa_core::Limits,
 ) -> Result<Vec<u8>, Error> {
-    let bytes = archive
-        .to_bytes_with_limits(limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
     drop(archive);
-    SnappyStream::compress(&bytes).map_err(map_core_error)
+    SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)
 }
 
 pub(super) fn unique_message(

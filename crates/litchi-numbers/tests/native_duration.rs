@@ -83,13 +83,13 @@ fn duration_cache(source: &[u8]) -> TestResult<CachedScalar> {
 }
 
 fn native_duration_cell(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == TILE_MEMBER)
         .ok_or_else(|| io::Error::other("native Duration tile member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let tile = archive
         .objects
         .iter()
@@ -178,8 +178,8 @@ fn assert_duration(package: &Package, expected: Duration) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for member in [FORMAT_MEMBER, TILE_MEMBER] {
         if !before.iter().any(|entry| entry.name() == member) {
             return Err(io::Error::other(format!(

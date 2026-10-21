@@ -231,6 +231,7 @@ fn replace_boundaries_in_archive(
             type_: original_type,
             data,
         },
+        Default::default(),
     )?;
     let replacements = boundaries.iter().map(|entry| entry.1).collect::<Vec<_>>();
     let info = object
@@ -414,6 +415,7 @@ pub(super) fn patch_style_reference(
                 type_: original_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = object
             .archive_info
@@ -780,6 +782,7 @@ mod tests {
                 type_: 2_001,
                 data: vec![0x80],
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -854,6 +857,7 @@ mod tests {
                 type_: 2_001,
                 data: raw,
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -893,6 +897,7 @@ mod tests {
                 type_: 2_001,
                 data: raw,
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -950,7 +955,12 @@ mod tests {
             .unwrap();
         append_varint_field(&mut data, 1_903, 303).unwrap();
 
-        let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2_001, data }]).unwrap();
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage { type_: 2_001, data }],
+            Default::default(),
+        )
+        .unwrap();
         object.archive_info.message_infos[0].object_references = vec![7];
         let mut package = HostPackage::new();
         package

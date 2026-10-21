@@ -254,7 +254,7 @@ impl HeapFootprint {
     }
 }
 
-/// Metadata vectors cloned by `Archive::to_bytes_with_limits` and by the
+/// Metadata vectors cloned by `Archive::to_bytes` and by the
 /// compatibility conversion used by the IWA header encoder.
 ///
 /// `use_capacity` is used for a source-owned clone. Conversion targets use
@@ -491,58 +491,20 @@ fn snappy_output_plan(
     input_len: usize,
     limits: SnappyLimits,
 ) -> Result<(usize, usize, usize), Error> {
-    if input_len > limits.max_decompressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: usize_to_u64(input_len),
-            maximum: usize_to_u64(limits.max_decompressed_stream()),
-        });
-    }
-    let frame_count = input_len
-        .checked_add(SnappyStream::WRITE_CHUNK_SIZE - 1)
-        .map_or(0, |length| length / SnappyStream::WRITE_CHUNK_SIZE);
-    if frame_count > limits.max_frames() {
-        return Err(Error::Limit {
-            kind: LimitKind::WireWork,
-            observed: usize_to_u64(frame_count),
-            maximum: usize_to_u64(limits.max_frames()),
-        });
-    }
-
-    let mut remaining = input_len;
-    let mut compressed = 0usize;
-    let mut maximum_frame = 0usize;
-    while remaining != 0 {
-        let chunk = remaining.min(SnappyStream::WRITE_CHUNK_SIZE);
-        if chunk > limits.max_uncompressed_chunk() {
-            return Err(Error::Limit {
-                kind: LimitKind::EntryBytes,
-                observed: usize_to_u64(chunk),
-                maximum: usize_to_u64(limits.max_uncompressed_chunk()),
-            });
-        }
-        let frame = SnappyStream::maximum_compressed_len(chunk).map_err(map_core_error)?;
-        let compressed_chunk = frame
+    let compressed =
+        SnappyStream::maximum_compressed_len(input_len, limits).map_err(map_core_error)?;
+    let chunk_size = SnappyStream::WRITE_CHUNK_SIZE.min(limits.max_uncompressed_chunk());
+    let frame_count = input_len.div_ceil(chunk_size);
+    // The encoder allocates a raw frame before checking its actual compressed
+    // length. Its temporary allocation is independent of the output ceiling.
+    let maximum_frame = if input_len == 0 {
+        0
+    } else {
+        SnappyStream::maximum_compressed_len(input_len.min(chunk_size), Default::default())
+            .map_err(map_core_error)?
             .checked_sub(SNAPPY_FRAME_HEADER_BYTES)
-            .ok_or(Error::InvalidSource)?;
-        if compressed_chunk > limits.max_compressed_chunk() {
-            return Err(Error::Limit {
-                kind: LimitKind::EntryBytes,
-                observed: usize_to_u64(compressed_chunk),
-                maximum: usize_to_u64(limits.max_compressed_chunk()),
-            });
-        }
-        compressed = compressed.checked_add(frame).ok_or(Error::InvalidSource)?;
-        maximum_frame = maximum_frame.max(compressed_chunk);
-        remaining -= chunk;
-    }
-    if compressed > limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: usize_to_u64(compressed),
-            maximum: usize_to_u64(limits.max_compressed_stream()),
-        });
-    }
+            .ok_or(Error::InvalidSource)?
+    };
     Ok((frame_count, compressed, maximum_frame))
 }
 
@@ -573,7 +535,7 @@ fn archive_reopen_heap(archive: &Archive) -> Result<HeapFootprint, Error> {
     Ok(footprint)
 }
 
-/// Estimate `Archive::to_bytes_with_limits`' per-object metadata work and the
+/// Estimate `Archive::to_bytes`' per-object metadata work and the
 /// multi-frame Snappy output it feeds. The output-free encoded length check is
 /// intentionally excluded; this helper covers only allocation-bearing work.
 fn archive_to_bytes_heap(
@@ -597,7 +559,16 @@ fn archive_to_bytes_heap(
     }
 
     // SnappyStream::compress reserves the complete maximum output once and
-    // `compress_vec` creates one temporary compressed vector per frame.
+    // Conservatively allow the temporary vector for every frame: tight
+    // encoded ceilings can require the fallback even when the result fits.
+    // Direct encoding into the reserved output uses less scratch.
+    // snap 1.1.2 also retains a 16,384-entry u16 encoder table for blocks
+    // larger than its 1,024-entry inline table.
+    if encoded.min(SnappyStream::WRITE_CHUNK_SIZE.min(snappy_limits.max_uncompressed_chunk()))
+        > 1_024
+    {
+        footprint.add_bytes(32 * 1024, true)?;
+    }
     footprint.add_bytes(compressed, false)?;
     for _ in 0..frames {
         footprint.add_bytes(maximum_frame, true)?;
@@ -988,7 +959,7 @@ impl ValueAxisBudget {
         snappy_limits: SnappyLimits,
     ) -> Result<(usize, usize), Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (footprint, frames) = archive_to_bytes_heap(archive, encoded, snappy_limits)?;
         let compressed = snappy_output_plan(encoded, snappy_limits)?.1;
@@ -1095,7 +1066,7 @@ impl ValueAxisBudget {
             let archive = component.archive();
             footprint.merge(archive_reopen_heap(archive)?)?;
             let encoded = archive
-                .encoded_len_with_limits(archive_limits)
+                .encoded_len(archive_limits)
                 .map_err(map_core_error)?;
             let (frames, _, _) = snappy_output_plan(encoded, snappy_limits)?;
             let metadata_work = archive_metadata_work(archive)?;
@@ -1993,7 +1964,7 @@ fn rewrite_value_axis_settings(
         .ok_or(Error::InvalidSource)?;
     let decompressed_bound = component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_native_decompress_parse(
         entry.data().len(),
@@ -2001,10 +1972,8 @@ fn rewrite_value_axis_settings(
         component.archive(),
         snappy_limits,
     )?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     super::chart_axis_support::validate_canonical_object_length_prefixes_with_budget(
         stream.as_bytes(),
         &archive,
@@ -2090,7 +2059,7 @@ fn rewrite_value_axis_settings(
     archive
         .object_mut(selection.axis_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.axis_message_index,
             RawMessage {
                 type_: CHART_AXIS_MESSAGE_TYPE,
@@ -2101,10 +2070,8 @@ fn rewrite_value_axis_settings(
         .map_err(map_core_error)?;
     let (_encoded_bound, _compressed_bound) =
         budget.charge_archive_snappy_plan(&archive, archive_limits, snappy_limits)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(|_| Error::InvalidSource)?;
     let edit = EntryEdit::new(
@@ -2587,5 +2554,43 @@ impl ValueAxisBudget {
             0,
             0,
         )
+    }
+}
+
+#[cfg(test)]
+mod snappy_output_plan_tests {
+    use super::{SNAPPY_FRAME_HEADER_BYTES, snappy_output_plan};
+    use litchi_iwa_core::{SnappyLimits, SnappyStream};
+
+    #[test]
+    fn tiny_output_cap_keeps_uncapped_frame_scratch() {
+        let limits = SnappyLimits::default()
+            .with_compressed_stream_bytes(1)
+            .expect("positive compressed output cap");
+        let (frames, compressed, maximum_frame) =
+            snappy_output_plan(1, limits).expect("the plan has one frame");
+        let uncapped_frame = SnappyStream::maximum_compressed_len(1, Default::default())
+            .expect("one byte has a finite Snappy bound");
+
+        assert_eq!(frames, 1);
+        assert_eq!(compressed, 1);
+        assert_eq!(maximum_frame, uncapped_frame - SNAPPY_FRAME_HEADER_BYTES);
+        assert!(maximum_frame > compressed);
+    }
+
+    #[test]
+    fn small_configured_chunk_changes_frame_count_and_scratch_shape() {
+        let limits = SnappyLimits::new(8, 64)
+            .expect("decoded limits")
+            .with_input_limits(32, 128, 16)
+            .expect("compressed input limits");
+        let (frames, compressed, maximum_frame) =
+            snappy_output_plan(25, limits).expect("four eight-byte frames");
+        let uncapped_frame = SnappyStream::maximum_compressed_len(8, Default::default())
+            .expect("an eight-byte frame has a finite bound");
+
+        assert_eq!(frames, 4);
+        assert!(compressed <= limits.max_compressed_stream());
+        assert_eq!(maximum_frame, uncapped_frame - SNAPPY_FRAME_HEADER_BYTES);
     }
 }

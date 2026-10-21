@@ -75,7 +75,7 @@ fn reassemble_style_object<F>(
 where
     F: FnOnce(&mut ArchiveObject),
 {
-    let catalog = Catalog::from_bytes(source_bytes).expect("fixture catalog");
+    let catalog = Catalog::from_bytes(source_bytes, Default::default()).expect("fixture catalog");
     let mut source_name = None;
     let mut source_archive = None;
     let mut destination_archive = None;
@@ -84,8 +84,10 @@ where
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data()).expect("fixture IWA stream");
-        let archive = Archive::parse(stream.as_bytes()).expect("fixture IWA archive");
+        let stream =
+            SnappyStream::decompress(entry.data(), Default::default()).expect("fixture IWA stream");
+        let archive =
+            Archive::parse(stream.as_bytes(), Default::default()).expect("fixture IWA archive");
         if archive.object(style_identifier).is_some() {
             source_name = Some(entry.name().to_owned());
             source_archive = Some(archive);
@@ -111,14 +113,19 @@ where
             .expect("external style object to move");
         destination_archive.objects.push(style);
         let destination_bytes = destination_archive
-            .to_bytes()
+            .to_bytes(Default::default())
             .expect("destination IWA bytes");
-        destination_compressed =
-            Some(SnappyStream::compress(&destination_bytes).expect("destination Snappy bytes"));
+        destination_compressed = Some(
+            SnappyStream::compress(&destination_bytes, Default::default())
+                .expect("destination Snappy bytes"),
+        );
     }
 
-    let source_bytes = source_archive.to_bytes().expect("source IWA bytes");
-    let source_compressed = SnappyStream::compress(&source_bytes).expect("source Snappy bytes");
+    let source_bytes = source_archive
+        .to_bytes(Default::default())
+        .expect("source IWA bytes");
+    let source_compressed =
+        SnappyStream::compress(&source_bytes, Default::default()).expect("source Snappy bytes");
     let mut edits = Vec::with_capacity(2);
     if let (Some(destination_name), Some(destination_compressed)) =
         (destination_component, destination_compressed.as_deref())

@@ -37,7 +37,7 @@ pub(super) fn validate_component_framing(
         return Err(Error::InvalidSource);
     }
     let snappy_limits = transaction_snappy_limits(package, budget, entry.data().len(), 2)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|error| map_transaction_snappy_error(error, budget))?;
     budget.charge_work(
         entry
@@ -48,7 +48,15 @@ pub(super) fn validate_component_framing(
     )?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            package
+                .state
+                .options
+                .archive()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -134,7 +142,7 @@ pub(super) fn rewrite_and_verify(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = transaction_snappy_limits(source, budget, entry.data().len(), 3)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|error| map_transaction_snappy_error(error, budget))?;
     let source_stream_len = stream.as_bytes().len();
     budget.charge_work(
@@ -144,10 +152,9 @@ pub(super) fn rewrite_and_verify(
             .checked_add(source_stream_len.saturating_mul(3))
             .ok_or(Error::InvalidSource)?,
     )?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
     let object = archive
@@ -165,7 +172,7 @@ pub(super) fn rewrite_and_verify(
     archive
         .object_mut(selection.soundtrack_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SOUNDTRACK_MESSAGE_TYPE,
@@ -183,15 +190,14 @@ pub(super) fn rewrite_and_verify(
             .checked_mul(3)
             .ok_or(Error::InvalidSource)?,
     )?;
-    let serialized = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
     if serialized.len() > serialized_bound {
         return Err(Error::Verification);
     }
     let serialized_len = serialized.len();
-    let compressed = SnappyStream::compress(&serialized).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&serialized, Default::default()).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(serialized);
     let package_bound = source_bytes

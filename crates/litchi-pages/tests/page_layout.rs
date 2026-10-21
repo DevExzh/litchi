@@ -64,19 +64,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -97,8 +101,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&rewritten)?.to_bytes()?, rewritten);
-    Ok(SnappyStream::compress(&rewritten)?)
+    assert_eq!(
+        Archive::parse(&rewritten, Default::default())?.to_bytes(Default::default())?,
+        rewritten
+    );
+    Ok(SnappyStream::compress(&rewritten, Default::default())?)
 }
 
 fn full_layout() -> TestResult<Layout> {
@@ -177,6 +184,7 @@ fn synthetic_package_with_view_location(
                 data: b"after-document".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     document.archive_info.message_infos[1].object_references =
         vec![BODY_IDENTIFIER, SECTION_IDENTIFIER];
@@ -258,6 +266,7 @@ fn synthetic_package_with_view_location(
                     data: b"after-view-state".to_vec(),
                 },
             ],
+            Default::default(),
         )?;
         let message_info = &mut view_state.archive_info.message_infos[1];
         message_info.object_references = vec![LAYOUT_STATE_IDENTIFIER];
@@ -328,7 +337,7 @@ fn synthetic_package_with_view_location(
 }
 
 fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -348,12 +357,12 @@ fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic Pages component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -361,7 +370,7 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut ArchiveObject, usize) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, DOCUMENT_MEMBER)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object_mut(DOCUMENT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic Pages document"))?;
@@ -371,8 +380,9 @@ fn rewrite_document(
         .position(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing Pages document message"))?;
     mutate(object, message_index)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -385,10 +395,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -401,7 +412,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -412,9 +423,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -435,6 +446,7 @@ fn with_unknown_group(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -450,7 +462,7 @@ fn message_payload_in(
     identifier: u64,
     message_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, component)?)?;
+    let archive = Archive::parse(&component_stream(package, component)?, Default::default())?;
     Ok(archive
         .object(identifier)
         .and_then(|object| {
@@ -466,7 +478,7 @@ fn message_payload_in(
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, DOCUMENT_MEMBER)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -490,15 +502,15 @@ fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn entry_names(package: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect())
 }
 
 fn assert_only_layout_components_and_previews_changed(before: &[u8], after: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     for old in before.iter() {
         if PREVIEW_NAMES.contains(&old.name()) {
             assert!(after.iter().all(|entry| entry.name() != old.name()));
@@ -706,7 +718,10 @@ fn changed_layout_invalidates_view_state_and_preserves_unknowns_and_locality() -
         )?,
         source_detached_cache
     );
-    let changed_archive = Archive::parse(&component_stream(&changed_bytes, VIEW_STATE_MEMBER)?)?;
+    let changed_archive = Archive::parse(
+        &component_stream(&changed_bytes, VIEW_STATE_MEMBER)?,
+        Default::default(),
+    )?;
     let view_object = changed_archive
         .object(VIEW_STATE_ROOT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("changed view-state root is missing"))?;
@@ -798,6 +813,7 @@ fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult 
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -810,11 +826,12 @@ fn malformed_duplicate_and_wrong_wire_layout_fields_fail_closed() -> TestResult 
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
     let duplicate_message = rewrite_document(&bytes, |object, index| {
-        object.push_message(object.messages[index].clone())?;
+        object.push_message(object.messages[index].clone(), Default::default())?;
         Ok(())
     })?;
 
@@ -924,6 +941,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -941,6 +959,7 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1020,7 +1039,7 @@ fn stale_tampered_replayed_and_inverse_patches_conflict() -> TestResult {
         Err(PageLayoutError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered sentinel")],
         Limits::default(),

@@ -48,7 +48,7 @@ pub(super) fn replace_payload(
     let limits = workspace.archive_limits();
     workspace
         .object_mut(identifier)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,
@@ -313,7 +313,7 @@ pub(super) fn remove(
     workspace
         .object_mut(slide)
         .map_err(lift)?
-        .replace_message_pruning_object_references_preserving_header_with_limits(
+        .replace_message_pruning_object_references_preserving_header(
             slide_index,
             RawMessage {
                 type_: SLIDE,
@@ -704,7 +704,7 @@ pub(super) fn set_text_style(
         let mut references = Vec::with_capacity(2);
         references.extend(*parent);
         references.push(stylesheet);
-        let mut object = litchi_iwa_core::ArchiveObject::new_with_limits(
+        let mut object = litchi_iwa_core::ArchiveObject::new(
             identifier,
             vec![RawMessage {
                 type_: CHARACTER_STYLE,
@@ -743,7 +743,7 @@ pub(super) fn set_text_style(
         let declared = workspace
             .object_mut(stylesheet)
             .map_err(lift)?
-            .replace_message_transitioning_object_references_preserving_header_with_limits(
+            .replace_message_transitioning_object_references_preserving_header(
                 sheet_index,
                 RawMessage {
                     type_: STYLESHEET,
@@ -784,7 +784,7 @@ pub(super) fn set_text_style(
     workspace
         .object_mut(storage)
         .map_err(lift)?
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             storage_index,
             RawMessage {
                 type_: inventory::STORAGE,

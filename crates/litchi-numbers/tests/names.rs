@@ -42,6 +42,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -107,11 +108,15 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> TestResult {
@@ -216,30 +221,38 @@ fn metadata_entry(include_tables: bool) -> TestResult<Vec<u8>> {
 }
 
 fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive.objects[0].replace_message_preserving_header(
         0,
         RawMessage {
             type_: PACKAGE_METADATA_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let rewritten = SnappyStream::compress(&archive.to_bytes()?)?;
+    let rewritten =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(METADATA, &rewritten)], Limits::default())?)
 }
 
 fn with_metadata_component(source: &[u8], component: Vec<u8>) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     append_length_delimited_field(
         &mut archive.objects[0].messages[0].data,
         3,
@@ -250,12 +263,15 @@ fn with_metadata_component(source: &[u8], component: Vec<u8>) -> TestResult<Vec<
 }
 
 fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     Ok(archive.objects[0].messages[0].data.clone())
 }
 
@@ -384,14 +400,18 @@ fn rewrite_document(
     source: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .unwrap();
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let payload = SnappyStream::compress(&archive.to_bytes()?)?;
+    let payload =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &payload)], Limits::default())?)
 }
 
@@ -417,6 +437,7 @@ fn calculation_engine_package(source: &[u8], volatile: bool) -> TestResult<Vec<u
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -489,6 +510,7 @@ fn malformed_calculation_engine_package(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -518,6 +540,7 @@ fn malformed_formula_owner_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 4_008,
                 data: vec![0xff],
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -556,6 +579,7 @@ fn form_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = &mut sheet.archive_info.message_infos[0];
         info.field_infos.clear();
@@ -575,18 +599,22 @@ fn legacy_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 6_000,
                 data: model.messages[0].data.clone(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
 fn split_components(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let (document_objects, table_objects): (Vec<_>, Vec<_>) =
         archive.objects.into_iter().partition(|object| {
             object
@@ -650,6 +678,7 @@ fn empty_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 2,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         sheet.archive_info.message_infos[0]
             .object_references
@@ -659,13 +688,13 @@ fn empty_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn mismatched_selected_message_info(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("selected object is missing"))?;
@@ -687,7 +716,7 @@ fn mismatched_selected_message_info(source: &[u8], identifier: u64) -> TestResul
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream[data_offset..]);
-    let compressed = SnappyStream::compress(&rewritten)?;
+    let compressed = SnappyStream::compress(&rewritten, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &compressed)], Limits::default())?)
 }
 
@@ -702,6 +731,7 @@ fn cross_sheet_shared_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: 6_000,
                 data: table_info_payload(FIRST_MODEL, false)?,
             },
+            Default::default(),
         )?;
         info.archive_info.message_infos[0].object_references = vec![FIRST_MODEL];
         Ok(())
@@ -752,19 +782,19 @@ fn sheet_table_and_combined_batches_are_atomic_and_preserve_view_state() -> Test
     assert_eq!(combined.diagnostics().operations(), 3);
     assert!(combined.diagnostics().changed());
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == VIEW_STATE)
             .unwrap()
             .data(),
-        Catalog::from_bytes(&bytes(combined.package())?)?
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
             .iter()
             .find(|entry| entry.name() == VIEW_STATE)
             .unwrap()
             .data()
     );
     assert!(
-        Catalog::from_bytes(&bytes(combined.package())?)?
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );
@@ -1144,8 +1174,8 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
         .edit_names()
         .rename_sheet("Alpha", "Changed")?
         .commit()?;
-    let source_catalog = Catalog::from_bytes(&clean)?;
-    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?)?;
+    let source_catalog = Catalog::from_bytes(&clean, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
     let source_archive = Archive::parse(
         &SnappyStream::decompress(
             source_catalog
@@ -1153,8 +1183,10 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
                 .find(|entry| entry.name() == DOCUMENT)
                 .unwrap()
                 .data(),
+            Default::default(),
         )?
         .into_bytes(),
+        Default::default(),
     )?;
     let target_archive = Archive::parse(
         &SnappyStream::decompress(
@@ -1163,8 +1195,10 @@ fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_rou
                 .find(|entry| entry.name() == DOCUMENT)
                 .unwrap()
                 .data(),
+            Default::default(),
         )?
         .into_bytes(),
+        Default::default(),
     )?;
     assert_eq!(
         source_archive.object(1).unwrap().messages[0].data,
@@ -1230,8 +1264,8 @@ fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
         .edit_names()
         .rename_table("Alpha", "One", "Known")?
         .commit()?;
-    let before = Catalog::from_bytes(&padded)?;
-    let after = Catalog::from_bytes(&bytes(commit.package())?)?;
+    let before = Catalog::from_bytes(&padded, Default::default())?;
+    let after = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
     let before_document = before
         .iter()
         .find(|entry| entry.name() == DOCUMENT)
@@ -1243,7 +1277,10 @@ fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
         .unwrap()
         .data();
     assert_ne!(before_document, after_document);
-    let parsed = Archive::parse(&SnappyStream::decompress(after_document)?.into_bytes())?;
+    let parsed = Archive::parse(
+        &SnappyStream::decompress(after_document, Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let model = parsed.object(FIRST_MODEL).unwrap();
     assert!(
         WireView::parse(
@@ -1273,7 +1310,7 @@ fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
         assert_eq!(sheet_name(commit.package(), 0), "Split sheet");
         assert_eq!(table_name(commit.package(), 0, 0), "Split table");
         let output = bytes(commit.package())?;
-        let catalog = Catalog::from_bytes(&output)?;
+        let catalog = Catalog::from_bytes(&output, Default::default())?;
         assert_eq!(
             catalog
                 .iter()
@@ -1287,7 +1324,7 @@ fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
                 .find(|entry| entry.name() == VIEW_STATE)
                 .unwrap()
                 .data(),
-            Catalog::from_bytes(&source)?
+            Catalog::from_bytes(&source, Default::default())?
                 .iter()
                 .find(|entry| entry.name() == VIEW_STATE)
                 .unwrap()
@@ -1417,7 +1454,7 @@ fn metadata_absent_selected_token_is_added_and_inverse_is_exact() -> TestResult 
 #[test]
 fn changed_names_fail_closed_for_missing_duplicate_or_overflow_metadata() -> TestResult {
     let source = package_bytes(false, false, 0)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let missing =
         catalog.reassemble_with_deletions_to_bytes(&[], &[METADATA], Limits::default())?;
     let missing_package = Package::from_bytes(&missing)?;

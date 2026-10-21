@@ -63,19 +63,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -109,9 +113,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn settings(
@@ -235,6 +239,7 @@ fn synthetic_package_with_first_message(
                 data: b"after-section-payload".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     first_section.archive_info.message_infos[1].object_references = FIRST_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(FIRST_TEMPLATES) {
@@ -247,6 +252,7 @@ fn synthetic_package_with_first_message(
     let mut second_section = ArchiveObject::new(
         SECOND_SECTION_IDENTIFIER,
         vec![section_message(second, SECOND_TEMPLATES, 8_888)?],
+        Default::default(),
     )?;
     second_section.archive_info.message_infos[0].object_references = SECOND_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(SECOND_TEMPLATES) {
@@ -366,7 +372,7 @@ fn synthetic_package_with_first_message(
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -393,12 +399,12 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn member_stream(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing synthetic Pages component member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
@@ -416,7 +422,7 @@ fn message_payload_in(
     type_: u32,
 ) -> TestResult<Vec<u8>> {
     let stream = member_stream(package, member)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -430,7 +436,7 @@ fn message_payload_in(
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -502,7 +508,7 @@ fn fields_except_settings(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn entry_map(package: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
@@ -518,8 +524,8 @@ fn assert_previews(package: &[u8], expected: bool) -> TestResult {
 }
 
 fn assert_one_iwa_member_changed(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     assert_eq!(
         before.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
         after.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
@@ -557,8 +563,8 @@ fn assert_one_iwa_member_changed(source: &[u8], target: &[u8]) -> TestResult {
 
 fn assert_changed_locality(source: &[u8], target: &[u8]) -> TestResult {
     assert_one_iwa_member_changed(source, target)?;
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let before_document = before
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)

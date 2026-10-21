@@ -1712,7 +1712,7 @@ fn validate_component_framing(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -1725,7 +1725,15 @@ fn validate_component_framing(
     budget.charge_work(stream.as_bytes().len())?;
     component
         .archive()
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(
+            stream.as_bytes(),
+            package
+                .state
+                .options
+                .archive()
+                .effective_archive_limits()
+                .map_err(map_archive_error)?,
+        )
         .map_err(map_core_error)
 }
 
@@ -2248,7 +2256,7 @@ mod tests {
     }
 
     fn legacy_package_bytes(flat: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(flat)?;
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(flat, Default::default())?;
         let inner_entries = catalog
             .iter()
             .filter(|entry| {

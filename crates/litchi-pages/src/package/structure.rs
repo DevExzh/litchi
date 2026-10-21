@@ -285,7 +285,7 @@ pub(super) fn replace(
         )
         .collect();
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: message_type,
@@ -861,12 +861,12 @@ impl<'p> Working<'p> {
                 .limits()
                 .snappy_limits()
                 .map_err(|error| map_archive(&error))?;
-            let stream = SnappyStream::decompress_with_limits(entry.data(), snappy)
-                .map_err(|error| map_core(&error))?;
-            let archive = Archive::parse_with_limits(stream.as_bytes(), self.archive_limits)
+            let stream =
+                SnappyStream::decompress(entry.data(), snappy).map_err(|error| map_core(&error))?;
+            let archive = Archive::parse(stream.as_bytes(), self.archive_limits)
                 .map_err(|error| map_core(&error))?;
             archive
-                .validate_canonical_object_framing(stream.as_bytes())
+                .validate_canonical_object_framing(stream.as_bytes(), self.archive_limits)
                 .map_err(|error| map_core(&error))?;
             self.edited.insert(name.to_owned(), archive);
         }
@@ -907,7 +907,7 @@ impl<'p> Working<'p> {
         }
         let limits = self.archive_limits;
         self.archive_mut(name)?
-            .insert_object_with_limits(object, limits)
+            .insert_object(object, limits)
             .map_err(|error| map_core(&error))?;
         self.inserted.insert(identifier, name.to_owned());
         Ok(())
@@ -919,7 +919,7 @@ impl<'p> Working<'p> {
         let limits = self.archive_limits;
         let removed = self
             .archive_mut(&name)?
-            .remove_object_checked_with_limits(identifier, limits)
+            .remove_object_checked(identifier, limits)
             .map_err(|error| map_core(&error))?;
         if self.inserted.remove(&identifier).is_none() {
             self.removed.insert(identifier);
@@ -1126,7 +1126,7 @@ impl<'p> Working<'p> {
         self.archive_mut(METADATA_ENTRY)?
             .object_mut(route.0)
             .ok_or(Fault::Invalid)?
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 route.1,
                 RawMessage {
                     type_: METADATA_MESSAGE_TYPE,
@@ -1147,9 +1147,10 @@ impl<'p> Working<'p> {
         let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
         for (name, archive) in &self.edited {
             let bytes = archive
-                .to_bytes_with_limits(self.archive_limits)
+                .to_bytes(self.archive_limits)
                 .map_err(|error| map_core(&error))?;
-            let compressed = SnappyStream::compress(&bytes).map_err(|error| map_core(&error))?;
+            let compressed = SnappyStream::compress(&bytes, Default::default())
+                .map_err(|error| map_core(&error))?;
             encoded.push((name.clone(), compressed));
         }
         let edits: Vec<EntryEdit<'_>> = encoded

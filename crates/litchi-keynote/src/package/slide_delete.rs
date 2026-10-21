@@ -1457,7 +1457,7 @@ fn publish_selection(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             catalog
                 .limits()
@@ -1465,8 +1465,7 @@ fn publish_selection(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive =
-            Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+        let mut archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
         if *name == selection.show_component {
             let show = archive
                 .object(selection.show_identifier)
@@ -1479,7 +1478,7 @@ fn publish_selection(
             archive
                 .object_mut(selection.show_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_pruning_object_references_preserving_header_with_limits(
+                .replace_message_pruning_object_references_preserving_header(
                     selection.show_message_index,
                     RawMessage {
                         type_: SHOW_MESSAGE_TYPE,
@@ -1504,7 +1503,7 @@ fn publish_selection(
             archive
                 .object_mut(selection.metadata.object_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.metadata.message_index,
                     RawMessage {
                         type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -1522,10 +1521,9 @@ fn publish_selection(
             limits,
             wire_limits,
         )?;
-        let bytes = archive
-            .to_bytes_with_limits(limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
         budget.allocation(compressed.len())?;
         rewritten.push((name, compressed));
     }
@@ -1613,7 +1611,7 @@ fn verify_expected_archive_delta(
                 .ok_or(Error::InvalidSource)?;
             let payload = remove_show_node(&message.data, selection.node_identifier, wire_limits)?;
             authorized
-                .replace_message_pruning_object_references_preserving_header_with_limits(
+                .replace_message_pruning_object_references_preserving_header(
                     selection.show_message_index,
                     RawMessage {
                         type_: SHOW_MESSAGE_TYPE,
@@ -1633,7 +1631,7 @@ fn verify_expected_archive_delta(
         {
             let mut authorized = source_object.clone();
             authorized
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.metadata.message_index,
                     RawMessage {
                         type_: PACKAGE_METADATA_MESSAGE_TYPE,

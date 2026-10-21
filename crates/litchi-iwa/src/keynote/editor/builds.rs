@@ -1727,6 +1727,7 @@ pub(super) fn normalize_and_patch_build_object(
             type_: BUILD_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
 
     let transient = object
@@ -2232,6 +2233,7 @@ pub(super) fn patch_build_chunk_object(
             type_: BUILD_CHUNK_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -2321,7 +2323,7 @@ pub(super) fn patch_slide_build_references(
                 ));
             }
         }
-        object.replace_message(index, RawMessage { type_: 5, data })?;
+        object.replace_message(index, RawMessage { type_: 5, data }, Default::default())?;
         let info = &mut object.archive_info.message_infos[index];
         let removed = remove_builds
             .iter()
@@ -2409,7 +2411,7 @@ pub(super) fn patch_slide_build_cache(
                 "Keynote slide build cache patch failed validation".to_owned(),
             ));
         }
-        object.replace_message(index, RawMessage { type_: 4, data })?;
+        object.replace_message(index, RawMessage { type_: 4, data }, Default::default())?;
         Ok(())
     })
 }

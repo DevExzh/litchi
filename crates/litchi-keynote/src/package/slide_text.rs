@@ -1353,13 +1353,13 @@ pub(super) fn rewrite_owned_storage_text(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
         if let Some(object) = archive.object(storage_identifier) {
             let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
@@ -1385,7 +1385,7 @@ pub(super) fn rewrite_owned_storage_text(
             archive
                 .object_mut(storage_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     message_index,
                     RawMessage {
                         type_: STORAGE_MESSAGE_TYPE,
@@ -1406,10 +1406,9 @@ pub(super) fn rewrite_owned_storage_text(
             )
             .map_err(map_slide_preview_error)?;
         }
-        let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+        let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
         compressed_components.push((*component_name, compressed));
     }
     if !storage_changed || !node_changed {

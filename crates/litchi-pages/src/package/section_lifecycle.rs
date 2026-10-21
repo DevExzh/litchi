@@ -752,7 +752,7 @@ fn add_section(
         };
         let message_type = message.type_;
         let mut cloned = object
-            .clone_with_identity_remap_with_limits(
+            .clone_with_identity_remap(
                 *identifier,
                 &pairs,
                 &[RawMessage {

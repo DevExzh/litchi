@@ -221,7 +221,7 @@ impl Draft {
         let mut staged = self.package().clone();
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -499,7 +499,7 @@ impl Draft {
                 clone_slide_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
         let new_style_ids = source_style_ids
@@ -864,6 +864,7 @@ fn update_chart_payload(
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -896,6 +897,7 @@ fn update_chart_payload_with_grid(
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

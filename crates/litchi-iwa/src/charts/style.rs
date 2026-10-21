@@ -196,6 +196,7 @@ impl ChartStyleSlot {
                     type_: CHART_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

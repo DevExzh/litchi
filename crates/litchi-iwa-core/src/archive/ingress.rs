@@ -4,7 +4,7 @@
 //! values.  This module only walks the object framing and the schema-selected
 //! header closure with borrowed wire views.  A format transaction can therefore
 //! admit the target's header, metadata vectors, and message payload storage
-//! before it calls [`Archive::parse_with_limits`].
+//! before it calls [`Archive::parse`].
 
 use std::mem::size_of;
 
@@ -177,10 +177,7 @@ impl Archive {
     /// Preflight a decoded candidate without allocating generated archive
     /// values. The returned facts are intended for a caller-owned aggregate
     /// transaction ledger immediately before archive parsing.
-    pub fn preflight_with_limits(
-        data: &[u8],
-        limits: Limits,
-    ) -> Result<ArchiveIngressRequirements> {
+    pub fn preflight(data: &[u8], limits: Limits) -> Result<ArchiveIngressRequirements> {
         let limits = limits.validate()?;
         if data.len() > limits.max_archive_bytes() {
             return Err(limit(
@@ -338,11 +335,6 @@ impl Archive {
             debug_assert!(cursor >= header_start);
         }
         Ok(requirements)
-    }
-
-    /// Preflight a decoded candidate using the default physical limits.
-    pub fn preflight(data: &[u8]) -> Result<ArchiveIngressRequirements> {
-        Self::preflight_with_limits(data, Limits::default())
     }
 }
 
@@ -773,15 +765,16 @@ mod tests {
                     type_: 9,
                     data: vec![1, 2, 3],
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
     }
 
     #[test]
     fn preflight_matches_the_physical_archive_shape() -> crate::Result<()> {
         let bytes = fixture()?;
-        let requirements = Archive::preflight(&bytes)?;
+        let requirements = Archive::preflight(&bytes, Default::default())?;
         assert_eq!(requirements.objects(), 1);
         assert_eq!(requirements.messages(), 1);
         assert_eq!(requirements.payload_bytes(), 3);
@@ -790,7 +783,7 @@ mod tests {
         assert!(requirements.retained_bytes() >= requirements.payload_bytes());
         assert!(requirements.traversal_bytes() >= bytes.len());
         assert!(requirements.allocations() > 0);
-        let parsed = Archive::parse(&bytes)?;
+        let parsed = Archive::parse(&bytes, Default::default())?;
         assert_eq!(parsed.objects.len(), requirements.objects());
         assert_eq!(parsed.objects[0].messages.len(), requirements.messages());
         Ok(())
@@ -801,7 +794,7 @@ mod tests {
         let mut bytes = fixture()?;
         bytes.pop();
         assert!(matches!(
-            Archive::preflight(&bytes),
+            Archive::preflight(&bytes, Default::default()),
             Err(Error::InvalidArchive { .. })
         ));
         Ok(())
@@ -812,7 +805,7 @@ mod tests {
         let bytes = fixture()?;
         let limits = Limits::default().with_message_bytes(2)?;
         assert!(matches!(
-            Archive::preflight_with_limits(&bytes, limits),
+            Archive::preflight(&bytes, limits),
             Err(Error::Limit {
                 kind: crate::LimitKind::MessageBytes,
                 observed: 3,
@@ -825,7 +818,7 @@ mod tests {
     #[test]
     fn requirements_are_copyable_for_a_caller_ledger() -> crate::Result<()> {
         let bytes = fixture()?;
-        let original = Archive::preflight(&bytes)?;
+        let original = Archive::preflight(&bytes, Default::default())?;
         let copied: ArchiveIngressRequirements = original;
         assert_eq!(copied, original);
         Ok(())

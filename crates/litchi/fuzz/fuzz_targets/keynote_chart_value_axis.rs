@@ -143,7 +143,7 @@ fn foreign_package_bytes() -> &'static [u8] {
     static BYTES: OnceLock<Box<[u8]>> = OnceLock::new();
     BYTES
         .get_or_init(|| {
-            let source = Catalog::from_bytes(source_package_bytes())
+            let source = Catalog::from_bytes(source_package_bytes(), Default::default())
                 .unwrap_or_else(|error| panic!("source value-axis catalog must parse: {error}"));
             let entries = source
                 .iter()
@@ -371,7 +371,7 @@ fn publish_and_reverse(
         );
         for preview in PREVIEWS {
             assert!(
-                Catalog::from_bytes(&committed_bytes)
+                Catalog::from_bytes(&committed_bytes, Default::default())
                     .expect("committed catalog must parse")
                     .iter()
                     .all(|entry| entry.name() != preview),
@@ -619,8 +619,8 @@ fn exercise_limit_guards() {
 }
 
 fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
-    let source = Catalog::from_bytes(before).expect("source value-axis catalog must parse");
-    let target = Catalog::from_bytes(after).expect("target value-axis catalog must parse");
+    let source = Catalog::from_bytes(before, Default::default()).expect("source value-axis catalog must parse");
+    let target = Catalog::from_bytes(after, Default::default()).expect("target value-axis catalog must parse");
     for name in ["Data/sentinel.bin", METADATA_MEMBER, FOREIGN_MEMBER] {
         let source_entry = source.iter().find(|entry| entry.name() == name);
         let target_entry = target.iter().find(|entry| entry.name() == name);
@@ -632,10 +632,10 @@ fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
     }
 
     let source_archive =
-        Archive::parse(&document_stream(before).expect("source document stream must parse"))
+        Archive::parse(&document_stream(before).expect("source document stream must parse"), Default::default())
             .expect("source archive must parse");
     let target_archive =
-        Archive::parse(&document_stream(after).expect("target document stream must parse"))
+        Archive::parse(&document_stream(after).expect("target document stream must parse"), Default::default())
             .expect("target archive must parse");
     for identifier in all_document_object_ids() {
         if identifier == selected_axis {
@@ -656,7 +656,7 @@ fn assert_locality(before: &[u8], after: &[u8], selected_axis: u64) {
 
 fn axis_message_data(package: &[u8], identifier: u64) -> Option<Vec<u8>> {
     let stream = document_stream(package).ok()?;
-    let archive = Archive::parse(&stream).ok()?;
+    let archive = Archive::parse(&stream, Default::default()).ok()?;
     archive.object(identifier).and_then(|object| {
         object
             .messages
@@ -667,12 +667,12 @@ fn axis_message_data(package: &[u8], identifier: u64) -> Option<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| std::io::Error::other("missing document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn package_bytes(package: &Package) -> Vec<u8> {
@@ -737,7 +737,7 @@ fn object(
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn object_with_references(
@@ -937,7 +937,7 @@ fn chart_non_style_payload(title: &str) -> Result<Vec<u8>, Box<dyn std::error::E
 }
 
 fn component(objects: Vec<ArchiveObject>) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?)
 }
 
 fn chart_object_references(chart: usize) -> Vec<u64> {
@@ -1210,7 +1210,7 @@ fn build_source_package() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
         metadata_payload()?,
     )?])?;
     let foreign = component(vec![object(FOREIGN_OBJECT, 9_000, Vec::new())?])?;
-    let catalog = Catalog::from_bytes(&base)?;
+    let catalog = Catalog::from_bytes(&base, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))

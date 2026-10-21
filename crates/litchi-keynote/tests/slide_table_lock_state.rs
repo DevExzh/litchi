@@ -85,7 +85,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -294,13 +298,15 @@ fn synthetic_package(states: [Option<bool>; 3]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: document_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let model_component = SnappyStream::compress(
         &Archive {
             objects: model_objects,
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let metadata_component = SnappyStream::compress(
         &Archive {
@@ -311,7 +317,8 @@ fn synthetic_package(states: [Option<bool>; 3]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -334,7 +341,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing package member"))?
@@ -345,7 +352,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 fn archive(package: &[u8], member: &str) -> TestResult<Archive> {
     let bytes = member_bytes(package, member)?;
     Ok(Archive::parse(
-        SnappyStream::decompress(&bytes)?.as_bytes(),
+        SnappyStream::decompress(&bytes, Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -354,10 +362,11 @@ fn rewrite_member_archive(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut archive = archive(package, member)?;
     mutate(&mut archive)?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(member, &replacement)], Limits::default())?)
 }
 
@@ -410,6 +419,7 @@ fn replace_metadata_payload(package: &[u8], payload: Vec<u8>) -> TestResult<Vec<
                 type_: METADATA_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -441,6 +451,7 @@ fn replace_table_info_payload(
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -518,8 +529,8 @@ fn has_unknown_table_info_field(package: &[u8], identifier: u64) -> TestResult<b
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let changed = before
         .iter()
         .filter(|entry| {
@@ -727,6 +738,7 @@ fn duplicate_slide_z_order(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: SLIDE_MESSAGE_TYPE,
                 data: slide.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })

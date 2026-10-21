@@ -494,25 +494,14 @@ impl ArchiveInfo {
     ///
     /// Because protobuf messages are not self-delimiting, callers must pass a
     /// reader bounded to exactly one header when additional bytes follow it.
-    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::parse_with_limits(reader, Limits::default())
-    }
-
-    /// Decode one `TSP.ArchiveInfo` protobuf from a reader under explicit
-    /// resource limits.
-    pub fn parse_with_limits<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
+    pub fn parse<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let data = read_bounded(reader, limits.max_header_bytes(), "ArchiveInfo")?;
-        Self::decode_with_limits(&data, limits)
-    }
-
-    /// Decode one bounded `TSP.ArchiveInfo` header.
-    pub fn decode(data: &[u8]) -> Result<Self> {
-        Self::decode_with_limits(data, Limits::default())
+        Self::decode(&data, limits)
     }
 
     /// Decode one `TSP.ArchiveInfo` header under explicit limits.
-    pub fn decode_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
+    pub fn decode(data: &[u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
         let preflight = preflight_header(data, HeaderKind::ArchiveInfo, limits)?;
@@ -526,7 +515,7 @@ impl ArchiveInfo {
                     )
                 })?;
         let archive_info = archive_info_from_codec(decoded)?;
-        archive_info.validate_with_limits(limits)?;
+        archive_info.validate(limits)?;
         Ok(archive_info)
     }
 
@@ -540,7 +529,7 @@ impl ArchiveInfo {
         }
     }
 
-    fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    fn validate(&self, limits: Limits) -> Result<()> {
         let message_count = self.message_infos.len();
         if message_count > limits.max_messages_per_object() {
             return Err(limit(
@@ -552,7 +541,7 @@ impl ArchiveInfo {
 
         let mut metadata_items = message_count;
         for message_info in &self.message_infos {
-            message_info.validate_with_limits(limits)?;
+            message_info.validate(limits)?;
             add_limited(
                 &mut metadata_items,
                 message_info.metadata_item_count()?,
@@ -626,13 +615,8 @@ impl MessageInfo {
         })
     }
 
-    /// Decode one bounded `TSP.MessageInfo` protobuf.
-    pub fn decode(data: &[u8]) -> Result<Self> {
-        Self::decode_with_limits(data, Limits::default())
-    }
-
     /// Decode one `TSP.MessageInfo` protobuf under explicit limits.
-    pub fn decode_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
+    pub fn decode(data: &[u8], limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
         let preflight = preflight_header(data, HeaderKind::MessageInfo, limits)?;
@@ -646,7 +630,7 @@ impl MessageInfo {
                     )
                 })?;
         let message_info = message_info_from_codec(decoded)?;
-        message_info.validate_with_limits(limits)?;
+        message_info.validate(limits)?;
         Ok(message_info)
     }
 
@@ -655,19 +639,13 @@ impl MessageInfo {
     /// Because protobuf messages are not self-delimiting, callers must pass a
     /// reader bounded to exactly one metadata message when additional bytes
     /// follow it.
-    pub fn parse<R: Read>(reader: &mut R) -> Result<Self> {
-        Self::parse_with_limits(reader, Limits::default())
-    }
-
-    /// Decode one `TSP.MessageInfo` protobuf from a reader under explicit
-    /// resource limits.
-    pub fn parse_with_limits<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
+    pub fn parse<R: Read>(reader: &mut R, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let data = read_bounded(reader, limits.max_header_bytes(), "MessageInfo")?;
-        Self::decode_with_limits(&data, limits)
+        Self::decode(&data, limits)
     }
 
-    fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    fn validate(&self, limits: Limits) -> Result<()> {
         let length = usize::try_from(self.length)
             .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
         if length > limits.max_message_bytes() {
@@ -763,17 +741,8 @@ pub struct ArchiveObject {
 }
 
 impl ArchiveObject {
-    /// Construct an object and conventional metadata for its raw payloads.
-    pub fn new(identifier: u64, messages: Vec<RawMessage>) -> Result<Self> {
-        Self::new_with_limits(identifier, messages, Limits::default())
-    }
-
     /// Construct an object under explicit resource limits.
-    pub fn new_with_limits(
-        identifier: u64,
-        messages: Vec<RawMessage>,
-        limits: Limits,
-    ) -> Result<Self> {
+    pub fn new(identifier: u64, messages: Vec<RawMessage>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         if messages.len() > limits.max_messages_per_object() {
             return Err(limit(
@@ -802,7 +771,7 @@ impl ArchiveObject {
             original_header: None,
             original_canonical_header: None,
         };
-        object.validate_with_limits(limits)?;
+        object.validate(limits)?;
         Ok(object)
     }
 
@@ -833,26 +802,10 @@ impl ArchiveObject {
         new_identifier: u64,
         object_remap: &[(u64, u64)],
         replacement_messages: &[RawMessage],
-    ) -> Result<Self> {
-        self.clone_with_identity_remap_with_limits(
-            new_identifier,
-            object_remap,
-            replacement_messages,
-            Limits::default(),
-        )
-    }
-
-    /// Clone an object with identity/reference remapping under explicit
-    /// physical resource limits.
-    pub fn clone_with_identity_remap_with_limits(
-        &self,
-        new_identifier: u64,
-        object_remap: &[(u64, u64)],
-        replacement_messages: &[RawMessage],
         limits: Limits,
     ) -> Result<Self> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let source_identifier = self
             .archive_info
             .identifier
@@ -931,7 +884,7 @@ impl ArchiveObject {
             limits,
         )?;
         let messages = clone_raw_messages_with_limits(replacement_messages, limits)?;
-        let decoded = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let decoded = ArchiveInfo::decode(&rewritten_header, limits)?;
         if decoded != archive_info {
             return Err(Error::invalid_archive(
                 0,
@@ -957,17 +910,12 @@ impl ArchiveObject {
             original_header: retained_header,
             original_canonical_header: retained_canonical,
         };
-        cloned.validate_with_limits(limits)?;
+        cloned.validate(limits)?;
         Ok(cloned)
     }
 
-    /// Validate object metadata, payload sizes, and encoded header size.
-    pub fn validate(&self) -> Result<()> {
-        self.validate_with_limits(Limits::default())
-    }
-
     /// Validate this object under explicit resource limits.
-    pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    pub fn validate(&self, limits: Limits) -> Result<()> {
         let limits = limits.validate()?;
         if self.archive_info.identifier.is_none() {
             return Err(Error::invalid_archive(
@@ -981,7 +929,7 @@ impl ArchiveObject {
                 "message metadata and payload counts differ",
             ));
         }
-        self.archive_info.validate_with_limits(limits)?;
+        self.archive_info.validate(limits)?;
         let header_length = archive_info_encoded_len(&self.archive_info)?;
         check_header_length(header_length, limits)?;
         let prefix_length = varint_len(header_length)?;
@@ -1040,21 +988,12 @@ impl ArchiveObject {
     /// publication, then cross-checked against the neutral projection before
     /// callbacks begin. This keeps producer-authored framing authoritative
     /// without exposing raw header bytes to format owners.
-    pub fn inspect_references(&self, visitor: &mut impl ArchiveReferenceVisitor) -> Result<usize> {
-        self.inspect_references_with_policy_and_limits(
-            visitor,
-            ArchiveReferencePolicy::KnownReferences,
-            Limits::default(),
-        )
-    }
-
-    /// Stream physical metadata references under explicit resource limits.
-    pub fn inspect_references_with_limits(
+    pub fn inspect_references(
         &self,
         visitor: &mut impl ArchiveReferenceVisitor,
         limits: Limits,
     ) -> Result<usize> {
-        self.inspect_references_with_policy_and_limits(
+        self.inspect_references_with_policy(
             visitor,
             ArchiveReferencePolicy::KnownReferences,
             limits,
@@ -1062,14 +1001,14 @@ impl ArchiveObject {
     }
 
     /// Stream physical metadata references with an explicit completeness policy.
-    pub fn inspect_references_with_policy_and_limits(
+    pub fn inspect_references_with_policy(
         &self,
         visitor: &mut impl ArchiveReferenceVisitor,
         policy: ArchiveReferencePolicy,
         limits: Limits,
     ) -> Result<usize> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let canonical = encode_archive_info(&self.archive_info, limits)?;
         let source_header = match (
             self.original_header.as_deref(),
@@ -1091,7 +1030,7 @@ impl ArchiveObject {
                 "archive reference census encountered unknown metadata",
             ));
         }
-        let decoded = ArchiveInfo::decode_with_limits(source_header, limits)?;
+        let decoded = ArchiveInfo::decode(source_header, limits)?;
         if decoded != self.archive_info {
             return Err(Error::invalid_archive(
                 0,
@@ -1166,20 +1105,15 @@ impl ArchiveObject {
         Ok(occurrences)
     }
 
-    /// Replace one payload and synchronize its physical metadata atomically.
-    pub fn replace_message(&mut self, index: usize, message: RawMessage) -> Result<RawMessage> {
-        self.replace_message_with_limits(index, message, Limits::default())
-    }
-
     /// Replace one payload under explicit resource limits.
-    pub fn replace_message_with_limits(
+    pub fn replace_message(
         &mut self,
         index: usize,
         message: RawMessage,
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let message_info = self
             .archive_info
             .message_infos
@@ -1199,7 +1133,7 @@ impl ArchiveObject {
         let info = &mut self.archive_info.message_infos[index];
         info.type_ = self.messages[index].type_;
         info.length = length;
-        if let Err(error) = self.validate_with_limits(limits) {
+        if let Err(error) = self.validate(limits) {
             drop(std::mem::replace(&mut self.messages[index], old));
             let restored_info = &mut self.archive_info.message_infos[index];
             restored_info.type_ = old_type;
@@ -1221,20 +1155,10 @@ impl ArchiveObject {
         &mut self,
         index: usize,
         message: RawMessage,
-    ) -> Result<RawMessage> {
-        self.replace_message_preserving_header_with_limits(index, message, Limits::default())
-    }
-
-    /// Replace one payload while preserving untouched `ArchiveInfo` bytes
-    /// under explicit resource limits.
-    pub fn replace_message_preserving_header_with_limits(
-        &mut self,
-        index: usize,
-        message: RawMessage,
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -1269,9 +1193,9 @@ impl ArchiveObject {
 
         let old_type = current_info.type_;
         let old_length = current_info.length;
-        let old = self.replace_message_with_limits(index, message, limits)?;
+        let old = self.replace_message(index, message, limits)?;
         let verification = (|| {
-            let decoded = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+            let decoded = ArchiveInfo::decode(&rewritten_header, limits)?;
             if decoded != self.archive_info {
                 return Err(Error::invalid_archive(
                     index,
@@ -1325,30 +1249,9 @@ impl ArchiveObject {
         index: usize,
         message: RawMessage,
         identifiers: &[u64],
-    ) -> Result<RawMessage> {
-        self.replace_message_pruning_object_references_preserving_header_with_limits(
-            index,
-            message,
-            identifiers,
-            Limits::default(),
-        )
-    }
-
-    /// Replace one payload and prune selected object references while
-    /// preserving untouched `ArchiveInfo` bytes under explicit limits.
-    ///
-    /// All raw and neutral metadata is prepared and validated before the
-    /// object is mutated, so every error leaves the object unchanged. The
-    /// caller retains the graph-ownership proof described by
-    /// [`Self::replace_message_pruning_object_references_preserving_header`].
-    pub fn replace_message_pruning_object_references_preserving_header_with_limits(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        identifiers: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
-        self.replace_message_pruning_references_preserving_header_with_limits(
+        self.replace_message_pruning_references_preserving_header(
             index,
             message,
             identifiers,
@@ -1377,32 +1280,10 @@ impl ArchiveObject {
         message: RawMessage,
         object_identifiers: &[u64],
         data_references: DataReferencePruning<'_>,
-    ) -> Result<RawMessage> {
-        self.replace_message_pruning_references_preserving_header_with_limits(
-            index,
-            message,
-            object_identifiers,
-            data_references,
-            Limits::default(),
-        )
-    }
-
-    /// Replace one payload and prune object and data references while
-    /// preserving untouched `ArchiveInfo` bytes under explicit limits.
-    ///
-    /// The selector inputs, complete source wire tree, projected neutral
-    /// metadata, rewritten header, replacement payload, and enclosing object
-    /// are all validated before mutation, so every error is atomic.
-    pub fn replace_message_pruning_references_preserving_header_with_limits(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        object_identifiers: &[u64],
-        data_references: DataReferencePruning<'_>,
         limits: Limits,
     ) -> Result<RawMessage> {
         if object_identifiers.is_empty() && data_references.is_none() {
-            return self.replace_message_preserving_header_with_limits(index, message, limits);
+            return self.replace_message_preserving_header(index, message, limits);
         }
 
         let limits = limits.validate()?;
@@ -1421,7 +1302,7 @@ impl ArchiveObject {
                 limits.max_metadata_items(),
             ));
         }
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -1490,7 +1371,7 @@ impl ArchiveObject {
             limits,
         )?;
 
-        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let rewritten_info = ArchiveInfo::decode(&rewritten_header, limits)?;
         verify_pruned_archive_info(
             &self.archive_info,
             &rewritten_info,
@@ -1556,28 +1437,6 @@ impl ArchiveObject {
         index: usize,
         message: RawMessage,
         reordered_selected_identifiers: &[u64],
-    ) -> Result<RawMessage> {
-        self.replace_message_reordering_object_references_preserving_header_with_limits(
-            index,
-            message,
-            reordered_selected_identifiers,
-            Limits::default(),
-        )
-    }
-
-    /// Replace one payload and reorder selected aggregate object references
-    /// while preserving untouched `ArchiveInfo` bytes under explicit limits.
-    ///
-    /// Validation, selector allocation, raw-wire rewriting, neutral projection,
-    /// and enclosing object sizing all complete before mutation. Authorization
-    /// runs in O(references + selected identifiers); the raw rewrite adds one
-    /// linear pass over the bounded header wire fields. Allocation is bounded
-    /// by the caller's metadata and header limits.
-    pub fn replace_message_reordering_object_references_preserving_header_with_limits(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        reordered_selected_identifiers: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
@@ -1588,7 +1447,7 @@ impl ArchiveObject {
                 limits.max_metadata_items(),
             ));
         }
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -1641,7 +1500,7 @@ impl ArchiveObject {
             .eq(reordered_selected_identifiers.iter().copied());
         if order_is_current {
             drop(selected);
-            return self.replace_message_preserving_header_with_limits(index, message, limits);
+            return self.replace_message_preserving_header(index, message, limits);
         }
 
         let mut reordered_object_references = Vec::new();
@@ -1696,7 +1555,7 @@ impl ArchiveObject {
         )?;
         drop(canonical_before);
 
-        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let rewritten_info = ArchiveInfo::decode(&rewritten_header, limits)?;
         verify_reordered_archive_info(
             &self.archive_info,
             &rewritten_info,
@@ -1741,6 +1600,21 @@ impl ArchiveObject {
         Ok(old)
     }
 
+    /// Replace one payload and reorder data references under explicit limits.
+    ///
+    /// Validation, raw-wire rewriting, neutral projection, and enclosing
+    /// object sizing complete before mutation. Unknown fields, field order,
+    /// non-canonical encodings, and unrelated metadata remain byte-for-byte
+    /// unchanged. For an actual reorder, the uniquely matching nested
+    /// `FieldInfo` data-reference list follows the aggregate reorder;
+    /// nonmatching nested lists are retained. If more than one nested list
+    /// matches, an actual reorder fails atomically because the physical layer
+    /// cannot select an owner. A byte-identical request delegates to the
+    /// header-preserving replacement path without selecting a nested owner.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the physical rewrite keeps complete source and requested reference state explicit"
+    )]
     /// Replace one payload and reorder the complete aggregate data-reference
     /// list while preserving every untouched `ArchiveInfo` byte.
     ///
@@ -1758,35 +1632,6 @@ impl ArchiveObject {
         index: usize,
         message: RawMessage,
         reordered_data_references: &[u64],
-    ) -> Result<RawMessage> {
-        self.replace_message_reordering_data_references_preserving_header_with_limits(
-            index,
-            message,
-            reordered_data_references,
-            Limits::default(),
-        )
-    }
-
-    /// Replace one payload and reorder data references under explicit limits.
-    ///
-    /// Validation, raw-wire rewriting, neutral projection, and enclosing
-    /// object sizing complete before mutation. Unknown fields, field order,
-    /// non-canonical encodings, and unrelated metadata remain byte-for-byte
-    /// unchanged. For an actual reorder, the uniquely matching nested
-    /// `FieldInfo` data-reference list follows the aggregate reorder;
-    /// nonmatching nested lists are retained. If more than one nested list
-    /// matches, an actual reorder fails atomically because the physical layer
-    /// cannot select an owner. A byte-identical request delegates to the
-    /// header-preserving replacement path without selecting a nested owner.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the physical rewrite keeps complete source and requested reference state explicit"
-    )]
-    pub fn replace_message_reordering_data_references_preserving_header_with_limits(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        reordered_data_references: &[u64],
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
@@ -1797,7 +1642,7 @@ impl ArchiveObject {
                 limits.max_metadata_items(),
             ));
         }
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -1813,7 +1658,7 @@ impl ArchiveObject {
             .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
         check_message_length(message.data.len(), limits)?;
         if expected_data_references == reordered_data_references {
-            return self.replace_message_preserving_header_with_limits(index, message, limits);
+            return self.replace_message_preserving_header(index, message, limits);
         }
         let matching_field_info_count = current_info
             .field_infos
@@ -1852,7 +1697,7 @@ impl ArchiveObject {
         )?;
         drop(canonical_before);
 
-        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let rewritten_info = ArchiveInfo::decode(&rewritten_header, limits)?;
         verify_reordered_data_archive_info(
             &self.archive_info,
             &rewritten_info,
@@ -1896,27 +1741,6 @@ impl ArchiveObject {
         Ok(old)
     }
 
-    /// Replace one payload while applying one exact aggregate and nested-field
-    /// object-reference transition.
-    ///
-    /// This is the general atomic primitive for simultaneous removal,
-    /// retained-reference reordering, and new-reference appending. Untouched
-    /// raw fields, unknown bytes, ordering, keys, and noncanonical encodings
-    /// are retained exactly.
-    pub fn replace_message_transitioning_object_references_preserving_header(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        transition: ObjectReferenceTransition<'_>,
-    ) -> Result<RawMessage> {
-        self.replace_message_transitioning_object_references_preserving_header_with_limits(
-            index,
-            message,
-            transition,
-            Limits::default(),
-        )
-    }
-
     /// Replace one payload and apply an exact object-reference transition under
     /// explicit resource limits.
     ///
@@ -1930,7 +1754,7 @@ impl ArchiveObject {
     /// member of both aggregate states. All work and allocations are bounded
     /// by the header and metadata limits, and failure leaves the object
     /// unchanged.
-    pub fn replace_message_transitioning_object_references_preserving_header_with_limits(
+    pub fn replace_message_transitioning_object_references_preserving_header(
         &mut self,
         index: usize,
         message: RawMessage,
@@ -1942,27 +1766,13 @@ impl ArchiveObject {
         )
     }
 
-    /// Atomically replace a payload, transition its object references, and
-    /// insert or remove canonical field-local reference records.
-    pub fn replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        transition: ObjectReferenceTransition<'_>,
-        fields: CanonicalObjectReferenceFields<'_>,
-    ) -> Result<RawMessage> {
-        self.replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
-            index, message, transition, fields, Limits::default(),
-        )
-    }
-
     /// Apply an exact aggregate/field transition and canonical field changes
     /// under explicit header, metadata, payload, and object limits.
     ///
     /// Existing selected fields must precede a removed suffix. Both the
     /// decoded metadata and retained raw bytes are checked before publication.
     /// On failure the original payload and archive header remain unchanged.
-    pub fn replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+    pub fn replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
         &mut self,
         index: usize,
         message: RawMessage,
@@ -1988,7 +1798,7 @@ impl ArchiveObject {
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -2030,7 +1840,7 @@ impl ArchiveObject {
         )?;
         drop(canonical_before);
 
-        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let rewritten_info = ArchiveInfo::decode(&rewritten_header, limits)?;
         verify_transitioned_archive_info(
             &self.archive_info,
             &rewritten_info,
@@ -2073,31 +1883,6 @@ impl ArchiveObject {
         Ok(old)
     }
 
-    /// Replace one payload and apply an exact aggregate and nested-field
-    /// data-reference transition while preserving unrelated `ArchiveInfo`
-    /// bytes.
-    ///
-    /// This is the changed-cardinality counterpart to
-    /// [`Self::replace_message_reordering_data_references_preserving_header`].
-    /// It is intentionally a low-level physical primitive: the caller must
-    /// prove that the selected data-reference field is the semantic owner of
-    /// the payload's references and that no unselected metadata edge needs a
-    /// corresponding update. Source and target lists are nevertheless fully
-    /// checked here before any mutation occurs.
-    pub fn replace_message_transitioning_data_references_preserving_header(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        transition: DataReferenceTransition<'_>,
-    ) -> Result<RawMessage> {
-        self.replace_message_transitioning_data_references_preserving_header_with_limits(
-            index,
-            message,
-            transition,
-            Limits::default(),
-        )
-    }
-
     /// Replace one payload and apply a changed-cardinality data-reference
     /// transition under explicit resource limits.
     ///
@@ -2107,7 +1892,7 @@ impl ArchiveObject {
     /// metadata, and publishes the new raw-header provenance only after every
     /// check succeeds. Values may be inserted, removed, or replaced at any
     /// position; zero identifiers and stale source authorizations are refused.
-    pub fn replace_message_transitioning_data_references_preserving_header_with_limits(
+    pub fn replace_message_transitioning_data_references_preserving_header(
         &mut self,
         index: usize,
         message: RawMessage,
@@ -2131,22 +1916,6 @@ impl ArchiveObject {
     /// aggregate-only removal that does not need to remove metadata. All
     /// validation, raw-header preservation, and publication remain atomic.
     pub fn replace_message_transitioning_data_references_with_canonical_field_preserving_header(
-        &mut self,
-        index: usize,
-        message: RawMessage,
-        transition: CanonicalFieldDataReferenceTransition<'_>,
-    ) -> Result<RawMessage> {
-        self.replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
-            index,
-            message,
-            transition,
-            Limits::default(),
-        )
-    }
-
-    /// Replace one payload while inserting or removing one canonical
-    /// data-reference `FieldInfo` under explicit resource limits.
-    pub fn replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
         &mut self,
         index: usize,
         message: RawMessage,
@@ -2176,7 +1945,7 @@ impl ArchiveObject {
         limits: Limits,
     ) -> Result<RawMessage> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let current_info = self
             .archive_info
             .message_infos
@@ -2299,7 +2068,7 @@ impl ArchiveObject {
             canonical_plan,
             limits,
         )?;
-        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        let rewritten_info = ArchiveInfo::decode(&rewritten_header, limits)?;
         verify_transitioned_data_archive_info(
             &self.archive_info,
             &rewritten_info,
@@ -2342,15 +2111,10 @@ impl ArchiveObject {
         Ok(old)
     }
 
-    /// Append one payload and synchronize its physical metadata atomically.
-    pub fn push_message(&mut self, message: RawMessage) -> Result<()> {
-        self.push_message_with_limits(message, Limits::default())
-    }
-
     /// Append one payload under explicit resource limits.
-    pub fn push_message_with_limits(&mut self, message: RawMessage, limits: Limits) -> Result<()> {
+    pub fn push_message(&mut self, message: RawMessage, limits: Limits) -> Result<()> {
         let limits = limits.validate()?;
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let next_count = self
             .messages
             .len()
@@ -2376,7 +2140,7 @@ impl ArchiveObject {
             .map_err(|_| Error::allocation("IWA object messages", 1))?;
         self.archive_info.message_infos.push(message_info);
         self.messages.push(message);
-        if let Err(error) = self.validate_with_limits(limits) {
+        if let Err(error) = self.validate(limits) {
             self.archive_info.message_infos.pop();
             self.messages.pop();
             return Err(error);
@@ -2409,13 +2173,8 @@ impl Archive {
         }
     }
 
-    /// Parse a decompressed IWA stream.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(data, Limits::default())
-    }
-
     /// Parse a decompressed IWA stream under explicit resource limits.
-    pub fn parse_with_limits(data: &[u8], limits: Limits) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
         Self::parse_internal_with_limits(data, limits, None)
     }
 
@@ -2432,20 +2191,12 @@ impl Archive {
     /// The returned archive is a selected view, not a lossless replacement for
     /// the source stream. Callers that may edit or serialize a component must
     /// use [`Self::parse`] so every payload remains available for preservation.
-    pub fn parse_objects_with_identifier_with_limits(
+    pub fn parse_objects_with_identifier(
         data: &[u8],
         identifier: u64,
         limits: Limits,
     ) -> Result<Self> {
         Self::parse_internal_with_limits(data, limits, Some(identifier))
-    }
-
-    /// Parse only objects with one archive identifier using default limits.
-    ///
-    /// See [`Self::parse_objects_with_identifier_with_limits`] for the
-    /// selected-view and validation semantics.
-    pub fn parse_objects_with_identifier(data: &[u8], identifier: u64) -> Result<Self> {
-        Self::parse_objects_with_identifier_with_limits(data, identifier, Limits::default())
     }
 
     fn parse_internal_with_limits(
@@ -2497,7 +2248,7 @@ impl Archive {
             let header = data.get(cursor..header_end).ok_or_else(|| {
                 Error::invalid_archive(object_start, "truncated ArchiveInfo header")
             })?;
-            let archive_info = ArchiveInfo::decode_with_limits(header, limits)?;
+            let archive_info = ArchiveInfo::decode(header, limits)?;
             if let Some(identifiers) = discarded_identifiers.as_mut() {
                 let identifier = archive_info.identifier.ok_or_else(|| {
                     Error::invalid_archive(object_start, "object is missing its archive identifier")
@@ -2609,7 +2360,7 @@ impl Archive {
             }
         }
         let archive = Self { objects };
-        archive.validate_with_limits(limits)?;
+        archive.validate(limits)?;
         Ok(archive)
     }
 
@@ -2631,12 +2382,50 @@ impl Archive {
     ///
     /// The check performs no allocation and runs in O(objects + messages)
     /// time, visiting metadata only to verify each recorded payload extent.
-    pub fn validate_canonical_object_framing(&self, decompressed_source: &[u8]) -> Result<()> {
+    pub fn validate_canonical_object_framing(
+        &self,
+        decompressed_source: &[u8],
+        limits: Limits,
+    ) -> Result<()> {
+        let limits = limits.validate()?;
+        if decompressed_source.len() > limits.max_archive_bytes() {
+            return Err(limit(
+                LimitKind::ArchiveBytes,
+                decompressed_source.len(),
+                limits.max_archive_bytes(),
+            ));
+        }
+        if self.objects.len() > limits.max_objects() {
+            return Err(limit(
+                LimitKind::Objects,
+                self.objects.len(),
+                limits.max_objects(),
+            ));
+        }
         let source_length = u64::try_from(decompressed_source.len())
             .map_err(|_| Error::invalid_archive(0, "source length exceeds u64"))?;
         let mut expected_object_offset = 0u64;
+        let mut message_count = 0usize;
 
         for (object_index, object) in self.objects.iter().enumerate() {
+            let object_messages = object.archive_info.message_infos.len();
+            if object_messages > limits.max_messages_per_object() {
+                return Err(limit(
+                    LimitKind::MessagesPerObject,
+                    object_messages,
+                    limits.max_messages_per_object(),
+                ));
+            }
+            message_count = message_count
+                .checked_add(object_messages)
+                .ok_or_else(|| Error::invalid_archive(object_index, "message count overflow"))?;
+            if message_count > limits.max_messages() {
+                return Err(limit(
+                    LimitKind::Messages,
+                    message_count,
+                    limits.max_messages(),
+                ));
+            }
             if object.header_offset != expected_object_offset {
                 return Err(Error::invalid_archive(
                     object_index,
@@ -2653,7 +2442,16 @@ impl Archive {
             let header_length = usize::try_from(raw_header_length).map_err(|_| {
                 Error::invalid_archive(header_offset, "header length exceeds usize")
             })?;
-            if prefix_length != varint_len(header_length)? {
+            if header_length > limits.max_header_bytes() {
+                return Err(limit(
+                    LimitKind::HeaderBytes,
+                    header_length,
+                    limits.max_header_bytes(),
+                ));
+            }
+            // A decoded unsigned varint is overlong exactly when its final
+            // seven-bit group is zero and it has more than one byte.
+            if prefix_length > 1 && remaining[prefix_length - 1] == 0 {
                 return Err(Error::invalid_archive(
                     header_offset,
                     "object header length prefix is not canonical",
@@ -2692,11 +2490,19 @@ impl Archive {
 
             let mut metadata_payload_length = 0u64;
             for message_info in &object.archive_info.message_infos {
-                metadata_payload_length = metadata_payload_length
-                    .checked_add(u64::from(message_info.length))
-                    .ok_or_else(|| {
-                        Error::invalid_archive(data_offset, "metadata payload length overflow")
-                    })?;
+                let message_length = usize::try_from(message_info.length).map_err(|_| {
+                    Error::invalid_archive(data_offset, "message length exceeds usize")
+                })?;
+                if message_length > limits.max_message_bytes() {
+                    return Err(limit(
+                        LimitKind::MessageBytes,
+                        message_length,
+                        limits.max_message_bytes(),
+                    ));
+                }
+                // The admitted count is at most MAX_MESSAGES_PER_OBJECT
+                // (100,000), and each length is u32: their sum fits u64.
+                metadata_payload_length += u64::from(message_info.length);
             }
             if object.data_length != metadata_payload_length {
                 return Err(Error::invalid_archive(
@@ -2704,10 +2510,19 @@ impl Archive {
                     "recorded data length does not match message metadata",
                 ));
             }
-            let data_end = object
-                .data_offset
-                .checked_add(metadata_payload_length)
-                .ok_or_else(|| Error::invalid_archive(data_offset, "payload range overflow"))?;
+            // data_offset was matched to a source offset no greater than
+            // MAX_ARCHIVE_BYTES. Adding the admitted u32-length sum fits u64.
+            let data_end = object.data_offset + metadata_payload_length;
+            let object_length = usize::try_from(data_end - object.header_offset).map_err(|_| {
+                Error::invalid_archive(header_offset, "object length exceeds usize")
+            })?;
+            if object_length > limits.max_object_bytes() {
+                return Err(limit(
+                    LimitKind::ObjectBytes,
+                    object_length,
+                    limits.max_object_bytes(),
+                ));
+            }
             if data_end > source_length {
                 return Err(Error::invalid_archive(
                     data_offset,
@@ -2727,15 +2542,10 @@ impl Archive {
         Ok(())
     }
 
-    /// Serialize this archive as a decompressed IWA stream.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.to_bytes_with_limits(Limits::default())
-    }
-
     /// Serialize this archive under explicit resource limits.
-    pub fn to_bytes_with_limits(&self, limits: Limits) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
         let limits = limits.validate()?;
-        let expected_length = self.encoded_len_with_limits(limits)?;
+        let expected_length = self.encoded_len(limits)?;
         validate_object_set(self.objects.iter(), limits)?;
         let mut output = Vec::new();
         output
@@ -2806,47 +2616,23 @@ impl Archive {
         Ok(output)
     }
 
-    /// Return the exact decompressed IWA length produced by serialization.
-    ///
-    /// This preflight performs no heap allocation and applies the same
-    /// source-preserving header rule as [`Self::to_bytes_with_limits`]. It is
-    /// suitable for checking an aggregate output budget before constructing
-    /// the serialized buffer.
-    pub fn encoded_len(&self) -> Result<usize> {
-        self.encoded_len_with_limits(Limits::default())
-    }
-
     /// Return the exact decompressed IWA length produced under `limits`.
     ///
     /// The calculation validates object/message/header/archive ceilings,
     /// checked arithmetic, duplicate identifiers, and retained raw-header
     /// selection without allocating an encoded header or output buffer.
-    pub fn encoded_len_with_limits(&self, limits: Limits) -> Result<usize> {
+    pub fn encoded_len(&self, limits: Limits) -> Result<usize> {
         encoded_archive_len_preflight(&self.objects, limits)
     }
 
-    /// Validate all objects under the default resource limits.
-    pub fn validate(&self) -> Result<()> {
-        self.validate_with_limits(Limits::default())
-    }
-
     /// Validate all objects under explicit resource limits.
-    pub fn validate_with_limits(&self, limits: Limits) -> Result<()> {
+    pub fn validate(&self, limits: Limits) -> Result<()> {
         let limits = limits.validate()?;
         validate_object_set(self.objects.iter(), limits)
     }
 
-    /// Insert an object, rejecting missing or duplicate identifiers.
-    pub fn insert_object(&mut self, object: ArchiveObject) -> Result<()> {
-        self.insert_object_with_limits(object, Limits::default())
-    }
-
     /// Insert an object under explicit resource limits.
-    pub fn insert_object_with_limits(
-        &mut self,
-        object: ArchiveObject,
-        limits: Limits,
-    ) -> Result<()> {
+    pub fn insert_object(&mut self, object: ArchiveObject, limits: Limits) -> Result<()> {
         let limits = limits.validate()?;
         let identifier = object
             .archive_info
@@ -2863,16 +2649,6 @@ impl Archive {
         Ok(())
     }
 
-    /// Append a batch of new objects under the default resource limits.
-    ///
-    /// Every object must have a nonzero identifier, and identifiers must be
-    /// unique across both the current archive and the complete appended batch.
-    /// Validation and fallible vector reservation complete before any object
-    /// is published, so failure leaves the archive unchanged.
-    pub fn append_objects(&mut self, objects: Vec<ArchiveObject>) -> Result<()> {
-        self.append_objects_with_limits(objects, Limits::default())
-    }
-
     /// Append a batch of new objects under explicit resource limits.
     ///
     /// This is the atomic batch counterpart to [`Self::insert_object`]. It
@@ -2880,11 +2656,7 @@ impl Archive {
     /// metadata, header, and archive byte ceilings—then reserves exactly the
     /// additional object slots before performing an infallible append. An
     /// empty batch is an exact no-op.
-    pub fn append_objects_with_limits(
-        &mut self,
-        objects: Vec<ArchiveObject>,
-        limits: Limits,
-    ) -> Result<()> {
+    pub fn append_objects(&mut self, objects: Vec<ArchiveObject>, limits: Limits) -> Result<()> {
         if objects.is_empty() {
             return Ok(());
         }
@@ -2923,13 +2695,8 @@ impl Archive {
             .find(|object| object.archive_info.identifier == Some(identifier))
     }
 
-    /// Insert or replace an object, returning the previous object if present.
-    pub fn upsert_object(&mut self, object: ArchiveObject) -> Result<Option<ArchiveObject>> {
-        self.upsert_object_with_limits(object, Limits::default())
-    }
-
     /// Insert or replace an object under explicit resource limits.
-    pub fn upsert_object_with_limits(
+    pub fn upsert_object(
         &mut self,
         object: ArchiveObject,
         limits: Limits,
@@ -2977,12 +2744,7 @@ impl Archive {
     /// Zero, missing, and duplicate identifiers are rejected. Validation and
     /// target resolution complete before mutation, so every error preserves
     /// the archive exactly. Graph ownership remains the caller's concern.
-    pub fn remove_object_checked(&mut self, identifier: u64) -> Result<ArchiveObject> {
-        self.remove_object_checked_with_limits(identifier, Limits::default())
-    }
-
-    /// Remove exactly one object under explicit resource limits.
-    pub fn remove_object_checked_with_limits(
+    pub fn remove_object_checked(
         &mut self,
         identifier: u64,
         limits: Limits,
@@ -2991,7 +2753,7 @@ impl Archive {
         if identifier == 0 {
             return Err(Error::invalid_archive(0, "object identifier is zero"));
         }
-        self.validate_with_limits(limits)?;
+        self.validate(limits)?;
         let mut selected = None;
         for (index, object) in self.objects.iter().enumerate() {
             if object.archive_info.identifier != Some(identifier) {
@@ -7346,7 +7108,7 @@ fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
 /// When `target` is absent this only counts bytes. When present it also
 /// compares the bytes emitted by the neutral projection with the retained
 /// canonical header, which is the source-authoritative test used by
-/// `to_bytes_with_limits` to decide whether an original raw header remains
+/// `to_bytes` to decide whether an original raw header remains
 /// valid after an in-memory mutation.
 struct CanonicalHeaderProbe<'a> {
     target: Option<&'a [u8]>,
@@ -7459,7 +7221,7 @@ fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> R
                 "message metadata and payload counts differ",
             ));
         }
-        object.archive_info.validate_with_limits(limits)?;
+        object.archive_info.validate(limits)?;
         add_limited(
             &mut total_messages,
             object.messages.len(),
@@ -8206,7 +7968,7 @@ where
         if !identifiers.insert(identifier) {
             return Err(Error::invalid_archive(0, "duplicate object identifier"));
         }
-        object.validate_with_limits(limits)?;
+        object.validate(limits)?;
         add_limited(
             &mut total_messages,
             object.messages.len(),
@@ -8404,6 +8166,7 @@ mod tests {
                 type_: 7,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         let message = &mut object.archive_info.message_infos[0];
         message.object_references = vec![10, 10];
@@ -8414,7 +8177,10 @@ mod tests {
         message.field_infos.push(field);
 
         let mut facts = ReferenceFacts::default();
-        assert_eq!(object.inspect_references(&mut facts)?, 6);
+        assert_eq!(
+            object.inspect_references(&mut facts, Default::default())?,
+            6
+        );
         assert_eq!(facts.0.len(), 6);
         assert_eq!(facts.0[0].object_identifier, 42);
         assert_eq!(facts.0[0].scope, ArchiveReferenceScope::Message);
@@ -8437,13 +8203,12 @@ mod tests {
                 type_: 7,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![10, 11, 12];
         let limits = Limits::default().with_metadata_items(3)?;
         let mut facts = ReferenceFacts::default();
-        let error = object
-            .inspect_references_with_limits(&mut facts, limits)
-            .unwrap_err();
+        let error = object.inspect_references(&mut facts, limits).unwrap_err();
         assert!(matches!(error, Error::Limit { .. }));
         assert!(facts.0.is_empty());
         Ok(())
@@ -8459,6 +8224,7 @@ mod tests {
                         type_: 7,
                         data: vec![1],
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     2,
@@ -8466,16 +8232,25 @@ mod tests {
                         type_: 8,
                         data: vec![2],
                     }],
+                    Default::default(),
                 )?,
             ],
         };
         let source = archive.clone();
-        assert!(archive.remove_object_checked(0).is_err());
+        assert!(
+            archive
+                .remove_object_checked(0, Default::default())
+                .is_err()
+        );
         assert_eq!(archive, source);
-        assert!(archive.remove_object_checked(3).is_err());
+        assert!(
+            archive
+                .remove_object_checked(3, Default::default())
+                .is_err()
+        );
         assert_eq!(archive, source);
 
-        let removed = archive.remove_object_checked(1)?;
+        let removed = archive.remove_object_checked(1, Default::default())?;
         assert_eq!(removed.archive_info.identifier, Some(1));
         assert_eq!(archive.objects.len(), 1);
         assert_eq!(archive.objects[0].archive_info.identifier, Some(2));
@@ -8490,6 +8265,7 @@ mod tests {
                 type_: 7,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = vec![10];
         let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
@@ -8499,10 +8275,13 @@ mod tests {
         object.original_canonical_header = Some(canonical.into_boxed_slice());
 
         let mut permissive = ReferenceFacts::default();
-        assert_eq!(object.inspect_references(&mut permissive)?, 1);
+        assert_eq!(
+            object.inspect_references(&mut permissive, Default::default())?,
+            1
+        );
         let mut strict = ReferenceFacts::default();
         let error = object
-            .inspect_references_with_policy_and_limits(
+            .inspect_references_with_policy(
                 &mut strict,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 Limits::default(),
@@ -8522,10 +8301,11 @@ mod tests {
                     type_: 2,
                     data: vec![3, 4],
                 }],
+                Default::default(),
             )?],
         };
-        let encoded = archive.to_bytes()?;
-        let parsed = Archive::parse(&encoded)?;
+        let encoded = archive.to_bytes(Default::default())?;
+        let parsed = Archive::parse(&encoded, Default::default())?;
         let [object] = parsed.objects.as_slice() else {
             return Err(Error::invalid_archive(
                 0,
@@ -8535,7 +8315,7 @@ mod tests {
 
         assert!(object.original_header.is_none());
         assert!(object.original_canonical_header.is_none());
-        assert_eq!(parsed.to_bytes()?, encoded);
+        assert_eq!(parsed.to_bytes(Default::default())?, encoded);
         Ok(())
     }
 
@@ -8547,6 +8327,7 @@ mod tests {
                 type_: 0x1234,
                 data: vec![3, 4, 5, 6],
             }],
+            Default::default(),
         )?;
         object.archive_info.should_merge = Some(false);
         let message = &mut object.archive_info.message_infos[0];
@@ -8572,31 +8353,28 @@ mod tests {
         let archive = Archive {
             objects: vec![object],
         };
-        let encoded = archive.to_bytes()?;
-        assert_eq!(archive.encoded_len()?, encoded.len());
-        assert_eq!(
-            archive.encoded_len_with_limits(Limits::default())?,
-            encoded.len()
-        );
+        let encoded = archive.to_bytes(Default::default())?;
+        assert_eq!(archive.encoded_len(Default::default())?, encoded.len());
+        assert_eq!(archive.encoded_len(Limits::default())?, encoded.len());
         Ok(())
     }
 
     #[test]
     fn encoded_len_matches_retained_unknown_header_and_exact_limits() -> Result<()> {
         let fixture = reference_pruning_fixture()?;
-        let archive = Archive::parse(&fixture.source)?;
-        assert_eq!(archive.encoded_len()?, fixture.source.len());
-
-        let exact_limits = Limits::default().with_archive_bytes(fixture.source.len())?;
+        let archive = Archive::parse(&fixture.source, Default::default())?;
         assert_eq!(
-            archive.encoded_len_with_limits(exact_limits)?,
+            archive.encoded_len(Default::default())?,
             fixture.source.len()
         );
-        assert_eq!(archive.to_bytes_with_limits(exact_limits)?, fixture.source);
+
+        let exact_limits = Limits::default().with_archive_bytes(fixture.source.len())?;
+        assert_eq!(archive.encoded_len(exact_limits)?, fixture.source.len());
+        assert_eq!(archive.to_bytes(exact_limits)?, fixture.source);
 
         let below_limits = Limits::default().with_archive_bytes(fixture.source.len() - 1)?;
         let error = archive
-            .encoded_len_with_limits(below_limits)
+            .encoded_len(below_limits)
             .expect_err("one byte below the exact archive length must fail");
         assert!(matches!(
             error,
@@ -8606,7 +8384,7 @@ mod tests {
                 maximum
             } if observed == fixture.source.len() && maximum == fixture.source.len() - 1
         ));
-        assert!(archive.to_bytes_with_limits(below_limits).is_err());
+        assert!(archive.to_bytes(below_limits).is_err());
         Ok(())
     }
 
@@ -8620,10 +8398,11 @@ mod tests {
                     type_: 2,
                     data: vec![3, 4],
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?;
-        let object = Archive::parse(&source)?.objects[0].clone();
+        .to_bytes(Default::default())?;
+        let object = Archive::parse(&source, Default::default())?.objects[0].clone();
         let mut alias = object.clone();
         alias.header_offset = 4096;
         alias.data_offset = alias.header_offset + alias.header_length;
@@ -8642,6 +8421,7 @@ mod tests {
                 type_: 2,
                 data: vec![3, 4],
             }],
+            Default::default(),
         )?;
         let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
         let mut retained = canonical.clone();
@@ -8690,6 +8470,7 @@ mod tests {
                 type_: 2,
                 data: vec![3, 4],
             }],
+            Default::default(),
         )?;
         let mut fresh_alias = fresh.clone();
         fresh_alias.header_offset = 128;
@@ -8699,8 +8480,8 @@ mod tests {
         let encoded = Archive {
             objects: vec![fresh.clone()],
         }
-        .to_bytes()?;
-        let parsed = Archive::parse(&encoded)?.objects[0].clone();
+        .to_bytes(Default::default())?;
+        let parsed = Archive::parse(&encoded, Default::default())?.objects[0].clone();
         assert!(!fresh.same_content_ignoring_offsets(&parsed));
 
         let mut parsed_alias = parsed.clone();
@@ -8711,11 +8492,86 @@ mod tests {
     }
 
     #[test]
+    fn canonical_object_framing_checks_supplied_resource_limits() -> Result<()> {
+        let source = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![
+                        RawMessage {
+                            type_: 2,
+                            data: vec![3, 4],
+                        },
+                        RawMessage {
+                            type_: 3,
+                            data: vec![7, 8],
+                        },
+                    ],
+                    Limits::default(),
+                )?,
+                ArchiveObject::new(
+                    2,
+                    vec![
+                        RawMessage {
+                            type_: 2,
+                            data: vec![5, 6],
+                        },
+                        RawMessage {
+                            type_: 3,
+                            data: vec![9, 0],
+                        },
+                    ],
+                    Limits::default(),
+                )?,
+            ],
+        }
+        .to_bytes(Limits::default())?;
+        let archive = Archive::parse(&source, Limits::default())?;
+        for (limits, expected_kind) in [
+            (
+                Limits::default().with_archive_bytes(source.len() - 1)?,
+                LimitKind::ArchiveBytes,
+            ),
+            (Limits::default().with_objects(1)?, LimitKind::Objects),
+            (Limits::default().with_messages(2)?, LimitKind::Messages),
+            (
+                Limits::default().with_messages_per_object(1)?,
+                LimitKind::MessagesPerObject,
+            ),
+            (
+                Limits::default().with_object_bytes(
+                    usize::try_from(
+                        archive.objects[0].header_length + archive.objects[0].data_length,
+                    )
+                    .expect("small fixture object")
+                        - 1,
+                )?,
+                LimitKind::ObjectBytes,
+            ),
+            (
+                Limits::default().with_message_bytes(1)?,
+                LimitKind::MessageBytes,
+            ),
+            (
+                Limits::default().with_header_bytes(1)?,
+                LimitKind::HeaderBytes,
+            ),
+        ] {
+            assert!(
+                matches!(archive.validate_canonical_object_framing(&source, limits),
+                Err(Error::Limit { kind, .. }) if kind == expected_kind)
+            );
+        }
+        archive.validate_canonical_object_framing(&source, Limits::default())?;
+        Ok(())
+    }
+
+    #[test]
     fn canonical_object_framing_accepts_unknown_raw_archive_info_bytes() -> Result<()> {
         let fixture = reference_pruning_fixture()?;
-        let archive = Archive::parse(&fixture.source)?;
-        archive.validate_canonical_object_framing(&fixture.source)?;
-        assert_eq!(archive.to_bytes()?, fixture.source);
+        let archive = Archive::parse(&fixture.source, Default::default())?;
+        archive.validate_canonical_object_framing(&fixture.source, Default::default())?;
+        assert_eq!(archive.to_bytes(Default::default())?, fixture.source);
         assert_eq!(
             archive.objects[0].original_header.as_deref(),
             Some(fixture.header.as_slice())
@@ -8733,6 +8589,7 @@ mod tests {
                         type_: 2,
                         data: vec![3],
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     4,
@@ -8740,12 +8597,13 @@ mod tests {
                         type_: 5,
                         data: vec![6, 7],
                     }],
+                    Default::default(),
                 )?,
             ],
         }
-        .to_bytes()?;
-        let parsed = Archive::parse(&canonical)?;
-        parsed.validate_canonical_object_framing(&canonical)?;
+        .to_bytes(Default::default())?;
+        let parsed = Archive::parse(&canonical, Default::default())?;
+        parsed.validate_canonical_object_framing(&canonical, Default::default())?;
         let second_offset = usize::try_from(parsed.objects[1].header_offset)
             .map_err(|_| Error::invalid_archive(0, "test offset exceeds usize"))?;
         let (header_length, prefix_length) = super::decode_varint(
@@ -8767,10 +8625,10 @@ mod tests {
 
         // Parsing remains deliberately permissive; only the opt-in framing
         // validator refuses the overlong second-object prefix.
-        let permissive = Archive::parse(&overlong)?;
+        let permissive = Archive::parse(&overlong, Default::default())?;
         assert!(
             permissive
-                .validate_canonical_object_framing(&overlong)
+                .validate_canonical_object_framing(&overlong, Default::default())
                 .is_err()
         );
         Ok(())
@@ -8785,27 +8643,28 @@ mod tests {
                     type_: 2,
                     data: vec![3, 4, 5],
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?;
-        let archive = Archive::parse(&source)?;
+        .to_bytes(Default::default())?;
+        let archive = Archive::parse(&source, Default::default())?;
         let data_offset = usize::try_from(archive.objects[0].data_offset)
             .map_err(|_| Error::invalid_archive(0, "test data offset exceeds usize"))?;
 
         let truncated_prefix = [source[0] | 0x80];
         assert!(
             archive
-                .validate_canonical_object_framing(&truncated_prefix)
+                .validate_canonical_object_framing(&truncated_prefix, Default::default())
                 .is_err()
         );
         assert!(
             archive
-                .validate_canonical_object_framing(&source[..data_offset - 1])
+                .validate_canonical_object_framing(&source[..data_offset - 1], Default::default())
                 .is_err()
         );
         assert!(
             archive
-                .validate_canonical_object_framing(&source[..source.len() - 1])
+                .validate_canonical_object_framing(&source[..source.len() - 1], Default::default())
                 .is_err()
         );
         Ok(())
@@ -8821,6 +8680,7 @@ mod tests {
                         type_: 2,
                         data: vec![3],
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     4,
@@ -8828,17 +8688,18 @@ mod tests {
                         type_: 5,
                         data: vec![6, 7],
                     }],
+                    Default::default(),
                 )?,
             ],
         }
-        .to_bytes()?;
-        let archive = Archive::parse(&source)?;
+        .to_bytes(Default::default())?;
+        let archive = Archive::parse(&source, Default::default())?;
 
         let mut wrong_header_offset = archive.clone();
         wrong_header_offset.objects[1].header_offset += 1;
         assert!(
             wrong_header_offset
-                .validate_canonical_object_framing(&source)
+                .validate_canonical_object_framing(&source, Default::default())
                 .is_err()
         );
 
@@ -8846,7 +8707,7 @@ mod tests {
         wrong_header_length.objects[0].header_length += 1;
         assert!(
             wrong_header_length
-                .validate_canonical_object_framing(&source)
+                .validate_canonical_object_framing(&source, Default::default())
                 .is_err()
         );
 
@@ -8854,7 +8715,7 @@ mod tests {
         wrong_data_offset.objects[0].data_offset += 1;
         assert!(
             wrong_data_offset
-                .validate_canonical_object_framing(&source)
+                .validate_canonical_object_framing(&source, Default::default())
                 .is_err()
         );
 
@@ -8862,7 +8723,7 @@ mod tests {
         wrong_data_length.objects[0].data_length += 1;
         assert!(
             wrong_data_length
-                .validate_canonical_object_framing(&source)
+                .validate_canonical_object_framing(&source, Default::default())
                 .is_err()
         );
 
@@ -8870,7 +8731,7 @@ mod tests {
         trailing.push(0);
         assert!(
             archive
-                .validate_canonical_object_framing(&trailing)
+                .validate_canonical_object_framing(&trailing, Default::default())
                 .is_err()
         );
         Ok(())
@@ -8883,28 +8744,41 @@ mod tests {
             data: vec![0x11; 127],
         };
         let source = Archive {
-            objects: vec![ArchiveObject::new(1, vec![original_message.clone()])?],
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![original_message.clone()],
+                Default::default(),
+            )?],
         }
-        .to_bytes()?;
-        let mut edited = Archive::parse(&source)?;
+        .to_bytes(Default::default())?;
+        let mut edited = Archive::parse(&source, Default::default())?;
         let replacement = RawMessage {
             type_: 2,
             data: vec![0x22; 128],
         };
 
-        let old = edited.objects[0].replace_message_preserving_header(0, replacement.clone())?;
+        let old = edited.objects[0].replace_message_preserving_header(
+            0,
+            replacement.clone(),
+            Default::default(),
+        )?;
         assert_eq!(old, original_message);
         let expected = Archive {
-            objects: vec![ArchiveObject::new(1, vec![replacement.clone()])?],
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![replacement.clone()],
+                Default::default(),
+            )?],
         }
-        .to_bytes()?;
-        assert_eq!(edited.to_bytes()?, expected);
+        .to_bytes(Default::default())?;
+        assert_eq!(edited.to_bytes(Default::default())?, expected);
         assert!(edited.objects[0].original_header.is_none());
         assert!(edited.objects[0].original_canonical_header.is_none());
 
-        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        let replaced =
+            edited.objects[0].replace_message_preserving_header(0, old, Default::default())?;
         assert_eq!(replaced, replacement);
-        assert_eq!(edited.to_bytes()?, source);
+        assert_eq!(edited.to_bytes(Default::default())?, source);
         assert!(edited.objects[0].original_header.is_none());
         assert!(edited.objects[0].original_canonical_header.is_none());
         Ok(())
@@ -8916,7 +8790,8 @@ mod tests {
             type_: 2,
             data: vec![3, 4],
         };
-        let mut original_object = ArchiveObject::new(1, vec![original_message.clone()])?;
+        let mut original_object =
+            ArchiveObject::new(1, vec![original_message.clone()], Default::default())?;
         let Some(original_info) = original_object.archive_info.message_infos.get_mut(0) else {
             return Err(Error::invalid_archive(
                 0,
@@ -8927,8 +8802,8 @@ mod tests {
         let source_archive = Archive {
             objects: vec![original_object],
         };
-        let source = source_archive.to_bytes()?;
-        let mut edited = Archive::parse(&source)?;
+        let source = source_archive.to_bytes(Default::default())?;
+        let mut edited = Archive::parse(&source, Default::default())?;
 
         let replacement = RawMessage {
             type_: 9,
@@ -8938,16 +8813,21 @@ mod tests {
             0,
             replacement.clone(),
             &[77],
+            Default::default(),
         )?;
         assert_eq!(old, original_message);
         assert!(edited.objects[0].original_header.is_none());
         assert!(edited.objects[0].original_canonical_header.is_none());
 
         let expected = Archive {
-            objects: vec![ArchiveObject::new(1, vec![replacement.clone()])?],
+            objects: vec![ArchiveObject::new(
+                1,
+                vec![replacement.clone()],
+                Default::default(),
+            )?],
         }
-        .to_bytes()?;
-        assert_eq!(edited.to_bytes()?, expected);
+        .to_bytes(Default::default())?;
+        assert_eq!(edited.to_bytes(Default::default())?, expected);
 
         let Some(edited_info) = edited.objects[0].archive_info.message_infos.get_mut(0) else {
             return Err(Error::invalid_archive(
@@ -8956,16 +8836,17 @@ mod tests {
             ));
         };
         edited_info.object_references.push(77);
-        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        let replaced =
+            edited.objects[0].replace_message_preserving_header(0, old, Default::default())?;
         assert_eq!(replaced, replacement);
-        assert_eq!(edited.to_bytes()?, source);
+        assert_eq!(edited.to_bytes(Default::default())?, source);
         Ok(())
     }
 
     #[test]
     fn reference_pruning_preserves_all_untouched_header_encodings() -> Result<()> {
         let fixture = reference_pruning_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let old = archive.objects[0].replace_message_pruning_object_references_preserving_header(
             0,
             RawMessage {
@@ -8973,11 +8854,12 @@ mod tests {
                 data: vec![0x5a; 130],
             },
             &[10, 12, 14, 10],
+            Default::default(),
         )?;
         assert_eq!(old.type_, 7);
         assert_eq!(old.data, [0xde, 0xad, 0xbe]);
 
-        let encoded = archive.to_bytes()?;
+        let encoded = archive.to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(header, fixture.expected_header);
         assert_eq!(payload, vec![0x5a; 130]);
@@ -8995,19 +8877,19 @@ mod tests {
             Some(fixture.expected_header.as_slice())
         );
 
-        let reparsed = Archive::parse(&encoded)?;
+        let reparsed = Archive::parse(&encoded, Default::default())?;
         assert_eq!(
             reparsed.objects[0].archive_info,
             archive.objects[0].archive_info
         );
-        assert_eq!(reparsed.to_bytes()?, encoded);
+        assert_eq!(reparsed.to_bytes(Default::default())?, encoded);
         Ok(())
     }
 
     #[test]
     fn empty_reference_removal_delegates_to_preserving_replacement() -> Result<()> {
         let fixture = reference_pruning_fixture()?;
-        let parsed = Archive::parse(&fixture.source)?;
+        let parsed = Archive::parse(&fixture.source, Default::default())?;
         let mut delegated = parsed.objects[0].clone();
         let mut existing = parsed.objects[0].clone();
         let replacement = RawMessage {
@@ -9019,8 +8901,10 @@ mod tests {
             0,
             replacement.clone(),
             &[],
+            Default::default(),
         )?;
-        let existing_old = existing.replace_message_preserving_header(0, replacement)?;
+        let existing_old =
+            existing.replace_message_preserving_header(0, replacement, Default::default())?;
         assert_eq!(delegated_old, existing_old);
         assert_eq!(delegated, existing);
         Ok(())
@@ -9029,13 +8913,13 @@ mod tests {
     #[test]
     fn reference_pruning_failures_are_atomic() -> Result<()> {
         let fixture = reference_pruning_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let before_limit = archive.objects[0].clone();
         let limits = Limits::default()
             .with_header_bytes(fixture.header.len())?
             .with_object_bytes(fixture.source.len())?;
         let limit_error = archive.objects[0]
-            .replace_message_pruning_object_references_preserving_header_with_limits(
+            .replace_message_pruning_object_references_preserving_header(
                 0,
                 RawMessage {
                     type_: 9,
@@ -9068,6 +8952,7 @@ mod tests {
                     type_: 2,
                     data: vec![0xcc],
                 }],
+                Default::default(),
             )?;
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
             let mut raw_header = vec![0x08, 0x01];
@@ -9084,6 +8969,7 @@ mod tests {
                         data: vec![0xdd],
                     },
                     &[1],
+                    Default::default(),
                 )
                 .err();
             assert!(malformed_error.is_some());
@@ -9095,7 +8981,7 @@ mod tests {
     #[test]
     fn selected_object_and_data_pruning_preserves_raw_occurrences() -> Result<()> {
         let fixture = combined_reference_pruning_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let old = archive.objects[0].replace_message_pruning_references_preserving_header(
             0,
             RawMessage {
@@ -9104,11 +8990,12 @@ mod tests {
             },
             &[10, 12, 10],
             DataReferencePruning::Selected(&[20, 22, 20]),
+            Default::default(),
         )?;
         assert_eq!(old.type_, 7);
         assert_eq!(old.data, [0xde, 0xad, 0xbe]);
 
-        let encoded = archive.to_bytes()?;
+        let encoded = archive.to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(header, fixture.selected_header);
         assert_eq!(payload, vec![0x5a; 130]);
@@ -9127,15 +9014,15 @@ mod tests {
 
         // A second parse proves that the raw result and its typed projection
         // remain paired for future header-preserving edits.
-        let reparsed = Archive::parse(&encoded)?;
-        assert_eq!(reparsed.to_bytes()?, encoded);
+        let reparsed = Archive::parse(&encoded, Default::default())?;
+        assert_eq!(reparsed.to_bytes(Default::default())?, encoded);
         Ok(())
     }
 
     #[test]
     fn all_data_pruning_clears_aggregate_and_nested_references_only() -> Result<()> {
         let fixture = combined_reference_pruning_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         archive.objects[0].replace_message_pruning_references_preserving_header(
             0,
             RawMessage {
@@ -9144,9 +9031,10 @@ mod tests {
             },
             &[],
             DataReferencePruning::All,
+            Default::default(),
         )?;
 
-        let encoded = archive.to_bytes()?;
+        let encoded = archive.to_bytes(Default::default())?;
         let (header, _) = split_test_archive(&encoded)?;
         assert_eq!(header, fixture.all_data_header);
         let info = &archive.objects[0].archive_info.message_infos[0];
@@ -9162,7 +9050,7 @@ mod tests {
     #[test]
     fn data_pruning_zero_and_noop_policies_preserve_existing_behavior() -> Result<()> {
         let fixture = combined_reference_pruning_fixture()?;
-        let parsed = Archive::parse(&fixture.source)?;
+        let parsed = Archive::parse(&fixture.source, Default::default())?;
         let replacement = RawMessage {
             type_: 9,
             data: vec![0x44; 130],
@@ -9174,8 +9062,10 @@ mod tests {
             replacement.clone(),
             &[],
             DataReferencePruning::Selected(&[]),
+            Default::default(),
         )?;
-        let preserving_old = preserving.replace_message_preserving_header(0, replacement)?;
+        let preserving_old =
+            preserving.replace_message_preserving_header(0, replacement, Default::default())?;
         assert_eq!(delegated_old, preserving_old);
         assert_eq!(delegated, preserving);
 
@@ -9186,13 +9076,14 @@ mod tests {
             same,
             &[u64::MAX],
             DataReferencePruning::Selected(&[u64::MAX]),
+            Default::default(),
         )?;
         assert_eq!(unmatched, parsed.objects[0]);
         assert_eq!(
             Archive {
                 objects: vec![unmatched],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
             fixture.source
         );
 
@@ -9202,11 +9093,12 @@ mod tests {
                 type_: 2,
                 data: vec![3],
             }],
+            Default::default(),
         )?;
         let empty_before = Archive {
             objects: vec![empty.clone()],
         }
-        .to_bytes()?;
+        .to_bytes(Default::default())?;
         empty.replace_message_pruning_references_preserving_header(
             0,
             RawMessage {
@@ -9215,12 +9107,13 @@ mod tests {
             },
             &[],
             DataReferencePruning::All,
+            Default::default(),
         )?;
         assert_eq!(
             Archive {
                 objects: vec![empty],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
             empty_before
         );
         Ok(())
@@ -9232,7 +9125,7 @@ mod tests {
             type_: 2,
             data: vec![3, 4],
         };
-        let mut object = ArchiveObject::new(1, vec![original_message.clone()])?;
+        let mut object = ArchiveObject::new(1, vec![original_message.clone()], Default::default())?;
         let info = &mut object.archive_info.message_infos[0];
         info.data_references.extend([7, 8]);
         let mut field = FieldInfo::new(vec![1]);
@@ -9241,8 +9134,8 @@ mod tests {
         let source = Archive {
             objects: vec![object],
         }
-        .to_bytes()?;
-        let mut edited = Archive::parse(&source)?;
+        .to_bytes(Default::default())?;
+        let mut edited = Archive::parse(&source, Default::default())?;
         let replacement = RawMessage {
             type_: 9,
             data: vec![5, 6, 7],
@@ -9252,6 +9145,7 @@ mod tests {
             replacement.clone(),
             &[],
             DataReferencePruning::Selected(&[8, 10]),
+            Default::default(),
         )?;
         assert_eq!(
             edited.objects[0].archive_info.message_infos[0].data_references,
@@ -9265,20 +9159,21 @@ mod tests {
         let edited_info = &mut edited.objects[0].archive_info.message_infos[0];
         edited_info.data_references.insert(1, 8);
         edited_info.field_infos[0].data_references.insert(1, 10);
-        let replaced = edited.objects[0].replace_message_preserving_header(0, old)?;
+        let replaced =
+            edited.objects[0].replace_message_preserving_header(0, old, Default::default())?;
         assert_eq!(replaced, replacement);
-        assert_eq!(edited.to_bytes()?, source);
+        assert_eq!(edited.to_bytes(Default::default())?, source);
         Ok(())
     }
 
     #[test]
     fn combined_reference_pruning_budgets_selectors_and_wire_work_atomically() -> Result<()> {
         let fixture = combined_reference_pruning_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let before = archive.objects[0].clone();
         let selector_limits = Limits::default().with_metadata_items(2)?;
         let selector_error = archive.objects[0]
-            .replace_message_pruning_references_preserving_header_with_limits(
+            .replace_message_pruning_references_preserving_header(
                 0,
                 RawMessage {
                     type_: 7,
@@ -9301,7 +9196,7 @@ mod tests {
 
         let wire_limits = Limits::default().with_header_fields(1)?;
         let wire_error = archive.objects[0]
-            .replace_message_pruning_references_preserving_header_with_limits(
+            .replace_message_pruning_references_preserving_header(
                 0,
                 RawMessage {
                     type_: 7,
@@ -9343,6 +9238,7 @@ mod tests {
                     type_: 2,
                     data: vec![0xcc],
                 }],
+                Default::default(),
             )?;
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
             let mut raw_header = vec![0x08, 0x01];
@@ -9360,6 +9256,7 @@ mod tests {
                     },
                     &[],
                     DataReferencePruning::All,
+                    Default::default(),
                 )
                 .err();
             assert!(error.is_some());
@@ -9381,6 +9278,7 @@ mod tests {
                 data: vec![0xdd],
             },
             &reordered,
+            Default::default(),
         )?;
         let info = &object.archive_info.message_infos[0];
         assert_eq!(info.data_references, reordered);
@@ -9396,6 +9294,7 @@ mod tests {
                     data: vec![0xdd],
                 },
                 &[42, 999, u64::MAX],
+                Default::default(),
             )
             .err();
         assert!(matches!(
@@ -9417,6 +9316,7 @@ mod tests {
                     data: vec![0xdd],
                 },
                 &[42, 0, 7],
+                Default::default(),
             )
             .err();
         assert!(matches!(
@@ -9438,6 +9338,7 @@ mod tests {
                     data: vec![0xdd],
                 },
                 &[42, 0, u64::MAX],
+                Default::default(),
             )
             .err();
         assert!(matches!(
@@ -9464,6 +9365,7 @@ mod tests {
                     data: vec![0xdd],
                 },
                 &[30, 10, 20],
+                Default::default(),
             )
             .err();
         assert!(matches!(
@@ -9490,13 +9392,14 @@ mod tests {
         let source = Archive {
             objects: vec![object.clone()],
         }
-        .to_bytes()?;
+        .to_bytes(Default::default())?;
         let replacement = object.messages[0].clone();
 
         let old = object.replace_message_reordering_data_references_preserving_header(
             0,
             replacement.clone(),
             &aggregate,
+            Default::default(),
         )?;
 
         assert_eq!(old, replacement);
@@ -9504,7 +9407,7 @@ mod tests {
             Archive {
                 objects: vec![object.clone()],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
             source
         );
         assert_eq!(
@@ -9532,11 +9435,12 @@ mod tests {
                 data: vec![0xdd],
             },
             &[33, 11, 22],
+            Default::default(),
         )?;
         let encoded = Archive {
             objects: vec![object.clone()],
         }
-        .to_bytes()?;
+        .to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(payload, [0xdd]);
         assert!(header.ends_with(&unknown_archive_info));
@@ -9555,7 +9459,7 @@ mod tests {
     #[test]
     fn object_reference_reorder_preserves_raw_header_and_nested_metadata() -> Result<()> {
         let fixture = reference_reorder_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let reordered = [200, 50, 50, 10, 50];
         let replacement = RawMessage {
             type_: 9,
@@ -9566,11 +9470,12 @@ mod tests {
                 0,
                 replacement.clone(),
                 &[200, 10],
+                Default::default(),
             )?;
         assert_eq!(old.type_, 7);
         assert_eq!(old.data, [0xde, 0xad, 0xbe]);
 
-        let encoded = archive.to_bytes()?;
+        let encoded = archive.to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(header, fixture.reordered_header);
         assert_eq!(payload, [0xfa, 0xfb, 0xfc]);
@@ -9585,9 +9490,14 @@ mod tests {
         );
 
         let replaced = archive.objects[0]
-            .replace_message_reordering_object_references_preserving_header(0, old, &[10, 200])?;
+            .replace_message_reordering_object_references_preserving_header(
+                0,
+                old,
+                &[10, 200],
+                Default::default(),
+            )?;
         assert_eq!(replaced, replacement);
-        assert_eq!(archive.to_bytes()?, fixture.source);
+        assert_eq!(archive.to_bytes(Default::default())?, fixture.source);
         assert_eq!(
             archive.objects[0].original_header.as_deref(),
             Some(fixture.header.as_slice())
@@ -9598,7 +9508,7 @@ mod tests {
     #[test]
     fn object_reference_reorder_noop_matches_preserving_replacement() -> Result<()> {
         let fixture = reference_reorder_fixture()?;
-        let parsed = Archive::parse(&fixture.source)?;
+        let parsed = Archive::parse(&fixture.source, Default::default())?;
         let replacement = RawMessage {
             type_: 9,
             data: vec![0xfa, 0xfb, 0xfc],
@@ -9610,14 +9520,21 @@ mod tests {
                 0,
                 replacement.clone(),
                 &[10, 200],
+                Default::default(),
             )?;
-        let preserving_old = preserving.replace_message_preserving_header(0, replacement)?;
+        let preserving_old =
+            preserving.replace_message_preserving_header(0, replacement, Default::default())?;
         assert_eq!(reordered_old, preserving_old);
         assert_eq!(reordered, preserving);
 
         let mut empty = parsed.objects[0].clone();
         let same = empty.messages[0].clone();
-        empty.replace_message_reordering_object_references_preserving_header(0, same, &[])?;
+        empty.replace_message_reordering_object_references_preserving_header(
+            0,
+            same,
+            &[],
+            Default::default(),
+        )?;
         assert_eq!(empty, parsed.objects[0]);
         Ok(())
     }
@@ -9625,7 +9542,7 @@ mod tests {
     #[test]
     fn object_reference_reorder_authorization_failures_are_atomic() -> Result<()> {
         let fixture = reference_reorder_fixture()?;
-        let archive = Archive::parse(&fixture.source)?;
+        let archive = Archive::parse(&fixture.source, Default::default())?;
         for selected in [&[200, 200][..], &[999, 10][..], &[50, 10][..]] {
             let mut object = archive.objects[0].clone();
             let before = object.clone();
@@ -9637,6 +9554,7 @@ mod tests {
                         data: vec![0xfa, 0xfb, 0xfc],
                     },
                     selected,
+                    Default::default(),
                 )
                 .err();
             assert!(error.is_some());
@@ -9648,11 +9566,11 @@ mod tests {
     #[test]
     fn object_reference_reorder_limits_and_malformed_fields_are_atomic() -> Result<()> {
         let fixture = reference_reorder_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let before_limit = archive.objects[0].clone();
         let limits = Limits::default().with_metadata_items(1)?;
         let limit_error = archive.objects[0]
-            .replace_message_reordering_object_references_preserving_header_with_limits(
+            .replace_message_reordering_object_references_preserving_header(
                 0,
                 RawMessage {
                     type_: 9,
@@ -9688,6 +9606,7 @@ mod tests {
                     type_: 2,
                     data: vec![0xcc],
                 }],
+                Default::default(),
             )?;
             object.archive_info.message_infos[0].object_references = vec![10, 20];
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
@@ -9705,6 +9624,7 @@ mod tests {
                         data: vec![0xdd],
                     },
                     &[20, 10],
+                    Default::default(),
                 )
                 .err();
             assert!(error.is_some());
@@ -9721,6 +9641,7 @@ mod tests {
                 type_: 2,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         let second = ArchiveObject::new(
             2,
@@ -9728,6 +9649,7 @@ mod tests {
                 type_: 3,
                 data: vec![2, 2],
             }],
+            Default::default(),
         )?;
         let third = ArchiveObject::new(
             3,
@@ -9735,20 +9657,24 @@ mod tests {
                 type_: 4,
                 data: vec![3, 3, 3],
             }],
+            Default::default(),
         )?;
         let mut archive = Archive {
             objects: vec![first.clone()],
         };
-        archive.append_objects(vec![second.clone(), third.clone()])?;
+        archive.append_objects(vec![second.clone(), third.clone()], Default::default())?;
         assert_eq!(
             archive.objects,
             [first.clone(), second.clone(), third.clone()]
         );
-        let encoded = archive.to_bytes()?;
-        assert_eq!(Archive::parse(&encoded)?.to_bytes()?, encoded);
+        let encoded = archive.to_bytes(Default::default())?;
+        assert_eq!(
+            Archive::parse(&encoded, Default::default())?.to_bytes(Default::default())?,
+            encoded
+        );
 
         let mut empty = archive.clone();
-        empty.append_objects(Vec::new())?;
+        empty.append_objects(Vec::new(), Default::default())?;
         assert_eq!(empty, archive);
 
         let exact = Limits::default()
@@ -9758,7 +9684,7 @@ mod tests {
         let mut exact_archive = Archive {
             objects: vec![first.clone()],
         };
-        exact_archive.append_objects_with_limits(vec![second.clone(), third.clone()], exact)?;
+        exact_archive.append_objects(vec![second.clone(), third.clone()], exact)?;
         assert_eq!(exact_archive, archive);
 
         for limits in [
@@ -9771,7 +9697,7 @@ mod tests {
             };
             let before = limited.clone();
             let error = limited
-                .append_objects_with_limits(vec![second.clone(), third.clone()], limits)
+                .append_objects(vec![second.clone(), third.clone()], limits)
                 .err();
             assert!(matches!(error, Some(Error::Limit { .. })));
             assert_eq!(limited, before);
@@ -9787,20 +9713,21 @@ mod tests {
                 type_: 2,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         for objects in [
-            vec![ArchiveObject::new(0, Vec::new())?],
-            vec![ArchiveObject::new(1, Vec::new())?],
+            vec![ArchiveObject::new(0, Vec::new(), Default::default())?],
+            vec![ArchiveObject::new(1, Vec::new(), Default::default())?],
             vec![
-                ArchiveObject::new(2, Vec::new())?,
-                ArchiveObject::new(2, Vec::new())?,
+                ArchiveObject::new(2, Vec::new(), Default::default())?,
+                ArchiveObject::new(2, Vec::new(), Default::default())?,
             ],
         ] {
             let mut archive = Archive {
                 objects: vec![existing.clone()],
             };
             let before = archive.clone();
-            assert!(archive.append_objects(objects).is_err());
+            assert!(archive.append_objects(objects, Default::default()).is_err());
             assert_eq!(archive, before);
         }
         Ok(())
@@ -9810,7 +9737,7 @@ mod tests {
     fn exact_reference_transition_preserves_raw_spans_and_changes_all_selected_lists() -> Result<()>
     {
         let fixture = reference_transition_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let old = archive.objects[0]
             .replace_message_transitioning_object_references_preserving_header(
                 0,
@@ -9828,10 +9755,11 @@ mod tests {
                         after: &[20, 40],
                     }],
                 },
+                Default::default(),
             )?;
         assert_eq!(old.type_, 7);
         assert_eq!(old.data, [0xde, 0xad, 0xbe]);
-        let encoded = archive.to_bytes()?;
+        let encoded = archive.to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(header, fixture.transitioned_header);
         assert_eq!(payload, [0xfa, 0xfb, 0xfc, 0xfd]);
@@ -9839,18 +9767,21 @@ mod tests {
         assert_eq!(info.object_references, [30, 20, 40]);
         assert_eq!(info.field_infos[0].object_references, [20, 40]);
         assert_eq!(info.field_infos[1].object_references, [30]);
-        assert_eq!(Archive::parse(&encoded)?.to_bytes()?, encoded);
+        assert_eq!(
+            Archive::parse(&encoded, Default::default())?.to_bytes(Default::default())?,
+            encoded
+        );
         Ok(())
     }
 
     #[test]
     fn exact_reference_transition_retains_duplicate_unselected_field_members() -> Result<()> {
         let fixture = reference_transition_fixture()?;
-        let mut parsed = Archive::parse(&fixture.source)?;
+        let mut parsed = Archive::parse(&fixture.source, Default::default())?;
         parsed.objects[0].archive_info.message_infos[0].field_infos[1].object_references =
             vec![30, 30];
-        let source = parsed.to_bytes()?;
-        let mut parsed = Archive::parse(&source)?;
+        let source = parsed.to_bytes(Default::default())?;
+        let mut parsed = Archive::parse(&source, Default::default())?;
         parsed.objects[0].replace_message_transitioning_object_references_preserving_header(
             0,
             RawMessage {
@@ -9867,6 +9798,7 @@ mod tests {
                     after: &[20, 40],
                 }],
             },
+            Default::default(),
         )?;
         assert_eq!(
             parsed.objects[0].archive_info.message_infos[0].field_infos[1].object_references,
@@ -9878,7 +9810,7 @@ mod tests {
     #[test]
     fn exact_reference_transition_hostile_authorization_is_atomic() -> Result<()> {
         let fixture = reference_transition_fixture()?;
-        let parsed = Archive::parse(&fixture.source)?;
+        let parsed = Archive::parse(&fixture.source, Default::default())?;
         let transitions = [
             ObjectReferenceTransition {
                 aggregate_before: &[10, 99, 30],
@@ -9937,6 +9869,7 @@ mod tests {
                         data: vec![0xfa, 0xfb, 0xfc, 0xfd],
                     },
                     transition,
+                    Default::default(),
                 )
                 .err();
             assert!(error.is_some());
@@ -9948,7 +9881,7 @@ mod tests {
     #[test]
     fn exact_reference_transition_limits_are_inclusive_and_atomic() -> Result<()> {
         let fixture = reference_transition_fixture()?;
-        let parsed = Archive::parse(&fixture.source)?;
+        let parsed = Archive::parse(&fixture.source, Default::default())?;
         let transition = ObjectReferenceTransition {
             aggregate_before: &[10, 20, 30],
             aggregate_after: &[30, 20, 40],
@@ -9967,11 +9900,12 @@ mod tests {
                 data: vec![0xfa, 0xfb, 0xfc, 0xfd],
             },
             transition,
+            Default::default(),
         )?;
         let successful_bytes = Archive {
             objects: vec![successful.clone()],
         }
-        .to_bytes()?;
+        .to_bytes(Default::default())?;
         let (header, _) = split_test_archive(&successful_bytes)?;
         let metadata_items = successful.archive_info.message_infos.len()
             + successful
@@ -9994,7 +9928,7 @@ mod tests {
             .with_header_bytes(header.len())?
             .with_object_bytes(object_bytes)?;
         let mut exact = parsed.objects[0].clone();
-        exact.replace_message_transitioning_object_references_preserving_header_with_limits(
+        exact.replace_message_transitioning_object_references_preserving_header(
             0,
             RawMessage {
                 type_: 9,
@@ -10011,7 +9945,7 @@ mod tests {
             let mut object = parsed.objects[0].clone();
             let before = object.clone();
             let error = object
-                .replace_message_transitioning_object_references_preserving_header_with_limits(
+                .replace_message_transitioning_object_references_preserving_header(
                     0,
                     RawMessage {
                         type_: 9,
@@ -10030,7 +9964,7 @@ mod tests {
     #[test]
     fn exact_reference_transition_rejects_ambiguous_raw_reference_atomically() -> Result<()> {
         let fixture = reference_transition_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let object = &mut archive.objects[0];
         let mut malformed = object
             .original_header
@@ -10061,6 +9995,7 @@ mod tests {
                         after: &[20, 40],
                     }],
                 },
+                Default::default(),
             )
             .err();
         assert!(error.is_some());
@@ -10078,6 +10013,7 @@ mod tests {
                 type_: 2,
                 data: vec![0xcc],
             }],
+            Default::default(),
         )?;
         let info = object
             .archive_info
@@ -10092,7 +10028,7 @@ mod tests {
             field.data_references.extend_from_slice(references);
             info.field_infos.push(field);
         }
-        object.validate()?;
+        object.validate(Default::default())?;
         Ok(object)
     }
 
@@ -10118,7 +10054,7 @@ mod tests {
     #[test]
     fn canonical_object_fields_preserve_unknown_header_and_remove_exact_suffix() -> Result<()> {
         let source = reference_transition_fixture()?.source;
-        let mut archive = Archive::parse(&source)?;
+        let mut archive = Archive::parse(&source, Default::default())?;
         let prior = archive.objects[0].archive_info.clone();
         let before = [10, 20, 30];
         let after = [10, 20, 30, 40, 50, 60, 70];
@@ -10135,6 +10071,7 @@ mod tests {
                     aggregate_after: &after,
                     fields: &[],
                 },
+                Default::default(),
             )?;
         aggregate_only.objects[0]
             .replace_message_transitioning_object_references_preserving_header(
@@ -10145,6 +10082,7 @@ mod tests {
                     aggregate_after: &before,
                     fields: &[],
                 },
+                Default::default(),
             )?;
         let fields = [
             CanonicalObjectReferenceField {
@@ -10157,11 +10095,7 @@ mod tests {
             },
         ];
         let old = archive.objects[0]
-            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-                0, RawMessage { type_: 7, data: vec![1, 2, 3, 4] },
-                ObjectReferenceTransition { aggregate_before: &before, aggregate_after: &after, fields: &[] },
-                CanonicalObjectReferenceFields::Insert(&fields),
-            )?;
+            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![1, 2, 3, 4] }, ObjectReferenceTransition { aggregate_before: &before, aggregate_after: &after, fields: &[] }, CanonicalObjectReferenceFields::Insert(&fields), Default::default())?;
         let info = &archive.objects[0].archive_info.message_infos[0];
         assert_eq!(info.object_references, after);
         assert_eq!(
@@ -10177,23 +10111,23 @@ mod tests {
         }
         // Reopen to ensure the inverse relies on persisted bytes, not a
         // remembered insertion action or an in-memory metadata cache.
-        let mut reopened = Archive::parse(&archive.to_bytes()?)?;
+        let mut reopened =
+            Archive::parse(&archive.to_bytes(Default::default())?, Default::default())?;
         reopened.objects[0]
-            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-                0, old,
-                ObjectReferenceTransition { aggregate_before: &after, aggregate_after: &before, fields: &[] },
-                CanonicalObjectReferenceFields::Remove(&fields),
-            )?;
+            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, old, ObjectReferenceTransition { aggregate_before: &after, aggregate_after: &before, fields: &[] }, CanonicalObjectReferenceFields::Remove(&fields), Default::default())?;
         assert_eq!(reopened.objects[0].archive_info, prior);
         // Ordinary aggregate transitions retain empty packed occurrences.
         // Adding and removing attribution must introduce no other raw delta.
-        assert_eq!(reopened.to_bytes()?, aggregate_only.to_bytes()?);
+        assert_eq!(
+            reopened.to_bytes(Default::default())?,
+            aggregate_only.to_bytes(Default::default())?
+        );
         Ok(())
     }
 
     #[test]
     fn canonical_object_fields_reject_ambiguous_authorization_atomically() -> Result<()> {
-        let parsed = Archive::parse(&reference_transition_fixture()?.source)?;
+        let parsed = Archive::parse(&reference_transition_fixture()?.source, Default::default())?;
         let duplicate_paths = [
             CanonicalObjectReferenceField {
                 path: &[34],
@@ -10230,11 +10164,7 @@ mod tests {
         for definitions in bad_definitions {
             let mut object = parsed.objects[0].clone();
             let before = object.clone();
-            assert!(object.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-                0, RawMessage { type_: 7, data: vec![1, 2, 3] },
-                ObjectReferenceTransition { aggregate_before: &[10, 20, 30], aggregate_after: &[10, 20, 30, 40, 50], fields: &[] },
-                CanonicalObjectReferenceFields::Insert(definitions),
-            ).is_err());
+            assert!(object.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![1, 2, 3] }, ObjectReferenceTransition { aggregate_before: &[10, 20, 30], aggregate_after: &[10, 20, 30, 40, 50], fields: &[] }, CanonicalObjectReferenceFields::Insert(definitions), Default::default()).is_err());
             assert_eq!(object, before);
         }
         Ok(())
@@ -10242,7 +10172,7 @@ mod tests {
 
     #[test]
     fn canonical_object_fields_admit_exact_metadata_and_reject_one_under() -> Result<()> {
-        let parsed = Archive::parse(&reference_transition_fixture()?.source)?;
+        let parsed = Archive::parse(&reference_transition_fixture()?.source, Default::default())?;
         let fields = [CanonicalObjectReferenceField {
             path: &[34],
             references: &[40],
@@ -10253,15 +10183,12 @@ mod tests {
             fields: &[],
         };
         let mut expected = parsed.objects[0].clone();
-        expected.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-            0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition,
-            CanonicalObjectReferenceFields::Insert(&fields),
-        )?;
+        expected.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition, CanonicalObjectReferenceFields::Insert(&fields), Default::default())?;
         let metadata_items = 1 + expected.archive_info.message_infos[0].metadata_item_count()?;
         for (maximum, success) in [(metadata_items, true), (metadata_items - 1, false)] {
             let mut object = parsed.objects[0].clone();
             let before = object.clone();
-            let result = object.replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+            let result = object.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
                 0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition,
                 CanonicalObjectReferenceFields::Insert(&fields), Limits::default().with_metadata_items(maximum)?,
             );
@@ -10281,19 +10208,16 @@ mod tests {
     #[test]
     fn canonical_object_fields_compose_with_selected_reference_transition() -> Result<()> {
         let fixture = reference_transition_fixture()?;
-        let mut archive = Archive::parse(&fixture.source)?;
+        let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let definition = [CanonicalObjectReferenceField {
             path: &[34],
             references: &[50],
         }];
-        archive.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-            0, RawMessage { type_: 9, data: vec![1, 2, 3, 4] },
-            ObjectReferenceTransition {
+        archive.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 9, data: vec![1, 2, 3, 4] }, ObjectReferenceTransition {
                 aggregate_before: &[10, 20, 30], aggregate_after: &[30, 20, 40, 50],
                 fields: &[FieldObjectReferenceTransition { field_info_index: 0, expected_path: &[4, 1], before: &[10, 20], after: &[20, 40] }],
-            }, CanonicalObjectReferenceFields::Insert(&definition),
-        )?;
-        let mut expected = Archive::parse(&fixture.source)?;
+            }, CanonicalObjectReferenceFields::Insert(&definition), Default::default())?;
+        let mut expected = Archive::parse(&fixture.source, Default::default())?;
         expected.objects[0].replace_message_transitioning_object_references_preserving_header(
             0,
             RawMessage {
@@ -10310,22 +10234,22 @@ mod tests {
                     after: &[20, 40],
                 }],
             },
+            Default::default(),
         )?;
         // Removing attribution without changing the aggregate proves that the
         // selected raw field (including its unknown bytes) matches the existing
         // independent transition path exactly.
-        archive.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-            0, RawMessage { type_: 9, data: vec![1, 2, 3, 4] },
-            ObjectReferenceTransition { aggregate_before: &[30, 20, 40, 50], aggregate_after: &[30, 20, 40, 50], fields: &[] },
-            CanonicalObjectReferenceFields::Remove(&definition),
-        )?;
-        assert_eq!(archive.to_bytes()?, expected.to_bytes()?);
+        archive.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 9, data: vec![1, 2, 3, 4] }, ObjectReferenceTransition { aggregate_before: &[30, 20, 40, 50], aggregate_after: &[30, 20, 40, 50], fields: &[] }, CanonicalObjectReferenceFields::Remove(&definition), Default::default())?;
+        assert_eq!(
+            archive.to_bytes(Default::default())?,
+            expected.to_bytes(Default::default())?
+        );
         Ok(())
     }
 
     #[test]
     fn canonical_object_fields_bound_output_header_atomically() -> Result<()> {
-        let archive = Archive::parse(&reference_transition_fixture()?.source)?;
+        let archive = Archive::parse(&reference_transition_fixture()?.source, Default::default())?;
         let definition = [CanonicalObjectReferenceField {
             path: &[34],
             references: &[40],
@@ -10336,9 +10260,7 @@ mod tests {
             fields: &[],
         };
         let mut expected = archive.objects[0].clone();
-        expected.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-            0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition, CanonicalObjectReferenceFields::Insert(&definition),
-        )?;
+        expected.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition, CanonicalObjectReferenceFields::Insert(&definition), Default::default())?;
         let header_bytes = expected
             .original_header
             .as_ref()
@@ -10347,7 +10269,7 @@ mod tests {
         for maximum in [header_bytes, header_bytes - 1] {
             let mut candidate = archive.objects[0].clone();
             let original = candidate.clone();
-            let result = candidate.replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+            let result = candidate.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
                 0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition, CanonicalObjectReferenceFields::Insert(&definition),
                 Limits::default().with_header_bytes(maximum)?,
             );
@@ -10389,15 +10311,11 @@ mod tests {
         push_test_varint(&mut source, header.len() as u64, 1);
         source.extend_from_slice(&header);
         source.extend_from_slice(&[1, 2, 3]);
-        let mut parsed = Archive::parse(&source)?;
+        let mut parsed = Archive::parse(&source, Default::default())?;
         let original = parsed.clone();
-        assert!(parsed.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
-            0, RawMessage { type_: 7, data: vec![4, 5, 6] },
-            ObjectReferenceTransition { aggregate_before: &[40], aggregate_after: &[], fields: &[] },
-            CanonicalObjectReferenceFields::Remove(&definitions),
-        ).is_err());
+        assert!(parsed.objects[0].replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![4, 5, 6] }, ObjectReferenceTransition { aggregate_before: &[40], aggregate_after: &[], fields: &[] }, CanonicalObjectReferenceFields::Remove(&definitions), Default::default()).is_err());
         assert_eq!(parsed, original);
-        assert_eq!(parsed.to_bytes()?, source);
+        assert_eq!(parsed.to_bytes(Default::default())?, source);
         Ok(())
     }
 
@@ -10678,7 +10596,7 @@ mod tests {
     #[test]
     fn changed_cardinality_data_transition_supports_insert_remove_and_replace() -> Result<()> {
         let source = data_reference_transition_fixture(true)?;
-        let original = Archive::parse(&source)?;
+        let original = Archive::parse(&source, Default::default())?;
 
         for (after, payload) in [
             (vec![10, 30, 20], data_reference_payload(&[10, 30, 20])?),
@@ -10706,6 +10624,7 @@ mod tests {
                     data: payload,
                 },
                 transition,
+                Default::default(),
             )?;
             assert_eq!(
                 edited.objects[0].archive_info.message_infos[0].data_references,
@@ -10715,7 +10634,7 @@ mod tests {
                 edited.objects[0].archive_info.message_infos[0].field_infos[0].data_references,
                 after
             );
-            let encoded = edited.to_bytes()?;
+            let encoded = edited.to_bytes(Default::default())?;
             let (header, _) = split_test_archive(&encoded)?;
             assert!(header.ends_with(&[0xb0, 0x3e, 0x07]));
 
@@ -10729,7 +10648,7 @@ mod tests {
     #[test]
     fn changed_cardinality_data_transition_inverse_restores_exact_source() -> Result<()> {
         let source = data_reference_transition_fixture(true)?;
-        let mut edited = Archive::parse(&source)?;
+        let mut edited = Archive::parse(&source, Default::default())?;
         let before = [10, 20];
         let after = [10, 30, 20];
         let transition = DataReferenceTransition {
@@ -10750,6 +10669,7 @@ mod tests {
                     data: data_reference_payload(&after)?,
                 },
                 transition,
+                Default::default(),
             )?;
         let inverse = DataReferenceTransition {
             aggregate_before: &after,
@@ -10761,9 +10681,13 @@ mod tests {
                 after: &before,
             }],
         };
-        edited.objects[0]
-            .replace_message_transitioning_data_references_preserving_header(0, old, inverse)?;
-        assert_eq!(edited.to_bytes()?, source);
+        edited.objects[0].replace_message_transitioning_data_references_preserving_header(
+            0,
+            old,
+            inverse,
+            Default::default(),
+        )?;
+        assert_eq!(edited.to_bytes(Default::default())?, source);
         Ok(())
     }
 
@@ -10771,7 +10695,7 @@ mod tests {
     fn changed_cardinality_data_transition_rejects_stale_or_limited_requests_atomically()
     -> Result<()> {
         let source = data_reference_transition_fixture(false)?;
-        let mut edited = Archive::parse(&source)?;
+        let mut edited = Archive::parse(&source, Default::default())?;
         let original = edited.clone();
         let wrong_before = [99, 20];
         let after = [10, 30, 20];
@@ -10794,6 +10718,7 @@ mod tests {
                         data: data_reference_payload(&after)?,
                     },
                     stale,
+                    Default::default(),
                 )
                 .is_err()
         );
@@ -10813,7 +10738,7 @@ mod tests {
         let limits = Limits::default().with_metadata_items(1)?;
         assert!(
             edited.objects[0]
-                .replace_message_transitioning_data_references_preserving_header_with_limits(
+                .replace_message_transitioning_data_references_preserving_header(
                     0,
                     RawMessage {
                         type_: 7,
@@ -10845,6 +10770,7 @@ mod tests {
                         data: data_reference_payload(&after)?,
                     },
                     limited,
+                    Default::default(),
                 )
                 .is_err()
         );
@@ -10855,7 +10781,7 @@ mod tests {
     #[test]
     fn canonical_field_transition_inserts_and_removes_exactly_with_unknown_header() -> Result<()> {
         let source = aggregate_only_data_reference_transition_fixture(true)?;
-        let mut edited = Archive::parse(&source)?;
+        let mut edited = Archive::parse(&source, Default::default())?;
         let before = [10, 20];
         let after = [10, 30, 20];
         let inserted = CanonicalFieldDataReferenceTransition {
@@ -10872,6 +10798,7 @@ mod tests {
                     data: data_reference_payload(&after)?,
                 },
                 inserted,
+                Default::default(),
             )?;
         let info = &edited.objects[0].archive_info.message_infos[0];
         assert_eq!(info.data_references, after);
@@ -10879,7 +10806,7 @@ mod tests {
         assert_eq!(info.field_infos[0].path.as_slice(), [3]);
         assert_eq!(info.field_infos[0].r#type, Some(FieldType::DataReference));
         assert_eq!(info.field_infos[0].data_references, after);
-        let encoded = edited.to_bytes()?;
+        let encoded = edited.to_bytes(Default::default())?;
         let (header, payload) = split_test_archive(&encoded)?;
         assert!(header.ends_with(&[0xb0, 0x3e, 0x07]));
         assert_eq!(payload, data_reference_payload(&after)?);
@@ -10892,16 +10819,19 @@ mod tests {
         };
         edited.objects[0]
             .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
-                0, old, inverse,
+                0,
+                old,
+                inverse,
+                Default::default(),
             )?;
-        assert_eq!(edited.to_bytes()?, source);
+        assert_eq!(edited.to_bytes(Default::default())?, source);
         Ok(())
     }
 
     #[test]
     fn canonical_field_transition_rejects_stale_and_existing_paths_atomically() -> Result<()> {
         let source = aggregate_only_data_reference_transition_fixture(true)?;
-        let mut stale = Archive::parse(&source)?;
+        let mut stale = Archive::parse(&source, Default::default())?;
         let original = stale.clone();
         let stale_before = [99, 20];
         let after = [99, 20, 30];
@@ -10919,13 +10849,14 @@ mod tests {
                     data: data_reference_payload(&after)?,
                 },
                 request,
+                Default::default(),
             )
             .is_err());
         assert_eq!(stale, original);
 
         let before = [10, 20];
         let inserted_after = [10, 30, 20];
-        let mut existing = Archive::parse(&source)?;
+        let mut existing = Archive::parse(&source, Default::default())?;
         existing.objects[0]
             .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
                 0,
@@ -10939,6 +10870,7 @@ mod tests {
                     field_path: &[3],
                     operation: CanonicalFieldDataReferenceOperation::Insert,
                 },
+                Default::default(),
             )?;
         let original = existing.clone();
         let next = [10, 30, 20, 40];
@@ -10955,6 +10887,7 @@ mod tests {
                     field_path: &[3],
                     operation: CanonicalFieldDataReferenceOperation::Insert,
                 },
+                Default::default(),
             )
             .is_err());
         assert_eq!(existing, original);
@@ -10965,7 +10898,7 @@ mod tests {
     fn canonical_field_transition_rejects_noncanonical_remove_and_limits_atomically() -> Result<()>
     {
         let source = aggregate_only_data_reference_transition_fixture(true)?;
-        let mut noncanonical = Archive::parse(&source)?;
+        let mut noncanonical = Archive::parse(&source, Default::default())?;
         let before = [10, 20];
         let after = [10, 30, 20];
         noncanonical.objects[0]
@@ -10981,6 +10914,7 @@ mod tests {
                     field_path: &[3],
                     operation: CanonicalFieldDataReferenceOperation::Insert,
                 },
+                Default::default(),
             )?;
         let raw = noncanonical.objects[0]
             .original_header
@@ -11016,15 +10950,16 @@ mod tests {
                     field_path: &[3],
                     operation: CanonicalFieldDataReferenceOperation::Remove,
                 },
+                Default::default(),
             )
             .is_err());
         assert_eq!(noncanonical, original);
 
-        let mut limited = Archive::parse(&source)?;
+        let mut limited = Archive::parse(&source, Default::default())?;
         let original = limited.clone();
         let limits = Limits::default().with_metadata_items(10)?;
         assert!(limited.objects[0]
-            .replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
                 0,
                 RawMessage {
                     type_: 7,
@@ -11053,13 +10988,14 @@ mod tests {
                 type_: 7,
                 data: before_payload.clone(),
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].data_references = vec![10, 20];
         if !with_unknown_header {
             return Archive {
                 objects: vec![object],
             }
-            .to_bytes();
+            .to_bytes(Default::default());
         }
 
         let mut header = encode_archive_info(&object.archive_info, Limits::default())?;
@@ -11080,6 +11016,7 @@ mod tests {
                 type_: 7,
                 data: before_payload.clone(),
             }],
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[0];
         info.data_references = vec![10, 20];
@@ -11091,7 +11028,7 @@ mod tests {
             return Archive {
                 objects: vec![object],
             }
-            .to_bytes();
+            .to_bytes(Default::default());
         }
 
         let mut header = encode_archive_info(&object.archive_info, Limits::default())?;

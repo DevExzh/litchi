@@ -343,7 +343,7 @@ fn package_directories_convert_and_save_back_byte_exactly() -> Result<(), Box<dy
 fn metadata_ignores_earlier_malformed_near_names_and_preserves_source()
 -> Result<(), Box<dyn std::error::Error>> {
     let source = std::fs::read(fixture_path())?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let malformed = b"not a plist";
     let mut entries = Vec::with_capacity(catalog.len().saturating_add(2));
     entries.push(("A/Properties.plist", malformed.as_slice()));

@@ -35,6 +35,7 @@ fn object<T: Message>(identifier: u64, type_: u32, value: T) -> ArchiveObject {
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )
     .unwrap()
 }
@@ -128,6 +129,7 @@ fn keynote_package_with_empty_author_storage() -> HostPackage {
                     type_: 7,
                     data: value.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             drawable.archive_info.message_infos[0]
                 .object_references
@@ -204,6 +206,7 @@ fn detached_keynote_comment_package(metadata: tsp::PackageMetadata) -> HostPacka
                     type_: 7,
                     data: value.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             drawable.archive_info.message_infos[0]
                 .object_references
@@ -249,10 +252,10 @@ fn decode_test_varint(source: &[u8]) -> (usize, usize) {
 
 fn inject_unknown_archive_info(package: &mut HostPackage, member: &str, object_identifier: u64) {
     let compressed = package.entry(member).unwrap();
-    let source = crate::snappy::SnappyStream::decompress(compressed)
+    let source = crate::snappy::SnappyStream::decompress(compressed, Default::default())
         .unwrap()
         .into_bytes();
-    let archive = Archive::parse(&source).unwrap();
+    let archive = Archive::parse(&source, Default::default()).unwrap();
     let object = archive.object(object_identifier).unwrap();
     let object_start = usize::try_from(object.header_offset).unwrap();
     let (header_length, prefix_length) = decode_test_varint(&source[object_start..]);
@@ -274,7 +277,7 @@ fn inject_unknown_archive_info(package: &mut HostPackage, member: &str, object_i
     package
         .insert_entry(
             member,
-            crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+            crate::snappy::SnappyStream::compress(&rewritten, Default::default()).unwrap(),
         )
         .unwrap();
 }
@@ -351,6 +354,7 @@ fn creates_updates_and_clears_direct_drawable_comments() {
                     type_: 7,
                     data: value.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             object.archive_info.message_infos[0]
                 .object_references
@@ -586,6 +590,7 @@ fn duplicate_author_component_reference_fails_transactionally() {
                     type_: crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
                     data: metadata.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -737,6 +742,7 @@ fn malformed_present_metadata_rejects_comment_creation_atomically() {
                     type_: crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
                     data: vec![0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -766,6 +772,7 @@ fn comment_cull_rejects_unknown_or_ambiguous_metadata_atomically() {
                     type_: crate::package_metadata::PACKAGE_METADATA_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -835,6 +842,7 @@ fn comment_cull_failure_after_root_removal_is_atomic() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data: vec![0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1014,6 +1022,7 @@ fn malformed_reply_graph_fails_transactionally() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data: comment.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -1042,6 +1051,7 @@ fn clearing_malformed_reply_graph_fails_transactionally() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data: comment.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
@@ -1071,15 +1081,19 @@ fn generated_author_is_not_confused_with_existing_native_author() {
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            Ok(archive.insert_object(object(
-                41,
-                ANNOTATION_AUTHOR_MESSAGE_TYPE,
-                tsk::AnnotationAuthorArchive {
-                    name: Some("Native author".to_owned()),
-                    ..Default::default()
-                },
-            ))?)
+            Ok(archive.insert_object(
+                object(
+                    41,
+                    ANNOTATION_AUTHOR_MESSAGE_TYPE,
+                    tsk::AnnotationAuthorArchive {
+                        name: Some("Native author".to_owned()),
+                        ..Default::default()
+                    },
+                ),
+                Default::default(),
+            )?)
         })
         .unwrap();
     let mut editor = crate::comments::Draft::from_package(package).unwrap();
@@ -1150,6 +1164,7 @@ fn create_then_clear_restores_unknown_drawable_bytes_exactly() {
                     type_: 7,
                     data: original_payload.clone(),
                 },
+                Default::default(),
             )?;
             object.archive_info.message_infos[0]
                 .object_references
@@ -1184,6 +1199,7 @@ fn storage_updates_and_copy_on_write_preserve_unknown_fields() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1204,6 +1220,7 @@ fn storage_updates_and_copy_on_write_preserve_unknown_fields() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1236,7 +1253,7 @@ fn drawable_reference_updates_preserve_unknown_leaf_fields() {
                     Ok(reference)
                 },
             )?;
-            drawable.replace_message(0, RawMessage { type_: 7, data })?;
+            drawable.replace_message(0, RawMessage { type_: 7, data }, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -1274,6 +1291,7 @@ fn annotation_author_storage_projection_preserves_unknown_fields() {
                     type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1306,6 +1324,7 @@ fn malformed_annotation_author_metadata_is_rejected_before_mutation() {
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1319,6 +1338,7 @@ fn malformed_annotation_author_metadata_is_rejected_before_mutation() {
                     type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
                     data: vec![0x0a, 0x01, 0xff],
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1342,6 +1362,7 @@ fn malformed_annotation_author_reference_is_rejected_strictly() {
                     type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
                     data: vec![0x0a, 0x00],
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1394,6 +1415,7 @@ fn malformed_storage_fails_transactionally() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data: vec![0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1419,7 +1441,7 @@ fn malformed_drawable_comment_reference_fails_transactionally() {
                 &[1, 1, 1, 6],
                 |_reference| Ok(vec![0x08]),
             )?;
-            drawable.replace_message(0, RawMessage { type_: 7, data })?;
+            drawable.replace_message(0, RawMessage { type_: 7, data }, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -1443,6 +1465,7 @@ fn duplicate_comment_storage_scalar_fails_transactionally() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1494,6 +1517,7 @@ fn comment_storage_updates_preserve_nested_author_reply_and_unknown_bytes() {
                     type_: COMMENT_STORAGE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

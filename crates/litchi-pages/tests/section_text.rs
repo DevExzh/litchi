@@ -53,19 +53,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -98,9 +102,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn section_message(name: &str, unknown: u64) -> TestResult<RawMessage> {
@@ -199,16 +203,23 @@ fn synthetic_package_with_text<const N: usize>(fragments: [&str; N]) -> TestResu
                 data: b"after-body-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let first = ArchiveObject::new(
         FIRST_SECTION_IDENTIFIER,
         vec![section_message("First", 11)?],
+        Default::default(),
     )?;
     let second = ArchiveObject::new(
         SECOND_SECTION_IDENTIFIER,
         vec![section_message("Middle", 22)?],
+        Default::default(),
     )?;
-    let third = ArchiveObject::new(THIRD_SECTION_IDENTIFIER, vec![section_message("Last", 33)?])?;
+    let third = ArchiveObject::new(
+        THIRD_SECTION_IDENTIFIER,
+        vec![section_message("Last", 33)?],
+        Default::default(),
+    )?;
     let mut zorder = object(
         DRAWABLES_ZORDER_IDENTIFIER,
         10_015,
@@ -265,7 +276,7 @@ fn rootless_fallback_package(fragments: &[&str]) -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -291,7 +302,7 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -319,9 +330,11 @@ fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: storage.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -334,7 +347,7 @@ fn package_with_hidden_bookmark_reference() -> TestResult<Vec<u8>> {
 fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -362,9 +375,11 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -377,7 +392,7 @@ fn package_with_duplicate_known_table() -> TestResult<Vec<u8>> {
 fn package_with_wrong_known_table_wire() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -397,9 +412,11 @@ fn package_with_wrong_known_table_wire() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -435,7 +452,7 @@ fn opaque_unknown_wire() -> Vec<u8> {
 fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let body = archive
         .object_mut(BODY_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing synthetic body"))?;
@@ -452,9 +469,11 @@ fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
             type_: STORAGE_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -467,23 +486,29 @@ fn package_with_opaque_body_unknowns() -> TestResult<Vec<u8>> {
 fn package_with_unselected_body_alias() -> TestResult<Vec<u8>> {
     let bytes = synthetic_package()?;
     let stream = document_stream(&bytes)?;
-    let source_archive = Archive::parse(&stream)?;
-    let mut unrelated_archive = Archive::parse(&{
-        let catalog = Catalog::from_bytes(&bytes)?;
-        let entry = catalog
-            .iter()
-            .find(|entry| entry.name() == UNRELATED_MEMBER)
-            .ok_or_else(|| io::Error::other("missing unrelated component"))?;
-        SnappyStream::decompress(entry.data())?.into_bytes()
-    })?;
+    let source_archive = Archive::parse(&stream, Default::default())?;
+    let mut unrelated_archive = Archive::parse(
+        &{
+            let catalog = Catalog::from_bytes(&bytes, Default::default())?;
+            let entry = catalog
+                .iter()
+                .find(|entry| entry.name() == UNRELATED_MEMBER)
+                .ok_or_else(|| io::Error::other("missing unrelated component"))?;
+            SnappyStream::decompress(entry.data(), Default::default())?.into_bytes()
+        },
+        Default::default(),
+    )?;
     let mut alias = source_archive
         .object(BODY_IDENTIFIER)
         .cloned()
         .ok_or_else(|| io::Error::other("missing source body for alias"))?;
     alias.archive_info.identifier = Some(UNSELECTED_BODY_ALIAS_IDENTIFIER);
-    unrelated_archive.append_objects(vec![alias])?;
-    let compressed = SnappyStream::compress(&unrelated_archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    unrelated_archive.append_objects(vec![alias], Default::default())?;
+    let compressed = SnappyStream::compress(
+        &unrelated_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             UNRELATED_MEMBER,
@@ -499,13 +524,13 @@ fn member_message_payload(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("missing requested component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing requested object"))?;
@@ -518,17 +543,17 @@ fn member_message_payload(
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Pages document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -542,7 +567,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -640,8 +665,8 @@ fn section_snapshot(package: &Package) -> TestResult<Vec<(Option<String>, String
 }
 
 fn assert_untouched_zip_members(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -906,7 +931,7 @@ fn changed_text_preserves_unknown_data_headers_and_zip_and_is_reversible() -> Te
     assert_eq!(exact_bytes(restored.package())?, bytes);
     assert_eq!(section_snapshot(restored.package())?, source_snapshot);
 
-    let equivalent_bytes = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let equivalent_bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             "Data/sentinel.bin",
             b"different unrelated ZIP sentinel",
@@ -1170,7 +1195,7 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
     let duplicate_name_bytes = {
         let duplicate_source = synthetic_package()?;
         let stream = document_stream(&duplicate_source)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let second = archive
             .object_mut(SECOND_SECTION_IDENTIFIER)
             .ok_or_else(|| io::Error::other("missing second section"))?;
@@ -1184,9 +1209,11 @@ fn selectors_spans_reserved_markers_and_dependent_content_are_typed() -> TestRes
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-        let catalog = Catalog::from_bytes(&duplicate_source)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+        let catalog = Catalog::from_bytes(&duplicate_source, Default::default())?;
         catalog.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 DOCUMENT_MEMBER,

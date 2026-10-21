@@ -102,16 +102,19 @@ fn focused_drawable_selector(
     source: &[u8],
     drawable_id: u64,
 ) -> Result<DrawableSelector, Box<dyn Error>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+            entry.data(),
+            Default::default(),
+        ) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -149,18 +152,21 @@ fn focused_drawable_selector(
 /// API; this generated-Prost projection remains private to the integration
 /// test so host graph correlations do not become a public raw-ID API.
 fn native_media_ids(source: &[u8]) -> Result<Vec<(u64, MovieKind)>, Box<dyn Error>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut movies = Vec::new();
     let mut slides = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+            entry.data(),
+            Default::default(),
+        ) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -279,13 +285,15 @@ fn add_movie(
 fn package_watermark(bytes: &[u8]) -> Result<u64, Box<dyn Error>> {
     use prost::Message as _;
 
-    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let stream = litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = litchi_iwa_archive::iwa::Archive::parse(&stream)?;
+    let stream =
+        litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data(), Default::default())?
+            .into_bytes();
+    let archive = litchi_iwa_archive::iwa::Archive::parse(&stream, Default::default())?;
     let message = archive
         .objects
         .iter()
@@ -691,15 +699,18 @@ fn native_component_containing_object(
     source: &[u8],
     identifier: u64,
 ) -> Result<Archive, Box<dyn Error>> {
-    for entry in Catalog::from_bytes(source)?
+    for entry in Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+            entry.data(),
+            Default::default(),
+        ) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };

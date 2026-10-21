@@ -564,11 +564,11 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> FixtureResult<ArchiveOb
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> FixtureResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?)
 }
 
 type FixtureResult<T> = Result<T, Box<dyn std::error::Error>>;

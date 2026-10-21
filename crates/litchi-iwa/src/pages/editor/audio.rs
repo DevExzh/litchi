@@ -104,7 +104,7 @@ impl Draft {
         )?;
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -311,7 +311,7 @@ impl Draft {
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
 

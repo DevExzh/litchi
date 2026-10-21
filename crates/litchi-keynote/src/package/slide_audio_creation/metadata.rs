@@ -603,7 +603,7 @@ pub(in crate::package) fn plan_and_rewrite_media(
         .get_mut(object_index)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -613,21 +613,21 @@ pub(in crate::package) fn plan_and_rewrite_media(
         )
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let encoded_len = archive
-        .encoded_len_with_limits(ctx.archive_limits)
+        .encoded_len(ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_output(encoded_len)?;
     budget.charge_total(encoded_len)?;
     budget.charge_allocations(encoded_len)?;
     let serialized = archive
-        .to_bytes_with_limits(ctx.archive_limits)
+        .to_bytes(ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-    let compressed_max = SnappyStream::maximum_compressed_len(serialized.len())
+    let compressed_max = SnappyStream::maximum_compressed_len(serialized.len(), Default::default())
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_output(compressed_max)?;
     budget.charge_total(compressed_max)?;
     budget.charge_allocations(compressed_max)?;
-    let compressed =
-        SnappyStream::compress(&serialized).map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed = SnappyStream::compress(&serialized, Default::default())
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_entry_bytes(compressed.len())?;
 
     drop(data_additions);
@@ -784,7 +784,7 @@ fn read_metadata_archive(
         .limits()
         .snappy_limits()
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let decoded_len = stream.as_bytes().len();
     budget.charge_allocations(decoded_len)?;
@@ -792,10 +792,10 @@ fn read_metadata_archive(
     // the Snappy buffer. Reserve the same bounded byte width for that clone
     // before the parser starts growing its object/message vectors.
     budget.charge_allocations(decoded_len)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), ctx.archive_limits)
+    let archive = Archive::parse(stream.as_bytes(), ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), ctx.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let mut selected = None;
     for (object_index, object) in archive.objects.iter().enumerate() {

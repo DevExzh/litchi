@@ -25,7 +25,7 @@ use litchi_iwa_core::archive::{
     ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor, FieldObjectReferenceTransition, ObjectReferenceTransition,
 };
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::comment_storage_codec::{
     self, CommentStorageReplyRewrite, DateSnapshot, DecodeOptions, ReferenceRecord,
     RewriteExecutionRequirements, UuidSnapshot,
@@ -149,7 +149,7 @@ impl<'source> WorkingSet<'source> {
                     .ok_or(Error::InvalidSource)?;
                 let archive = component.archive();
                 let encoded = archive
-                    .encoded_len_with_limits(
+                    .encoded_len(
                         self.source
                             .limits()
                             .effective_archive_limits()
@@ -1503,17 +1503,12 @@ fn clone_storage_object_raw(
     // Source headers are preserved by the core object clone operation. This
     // also retains unknown ArchiveInfo fields and all object-reference order.
     let clone = source_object
-        .clone_with_identity_remap_with_limits(
-            new_identifier,
-            &[],
-            &source_object.messages,
-            core_limits,
-        )
+        .clone_with_identity_remap(new_identifier, &[], &source_object.messages, core_limits)
         .map_err(|_| Error::InvalidSource)?;
     let archive = working.load(component, budget)?;
     budget.charge_allocations(size_of::<ArchiveObject>())?;
     archive
-        .insert_object_with_limits(clone, archive_limits)
+        .insert_object(clone, archive_limits)
         .map_err(|_| Error::InvalidSource)
 }
 
@@ -1539,7 +1534,7 @@ fn insert_storage_object(
         .and_then(|bytes| bytes.checked_add(size_of::<litchi_iwa_core::MessageInfo>()))
         .ok_or(Error::InvalidSource)?;
     budget.charge_allocation_plan(constructor_bytes, 3)?;
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
@@ -1560,7 +1555,7 @@ fn insert_storage_object(
     let archive = working.load(component, budget)?;
     budget.charge_allocations(size_of::<ArchiveObject>())?;
     archive
-        .insert_object_with_limits(object, archive_limits)
+        .insert_object(object, archive_limits)
         .map_err(|_| Error::InvalidSource)
 }
 
@@ -1693,7 +1688,7 @@ fn rewrite_root_replies(
     archive
         .object_mut(root_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
@@ -1981,7 +1976,7 @@ fn replace_drawable_reference(
                     budget,
                 )?;
                 object
-                    .replace_message_preserving_header_with_limits(
+                    .replace_message_preserving_header(
                         selection.message_index,
                         RawMessage {
                             type_: selection.message_type,
@@ -2031,7 +2026,7 @@ fn replace_drawable_reference(
         budget,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: selection.message_type,
@@ -2280,7 +2275,7 @@ fn cleanup_old_graph(
                 source_in_closure,
             };
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2430,7 +2425,7 @@ fn cleanup_old_graph(
         }
         let archive = working.load(node.component_name.as_ref(), budget)?;
         archive
-            .remove_object_checked_with_limits(
+            .remove_object_checked(
                 node.identifier,
                 source
                     .limits()
@@ -2500,7 +2495,7 @@ fn replace_message(
         .ok_or(Error::InvalidSource)?
         .type_;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,
@@ -2847,25 +2842,24 @@ fn serialize_candidate(
     for name in working.changed_names() {
         let archive = working.get(name).ok_or(Error::InvalidSource)?;
         let encoded_length = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource)?;
-        let compressed_upper_bound = SnappyStream::maximum_compressed_len(encoded_length)
-            .map_err(|_| Error::InvalidSource)?;
-        if compressed_upper_bound > snappy_limits.max_compressed_stream() {
-            return Err(Error::InvalidSource);
-        }
+        let compressed_upper_bound =
+            SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
+                .map_err(|_| Error::InvalidSource)?;
         budget.charge_allocations(
             encoded_length
                 .checked_add(compressed_upper_bound)
                 .ok_or(Error::InvalidSource)?,
         )?;
         let decompressed = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource)?;
         if decompressed.len() != encoded_length {
             return Err(Error::InvalidSource);
         }
-        let bytes = SnappyStream::compress(&decompressed).map_err(|_| Error::InvalidSource)?;
+        let bytes = SnappyStream::compress(&decompressed, snappy_limits)
+            .map_err(|_| Error::InvalidSource)?;
         if bytes.len() > snappy_limits.max_compressed_stream() {
             return Err(Error::InvalidSource);
         }

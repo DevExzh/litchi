@@ -1656,6 +1656,7 @@ pub(super) fn rewind_table_data_list_next_id(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1720,6 +1721,7 @@ where
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 for reference in old_references.difference(&remaining_references) {
                     remove_message_object_reference(object, message_index, *reference);
@@ -1784,6 +1786,7 @@ where
                             type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
                             data,
                         },
+                        Default::default(),
                     )?;
                     for reference in old_references.difference(&remaining_references) {
                         remove_message_object_reference(object, message_index, *reference);
@@ -1822,6 +1825,7 @@ where
                             type_: message_type,
                             data,
                         },
+                        Default::default(),
                     )?;
                     remove_message_object_reference(object, message_index, *object_id);
                     Ok(())
@@ -2085,10 +2089,10 @@ pub(super) fn set_rich_text(
     )?;
 
     package.update_archive(&entry.storage_archive, |archive| {
-        Ok(archive.insert_object(cloned_storage)?)
+        Ok(archive.insert_object(cloned_storage, Default::default())?)
     })?;
     package.update_archive(&entry.payload_archive, |archive| {
-        Ok(archive.insert_object(cloned_payload)?)
+        Ok(archive.insert_object(cloned_payload, Default::default())?)
     })?;
 
     let resolved = resolve_table_data_list(
@@ -2156,6 +2160,7 @@ pub(super) fn set_rich_text(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         add_message_object_reference(object, message_index, entry.payload_id, new_payload_id);
         Ok(())
@@ -2534,6 +2539,7 @@ where
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -2585,6 +2591,7 @@ where
                         type_: TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -2708,6 +2715,7 @@ pub(super) fn insert_formula_table(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -3170,7 +3178,8 @@ pub(super) fn update_formula_dependencies(
                         type_: 4009,
                         data,
                     },
-            )?;
+                    Default::default(),
+                )?;
             Some(tile_id)
             }
         } else if present {
@@ -3200,7 +3209,7 @@ pub(super) fn update_formula_dependencies(
                     type_: 4009,
                     data: tile.encode_to_vec(),
                 }],
-            )?)?;
+             Default::default(),)?, Default::default())?;
             created_tile_id = Some(new_identifier);
             Some(new_identifier)
         } else {
@@ -3221,6 +3230,7 @@ pub(super) fn update_formula_dependencies(
                 type_: owner_message_type,
                 data: owner_data,
             },
+            Default::default(),
         )?;
         if present && let Some(tile_id) = tile_id {
             let references = &mut owner_object.archive_info.message_infos[owner_message_index]
@@ -3267,6 +3277,7 @@ pub(super) fn update_formula_dependencies(
                 type_: 4000,
                 data: engine_data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -3656,6 +3667,7 @@ pub(super) fn update_string_table(
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })?;
@@ -3890,6 +3902,7 @@ pub(super) fn update_tile(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -3973,6 +3986,7 @@ pub(super) fn update_row_header(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -4346,6 +4360,7 @@ mod tests {
                 type_: 6005,
                 data: payload,
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -4377,6 +4392,7 @@ mod tests {
                     data: valid_payload,
                 },
             ],
+            Default::default(),
         )
         .unwrap();
         let before = object.messages.clone();
@@ -4423,6 +4439,7 @@ mod tests {
                         type_: 4000,
                         data: engine.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
                 ArchiveObject::new(
@@ -4431,6 +4448,7 @@ mod tests {
                         type_: 4008,
                         data: owner.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -4467,6 +4485,7 @@ mod tests {
                         }
                         .encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],

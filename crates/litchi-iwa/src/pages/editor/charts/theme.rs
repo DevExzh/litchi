@@ -133,6 +133,7 @@ pub(super) fn patch_theme_chart_preset(
                 type_: PAGES_THEME_MESSAGE_TYPE,
                 data: theme.encode()?,
             },
+            Default::default(),
         )?;
         let references = &mut object.archive_info.message_infos[message_index].object_references;
         if let Some(previous) = previous {

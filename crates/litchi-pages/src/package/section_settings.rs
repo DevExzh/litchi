@@ -183,7 +183,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             .saturating_add(128),
         Path::Package,
     )?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
+    let catalog = SourceCatalog::from_shared_bytes(
         Arc::clone(patch.target_artifact()),
         source.state.source.limits(),
     )
@@ -1072,7 +1072,7 @@ fn selected_component_stream(package: &Package, name: &str) -> Result<SnappyStre
             path: Path::Package,
         });
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -1406,6 +1406,7 @@ mod tests {
                 type_: 10_143,
                 data: Vec::new(),
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].object_references = aggregate;
         for (field_number, references) in declarations {

@@ -684,6 +684,7 @@ impl AxisStyleSlot {
                     type_: AXIS_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

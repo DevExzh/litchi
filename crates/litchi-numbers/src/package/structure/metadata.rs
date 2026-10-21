@@ -551,7 +551,7 @@ pub(super) fn apply(
         .object_mut(route.0)
         .ok_or(Fault::Invalid)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.1,
             RawMessage {
                 type_: MESSAGE_TYPE,

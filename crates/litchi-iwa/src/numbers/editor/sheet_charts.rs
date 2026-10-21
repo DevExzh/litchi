@@ -207,7 +207,7 @@ impl Draft {
         let mut staged = self.package.clone();
         staged.update_archive(&archive_name, |archive| {
             for object in objects {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -471,7 +471,7 @@ impl Draft {
                 clone_numbers_drawable_graph_object(source_object, &remap)?
             };
             staged.update_archive(&source.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
         let new_style_ids = source_style_ids
@@ -828,6 +828,7 @@ fn update_chart_payload(
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -860,6 +861,7 @@ fn update_chart_payload_with_grid(
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1044,10 +1046,10 @@ mod tests {
         object_identifier: u64,
     ) -> Vec<u8> {
         let compressed = editor.package.entry(archive_name).unwrap();
-        let source = crate::snappy::SnappyStream::decompress(compressed)
+        let source = crate::snappy::SnappyStream::decompress(compressed, Default::default())
             .unwrap()
             .into_bytes();
-        let archive = crate::archive::Archive::parse(&source).unwrap();
+        let archive = crate::archive::Archive::parse(&source, Default::default()).unwrap();
         let object = archive.object(object_identifier).unwrap();
         let object_start = usize::try_from(object.header_offset).unwrap();
         let (_, prefix_length) = test_decode_varint(&source[object_start..]);
@@ -1063,10 +1065,10 @@ mod tests {
     ) -> Vec<u8> {
         let mut package = editor.package.clone();
         let compressed = package.entry(archive_name).unwrap().to_vec();
-        let source = crate::snappy::SnappyStream::decompress(&compressed)
+        let source = crate::snappy::SnappyStream::decompress(&compressed, Default::default())
             .unwrap()
             .into_bytes();
-        let archive = crate::archive::Archive::parse(&source).unwrap();
+        let archive = crate::archive::Archive::parse(&source, Default::default()).unwrap();
         let object = archive.object(object_identifier).unwrap();
         let object_start = usize::try_from(object.header_offset).unwrap();
         let (header_length, prefix_length) = test_decode_varint(&source[object_start..]);
@@ -1088,7 +1090,7 @@ mod tests {
         package
             .insert_entry(
                 archive_name,
-                crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+                crate::snappy::SnappyStream::compress(&rewritten, Default::default()).unwrap(),
             )
             .unwrap();
         *editor = Draft::from_bytes(&package.to_bytes().unwrap()).unwrap();
@@ -1101,13 +1103,17 @@ mod tests {
             let mut package = editor.package.clone();
             package
                 .update_archive(archive_name, |archive| {
-                    archive.insert_object(crate::archive::ArchiveObject::new(
-                        16_383,
-                        vec![RawMessage {
-                            type_: 65_534,
-                            data: vec![0],
-                        }],
-                    )?)?;
+                    archive.insert_object(
+                        crate::archive::ArchiveObject::new(
+                            16_383,
+                            vec![RawMessage {
+                                type_: 65_534,
+                                data: vec![0],
+                            }],
+                            Default::default(),
+                        )?,
+                        Default::default(),
+                    )?;
                     Ok(())
                 })
                 .unwrap();
@@ -1276,6 +1282,7 @@ mod tests {
                         type_: crate::image_caption::CAPTION_INFO_MESSAGE_TYPE,
                         data,
                     },
+                    Default::default(),
                 )?;
                 for identifier in
                     &mut object.archive_info.message_infos[message_index].object_references
@@ -1323,6 +1330,7 @@ mod tests {
                         type_: CHART_MESSAGE_TYPE,
                         data,
                     },
+                    Default::default(),
                 )?;
                 let info = &mut object.archive_info.message_infos[message_index];
                 for identifier in &mut info.object_references {
@@ -1883,6 +1891,7 @@ mod tests {
                         type_: CHART_MESSAGE_TYPE,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })

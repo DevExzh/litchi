@@ -71,13 +71,13 @@ fn push_varint_width(mut value: u64, width: usize, output: &mut Vec<u8>) {
 }
 
 fn slide_header(source: &[u8], component_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component_name)
         .ok_or_else(|| io::Error::other("native slide component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object(SLIDE_IDENTIFIER)
         .ok_or_else(|| io::Error::other("native slide object is missing"))?;
@@ -101,7 +101,7 @@ fn slide_header(source: &[u8], component_name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, Vec<u8>)> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected_component = None;
     let mut selected_data = None;
     let mut unknown_field = Vec::new();
@@ -110,8 +110,8 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some(object) = archive.object(SLIDE_IDENTIFIER) else {
             continue;
         };
@@ -195,10 +195,13 @@ fn mutate_slide_header(source: &[u8]) -> TestResult<(Vec<u8>, String, Vec<u8>, V
         );
         rewritten_stream.extend_from_slice(&rewritten_header);
         rewritten_stream.extend_from_slice(&stream.as_bytes()[header_end..]);
-        Archive::parse(&rewritten_stream)?;
+        Archive::parse(&rewritten_stream, Default::default())?;
 
         selected_component = Some(entry.name().to_owned());
-        selected_data = Some(SnappyStream::compress(&rewritten_stream)?);
+        selected_data = Some(SnappyStream::compress(
+            &rewritten_stream,
+            Default::default(),
+        )?);
         break;
     }
 

@@ -888,17 +888,17 @@ fn rewrite_bytes_with_parent_policy(
         if entry.is_opaque() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits
                 .snappy_limits()
                 .map_err(|_error| invalid_source(operation.path()))?,
         )
         .map_err(|error| map_core_error(error, operation.path()))?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, operation.path()))?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, operation.path()))?;
         if source_sheet.component_index == component_index {
             mutate_sheet(
@@ -935,9 +935,9 @@ fn rewrite_bytes_with_parent_policy(
             )?;
         }
         let encoded = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, operation.path()))?;
-        let compressed = SnappyStream::compress(&encoded)
+        let compressed = SnappyStream::compress(&encoded, Default::default())
             .map_err(|error| map_core_error(error, operation.path()))?;
         rewritten.push((name, compressed));
     }
@@ -1057,7 +1057,7 @@ fn mutate_table_info(
         }
         let data = try_copy_bytes(&message.data, path)?;
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 target.info_message_index,
                 RawMessage {
                     type_: message.type_,
@@ -1117,7 +1117,7 @@ fn mutate_table_info(
                     path,
                 )?;
                 object
-                    .replace_message_reordering_object_references_preserving_header_with_limits(
+                    .replace_message_reordering_object_references_preserving_header(
                         target.info_message_index,
                         RawMessage {
                             type_: message_type,
@@ -1147,7 +1147,7 @@ fn mutate_table_info(
         // payload; attempting to synthesize a metadata transition would
         // either reject the valid shape or invent an ownership edge.
         None => object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 target.info_message_index,
                 RawMessage {
                     type_: message_type,
@@ -1679,7 +1679,7 @@ fn replace_with_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: object

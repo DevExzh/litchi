@@ -225,7 +225,8 @@ fn clone_named_style(
         None,
     )?;
 
-    let mut cloned = crate::archive::ArchiveObject::new(new_id, source.messages.clone())?;
+    let mut cloned =
+        crate::archive::ArchiveObject::new(new_id, source.messages.clone(), Default::default())?;
     cloned.archive_info.message_infos = source.archive_info.message_infos.clone();
     cloned.archive_info.should_merge = source.archive_info.should_merge;
     cloned.replace_message(
@@ -234,6 +235,7 @@ fn clone_named_style(
             type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     Ok(cloned)
 }
@@ -319,11 +321,12 @@ fn insert_named_style_in_archive(
             type_: STYLESHEET_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     stylesheet.archive_info.message_infos[message_index]
         .object_references
         .push(style_id);
-    Ok(archive.insert_object(style)?)
+    Ok(archive.insert_object(style, Default::default())?)
 }
 
 fn append_theme_preset(
@@ -390,6 +393,7 @@ fn append_theme_preset(
                 type_: location.message_type,
                 data: theme.encode()?,
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[message_index]
             .object_references

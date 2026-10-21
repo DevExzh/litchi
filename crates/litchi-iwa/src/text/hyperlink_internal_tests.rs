@@ -88,6 +88,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             let object = archive.object_mut(native_object_id(hyperlink.id)).unwrap();
             let original = &object.messages[0];
@@ -98,6 +99,7 @@ fn unknown_table_entry_and_hyperlink_fields_survive_updates() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -167,6 +169,7 @@ fn duplicate_smart_field_tables_fail_without_mutation() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -195,13 +198,13 @@ fn hyperlink_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     .encode_to_vec();
     package
         .update_archive(&location.archive_name, |archive| {
-            archive
-                .object_mut(storage_id.get())
-                .unwrap()
-                .push_message(RawMessage {
+            archive.object_mut(storage_id.get()).unwrap().push_message(
+                RawMessage {
                     type_: 2_022,
                     data: style_data.clone(),
-                })?;
+                },
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();

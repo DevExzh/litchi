@@ -412,6 +412,7 @@ fn adjust_component_data_reference_by(
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -695,6 +696,7 @@ mod tests {
                                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
                                 data: source,
                             }],
+                            Default::default(),
                         )
                         .unwrap(),
                     ],

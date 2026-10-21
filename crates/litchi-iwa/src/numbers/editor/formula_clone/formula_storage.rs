@@ -49,6 +49,7 @@ fn remap_formula_storage(
                 type_: message.type_,
                 data,
             },
+            Default::default(),
         )?;
     }
     Ok(())

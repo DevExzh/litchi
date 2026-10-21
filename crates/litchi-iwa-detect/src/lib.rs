@@ -447,8 +447,8 @@ impl PreparedSource {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
         }
-        let catalog = SourceCatalog::from_bytes_with_limits(value, archive_limits(limits)?)
-            .map_err(map_archive_error)?;
+        let catalog =
+            SourceCatalog::from_bytes(value, archive_limits(limits)?).map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
 
@@ -562,12 +562,9 @@ impl PreparedSource {
         if format != expected {
             return Ok(Some(Self::format_only(format, limits, archive_limits)));
         }
-        let projection = SemanticProjection::from_bytes_with_limits(
-            value,
-            archive_limits,
-            SemanticProfile::Metadata,
-        )
-        .map_err(map_archive_error)?;
+        let projection =
+            SemanticProjection::from_bytes(value, archive_limits, SemanticProfile::Metadata)
+                .map_err(map_archive_error)?;
         let (components, sidecars, projected_limits) = projection.into_parts();
         Ok(Some(Self {
             backing: PreparedBacking::Semantic {
@@ -606,7 +603,7 @@ impl PreparedSource {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
         }
-        let catalog = SourceCatalog::from_shared_bytes_with_limits(value, archive_limits(limits)?)
+        let catalog = SourceCatalog::from_shared_bytes(value, archive_limits(limits)?)
             .map_err(map_archive_error)?;
         Self::from_catalog(catalog, limits)
     }
@@ -733,9 +730,8 @@ impl PreparedSource {
         value: FrozenEntryStore,
         limits: Limits,
     ) -> Result<Option<Self>> {
-        let logical =
-            LogicalSourceCatalog::from_frozen_entries_with_limits(value, archive_limits(limits)?)
-                .map_err(map_archive_error)?;
+        let logical = LogicalSourceCatalog::from_frozen_entries(value, archive_limits(limits)?)
+            .map_err(map_archive_error)?;
         let Some(format) = component_catalog(logical.components())? else {
             return Ok(None);
         };
@@ -944,7 +940,7 @@ impl PreparedSource {
                 let archive = archive_limits(limits)?;
                 let directory = match profile {
                     PathProfile::IndexOnly => {
-                        FrozenDirectoryBundle::open_with_limits(path, archive)
+                        FrozenDirectoryBundle::open(path, archive)
                     },
                     PathProfile::Properties => {
                         FrozenDirectoryBundle::open_with_properties(path, archive)
@@ -1928,11 +1924,10 @@ fn invalid_application_authority(number: u32, reason: &str) -> Error {
 }
 
 fn root_format(data: &[u8], limits: Limits) -> Result<Option<Format>> {
-    let stream = SnappyStream::decompress_with_limits(data, limits.snappy_limits()?)?;
+    let stream = SnappyStream::decompress(data, limits.snappy_limits()?)?;
     let archive_limits =
         litchi_iwa_core::Limits::default().with_archive_bytes(limits.max_iwa_stream_size())?;
-    let archive =
-        Archive::parse_objects_with_identifier_with_limits(stream.as_bytes(), 1, archive_limits)?;
+    let archive = Archive::parse_objects_with_identifier(stream.as_bytes(), 1, archive_limits)?;
     root_format_archive(&archive)
 }
 
@@ -2413,11 +2408,16 @@ mod tests {
                         type_: message_type,
                         data: payload,
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
         };
-        SnappyStream::compress(&archive.to_bytes().unwrap()).unwrap()
+        SnappyStream::compress(
+            &archive.to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap()
     }
 
     fn document_package(format: Format, extra_names: &[&str]) -> Vec<u8> {
@@ -2521,7 +2521,7 @@ mod tests {
     }
 
     fn frozen_package(bytes: &[u8]) -> FrozenEntryStore {
-        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes)
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(bytes, Default::default())
             .expect("parse logical test package");
         let entries = catalog
             .into_iter()
@@ -2711,6 +2711,7 @@ mod tests {
                         type_: 10_000,
                         data: document_payload(Format::Pages),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
                 ArchiveObject::new(
@@ -2719,6 +2720,7 @@ mod tests {
                         type_: 10_000,
                         data: document_payload(Format::Pages),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -2730,7 +2732,7 @@ mod tests {
     fn detects_from_the_same_parsed_component_snapshot() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let source = SourceCatalog::from_bytes(&bytes).unwrap();
+            let source = SourceCatalog::from_bytes(&bytes, Default::default()).unwrap();
 
             assert_eq!(
                 component_catalog(source.components()).unwrap(),
@@ -2743,13 +2745,13 @@ mod tests {
         }
 
         let media_package = package(&[("Data/image.png", b"not an IWA component")]);
-        let source = SourceCatalog::from_bytes(&media_package).unwrap();
+        let source = SourceCatalog::from_bytes(&media_package, Default::default()).unwrap();
         assert_eq!(component_catalog(source.components()).unwrap(), None);
 
         let pages_root = document(Format::Pages);
         let legacy_index = package(&[("Document.iwa", &pages_root)]);
         let legacy = package(&[("legacy.pages/Index.zip", &legacy_index)]);
-        let legacy_source = SourceCatalog::from_bytes(&legacy).unwrap();
+        let legacy_source = SourceCatalog::from_bytes(&legacy, Default::default()).unwrap();
         assert_eq!(
             component_catalog(legacy_source.components()).unwrap(),
             Some(Format::Pages)
@@ -2759,7 +2761,7 @@ mod tests {
             ("Index/Document.iwa", &pages_root),
             ("Document.iwa", &pages_root),
         ]);
-        let duplicate_source = SourceCatalog::from_bytes(&duplicate).unwrap();
+        let duplicate_source = SourceCatalog::from_bytes(&duplicate, Default::default()).unwrap();
         assert!(component_catalog(duplicate_source.components()).is_err());
     }
 
@@ -2828,11 +2830,11 @@ mod tests {
         let mut exact = Vec::new();
         catalog
             .package()
-            .write_to(&mut exact)
+            .write_to(&mut exact, Default::default())
             .expect("selective preparation must preserve exact source bytes");
         assert_eq!(exact, source.as_ref());
 
-        let full = SourceCatalog::from_shared_bytes(catalog.shared_source())
+        let full = SourceCatalog::from_shared_bytes(catalog.shared_source(), Default::default())
             .expect("an explicit full package request should materialize media");
         assert!(
             full.package()
@@ -2927,7 +2929,7 @@ mod tests {
                 .unwrap()
                 .expect("recognized logical source");
             let (logical, retained_limits) = component_prepared.__into_components();
-            let packaged = SourceCatalog::from_bytes(&bytes).unwrap();
+            let packaged = SourceCatalog::from_bytes(&bytes, Default::default()).unwrap();
             assert_eq!(retained_limits, archive_limits(Limits::default()).unwrap());
             assert_eq!(
                 logical

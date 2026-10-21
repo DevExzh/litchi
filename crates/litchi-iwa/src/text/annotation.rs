@@ -112,7 +112,10 @@ pub(super) fn add_annotation(
         encode_table(table, boundaries).map(|table| (Some(table), Some(annotation_id), None))
     })?;
     staged.update_archive(&archive_name, |archive| {
-        Ok(archive.insert_object(new_highlight_object(annotation_id, comment_storage_id)?)?)
+        Ok(archive.insert_object(
+            new_highlight_object(annotation_id, comment_storage_id)?,
+            Default::default(),
+        )?)
     })?;
     insert_annotation_comment_storage(
         &mut staged,

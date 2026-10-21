@@ -1799,8 +1799,7 @@ pub(super) fn one_message_object(
         type_: message_type,
         data: payload,
     });
-    ArchiveObject::new_with_limits(identifier, messages, limits)
-        .map_err(|_error| Error::InvalidSource { path })
+    ArchiveObject::new(identifier, messages, limits).map_err(|_error| Error::InvalidSource { path })
 }
 
 fn assignment_for_tile(

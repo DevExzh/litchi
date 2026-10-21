@@ -218,6 +218,7 @@ fn patch_style_reference_in_archive(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = object
             .archive_info

@@ -1756,14 +1756,15 @@ fn rewrite_native_entry(
     let mut member_edits = output.member_edits.edits;
     budget.charge_allocations(member_edits.len(), path)?;
     for edit in &mut member_edits {
-        let maximum_compressed = SnappyStream::maximum_compressed_len(edit.member_bytes.len())
-            .map_err(|_| Error::InvalidSource { path })?;
+        let maximum_compressed =
+            SnappyStream::maximum_compressed_len(edit.member_bytes.len(), Default::default())
+                .map_err(|_| Error::InvalidSource { path })?;
         budget.charge_compressed_bytes(maximum_compressed, path)?;
         budget.charge_transaction_work(
             edit.member_bytes.len().saturating_add(maximum_compressed),
             path,
         )?;
-        edit.member_bytes = SnappyStream::compress(&edit.member_bytes)
+        edit.member_bytes = SnappyStream::compress(&edit.member_bytes, Default::default())
             .map_err(|_| Error::InvalidSource { path })?;
     }
     let added_model = match output.added_object_identifiers.as_slice() {
@@ -2239,7 +2240,7 @@ fn pack_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -2248,7 +2249,7 @@ fn pack_metadata_payload(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     let source_payload_bytes = stream.as_bytes().len();
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     budget.charge_archive(&archive, source_payload_bytes, path)?;
     let message = archive
@@ -2261,17 +2262,18 @@ fn pack_metadata_payload(
     let archive_upper_bound = source_payload_bytes
         .saturating_sub(old_message_bytes)
         .saturating_add(payload.len());
-    let maximum_compressed = SnappyStream::maximum_compressed_len(archive_upper_bound)
-        .map_err(|_| Error::InvalidSource { path })?;
+    let maximum_compressed =
+        SnappyStream::maximum_compressed_len(archive_upper_bound, Default::default())
+            .map_err(|_| Error::InvalidSource { path })?;
     budget.charge_payload_bytes(archive_upper_bound, path)?;
     budget.charge_compressed_bytes(maximum_compressed, path)?;
     budget.charge_transaction_work(archive_upper_bound.saturating_add(maximum_compressed), path)?;
     message.data = payload;
     let archive_bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let compressed =
-        SnappyStream::compress(&archive_bytes).map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&archive_bytes, Default::default())
+        .map_err(|_| Error::InvalidSource { path })?;
     if archive_bytes.len() > archive_upper_bound || compressed.len() > maximum_compressed {
         return Err(Error::Limit {
             kind: LimitKind::PayloadBytes,

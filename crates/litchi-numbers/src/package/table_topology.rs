@@ -1365,7 +1365,7 @@ fn replace(working: &mut Working<'_>, replacement: Replacement) -> FaultResult<(
         .ok_or(Fault::Invalid)?
         .type_;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             replacement.index,
             RawMessage {
                 type_: message_type,

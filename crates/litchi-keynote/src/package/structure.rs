@@ -16,7 +16,7 @@ pub(in crate::package) mod workspace;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
-use litchi_iwa_core::{Archive, ArchiveLimits};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 
 use super::{Package, PhysicalSource};
 

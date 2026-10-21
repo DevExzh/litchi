@@ -126,6 +126,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -190,7 +191,8 @@ fn metadata_entry(object_ids: &[u64]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![metadata_object],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?)
 }
 
@@ -370,6 +372,7 @@ fn segment_object(
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     let mut result = object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, data)?;
@@ -481,7 +484,7 @@ fn sidecar_object_with_message_type(
         // the production strict list codec rejects this non-canonical wire.
         payloads[0].data.extend_from_slice(&[0x08, 0x01]);
     }
-    let mut result = ArchiveObject::new(SIDECAR_ID, payloads)?;
+    let mut result = ArchiveObject::new(SIDECAR_ID, payloads, Default::default())?;
     set_message_info(
         &mut result,
         4,
@@ -603,6 +606,7 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     if matches!(corruption, Corruption::CommentDuplicateMalformedPayload) {
@@ -624,6 +628,7 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
                 ],
                 2,
             )?,
+            Default::default(),
         )?);
     }
     let mut result = object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)?;
@@ -904,7 +909,7 @@ fn synthetic_table_data_list_package_with_message_type(
         .filter_map(|object| object.archive_info.identifier)
         .collect::<Vec<_>>();
     let archive = Archive { objects };
-    let iwa = SnappyStream::compress(&archive.to_bytes()?)?;
+    let iwa = SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let metadata = metadata_entry(&object_ids)?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -920,13 +925,13 @@ fn rewrite_iwa_member(
     name: &str,
     rewrite: impl FnOnce(Vec<u8>) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| std::io::Error::other(format!("missing {name}")))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let rewritten = SnappyStream::compress(&rewrite(stream)?)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let rewritten = SnappyStream::compress(&rewrite(stream)?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(name, &rewritten)],
         ArchiveLimits::default(),
@@ -1674,22 +1679,25 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         Ok(stream)
     })?;
     let extra_storage_message = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let storage = archive
             .objects
             .iter_mut()
             .find(|object| object.archive_info.identifier == Some(51))
             .ok_or_else(|| std::io::Error::other("fixture storage object is missing"))?;
-        storage.push_message(RawMessage {
-            type_: 99_999,
-            data: vec![0x08, 0x01],
-        })?;
-        Ok(archive.to_bytes()?)
+        storage.push_message(
+            RawMessage {
+                type_: 99_999,
+                data: vec![0x08, 0x01],
+            },
+            Default::default(),
+        )?;
+        Ok(archive.to_bytes(Default::default())?)
     })?;
     let opaque_table_candidate = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         archive.objects.push(object(99_998, 6_000, Vec::new())?);
-        Ok(archive.to_bytes()?)
+        Ok(archive.to_bytes(Default::default())?)
     })?;
 
     for (candidate, expected) in [

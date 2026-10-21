@@ -44,13 +44,13 @@ fn expected() -> [Region; 1] {
 }
 
 fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or("missing Pages document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     for object in &mut archive.objects {
         for message_index in 0..object.messages.len() {
             let message_type = object.messages[message_index].type_;
@@ -76,8 +76,10 @@ fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8
                     type_: message_type,
                     data: storage.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            let component = SnappyStream::compress(&archive.to_bytes()?)?;
+            let component =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[EntryEdit::new(entry.name(), component.as_ref())],
                 Limits::default(),
@@ -204,7 +206,7 @@ fn shared_byte_reader_clones_survive_input_source_drop() -> TestResult {
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_ingress_retains_the_original_archive_records() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let components_lifetime = Arc::downgrade(&components);
     let reader = MergeReader::__from_shared_catalog(Arc::clone(&components), Limits::default())?;
@@ -284,7 +286,7 @@ fn total_component_payload_bytes(components: &litchi_iwa_archive::ComponentCatal
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_reader_accepts_the_exact_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let total = total_component_payload_bytes(&components);
     let limits = component_payload_limits(&components, total);
@@ -297,7 +299,7 @@ fn shared_catalog_reader_accepts_the_exact_component_payload_budget() -> TestRes
 #[cfg(feature = "internal-iwork-source")]
 #[test]
 fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes_with_limits(NATIVE, Limits::default())?;
+    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
     let components = Arc::new(source.into_components());
     let total = total_component_payload_bytes(&components);
     assert!(total > 0);

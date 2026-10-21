@@ -119,8 +119,8 @@ fn assert_common_movie_state(before: &Package, after: &Package) -> TestResult {
 }
 
 fn assert_unrelated_members_preserved(before: &[u8], after: &[u8]) -> TestResult {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     for name in [
         "Data/sentinel.bin",
         "Data/poster.png",
@@ -804,21 +804,29 @@ fn neutral_map_reader_preserves_unselected_extensions_during_replacement() -> Te
                 litchi_iwa_common::WireLimits::DEFAULT,
             )?;
         }
-        let mut archive = Archive::parse(&document_stream(&source)?)?;
-        archive.insert_object(ArchiveObject::new(
-            500,
-            vec![RawMessage {
-                type_: 11_015,
-                data: map,
-            }],
-        )?)?;
-        archive.insert_object(ArchiveObject::new(
-            501,
-            vec![RawMessage {
-                type_: 11_014,
-                data: Vec::new(),
-            }],
-        )?)?;
+        let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
+        archive.insert_object(
+            ArchiveObject::new(
+                500,
+                vec![RawMessage {
+                    type_: 11_015,
+                    data: map,
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
+        archive.insert_object(
+            ArchiveObject::new(
+                501,
+                vec![RawMessage {
+                    type_: 11_014,
+                    data: Vec::new(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         let source = replace_document_archive(&source, archive)?;
         let package = Package::from_bytes(&source)?;
         assert_media(&package, 0, MediaPart::Content, MOVIE_BYTES)?;
@@ -876,8 +884,8 @@ fn authored_native_assets_replace_shared_pairs_with_exact_inverse() -> TestResul
         assert_media(commit.package(), movie + 1, part, replacement)?;
         assert_eq!(exact_bytes(&current)?, before);
         let after = exact_bytes(commit.package())?;
-        let source_catalog = Catalog::from_bytes(&before)?;
-        let candidate_catalog = Catalog::from_bytes(&after)?;
+        let source_catalog = Catalog::from_bytes(&before, Default::default())?;
+        let candidate_catalog = Catalog::from_bytes(&after, Default::default())?;
         let selected_name = match (movie, part) {
             (0, MediaPart::Content) => "Data/keynote-coral-9075.wav",
             (2, MediaPart::Content) => "Data/keynote-selfauthored-coral-mjpeg-9085.mov",

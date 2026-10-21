@@ -89,6 +89,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -112,7 +113,10 @@ fn referenced_object(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn encode_varint_into(output: &mut Vec<u8>, mut value: u64) {
@@ -127,8 +131,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic header target is missing"))?;
@@ -147,8 +151,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut modified, u64::try_from(header.len())?);
     modified.extend_from_slice(&header);
     modified.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&modified)?.to_bytes()?, modified);
-    Ok(SnappyStream::compress(&modified)?)
+    assert_eq!(
+        Archive::parse(&modified, Default::default())?.to_bytes(Default::default())?,
+        modified
+    );
+    Ok(SnappyStream::compress(&modified, Default::default())?)
 }
 
 fn node(slide_identifier: u64, thumbnail: bool) -> Vec<u8> {
@@ -554,6 +561,7 @@ fn package_bytes(names: &[&str], mode: MetadataMode) -> TestResult<Vec<u8>> {
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let show_info = &mut show_object.archive_info.message_infos[1];
     show_info
@@ -831,18 +839,19 @@ fn names(package: &Package) -> TestResult<Vec<String>> {
 }
 
 fn component_archive(package: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing synthetic member {member}")))?;
     Ok(Archive::parse(
-        &SnappyStream::decompress(entry.data())?.into_bytes(),
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
     )?)
 }
 
 fn member_bytes(package: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -864,13 +873,13 @@ fn object_contents(
 }
 
 fn raw_object_record(package: &[u8], member: &str, identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing synthetic member {member}")))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other(format!("missing synthetic object {identifier}")))?;
@@ -994,7 +1003,7 @@ fn selector_first_deletion_is_exact_applicable_and_reversible() -> TestResult<()
     );
     for root_preview in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(
-            Catalog::from_bytes(&changed)?
+            Catalog::from_bytes(&changed, Default::default())?
                 .iter()
                 .all(|entry| entry.name() != root_preview)
         );

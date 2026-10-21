@@ -154,6 +154,7 @@ pub(in crate::numbers::editor::conditional_highlight) fn remove_volatile_host(
                 type_: CELL_RECORD_TILE_MESSAGE_TYPE,
                 data: tile.encode_to_vec(),
             },
+            Default::default(),
         )?;
 
         let owner_object = archive.object_mut(owner_id).ok_or_else(|| {
@@ -166,6 +167,7 @@ pub(in crate::numbers::editor::conditional_highlight) fn remove_volatile_host(
                 type_: owner_message_type,
                 data: owner.encode_to_vec(),
             },
+            Default::default(),
         )?;
 
         let (engine_id, engine_message_index) =
@@ -183,6 +185,7 @@ pub(in crate::numbers::editor::conditional_highlight) fn remove_volatile_host(
                 type_: CALCULATION_ENGINE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

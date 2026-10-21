@@ -1365,6 +1365,7 @@ fn raw_object(
             type_: message_type.value(),
             data,
         }],
+        Default::default(),
     )?;
     let message_info = &mut object.archive_info.message_infos[0];
     message_info.versions = MESSAGE_VERSION.to_vec();
@@ -1388,6 +1389,7 @@ fn raw_object_with_id(
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?;
     let message_info = &mut object.archive_info.message_infos[0];
     message_info.versions = MESSAGE_VERSION.to_vec();
@@ -1475,7 +1477,7 @@ fn install_initial_table_graph(
 
     package.update_archive(DOCUMENT_ARCHIVE_ENTRY, |archive| {
         for object in document_objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -1496,7 +1498,7 @@ fn install_initial_table_graph(
     prune_uncopied_stylesheet_edges(imported_stylesheet)?;
     package.update_archive(STYLESHEET_ARCHIVE_ENTRY, |archive| {
         for object in style_objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;

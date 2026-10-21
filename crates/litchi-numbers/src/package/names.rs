@@ -2213,7 +2213,7 @@ fn rewrite_metadata_entry(
     if entry.is_opaque() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -2225,8 +2225,7 @@ fn rewrite_metadata_entry(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .objects
         .get_mut(route.object_index)
@@ -2239,7 +2238,7 @@ fn rewrite_metadata_entry(
         return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2248,10 +2247,9 @@ fn rewrite_metadata_entry(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     Ok(OwnedEntryEdit {
         name: PACKAGE_METADATA_ENTRY,
         data: compressed,
@@ -2299,23 +2297,22 @@ fn rewrite_names(
         if entry.is_opaque() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
         drop(stream);
         for operation in &operations[begin..end] {
             rewrite_native_operation(&mut archive, operation, archive_limits)?;
         }
-        let rewritten = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
-        let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
         drop(rewritten);
         rewritten_entries.push(OwnedEntryEdit {
             name: component_name,
@@ -2746,7 +2743,7 @@ fn rewrite_native_operation(
     }
     let data = rewritten_operation_payload(message, operation, Direction::Forward)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             operation.message_index,
             RawMessage {
                 type_: operation.message_type,

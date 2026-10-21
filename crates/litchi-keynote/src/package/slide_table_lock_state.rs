@@ -1225,14 +1225,12 @@ fn rewrite_lock(
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
 
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     let object = archive
         .object(selection.table_info_identifier)
@@ -1296,7 +1294,7 @@ fn rewrite_lock(
         .object_mut(selection.table_info_identifier)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.table_info_message_index,
             RawMessage {
                 type_: TABLE_INFO_MESSAGE_TYPE,
@@ -1307,26 +1305,24 @@ fn rewrite_lock(
         .map_err(map_core_error)?;
 
     let encoded_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.output(encoded_len)?;
     budget.allocations(1)?;
     budget.retained(encoded_len)?;
     budget.scratch(encoded_len)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_len {
         return Err(Error::Verification);
     }
     budget.work(bytes.len())?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, Default::default())
+        .map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.allocations(1)?;
     budget.retained(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -1946,7 +1942,7 @@ fn validate_global_inbound_references(
                     count.checked_add(bytes).ok_or(Error::InvalidSource)
                 })?;
             let header_bytes = usize::try_from(object.header_length).unwrap_or(usize::MAX);
-            // `inspect_references_with_policy_and_limits` canonicalizes and
+            // `inspect_references_with_policy` canonicalizes and
             // walks the complete ArchiveInfo header. Debit that work before
             // entering the visitor so a hostile header cannot spend the
             // transaction budget after the scan has already run.
@@ -1973,7 +1969,7 @@ fn validate_global_inbound_references(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2163,7 +2159,7 @@ fn verify_locality(
                 .ok_or(Error::Verification)?;
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.table_info_message_index,
                     candidate_message.clone(),
                     archive_limits,
@@ -2208,13 +2204,12 @@ fn component_archive(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
 }

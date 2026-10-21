@@ -1171,7 +1171,7 @@ fn rewrite_image(
         .data
         .as_slice();
     let source_encoded_len = source_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let before = decode_with_budget(original, budget)?;
     if before != selection.before {
@@ -1192,15 +1192,8 @@ fn rewrite_image(
         original.len(),
         requirements.output_bytes,
     )?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::WireBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .source_bytes()
         .len()
@@ -1247,7 +1240,7 @@ fn rewrite_image(
     archive
         .object_mut(selection.image_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: IMAGE_MESSAGE_TYPE,
@@ -1256,12 +1249,10 @@ fn rewrite_image(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.slide_component_name.as_ref(),
@@ -1343,7 +1334,7 @@ fn verify_locality(
                 data: candidate_message.data.clone(),
             };
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.message_index,
                     replacement,
                     archive_limits,
@@ -1397,7 +1388,7 @@ fn archive_header_rewrite_requirements(
         .checked_add(64)
         .and_then(|header| header.checked_mul(3))
         .ok_or(Error::InvalidSource)?;
-    // replace_message_preserving_header_with_limits constructs canonical,
+    // replace_message_preserving_header constructs canonical,
     // rewritten, and post-mutation header buffers before publishing the
     // changed message.  The core API currently exposes no fallible clone of
     // those internal buffers, so the focused owner admits their bounded
@@ -1576,7 +1567,7 @@ fn package_reopen_requirements(
             .ok_or(Error::InvalidSource)?;
         let encoded_len = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (archive_allocations, archive_retained) =
             archive_clone_requirements(component.archive(), encoded_len)?;

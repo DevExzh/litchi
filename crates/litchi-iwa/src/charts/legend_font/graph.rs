@@ -577,6 +577,7 @@ impl LegendFontGraph {
                     type_: CHART_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             let metadata =
                 &mut object.archive_info.message_infos[self.chart_message_index].object_references;

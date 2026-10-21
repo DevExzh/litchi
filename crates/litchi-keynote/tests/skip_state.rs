@@ -56,13 +56,14 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     let archive = Archive { objects };
-    let bytes = archive.to_bytes()?;
-    Ok(SnappyStream::compress(&bytes)?)
+    let bytes = archive.to_bytes(Default::default())?;
+    Ok(SnappyStream::compress(&bytes, Default::default())?)
 }
 
 fn component_with_unknown_header(
@@ -70,8 +71,8 @@ fn component_with_unknown_header(
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let archive = Archive { objects };
-    let bytes = archive.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = archive.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -105,9 +106,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 #[allow(deprecated, reason = "native schema requires legacy cache fields")]
@@ -214,7 +215,7 @@ fn synthetic_package(
         vec![
             object(1, 1, document.encode_to_vec())?,
             object(2, 2, show.encode_to_vec())?,
-            ArchiveObject::new(FIRST_NODE, first_messages)?,
+            ArchiveObject::new(FIRST_NODE, first_messages, Default::default())?,
             object(5, 4, canonical_node(6, true)?)?,
         ],
         FIRST_NODE,
@@ -237,13 +238,13 @@ fn synthetic_package(
 }
 
 fn node_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("synthetic package has no document member"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("synthetic package has no requested slide node"))?
@@ -256,12 +257,14 @@ fn node_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn decompressed_document(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("synthetic package has no document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.as_bytes().to_vec())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?
+        .as_bytes()
+        .to_vec())
 }
 
 fn fields_except_skip(data: &[u8]) -> TestResult<Vec<Vec<u8>>> {
@@ -402,8 +405,8 @@ fn commit_preserves_unrelated_wire_and_zip_bytes_and_patch_is_reversible()
         .collect::<Vec<_>>();
     assert_eq!(changed_iwa_bytes, [(0, 1)]);
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(commit.package().exact_bytes())?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(commit.package().exact_bytes(), Default::default())?;
     let mut changed = 0;
     for (before, after) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before.name(), after.name());

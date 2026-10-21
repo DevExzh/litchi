@@ -74,6 +74,7 @@ pub(super) fn delete_table_tile_column(
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -168,6 +169,7 @@ pub(super) fn delete_column_headers(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

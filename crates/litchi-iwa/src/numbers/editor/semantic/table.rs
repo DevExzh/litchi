@@ -3307,8 +3307,9 @@ mod focused_custom_tests {
     }
 
     fn assert_native_custom_host_locality(source: &[u8], target: &[u8]) {
-        let before = Catalog::from_bytes(source).expect("native source catalog");
-        let after = Catalog::from_bytes(target).expect("native target catalog");
+        let before =
+            Catalog::from_bytes(source, Default::default()).expect("native source catalog");
+        let after = Catalog::from_bytes(target, Default::default()).expect("native target catalog");
         let mut changed = Vec::new();
         for entry in before.iter() {
             let candidate = after

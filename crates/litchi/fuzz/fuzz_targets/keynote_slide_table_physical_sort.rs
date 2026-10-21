@@ -409,7 +409,7 @@ fn synthetic_object(
     data: Vec<u8>,
     references: &[u64],
 ) -> Result<ArchiveObject, Box<dyn StdError>> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }], Default::default())?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -1134,7 +1134,7 @@ fn synthetic_source_package_with_variant(
     .into_iter()
     .collect::<Vec<_>>();
 
-    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes(Default::default())?, Default::default())?;
     let metadata_bytes = SnappyStream::compress(
         &Archive {
             objects: vec![synthetic_object(
@@ -1144,8 +1144,8 @@ fn synthetic_source_package_with_variant(
                 &[],
             )?],
         }
-        .to_bytes()?,
-    )?;
+        .to_bytes(Default::default())?,
+     Default::default(),)?;
     Ok(package_to_bytes(
         [
             (
@@ -1169,18 +1169,18 @@ fn synthetic_source_package_with_variant(
 }
 
 fn synthetic_document_archive(package: &[u8]) -> Archive {
-    let catalog = Catalog::from_bytes(package)
+    let catalog = Catalog::from_bytes(package, Default::default())
         .unwrap_or_else(|error| panic!("synthetic physical-sort package catalog failed: {error}"));
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == SYNTHETIC_DOCUMENT_MEMBER)
         .unwrap_or_else(|| panic!("synthetic physical-sort document component is missing"));
-    let stream = SnappyStream::decompress(entry.data())
+    let stream = SnappyStream::decompress(entry.data(), Default::default())
         .unwrap_or_else(|error| {
             panic!("synthetic physical-sort document decompress failed: {error}")
         })
         .into_bytes();
-    Archive::parse(&stream)
+    Archive::parse(&stream, Default::default())
         .unwrap_or_else(|error| panic!("synthetic physical-sort document archive failed: {error}"))
 }
 

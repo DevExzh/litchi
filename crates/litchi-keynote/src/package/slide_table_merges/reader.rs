@@ -129,8 +129,8 @@ impl MergeReader {
                 maximum: options.archive().max_input_bytes(),
             });
         }
-        let source = SourceCatalog::from_bytes_with_limits(bytes, options.archive())
-            .map_err(map_archive_error)?;
+        let source =
+            SourceCatalog::from_bytes(bytes, options.archive()).map_err(map_archive_error)?;
         let components = Arc::new(source.into_components());
         let package =
             Package::from_merge_components(components, options).map_err(map_read_error)?;
@@ -162,7 +162,7 @@ impl MergeReader {
         options: OpenOptions,
     ) -> Result<Self, Error> {
         let options = Profile::from_options(options).map_err(map_read_error)?;
-        let source = SourceCatalog::from_shared_bytes_with_limits(bytes, options.archive())
+        let source = SourceCatalog::from_shared_bytes(bytes, options.archive())
             .map_err(map_archive_error)?;
         let components = Arc::new(source.into_components());
         let package =
@@ -382,7 +382,7 @@ mod tests {
     fn shared_catalog_keeps_original_archive_allocations() {
         use litchi_iwa_archive::{ComponentCatalog, Limits};
 
-        let records = ComponentCatalog::from_bytes(NATIVE_SOURCE)
+        let records = ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
             .expect("native Keynote source")
             .into_iter()
             .map(|component| {
@@ -476,7 +476,7 @@ mod tests {
 
         let package = Package::from_bytes(NATIVE_SOURCE)?;
         let show_identifier = package.root_show_identifier()?;
-        let components = ComponentCatalog::from_bytes(NATIVE_SOURCE)?;
+        let components = ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())?;
         let mut parts = components
             .into_iter()
             .map(|component| component.into_parts())
@@ -526,6 +526,7 @@ mod tests {
                                 type_: 4,
                                 data: node.encode_to_vec(),
                             }],
+                            Default::default(),
                         )?);
                         extra_objects.push(ArchiveObject::new(
                             slide_identifier,
@@ -533,6 +534,7 @@ mod tests {
                                 type_: 5,
                                 data: Vec::new(),
                             }],
+                            Default::default(),
                         )?);
                     }
                     message.data = show.encode_to_vec();
@@ -573,7 +575,7 @@ mod tests {
     #[test]
     fn semantic_only_package_ingress_remains_unsupported_for_package_reads() {
         let components = std::sync::Arc::new(
-            litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE_SOURCE)
+            litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
                 .expect("native Keynote components"),
         );
         let package = Package::from_classified_components(

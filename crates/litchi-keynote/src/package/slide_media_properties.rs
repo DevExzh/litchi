@@ -1744,7 +1744,7 @@ fn validate_single_drawable_ownership(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut metadata_census,
                     ArchiveReferencePolicy::KnownReferences,
                     archive_limits,

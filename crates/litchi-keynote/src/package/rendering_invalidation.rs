@@ -285,13 +285,13 @@ mod tests {
             ],
             Limits::default(),
         )?;
-        let source = Catalog::from_bytes(&source_bytes)?;
+        let source = Catalog::from_bytes(&source_bytes, Default::default())?;
         let plan = root_preview_deletions(&source)?;
         assert_eq!(plan.len(), 3);
 
         let candidate_bytes =
             source.reassemble_with_deletions_to_bytes(&[], plan.names(), Limits::default())?;
-        let candidate = Catalog::from_bytes(&candidate_bytes)?;
+        let candidate = Catalog::from_bytes(&candidate_bytes, Default::default())?;
         assert!(root_previews_absent(&candidate)?);
         assert!(
             candidate
@@ -312,7 +312,7 @@ mod tests {
             ],
             Limits::default(),
         )?;
-        let source = Catalog::from_bytes(&source_bytes)?;
+        let source = Catalog::from_bytes(&source_bytes, Default::default())?;
         let playback_bytes = source.reassemble_to_bytes(
             &[EntryEdit::new(
                 "Index/Document.iwa",
@@ -320,14 +320,14 @@ mod tests {
             )],
             Limits::default(),
         )?;
-        let playback = Catalog::from_bytes(&playback_bytes)?;
+        let playback = Catalog::from_bytes(&playback_bytes, Default::default())?;
         assert!(root_previews_preserved(&source, &playback)?);
 
         let changed_preview_bytes = source.reassemble_to_bytes(
             &[EntryEdit::new("preview.jpg", b"different")],
             Limits::default(),
         )?;
-        let changed_preview = Catalog::from_bytes(&changed_preview_bytes)?;
+        let changed_preview = Catalog::from_bytes(&changed_preview_bytes, Default::default())?;
         assert!(!root_previews_preserved(&source, &changed_preview)?);
         Ok(())
     }

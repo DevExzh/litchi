@@ -137,6 +137,7 @@ pub(in crate::numbers::editor) fn replace_movie_playback_settings(
                 type_: MOVIE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -751,6 +752,7 @@ pub(in crate::numbers::editor) fn set_movie_geometry(
                 type_: MOVIE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -793,6 +795,7 @@ pub(in crate::numbers::editor) fn set_movie_properties(
                 type_: MOVIE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -822,6 +825,7 @@ fn numbers_movie_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

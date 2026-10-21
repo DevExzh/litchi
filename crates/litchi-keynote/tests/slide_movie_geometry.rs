@@ -61,6 +61,7 @@ fn object(id: u64, ty: u32, data: Vec<u8>) -> R<ArchiveObject> {
     Ok(ArchiveObject::new(
         id,
         vec![RawMessage { type_: ty, data }],
+        Default::default(),
     )?)
 }
 
@@ -180,7 +181,10 @@ fn metadata() -> R<Vec<u8>> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> R<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn source() -> R<Vec<u8>> {
@@ -272,15 +276,15 @@ fn bytes(package: &Package) -> R<Vec<u8>> {
     Ok(value)
 }
 fn document_stream(package: &[u8]) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|e| e.name() == DOCUMENT)
         .ok_or_else(|| io::Error::other("document"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 fn movie_payload_at(package: &[u8], id: u64) -> R<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(id)
         .and_then(|o| o.messages.iter().find(|m| m.type_ == MOVIE_TYPE))
@@ -288,8 +292,9 @@ fn movie_payload_at(package: &[u8], id: u64) -> R<Vec<u8>> {
         .ok_or_else(|| io::Error::other("movie").into())
 }
 fn replace_document(source: &[u8], archive: Archive) -> R<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -306,17 +311,18 @@ fn replace_document(source: &[u8], archive: Archive) -> R<Vec<u8>> {
 }
 
 fn metadata_stream(package: &[u8]) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA)
         .ok_or_else(|| io::Error::other("metadata"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn replace_metadata(source: &[u8], archive: Archive) -> R<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -333,7 +339,7 @@ fn replace_metadata(source: &[u8], archive: Archive) -> R<Vec<u8>> {
 }
 
 fn with_metadata(source: &[u8], edit: impl FnOnce(&mut tsp::PackageMetadata)) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&metadata_stream(source)?)?;
+    let mut archive = Archive::parse(&metadata_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(300)
         .ok_or_else(|| io::Error::other("metadata object"))?;
@@ -344,7 +350,7 @@ fn with_metadata(source: &[u8], edit: impl FnOnce(&mut tsp::PackageMetadata)) ->
 }
 
 fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let object = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("alias object"))?;
@@ -366,7 +372,7 @@ fn with_message_alias(source: &[u8], id: u64, alias_type: u32) -> R<Vec<u8>> {
 }
 
 fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let mut foreign = object_refs(
         900,
         MOVIE_TYPE,
@@ -393,7 +399,7 @@ fn with_foreign_inbound(source: &[u8], target: u64, mode: ForeignInbound) -> R<V
 }
 
 fn with_foreign_z_order(source: &[u8]) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let foreign = object_refs(
         900,
         MOVIE_TYPE,
@@ -440,7 +446,7 @@ fn with_duplicate_movie_data(source: &[u8], id: u64) -> R<Vec<u8>> {
 }
 
 fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -451,7 +457,7 @@ fn with_movie_archive_data_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec
 }
 
 fn with_style_message_type(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let style = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("style"))?;
@@ -466,7 +472,7 @@ fn with_style_message_type(source: &[u8], id: u64, message_type: u32) -> R<Vec<u
 }
 
 fn with_duplicate_style_message(source: &[u8], id: u64, message_type: u32) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let style = archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("style"))?;
@@ -489,13 +495,13 @@ enum ForeignInbound {
     FieldData,
 }
 fn with_alias_member(source: &[u8], id: u64) -> R<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(source)?)?;
+    let archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let alias = archive
         .object(id)
         .ok_or_else(|| io::Error::other("movie"))?
         .clone();
     let alias_member = component(vec![alias])?;
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name(), entry.data()))
@@ -507,7 +513,7 @@ fn with_alias_member(source: &[u8], id: u64) -> R<Vec<u8>> {
     )?)
 }
 fn with_movie(source: &[u8], id: u64, payload: Vec<u8>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -758,7 +764,7 @@ fn with_field_info_path(
     object_references: &[u64],
     data_references: &[u64],
 ) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -775,7 +781,7 @@ fn with_field_info_path(
 }
 
 fn with_invalid_slide_drawable_role(source: &[u8]) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("slide"))?;
@@ -795,7 +801,7 @@ fn with_invalid_slide_drawable_role(source: &[u8]) -> R<Vec<u8>> {
 }
 
 fn with_z_order_only_reference(source: &[u8], target: u64) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     let slide = archive
         .object_mut(SLIDE)
         .ok_or_else(|| io::Error::other("slide"))?;
@@ -814,7 +820,7 @@ fn with_z_order_only_reference(source: &[u8], target: u64) -> R<Vec<u8>> {
 }
 
 fn with_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -824,7 +830,7 @@ fn with_refs(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
     replace_document(source, archive)
 }
 fn with_field_info(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(id)
         .ok_or_else(|| io::Error::other("movie"))?
@@ -839,7 +845,7 @@ fn with_field_info(source: &[u8], id: u64, refs: Vec<u64>) -> R<Vec<u8>> {
     replace_document(source, archive)
 }
 fn without_entry(source: &[u8], name: &str) -> R<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -914,7 +920,7 @@ fn reads_file_movies_with_audio_sibling_and_media_assets() -> R<()> {
         movie_payload(1, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|e| e.name() == "Data/movie.mov")
             .map(|e| e.data()),
@@ -981,7 +987,7 @@ fn replacement_invalidates_previews_and_preserves_unselected_graph() -> R<()> {
     assert!(commit.diagnostics().deleted_previews() > 0);
     let candidate = bytes(commit.package())?;
     assert_eq!(movie_payload_at(&candidate, MOVIES[1])?, sibling);
-    let catalog = Catalog::from_bytes(&candidate)?;
+    let catalog = Catalog::from_bytes(&candidate, Default::default())?;
     assert!(catalog.iter().all(|e| !e.name().starts_with("preview")));
     assert_eq!(
         catalog
@@ -1179,7 +1185,7 @@ fn archive_info_refs_and_duplicate_physical_aliases_fail_atomically() -> R<()> {
         MOVIES[0],
         vec![CAPTION[0], CAPTION[0]],
     )?)?;
-    let mut archive = Archive::parse(&document_stream(&source)?)?;
+    let mut archive = Archive::parse(&document_stream(&source)?, Default::default())?;
     let movie = archive
         .object(MOVIES[0])
         .ok_or_else(|| io::Error::other("movie"))?

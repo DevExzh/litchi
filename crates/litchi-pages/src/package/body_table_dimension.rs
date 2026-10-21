@@ -1078,7 +1078,7 @@ fn rewrite_dimension(
     }
     validate_message_metadata(object, selected.evidence.bucket_message)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selected.evidence.bucket_message,
             RawMessage {
                 type_: HEADER_BUCKET_MESSAGE_TYPE,
@@ -1116,9 +1116,8 @@ fn rewrite_dimension(
     if output.len() != requirements.output_bytes() {
         return Err(Error::Verification);
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 
@@ -1279,9 +1278,8 @@ fn reopen_target(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;

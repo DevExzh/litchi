@@ -648,8 +648,9 @@ fn rewrite(
                 path,
             });
         }
-        let maximum = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
-            .map_err(|_| Error::Verification)?;
+        let maximum =
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
+                .map_err(|_| Error::Verification)?;
         if maximum > native_bound.compressed_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::CompressedBytes,
@@ -691,10 +692,10 @@ fn rewrite(
             path,
         })?;
     for member in &native_output.members {
-        let compressed =
-            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)?;
+        let compressed = SnappyStream::compress(&member.archive_bytes, Default::default())
+            .map_err(|_| Error::Verification)?;
         if compressed.len()
-            > SnappyStream::maximum_compressed_len(member.archive_bytes.len())
+            > SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
                 .map_err(|_| Error::Verification)?
         {
             return Err(Error::Verification);

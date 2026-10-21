@@ -1603,7 +1603,7 @@ fn rewrite(
         let component = core::component(source, component_name).map_err(map_core_error)?;
         let encoded = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_native_error)?;
         budget.allocations(1).map_err(map_core_error)?;
         budget.retained(encoded).map_err(map_core_error)?;
@@ -1638,10 +1638,11 @@ fn rewrite(
         })?;
     for (name, archive) in &archives {
         let encoded_bound = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_native_error)?;
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_native_error)?;
+            SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+                .map_err(map_core_native_error)?;
         budget
             .output(
                 encoded_bound
@@ -1655,12 +1656,13 @@ fn rewrite(
         budget.retained(compressed_bound).map_err(map_core_error)?;
         budget.scratch(encoded_bound).map_err(map_core_error)?;
         let bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(map_core_native_error)?;
         if bytes.len() != encoded_bound {
             return Err(Error::Verification);
         }
-        let bytes = SnappyStream::compress(&bytes).map_err(map_core_native_error)?;
+        let bytes =
+            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_native_error)?;
         if bytes.len() > compressed_bound {
             return Err(Error::Verification);
         }
@@ -2368,7 +2370,7 @@ fn replace_archive_message(
         .map(|message| message.type_)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: message_type,
@@ -2578,7 +2580,7 @@ fn verify_object_delta(
             return Err(Error::Verification);
         }
         expected
-            .replace_message_preserving_header_with_limits(index, candidate_message.clone(), limits)
+            .replace_message_preserving_header(index, candidate_message.clone(), limits)
             .map_err(map_core_native_error)?;
         changed = true;
     }
@@ -2622,9 +2624,7 @@ fn physical_object_framing(
         .and_then(|_| budget.retained(size_of::<ArchiveObject>()))
         .and_then(|_| budget.work(payload_length))
         .map_err(map_core_error)?;
-    let encoded_length = archive
-        .encoded_len_with_limits(limits)
-        .map_err(map_core_native_error)?;
+    let encoded_length = archive.encoded_len(limits).map_err(map_core_native_error)?;
     let header_length = encoded_length
         .checked_sub(payload_length)
         .ok_or(Error::Verification)?;

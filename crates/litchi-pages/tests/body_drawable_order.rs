@@ -52,6 +52,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -69,7 +70,8 @@ fn fixture_bytes(order: &[u64], sentinel: &[u8]) -> TestResult<Vec<u8>> {
         object(DRAWABLE_IDENTIFIERS[2], 9_000, b"front".to_vec())?,
     ];
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             (SENTINEL_MEMBER, sentinel),
@@ -100,7 +102,8 @@ fn fixture_bytes_with_native_body_slot(sentinel: &[u8]) -> TestResult<Vec<u8>> {
         object(DRAWABLE_IDENTIFIERS[2], 9_000, b"front".to_vec())?,
     ];
     let archive = Archive { objects };
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             (SENTINEL_MEMBER, sentinel),
@@ -118,7 +121,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 
 fn member_payload(package: &Package, member: &str) -> TestResult<Vec<u8>> {
     let bytes = exact_bytes(package)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
@@ -128,7 +131,10 @@ fn member_payload(package: &Package, member: &str) -> TestResult<Vec<u8>> {
 
 fn zorder_payload_from_package(package: &Package) -> TestResult<Vec<u8>> {
     let bytes = member_payload(package, DOCUMENT_MEMBER)?;
-    let archive = Archive::parse(&SnappyStream::decompress(&bytes)?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(&bytes, Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object(ZORDER_IDENTIFIER)
         .ok_or_else(|| io::Error::other("fixture z-order object is missing"))?;
@@ -198,7 +204,8 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
         member_payload(commit.package(), SENTINEL_MEMBER)?,
         b"unchanged sentinel"
     );
-    let candidate_catalog = Catalog::from_bytes(&exact_bytes(commit.package())?)?;
+    let candidate_catalog =
+        Catalog::from_bytes(&exact_bytes(commit.package())?, Default::default())?;
     assert!(
         PREVIEW_MEMBERS
             .iter()

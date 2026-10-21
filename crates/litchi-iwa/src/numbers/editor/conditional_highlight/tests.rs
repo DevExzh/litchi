@@ -466,6 +466,7 @@ fn shared_conditional_copy_on_write_rolls_back_after_late_failure() {
                     type_: message_type,
                     data: list.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1715,6 +1716,7 @@ fn blank_predicates_reject_noncanonical_formula_graphs() {
                     type_: message_type,
                     data: set.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1818,6 +1820,7 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
                     type_: message_type,
                     data: set.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })

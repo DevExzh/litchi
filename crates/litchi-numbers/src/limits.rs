@@ -123,7 +123,7 @@ impl SourceLimits {
         entry_bytes: litchi_iwa_detect::Limits::HARD_MAX_ENTRY_SIZE,
         aggregate_bytes: litchi_iwa_detect::Limits::HARD_MAX_TOTAL_SIZE,
         component_bytes: litchi_iwa_detect::Limits::HARD_MAX_IWA_STREAM_SIZE,
-        header_fields: litchi_iwa_core::ArchiveLimits::MAX_HEADER_FIELDS,
+        header_fields: litchi_iwa_core::Limits::MAX_HEADER_FIELDS,
     };
 
     /// The default ingress profile: every dimension at its hard ceiling.

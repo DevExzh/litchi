@@ -109,11 +109,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 #[allow(
@@ -272,6 +276,7 @@ fn package_bytes_with_slide_nodes(
                 data: b"after-show-sentinel".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let mut document = object(DOCUMENT_IDENTIFIER, 1, document.encode_to_vec())?;
     document.archive_info.message_infos[0].object_references = vec![SHOW_IDENTIFIER];
@@ -292,7 +297,7 @@ fn package_bytes_with_slide_nodes(
 
 fn interleaved_adversarial_zip_package_bytes() -> TestResult<Vec<u8>> {
     let source = package_bytes(NativeSettings::absent(), Malformation::None, 160)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -311,7 +316,7 @@ fn interleaved_adversarial_zip_package_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn adversarialize_selected_zip_metadata(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let selected = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -333,7 +338,7 @@ fn adversarialize_selected_zip_metadata(package: &[u8]) -> TestResult<Vec<u8>> {
     output[central_offset + 36..central_offset + 38].copy_from_slice(&0xa55a_u16.to_le_bytes());
     output[central_offset + 38..central_offset + 42]
         .copy_from_slice(&0x81a4_0000_u32.to_le_bytes());
-    Catalog::from_bytes(&output)?;
+    Catalog::from_bytes(&output, Default::default())?;
     Ok(output)
 }
 
@@ -484,7 +489,7 @@ fn empty_show_package_bytes() -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -513,12 +518,12 @@ fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], component: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -527,10 +532,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -538,13 +544,16 @@ fn rewrite_component(
 }
 
 fn adversarialize_show_archive_header(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut entries = Vec::with_capacity(catalog.len());
     for entry in catalog.iter() {
         let data = if entry.name() == DOCUMENT_MEMBER {
-            let stream = SnappyStream::decompress(entry.data())?.into_bytes();
+            let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
             let stream = rewrite_object_header(&stream, DOCUMENT_IDENTIFIER, 0)?;
-            SnappyStream::compress(&rewrite_object_header(&stream, SHOW_IDENTIFIER, 1)?)?
+            SnappyStream::compress(
+                &rewrite_object_header(&stream, SHOW_IDENTIFIER, 1)?,
+                Default::default(),
+            )?
         } else {
             entry.data().to_vec()
         };
@@ -564,7 +573,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -575,9 +584,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -739,7 +748,7 @@ fn object_header_location(stream: &[u8], identifier: u64) -> TestResult<(usize, 
         let header = stream
             .get(header_start..header_end)
             .ok_or_else(|| io::Error::other("synthetic header is truncated"))?;
-        let info = ArchiveInfo::decode(header)?;
+        let info = ArchiveInfo::decode(header, Default::default())?;
         if info.identifier == Some(identifier) {
             return Ok((object_start, prefix_length, header_length));
         }
@@ -810,7 +819,7 @@ fn normalize_message_length(header: &[u8], target_index: usize) -> TestResult<Ve
 
 fn show_messages(package: &[u8]) -> TestResult<Vec<(u32, Vec<u8>)>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     Ok(archive
         .object(2)
         .ok_or_else(|| io::Error::other("missing synthetic show object"))?
@@ -906,6 +915,7 @@ fn rewrite_root_reference(
                 type_: 1,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -930,7 +940,7 @@ fn assert_noop_then_changed_refused(bytes: &[u8]) -> TestResult<()> {
 }
 
 fn entry_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic package entry"))?
@@ -946,7 +956,7 @@ fn written(package: &Package) -> TestResult<Vec<u8>> {
 
 fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -961,7 +971,7 @@ fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<
 }
 
 fn assert_previews_absent(package: &[u8]) -> TestResult<()> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     for preview in PREVIEW_MEMBERS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
@@ -969,8 +979,8 @@ fn assert_previews_absent(package: &[u8]) -> TestResult<()> {
 }
 
 fn assert_entry_preserved(before: &[u8], after: &[u8], name: &str) -> TestResult<()> {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     let source = before
         .iter()
         .find(|entry| entry.name() == name)
@@ -1045,7 +1055,7 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<SourceLimits> {
 
     for artifact in artifacts {
         max_input_bytes = max_input_bytes.max(u64::try_from(artifact.len())?);
-        let catalog = Catalog::from_bytes(artifact)?;
+        let catalog = Catalog::from_bytes(artifact, Default::default())?;
         max_entries = max_entries.max(catalog.len());
         let mut total_bytes = 0u64;
         for entry in catalog.iter() {
@@ -1058,7 +1068,9 @@ fn tight_limits_for(artifacts: &[&[u8]]) -> TestResult<SourceLimits> {
                 .extension()
                 .is_some_and(|extension| extension.eq_ignore_ascii_case("iwa"))
             {
-                let stream_bytes = SnappyStream::decompress(entry.data())?.as_bytes().len();
+                let stream_bytes = SnappyStream::decompress(entry.data(), Default::default())?
+                    .as_bytes()
+                    .len();
                 // Replacing one Archive message briefly retains a slightly larger
                 // encoded header before the final stream is serialized.
                 max_iwa_stream_bytes = max_iwa_stream_bytes.max(stream_bytes.saturating_add(16));
@@ -1186,8 +1198,8 @@ fn changed_commit_preserves_unknowns_and_the_immutable_source() -> TestResult<()
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert!(commit.diagnostics().full_reparse_performed());
 
-    let before_catalog = Catalog::from_bytes(&bytes)?;
-    let after_catalog = Catalog::from_bytes(&after_bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let after_catalog = Catalog::from_bytes(&after_bytes, Default::default())?;
     let mut changed_entries = 0usize;
     for (before, after) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before.name(), after.name());
@@ -1212,7 +1224,7 @@ fn changed_commit_preserves_unknowns_and_the_immutable_source() -> TestResult<()
 #[test]
 fn changed_commit_preserves_selected_zip_metadata_and_interleaved_members() -> TestResult<()> {
     let bytes = interleaved_adversarial_zip_package_bytes()?;
-    let before_catalog = Catalog::from_bytes(&bytes)?;
+    let before_catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let before_order = before_catalog
         .iter()
         .map(|entry| entry.name().to_owned())
@@ -1252,7 +1264,7 @@ fn changed_commit_preserves_selected_zip_metadata_and_interleaved_members() -> T
         .set(present_settings()?)
         .commit()?;
     let changed_bytes = written(changed.package())?;
-    let after_catalog = Catalog::from_bytes(&changed_bytes)?;
+    let after_catalog = Catalog::from_bytes(&changed_bytes, Default::default())?;
     let after_order = after_catalog
         .iter()
         .map(|entry| entry.name().to_owned())
@@ -1403,7 +1415,7 @@ fn patch_is_exact_conflict_checked_and_byte_reversible() -> TestResult<()> {
         Err(ShowSettingsError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1568,6 +1580,7 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
                 type_: 1,
                 data: document.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1740,7 +1753,7 @@ fn checked_native_fixture_noop_playback_and_rendering_changes_follow_cache_polic
     let bytes = std::fs::read(native_fixture_path())?;
     let package = Package::from_bytes(&bytes)?;
     let before = package.show_settings()?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let slide_components = catalog
         .iter()
         .filter_map(|entry| {
@@ -1964,6 +1977,7 @@ fn huge_nested_size_opaque_field_hits_byte_work_limit_before_publication() -> Te
                 type_: 2,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

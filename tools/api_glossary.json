@@ -12167,6 +12167,82 @@
       "families": []
     },
     {
+      "id": "iwa-core",
+      "package": "litchi-iwa-core",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_core",
+          "replacement": "raw IWA operations require an explicit limits argument (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_policy_and_limits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the policy variant with required limits (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa_core::SnappyStream"
+      ]
+    },
+    {
+      "id": "iwa-archive",
+      "package": "litchi-iwa-archive",
+      "default_features": true,
+      "features": [
+        "internal-iwork-source"
+      ],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "raw IWA operations require an explicit limits argument (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_policy_and_limits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the policy variant with required limits (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa_archive::ComponentCatalog",
+        "litchi_iwa_archive::SourceCatalog",
+        "litchi_iwa_archive::OwnedSourceCatalog",
+        "litchi_iwa_archive::LogicalSourceCatalog",
+        "litchi_iwa_archive::FrozenDirectoryBundle",
+        "litchi_iwa_archive::SemanticProjection",
+        "litchi_iwa_archive::package::Catalog"
+      ]
+    },
+    {
       "id": "iwa-common",
       "package": "litchi-iwa-common",
       "default_features": true,
@@ -13154,6 +13230,16 @@
           "name": "Editor",
           "scope": "litchi_iwa",
           "replacement": "the host's per-format working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft (record 0351 §2.1 rule 7, record 0361)"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
         }
       ],
       "families": [],

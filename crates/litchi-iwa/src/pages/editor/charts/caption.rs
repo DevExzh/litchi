@@ -209,7 +209,7 @@ fn insert_body_chart_caption(
     let limits = package.limits();
     package.update_archive(archive_name, |archive| {
         for object in objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         retarget_body_chart_caption_edge(
             limits,
@@ -231,7 +231,7 @@ fn insert_body_chart_caption_standin(
     let standin = standin_caption_object(standin_id)?;
     let limits = package.limits();
     package.update_archive(archive_name, |archive| {
-        archive.insert_object(standin)?;
+        archive.insert_object(standin, Default::default())?;
         retarget_body_chart_caption_edge(
             limits,
             archive,
@@ -384,16 +384,15 @@ fn retarget_body_chart_caption_edge(
         fields: fields.as_slice(),
     };
     let mut rewritten_object = source_object.clone();
-    rewritten_object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
-            *message_index,
-            RawMessage {
-                type_: CHART_MESSAGE_TYPE,
-                data,
-            },
-            transition,
-            limits.archive_limits(),
-        )?;
+    rewritten_object.replace_message_transitioning_object_references_preserving_header(
+        *message_index,
+        RawMessage {
+            type_: CHART_MESSAGE_TYPE,
+            data,
+        },
+        transition,
+        limits.archive_limits(),
+    )?;
     *archive.object_mut(drawable_object_id).ok_or_else(|| {
         Error::InvalidFormat(format!("Pages chart {drawable_object_id} is missing"))
     })? = rewritten_object;

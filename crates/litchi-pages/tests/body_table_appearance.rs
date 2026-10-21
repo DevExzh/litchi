@@ -218,6 +218,7 @@ mod body_fixture {
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 let info = &mut model.archive_info.message_infos[0];
                 info.object_references.clear();
@@ -265,13 +266,15 @@ mod body_fixture {
     }
 
     fn metadata_package(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let source_catalog = Catalog::from_bytes(source)?;
+        let source_catalog = Catalog::from_bytes(source, Default::default())?;
         let document = source_catalog
             .iter()
             .find(|entry| entry.name() == DOCUMENT_MEMBER)
             .ok_or("missing document member")?;
-        let document_archive =
-            Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+        let document_archive = Archive::parse(
+            SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut identifiers = document_archive
             .objects
             .iter()
@@ -302,9 +305,10 @@ mod body_fixture {
             &Archive {
                 objects: vec![object(METADATA_OBJECT_ID, 11_006, metadata, &[])?],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let mut members = catalog
             .iter()
             .filter(|entry| entry.name() != METADATA_MEMBER)
@@ -325,12 +329,15 @@ mod body_fixture {
         source: &[u8],
         mutate: impl FnOnce(&mut tsp::PackageMetadata) -> Result<(), Box<dyn StdError>>,
     ) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == METADATA_MEMBER)
             .ok_or("missing metadata member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let metadata_object = archive
             .object_mut(METADATA_OBJECT_ID)
             .ok_or("missing metadata object")?;
@@ -349,8 +356,10 @@ mod body_fixture {
                 type_: message_type,
                 data: metadata.encode_to_vec(),
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         Ok(catalog.reassemble_to_bytes(
             &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
             Limits::default(),
@@ -358,12 +367,15 @@ mod body_fixture {
     }
 
     fn append_metadata_unknown(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == METADATA_MEMBER)
             .ok_or("missing metadata member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let metadata_object = archive
             .object_mut(METADATA_OBJECT_ID)
             .ok_or("missing metadata object")?;
@@ -381,8 +393,10 @@ mod body_fixture {
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         Ok(catalog.reassemble_to_bytes(
             &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
             Limits::default(),
@@ -391,7 +405,7 @@ mod body_fixture {
 
     pub(crate) fn without_metadata_member(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
         Ok(
-            Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+            Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
                 &[],
                 &[METADATA_MEMBER],
                 Limits::default(),
@@ -401,12 +415,15 @@ mod body_fixture {
 
     pub(crate) fn split_style_component(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
         const FOREIGN_MEMBER: &str = "Index/ForeignStyles.iwa";
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let document = catalog
             .iter()
             .find(|entry| entry.name() == DOCUMENT_MEMBER)
             .ok_or("missing document member")?;
-        let mut archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut kept = Vec::new();
         let mut moved = Vec::new();
         for object in archive.objects {
@@ -421,8 +438,12 @@ mod body_fixture {
             }
         }
         archive.objects = kept;
-        let document_data = SnappyStream::compress(&archive.to_bytes()?)?;
-        let foreign_data = SnappyStream::compress(&Archive { objects: moved }.to_bytes()?)?;
+        let document_data =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+        let foreign_data = SnappyStream::compress(
+            &Archive { objects: moved }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         let mut members = catalog
             .iter()
             .map(|entry| {
@@ -625,6 +646,7 @@ mod body_fixture {
                     type_: TABLE_MODEL_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -680,19 +702,21 @@ mod body_fixture {
                     type_: TABLE_INFO_MESSAGE_TYPE,
                     data: native.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
     }
 
     pub(crate) fn add_cross_component_inbound(source: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let inbound = object(7_000, 7_001, vec![0x08, 0x01], &[PARENT_STYLE_ID])?;
         let component = SnappyStream::compress(
             &Archive {
                 objects: vec![inbound],
             }
-            .to_bytes()?,
+            .to_bytes(Default::default())?,
+            Default::default(),
         )?;
         let mut members = catalog
             .iter()
@@ -761,7 +785,7 @@ fn expected_child() -> Appearance {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| format!("missing package member {name}"))?
@@ -770,13 +794,14 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 

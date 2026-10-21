@@ -522,7 +522,7 @@ impl Package {
             },
             _ => (read_path(path, limits)?, limits),
         };
-        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source_bytes, limits)?;
+        let source_catalog = SourceCatalog::from_shared_bytes(source_bytes, limits)?;
         Self::from_ingress(source_catalog, options.semantic_limits_value())
     }
 
@@ -553,7 +553,7 @@ impl Package {
         options: crate::OpenOptions,
     ) -> PackageResult<Self> {
         let limits = options.archive()?;
-        let source = SourceCatalog::from_bytes_with_limits(bytes, limits)?;
+        let source = SourceCatalog::from_bytes(bytes, limits)?;
         Self::from_ingress(source, options.semantic_limits_value())
     }
 
@@ -577,7 +577,7 @@ impl Package {
         options: crate::OpenOptions,
     ) -> PackageResult<Self> {
         let limits = options.archive()?;
-        let source = SourceCatalog::from_shared_bytes_with_limits(bytes, limits)?;
+        let source = SourceCatalog::from_shared_bytes(bytes, limits)?;
         Self::from_ingress(source, options.semantic_limits_value())
     }
 
@@ -647,7 +647,7 @@ impl Package {
         bytes: &[u8],
         limits: Limits,
     ) -> PackageResult<Self> {
-        Self::from_source_catalog(SourceCatalog::from_bytes_with_limits(bytes, limits)?)
+        Self::from_source_catalog(SourceCatalog::from_bytes(bytes, limits)?)
     }
 
     pub(crate) fn from_source_catalog(source: SourceCatalog) -> PackageResult<Self> {
@@ -3483,6 +3483,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         ];
@@ -3498,6 +3499,7 @@ mod tests {
                         type_: 2001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             );
@@ -3553,6 +3555,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         );
@@ -3563,12 +3566,13 @@ mod tests {
                     type_: 2001,
                     data: storage.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         );
         for (identifier, messages) in section_objects {
             objects.push(
-                ArchiveObject::new(identifier, messages)
+                ArchiveObject::new(identifier, messages, Default::default())
                     .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             );
         }
@@ -3654,6 +3658,7 @@ mod tests {
                         type_: FOOTNOTE_REFERENCE_MESSAGE_TYPE,
                         data: reference,
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
                 ArchiveObject::new(
@@ -3662,6 +3667,7 @@ mod tests {
                         type_: 2_001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
                 ArchiveObject::new(
@@ -3670,6 +3676,7 @@ mod tests {
                         type_: TEXTUAL_ATTACHMENT_MESSAGE_TYPE,
                         data: marker,
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string())),
             ]
@@ -3683,6 +3690,7 @@ mod tests {
                     type_: 10_000,
                     data: root.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ArchiveObject::new(
@@ -3691,6 +3699,7 @@ mod tests {
                     type_: 2_001,
                     data: body.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
         ];
@@ -3706,9 +3715,10 @@ mod tests {
         let archive = Archive { objects };
         let compressed = SnappyStream::compress(
             archive
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
                 .as_slice(),
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
 
@@ -3729,7 +3739,7 @@ mod tests {
 
     fn package_bytes_with_opaque_member() -> PackageResult<Vec<u8>> {
         let source = package_bytes(Some("Opaque body"), true, true)?;
-        let catalog = Catalog::from_bytes(&source)?;
+        let catalog = Catalog::from_bytes(&source, Default::default())?;
         let mut entries: Vec<(&str, &[u8])> = catalog
             .iter()
             .map(|entry| (entry.name(), entry.data()))
@@ -3875,7 +3885,7 @@ mod tests {
         let limits = Limits::default();
         let source = read_path(&path, limits)?;
         let source_pointer = source.as_ptr();
-        let catalog = SourceCatalog::from_shared_bytes_with_limits(Arc::clone(&source), limits)?;
+        let catalog = SourceCatalog::from_shared_bytes(Arc::clone(&source), limits)?;
         assert_eq!(catalog.source_bytes().as_ptr(), source_pointer);
         assert_eq!(catalog.source_bytes(), expected);
 
@@ -4335,6 +4345,7 @@ mod tests {
                         type_: 10_000,
                         data: root.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
                 ArchiveObject::new(
@@ -4343,6 +4354,7 @@ mod tests {
                         type_: 2_001,
                         data: storage.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4368,6 +4380,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![0x22, 0x02, 0x08, 0x2a],
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4390,6 +4403,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![0x22, 0x02, 0x08, 0x2a, 0x22, 0x02, 0x08, 0x2b, 0x7a, 0x00],
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4521,6 +4535,7 @@ mod tests {
                         type_: 10_000,
                         data: root.encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4822,8 +4837,12 @@ mod tests {
 
     #[test]
     fn section_name_budget_is_charged_before_owned_materialization() -> PackageResult<()> {
-        let object = ArchiveObject::new(43, vec![section_payload(Some("oversized"))])
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let object = ArchiveObject::new(
+            43,
+            vec![section_payload(Some("oversized"))],
+            Default::default(),
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let error = decode_section_name(&object, NonZeroU64::MIN, 2, 4)
             .err()
             .unwrap_or_else(|| panic!("an over-budget section name should fail"));
@@ -4881,6 +4900,7 @@ mod tests {
                         type_: 10_000,
                         data: tp::DocumentArchive::default().encode_to_vec(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
@@ -4893,20 +4913,23 @@ mod tests {
                         type_: 999,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
             ],
         };
         let root_stream = SnappyStream::compress(
             &root
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let other_stream = SnappyStream::compress(
             &other
-                .to_bytes()
+                .to_bytes(Default::default())
                 .map_err(|error| PackageError::InvalidFormat(error.to_string()))?,
+            Default::default(),
         )
         .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let bytes = litchi_iwa_archive::package::to_bytes(

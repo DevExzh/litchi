@@ -47,8 +47,8 @@ fn assert_exact_scalar_locality(
     target: &[u8],
     expected_changed_members: &[&str],
 ) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed_members = Vec::new();
 
     for before in source.iter() {
@@ -79,14 +79,14 @@ fn assert_exact_scalar_locality(
 }
 
 fn string_lists(package: &[u8]) -> TestResult<Vec<tst::TableDataList>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut lists = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -405,12 +405,13 @@ fn native_number_change_is_exact_reversible_and_source_bound() -> TestResult {
 #[test]
 fn changed_patch_preserves_exact_source_preview_subset() -> TestResult {
     let native = std::fs::read(fixture_path())?;
-    let masked = Catalog::from_bytes(&native)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
-    let masked_catalog = Catalog::from_bytes(&masked)?;
+    let masked = Catalog::from_bytes(&native, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
+    let masked_catalog = Catalog::from_bytes(&masked, Default::default())?;
     assert_eq!(
         CANONICAL_PREVIEWS
             .iter()
@@ -428,7 +429,7 @@ fn changed_patch_preserves_exact_source_preview_subset() -> TestResult {
         .commit()?;
     assert_eq!(commit.diagnostics().deleted_previews(), 1);
     let target = commit.package().exact_bytes();
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert!(
         CANONICAL_PREVIEWS
             .iter()

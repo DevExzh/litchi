@@ -1,7 +1,7 @@
 //! Transactional reassignment of a live slide to a theme layout.
 
 use super::*;
-use crate::archive::ArchiveLimits;
+use crate::archive::Limits as ArchiveLimits;
 use litchi_keynote::slide::placeholder::Kind as PlaceholderKind;
 use slide_create::layout::{read_layout_graph, resolve_layout};
 

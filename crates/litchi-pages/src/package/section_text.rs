@@ -749,11 +749,9 @@ impl Package {
             .precharge_candidate_reopen(self, patch.target_bytes.len(), Path::Package)
             .map_err(map_transaction_error)?;
 
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         budget
@@ -1432,7 +1430,7 @@ fn verify_native_locality(
                 .map_err(map_transaction_error)?;
             let mut expected_object = before_object.clone();
             expected_object
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.message_index,
                     after_message,
                     source_catalog
@@ -1448,7 +1446,7 @@ fn verify_native_locality(
             let mut expected_archive = litchi_iwa_core::Archive::new();
             expected_archive.objects.push(expected_object);
             let expected_bytes = expected_archive
-                .to_bytes_with_limits(archive_limits)
+                .to_bytes(archive_limits)
                 .map_err(map_core_error)?;
             budget
                 .charge_limit(
@@ -1457,9 +1455,8 @@ fn verify_native_locality(
                     Path::section(target.position),
                 )
                 .map_err(map_transaction_error)?;
-            let expected_archive =
-                litchi_iwa_core::Archive::parse_with_limits(&expected_bytes, archive_limits)
-                    .map_err(map_core_error)?;
+            let expected_archive = litchi_iwa_core::Archive::parse(&expected_bytes, archive_limits)
+                .map_err(map_core_error)?;
             let expected_object = expected_archive
                 .objects
                 .first()

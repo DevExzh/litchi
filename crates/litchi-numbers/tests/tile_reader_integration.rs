@@ -31,6 +31,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -112,6 +113,7 @@ fn synthetic_tile_package(malformed_later_row: bool) -> TestResult<Vec<u8>> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?;
 
     let model = tst::TableModelArchive {
@@ -180,7 +182,10 @@ fn synthetic_tile_package(malformed_later_row: bool) -> TestResult<Vec<u8>> {
         sidecars,
         object(6, TILE_MESSAGE_TYPE, tile_payload(malformed_later_row)?)?,
     ];
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         ArchiveLimits::default(),

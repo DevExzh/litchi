@@ -415,20 +415,24 @@ fn ensure_conditional_style_table(
     let owner_uid = fresh_uuid();
     let owner = uuid_as_cfuuid(&owner_uid);
     package.update_archive(&model_archive, |archive| {
-        archive.insert_object(ArchiveObject::new(
-            list_id,
-            vec![RawMessage {
-                type_: TABLE_DATA_LIST_MESSAGE_TYPE,
-                data: TableDataList {
-                    list_type: tst::table_data_list::ListType::ConditionalStyle as i32,
-                    next_list_id: 1,
-                    entries: Vec::new(),
-                    segments: Vec::new(),
-                    is_new_for_bnc: Some(true),
-                }
-                .encode_to_vec(),
-            }],
-        )?)?;
+        archive.insert_object(
+            ArchiveObject::new(
+                list_id,
+                vec![RawMessage {
+                    type_: TABLE_DATA_LIST_MESSAGE_TYPE,
+                    data: TableDataList {
+                        list_type: tst::table_data_list::ListType::ConditionalStyle as i32,
+                        next_list_id: 1,
+                        entries: Vec::new(),
+                        segments: Vec::new(),
+                        is_new_for_bnc: Some(true),
+                    }
+                    .encode_to_vec(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         let object = archive
             .object_mut(location.descriptor.object_id)
             .ok_or_else(|| {
@@ -463,6 +467,7 @@ fn ensure_conditional_style_table(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         add_message_object_reference(object, message_index, list_id, list_id);
         Ok(())
@@ -520,6 +525,7 @@ fn append_conditional_style_entry(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[message_index].versions =
             CONDITIONAL_LIST_MESSAGE_VERSION.to_vec();

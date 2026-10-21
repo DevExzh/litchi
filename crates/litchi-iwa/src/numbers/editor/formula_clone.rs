@@ -91,6 +91,7 @@ pub(super) fn create_empty_table_formula_graph(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut engine_object.archive_info.message_infos[engine_message_index];
         if !info.object_references.contains(&owner_id) {
@@ -103,9 +104,10 @@ pub(super) fn create_empty_table_formula_graph(
                 type_: FORMULA_OWNER_MESSAGE_TYPE,
                 data: owner.encode_to_vec(),
             }],
+            Default::default(),
         )?;
         owner_object.archive_info.message_infos[0].versions = vec![3, 2, 10];
-        Ok(archive.insert_object(owner_object)?)
+        Ok(archive.insert_object(owner_object, Default::default())?)
     })?;
 
     set_package_last_object_identifier(package, owner_id)?;
@@ -346,6 +348,7 @@ pub(super) fn clone_table_formula_graph(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut engine_object.archive_info.message_infos[engine_message_index];
         let previous_owner_set = info
@@ -367,7 +370,7 @@ pub(super) fn clone_table_formula_graph(
             }
         }
         for object in cloned_objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -798,7 +801,7 @@ fn copy_archive_object(source: &ArchiveObject) -> Result<ArchiveObject> {
     let identifier = source.archive_info.identifier.ok_or_else(|| {
         Error::InvalidFormat("Numbers archive object has no identifier".to_owned())
     })?;
-    let mut copied = ArchiveObject::new(identifier, source.messages.clone())?;
+    let mut copied = ArchiveObject::new(identifier, source.messages.clone(), Default::default())?;
     copied.archive_info = source.archive_info.clone();
     copied.header_offset = source.header_offset;
     copied.header_length = source.header_length;
