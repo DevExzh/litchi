@@ -5,13 +5,17 @@ edition = "2024"
 publish = false
 
 [features]
+default = ["current-api"]
+current-api = []
 allocator-metrics = []
 ordinary-save-process-metrics = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
 # The paired OLE probe is built against the pre-owner/property-limit API when
-# these flags are enabled on the recorded baseline checkout.  They are kept
-# here so the same source has an explicit, reproducible compatibility mode.
+# these flags are enabled on the recorded baseline checkout with
+# `--no-default-features`.  They are kept here so the same source has an
+# explicit, reproducible compatibility mode while `--all-features` continues
+# to exercise the current API.
 legacy-owner-api = []
 legacy-property-api = []
 

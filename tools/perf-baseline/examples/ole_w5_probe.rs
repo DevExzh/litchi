@@ -2,8 +2,8 @@
 //!
 //! The probe deliberately keeps the fixture and timed operation boundaries
 //! independent of the API revision.  On the pre-migration checkout, pass
-//! `--features legacy-owner-api,legacy-property-api`; on the current checkout
-//! leave both features disabled.  The output is one CSV row per measured
+//! `--no-default-features --features legacy-owner-api,legacy-property-api`;
+//! on the current checkout leave both features disabled.  The output is one CSV row per measured
 //! sample so an external ABBA runner can own CPU pinning, calibration, and
 //! source/binary provenance.
 
@@ -23,12 +23,12 @@ use litchi_ole_common::property_set::{
 };
 use litchi_ole_common::property_set::Value;
 
-#[cfg(not(feature = "legacy-owner-api"))]
+#[cfg(feature = "current-api")]
 use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage};
 
-#[cfg(feature = "legacy-owner-api")]
+#[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]
 type OwnerSource = litchi_ole_common::object::Snapshot;
-#[cfg(not(feature = "legacy-owner-api"))]
+#[cfg(feature = "current-api")]
 type OwnerSource = litchi_ole_common::object::Package;
 
 const TARGET_NAME: &str = "ole_w5_edit_target.bin";
@@ -204,7 +204,7 @@ fn build_corpus() -> Result<Corpus, Box<dyn StdError>> {
 }
 
 fn owner_open_source(corpus: &Corpus) -> Result<OwnerSource, Box<dyn StdError>> {
-    #[cfg(feature = "legacy-owner-api")]
+    #[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]
     {
         Ok(ObjectEdit::open(
             corpus.archive.clone(),
@@ -213,7 +213,7 @@ fn owner_open_source(corpus: &Corpus) -> Result<OwnerSource, Box<dyn StdError>> 
         )?
         .staged())
     }
-    #[cfg(not(feature = "legacy-owner-api"))]
+    #[cfg(feature = "current-api")]
     {
         Ok(ObjectPackage::open_with_options(
             corpus.archive.clone(),
@@ -230,11 +230,11 @@ fn owner_open_editor(corpus: &Corpus) -> Result<ObjectEdit, Box<dyn StdError>> {
 }
 
 fn owner_start_edit(source: &OwnerSource) -> Result<ObjectEdit, Box<dyn StdError>> {
-    #[cfg(feature = "legacy-owner-api")]
+    #[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]
     {
         Ok(source.edit())
     }
-    #[cfg(not(feature = "legacy-owner-api"))]
+    #[cfg(feature = "current-api")]
     {
         Ok(source.edit()?)
     }
@@ -242,11 +242,11 @@ fn owner_start_edit(source: &OwnerSource) -> Result<ObjectEdit, Box<dyn StdError
 
 fn owner_commit_bytes(editor: ObjectEdit) -> Result<Vec<u8>, Box<dyn StdError>> {
     let package = editor.commit()?.into_parts().0;
-    #[cfg(feature = "legacy-owner-api")]
+    #[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]
     {
         Ok(package.finish()?)
     }
-    #[cfg(not(feature = "legacy-owner-api"))]
+    #[cfg(feature = "current-api")]
     {
         let mut output = Vec::new();
         package.write_to(&mut output)?;
@@ -266,11 +266,11 @@ fn user_properties<'a>(
     section: &'a Section,
     limits: UserLimits,
 ) -> Result<UserProperties<'a>, Box<dyn StdError>> {
-    #[cfg(feature = "legacy-property-api")]
+    #[cfg(all(feature = "legacy-property-api", not(feature = "current-api")))]
     {
         Ok(UserProperties::with_limits(section, limits)?)
     }
-    #[cfg(not(feature = "legacy-property-api"))]
+    #[cfg(feature = "current-api")]
     {
         Ok(UserProperties::new(section, limits)?)
     }
@@ -280,11 +280,11 @@ fn user_editor<'a>(
     section: &'a mut Section,
     limits: UserLimits,
 ) -> Result<UserEdit<'a>, Box<dyn StdError>> {
-    #[cfg(feature = "legacy-property-api")]
+    #[cfg(all(feature = "legacy-property-api", not(feature = "current-api")))]
     {
         Ok(UserEdit::with_limits(section, limits)?)
     }
-    #[cfg(not(feature = "legacy-property-api"))]
+    #[cfg(feature = "current-api")]
     {
         Ok(UserEdit::new(section, limits)?)
     }
