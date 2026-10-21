@@ -11,6 +11,7 @@ use super::target::{Target, Targets};
 use crate::ole_streams::{self, native, presentation};
 use crate::{Error, LimitKind};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
+use std::fmt;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
@@ -23,7 +24,6 @@ pub const MAX_STREAM_REMOVALS: usize = 1_024;
 /// cloning an outer format editor, then hand it back to the same object owner
 /// for atomic publication. It cannot be constructed without the common
 /// owner's target, limits, and validated replacement package.
-#[derive(Debug)]
 pub struct PreparedReplacement {
     key: String,
     path: Vec<String>,
@@ -31,6 +31,19 @@ pub struct PreparedReplacement {
     replacement: CapturedPackage,
     source: Arc<Vec<u8>>,
     limits: Limits,
+}
+
+impl fmt::Debug for PreparedReplacement {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedReplacement")
+            .field("path_depth", &self.path.len())
+            .field("has_key", &true)
+            .field("has_before", &true)
+            .field("has_replacement", &true)
+            .field("has_source", &true)
+            .finish()
+    }
 }
 
 /// Result class attached to a completed top-level in-memory CFB parse.
@@ -79,7 +92,7 @@ fn observe_cfb_parse<T>(
 ///
 /// Dropping the edit discards it; the source bytes or snapshot it started
 /// from are never changed.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Edit {
     targets: Arc<Targets>,
     limits: Limits,
@@ -91,6 +104,21 @@ pub struct Edit {
     changed: bool,
     layout: SectorLayoutPolicy,
     validated_layout: SectorLayoutPolicy,
+}
+
+impl fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("target_count", &self.targets.len())
+            .field("object_count", &self.objects.len())
+            .field("changed", &self.changed)
+            .field("catalog_is_shared", &Arc::ptr_eq(
+                &self.base_package,
+                &self.package,
+            ))
+            .finish()
+    }
 }
 
 impl Edit {

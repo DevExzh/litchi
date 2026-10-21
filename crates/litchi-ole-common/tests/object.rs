@@ -1018,6 +1018,53 @@ fn prepared_replacement_commit_supports_forward_and_inverse_patch() {
 }
 
 #[test]
+fn public_object_debug_reports_shape_without_source_content() {
+    let original = doc_with_object(&[0, 0, 0, 0]);
+    let selected = targets("private-selector", &["ObjectPool", "_42"]);
+    let package = Package::open_with_options(
+        original,
+        OpenOptions::new()
+            .targets(selected)
+            .limits(Limits::default()),
+    )
+    .expect("package should open");
+    let package_debug = format!("{package:?}");
+    assert!(package_debug.contains("target_count"));
+    assert!(!package_debug.contains("private-selector"));
+    assert!(!package_debug.contains("ObjectPool"));
+
+    let mut editor = package.edit().expect("edit should start");
+    let edit_debug = format!("{editor:?}");
+    assert!(edit_debug.contains("object_count"));
+    assert!(!edit_debug.contains("private-selector"));
+    assert!(!edit_debug.contains("ObjectPool"));
+
+    let replacement = write_cfb(|writer| {
+        writer
+            .create_stream(&["CONTENTS"], b"private-replacement-payload")
+            .expect("replacement stream should write");
+    });
+    let prepared = editor
+        .prepare_replacement("private-selector", replacement)
+        .expect("replacement should be admitted")
+        .expect("replacement should change the object");
+    let prepared_debug = format!("{prepared:?}");
+    assert!(prepared_debug.contains("path_depth"));
+    assert!(!prepared_debug.contains("private-selector"));
+    assert!(!prepared_debug.contains("ObjectPool"));
+    assert!(!prepared_debug.contains("private-replacement-payload"));
+
+    editor
+        .replace_prepared(prepared)
+        .expect("prepared replacement should publish");
+    let commit = editor.commit().expect("replacement should commit");
+    let package_debug = format!("{:?}", commit.package());
+    let patch_debug = format!("{:?}", commit.patch());
+    assert!(!package_debug.contains("private-selector"));
+    assert!(!patch_debug.contains("private-replacement-payload"));
+}
+
+#[test]
 fn shared_stream_replacement_reuses_validated_allocation() {
     let original = doc_with_object(&[0, 0, 0, 0]);
     let mut editor = open_editor(

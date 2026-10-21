@@ -3,6 +3,7 @@
 use super::options::OpenOptions;
 use super::snapshot::Package;
 use crate::Error;
+use std::fmt;
 use std::sync::Arc;
 
 /// A deterministic whole-artifact replacement from one OLE snapshot to the
@@ -12,10 +13,21 @@ use std::sync::Arc;
 /// boundary. Host crates retain responsibility for semantic operations and
 /// dependency closure; this value only makes the already-validated before and
 /// after snapshots explicit and safely replayable.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
     before: Arc<Vec<u8>>,
     after: Arc<Vec<u8>>,
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("before_len", &self.before.len())
+            .field("after_len", &self.after.len())
+            .field("is_noop", &self.is_noop())
+            .finish()
+    }
 }
 
 impl Patch {
@@ -130,5 +142,18 @@ mod tests {
     fn equal_artifacts_are_a_noop() {
         let patch = Patch::new(b"same".to_vec(), b"same".to_vec());
         assert!(patch.is_noop());
+    }
+
+    #[test]
+    fn debug_reports_shape_without_artifact_bytes() {
+        let patch = Patch::new(
+            b"private-before-payload".to_vec(),
+            b"private-after-payload".to_vec(),
+        );
+        let debug = format!("{patch:?}");
+        assert!(debug.contains("before_len"));
+        assert!(debug.contains("after_len"));
+        assert!(!debug.contains("private-before-payload"));
+        assert!(!debug.contains("private-after-payload"));
     }
 }

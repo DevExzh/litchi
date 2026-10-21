@@ -15,10 +15,11 @@ use super::target::Targets;
 use crate::Error;
 use crate::ole_streams::{self, native, presentation};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
+use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct State {
     targets: Arc<Targets>,
     limits: super::model::Limits,
@@ -40,9 +41,24 @@ struct State {
 /// and clones only the catalog it first mutates, so starting an edit is O(1)
 /// in package topology.  Use [`Package::edit`] to start an independent
 /// transactional edit.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Package {
     state: Arc<State>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("target_count", &self.state.targets.len())
+            .field("object_count", &self.state.objects.len())
+            .field("changed", &self.state.changed)
+            .field("source_is_current", &Arc::ptr_eq(
+                &self.state.original,
+                &self.state.current,
+            ))
+            .finish()
+    }
 }
 
 impl Package {
