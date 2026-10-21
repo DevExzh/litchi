@@ -1538,10 +1538,212 @@ fn physical_candidate_limit_survives_snapshot_reopening_and_refusal() {
     let mut reopened = snapshot.edit();
     let path = vec!["Target".to_string()];
     let error = reopened.put_stream(&path, vec![0; 100_000]).unwrap_err();
-    assert!(matches!(error, litchi_cfb::OleError::LimitExceeded {
+    assert!(
+        matches!(error, litchi_ole_common::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
         resource: "input bytes", observed, maximum: actual,
-    } if observed > maximum && actual == maximum));
+    }) if observed > maximum && actual == maximum)
+    );
     assert_eq!(reopened.cfb_limits(), limits);
     assert_eq!(reopened.finish().unwrap(), original);
     assert_eq!(snapshot.finish().unwrap(), original);
+}
+
+#[test]
+fn configured_object_budgets_keep_their_dimension_and_counts() {
+    use litchi_ole_common::{Error, LimitKind};
+    let source = write_cfb(|writer| {
+        writer.create_stream(&["Object", "One"], &[1; 5]).unwrap();
+        writer.create_stream(&["Object", "Two"], &[2; 7]).unwrap();
+    });
+    let policy = Limits::default();
+    for (limits, kind, maximum) in [
+        (
+            Limits {
+                max_stream_size: 6,
+                ..policy
+            },
+            LimitKind::StreamBytes,
+            6,
+        ),
+        (
+            Limits {
+                max_streams: 1,
+                ..policy
+            },
+            LimitKind::PackageStreams,
+            1,
+        ),
+        (
+            Limits {
+                max_streams_per_object: 1,
+                ..policy
+            },
+            LimitKind::ObjectStreams,
+            1,
+        ),
+        (
+            Limits {
+                max_total_size: 11,
+                ..policy
+            },
+            LimitKind::TotalBytes,
+            11,
+        ),
+        (
+            Limits {
+                max_object_size: 100,
+                ..policy
+            },
+            LimitKind::ObjectBytes,
+            100,
+        ),
+    ] {
+        let error = Edit::open(source.clone(), targets("object", &["Object"]), limits).unwrap_err();
+        assert!(
+            matches!(error, Error::Limit { kind: actual, observed, maximum: actual_maximum }
+            if actual == kind && observed > maximum && actual_maximum == maximum),
+            "{error:?}"
+        );
+    }
+    let mut editor = Edit::open(
+        source.clone(),
+        targets("object", &["Object"]),
+        Limits {
+            max_stream_size: 7,
+            ..policy
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        editor.put_stream(&["Object".into(), "One".into()], vec![0; 8]),
+        Err(Error::Limit {
+            kind: LimitKind::StreamBytes,
+            observed: 8,
+            maximum: 7
+        })
+    ));
+    assert_eq!(editor.finish().unwrap(), source);
+}
+
+#[test]
+fn invalid_object_policy_precedes_input_admission_and_survives_core_conversion() {
+    use litchi_ole_common::{Error, LimitKind};
+    let error = Edit::open(
+        Vec::new(),
+        Targets::default(),
+        Limits {
+            max_storage_depth: 0,
+            ..Limits::default()
+        },
+    )
+    .unwrap_err();
+    assert!(matches!(error, Error::InvalidLimit {
+        kind: LimitKind::StorageDepth, value: 0, maximum
+    } if maximum == usize::MAX as u64));
+    let core: litchi_core::Error = error.into();
+    assert!(matches!(
+        core,
+        litchi_core::Error::InvalidLimit {
+            kind: litchi_core::Resource::Depth,
+            value: 0,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn selected_capture_enforces_absolute_depth_and_directory_admission() {
+    use litchi_ole_common::{Error, LimitKind};
+    let source = write_cfb(|writer| {
+        writer
+            .create_stream(&["Object", "Child", "Payload"], b"inert")
+            .unwrap();
+    });
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    assert!(matches!(
+        discover(
+            &mut ole,
+            &targets("object", &["Object"]),
+            Limits {
+                max_storage_depth: 1,
+                ..Limits::default()
+            }
+        ),
+        Err(Error::Limit {
+            kind: LimitKind::StorageDepth,
+            observed: 2,
+            maximum: 1
+        })
+    ));
+
+    let source = write_cfb(|writer| {
+        writer.create_storage(&["One"]).unwrap();
+        writer.create_storage(&["Two"]).unwrap();
+        writer.create_stream(&["Three"], b"inert").unwrap();
+    });
+    assert!(matches!(
+        Edit::open(
+            source,
+            Targets::default(),
+            Limits {
+                max_objects: 1,
+                max_storage_depth: 1,
+                max_streams: 1,
+                ..Limits::default()
+            }
+        ),
+        Err(Error::Limit {
+            kind: LimitKind::DirectoryEntries,
+            observed: 3,
+            maximum: 2
+        })
+    ));
+}
+
+#[test]
+fn maximum_depth_policy_does_not_overflow_stream_selector_admission() {
+    let source = write_cfb(|writer| {
+        writer
+            .create_stream(&["Object", "Payload"], b"base")
+            .unwrap();
+    });
+    let mut edit = Edit::open(
+        source,
+        targets("object", &["Object"]),
+        Limits {
+            max_storage_depth: usize::MAX,
+            ..Limits::default()
+        },
+    )
+    .unwrap();
+    edit.put_stream(&["Object".into(), "Payload".into()], b"next".to_vec())
+        .unwrap();
+    assert_eq!(
+        edit.stream(&["Object".into(), "Payload".into()]),
+        Some(b"next".as_slice())
+    );
+}
+
+#[test]
+fn descendant_storage_budget_is_distinct_from_nesting_depth() {
+    let source = write_cfb(|writer| {
+        for name in ["One", "Two", "Three"] {
+            writer.create_storage(&["Object", name]).unwrap();
+        }
+    });
+    assert!(matches!(
+        Edit::open(
+            source,
+            targets("object", &["Object"]),
+            Limits {
+                max_storage_depth: 2,
+                ..Limits::default()
+            }
+        ),
+        Err(litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::ObjectStorages,
+            observed: 3,
+            maximum: 2,
+        })
+    ));
 }

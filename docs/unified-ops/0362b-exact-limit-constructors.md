@@ -147,8 +147,10 @@ The typed-error sweep also remains required. Record
 [0359c](0359c-typed-legacy-edit-budgets.md) migrates XLS embedded-payload,
 compound-publication and primary staging budgets to typed kinds, followed by
 Graph ingress, authoring and fixed-record budgets with every host consumer and
-unified classifier migrated. Shared OLE capture still emits configured-budget
-failures through generic format errors. [0359d](0359d-graph-package-owner.md)
+unified classifier migrated. [0359e](0359e-object-capture-budgets.md) migrates
+shared OLE core object-capture budgets and their host conversions; raw
+directory/OLEDS/link/protection policies remain required work.
+[0359d](0359d-graph-package-owner.md)
 consolidates Graph's separate `Package` and edit `Snapshot` owners onto the
 canonical returned owner. Untouched-stream sharing, nested raw chart models
 and shared OLE publication remain required semantic work. The constructor

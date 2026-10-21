@@ -6,6 +6,7 @@ use super::model::{Limits, Object, Storage, Stream};
 use super::target::Target;
 use crate::property_set::Guid;
 use crate::protection::reject_protected_container;
+use crate::{Error, LimitKind};
 use litchi_cfb::{
     OleError, OleFile, OleFileLimits, OleWriter, OverlayError, OverlayLimits,
     SameLengthStreamOverlay, SectorLayoutPolicy, SharedOleFile, SharedOleFileLimits,
@@ -28,7 +29,7 @@ impl Package {
     pub(crate) fn capture<R: Read + Seek>(
         ole: &mut OleFile<R>,
         limits: Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         Self::capture_with_budget(
             ole,
             limits,
@@ -45,7 +46,7 @@ impl Package {
     pub(crate) fn capture_object<R: Read + Seek>(
         ole: &mut OleFile<R>,
         limits: Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         Self::capture_with_budget(
             ole,
             limits,
@@ -63,7 +64,7 @@ impl Package {
         max_streams: usize,
         max_bytes: u64,
         retain_root: bool,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         let root_directory = ole.root_entry().map(directory::decode).transpose()?;
         let mut package = Self {
             sector_size: ole.sector_size(),
@@ -75,7 +76,7 @@ impl Package {
         if !retain_root {
             package.root_directory = None;
         }
-        let mut budget = Budget::new(max_storages, max_streams, max_bytes);
+        let mut budget = Budget::new(max_storages, max_streams, max_bytes, retain_root);
         capture_container(ole, &[], &mut package, &mut budget, limits)?;
         Ok(package)
     }
@@ -84,11 +85,13 @@ impl Package {
         ole: &mut OleFile<R>,
         target: &Target,
         limits: Limits,
-    ) -> Result<Object, OleError> {
+    ) -> Result<Object, Error> {
         if target.path().len() > limits.max_storage_depth {
-            return Err(OleError::InvalidFormat(
-                "object target path exceeds storage depth limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::StorageDepth,
+                observed: target.path().len() as u64,
+                maximum: limits.max_storage_depth as u64,
+            });
         }
         let resolved_target = target.resolve(ole, limits.max_package_directory_entries())?;
         let storage = find_storage(
@@ -111,6 +114,7 @@ impl Package {
             limits.max_object_storages(),
             limits.max_object_streams(),
             limits.max_object_size,
+            false,
         );
         capture_subtree(
             ole,
@@ -123,7 +127,7 @@ impl Package {
         package.object_from_root(resolved_target, storage, limits)
     }
 
-    pub(crate) fn object(&self, target: Target, limits: Limits) -> Result<Object, OleError> {
+    pub(crate) fn object(&self, target: Target, limits: Limits) -> Result<Object, Error> {
         let storage = self
             .storages
             .iter()
@@ -177,11 +181,13 @@ impl Package {
         path: &[String],
         data: Arc<[u8]>,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         if data.len() as u64 > limits.max_stream_size {
-            return Err(OleError::InvalidFormat(
-                "replacement stream exceeds size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: data.len() as u64,
+                maximum: limits.max_stream_size,
+            });
         }
         let stream = self
             .streams
@@ -211,7 +217,7 @@ impl Package {
             .map(Stream::bytes_shared)
     }
 
-    pub(crate) fn reuse_stream_allocations(&mut self, previous: &Self) -> Result<(), OleError> {
+    pub(crate) fn reuse_stream_allocations(&mut self, previous: &Self) -> Result<(), Error> {
         let mut by_path = HashMap::new();
         by_path
             .try_reserve(previous.streams.len())
@@ -237,21 +243,24 @@ impl Package {
         path: Vec<String>,
         data: Arc<[u8]>,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         if path.is_empty() || path.iter().any(String::is_empty) {
             return Err(OleError::InvalidFormat(
                 "new package stream path must contain names".into(),
-            ));
+            )
+            .into());
         }
         if data.len() as u64 > limits.max_stream_size {
-            return Err(OleError::InvalidFormat(
-                "new package stream exceeds size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: data.len() as u64,
+                maximum: limits.max_stream_size,
+            });
         }
         if self.streams.iter().any(|stream| stream.path() == path) {
-            return Err(OleError::InvalidFormat(format!(
-                "package stream {path:?} already exists"
-            )));
+            return Err(
+                OleError::InvalidFormat(format!("package stream {path:?} already exists")).into(),
+            );
         }
         if path.len() > 1
             && !self
@@ -261,7 +270,8 @@ impl Package {
         {
             return Err(OleError::InvalidFormat(
                 "new package stream parent storage is missing".into(),
-            ));
+            )
+            .into());
         }
         self.streams.push(Stream::new(path, data, None));
         self.check(limits)
@@ -271,7 +281,7 @@ impl Package {
         &mut self,
         path: &CfbPath,
         limits: Limits,
-    ) -> Result<Option<Arc<[u8]>>, OleError> {
+    ) -> Result<Option<Arc<[u8]>>, Error> {
         let Some(removed) = self.removable_stream(path)? else {
             return Ok(None);
         };
@@ -287,7 +297,7 @@ impl Package {
         Ok(Some(removed))
     }
 
-    pub(crate) fn removable_stream(&self, path: &CfbPath) -> Result<Option<Arc<[u8]>>, OleError> {
+    pub(crate) fn removable_stream(&self, path: &CfbPath) -> Result<Option<Arc<[u8]>>, Error> {
         if let Some(stream) = self
             .streams
             .iter()
@@ -303,7 +313,8 @@ impl Package {
             return Err(OleError::InvalidFormat(format!(
                 "package entry {:?} is a storage, not a stream",
                 path.as_slice()
-            )));
+            ))
+            .into());
         }
         Ok(None)
     }
@@ -312,7 +323,7 @@ impl Package {
         &mut self,
         paths: impl ExactSizeIterator<Item = &'a CfbPath>,
         limits: Limits,
-    ) -> Result<Vec<Option<Arc<[u8]>>>, OleError> {
+    ) -> Result<Vec<Option<Arc<[u8]>>>, Error> {
         let mut by_identity = HashMap::new();
         by_identity
             .try_reserve(self.streams.len())
@@ -376,7 +387,8 @@ impl Package {
                     return Err(OleError::InvalidFormat(format!(
                         "package entry {:?} is a storage, not a stream",
                         path.as_slice()
-                    )));
+                    ))
+                    .into());
                 }
                 removed.push(None);
             }
@@ -410,7 +422,7 @@ impl Package {
         path: &[String],
         replacement: &Self,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         limits.validate()?;
         let root_index = self
             .storages
@@ -521,7 +533,7 @@ impl Package {
         target: &Target,
         replacement: &Self,
         limits: Limits,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         limits.validate()?;
         if self
             .storages
@@ -531,7 +543,8 @@ impl Package {
             return Err(OleError::InvalidFormat(format!(
                 "object storage {:?} already exists",
                 target.path()
-            )));
+            ))
+            .into());
         }
         if target.path().len() > 1
             && !self
@@ -539,9 +552,9 @@ impl Package {
                 .iter()
                 .any(|storage| storage.path() == &target.path()[..target.path().len() - 1])
         {
-            return Err(OleError::InvalidFormat(
-                "new object storage parent is missing".into(),
-            ));
+            return Err(
+                OleError::InvalidFormat("new object storage parent is missing".into()).into(),
+            );
         }
         let storage_count = self
             .storages
@@ -608,16 +621,12 @@ impl Package {
         Ok(())
     }
 
-    pub(crate) fn remove_object(
-        &mut self,
-        path: &[String],
-        limits: Limits,
-    ) -> Result<(), OleError> {
+    pub(crate) fn remove_object(&mut self, path: &[String], limits: Limits) -> Result<(), Error> {
         let found = self.storages.iter().any(|storage| storage.path() == path);
         if !found {
-            return Err(OleError::InvalidFormat(format!(
-                "object storage {path:?} not found"
-            )));
+            return Err(
+                OleError::InvalidFormat(format!("object storage {path:?} not found")).into(),
+            );
         }
         self.storages
             .retain(|storage| !storage.path().starts_with(path));
@@ -626,7 +635,7 @@ impl Package {
         self.check(limits)
     }
 
-    pub(crate) fn render(&self) -> Result<Vec<u8>, OleError> {
+    pub(crate) fn render(&self) -> Result<Vec<u8>, Error> {
         self.render_with_layout(None, SectorLayoutPolicy::default())
     }
 
@@ -640,7 +649,7 @@ impl Package {
         &self,
         source: Option<&[u8]>,
         policy: SectorLayoutPolicy,
-    ) -> Result<Vec<u8>, OleError> {
+    ) -> Result<Vec<u8>, Error> {
         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
         writer.set_sector_layout_policy(policy);
         if let Some(source) = source {
@@ -742,7 +751,7 @@ impl Package {
         source: &Arc<Vec<u8>>,
         limits: Limits,
         cfb_limits: OleFileLimits,
-    ) -> Result<Option<Vec<u8>>, OleError> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let Some(overlays) = self.same_length_overlays(baseline, limits)? else {
             return Ok(None);
         };
@@ -757,7 +766,7 @@ impl Package {
         match source_v3_stream_size_needs_normalization(source) {
             Ok(true) => return Ok(None),
             Ok(false) => {},
-            Err(error @ OleError::Allocation { .. }) => return Err(error),
+            Err(error @ Error::Cfb(OleError::Allocation { .. })) => return Err(error),
             Err(_) => return Ok(None),
         }
 
@@ -834,7 +843,7 @@ impl Package {
         &self,
         baseline: &Self,
         limits: Limits,
-    ) -> Result<Option<Vec<SameLengthStreamOverlay>>, OleError> {
+    ) -> Result<Option<Vec<SameLengthStreamOverlay>>, Error> {
         if self.streams.len() > limits.max_streams {
             return Ok(None);
         }
@@ -891,7 +900,7 @@ impl Package {
         Ok(Some(overlays))
     }
 
-    pub(crate) fn check(&self, limits: Limits) -> Result<(), OleError> {
+    pub(crate) fn check(&self, limits: Limits) -> Result<(), Error> {
         limits.validate()?;
         check_counts(
             limits,
@@ -901,14 +910,21 @@ impl Package {
         )
     }
 
-    pub(crate) fn check_object_limits(&self, limits: Limits) -> Result<(), OleError> {
+    pub(crate) fn check_object_limits(&self, limits: Limits) -> Result<(), Error> {
         limits.validate()?;
-        if self.storages.len() > limits.max_object_storages()
-            || self.streams.len() > limits.max_object_streams()
-        {
-            return Err(OleError::InvalidFormat(
-                "selected object exceeds capture limits".into(),
-            ));
+        if self.storages.len() > limits.max_object_storages() {
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectStorages,
+                observed: self.storages.len() as u64,
+                maximum: limits.max_object_storages() as u64,
+            });
+        }
+        if self.streams.len() > limits.max_object_streams() {
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectStreams,
+                observed: self.streams.len() as u64,
+                maximum: limits.max_object_streams() as u64,
+            });
         }
         Ok(())
     }
@@ -918,19 +934,28 @@ impl Package {
         target: Target,
         storage: Storage,
         limits: Limits,
-    ) -> Result<Object, OleError> {
-        if self.storages.len() > limits.max_object_storages()
-            || self.streams.len() > limits.max_object_streams()
-        {
-            return Err(OleError::InvalidFormat(
-                "selected object exceeds capture limits".into(),
-            ));
+    ) -> Result<Object, Error> {
+        if self.storages.len() > limits.max_object_storages() {
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectStorages,
+                observed: self.storages.len() as u64,
+                maximum: limits.max_object_storages() as u64,
+            });
+        }
+        if self.streams.len() > limits.max_object_streams() {
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectStreams,
+                observed: self.streams.len() as u64,
+                maximum: limits.max_object_streams() as u64,
+            });
         }
         let compound = self.render()?;
         if compound.len() as u64 > limits.max_object_size {
-            return Err(OleError::InvalidFormat(
-                "selected object exceeds size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectBytes,
+                observed: compound.len() as u64,
+                maximum: limits.max_object_size,
+            });
         }
         let storages = self.storages.clone();
         let streams = self.streams.clone();
@@ -944,7 +969,7 @@ impl Package {
     }
 }
 
-fn overlay_fallback(error: OverlayError) -> Result<Option<Vec<u8>>, OleError> {
+fn overlay_fallback(error: OverlayError) -> Result<Option<Vec<u8>>, Error> {
     match error {
         OverlayError::Unavailable { .. }
         | OverlayError::Ole(_)
@@ -953,10 +978,10 @@ fn overlay_fallback(error: OverlayError) -> Result<Option<Vec<u8>>, OleError> {
         | OverlayError::PreconditionFailed { .. }
         | OverlayError::TargetFingerprintChanged { .. } => Ok(None),
         OverlayError::Allocation { resource, source } => {
-            Err(OleError::Allocation { resource, source })
+            Err(OleError::Allocation { resource, source }.into())
         },
-        OverlayError::Io(source) => Err(OleError::Io(source)),
-        OverlayError::Committed { source } => Err(OleError::Committed { source }),
+        OverlayError::Io(source) => Err(OleError::Io(source).into()),
+        OverlayError::Committed { source } => Err(OleError::Committed { source }.into()),
         OverlayError::IncompleteOutput { source, .. } => overlay_fallback(*source),
         _ => Ok(None),
     }
@@ -967,7 +992,7 @@ fn overlay_fallback(error: OverlayError) -> Result<Option<Vec<u8>>, OleError> {
 /// CFB parser at this point, so this bounded raw walk only decides whether the
 /// payload-only overlay may preserve the directory image. DIFAT sources are
 /// conservatively declined to the layout writer as well.
-fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, OleError> {
+fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, Error> {
     const MAJOR_VERSION_OFFSET: usize = 0x1A;
     const SECTOR_SHIFT_OFFSET: usize = 0x1E;
     const FAT_COUNT_OFFSET: usize = 0x2C;
@@ -1001,15 +1026,13 @@ fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, OleE
         9 => 512usize,
         12 => 4096usize,
         _ => {
-            return Err(OleError::InvalidFormat(
-                "CFB sector shift is invalid".into(),
-            ));
+            return Err(OleError::InvalidFormat("CFB sector shift is invalid".into()).into());
         },
     };
     let header = source
         .get(..sector_size)
         .ok_or_else(|| OleError::InvalidFormat("CFB header is truncated".into()))?;
-    let read_u32 = |offset: usize| -> Result<u32, OleError> {
+    let read_u32 = |offset: usize| -> Result<u32, Error> {
         Ok(u32::from_le_bytes(
             header
                 .get(offset..offset + 4)
@@ -1101,9 +1124,7 @@ fn source_v3_stream_size_needs_normalization(source: &[u8]) -> Result<bool, OleE
             .get(sector_index)
             .ok_or_else(|| OleError::InvalidFormat("CFB directory chain leaves FAT".into()))?;
     }
-    Err(OleError::InvalidFormat(
-        "CFB directory chain exceeds the source bound".into(),
-    ))
+    Err(OleError::InvalidFormat("CFB directory chain exceeds the source bound".into()).into())
 }
 
 struct Budget {
@@ -1113,10 +1134,11 @@ struct Budget {
     max_storages: usize,
     max_streams: usize,
     max_bytes: u64,
+    package: bool,
 }
 
 impl Budget {
-    fn new(max_storages: usize, max_streams: usize, max_bytes: u64) -> Self {
+    fn new(max_storages: usize, max_streams: usize, max_bytes: u64, package: bool) -> Self {
         Self {
             storages: 0,
             streams: 0,
@@ -1124,6 +1146,7 @@ impl Budget {
             max_storages,
             max_streams,
             max_bytes,
+            package,
         }
     }
 
@@ -1131,30 +1154,48 @@ impl Budget {
         self.max_storages.saturating_add(self.max_streams)
     }
 
-    fn charge_storage(&mut self) -> Result<(), OleError> {
+    fn charge_storage(&mut self) -> Result<(), Error> {
         if self.storages >= self.max_storages {
-            return Err(OleError::InvalidFormat(
-                "CFB storage count exceeds capture limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: if self.package {
+                    LimitKind::PackageStorages
+                } else {
+                    LimitKind::ObjectStorages
+                },
+                observed: self.storages.saturating_add(1) as u64,
+                maximum: self.max_storages as u64,
+            });
         }
         self.storages += 1;
         Ok(())
     }
 
-    fn charge(&mut self, size: u64) -> Result<(), OleError> {
+    fn charge(&mut self, size: u64) -> Result<(), Error> {
         if self.streams >= self.max_streams {
-            return Err(OleError::InvalidFormat(
-                "CFB stream count exceeds capture limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: if self.package {
+                    LimitKind::PackageStreams
+                } else {
+                    LimitKind::ObjectStreams
+                },
+                observed: self.streams.saturating_add(1) as u64,
+                maximum: self.max_streams as u64,
+            });
         }
         let total = self
             .bytes
             .checked_add(size)
             .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))?;
         if total > self.max_bytes {
-            return Err(OleError::InvalidFormat(
-                "CFB captured stream bytes exceed size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: if self.package {
+                    LimitKind::TotalBytes
+                } else {
+                    LimitKind::ObjectBytes
+                },
+                observed: total,
+                maximum: self.max_bytes,
+            });
         }
         self.streams += 1;
         self.bytes = total;
@@ -1168,7 +1209,7 @@ fn capture_container<R: Read + Seek>(
     package: &mut Package,
     budget: &mut Budget,
     limits: Limits,
-) -> Result<(), OleError> {
+) -> Result<(), Error> {
     let max_entries = budget.max_directory_entries();
     let refs = path_refs(path);
     ole.visit_directory_entries(&refs, max_entries, |ole, sid| {
@@ -1183,9 +1224,11 @@ fn capture_container<R: Read + Seek>(
         match metadata.kind() {
             EntryKind::Storage => {
                 if child.len() > limits.max_storage_depth {
-                    return Err(OleError::InvalidFormat(
-                        "CFB storage nesting limit exceeded".into(),
-                    ));
+                    return Err(Error::Limit {
+                        kind: LimitKind::StorageDepth,
+                        observed: child.len() as u64,
+                        maximum: limits.max_storage_depth as u64,
+                    });
                 }
                 budget.charge_storage()?;
                 package
@@ -1200,16 +1243,19 @@ fn capture_container<R: Read + Seek>(
             },
             EntryKind::Stream => {
                 if size > limits.max_stream_size {
-                    return Err(OleError::InvalidFormat(format!(
-                        "stream {child:?} exceeds size limit"
-                    )));
+                    return Err(Error::Limit {
+                        kind: LimitKind::StreamBytes,
+                        observed: size,
+                        maximum: limits.max_stream_size,
+                    });
                 }
                 budget.charge(size)?;
                 let data = ole.open_stream(&path_refs(&child))?;
                 if data.len() as u64 != size {
                     return Err(OleError::InvalidFormat(format!(
                         "stream {child:?} size changed during capture"
-                    )));
+                    ))
+                    .into());
                 }
                 package
                     .streams
@@ -1235,11 +1281,13 @@ fn capture_subtree<R: Read + Seek>(
     package: &mut Package,
     budget: &mut Budget,
     limits: Limits,
-) -> Result<(), OleError> {
-    if relative.len() > limits.max_storage_depth {
-        return Err(OleError::InvalidFormat(
-            "object storage nesting limit exceeded".into(),
-        ));
+) -> Result<(), Error> {
+    if absolute.len().saturating_add(relative.len()) > limits.max_storage_depth {
+        return Err(Error::Limit {
+            kind: LimitKind::StorageDepth,
+            observed: absolute.len().saturating_add(relative.len()) as u64,
+            maximum: limits.max_storage_depth as u64,
+        });
     }
     let current = join(absolute, relative);
     let max_entries = budget.max_directory_entries();
@@ -1255,10 +1303,12 @@ fn capture_subtree<R: Read + Seek>(
         child.push(name);
         match metadata.kind() {
             EntryKind::Storage => {
-                if child.len() > limits.max_storage_depth {
-                    return Err(OleError::InvalidFormat(
-                        "object storage nesting limit exceeded".into(),
-                    ));
+                if absolute.len().saturating_add(child.len()) > limits.max_storage_depth {
+                    return Err(Error::Limit {
+                        kind: LimitKind::StorageDepth,
+                        observed: absolute.len().saturating_add(child.len()) as u64,
+                        maximum: limits.max_storage_depth as u64,
+                    });
                 }
                 budget.charge_storage()?;
                 package
@@ -1273,16 +1323,19 @@ fn capture_subtree<R: Read + Seek>(
             },
             EntryKind::Stream => {
                 if size > limits.max_stream_size {
-                    return Err(OleError::InvalidFormat(
-                        "object stream size exceeds limit".into(),
-                    ));
+                    return Err(Error::Limit {
+                        kind: LimitKind::StreamBytes,
+                        observed: size,
+                        maximum: limits.max_stream_size,
+                    });
                 }
                 budget.charge(size)?;
                 let data = ole.open_stream(&path_refs(&join(absolute, &child)))?;
                 if data.len() as u64 != size {
                     return Err(OleError::InvalidFormat(
                         "object stream size changed during capture".into(),
-                    ));
+                    )
+                    .into());
                 }
                 package
                     .streams
@@ -1305,7 +1358,7 @@ fn find_storage<R: Read + Seek>(
     ole: &mut OleFile<R>,
     path: &[String],
     max_entries: usize,
-) -> Result<Storage, OleError> {
+) -> Result<Storage, Error> {
     let (name, parent) = path
         .split_last()
         .ok_or_else(|| OleError::InvalidFormat("object target path is empty".into()))?;
@@ -1319,20 +1372,21 @@ fn find_storage<R: Read + Seek>(
         {
             metadata = Some(directory::decode(entry)?);
         }
-        Ok::<(), OleError>(())
+        Ok::<(), Error>(())
     })?;
     let metadata = metadata
         .ok_or_else(|| OleError::InvalidFormat(format!("object storage {path:?} not found")))?;
     if metadata.kind() != EntryKind::Storage {
         return Err(OleError::InvalidFormat(format!(
             "object target path {path:?} is not a storage"
-        )));
+        ))
+        .into());
     }
     Ok(Storage::new(path.to_vec(), metadata))
 }
 
-pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>, max_entries: usize) -> Result<(), OleError> {
-    reject_protected_container(ole, "object editing", max_entries)
+pub(crate) fn open<R: Read + Seek>(ole: &OleFile<R>, max_entries: usize) -> Result<(), Error> {
+    reject_protected_container(ole, "object editing", max_entries).map_err(Error::from)
 }
 
 fn path_refs(path: &[String]) -> Vec<&str> {
@@ -1343,11 +1397,11 @@ fn join(left: &[String], right: &[String]) -> Vec<String> {
     left.iter().chain(right).cloned().collect()
 }
 
-fn clone_path(path: &[String]) -> Result<Vec<String>, OleError> {
+fn clone_path(path: &[String]) -> Result<Vec<String>, Error> {
     join_checked(&[], path)
 }
 
-fn join_checked(left: &[String], right: &[String]) -> Result<Vec<String>, OleError> {
+fn join_checked(left: &[String], right: &[String]) -> Result<Vec<String>, Error> {
     let count = left
         .len()
         .checked_add(right.len())
@@ -1373,11 +1427,11 @@ fn join_checked(left: &[String], right: &[String]) -> Result<Vec<String>, OleErr
     Ok(output)
 }
 
-fn stream_bytes_total<'a>(mut streams: impl Iterator<Item = &'a Stream>) -> Result<u64, OleError> {
+fn stream_bytes_total<'a>(mut streams: impl Iterator<Item = &'a Stream>) -> Result<u64, Error> {
     streams.try_fold(0u64, |total, stream| {
         total
             .checked_add(stream.bytes().len() as u64)
-            .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()))
+            .ok_or_else(|| OleError::InvalidFormat("CFB capture size overflow".into()).into())
     })
 }
 
@@ -1386,21 +1440,27 @@ fn check_counts(
     storage_count: usize,
     stream_count: usize,
     total_bytes: u64,
-) -> Result<(), OleError> {
+) -> Result<(), Error> {
     if storage_count > limits.max_objects.saturating_mul(limits.max_storage_depth) {
-        return Err(OleError::InvalidFormat(
-            "CFB storage count exceeds object capture limit".into(),
-        ));
+        return Err(Error::Limit {
+            kind: LimitKind::PackageStorages,
+            observed: storage_count as u64,
+            maximum: limits.max_package_storages() as u64,
+        });
     }
     if stream_count > limits.max_streams {
-        return Err(OleError::InvalidFormat(
-            "CFB stream count exceeds package capture limit".into(),
-        ));
+        return Err(Error::Limit {
+            kind: LimitKind::PackageStreams,
+            observed: stream_count as u64,
+            maximum: limits.max_streams as u64,
+        });
     }
     if total_bytes > limits.max_total_size {
-        return Err(OleError::InvalidFormat(
-            "CFB captured stream bytes exceed total size limit".into(),
-        ));
+        return Err(Error::Limit {
+            kind: LimitKind::TotalBytes,
+            observed: total_bytes,
+            maximum: limits.max_total_size,
+        });
     }
     Ok(())
 }

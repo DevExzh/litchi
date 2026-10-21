@@ -1,0 +1,207 @@
+{
+  "baseline_commit": "7d5de8000a28c2bf943a2a2f1137a1e925ea590f",
+  "candidate": "Commit containing this receipt; exact changed source hashes and paired common/dependency source maps accompany it.",
+  "scope": "Typed core OLE object-capture budgets; DOC callbacks, XLS and core/sheet conversions, unified error classifications; absolute selected-object depth and saturating selector-depth admission.",
+  "tests": {
+    "common": 315,
+    "doc": 1228,
+    "xls": 1314,
+    "ppt": 1236,
+    "ops": 48,
+    "unique_total": 4141,
+    "existing_ignored": 5,
+    "tools": 36,
+    "additional_recheck": "23 XLS error tests; included in the XLS total, not added twice."
+  },
+  "checks": {
+    "common": {
+      "command": "cargo test --locked -p litchi-ole-common --all-features",
+      "file": "ole-budget-tests-final.log",
+      "bytes": 30812,
+      "sha256": "6a8fe84e531728a60a15892999494fc6975dc75784180cd9ca843b677ba59b8d",
+      "status": "passed"
+    },
+    "doc_xls": {
+      "command": "cargo test --locked -p litchi-doc -p litchi-xls --all-features --lib",
+      "file": "ole-budget-consumers-final.log",
+      "bytes": 208471,
+      "sha256": "b3b0a3531b51a7be7ea81772679cb5f80f6dc77700dbb62479e98e89f5c3eca6",
+      "status": "passed"
+    },
+    "ppt": {
+      "command": "cargo test --locked -p litchi-doc -p litchi-xls -p litchi-ppt --all-features --lib",
+      "file": "ole-budget-host-tests.log",
+      "bytes": 311124,
+      "sha256": "963b55f9422d2f4481838020aac03b3b206df256a274b9dcc27c6c6d3200964e",
+      "qualification": "This earlier combined command failed on two stale XLS string assertions. DOC 1227 and PPT 1236 tests passed. XLS assertions migrated and its subsequent full suite passes; DOC subsequent callback migration rechecked in doc_xls. The combined command is not recorded as a pass."
+    },
+    "sheet": {
+      "command": "cargo test --locked -p litchi-xls --lib error::tests",
+      "file": "ole-budget-sheet-conversion.log",
+      "bytes": 1872,
+      "sha256": "09ff290d7fd6fe55b89da3df6f4407aef108cbbd06c1e9d937a1a149ed47d4e0",
+      "status": "passed"
+    },
+    "ops": {
+      "command": "cargo test --locked -p litchi-ops --no-default-features --features doc,xls,ppt --lib error::tests",
+      "file": "ole-budget-ops-tests-final.log",
+      "bytes": 4458,
+      "sha256": "d1dea51b4c5524263373f461d37741f699a2f31d50b0ab8ff4e6647f7dbb2131",
+      "status": "passed"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p litchi-core -p litchi-ole-common -p litchi-doc -p litchi-xls -p litchi-ppt --all-targets --all-features -- -D warnings",
+      "file": "ole-budget-clippy-final.log",
+      "bytes": 3251,
+      "sha256": "76e9b3cf0e2ab96dc80c20eb5a7f15cf12e2c031de07cdccfc52cede433ca59b",
+      "status": "passed"
+    },
+    "harness": {
+      "command": "cargo check --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets",
+      "file": "ole-budget-harness-final.log",
+      "bytes": 3025,
+      "sha256": "a737a654d815bcc57f4476477885a16f7ea195ba38e55b34cd9402b342d6ed2c",
+      "status": "passed"
+    },
+    "boundaries": {
+      "command": "python3 tools/check_crate_boundaries.py",
+      "file": "ole-budget-boundaries.log",
+      "bytes": 565,
+      "sha256": "b26d84df60995a6e6f079399e51488bf87aa446cda93f6a1a01f5f00ab5c38db",
+      "status": "passed"
+    },
+    "tools": {
+      "command": "python3 -m unittest tools.test_check_api_glossary tools.test_unified_bench_matrix",
+      "file": "ole-budget-tools-tests.log",
+      "bytes": 541,
+      "sha256": "f63cbd368b5640ac171948c880894a0ce52e453342358d8165b8fc4cd5c907e8",
+      "status": "passed"
+    },
+    "conversion_clippy": {
+      "command": "cargo clippy --locked -p litchi-ole-common -p litchi-xls --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "file": "ole-budget-conversion-clippy.log",
+      "bytes": 1470,
+      "sha256": "be27a6ac4b3818c701940bb1ff58c7222961862b5aa31aa6a7be812ec2536de2"
+    },
+    "common_clippy_final": {
+      "command": "cargo clippy --locked -p litchi-ole-common --all-targets --all-features -- -D warnings",
+      "status": "passed",
+      "file": "ole-budget-common-clippy-final.log",
+      "bytes": 175,
+      "sha256": "083e37c41a86e9a45e64b96fdaa7e3751d8a09461947581354041c8e2f7d4b91"
+    },
+    "ops_clippy": {
+      "command": "cargo clippy --locked -p litchi-ops --no-default-features --features doc,xls,ppt --all-targets -- -D warnings",
+      "status": "passed",
+      "file": "ole-budget-ops-clippy-final.log",
+      "bytes": 1576,
+      "sha256": "d9d00afd1be595a8b4f5c5cd8629964dff42dc0f3395316fca2a6261439b9805"
+    },
+    "fmt": {
+      "command": "cargo fmt --check -p litchi-core -p litchi-ole-common -p litchi-doc -p litchi-xls -p litchi-ops",
+      "status": "passed",
+      "file": "ole-budget-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "glossary_ole-common": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ole-common --target-dir \"$CARGO_TARGET_DIR\"",
+      "status": "passed",
+      "result": "API glossary: 1 profiles, 9 banned names, 0 transaction families checked, 0 immutable owners, family methods in 1 profiles",
+      "file": "ole-budget-glossary-ole-common.log",
+      "bytes": 808,
+      "sha256": "f8c205ecbdce02fce78df15ce9ed774f3c80340168a172ee9337f7ec7f115ac7"
+    },
+    "glossary_doc-minimal": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile doc-minimal --target-dir \"$CARGO_TARGET_DIR\"",
+      "status": "passed",
+      "result": "API glossary: 1 profiles, 82 banned names, 15 transaction families checked, 3 immutable owners, family methods in 1 profiles",
+      "file": "ole-budget-glossary-doc-minimal.log",
+      "bytes": 1514,
+      "sha256": "9caaae1478469bdab041e39786859f90b898bc445f90d77dfef4f11e83800654"
+    },
+    "glossary_xls-minimal": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile xls-minimal --target-dir \"$CARGO_TARGET_DIR\"",
+      "status": "passed",
+      "result": "API glossary: 1 profiles, 97 banned names, 13 transaction families checked, 3 immutable owners, family methods in 1 profiles",
+      "file": "ole-budget-glossary-xls-minimal.log",
+      "bytes": 496,
+      "sha256": "6aa865c2ea6bc694377c7963112896bdc76ddbf8d781e358ab2707fb9d3549c1"
+    },
+    "glossary_ppt-minimal": {
+      "command": "RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile ppt-minimal --target-dir \"$CARGO_TARGET_DIR\"",
+      "status": "passed",
+      "result": "API glossary: 1 profiles, 164 banned names, 15 transaction families checked, 2 immutable owners, family methods in 1 profiles",
+      "file": "ole-budget-glossary-ppt-minimal.log",
+      "bytes": 1987,
+      "sha256": "650fd57ac1e9637a4006a0c348e40dc2f243d640429ca19e885379962894c49f"
+    },
+    "matrix": {
+      "command": "python3 tools/unified_bench_matrix.py --check",
+      "status": "passed",
+      "file": "ole-budget-matrix.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "sources": {
+    "crates/litchi-core/src/error/types.rs": "a407fe1260091a48a954f21831ee81c9f66dd54c6518228533a560a5bd11c1bf",
+    "crates/litchi-core/src/sheet/error.rs": "59b5dba68fa340920252869df37e33297b089643e23af135d6381fd76485931f",
+    "crates/litchi-doc/src/embedded_object/family.rs": "410ec2c66eb35b0d928c1a09fd550922ab91b0f92d74fbee428ea7358e24bce6",
+    "crates/litchi-doc/src/embedded_object/tests.rs": "398d3b127b6b55c1da09225c7090a05775af2e874900b7fb9875c9cd4bb4318a",
+    "crates/litchi-doc/src/embedded_object/transaction/edit.rs": "a7c4e700ac281d2fc527158789dd61c9c42f91c82aecdd5dda0a24909d12f853",
+    "crates/litchi-doc/src/embedded_object/transaction/metadata.rs": "b93f5972328a4d8270132556f644b5552f467ccc09c944cebb630cb0180490cb",
+    "crates/litchi-doc/src/embedded_object/transaction/storage.rs": "3d1a8c793b33d60addea6690b9e3d613b3d65bace72e94260fd3633ec7eb90d8",
+    "crates/litchi-doc/src/package/model.rs": "13ee1acfefdf435ce04dc6b1907af9e343458a10b44233ba9c56db5ca3c82ce0",
+    "crates/litchi-ole-common/src/error.rs": "869aba7285fa8a73ee1ce694c31418b489a14fd48d989346c385beaa4e3788b5",
+    "crates/litchi-ole-common/src/lib.rs": "a7ba8850588fa44dab8b64efe70d26b5444bf47ac4fef158b73c93fd45fcfba0",
+    "crates/litchi-ole-common/src/object/codec.rs": "98494b5b6ffa996e99b6d819c661a3fd6c56f2eeb29e32d18a55dfc1cb4e51b2",
+    "crates/litchi-ole-common/src/object/discovery.rs": "f362c5efafc964b3174764c4b3f7254e4f28bab21bbf14e87522680979c24a38",
+    "crates/litchi-ole-common/src/object/editor.rs": "9a9977158263c21088afd3bd025d57eb3b4564b9396799821bc910762d257142",
+    "crates/litchi-ole-common/src/object/model.rs": "faa4523eb92b34970328a900d19f6a41706c26b74dcb0b44489273b1d862e46f",
+    "crates/litchi-ole-common/src/object/patch.rs": "b0944d020f2d580d409e97b1f8bfe583302a0e69a916aedd78ff3b45adfe822a",
+    "crates/litchi-ole-common/src/object/snapshot.rs": "580bf21c77de6277f1b931aecb4b3b0054d57dc42146cb5ba82c91deabbe6db6",
+    "crates/litchi-ole-common/tests/object.rs": "b6a14ae0338755d4a99d80678d6a1a4c8a0b977d4ac424b643ddb671c373e49b",
+    "crates/litchi-ole-common/tests/object_link.rs": "03ffaf4449432c79ded55a82701951afcb18ac8cc3ccd53fe10f67d57d72d668",
+    "crates/litchi-ops/src/error.rs": "862f081f680f12c67b6b79ed8d0ce26c08b2625924a5b099833364f4f4374fe4",
+    "crates/litchi-ops/src/error/tests.rs": "74c00bc1284dadd651f2d1ea4fe024fe0e7f2711ce4c213ae00d7310f4679d36",
+    "crates/litchi-xls/src/cell_values/tests.rs": "dcf9cffe624388f61754c0429b29128ff52f5962a3b933dede70f0b7fa82b6b6",
+    "crates/litchi-xls/src/error.rs": "24b7f2ce26eeb9c1d0a9a717bba5d49ced4c8700cbe2c0cb55bd2384d65300fd",
+    "docs/unified-ops/results/0359e/object-budget-probe.py": "c6d10574823d688d55aa088fe359b5bbd0b216bd3de80b6c34fbedc99df9bbd8",
+    "docs/unified-ops/results/0359e/object-budget-probe.rs": "e1118dc32fa44ee41b28838408a0856b287c87565aa9ab58270f3b08513bcef4"
+  },
+  "external_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "performance": {
+    "measurements": "object-measurements.json",
+    "large_replay_followup": "large-replay-followup.json",
+    "heap": "object-heap.json",
+    "sampling": "Three CPU24-pinned process ABBA blocks per route, baseline-calibrated legs targeting >=150ms and at least100 iterations. Workers acknowledged holds and process audits were clear before launch. Owners and actual returned buffers cross black_box. Large replay follow-up uses15000 iterations per leg with unchanged binaries.",
+    "reproduce": [
+      "python3 docs/unified-ops/results/0359e/object-budget-probe.py build /external/object-budget-probe",
+      "python3 docs/unified-ops/results/0359e/object-budget-probe.py run /external/object-budget-probe"
+    ],
+    "rejected_or_excluded": [
+      {
+        "file": "rejected-first-measurements.json",
+        "reason": "Short fixed-iteration legs, some below1ms; small replay cost investigated and wrapper inlined. Length-only output consumer also limits publication conclusions."
+      },
+      {
+        "file": "excluded-unobserved-output.json",
+        "reason": "Inlining lets compiler eliminate an unobserved output Vec. Diagnostic only; not publication-cost acceptance."
+      },
+      {
+        "file": "rejected-open-measurements.json",
+        "reason": "Corrected returned-buffer consumer but array-based policy validation; small-open median1.019. Replaced eager error-metadata table with direct checks."
+      }
+    ],
+    "explanation": "Final small-open range crosses baseline. Long large-replay follow-up crosses baseline despite earlier full-pass positive ratios; all original/follow-up data retained, no claim of large-replay speedup. Heap and copy semantics unchanged."
+  },
+  "review": "Independent W4b read-only review identified DOC callback and XLS sheet-propagation gaps, selected-depth and selector-overflow issues; fixes and regression coverage included.",
+  "remaining_required": [
+    "Raw directory/OLEDS/link/protection policies and errors, explicit limits",
+    "Shared OLE Snapshot publication, canonical options/owners, source sharing",
+    "Graph untouched-CFB-stream sharing and nested raw chart audit",
+    "W4/W4b/W8 integration, corpus/performance dispositions, final inventory and full53-check gate"
+  ]
+}

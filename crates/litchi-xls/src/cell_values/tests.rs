@@ -567,8 +567,9 @@ fn retained_stream_limit_rejects_a_growing_candidate() {
     let error = edit.commit().unwrap_err();
     assert!(matches!(
         error,
-        Error::Cfb(litchi_cfb::OleError::InvalidFormat(message))
-            if message.contains("replacement stream exceeds size limit")
+        Error::Object(litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::StreamBytes, observed, maximum,
+        }) if observed > maximum && maximum == limits.max_stream_size
     ));
     assert_eq!(source.bytes(), before.as_slice());
 }
@@ -587,8 +588,9 @@ fn broad_patch_cannot_widen_a_narrow_same_bytes_destination() {
     let error = broad_commit.patch().apply(&narrow).unwrap_err();
     assert!(matches!(
         error,
-        Error::Cfb(litchi_cfb::OleError::InvalidFormat(message))
-            if message.contains("Workbook") && message.contains("exceeds size limit")
+        Error::Object(litchi_ole_common::Error::Limit {
+            kind: litchi_ole_common::LimitKind::StreamBytes, observed, maximum,
+        }) if observed > maximum && maximum == limits.max_stream_size
     ));
     assert_eq!(narrow.bytes(), before.as_slice());
     assert_eq!(narrow.inner.limits, limits);

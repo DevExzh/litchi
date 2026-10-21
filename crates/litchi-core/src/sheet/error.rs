@@ -31,6 +31,8 @@ pub enum Error {
         /// The bound's value.
         maximum: usize,
     },
+    /// A replay recipient does not match the patch's recorded base.
+    PatchConflict,
     /// The source file changed after it was opened.
     SourceChanged,
     /// Reading the source failed.
@@ -90,6 +92,9 @@ impl fmt::Display for Error {
                 observed,
                 maximum,
             } => write!(formatter, "{kind} {observed} exceeds its bound {maximum}"),
+            Self::PatchConflict => {
+                formatter.write_str("the patch base does not match the recipient")
+            },
             Self::SourceChanged => formatter.write_str("the source changed after it was opened"),
             Self::Io => formatter.write_str("reading the source failed"),
             Self::Malformed(reason) => write!(formatter, "malformed source: {reason}"),

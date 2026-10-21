@@ -58,6 +58,8 @@ pub enum Error {
     Io(std::io::Error),
     /// CFB (Compound File Binary) error
     Cfb(litchi_cfb::OleError),
+    /// Shared OLE object capture or publication failure.
+    Object(litchi_ole_common::Error),
     /// MS-OVBA project authoring or parsing error
     Vba(litchi_vba::Error),
     /// Host-neutral Office Graph parsing or encoding error.
@@ -211,6 +213,7 @@ impl fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "I/O error: {e}"),
             Error::Cfb(e) => write!(f, "CFB error: {e}"),
+            Error::Object(e) => write!(f, "OLE object error: {e}"),
             Error::Vba(e) => write!(f, "VBA project error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidRecord {
@@ -365,6 +368,7 @@ impl std::error::Error for Error {
         match self {
             Error::Io(e) => Some(e),
             Error::Cfb(e) => Some(e),
+            Error::Object(e) => Some(e),
             Error::Vba(e) => Some(e),
             Error::Graph(e) => Some(e),
             Error::Metadata(e) => Some(e),
@@ -460,6 +464,33 @@ impl From<Error> for litchi_core::sheet::Error {
         use litchi_core::edit::RefusalKind;
         let refused = |kind, reason| Self::refused(kind, "read", reason);
         match error {
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::SourceChanged {
+                ..
+            })) => Self::SourceChanged,
+            Error::Object(litchi_ole_common::Error::Cfb(
+                litchi_cfb::OleError::Io(_) | litchi_cfb::OleError::Committed { .. },
+            )) => Self::Io,
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::Allocation {
+                ..
+            })) => Self::Internal("the XLS object allocation failed"),
+            Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::StreamNotFound)) => {
+                refused(RefusalKind::NotFound, "the XLS object stream was not found")
+            },
+            Error::Object(
+                litchi_ole_common::Error::Limit { .. }
+                | litchi_ole_common::Error::Cfb(litchi_cfb::OleError::LimitExceeded { .. }),
+            ) => refused(
+                RefusalKind::UnsupportedContent,
+                "the XLS workbook exceeds a configured limit",
+            ),
+            Error::Object(
+                litchi_ole_common::Error::InvalidLimit { .. }
+                | litchi_ole_common::Error::Cfb(litchi_cfb::OleError::InvalidLimit { .. }),
+            ) => refused(
+                RefusalKind::InvalidValue,
+                "the XLS object limit is not valid",
+            ),
+            Error::Object(litchi_ole_common::Error::PatchConflict) => Self::PatchConflict,
             Error::Io(_) | Error::Cfb(_) => Self::Io,
             Error::WorksheetNotFound(_) => refused(
                 RefusalKind::NotFound,
@@ -487,9 +518,85 @@ impl From<Error> for litchi_core::sheet::Error {
     }
 }
 
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn object_errors_keep_sheet_failure_categories() {
+        use litchi_core::{edit::RefusalKind, sheet::Error as SheetError};
+        use litchi_ole_common::{Error as ObjectError, LimitKind};
+        let convert = |error| SheetError::from(Error::Object(error));
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::Io(
+                std::io::Error::other("inert")
+            ))),
+            SheetError::Io
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::SourceChanged {
+                expected: litchi_core::SourceVersion::new(1, 0),
+                observed: litchi_core::SourceVersion::new(1, 1),
+            })),
+            SheetError::SourceChanged
+        );
+        assert_eq!(
+            convert(ObjectError::PatchConflict),
+            SheetError::PatchConflict
+        );
+        assert_eq!(
+            convert(ObjectError::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: 2,
+                maximum: 1
+            })
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::UnsupportedContent)
+        );
+        assert_eq!(
+            convert(ObjectError::InvalidLimit {
+                kind: LimitKind::StorageDepth,
+                value: 0,
+                maximum: 32
+            })
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::InvalidValue)
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: 2,
+                maximum: 1,
+            }))
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::UnsupportedContent)
+        );
+        assert_eq!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::InvalidLimit {
+                resource: "input bytes",
+                value: 0,
+                maximum: 1,
+            }))
+            .refusal()
+            .map(litchi_core::edit::Refusal::kind),
+            Some(RefusalKind::InvalidValue)
+        );
+        assert!(matches!(
+            convert(ObjectError::Cfb(litchi_cfb::OleError::InvalidFormat(
+                "inert".into()
+            ))),
+            SheetError::Malformed(_)
+        ));
+    }
     use std::error::Error as StdError;
 
     #[test]

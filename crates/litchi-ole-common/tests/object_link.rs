@@ -106,7 +106,7 @@ fn link_edits_publish_atomically_and_preserve_opaque_streams() {
     assert!(
         rejected
             .update_link("object", |_link| {
-                Err(litchi_cfb::OleError::InvalidFormat("reject edit".into()))
+                Err(litchi_cfb::OleError::InvalidFormat("reject edit".into()).into())
             })
             .is_err()
     );

@@ -178,7 +178,9 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut litchi_ole_common::object::link::Link) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(
+            &mut litchi_ole_common::object::link::Link,
+        ) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
             .update_link(storage_id, edit)
@@ -194,7 +196,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
             .update_presentation(storage_id, index, limits, edit)
@@ -210,7 +212,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
             .update_presentation_for(reference, index, limits, edit)
@@ -249,7 +251,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
             .update_native(storage_id, limits, edit)
@@ -264,7 +266,7 @@ impl Transaction {
         edit: F,
     ) -> Result<(), TransactionError>
     where
-        F: FnOnce(&mut native::Edit) -> Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
             .update_native_for(reference, limits, edit)

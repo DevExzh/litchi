@@ -1,0 +1,112 @@
+{
+  "route": "apply_patch",
+  "opaque_bytes": 2097152,
+  "extra_streams": 0,
+  "iterations": 15000,
+  "cpu": 24,
+  "after_before": [
+    0.9923911723093737,
+    0.9855817646138566,
+    1.0146899813903631
+  ],
+  "samples": [
+    {
+      "ns": 986661284,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 0
+    },
+    {
+      "ns": 1007956643,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 0
+    },
+    {
+      "ns": 928488886,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 0
+    },
+    {
+      "ns": 964631294,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 0
+    },
+    {
+      "ns": 1003530547,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 1
+    },
+    {
+      "ns": 986107148,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 1
+    },
+    {
+      "ns": 959465184,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 1
+    },
+    {
+      "ns": 970503878,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 1
+    },
+    {
+      "ns": 967773671,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 2
+    },
+    {
+      "ns": 963218075,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 2
+    },
+    {
+      "ns": 974559181,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "after",
+      "block": 2
+    },
+    {
+      "ns": 941949783,
+      "iterations": 15000,
+      "checksum": 31741440000,
+      "input_bytes": 2116096,
+      "build": "before",
+      "block": 2
+    }
+  ],
+  "reason": "Investigate stable cost versus variance after full final run; retain every original and follow-up sample.",
+  "source_sha256": "e1118dc32fa44ee41b28838408a0856b287c87565aa9ab58270f3b08513bcef4"
+}

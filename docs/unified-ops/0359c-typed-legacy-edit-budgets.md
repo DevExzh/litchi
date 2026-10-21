@@ -126,9 +126,11 @@ source/log hashes are in [the validation receipt](results/0359c/graph-validation
 
 ## Required continuation
 
-The shared `litchi-ole-common::object` capture/editor still reports several
-configured bounds through `OleError::InvalidFormat`. Its typed error migration
-must cover every DOC/XLS/Graph/PPT consumer in the same change.
+[0359e](0359e-object-capture-budgets.md) migrates the shared
+`litchi-ole-common::object` core capture/editor budgets to typed errors with
+all direct consumers, DOC callbacks, XLS sheet conversion and unified
+classifiers. Raw directory, OLEDS, link and protection policy/error surfaces
+remain required work; the core capture migration does not close them.
 
 [0359d](0359d-graph-package-owner.md) consolidates Graph's standalone edit
 onto `Commit<Package, Patch>`, removes the second Snapshot owner and migrates

@@ -1898,3 +1898,80 @@ fn graph_typed_causes_are_classified_without_parsing_messages() {
         assert_eq!(error.classify().code, expected);
     }
 }
+
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+#[test]
+fn shared_object_errors_keep_codes_through_host_and_core_conversions() {
+    use litchi_ole_common::{Error as ObjectError, LimitKind};
+    let cases: [(fn() -> ObjectError, Code); 5] = [
+        (
+            || {
+                ObjectError::Cfb(litchi_cfb::OleError::LimitExceeded {
+                    resource: "input bytes",
+                    observed: 2,
+                    maximum: 1,
+                })
+            },
+            Code::LimitExceeded,
+        ),
+        (
+            || {
+                ObjectError::Cfb(litchi_cfb::OleError::InvalidLimit {
+                    resource: "input bytes",
+                    value: 0,
+                    maximum: 1,
+                })
+            },
+            Code::InvalidArgument,
+        ),
+        (
+            || ObjectError::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: 2,
+                maximum: 1,
+            },
+            Code::LimitExceeded,
+        ),
+        (
+            || ObjectError::InvalidLimit {
+                kind: LimitKind::StorageDepth,
+                value: 0,
+                maximum: 32,
+            },
+            Code::InvalidArgument,
+        ),
+        (|| ObjectError::PatchConflict, Code::InvalidInput),
+    ];
+    for (make_error, expected) in cases {
+        let core: litchi_core::Error = make_error().into();
+        assert_eq!(Error::from(core).code(), expected);
+        #[cfg(feature = "doc")]
+        {
+            let host: litchi_doc::Error = make_error().into();
+            assert_eq!(Error::from(host).code(), expected);
+        }
+        #[cfg(feature = "xls")]
+        {
+            let host: litchi_xls::Error = make_error().into();
+            assert_eq!(Error::from(host).code(), expected);
+        }
+    }
+    let changed = || {
+        ObjectError::Cfb(litchi_cfb::OleError::SourceChanged {
+            expected: SourceVersion::new(1, 0),
+            observed: SourceVersion::new(1, 1),
+        })
+    };
+    let core: litchi_core::Error = changed().into();
+    assert_eq!(Error::from(core).code(), Code::IoError);
+    #[cfg(feature = "doc")]
+    assert_eq!(
+        Error::from(litchi_doc::Error::from(changed())).code(),
+        Code::IoError
+    );
+    #[cfg(feature = "xls")]
+    assert_eq!(
+        Error::from(litchi_xls::Error::from(changed())).code(),
+        Code::IoError
+    );
+}

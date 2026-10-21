@@ -1116,6 +1116,8 @@ impl Classify for litchi_core::selector::ParseError {
 impl Classify for litchi_core::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::Io(error) => error.classify(),
             Self::SourceChanged { .. } => Class::of(Code::IoError),
             Self::NotOfficeFile => Class::of(Code::UnsupportedFormat),
@@ -1497,6 +1499,7 @@ impl Classify for litchi_xlsb::Error {
 impl Classify for litchi_doc::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::Object(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
@@ -1656,6 +1659,18 @@ impl Classify for litchi_biff::Error {
     }
 }
 
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+impl Classify for litchi_ole_common::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Cfb(error) => error.classify(),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+        }
+    }
+}
+
 #[cfg(any(feature = "xls", feature = "ppt"))]
 impl Classify for litchi_ograph::Error {
     fn classify(&self) -> Class {
@@ -1686,6 +1701,7 @@ impl Classify for litchi_ograph::Error {
 impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::Object(error) => error.classify(),
             Self::InvalidLimit { .. } | Self::EncryptionEntropyRequired => {
                 Class::of(Code::InvalidArgument)
             },

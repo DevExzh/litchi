@@ -389,6 +389,48 @@ fn malformed_known_metadata_remains_lossless_unknown_bytes() {
 }
 
 #[test]
+fn public_object_callback_preserves_typed_failure_and_discards_candidate() {
+    use litchi_ole_common::{Error as ObjectError, LimitKind};
+    let mut editor = super::Editor::open(base_doc(), Limits::default()).unwrap();
+    editor
+        .add(super::WriteOptions::new(
+            77,
+            object_cfb(
+                &crate::writer::ole_metadata::generate_compobj_stream(),
+                &crate::writer::ole_metadata::generate_ole_stream(),
+                &[0, 0, 3, 0, 0, 0],
+                &[],
+            ),
+            picture_data(77),
+        ))
+        .unwrap();
+    let bytes = editor.finish().unwrap();
+    let source = crate::Package::from_bytes(&bytes).unwrap();
+    let mut edit = source.edit_embedded_objects().unwrap();
+    let error = edit
+        .update_link(77, |link| {
+            link.set_cache_hint(true);
+            Err(ObjectError::Limit {
+                kind: LimitKind::StreamBytes,
+                observed: 2,
+                maximum: 1,
+            })
+        })
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        super::Error::Package(crate::Error::Object(ObjectError::Limit {
+            kind: LimitKind::StreamBytes,
+            observed: 2,
+            maximum: 1,
+        }))
+    ));
+    let committed = edit.commit().unwrap();
+    assert!(committed.patch().is_noop());
+    assert_eq!(committed.package().to_bytes().unwrap(), bytes);
+}
+
+#[test]
 fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
     let mut comp_obj = crate::writer::ole_metadata::generate_compobj_stream();
     comp_obj.extend_from_slice(&[0xA1, 0xB2, 0xC3]);
@@ -577,7 +619,12 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         .update_native_for(
             &reference,
             litchi_ole_common::ole_streams::Limits::default(),
-            |native| native.set_data([0xCC, 0xDD]).map(|_| ()),
+            |native| {
+                native
+                    .set_data([0xCC, 0xDD])
+                    .map(|_| ())
+                    .map_err(litchi_ole_common::Error::from)
+            },
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
@@ -810,7 +857,12 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
             .update_native_for(
                 &forged_name,
                 litchi_ole_common::ole_streams::Limits::default(),
-                |native| { native.set_data([0xF0, 0xF1]).map(|_| ()) }
+                |native| {
+                    native
+                        .set_data([0xF0, 0xF1])
+                        .map(|_| ())
+                        .map_err(litchi_ole_common::Error::from)
+                }
             )
             .is_err()
     );
@@ -888,7 +940,12 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
             .update_native_for(
                 &ambiguous_reference,
                 litchi_ole_common::ole_streams::Limits::default(),
-                |native| { native.set_data([0xF2, 0xF3]).map(|_| ()) }
+                |native| {
+                    native
+                        .set_data([0xF2, 0xF3])
+                        .map(|_| ())
+                        .map_err(litchi_ole_common::Error::from)
+                }
             )
             .is_err()
     );

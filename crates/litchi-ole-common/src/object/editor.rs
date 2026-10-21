@@ -9,6 +9,7 @@ use super::patch::{Commit, Diagnostics, Patch};
 use super::snapshot::Snapshot;
 use super::target::{Target, Targets};
 use crate::ole_streams::{self, native, presentation};
+use crate::{Error, LimitKind};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -60,8 +61,8 @@ pub enum CfbParseEvent {
 #[cfg(feature = "performance-diagnostics")]
 fn observe_cfb_parse<T>(
     observer: &mut impl FnMut(CfbParseEvent),
-    operation: impl FnOnce() -> Result<T, OleError>,
-) -> Result<T, OleError> {
+    operation: impl FnOnce() -> Result<T, Error>,
+) -> Result<T, Error> {
     observer(CfbParseEvent::Started);
     let result = operation();
     observer(CfbParseEvent::Finished {
@@ -99,7 +100,7 @@ impl Edit {
     ///
     /// Returns an error when the CFB is malformed or protected, a target is
     /// missing/invalid, or a configured resource limit is exceeded.
-    pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, OleError> {
+    pub fn open(bytes: Vec<u8>, targets: Targets, limits: Limits) -> Result<Self, Error> {
         Self::validate_open_inputs(&targets, limits)?;
         let mut ole = OleFile::open(Cursor::new(bytes))?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
@@ -124,7 +125,7 @@ impl Edit {
         targets: Targets,
         limits: Limits,
         cfb_limits: OleFileLimits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         Self::validate_open_inputs(&targets, limits)?;
         let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
@@ -149,7 +150,7 @@ impl Edit {
         bytes: Vec<u8>,
         targets: Targets,
         limits: Limits,
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), Error> {
         Self::open_with_ole_file_with_admission(bytes, targets, limits, |_| Ok(()))
     }
 
@@ -165,23 +166,23 @@ impl Edit {
     /// ```
     /// use std::io::Cursor;
     /// use litchi_cfb::{OleError, OleWriter};
-    /// use litchi_ole_common::object::{Edit, Limits, Targets};
+    /// use litchi_ole_common::{Error, object::{Edit, Limits, Targets}};
     ///
     /// let mut writer = OleWriter::new();
     /// writer.create_stream(&["payload"], b"example")?;
     /// let mut bytes = Cursor::new(Vec::new());
     /// writer.write_to(&mut bytes)?;
-    /// let result = Edit::open_with_ole_file_with_admission::<OleError, _>(
+    /// let result = Edit::open_with_ole_file_with_admission::<Error, _>(
     ///     bytes.into_inner(), Targets::default(), Limits::default(),
     ///     |ole| {
     ///         if ole.stream_len(&["payload"])? > 4 {
-    ///             return Err(OleError::InvalidFormat("caller payload limit".into()));
+    ///             return Err(OleError::InvalidFormat("caller payload limit".into()).into());
     ///         }
     ///         Ok(())
     ///     },
     /// );
-    /// assert!(matches!(result, Err(OleError::InvalidFormat(_))));
-    /// # Ok::<(), OleError>(())
+    /// assert!(matches!(result, Err(Error::Cfb(OleError::InvalidFormat(_)))));
+    /// # Ok::<(), Error>(())
     /// ```
     ///
     /// # Errors
@@ -200,11 +201,13 @@ impl Edit {
         admission: F,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
     where
-        E: From<OleError>,
+        E: From<Error>,
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
     {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open(Cursor::new(bytes)).map_err(E::from)?;
+        let mut ole = OleFile::open(Cursor::new(bytes))
+            .map_err(Error::from)
+            .map_err(E::from)?;
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
@@ -235,7 +238,7 @@ impl Edit {
         targets: Targets,
         limits: Limits,
         observer: impl FnMut(CfbParseEvent),
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), Error> {
         Self::open_with_ole_file_profiled_with_admission(bytes, targets, limits, observer, |_| {
             Ok(())
         })
@@ -251,15 +254,14 @@ impl Edit {
     /// ```no_run
     /// # #[cfg(feature = "performance-diagnostics")]
     /// # {
-    /// use litchi_cfb::OleError;
-    /// use litchi_ole_common::object::{Edit, Limits, Targets};
+    /// use litchi_ole_common::{Error, object::{Edit, Limits, Targets}};
     ///
-    /// let _result = Edit::open_with_ole_file_profiled_with_admission::<OleError, _>(
+    /// let _result = Edit::open_with_ole_file_profiled_with_admission::<Error, _>(
     ///     Vec::new(),
     ///     Targets::default(),
     ///     Limits::default(),
     ///     |_| {},
-    ///     |_| Ok::<(), OleError>(()),
+    ///     |_| Ok::<(), Error>(()),
     /// );
     /// # }
     /// ```
@@ -283,12 +285,14 @@ impl Edit {
         admission: F,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
     where
-        E: From<OleError>,
+        E: From<Error>,
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
     {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = observe_cfb_parse(&mut observer, || OleFile::open(Cursor::new(bytes)))
-            .map_err(E::from)?;
+        let mut ole = observe_cfb_parse(&mut observer, || {
+            OleFile::open(Cursor::new(bytes)).map_err(Error::from)
+        })
+        .map_err(E::from)?;
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
@@ -296,14 +300,14 @@ impl Edit {
         Ok((editor, ole))
     }
 
-    fn validate_open_inputs(targets: &Targets, limits: Limits) -> Result<(), OleError> {
+    fn validate_open_inputs(targets: &Targets, limits: Limits) -> Result<(), Error> {
         limits.validate()?;
         if targets.len() > limits.max_objects {
-            return Err(OleError::InvalidFormat(format!(
-                "object target count {} exceeds limit {}",
-                targets.len(),
-                limits.max_objects
-            )));
+            return Err(Error::Limit {
+                kind: LimitKind::Objects,
+                observed: targets.len() as u64,
+                maximum: limits.max_objects as u64,
+            });
         }
         Ok(())
     }
@@ -312,16 +316,19 @@ impl Edit {
         ole: &mut OleFile<R>,
         targets: Targets,
         limits: Limits,
-    ) -> Result<(Targets, Package, Objects), OleError> {
+    ) -> Result<(Targets, Package, Objects), Error> {
         codec::open(ole, limits.max_package_directory_entries())?;
-        if targets
+        if let Some(target) = targets
             .iter()
-            .any(|target| target.path().len() > limits.max_storage_depth)
+            .find(|target| target.path().len() > limits.max_storage_depth)
         {
-            return Err(OleError::InvalidFormat(
-                "object target path exceeds storage depth limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::StorageDepth,
+                observed: target.path().len() as u64,
+                maximum: limits.max_storage_depth as u64,
+            });
         }
+
         let resolved_target_entries = targets
             .into_vec()
             .into_iter()
@@ -442,9 +449,9 @@ impl Edit {
     ///
     /// Returns an error when the selected target is missing, the callback
     /// rejects the replacement, or the replacement fails CFB validation.
-    pub fn update<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
+    pub fn update<F>(&mut self, key: &str, edit: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut Vec<u8>) -> Result<(), OleError>,
+        F: FnOnce(&mut Vec<u8>) -> Result<(), Error>,
     {
         let mut bytes = self
             .objects
@@ -462,7 +469,7 @@ impl Edit {
     ///
     /// Returns an error when the target or replacement is invalid, protected,
     /// oversized, or cannot be committed atomically.
-    pub fn replace(&mut self, key: &str, compound_file: Vec<u8>) -> Result<(), OleError> {
+    pub fn replace(&mut self, key: &str, compound_file: Vec<u8>) -> Result<(), Error> {
         let Some(prepared) = self.prepare_replacement(key, compound_file)? else {
             return Ok(());
         };
@@ -483,11 +490,13 @@ impl Edit {
         &self,
         key: &str,
         compound_file: Vec<u8>,
-    ) -> Result<Option<PreparedReplacement>, OleError> {
+    ) -> Result<Option<PreparedReplacement>, Error> {
         if compound_file.len() as u64 > self.limits.max_object_size {
-            return Err(OleError::InvalidFormat(
-                "replacement object exceeds size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectBytes,
+                observed: compound_file.len() as u64,
+                maximum: self.limits.max_object_size,
+            });
         }
         let object = self
             .objects
@@ -526,16 +535,18 @@ impl Edit {
     ///
     /// Returns an error when the prepared value does not match this editor or
     /// the candidate package fails its normal bounded publication checks.
-    pub fn replace_prepared(&mut self, prepared: PreparedReplacement) -> Result<(), OleError> {
+    pub fn replace_prepared(&mut self, prepared: PreparedReplacement) -> Result<(), Error> {
         if self.limits != prepared.limits {
             return Err(OleError::InvalidFormat(
                 "prepared replacement limits do not match editor".into(),
-            ));
+            )
+            .into());
         }
         if !Arc::ptr_eq(&self.original, &prepared.source) {
             return Err(OleError::InvalidFormat(
                 "prepared replacement source does not match editor".into(),
-            ));
+            )
+            .into());
         }
         let object = self.objects.get(&prepared.key).ok_or_else(|| {
             OleError::InvalidFormat(format!("object target {:?} not found", prepared.key))
@@ -543,7 +554,8 @@ impl Edit {
         if object.path() != prepared.path || object.compound() != prepared.before.as_ref() {
             return Err(OleError::InvalidFormat(
                 "prepared replacement source does not match object editor".into(),
-            ));
+            )
+            .into());
         }
         let mut candidate = self.clone();
         candidate
@@ -559,7 +571,7 @@ impl Edit {
     ///
     /// Returns an error when the stream is missing, oversized, or the rendered
     /// package fails validation.
-    pub fn put_stream(&mut self, path: &[String], data: Vec<u8>) -> Result<(), OleError> {
+    pub fn put_stream(&mut self, path: &[String], data: Vec<u8>) -> Result<(), Error> {
         self.put_stream_shared(path, data.into())
     }
 
@@ -569,7 +581,7 @@ impl Edit {
     ///
     /// Returns an error when the stream is missing, oversized, or the rendered
     /// package fails validation.
-    pub fn put_stream_shared(&mut self, path: &[String], data: Arc<[u8]>) -> Result<(), OleError> {
+    pub fn put_stream_shared(&mut self, path: &[String], data: Arc<[u8]>) -> Result<(), Error> {
         if self
             .stream(path)
             .is_some_and(|current| current == data.as_ref())
@@ -600,7 +612,7 @@ impl Edit {
         &mut self,
         path: &[String],
         data: Arc<[u8]>,
-    ) -> Result<Vec<u8>, OleError> {
+    ) -> Result<Vec<u8>, Error> {
         if self
             .stream(path)
             .is_some_and(|current| current == data.as_ref())
@@ -629,7 +641,7 @@ impl Edit {
     pub fn put_streams_shared<'a>(
         &mut self,
         replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         self.put_streams_shared_with_rendered(replacements)
             .map(|_| ())
     }
@@ -658,13 +670,15 @@ impl Edit {
     pub fn put_streams_shared_with_rendered<'a>(
         &mut self,
         replacements: impl IntoIterator<Item = (&'a [String], Arc<[u8]>)>,
-    ) -> Result<Option<Vec<u8>>, OleError> {
+    ) -> Result<Option<Vec<u8>>, Error> {
         let mut candidate = None;
         for (index, (path, data)) in replacements.into_iter().enumerate() {
             if index >= self.limits.max_streams {
-                return Err(OleError::InvalidFormat(
-                    "stream replacement batch exceeds package stream-count limit".into(),
-                ));
+                return Err(Error::Limit {
+                    kind: LimitKind::PackageStreams,
+                    observed: index.saturating_add(1) as u64,
+                    maximum: self.limits.max_streams as u64,
+                });
             }
             if candidate
                 .as_ref()
@@ -691,7 +705,7 @@ impl Edit {
     ///
     /// Returns an error when the path or data exceeds the configured bounds,
     /// the parent is missing, or the rendered package fails validation.
-    pub fn add_stream(&mut self, path: Vec<String>, data: Vec<u8>) -> Result<(), OleError> {
+    pub fn add_stream(&mut self, path: Vec<String>, data: Vec<u8>) -> Result<(), Error> {
         let mut candidate = self.clone();
         candidate
             .package
@@ -712,7 +726,7 @@ impl Edit {
     /// Returns an error when the path is empty or invalid, identifies a
     /// storage, or the rendered package fails validation. Failure leaves this
     /// editor unchanged.
-    pub fn remove_stream(&mut self, path: &[String]) -> Result<Option<Arc<[u8]>>, OleError> {
+    pub fn remove_stream(&mut self, path: &[String]) -> Result<Option<Arc<[u8]>>, Error> {
         self.validate_stream_path_depth(path)?;
         let path = CfbPath::try_from_slice(path, "stream removal path")?;
         let Some(removed) = self.package.removable_stream(&path)? else {
@@ -740,13 +754,15 @@ impl Edit {
     pub fn remove_streams<'a>(
         &mut self,
         paths: impl IntoIterator<Item = &'a [String]>,
-    ) -> Result<Vec<Option<Arc<[u8]>>>, OleError> {
+    ) -> Result<Vec<Option<Arc<[u8]>>>, Error> {
         let mut validated = Vec::<(CfbPath, u64)>::new();
         for path in paths {
             if validated.len() == MAX_STREAM_REMOVALS {
-                return Err(OleError::InvalidFormat(format!(
-                    "stream removal batch exceeds operation limit {MAX_STREAM_REMOVALS}"
-                )));
+                return Err(Error::Limit {
+                    kind: LimitKind::StreamRemovals,
+                    observed: validated.len().saturating_add(1) as u64,
+                    maximum: MAX_STREAM_REMOVALS as u64,
+                });
             }
             self.validate_stream_path_depth(path)?;
             let path = CfbPath::try_from_slice(path, "stream removal path")?;
@@ -757,7 +773,8 @@ impl Edit {
                 return Err(OleError::InvalidFormat(format!(
                     "stream removal batch contains duplicate path {:?}",
                     path.as_slice()
-                )));
+                ))
+                .into());
             }
             validated
                 .try_reserve(1)
@@ -781,19 +798,14 @@ impl Edit {
         Ok(removed)
     }
 
-    fn validate_stream_path_depth(&self, path: &[String]) -> Result<(), OleError> {
-        let maximum = self
-            .limits
-            .max_storage_depth
-            .checked_add(1)
-            .ok_or_else(|| {
-                OleError::InvalidFormat("stream selector depth limit overflows usize".into())
-            })?;
+    fn validate_stream_path_depth(&self, path: &[String]) -> Result<(), Error> {
+        let maximum = self.limits.max_storage_depth.saturating_add(1);
         if path.len() > maximum {
-            return Err(OleError::InvalidFormat(format!(
-                "stream selector depth {} exceeds limit {maximum}",
-                path.len()
-            )));
+            return Err(Error::Limit {
+                kind: LimitKind::SelectorDepth,
+                observed: path.len() as u64,
+                maximum: maximum as u64,
+            });
         }
         Ok(())
     }
@@ -809,9 +821,9 @@ impl Edit {
     ///
     /// Returns an error when `key` is absent, its OLEDS stream is missing or
     /// malformed, `edit` fails, or the resulting package cannot be validated.
-    pub fn update_link<F>(&mut self, key: &str, edit: F) -> Result<(), OleError>
+    pub fn update_link<F>(&mut self, key: &str, edit: F) -> Result<(), Error>
     where
-        F: FnOnce(&mut Link) -> Result<(), OleError>,
+        F: FnOnce(&mut Link) -> Result<(), Error>,
     {
         let object_path = self
             .objects
@@ -838,9 +850,9 @@ impl Edit {
         index: usize,
         limits: ole_streams::Limits,
         edit: F,
-    ) -> Result<(), OleError>
+    ) -> Result<(), Error>
     where
-        F: FnOnce(&mut presentation::Edit) -> Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> Result<(), Error>,
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_presentation_path(key, index)?;
@@ -865,16 +877,14 @@ impl Edit {
         key: &str,
         index: usize,
         patch: &presentation::Patch,
-    ) -> Result<(), OleError> {
+    ) -> Result<(), Error> {
         let stream_path = self.object_presentation_path(key, index)?;
         let bytes = self
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
         if bytes.as_ref() != patch.before_bytes() {
-            return Err(OleError::InvalidFormat(
-                "OLEDS presentation patch source does not match object stream".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         let source = presentation::Snapshot::parse_shared(bytes, patch.source().limits())?;
         let replacement = patch.apply(&source)?;
@@ -888,9 +898,9 @@ impl Edit {
         key: &str,
         limits: ole_streams::Limits,
         edit: F,
-    ) -> Result<(), OleError>
+    ) -> Result<(), Error>
     where
-        F: FnOnce(&mut native::Edit) -> Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> Result<(), Error>,
     {
         model::validate_ole_stream_limits(limits)?;
         let stream_path = self.object_native_path(key)?;
@@ -910,23 +920,21 @@ impl Edit {
     ///
     /// The exact source bytes are compared before reparsing, so a stale patch
     /// is rejected before an editor candidate is cloned or rendered.
-    pub fn apply_native_patch(&mut self, key: &str, patch: &native::Patch) -> Result<(), OleError> {
+    pub fn apply_native_patch(&mut self, key: &str, patch: &native::Patch) -> Result<(), Error> {
         let stream_path = self.object_native_path(key)?;
         let bytes = self
             .package
             .stream_shared(&stream_path)
             .ok_or(OleError::StreamNotFound)?;
         if bytes.as_ref() != patch.before_bytes() {
-            return Err(OleError::InvalidFormat(
-                "OLEDS native patch source does not match object stream".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         let source = native::Snapshot::parse_shared(bytes, patch.source().limits())?;
         let replacement = patch.apply(&source)?;
         self.put_stream_shared(&stream_path, replacement.bytes_shared())
     }
 
-    fn object_presentation_path(&self, key: &str, index: usize) -> Result<Vec<String>, OleError> {
+    fn object_presentation_path(&self, key: &str, index: usize) -> Result<Vec<String>, Error> {
         let object = self
             .objects
             .get(key)
@@ -937,7 +945,7 @@ impl Edit {
         Ok(path)
     }
 
-    fn object_native_path(&self, key: &str) -> Result<Vec<String>, OleError> {
+    fn object_native_path(&self, key: &str) -> Result<Vec<String>, Error> {
         let object = self
             .objects
             .get(key)
@@ -954,11 +962,13 @@ impl Edit {
     ///
     /// Returns an error when the target or replacement CFB is invalid, the
     /// target already exists, or the rendered package fails validation.
-    pub fn add_storage(&mut self, target: Target, compound_file: Vec<u8>) -> Result<(), OleError> {
+    pub fn add_storage(&mut self, target: Target, compound_file: Vec<u8>) -> Result<(), Error> {
         if compound_file.len() as u64 > self.limits.max_object_size {
-            return Err(OleError::InvalidFormat(
-                "new object exceeds size limit".into(),
-            ));
+            return Err(Error::Limit {
+                kind: LimitKind::ObjectBytes,
+                observed: compound_file.len() as u64,
+                maximum: self.limits.max_object_size,
+            });
         }
         let mut nested_ole =
             OleFile::open_with_limits(Cursor::new(compound_file), self.cfb_limits)?;
@@ -984,7 +994,7 @@ impl Edit {
     ///
     /// Returns an error when the target is missing or the rendered package
     /// fails validation.
-    pub fn remove_storage(&mut self, key: &str) -> Result<Arc<[u8]>, OleError> {
+    pub fn remove_storage(&mut self, key: &str) -> Result<Arc<[u8]>, Error> {
         let object = self
             .objects
             .get(key)
@@ -1024,7 +1034,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if the edited CFB cannot be rendered.
-    pub fn finish(self) -> Result<Vec<u8>, OleError> {
+    pub fn finish(self) -> Result<Vec<u8>, Error> {
         if self.changed {
             if self.layout == SectorLayoutPolicy::Reuse
                 && let Some(rendered) = self.package.render_copy_through(
@@ -1063,7 +1073,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the edited package cannot be rendered.
-    pub fn commit(self) -> Result<Commit, OleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let before = self.original.as_ref().clone();
         let snapshot = self.staged();
         let after = self.finish()?;
@@ -1072,12 +1082,12 @@ impl Edit {
         Ok(Commit::new(snapshot, patch, diagnostics))
     }
 
-    fn commit_candidate(self) -> Result<Self, OleError> {
+    fn commit_candidate(self) -> Result<Self, Error> {
         self.commit_candidate_with_rendered()
             .map(|(candidate, _rendered)| candidate)
     }
 
-    fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), OleError> {
+    fn commit_candidate_with_rendered(mut self) -> Result<(Self, Vec<u8>), Error> {
         self.package.check(self.limits)?;
         let rendered = if self.layout == SectorLayoutPolicy::Reuse {
             self.package

@@ -308,6 +308,8 @@ pub enum Error {
     Io(io::Error),
     /// OLE file error
     Ole(OleError),
+    /// Shared OLE object capture or publication failure.
+    Object(litchi_ole_common::Error),
     /// Invalid DOC format
     InvalidFormat(String),
     /// Stream not found
@@ -385,6 +387,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
+            Error::Object(e) => write!(f, "OLE object error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
@@ -435,6 +438,7 @@ impl std::error::Error for Error {
         match self {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Allocation { source, .. } => Some(source),
             Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
@@ -616,6 +620,7 @@ impl From<Error> for litchi_core::Error {
         match err {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            Error::Object(error) => litchi_core::Error::from(error),
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
@@ -656,5 +661,11 @@ impl From<Error> for litchi_core::Error {
                 "{name} documents (nFib {nfib:#06x}) are not supported"
             )),
         }
+    }
+}
+
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
     }
 }

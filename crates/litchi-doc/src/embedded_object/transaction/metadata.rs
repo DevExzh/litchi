@@ -98,7 +98,7 @@ impl Editor {
     /// callback rejects the candidate, or the package cannot be validated.
     pub(crate) fn update_link<F>(&mut self, storage_id: u32, edit: F) -> Result<()>
     where
-        F: FnOnce(&mut Link) -> StdResult<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut Link) -> StdResult<(), litchi_ole_common::Error>,
     {
         let reference = self
             .objects()?

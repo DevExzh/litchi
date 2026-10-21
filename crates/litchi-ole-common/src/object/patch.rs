@@ -1,7 +1,7 @@
 //! Reversible snapshot commits for target-selected OLE edits.
 
 use super::snapshot::Snapshot;
-use litchi_cfb::OleError;
+use crate::Error;
 use std::sync::Arc;
 
 /// A deterministic whole-artifact replacement from one OLE snapshot to the
@@ -61,11 +61,10 @@ impl Patch {
     ///
     /// Returns an error when `source` does not exactly match the artifact this
     /// patch was created from.
-    pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>, OleError> {
+    #[inline]
+    pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>, Error> {
         if source != self.before.as_ref() {
-            return Err(OleError::InvalidFormat(
-                "OLE patch source snapshot does not match".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.as_ref().to_vec())
     }

@@ -148,7 +148,7 @@ impl Edit {
     where
         F: FnOnce(
             &mut litchi_ole_common::object::link::Link,
-        ) -> std::result::Result<(), litchi_cfb::OleError>,
+        ) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self.inner.update_link(storage_id, edit)?)
     }
@@ -162,7 +162,7 @@ impl Edit {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self
             .inner
@@ -178,7 +178,7 @@ impl Edit {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self
             .inner
@@ -217,7 +217,7 @@ impl Edit {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self.inner.update_native(storage_id, limits, edit)?)
     }
@@ -230,7 +230,7 @@ impl Edit {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_cfb::OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self.inner.update_native_for(reference, limits, edit)?)
     }

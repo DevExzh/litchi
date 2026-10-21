@@ -10,6 +10,7 @@ use super::editor::Edit;
 use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
+use crate::Error;
 use crate::ole_streams::{self, native, presentation};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
 use std::io::Cursor;
@@ -80,7 +81,7 @@ impl Snapshot {
         bytes: Vec<u8>,
         targets: Targets,
         limits: super::model::Limits,
-    ) -> Result<Self, OleError> {
+    ) -> Result<Self, Error> {
         Ok(Edit::open(bytes, targets, limits)?.staged())
     }
 
@@ -123,7 +124,7 @@ impl Snapshot {
     ///
     /// Returns an error when `key` is absent or its OLEDS stream is malformed
     /// or exceeds the metadata limit.
-    pub fn link(&self, key: &str) -> Result<Option<Link>, OleError> {
+    pub fn link(&self, key: &str) -> Result<Option<Link>, Error> {
         self.state
             .objects
             .get(key)
@@ -137,7 +138,7 @@ impl Snapshot {
         key: &str,
         index: usize,
         limits: ole_streams::Limits,
-    ) -> Result<Option<presentation::Snapshot>, OleError> {
+    ) -> Result<Option<presentation::Snapshot>, Error> {
         self.state
             .objects
             .get(key)
@@ -150,7 +151,7 @@ impl Snapshot {
         &self,
         key: &str,
         limits: ole_streams::Limits,
-    ) -> Result<Vec<(usize, presentation::Snapshot)>, OleError> {
+    ) -> Result<Vec<(usize, presentation::Snapshot)>, Error> {
         self.state
             .objects
             .get(key)
@@ -163,7 +164,7 @@ impl Snapshot {
         &self,
         key: &str,
         limits: ole_streams::Limits,
-    ) -> Result<Option<native::Snapshot>, OleError> {
+    ) -> Result<Option<native::Snapshot>, Error> {
         self.state
             .objects
             .get(key)
@@ -185,7 +186,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the captured package cannot be rendered.
-    pub fn finish(&self) -> Result<Vec<u8>, OleError> {
+    pub fn finish(&self) -> Result<Vec<u8>, Error> {
         if self.state.changed {
             if self.state.layout == SectorLayoutPolicy::Reuse
                 && let Some(rendered) = self.state.package.render_copy_through(

@@ -206,7 +206,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_presentation_for(&reference, index, limits, edit)
@@ -221,7 +221,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
@@ -293,7 +293,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let reference = reference_for_storage_id(self, storage_id)?;
         self.update_native_for(&reference, limits, edit)
@@ -307,7 +307,7 @@ impl Editor {
         edit: F,
     ) -> Result<()>
     where
-        F: FnOnce(&mut native::Edit) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let object = object_for_reference_checked(self, reference)?;
         let source = object
