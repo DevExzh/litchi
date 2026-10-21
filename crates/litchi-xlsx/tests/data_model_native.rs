@@ -197,7 +197,7 @@ fn public_data_model_writer_enforces_xml10_character_boundaries() {
         let mut value = definition();
         value.tables[0].name = format!("table{forbidden}");
         assert!(matches!(
-            litchi_xlsx::write_data_model(&value),
+            litchi_xlsx::write_data_model(&value, &litchi_opc::SourceLimits::default()),
             Err(Error::Invalid(message)) if message.contains("XML 1.0-forbidden character")
         ));
     }
@@ -207,8 +207,10 @@ fn public_data_model_writer_enforces_xml10_character_boundaries() {
     value.tables[0].id = format!("id{valid}");
     value.tables[0].name = format!("table{valid}");
     value.tables[0].connection = format!("connection{valid}");
-    let encoded = litchi_xlsx::write_data_model(&value).unwrap();
-    let decoded = litchi_xlsx::parse_data_model(&encoded).unwrap();
+    let encoded =
+        litchi_xlsx::write_data_model(&value, &litchi_opc::SourceLimits::default()).unwrap();
+    let decoded =
+        litchi_xlsx::parse_data_model(&encoded, &litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(decoded.tables[0], value.tables[0]);
 }
 

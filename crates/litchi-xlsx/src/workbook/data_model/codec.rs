@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::SeenNames;
+use litchi_opc::SourceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, PrefixDeclaration, ResolveResult};
@@ -18,10 +19,11 @@ use super::model::{
     ModelTimeGroupings, OpaqueXml, Relationship, Table,
 };
 use super::{
-    DATA_MODEL_EXTENSION_URI, MAX_CALCULATED_TIME_COLUMNS, MAX_DEPTH, MAX_EXTENSION_BYTES,
-    MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES, MAX_STRING_BYTES, MAX_TABLES,
-    MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES, MODEL_TIME_GROUPINGS_EXTENSION_URI,
-    MODEL_TIME_GROUPINGS_NAMESPACE, SML, STRICT_SML, X15, invalid, limit, xml_error,
+    DATA_MODEL_EXTENSION_URI, LimitKind, MAX_CALCULATED_TIME_COLUMNS, MAX_DEPTH,
+    MAX_EXTENSION_BYTES, MAX_NODES, MAX_RELATIONSHIPS, MAX_REWRITE_BYTES, MAX_STRING_BYTES,
+    MAX_TABLES, MAX_TIME_GROUPINGS, MAX_TOTAL_STRING_BYTES, MAX_XML_BYTES,
+    MODEL_TIME_GROUPINGS_EXTENSION_URI, MODEL_TIME_GROUPINGS_NAMESPACE, SML, STRICT_SML, X15,
+    invalid, limit, xml_error,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -68,21 +70,28 @@ struct XmlContext {
 }
 
 /// Parse an inline `x15:dataModel` descriptor.
-pub fn parse_data_model(xml: &[u8]) -> Result<Definition> {
-    let root = parse_document(xml)?;
+pub fn parse_data_model(xml: &[u8], limits: &SourceLimits) -> Result<Definition> {
+    let root = parse_document_with_base(xml, None, limits)?;
     parse_data_model_node(&root)
 }
 
 /// Parse a standalone MS-XLSX `modelTimeGroupings` element.
-pub fn parse_model_time_groupings(xml: &[u8]) -> Result<ModelTimeGroupings> {
-    let root = parse_document(xml)?;
+pub fn parse_model_time_groupings(xml: &[u8], limits: &SourceLimits) -> Result<ModelTimeGroupings> {
+    let root = parse_document_with_base(xml, None, limits)?;
     parse_model_time_groupings_node(&root)
 }
 
 /// Serialize a standalone MS-XLSX `modelTimeGroupings` element.
-pub fn write_model_time_groupings(value: &ModelTimeGroupings) -> Result<Vec<u8>> {
+pub fn write_model_time_groupings(
+    value: &ModelTimeGroupings,
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
     validate_model_time_groupings(value)?;
     let encoded_size = serialized_model_time_groupings_size(value)?;
+    let maximum = source_xml_limit(limits);
+    if encoded_size > maximum {
+        return Err(Error::limit(LimitKind::XmlBytes, encoded_size, maximum));
+    }
     let mut output = Vec::new();
     reserve_bytes(&mut output, encoded_size, "modelTimeGroupings bytes")?;
     write_model_time_groupings_node(&mut output, value);
@@ -125,9 +134,12 @@ pub(crate) fn rewrite_model_time_groupings_extension(
             return Ok(None);
         };
         let output_size = new_model_time_groupings_document_size(value_size)?;
-        let node = write_model_time_groupings(value.ok_or_else(|| {
-            invalid("modelTimeGroupings value disappeared during serialization")
-        })?)?;
+        let node = write_model_time_groupings(
+            value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?,
+            &SourceLimits::default(),
+        )?;
         let mut output = Vec::new();
         reserve_bytes(&mut output, output_size, "modelTimeGroupings bytes")?;
         output.extend_from_slice(b"<x15:extLst xmlns:x15=\"");
@@ -167,9 +179,12 @@ pub(crate) fn rewrite_model_time_groupings_extension(
     };
     if let Some(child) = spans.child {
         let _ = splice_length(source, child.start..child.end, value_size)?;
-        let node = write_model_time_groupings(value.ok_or_else(|| {
-            invalid("modelTimeGroupings value disappeared during serialization")
-        })?)?;
+        let node = write_model_time_groupings(
+            value.ok_or_else(|| {
+                invalid("modelTimeGroupings value disappeared during serialization")
+            })?,
+            &SourceLimits::default(),
+        )?;
         return splice(source, child.start..child.end, &node).map(Some);
     }
     let list = spans
@@ -178,27 +193,36 @@ pub(crate) fn rewrite_model_time_groupings_extension(
     let extension = if let Some(target) = spans.target_extension {
         if target.empty {
             preflight_expand_empty(source, &target, value_size)?;
-            let node = write_model_time_groupings(value.ok_or_else(|| {
-                invalid("modelTimeGroupings value disappeared during serialization")
-            })?)?;
+            let node = write_model_time_groupings(
+                value.ok_or_else(|| {
+                    invalid("modelTimeGroupings value disappeared during serialization")
+                })?,
+                &SourceLimits::default(),
+            )?;
             expand_empty(source, &target, &node)
         } else {
             let at = target
                 .close_start
                 .ok_or_else(|| invalid("missing modelTimeGroupings extension close tag"))?;
             let _ = splice_length(source, at..at, value_size)?;
-            let node = write_model_time_groupings(value.ok_or_else(|| {
-                invalid("modelTimeGroupings value disappeared during serialization")
-            })?)?;
+            let node = write_model_time_groupings(
+                value.ok_or_else(|| {
+                    invalid("modelTimeGroupings value disappeared during serialization")
+                })?,
+                &SourceLimits::default(),
+            )?;
             splice(source, at..at, &node)
         }
     } else {
         let extension_size = model_time_groupings_extension_size(&list.qname, value_size)?;
         if list.empty {
             preflight_expand_empty(source, &list, extension_size)?;
-            let node = write_model_time_groupings(value.ok_or_else(|| {
-                invalid("modelTimeGroupings value disappeared during serialization")
-            })?)?;
+            let node = write_model_time_groupings(
+                value.ok_or_else(|| {
+                    invalid("modelTimeGroupings value disappeared during serialization")
+                })?,
+                &SourceLimits::default(),
+            )?;
             let extension =
                 write_model_time_groupings_extension(&list.qname, &node, extension_size)?;
             expand_empty(source, &list, &extension)
@@ -207,9 +231,12 @@ pub(crate) fn rewrite_model_time_groupings_extension(
                 .close_start
                 .ok_or_else(|| invalid("missing extension list close tag"))?;
             let _ = splice_length(source, at..at, extension_size)?;
-            let node = write_model_time_groupings(value.ok_or_else(|| {
-                invalid("modelTimeGroupings value disappeared during serialization")
-            })?)?;
+            let node = write_model_time_groupings(
+                value.ok_or_else(|| {
+                    invalid("modelTimeGroupings value disappeared during serialization")
+                })?,
+                &SourceLimits::default(),
+            )?;
             let extension =
                 write_model_time_groupings_extension(&list.qname, &node, extension_size)?;
             splice(source, at..at, &extension)
@@ -909,12 +936,16 @@ pub(crate) fn close_extension(xml: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Deterministically serialize an inline `x15:dataModel` descriptor.
-pub fn write_data_model(value: &Definition) -> Result<Vec<u8>> {
+pub fn write_data_model(value: &Definition, limits: &SourceLimits) -> Result<Vec<u8>> {
     // Compute the complete encoded length before validating or materializing
     // the output buffer.  The descriptor limit applies to escaped wire bytes,
     // not to the caller's UTF-8 string lengths, so counting after `push` would
     // permit an oversized allocation.
     let encoded_size = serialized_data_model_size(value)?;
+    let maximum = source_xml_limit(limits);
+    if encoded_size > maximum {
+        return Err(Error::limit(LimitKind::XmlBytes, encoded_size, maximum));
+    }
     validate_definition(value, false)?;
     let mut output = Vec::with_capacity(encoded_size);
     output.extend_from_slice(b"<x15:dataModel xmlns:x15=\"");
@@ -1671,16 +1702,21 @@ fn validate_opaque_entity(entity: &[u8]) -> Result<()> {
 }
 
 pub(crate) fn parse_document(xml: &[u8]) -> Result<Node> {
-    parse_document_with_base(xml, None)
+    parse_document_with_base(xml, None, &SourceLimits::default())
 }
 
 /// Parse an XML owner with its OPC part URI as the initial XML Base context.
 /// Standalone fragments retain the historical context-free entry point above;
 /// package-owned workbook parts can provide their concrete part URI so a
 /// relative root `xml:base` remains portable when detached.
-pub(crate) fn parse_document_with_base(xml: &[u8], initial_base: Option<&str>) -> Result<Node> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("XML bytes"));
+pub(crate) fn parse_document_with_base(
+    xml: &[u8],
+    initial_base: Option<&str>,
+    limits: &SourceLimits,
+) -> Result<Node> {
+    let maximum = source_xml_limit(limits);
+    if xml.len() > maximum {
+        return Err(Error::limit(LimitKind::XmlBytes, xml.len(), maximum));
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = NsReader::from_reader(xml);
@@ -1879,6 +1915,10 @@ pub(crate) fn parse_document_with_base(xml: &[u8], initial_base: Option<&str>) -
         return Err(invalid("unterminated XML"));
     }
     root.ok_or_else(|| invalid("missing XML root"))
+}
+
+fn source_xml_limit(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_XML_BYTES as u64) as usize
 }
 
 fn make_node(
@@ -2929,7 +2969,7 @@ mod tests {
             ..Definition::default()
         };
         let escaped_size = serialized_data_model_size(&escaped).unwrap();
-        let escaped_output = write_data_model(&escaped).unwrap();
+        let escaped_output = write_data_model(&escaped, &SourceLimits::default()).unwrap();
         assert_eq!(escaped_output.len(), escaped_size);
         assert!(
             String::from_utf8_lossy(&escaped_output).contains("a&amp;&lt;>&quot;&#x9;&#xA;&#xD;")
@@ -2967,20 +3007,55 @@ mod tests {
         id.truncate(id.len() - excess);
 
         assert_eq!(serialized_data_model_size(&value).unwrap(), MAX_XML_BYTES);
-        let exact = write_data_model(&value).unwrap();
+        let exact = write_data_model(&value, &SourceLimits::default()).unwrap();
         assert_eq!(exact.len(), MAX_XML_BYTES);
 
         value.tables[0].id.pop();
-        assert_eq!(write_data_model(&value).unwrap().len(), MAX_XML_BYTES - 1);
+        assert_eq!(
+            write_data_model(&value, &SourceLimits::default())
+                .unwrap()
+                .len(),
+            MAX_XML_BYTES - 1
+        );
 
         value.tables[0].id.push('x');
         value.tables[0].id.push('y');
         assert!(matches!(
-            write_data_model(&value),
+            write_data_model(&value, &SourceLimits::default()),
             Err(Error::Limit {
-                kind: crate::LimitKind::DataModel(crate::workbook::data_model::LimitKind::XmlBytes,),
+                kind: crate::LimitKind::DataModel(LimitKind::XmlBytes,),
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn source_limits_bound_descriptor_input_and_output() {
+        let limits = SourceLimits::builder()
+            .max_part_bytes(16)
+            .unwrap()
+            .build()
+            .unwrap();
+        let xml = format!(r#"<x15:dataModel xmlns:x15="{X15}"/>"#);
+        let error = parse_data_model(xml.as_bytes(), &limits)
+            .expect_err("the caller's source part budget must be enforced");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::XmlBytes),
+                maximum: 16,
+                ..
+            }
+        ));
+        let error = write_data_model(&Definition::default(), &limits)
+            .expect_err("the caller's source part budget must bound generated XML");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::XmlBytes),
+                maximum: 16,
+                ..
+            }
         ));
     }
 
@@ -2997,13 +3072,11 @@ mod tests {
     fn oversized_opaque_source_is_rejected_before_child_materialization() {
         let text = "x".repeat(MAX_EXTENSION_BYTES);
         let xml = format!("<m:dataModel xmlns:m='{X15}'><m:extLst>{text}</m:extLst></m:dataModel>");
-        let result = parse_data_model(xml.as_bytes());
+        let result = parse_data_model(xml.as_bytes(), &SourceLimits::default());
         assert!(matches!(
             result,
             Err(Error::Limit {
-                kind: crate::LimitKind::DataModel(
-                    crate::workbook::data_model::LimitKind::ExtensionBytes,
-                ),
+                kind: crate::LimitKind::DataModel(LimitKind::ExtensionBytes,),
                 ..
             })
         ));
@@ -3014,13 +3087,11 @@ mod tests {
         let namespace = "x".repeat(MAX_EXTENSION_BYTES);
         let xml =
             format!("<m:dataModel xmlns:m='{X15}' xmlns:q='{namespace}'><m:extLst/></m:dataModel>");
-        let result = parse_data_model(xml.as_bytes());
+        let result = parse_data_model(xml.as_bytes(), &SourceLimits::default());
         assert!(matches!(
             result,
             Err(Error::Limit {
-                kind: crate::LimitKind::DataModel(
-                    crate::workbook::data_model::LimitKind::NamespaceBytes,
-                ),
+                kind: crate::LimitKind::DataModel(LimitKind::NamespaceBytes,),
                 ..
             })
         ));
@@ -3058,13 +3129,16 @@ mod tests {
     #[test]
     fn model_time_groupings_round_trip_and_escape_values() {
         let expected = sample_model_time_groupings();
-        let xml = write_model_time_groupings(&expected).unwrap();
+        let xml = write_model_time_groupings(&expected, &SourceLimits::default()).unwrap();
         let text = String::from_utf8_lossy(&xml);
         assert!(text.contains("Date &amp; Sales"));
         assert!(text.contains("Order &lt;Date>"));
         assert!(text.contains("isSelected=\"1\""));
         assert!(text.contains("isSelected=\"0\""));
-        assert_eq!(parse_model_time_groupings(&xml).unwrap(), expected);
+        assert_eq!(
+            parse_model_time_groupings(&xml, &SourceLimits::default()).unwrap(),
+            expected
+        );
     }
 
     #[test]
@@ -3076,13 +3150,13 @@ mod tests {
                 </x14:modelTimeGrouping>
             </x14:modelTimeGroupings>"#
         );
-        let parsed = parse_model_time_groupings(xml.as_bytes()).unwrap();
+        let parsed = parse_model_time_groupings(xml.as_bytes(), &SourceLimits::default()).unwrap();
         assert!(matches!(
             &parsed.groupings[0].calculated_time_columns[0].content_type,
             ModelTimeGroupingContentType::Other(value) if value == "futureUnit"
         ));
         assert!(matches!(
-            write_model_time_groupings(&parsed),
+            write_model_time_groupings(&parsed, &SourceLimits::default()),
             Err(Error::Unsupported { feature })
                 if feature.contains("unknown modelTimeGrouping contentType")
         ));
@@ -3102,6 +3176,7 @@ mod tests {
         );
         let mut definition = parse_data_model(
             format!(r#"<x15:dataModel xmlns:x15="{X15}">{source}</x15:dataModel>"#).as_bytes(),
+            &SourceLimits::default(),
         )
         .unwrap();
         let expected = ModelTimeGroupings {
@@ -3153,6 +3228,7 @@ mod tests {
         );
         let mut definition = parse_data_model(
             format!(r#"<x15:dataModel xmlns:x15="{X15}">{source}</x15:dataModel>"#).as_bytes(),
+            &SourceLimits::default(),
         )
         .unwrap();
         assert!(definition.model_time_groupings().unwrap().is_some());

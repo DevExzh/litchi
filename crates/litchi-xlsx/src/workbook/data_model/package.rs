@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use litchi_core::xml::ReaderOrigin;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 use quick_xml::{Reader, events::Event};
 
 use crate::error::Result;
@@ -34,13 +34,22 @@ use super::{
 
 /// Load an independently owned Data Model, explicitly copying its inert payload.
 /// Use [`Snapshot::load`] for a view that shares the package allocation.
-pub fn load_data_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<Model>> {
-    Ok(load_shared_model(package, workbook_name)?.map(|model| model.to_owned()))
+pub fn load_data_model(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Option<Model>> {
+    Ok(load_shared_model(package, workbook_name, limits)?.map(|model| model.to_owned()))
 }
 
-fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Option<ModelView>> {
+fn load_shared_model(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Option<ModelView>> {
     let workbook = package.get_part(workbook_name)?;
-    let workbook_root = parse_document_with_base(workbook.blob(), Some(workbook_name.as_str()))?;
+    let workbook_root =
+        parse_document_with_base(workbook.blob(), Some(workbook_name.as_str()), limits)?;
     let (_, definition) = workbook_definition(&workbook_root)?;
     let mut parts = package
         .iter_parts()
@@ -75,8 +84,13 @@ fn load_shared_model(package: &OpcPackage, workbook_name: &PackURI) -> Result<Op
     if blob.is_empty() {
         return Err(invalid("Data Model payload cannot be empty"));
     }
-    if blob.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("payload bytes"));
+    let maximum = limits.max_part_bytes().min(MAX_PAYLOAD_BYTES as u64) as usize;
+    if blob.len() > maximum {
+        return Err(Error::limit(
+            super::LimitKind::PayloadBytes,
+            blob.len(),
+            maximum,
+        ));
     }
     let profile = inspect_xldm(blob)?.profile();
     if !part.rels().is_empty() {
@@ -112,7 +126,7 @@ pub(crate) fn store_data_model(
     if package.is_signed() || package.requires_signature_edit_policy() {
         return Err(Error::Signed);
     }
-    if load_shared_model(package, workbook_name)?.is_some() {
+    if load_shared_model(package, workbook_name, &package.read_limits())?.is_some() {
         return Err(invalid("workbook already contains a Data Model"));
     }
     validate_model_time_grouping_identity(
@@ -166,7 +180,7 @@ fn publish_data_model(
         }
     }
     let removal = if value.is_none() {
-        load_shared_model(package, workbook_name)?
+        load_shared_model(package, workbook_name, &package.read_limits())?
             .map(|model| {
                 super::removal::prepare(package, workbook_name, model.definition(), limits)
             })
@@ -191,7 +205,12 @@ fn publish_data_model(
         None
     };
     let workbook_source = package.source_xml_part(workbook_name)?;
-    let root = parse_document_with_base(workbook_source.bytes(), Some(workbook_name.as_str()))?;
+    let source_limits = package.read_limits();
+    let root = parse_document_with_base(
+        workbook_source.bytes(),
+        Some(workbook_name.as_str()),
+        &source_limits,
+    )?;
     let (core, existing) = workbook_definition(&root)?;
     let updated = match (existing.as_ref(), value) {
         (Some(before), Some(after)) if same_structure(before, &after.definition) => {
@@ -207,7 +226,7 @@ fn publish_data_model(
         },
         _ => {
             let fragment = value
-                .map(|value| write_data_model_fragment(core, &value.definition))
+                .map(|value| write_data_model_fragment(core, &value.definition, &source_limits))
                 .transpose()?;
             Some(rewrite_data_model_extension(
                 &workbook_source,
@@ -269,8 +288,12 @@ fn publish_data_model(
     Ok(())
 }
 
-fn write_data_model_fragment(core: &str, definition: &Definition) -> Result<Vec<u8>> {
-    let descriptor = write_data_model(definition)?;
+fn write_data_model_fragment(
+    core: &str,
+    definition: &Definition,
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
+    let descriptor = write_data_model(definition, limits)?;
     let mut fragment = Vec::new();
     fragment.extend_from_slice(b"<x:ext xmlns:x=\"");
     escape(&mut fragment, core);
@@ -292,11 +315,14 @@ fn prepare_import(
     if let Some(extension) = &mut Arc::make_mut(&mut model.definition).extension_list {
         extension.xml = super::codec::close_extension(&extension.xml)?;
         let source = package.source_xml_part(workbook)?;
-        let root = parse_document_with_base(source.bytes(), Some(workbook.as_str()))?;
+        let source_limits = package.read_limits();
+        let root =
+            parse_document_with_base(source.bytes(), Some(workbook.as_str()), &source_limits)?;
         let (core, _) = workbook_definition(&root)?;
-        let fragment = write_data_model_fragment(core, &model.definition)?;
+        let fragment = write_data_model_fragment(core, &model.definition, &source_limits)?;
         let projected = rewrite_data_model_extension(&source, core, Some(&fragment))?;
-        let projected_root = parse_document_with_base(projected.bytes(), Some(workbook.as_str()))?;
+        let projected_root =
+            parse_document_with_base(projected.bytes(), Some(workbook.as_str()), &source_limits)?;
         model.definition = Arc::new(
             workbook_definition(&projected_root)?
                 .1
@@ -800,7 +826,7 @@ impl Snapshot {
     }
 
     fn load_for(package: &OpcPackage, workbook_name: PackURI) -> Result<Self> {
-        let model = load_shared_model(package, &workbook_name)?;
+        let model = load_shared_model(package, &workbook_name, &package.read_limits())?;
         let source = Arc::new(capture_source(package, &workbook_name, model.as_ref())?);
         Ok(Self {
             workbook_name,
@@ -1440,6 +1466,18 @@ mod tests {
     };
     use litchi_opc::Part;
 
+    fn load_model(package: &OpcPackage, workbook: &PackURI) -> Result<Option<Model>> {
+        load_data_model(package, workbook, &package.read_limits())
+    }
+
+    fn parse_model(xml: &[u8]) -> Result<Definition> {
+        parse_data_model(xml, &SourceLimits::default())
+    }
+
+    fn write_model(value: &Definition) -> Result<Vec<u8>> {
+        write_data_model(value, &SourceLimits::default())
+    }
+
     fn definition() -> Definition {
         Definition {
             min_version_load: 7,
@@ -1563,7 +1601,8 @@ mod tests {
         workbook: &PackURI,
         value: ModelTimeGroupings,
     ) {
-        let mut current = load_data_model(package, workbook).unwrap().unwrap();
+        let limits = package.read_limits();
+        let mut current = load_model(package, workbook).unwrap().unwrap();
         current
             .definition
             .set_model_time_groupings(Some(value))
@@ -1571,9 +1610,10 @@ mod tests {
         let (source, updated) = {
             let source = package.source_xml_part(workbook).unwrap();
             let source_bytes = source.bytes().to_vec();
-            let root = parse_document_with_base(&source_bytes, Some(workbook.as_str())).unwrap();
+            let root =
+                parse_document_with_base(&source_bytes, Some(workbook.as_str()), &limits).unwrap();
             let (core, _) = workbook_definition(&root).unwrap();
-            let fragment = write_data_model_fragment(core, &current.definition).unwrap();
+            let fragment = write_data_model_fragment(core, &current.definition, &limits).unwrap();
             let updated = rewrite_data_model_extension(&source, core, Some(&fragment)).unwrap();
             (source_bytes, updated)
         };
@@ -1670,7 +1710,7 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(load_data_model(&package, &workbook).unwrap().is_none());
+        assert!(load_model(&package, &workbook).unwrap().is_none());
     }
 
     #[test]
@@ -1726,7 +1766,7 @@ mod tests {
         let xml = format!(
             r#"<m:dataModel xmlns:m='{X15}' xmlns='urn:default' xmlns:a='urn:a&amp;b' xmlns:q='urn:value'><m:extLst marker='q:Tag'>{content}</m:extLst></m:dataModel>"#
         );
-        let parsed = parse_data_model(xml.as_bytes()).unwrap();
+        let parsed = parse_model(xml.as_bytes()).unwrap();
         let extension = String::from_utf8_lossy(&parsed.extension_list.as_ref().unwrap().xml);
         assert!(extension.contains(content));
         assert!(extension.contains("marker='q:Tag'"));
@@ -1739,17 +1779,17 @@ mod tests {
         }
         let detached = super::super::codec::close_extension(extension.as_bytes()).unwrap();
         assert_eq!(detached, extension.as_bytes());
-        let serialized = write_data_model(&parsed).unwrap();
+        let serialized = write_model(&parsed).unwrap();
         assert!(String::from_utf8_lossy(&serialized).contains(content));
-        assert!(parse_data_model(&serialized).is_ok());
+        assert!(parse_model(&serialized).is_ok());
         assert!(
-            parse_data_model(
+            parse_model(
                 format!(r#"<m:dataModel xmlns:m='{X15}'><![CDATA[bad]]></m:dataModel>"#).as_bytes()
             )
             .is_err()
         );
         assert!(
-            parse_data_model(
+            parse_model(
                 format!(r#"<!DOCTYPE dataModel><m:dataModel xmlns:m='{X15}'/>"#).as_bytes()
             )
             .is_err()
@@ -1827,8 +1867,8 @@ mod tests {
     #[test]
     fn typed_descriptor_round_trip() {
         let expected = definition();
-        let xml = write_data_model(&expected).unwrap();
-        let actual = parse_data_model(&xml).unwrap();
+        let xml = write_model(&expected).unwrap();
+        let actual = parse_model(&xml).unwrap();
         assert_eq!(actual.min_version_load, expected.min_version_load);
         assert_eq!(actual.tables, expected.tables);
         assert_eq!(actual.relationships, expected.relationships);
@@ -1840,7 +1880,7 @@ mod tests {
         let (mut package, workbook) = fixture_package();
         let expected = model();
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(
             actual.definition.min_version_load,
             expected.definition.min_version_load
@@ -1865,7 +1905,7 @@ mod tests {
         );
         let mut package = as_source(&package);
         store_data_model(&mut package, &workbook, &model()).unwrap();
-        assert!(load_data_model(&package, &workbook).unwrap().is_some());
+        assert!(load_model(&package, &workbook).unwrap().is_some());
     }
 
     #[test]
@@ -1879,9 +1919,9 @@ mod tests {
                 r#"<x15:dataModel xmlns:x15="{X15}"><x15:modelRelationships><x15:modelRelationship fromTable="Missing" fromColumn="a" toTable="Missing" toColumn="b"/></x15:modelRelationships></x15:dataModel>"#
             ),
         ] {
-            assert!(parse_data_model(xml.as_bytes()).is_err());
+            assert!(parse_model(xml.as_bytes()).is_err());
         }
-        assert!(parse_data_model(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
+        assert!(parse_model(&vec![b' '; MAX_XML_BYTES + 1]).is_err());
     }
 
     #[test]
@@ -1902,7 +1942,7 @@ mod tests {
         );
         let mut value = definition();
         value.relationships[0].to_table = "Absent".into();
-        assert!(write_data_model(&value).is_err());
+        assert!(write_model(&value).is_err());
     }
 
     #[test]
@@ -1937,7 +1977,7 @@ mod tests {
             table.connection = "Model_Connection".into();
         }
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(actual.definition.tables, expected.definition.tables);
     }
 
@@ -1973,7 +2013,7 @@ mod tests {
             DATA_MODEL_CONTENT_TYPE.into(),
             vec![1],
         )));
-        assert!(load_data_model(&package, &workbook).is_err());
+        assert!(load_model(&package, &workbook).is_err());
         let (mut package, workbook) = fixture_package();
         store_data_model(&mut package, &workbook, &model()).unwrap();
         package
@@ -1986,7 +2026,7 @@ mod tests {
                 "rIdModel".into(),
                 false,
             );
-        assert!(load_data_model(&package, &workbook).is_err());
+        assert!(load_model(&package, &workbook).is_err());
         let mut wrong = model();
         wrong.payload.part_name = "/xl/model/other.data".into();
         let (mut package, workbook) = fixture_package();
@@ -2017,7 +2057,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .payload
@@ -2068,7 +2108,7 @@ mod tests {
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -2112,7 +2152,7 @@ mod tests {
         assert_eq!(after, before);
         let mut reopened = OpcPackage::from_bytes(&after).unwrap();
         assert_eq!(
-            load_data_model(&reopened, &workbook)
+            load_model(&reopened, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -2152,7 +2192,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert_eq!(
-            load_data_model(&package, &workbook)
+            load_model(&package, &workbook)
                 .unwrap()
                 .unwrap()
                 .definition
@@ -2273,7 +2313,7 @@ mod tests {
         };
         install_model_time_groupings(&mut package, &workbook, grouping);
         assert!(matches!(
-            load_data_model(&package, &workbook),
+            load_model(&package, &workbook),
             Err(Error::Invalid(message)) if message.contains("unknown table 'MissingTable'")
         ));
     }
@@ -2309,7 +2349,7 @@ mod tests {
             .unwrap()
             .set_blob(format!("{before_close}{duplicate}{marker}{close}").into_bytes());
         assert!(matches!(
-            load_data_model(&package, &workbook),
+            load_model(&package, &workbook),
             Err(Error::Invalid(message)) if message.contains("duplicate modelTimeGroupings owner")
         ));
     }
@@ -2359,9 +2399,9 @@ mod tests {
         assert!(transaction.remove().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
-        assert!(load_data_model(&package, &workbook).unwrap().is_none());
+        assert!(load_model(&package, &workbook).unwrap().is_none());
         commit.patch().inverse().apply(&mut package).unwrap();
-        assert!(load_data_model(&package, &workbook).unwrap().is_some());
+        assert!(load_model(&package, &workbook).unwrap().is_some());
     }
 
     #[test]
@@ -2536,7 +2576,7 @@ mod tests {
             table.connection = "MODELCONNECTION".into();
         }
         store_data_model(&mut package, &workbook, &expected).unwrap();
-        let actual = load_data_model(&package, &workbook).unwrap().unwrap();
+        let actual = load_model(&package, &workbook).unwrap().unwrap();
         assert_eq!(actual.definition.tables, expected.definition.tables);
         assert_eq!(actual.payload, expected.payload);
 
@@ -2774,13 +2814,13 @@ mod tests {
         for lexical in ["  +007  ", "&#x9;005&#xA;"] {
             let xml = format!(r#"<d:dataModel xmlns:d="{X15}" minVersionLoad="{lexical}"/>"#);
             assert!(matches!(
-                parse_data_model(xml.as_bytes()).unwrap().min_version_load,
+                parse_model(xml.as_bytes()).unwrap().min_version_load,
                 5 | 7
             ));
         }
         for lexical in ["4", "256", "5.0", "&#xA0;5", "5 0"] {
             let xml = format!(r#"<d:dataModel xmlns:d="{X15}" minVersionLoad="{lexical}"/>"#);
-            assert!(parse_data_model(xml.as_bytes()).is_err());
+            assert!(parse_model(xml.as_bytes()).is_err());
         }
     }
 }
