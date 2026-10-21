@@ -96,7 +96,7 @@ fn nested_group_emits_ms_odraw_shape_topology_and_ids() {
         vec![10, 11, 12, 13, 14, 15]
     );
 
-    let root = Parser::new(&bytes)
+    let root = Parser::new(&bytes, litchi_odraw::Limits::default())
         .root()
         .expect("parse root")
         .expect("root container");

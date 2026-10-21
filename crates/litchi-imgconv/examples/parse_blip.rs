@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let png = std::fs::read("test-data/images/png/lena.png")?;
             let builder = BlipBuilder::bitmap(Kind::Png, png)?;
             let mut bytes = Vec::new();
-            builder.write(&mut bytes)?;
+            builder.write(&mut bytes, litchi_odraw::image::Limits::default())?;
             bytes
         },
     };

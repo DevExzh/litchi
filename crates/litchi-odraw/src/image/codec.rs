@@ -22,7 +22,7 @@ impl<'data> Blip<'data> {
     /// Returns an error if `data` cannot be decoded as exactly one BLIP record,
     /// or if the record exceeds `limits` or fails BLIP validation.
     pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
-        let (record, consumed) = Record::parse(data, 0)?;
+        let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
         }
@@ -36,9 +36,11 @@ impl<'data> Blip<'data> {
     /// Returns an error if `record` exceeds `limits`, is not a BLIP record, or
     /// fails BLIP validation.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
+        check_record_bytes(&record, limits)?;
         if record.len() > limits.max_blip_bytes {
             return Err(Error::ImageLimitExceeded {
                 limit: LimitKind::BlipBytes,
+                observed: u64::from(record.len()),
                 maximum: u64::from(limits.max_blip_bytes),
             });
         }
@@ -187,6 +189,7 @@ impl<'data> Entry<'data> {
     /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
     /// fails FBSE validation.
     pub fn parse(record: Record<'data>, limits: Limits) -> Result<Self> {
+        check_record_bytes(&record, limits)?;
         if record.kind() != RecordKind::Bse {
             return Err(Error::NotImageRecord {
                 raw_kind: record.raw_kind(),
@@ -306,7 +309,7 @@ impl<'data> Entry<'data> {
     #[must_use]
     pub fn embedded(&self) -> Embedded<'data> {
         Embedded {
-            records: crate::Children::new(self.embedded),
+            records: crate::Children::new(self.embedded, self.limits.record_limits()),
             limits: self.limits,
         }
     }
@@ -320,7 +323,7 @@ impl<'data> Store<'data> {
     /// Returns an error if `data` cannot be decoded as exactly one `BStore`
     /// container under `limits`.
     pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
-        let (record, consumed) = Record::parse(data, 0)?;
+        let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
         }
@@ -343,7 +346,7 @@ impl<'data> Store<'data> {
     #[must_use]
     pub fn iter(&self) -> super::model::Blocks<'data> {
         super::model::Blocks {
-            records: crate::Children::new(self.record.data()),
+            records: crate::Children::new(self.record.data(), self.limits.record_limits()),
             expected: self.count,
             seen: 0,
             done: false,
@@ -393,6 +396,23 @@ impl<'data> Store<'data> {
     pub const fn record(&self) -> &Record<'data> {
         &self.record
     }
+
+    /// Returns the image and traversal policy retained by this store.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+}
+
+fn check_record_bytes(record: &Record<'_>, limits: Limits) -> Result<()> {
+    if record.len() > limits.records.max_record_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::from(record.len()),
+            maximum: u64::from(limits.records.max_record_bytes),
+        });
+    }
+    Ok(())
 }
 
 impl<'data> Delay<'data> {
@@ -406,7 +426,7 @@ impl<'data> Delay<'data> {
     #[must_use]
     pub fn iter(self) -> DelayBlocks<'data> {
         DelayBlocks {
-            records: crate::Children::new(self.data),
+            records: crate::Children::new(self.data, self.limits.record_limits()),
             limits: self.limits,
             seen: 0,
             done: false,
@@ -434,7 +454,7 @@ impl<'data> Delay<'data> {
                 available: self.data.len(),
             });
         }
-        let (record, _) = Record::parse(self.data, start)?;
+        let (record, _) = Record::parse(self.data, start, self.limits.record_limits())?;
         block(record, self.limits)
     }
 
@@ -516,6 +536,7 @@ impl<'data> Iterator for DelayBlocks<'data> {
                 self.done = true;
                 Some(Err(Error::ImageLimitExceeded {
                     limit: LimitKind::StoreEntries,
+                    observed: u64::from(self.seen) + 1,
                     maximum: u64::from(self.limits.max_store_entries),
                 }))
             },

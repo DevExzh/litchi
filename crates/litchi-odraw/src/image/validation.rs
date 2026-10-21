@@ -52,8 +52,7 @@ impl<'data> Entry<'data> {
             Storage::Empty => Ok(None),
             Storage::Delay(offset) => {
                 let mut delay = context.delay.ok_or(Error::MissingDelayStore)?;
-                delay.limits.max_blip_bytes =
-                    delay.limits.max_blip_bytes.min(self.limits.max_blip_bytes);
+                delay.limits = delay.limits.constrained_by(self.limits);
                 match delay.at(offset)? {
                     Block::Blip(blip) => {
                         self.validate_selected(&blip, true)?;
@@ -123,6 +122,13 @@ impl<'data> Store<'data> {
     /// does not match `recInstance`, and `Error::ImageLimitExceeded` when the
     /// entry count exceeds `limits.max_store_entries`.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
+        if record.len() > limits.records.max_record_bytes {
+            return Err(Error::ImageLimitExceeded {
+                limit: LimitKind::RecordBytes,
+                observed: u64::from(record.len()),
+                maximum: u64::from(limits.records.max_record_bytes),
+            });
+        }
         if record.kind() != RecordKind::BStoreContainer
             || record.version() != 0x0F
             || !record.is_container()
@@ -135,11 +141,12 @@ impl<'data> Store<'data> {
         if count > limits.max_store_entries {
             return Err(Error::ImageLimitExceeded {
                 limit: LimitKind::StoreEntries,
+                observed: u64::from(count),
                 maximum: u64::from(limits.max_store_entries),
             });
         }
         let mut actual = 0u16;
-        for child in crate::Children::new(record.data()) {
+        for child in crate::Children::new(record.data(), limits.record_limits()) {
             child?;
             actual = actual.checked_add(1).ok_or(Error::MalformedImage {
                 reason: "BStore file-block count exceeds 4095",
@@ -170,7 +177,7 @@ pub(super) fn validate_embedded(entry: &Entry<'_>, instance: u8) -> Result<()> {
     }
 
     let mut selected = false;
-    for record in crate::Children::new(entry.embedded) {
+    for record in crate::Children::new(entry.embedded, entry.limits.record_limits()) {
         let blip = record.and_then(|child| Blip::from_record(child, entry.limits))?;
         if matches_instance(&blip, instance) {
             entry.validate_selected(&blip, false)?;

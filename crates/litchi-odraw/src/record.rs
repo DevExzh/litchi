@@ -214,6 +214,7 @@ pub struct Record<'data> {
     instance: u16,
     len: u32,
     data: &'data [u8],
+    limits: crate::Limits,
 }
 
 impl core::fmt::Debug for Record<'_> {
@@ -236,10 +237,18 @@ impl<'data> Record<'data> {
         version: u8,
         instance: u16,
         data: &'data [u8],
+        limits: crate::Limits,
     ) -> Result<Self> {
         let len = u32::try_from(data.len()).map_err(|_err| Error::ArithmeticOverflow {
             context: "test record body length",
         })?;
+        if len > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: crate::LimitKind::RecordBytes,
+                observed: u64::from(len),
+                maximum: limits.max_record_bytes,
+            });
+        }
         Ok(Self {
             kind,
             raw_kind: kind.raw(),
@@ -247,6 +256,7 @@ impl<'data> Record<'data> {
             instance: instance & 0x0FFF,
             len,
             data,
+            limits,
         })
     }
 
@@ -261,7 +271,7 @@ impl<'data> Record<'data> {
     /// cannot be represented, `Error::TruncatedHeader` if fewer than eight
     /// header bytes remain at `offset`, or `Error::TruncatedPayload` if the
     /// declared `recLen` extends past the supplied slice.
-    pub fn parse(data: &'data [u8], offset: usize) -> Result<(Self, usize)> {
+    pub fn parse(data: &'data [u8], offset: usize, limits: crate::Limits) -> Result<(Self, usize)> {
         let header_end = offset.checked_add(8).ok_or(Error::ArithmeticOverflow {
             context: "record header extent",
         })?;
@@ -273,6 +283,13 @@ impl<'data> Record<'data> {
         let ver_inst = u16::from_le_bytes([header[0], header[1]]);
         let raw_kind = u16::from_le_bytes([header[2], header[3]]);
         let len = u32::from_le_bytes([header[4], header[5], header[6], header[7]]);
+        if len > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: crate::LimitKind::RecordBytes,
+                observed: u64::from(len),
+                maximum: limits.max_record_bytes,
+            });
+        }
         let body_len = usize::try_from(len).map_err(|_err| Error::ArithmeticOverflow {
             context: "record body length",
         })?;
@@ -302,6 +319,7 @@ impl<'data> Record<'data> {
                 instance: (ver_inst >> 4) & 0x0FFF,
                 len,
                 data: body,
+                limits,
             },
             consumed,
         ))
@@ -349,6 +367,12 @@ impl<'data> Record<'data> {
         self.data
     }
 
+    /// Returns the finite policy under which this record was admitted.
+    #[must_use]
+    pub const fn limits(&self) -> crate::Limits {
+        self.limits
+    }
+
     /// Returns whether this record can contain child records.
     #[must_use]
     pub const fn is_container(&self) -> bool {
@@ -384,7 +408,8 @@ mod tests {
         let bytes = [
             0x02, 0x00, 0x0A, 0xF0, 0x04, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
         ];
-        let (record, consumed) = Record::parse(&bytes, 0).expect("valid record");
+        let (record, consumed) =
+            Record::parse(&bytes, 0, crate::Limits::default()).expect("valid record");
 
         assert_eq!(record.kind(), RecordKind::Sp);
         assert_eq!(record.raw_kind(), 0xF00A);
@@ -396,7 +421,7 @@ mod tests {
     #[test]
     fn preserves_unknown_kinds() {
         let bytes = [0x00, 0x00, 0x34, 0x12, 0, 0, 0, 0];
-        let (record, _) = Record::parse(&bytes, 0).expect("valid record");
+        let (record, _) = Record::parse(&bytes, 0, crate::Limits::default()).expect("valid record");
 
         assert_eq!(record.kind(), RecordKind::Unknown(0x1234));
         assert_eq!(record.raw_kind(), 0x1234);
@@ -411,7 +436,7 @@ mod tests {
             bytes.extend_from_slice(&[1, 2]);
 
             assert!(matches!(
-                Record::parse(&bytes, 0),
+                Record::parse(&bytes, 0, crate::Limits::default()),
                 Err(Error::TruncatedPayload { .. })
             ));
         }
@@ -420,7 +445,7 @@ mod tests {
     #[test]
     fn rejects_offset_overflow() {
         assert!(matches!(
-            Record::parse(&[], usize::MAX),
+            Record::parse(&[], usize::MAX, crate::Limits::default()),
             Err(Error::ArithmeticOverflow { .. })
         ));
     }
@@ -431,13 +456,13 @@ mod tests {
         let unknown_container = [0x0F, 0x00, 0x34, 0x12, 0, 0, 0, 0];
 
         assert!(
-            !Record::parse(&wrong_version, 0)
+            !Record::parse(&wrong_version, 0, crate::Limits::default())
                 .expect("valid record")
                 .0
                 .is_container()
         );
         assert!(
-            Record::parse(&unknown_container, 0)
+            Record::parse(&unknown_container, 0, crate::Limits::default())
                 .expect("valid record")
                 .0
                 .is_container()

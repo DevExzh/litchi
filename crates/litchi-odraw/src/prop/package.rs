@@ -1,4 +1,4 @@
-use crate::{Container, RecordKind, Result};
+use crate::{Container, Limits, RecordKind, Result};
 use std::collections::HashMap;
 
 use super::geometry::Geometry;
@@ -37,9 +37,9 @@ impl<'data> Props<'data> {
     /// preceding the match is malformed, and `Error::MalformedProperties`
     /// or `Error::ArithmeticOverflow` from `Props::parse` when the Opt
     /// table itself is malformed.
-    pub fn from_container(container: &Container<'data>) -> Result<Self> {
+    pub fn from_container(container: &Container<'data>, limits: Limits) -> Result<Self> {
         match container.find(RecordKind::Opt)? {
-            Some(opt) => Self::parse(&opt),
+            Some(opt) => Self::parse(&opt, limits),
             None => Ok(Self::new()),
         }
     }

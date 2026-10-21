@@ -1470,7 +1470,10 @@ impl Presentation {
         }
         self.pictures_bytes()?.map_or_else(
             || Ok(Vec::new()),
-            |pictures| litchi_odraw::image::delay(pictures).map_err(Error::from),
+            |pictures| {
+                litchi_odraw::image::delay(pictures, litchi_odraw::image::Limits::default())
+                    .map_err(Error::from)
+            },
         )
     }
 
@@ -1524,7 +1527,9 @@ impl Presentation {
             .into_iter()
             .filter(|record| record.record_type == RecordType::PPDrawingGroup)
         {
-            let candidate = litchi_odraw::image::store(&record.data).map_err(Error::from)?;
+            let candidate =
+                litchi_odraw::image::store(&record.data, litchi_odraw::image::Limits::default())
+                    .map_err(Error::from)?;
             if let Some(parsed_store) = candidate
                 && store.replace(parsed_store).is_some()
             {

@@ -267,15 +267,24 @@ fn shape_container(
     }
     ShapeBuilder::new(litchi_odraw::shape::Native::from_raw(spt), shape_id)
         .with_flags(flags)
-        .write(&mut body)
+        .write(&mut body, Default::default())
         .map_err(io)?;
-    properties.write(&mut body).map_err(io)?;
-    atom(&mut body, 0, Atom::ClientAnchor, &anchor).map_err(io)?;
-    atom(&mut body, 0, Atom::ClientData, &[]).map_err(io)?;
+    properties
+        .write(&mut body, Default::default())
+        .map_err(io)?;
+    atom(
+        &mut body,
+        0,
+        Atom::ClientAnchor,
+        &anchor,
+        Default::default(),
+    )
+    .map_err(io)?;
+    atom(&mut body, 0, Atom::ClientData, &[], Default::default()).map_err(io)?;
     let length = u32::try_from(body.len() + if textbox { 8 } else { 0 })
         .map_err(|_| refused(RefusalKind::InvalidValue, "a shape container is too large"))?;
     let mut out = Vec::with_capacity(body.len() + 8);
-    container_header(&mut out, 0, Container::Sp, length).map_err(io)?;
+    container_header(&mut out, 0, Container::Sp, length, Default::default()).map_err(io)?;
     out.extend(body);
     Ok(out)
 }
@@ -289,7 +298,14 @@ fn io(_: std::io::Error) -> Error {
 
 fn textbox_records(text: &str) -> Result<Vec<u8>> {
     let mut atom_bytes = Vec::with_capacity(8);
-    atom(&mut atom_bytes, 0, Atom::ClientTextbox, &[]).map_err(io)?;
+    atom(
+        &mut atom_bytes,
+        0,
+        Atom::ClientTextbox,
+        &[],
+        Default::default(),
+    )
+    .map_err(io)?;
     let mut out = stream::record(MSO_DRAWING, &atom_bytes)?;
     out.extend(
         encode::txo(text)
@@ -382,31 +398,46 @@ impl Edit {
     fn drawing_header(drawing_id: u32, children: usize, first_shape: u32) -> Result<Vec<u8>> {
         let patriarch_id = first_shape - 1;
         let mut patriarch = Vec::with_capacity(40);
-        atom_header(&mut patriarch, 0, Atom::Spgr, 16).map_err(io)?;
+        atom_header(&mut patriarch, 0, Atom::Spgr, 16, Default::default()).map_err(io)?;
         patriarch.extend_from_slice(&[0; 16]);
         ShapeBuilder::new(litchi_odraw::shape::Native::FREEFORM, patriarch_id)
             .with_flags(litchi_odraw::shape::Flags::GROUP | litchi_odraw::shape::Flags::PATRIARCH)
-            .write(&mut patriarch)
+            .write(&mut patriarch, Default::default())
             .map_err(io)?;
         let spgr_length = u32::try_from(8 + patriarch.len() + children)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the drawing is too large"))?;
         let mut out = Vec::with_capacity(80);
-        container_header(&mut out, 0, Container::Dg, 16 + 8 + spgr_length).map_err(io)?;
+        container_header(
+            &mut out,
+            0,
+            Container::Dg,
+            16 + 8 + spgr_length,
+            Default::default(),
+        )
+        .map_err(io)?;
         let instance = u16::try_from(drawing_id).map_err(|_| {
             refused(
                 RefusalKind::UnsupportedOperation,
                 "the drawing id exceeds 12 bits",
             )
         })?;
-        atom_header(&mut out, instance, Atom::Dg, 8).map_err(io)?;
+        atom_header(&mut out, instance, Atom::Dg, 8, Default::default()).map_err(io)?;
         out.extend_from_slice(&2u32.to_le_bytes());
         out.extend_from_slice(&first_shape.to_le_bytes());
-        container_header(&mut out, 0, Container::Spgr, spgr_length).map_err(io)?;
+        container_header(
+            &mut out,
+            0,
+            Container::Spgr,
+            spgr_length,
+            Default::default(),
+        )
+        .map_err(io)?;
         container_header(
             &mut out,
             0,
             Container::Sp,
             u32::try_from(patriarch.len()).unwrap_or(0),
+            Default::default(),
         )
         .map_err(io)?;
         out.extend(patriarch);
@@ -1137,7 +1168,9 @@ impl Edit {
             .add_embedded(blip)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the image cannot be stored"))?;
         let mut written = Vec::new();
-        store.write_store(&mut written).map_err(io)?;
+        store
+            .write_store(&mut written, litchi_odraw::image::Limits::default())
+            .map_err(io)?;
         let entry = written
             .get(8..)
             .ok_or(refused(
@@ -1197,6 +1230,7 @@ impl Edit {
                     1,
                     Container::BStore,
                     u32::try_from(entry.len()).unwrap_or(0),
+                    Default::default(),
                 )
                 .map_err(io)?;
                 store_bytes.extend_from_slice(&entry);

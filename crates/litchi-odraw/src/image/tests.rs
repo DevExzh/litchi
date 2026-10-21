@@ -92,7 +92,9 @@ fn entry_admission_checks_the_complete_instance_before_resolution() {
         body[0] = instance.to_le_bytes()[0];
         body[1] = body[0];
         let bytes = record(2, instance, 0xF007, &body);
-        let parsed = crate::Record::parse(&bytes, 0).unwrap().0;
+        let parsed = crate::Record::parse(&bytes, 0, crate::Limits::default())
+            .unwrap()
+            .0;
         let entry = Entry::parse(parsed, Limits::default());
         if instance == 255 {
             let entry = entry.unwrap();
@@ -203,6 +205,7 @@ fn bounds_headerless_delay_block_count_and_fuses_after_error() {
         Some(Err(Error::ImageLimitExceeded {
             limit: LimitKind::StoreEntries,
             maximum: 1,
+            ..
         }))
     ));
     assert!(blocks.next().is_none());

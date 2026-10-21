@@ -88,9 +88,10 @@ fn parse_properties<'data>(
         3,
         u16::try_from(count).expect("bounded test property table"),
         data.as_slice(),
+        crate::Limits::default(),
     )
     .expect("valid test record");
-    Props::parse(&record).expect("valid test properties")
+    Props::parse(&record, crate::Limits::default()).expect("valid test properties")
 }
 
 #[test]
@@ -195,9 +196,16 @@ fn rejects_invalid_geometry_array_width_and_point_consumption() {
         i32::try_from(array.len()).expect("bounded test array"),
     );
     invalid_data.extend_from_slice(&array);
-    let record =
-        Record::from_parts(RecordKind::Opt, 3, 1, invalid_data.as_slice()).expect("record");
-    let properties = Props::parse(&record).expect("generic array remains structurally valid");
+    let record = Record::from_parts(
+        RecordKind::Opt,
+        3,
+        1,
+        invalid_data.as_slice(),
+        crate::Limits::default(),
+    )
+    .expect("record");
+    let properties = Props::parse(&record, crate::Limits::default())
+        .expect("generic array remains structurally valid");
     assert!(matches!(
         properties.geometry(),
         Err(Error::MalformedGeometry {
@@ -251,8 +259,16 @@ fn rejects_a_complex_shape_path_property() {
     let mut data = Vec::new();
     property(&mut data, Id::ShapePath, true, 4);
     data.extend_from_slice(&[0; 4]);
-    let record = Record::from_parts(RecordKind::Opt, 3, 1, data.as_slice()).expect("record");
-    let properties = Props::parse(&record).expect("generic property table");
+    let record = Record::from_parts(
+        RecordKind::Opt,
+        3,
+        1,
+        data.as_slice(),
+        crate::Limits::default(),
+    )
+    .expect("record");
+    let properties =
+        Props::parse(&record, crate::Limits::default()).expect("generic property table");
 
     assert!(matches!(
         properties.geometry(),

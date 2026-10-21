@@ -191,12 +191,13 @@ fn header_text_box_writes_two_drawing_layers() {
     let (dgg_offset, dgg_len) = fib.get_table_pointer(FIB_INDEX_DGG_INFO).unwrap();
     assert!(dgg_len > 0);
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
-    let (_first, first_size) = Record::parse(dgg, 0).unwrap();
+    let (_first, first_size) = Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     let mut dgglbls = Vec::new();
     let mut offset = first_size;
     while offset + 9 <= dgg.len() {
         dgglbls.push(dgg[offset]);
-        let Ok((record, size)) = Record::parse(dgg, offset + 1) else {
+        let Ok((record, size)) = Record::parse(dgg, offset + 1, litchi_odraw::Limits::default())
+        else {
             break;
         };
         if record.raw_kind() != RECORD_DG_CONTAINER {

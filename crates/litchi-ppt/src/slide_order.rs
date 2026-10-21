@@ -6766,8 +6766,12 @@ fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
             .ok_or_else(|| PackageError::Corrupted("PPT BLIP index exceeds u32".into()))?;
         let data = image.data().map_err(PackageError::from)?.to_vec();
         let mut blip = Vec::new();
-        litchi_odraw::image::write::copy(&mut blip, &image.blip().map_err(PackageError::from)?)
-            .map_err(PackageError::from)?;
+        litchi_odraw::image::write::copy(
+            &mut blip,
+            &image.blip().map_err(PackageError::from)?,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(PackageError::from)?;
         if resources
             .insert(
                 id,

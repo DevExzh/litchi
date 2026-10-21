@@ -19,6 +19,13 @@ impl<'data> Shape<'data> {
     /// implementation's safe maximum.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         validate_limits(limits)?;
+        if record.len() > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: LimitKind::RecordBytes,
+                observed: u64::from(record.len()),
+                maximum: limits.max_record_bytes,
+            });
+        }
         let kind = record.kind();
         let container = Container::try_new(record)?;
         let mut budget = Budget::new(limits);
@@ -106,7 +113,7 @@ pub fn parse(data: &[u8], limits: Limits) -> Result<Vec<Shape<'_>>> {
         return Ok(Vec::new());
     }
 
-    let (record, consumed) = Record::parse(data, 0)?;
+    let (record, consumed) = Record::parse(data, 0, limits)?;
     if consumed != data.len() {
         return Err(Error::TrailingData { offset: consumed });
     }
@@ -170,7 +177,7 @@ fn drawing<'data>(
     let mut dg = false;
     let mut root_group_seen = false;
     let mut shapes = Vec::new();
-    for child_result in container.children() {
+    for child_result in container.children_under(budget.limits()) {
         let child = child_result?;
         budget.visit()?;
         match child.kind() {
@@ -256,7 +263,7 @@ fn root_group<'data>(
 ) -> Result<Vec<Shape<'data>>> {
     validate_container_header(container, RecordKind::SpgrContainer)?;
     budget.depth(depth)?;
-    let mut children = container.children();
+    let mut children = container.children_under(budget.limits());
     let header = children.next().ok_or(Error::MalformedShape {
         reason: "shape-group container has no group header",
     })??;
@@ -336,7 +343,7 @@ fn build_group<'data>(
 ) -> Result<Shape<'data>> {
     validate_container_header(&container, RecordKind::SpgrContainer)?;
     budget.depth(depth)?;
-    let mut records = container.children();
+    let mut records = container.children_under(budget.limits());
     let header = records.next().ok_or(Error::MalformedShape {
         reason: "shape-group container has no group header",
     })??;
@@ -468,6 +475,7 @@ fn validate_limits(limits: Limits) -> Result<()> {
     if limits.max_depth > MAX_SAFE_DEPTH {
         return Err(Error::InvalidLimit {
             limit: LimitKind::Depth,
+            value: u32::from(limits.max_depth),
             maximum: u32::from(MAX_SAFE_DEPTH),
         });
     }

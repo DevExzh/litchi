@@ -381,22 +381,31 @@ fn floating_picture_writes_valid_dgg_info() {
     let dgg = &table_stream[dgg_offset as usize..(dgg_offset + dgg_len) as usize];
 
     // Top level: DggContainer, dgglbl byte, DgContainer.
-    let (dgg_container, dgg_container_size) = Record::parse(dgg, 0).unwrap();
+    let (dgg_container, dgg_container_size) =
+        Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(dgg_container.raw_kind(), RECORD_DGG_CONTAINER);
     let dgglbl = dgg[dgg_container_size];
     assert_eq!(dgglbl, 0, "dgglbl 0 = Main Document drawing");
-    let (dg_container, _) = Record::parse(dgg, dgg_container_size + 1).unwrap();
+    let (dg_container, _) =
+        Record::parse(dgg, dgg_container_size + 1, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(dg_container.raw_kind(), RECORD_DG_CONTAINER);
 
     // The BStoreContainer holds one BSE whose embedded BLIP is the JPEG.
     let mut offset = 0;
     let mut bse_count = 0;
     while offset < dgg_container.data().len() {
-        let (record, size) = Record::parse(dgg_container.data(), offset).unwrap();
+        let (record, size) = Record::parse(
+            dgg_container.data(),
+            offset,
+            litchi_odraw::Limits::default(),
+        )
+        .unwrap();
         if record.raw_kind() == RECORD_BSTORE_CONTAINER {
             let mut bse_offset = 0;
             while bse_offset < record.data().len() {
-                let (bse, bse_size) = Record::parse(record.data(), bse_offset).unwrap();
+                let (bse, bse_size) =
+                    Record::parse(record.data(), bse_offset, litchi_odraw::Limits::default())
+                        .unwrap();
                 assert_eq!(bse.raw_kind(), RECORD_BSE);
                 assert!(
                     bse.data()
@@ -422,7 +431,8 @@ fn floating_picture_writes_valid_dgg_info() {
     ) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = Record::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset, litchi_odraw::Limits::default())
+            else {
                 break;
             };
             match record.raw_kind() {

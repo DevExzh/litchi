@@ -30,7 +30,7 @@ mod tests {
         builder.add_complex(0x0145, &[1, 2, 3, 4]);
 
         let mut bytes = Vec::new();
-        builder.write(&mut bytes).unwrap();
+        builder.write(&mut bytes, Default::default()).unwrap();
 
         assert_eq!(builder.size().unwrap(), 24);
         assert_eq!(u16::from_le_bytes([bytes[8], bytes[9]]), 0x4104);

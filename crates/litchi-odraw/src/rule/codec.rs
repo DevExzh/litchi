@@ -4,15 +4,7 @@ use std::io::{self, Write};
 
 use super::model::{Arc, Callout, Connector, Opaque, Rule};
 use super::validation::{Layout, validate};
-use crate::{Error, Record, Result, write};
-
-impl<'data> TryFrom<Record<'data>> for Rule<'data> {
-    type Error = Error;
-
-    fn try_from(record: Record<'data>) -> Result<Self> {
-        from_record(record)
-    }
-}
+use crate::{Error, Limits, Record, Result, write};
 
 impl Rule<'_> {
     /// Writes the complete `OfficeArt` record, including its eight-byte header.
@@ -23,10 +15,11 @@ impl Rule<'_> {
     /// # Errors
     ///
     /// Returns an error if the underlying writer fails.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub fn write_to<W: Write>(&self, writer: &mut W, limits: Limits) -> io::Result<()> {
         match self {
             Self::Connector(rule) => {
-                write::raw_header(writer, 1, 0, 0xF012, 24)?;
+                bounded_rule_len(24, limits)?;
+                write::raw_header(writer, 1, 0, 0xF012, 24, limits)?;
                 write_field(writer, rule.rule_id())?;
                 write_field(writer, rule.start_shape_id())?;
                 write_field(writer, rule.end_shape_id())?;
@@ -35,27 +28,41 @@ impl Rule<'_> {
                 write_field(writer, rule.end_connection_site())
             },
             Self::Arc(rule) => {
-                write::raw_header(writer, 0, 0, 0xF014, 8)?;
+                bounded_rule_len(8, limits)?;
+                write::raw_header(writer, 0, 0, 0xF014, 8, limits)?;
                 write_field(writer, rule.rule_id())?;
                 write_field(writer, rule.shape_id())
             },
             Self::Callout(rule) => {
-                write::raw_header(writer, 0, 0, 0xF017, 8)?;
+                bounded_rule_len(8, limits)?;
+                write::raw_header(writer, 0, 0, 0xF017, 8, limits)?;
                 write_field(writer, rule.rule_id())?;
                 write_field(writer, rule.shape_id())
             },
             Self::Opaque(record) => {
+                bounded_rule_len(record.len(), limits)?;
                 write::raw_header(
                     writer,
                     record.version(),
                     record.instance(),
                     record.raw_kind(),
                     record.len(),
+                    limits,
                 )?;
                 writer.write_all(record.data())
             },
         }
     }
+}
+
+fn bounded_rule_len(len: u32, limits: Limits) -> io::Result<()> {
+    if len > limits.max_record_bytes {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "solver-rule payload exceeds the configured record limit",
+        ));
+    }
+    Ok(())
 }
 
 /// Parses exactly one `OfficeArt` solver-rule record.
@@ -67,12 +74,12 @@ impl Rule<'_> {
 /// when a declared extent cannot be represented, and `Error::TrailingData`
 /// when bytes follow the first record.  Returns `Error::MalformedShape` under
 /// the conditions documented on [`from_record`].
-pub fn parse(data: &[u8]) -> Result<Rule<'_>> {
-    let (record, consumed) = Record::parse(data, 0)?;
+pub fn parse(data: &[u8], limits: Limits) -> Result<Rule<'_>> {
+    let (record, consumed) = Record::parse(data, 0, limits)?;
     if consumed != data.len() {
         return Err(Error::TrailingData { offset: consumed });
     }
-    from_record(record)
+    from_record(record, limits)
 }
 
 /// Decodes a previously parsed `OfficeArt` record as a solver rule.
@@ -84,7 +91,14 @@ pub fn parse(data: &[u8]) -> Result<Rule<'_>> {
 /// instance, or body length, or when a fixed-width field is truncated.
 /// Returns `Error::ArithmeticOverflow` when a field extent cannot be
 /// represented.
-pub fn from_record(record: Record<'_>) -> Result<Rule<'_>> {
+pub fn from_record(record: Record<'_>, limits: Limits) -> Result<Rule<'_>> {
+    if record.len() > limits.max_record_bytes {
+        return Err(Error::LimitExceeded {
+            limit: crate::LimitKind::RecordBytes,
+            observed: u64::from(record.len()),
+            maximum: limits.max_record_bytes,
+        });
+    }
     let layout = validate(&record)?;
     match layout {
         Layout::Connector => Ok(Rule::Connector(Connector::new(

@@ -585,7 +585,8 @@ mod tests {
         let frame =
             ChartFrame::new(914_400, 914_400, 3_657_600, 2_743_200, 42).expect("valid frame");
         let bytes = build_chart_sp_container(&frame, 1027).unwrap();
-        let (record, consumed) = litchi_odraw::Record::parse(&bytes, 0).unwrap();
+        let (record, consumed) =
+            litchi_odraw::Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         let shape = litchi_odraw::shape::Shape::from_record(record, Default::default()).unwrap();
         assert_eq!(shape.external_object_id().unwrap(), Some(42));

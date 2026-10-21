@@ -192,7 +192,7 @@ pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
     let mut visited = 0u32;
     while offset < data.len() {
         visit_host_record(&mut visited)?;
-        let (record, consumed) = Record::parse(data, offset)?;
+        let (record, consumed) = Record::parse(data, offset, litchi_odraw::Limits::default())?;
         let end = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
         shapes.extend(litchi_odraw::shape::parse(
             &data[offset..end],
@@ -264,7 +264,7 @@ fn drawing_text(data: &[u8], outline: Option<&[crate::OutlineTextBody]>) -> Resu
     let mut text = String::with_capacity(1024);
     while offset < data.len() {
         visit_host_record(&mut records)?;
-        let (record, consumed) = Record::parse(data, offset)?;
+        let (record, consumed) = Record::parse(data, offset, litchi_odraw::Limits::default())?;
         let container = Container::try_new(record)?;
         text_from_container(&container, outline, &mut text)?;
         offset = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
