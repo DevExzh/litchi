@@ -339,6 +339,10 @@ pub fn container<'data>(
     delay_store: Option<&'data [u8]>,
     limits: Limits,
 ) -> Result<Vec<File<'data>>> {
+    let limits = Limits {
+        records: container.record().limits().constrained_by(limits.records),
+        ..limits
+    };
     let mut files = Vec::new();
     collect(container.record().data(), delay_store, &mut files, limits)?;
     for (index, file) in files.iter_mut().enumerate() {
@@ -822,6 +826,31 @@ mod tests {
                 limit: ImageLimitKind::Files,
                 observed: 4096,
                 maximum: 4095,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn container_scan_retains_the_admitted_root_policy() {
+        let first = png_blip(b"one");
+        let second = png_blip(b"two");
+        let mut body = first;
+        body.extend_from_slice(&second);
+        let mut bytes = vec![0x0F, 0x00, 0x04, 0xF0];
+        bytes.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(&body);
+        let origin = crate::Limits {
+            max_records: 1,
+            ..crate::Limits::default()
+        };
+        let record = crate::Record::parse(&bytes, 0, origin).unwrap().0;
+        let container = Container::try_new(record).unwrap();
+        assert!(matches!(
+            super::container(&container, None, Limits::default()),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Records,
+                maximum: 1,
                 ..
             })
         ));
