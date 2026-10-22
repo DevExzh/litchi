@@ -73,6 +73,13 @@ Managed is 23,338,368 bytes / 27,616 calls, with 3,862,538 retained bytes
 and 102,515,744 verification bytes. Custom is 23,351,936 bytes / 27,232
 calls, with 3,862,962 retained bytes and 102,700,588 verification bytes.
 
+The default current owner leaves 141,687 live bytes and reaches a 593,449-byte
+peak, versus 167,953 live and 606,577 peak for e63. Retained-history live
+bytes are 137,519 versus 167,697, with the same 427,929-byte peak. Independent
+verification live bytes are 141,687 versus 167,953, and peak bytes are 593,449
+versus 606,577. These paired live/peak values show that the +1,088 owner
+request is not a retained-history or peak-heap increase.
+
 The +1,088-byte default owner delta is a layout tradeoff, not an additional
 reader allocation: moving the style `OnceLock` and `FormatCache` inline adds
 5,120 bytes over 64 owners (+80 bytes/owner) compared with the preceding
